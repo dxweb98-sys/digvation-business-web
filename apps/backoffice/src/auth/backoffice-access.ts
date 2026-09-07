@@ -6,6 +6,7 @@ export type BackofficeCapability =
   | 'employees'
   | 'finance'
   | 'financialAccounts'
+  | 'financialOperations'
   | 'reports'
   | 'configuration'
   | 'tax'
@@ -36,7 +37,12 @@ export type BackofficeAction =
   | 'updateEmployee'
   | 'createFinancialAccount'
   | 'updateFinancialAccount'
-  | 'updatePaymentRouting';
+  | 'updatePaymentRouting'
+  | 'moveCash'
+  | 'createSettlement'
+  | 'updateSettlement'
+  | 'createReconciliation'
+  | 'updateReconciliation';
 
 interface PermissionRequirement {
   allOf?: readonly string[];
@@ -49,6 +55,7 @@ const capabilityPermissions: Record<BackofficeCapability, PermissionRequirement>
   employees: { allOf: ['employees:read'] },
   finance: { allOf: ['payments:read'] },
   financialAccounts: { allOf: ['financial-accounts:read', 'payment-routing:read'] },
+  financialOperations: { allOf: ['cash:read', 'settlements:read', 'reconciliations:read'] },
   reports: { allOf: ['sales:read'] },
 
   configuration: {
@@ -90,6 +97,11 @@ const actionPermissions: Record<BackofficeAction, readonly string[]> = {
   createFinancialAccount: ['financial-accounts:create'],
   updateFinancialAccount: ['financial-accounts:update'],
   updatePaymentRouting: ['payment-routing:update'],
+  moveCash: ['cash:move'],
+  createSettlement: ['settlements:create'],
+  updateSettlement: ['settlements:update'],
+  createReconciliation: ['reconciliations:create'],
+  updateReconciliation: ['reconciliations:update'],
 };
 
 export function canAccessBackoffice(

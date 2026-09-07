@@ -13,6 +13,7 @@ import { CatalogPage } from '../../routes/catalog/catalog-page';
 import { TaxPage } from '../../routes/tax/tax-page';
 import { EmployeesPage } from '../../routes/employees/employees-page';
 import { FinancialAccountsPage } from '../../routes/financial-accounts/financial-accounts-page';
+import { FinancialOperationsPage } from '../../routes/financial-operations/financial-operations-page';
 
 export const backofficeRouter = createBrowserRouter([
   { path: '/login', element: <BackofficeLoginPage /> },
@@ -47,8 +48,11 @@ export const backofficeRouter = createBrowserRouter([
             element: <AuthorizedRoute capability="finance" />,
             children: [
               { path: '/expenses', element: <PlaceholderPage title="expenses" /> },
-              { path: '/reconciliation', element: <PlaceholderPage title="reconciliation" /> },
             ],
+          },
+          {
+            element: <AuthorizedRoute capability="financialOperations" />,
+            children: [{ path: '/reconciliation', element: <FinancialOperationsPage /> }],
           },
           {
             element: <AuthorizedRoute capability="reports" />,

@@ -69,7 +69,7 @@ const navigationSections: ReadonlyArray<{
         label: 'reconciliation',
         to: '/reconciliation',
         icon: ChartNoAxesCombined,
-        capability: 'finance',
+        capability: 'financialOperations',
       },
     ],
   },
