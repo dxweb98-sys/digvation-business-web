@@ -9,6 +9,9 @@ export interface Page<T> {
   limit: number;
   offset: number;
 }
+interface FinancialAccountPage<T> extends Page<T> {
+  total: number;
+}
 
 export interface FinancialAccount {
   id: string;
@@ -63,7 +66,7 @@ export class FinancialAccountsApi {
   public constructor(private readonly client: ApiClient) {}
 
   listAccounts(query: Query) {
-    return this.client.get<Page<FinancialAccount>>(
+    return this.client.get<FinancialAccountPage<FinancialAccount>>(
       `/api/v1/financial-accounts?${queryString(query)}`,
     );
   }
@@ -91,7 +94,7 @@ export class FinancialAccountsApi {
   }
 
   listRoutes(query: Query) {
-    return this.client.get<Page<PaymentRoute>>(`/api/v1/payment-routing?${queryString(query)}`);
+    return this.client.get<FinancialAccountPage<PaymentRoute>>(`/api/v1/payment-routing?${queryString(query)}`);
   }
   getRoute(id: string) {
     return this.client.get<PaymentRoute>(`/api/v1/payment-routing/${id}`);

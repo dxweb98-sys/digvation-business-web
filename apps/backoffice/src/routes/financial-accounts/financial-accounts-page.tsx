@@ -90,16 +90,17 @@ function AccountsPanel({ api }: { api: FinancialAccountsApi }) {
   const [status, setStatus] = useState<'' | RecordStatus>('');
   const [type, setType] = useState<'' | FinancialAccountType>('');
   const [offset, setOffset] = useState(0);
+  const [pageSize, setPageSize] = useState(pageLimit);
   const [editor, setEditor] = useState<FinancialAccount | 'create' | null>(null);
   const [detail, setDetail] = useState<FinancialAccount | null>(null);
   const accounts = useQuery({
-    queryKey: [...accountKey, q, status, type, offset],
+    queryKey: [...accountKey, q, status, type, offset, pageSize],
     queryFn: () =>
       api.listAccounts({
         q: q.trim() || undefined,
         status: status || undefined,
         type: type || undefined,
-        limit: pageLimit,
+        limit: pageSize,
         offset,
       }),
   });
@@ -147,7 +148,6 @@ function AccountsPanel({ api }: { api: FinancialAccountsApi }) {
       render: (account) => <StatusBadge status={account.status} />,
     },
   ];
-  const hasNext = Boolean(accounts.data && accounts.data.items.length === accounts.data.limit);
   if (accounts.isError)
     return (
       <div className="mt-6">
@@ -213,6 +213,9 @@ function AccountsPanel({ api }: { api: FinancialAccountsApi }) {
             </DButton>
           ) : null
         }
+        pagination={{ page: Math.floor(offset / pageSize) + 1, pageSize, total: accounts.data?.total ?? 0 }}
+        onPageChange={(page) => setOffset((page - 1) * pageSize)}
+        onPageSizeChange={(nextPageSize) => { setPageSize(nextPageSize); setOffset(0); }}
         emptyMessage={
           q || status || type
             ? copy('No matching financial accounts found.')
@@ -244,13 +247,6 @@ function AccountsPanel({ api }: { api: FinancialAccountsApi }) {
             show: (account) => canUpdate && account.status === 'INACTIVE',
           },
         ]}
-      />
-      <PageFooter
-        offset={offset}
-        count={accounts.data?.items.length ?? 0}
-        hasNext={hasNext}
-        onChange={setOffset}
-        copy={copy}
       />
       <AccountEditor
         key={editor === 'create' ? 'create' : (editor?.id ?? 'closed')}
@@ -460,16 +456,17 @@ function RoutingPanel({ api }: { api: FinancialAccountsApi }) {
   const { copy } = useBackofficeLocalization();
   const queryClient = useQueryClient();
   const [offset, setOffset] = useState(0);
+  const [pageSize, setPageSize] = useState(pageLimit);
   const [status, setStatus] = useState<'' | RecordStatus>('');
   const [method, setMethod] = useState<'' | PaymentMethod>('');
   const [editor, setEditor] = useState<PaymentRoute | 'create' | null>(null);
   const routes = useQuery({
-    queryKey: [...routeKey, status, method, offset],
+    queryKey: [...routeKey, status, method, offset, pageSize],
     queryFn: () =>
       api.listRoutes({
         status: status || undefined,
         paymentMethod: method || undefined,
-        limit: pageLimit,
+        limit: pageSize,
         offset,
       }),
   });
@@ -497,7 +494,6 @@ function RoutingPanel({ api }: { api: FinancialAccountsApi }) {
       render: (route) => <StatusBadge status={route.status} />,
     },
   ];
-  const hasNext = Boolean(routes.data && routes.data.items.length === routes.data.limit);
   if (routes.isError)
     return (
       <div className="mt-6">
@@ -557,6 +553,9 @@ function RoutingPanel({ api }: { api: FinancialAccountsApi }) {
             </DButton>
           ) : null
         }
+        pagination={{ page: Math.floor(offset / pageSize) + 1, pageSize, total: routes.data?.total ?? 0 }}
+        onPageChange={(page) => setOffset((page - 1) * pageSize)}
+        onPageSizeChange={(nextPageSize) => { setPageSize(nextPageSize); setOffset(0); }}
         actions={
           canUpdate
             ? [
@@ -568,13 +567,6 @@ function RoutingPanel({ api }: { api: FinancialAccountsApi }) {
               ]
             : []
         }
-      />
-      <PageFooter
-        offset={offset}
-        count={routes.data?.items.length ?? 0}
-        hasNext={hasNext}
-        onChange={setOffset}
-        copy={copy}
       />
       <RouteEditor
         key={editor === 'create' ? 'create' : (editor?.id ?? 'closed')}
