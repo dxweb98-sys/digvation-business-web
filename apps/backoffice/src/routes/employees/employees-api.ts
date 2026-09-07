@@ -13,6 +13,7 @@ export interface Employee {
 
 export interface EmployeePage {
   items: Employee[];
+  total: number;
   limit: number;
   offset: number;
 }

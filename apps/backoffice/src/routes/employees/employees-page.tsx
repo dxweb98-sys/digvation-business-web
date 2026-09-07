@@ -1,5 +1,5 @@
 import {
-  DBadge, DButton, DDataTable, DDatePicker, DDialog, DInput, DPagination, DSkeleton, DStatusFilter,
+  DBadge, DButton, DDataTable, DDatePicker, DDialog, DInput, DSkeleton, DStatusFilter,
   DTextarea, useToast, type TableColumn,
 } from '@digvation/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -14,7 +14,7 @@ import { canPerformBackofficeAction } from '../../auth/backoffice-access';
 import { isSessionExpiredError, useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import { EmployeesApi, type Employee, type EmployeeDetail, type EmployeeStatusHistoryEntry } from './employees-api';
 
-const pageLimit = 20;
+const defaultPageSize = 20;
 const employeeKey = ['employees'] as const;
 
 export function EmployeesPage() {
@@ -27,6 +27,7 @@ export function EmployeesPage() {
   const [q, setQuery] = useState('');
   const [status, setStatus] = useState<'' | Employee['status']>('');
   const [offset, setOffset] = useState(0);
+  const [pageSize, setPageSize] = useState(defaultPageSize);
   const [editorId, setEditorId] = useState<string | 'create' | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [statusTarget, setStatusTarget] = useState<Employee | null>(null);
@@ -34,8 +35,8 @@ export function EmployeesPage() {
   const canCreate = Boolean(session && canPerformBackofficeAction(session, 'createEmployee'));
   const canUpdate = Boolean(session && canPerformBackofficeAction(session, 'updateEmployee'));
   const employees = useQuery({
-    queryKey: [...employeeKey, q, status, offset],
-    queryFn: () => api.list({ ...(q.trim() ? { q: q.trim() } : {}), ...(status ? { status } : {}), limit: pageLimit, offset }),
+    queryKey: [...employeeKey, q, status, offset, pageSize],
+    queryFn: () => api.list({ ...(q.trim() ? { q: q.trim() } : {}), ...(status ? { status } : {}), limit: pageSize, offset }),
     enabled: Boolean(session),
   });
   const selectedEmployeeId = detailId ?? (editorId && editorId !== 'create' ? editorId : null);
@@ -65,9 +66,6 @@ export function EmployeesPage() {
     { key: 'joinedOn', label: copy('Join date'), render: (employee) => formatJoinedOn(employee.joinedOn, formatDate, copy) },
     { key: 'status', label: copy('Status'), render: (employee) => <StatusBadge status={employee.status} /> },
   ];
-  const hasNext = Boolean(employees.data && employees.data.items.length === employees.data.limit);
-  const currentPage = Math.floor(offset / pageLimit) + 1;
-  const totalPages = currentPage + (hasNext ? 1 : 0);
   const nextStatus = statusTarget?.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
   return (
     <BackofficePage>
@@ -80,6 +78,9 @@ export function EmployeesPage() {
           filters={<DStatusFilter label={copy('Status')} value={status} onChange={(value) => { setStatus(value as '' | Employee['status']); setOffset(0); }} allLabel={copy('All')} options={[{ label: copy('Active'), value: 'ACTIVE' }, { label: copy('Inactive'), value: 'INACTIVE' }]} />}
           headerActions={canCreate ? <DButton leftIcon={<Plus className="size-4" />} onClick={() => setEditorId('create')}>{copy('Add employee')}</DButton> : null}
           emptyMessage={q || status ? copy('No matching employees found.') : copy('No employees are available.')}
+          pagination={{ page: Math.floor(offset / pageSize) + 1, pageSize, total: employees.data?.total ?? 0 }}
+          onPageChange={(page) => setOffset((page - 1) * pageSize)}
+          onPageSizeChange={(nextPageSize) => { setPageSize(nextPageSize); setOffset(0); }}
           actions={[
             { label: copy('View details'), icon: <Eye className="size-4" />, onClick: (employee) => setDetailId(employee.id) },
             { label: copy('Edit employee'), icon: <Pencil className="size-4" />, onClick: (employee) => setEditorId(employee.id), show: () => canUpdate },
@@ -87,7 +88,6 @@ export function EmployeesPage() {
             { label: copy('Activate employee'), icon: <CircleCheck className="size-4" />, onClick: openStatusChange, show: (employee) => canUpdate && employee.status === 'INACTIVE' },
           ]}
         />
-        {employees.data?.items.length ? <div className="mt-4 flex flex-wrap items-center justify-end gap-3"><span className="mr-auto text-xs text-[var(--color-text-muted)]">{copy('Showing')} {offset + 1}–{offset + employees.data.items.length}</span><DPagination page={currentPage} totalPages={totalPages} onChange={(page) => setOffset((page - 1) * pageLimit)} /></div> : null}
       </section>
       <EmployeeEditor open={editorId !== null} employee={editorId === 'create' ? null : detail.data} isLoading={editorId !== null && editorId !== 'create' && detail.isLoading} isError={editorId !== null && editorId !== 'create' && detail.isError} api={api} onClose={() => setEditorId(null)} onSaved={refresh} />
       <EmployeeDetail open={detailId !== null} employee={detailId ? detail.data : undefined} isLoading={Boolean(detailId && detail.isLoading)} isError={Boolean(detailId && detail.isError)} onClose={() => setDetailId(null)} />

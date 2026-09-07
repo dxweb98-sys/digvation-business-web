@@ -3,10 +3,11 @@ import {
   DButton,
   DConfirmDialog,
   DDialog,
+  DDataTable,
   DInput,
-  DPagination,
   DSkeleton,
   useToast,
+  type TableColumn,
 } from '@digvation/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Building2, CircleOff, MapPinPlus, Pencil } from 'lucide-react';
@@ -47,6 +48,7 @@ export function BusinessSettingsPage() {
   );
   const [deactivatingLocation, setDeactivatingLocation] = useState<SellingLocation | null>(null);
   const [locationsOffset, setLocationsOffset] = useState(0);
+  const [locationsPageSize, setLocationsPageSize] = useState(locationPageLimit);
 
   const canViewProfile = session
     ? canPerformBackofficeAction(session, 'viewBusinessProfile')
@@ -69,8 +71,8 @@ export function BusinessSettingsPage() {
     enabled: canViewProfile,
   });
   const locationsQuery = useQuery({
-    queryKey: [...businessSettingsKeys.locations, locationsOffset],
-    queryFn: () => api.listLocations({ limit: locationPageLimit, offset: locationsOffset }),
+    queryKey: [...businessSettingsKeys.locations, locationsOffset, locationsPageSize],
+    queryFn: () => api.listLocations({ limit: locationsPageSize, offset: locationsOffset }),
     enabled: canViewLocations,
   });
   const invalidateProfile = () =>
@@ -99,6 +101,7 @@ export function BusinessSettingsPage() {
       {canViewLocations ? (
         <LocationsPanel
           locations={locationsQuery.data?.items}
+          total={locationsQuery.data?.total ?? 0}
           isLoading={locationsQuery.isLoading}
           canCreate={canCreateLocation}
           canUpdate={canUpdateLocation}
@@ -106,10 +109,9 @@ export function BusinessSettingsPage() {
           onEdit={setEditingLocation}
           onDeactivate={setDeactivatingLocation}
           offset={locationsQuery.data?.offset ?? locationsOffset}
-          hasNext={Boolean(
-            locationsQuery.data && locationsQuery.data.items.length === locationsQuery.data.limit,
-          )}
-          onOffsetChange={setLocationsOffset}
+          pageSize={locationsPageSize}
+          onPageChange={(page) => setLocationsOffset((page - 1) * locationsPageSize)}
+          onPageSizeChange={(pageSize) => { setLocationsPageSize(pageSize); setLocationsOffset(0); }}
         />
       ) : null}
       <ProfileEditor
@@ -212,10 +214,13 @@ function LocationsPanel({
   onEdit,
   onDeactivate,
   offset,
-  hasNext,
-  onOffsetChange,
+  total,
+  pageSize,
+  onPageChange,
+  onPageSizeChange,
 }: {
   locations?: SellingLocation[] | undefined;
+  total: number;
   isLoading: boolean;
   canCreate: boolean;
   canUpdate: boolean;
@@ -223,90 +228,33 @@ function LocationsPanel({
   onEdit: (location: SellingLocation) => void;
   onDeactivate: (location: SellingLocation) => void;
   offset: number;
-  hasNext: boolean;
-  onOffsetChange: (offset: number) => void;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
 }) {
   const { copy } = useBackofficeLocalization();
-  const page = Math.floor(offset / locationPageLimit) + 1;
-  const totalPages = page + (hasNext ? 1 : 0);
+  const columns: TableColumn<SellingLocation>[] = [
+    { key: 'name', label: copy('Selling location') },
+    { key: 'code', label: copy('Code') },
+    { key: 'status', label: copy('Status'), render: (location) => <DBadge variant={location.status === 'ACTIVE' ? 'outline' : 'secondary'}>{copy(location.status === 'ACTIVE' ? 'Active' : 'Inactive')}</DBadge> },
+  ];
   return (
     <section className="mt-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-semibold">{copy('Selling locations')}</h2>
-          <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-            Selling locations are the branches used by POS transactions and location-specific
-            pricing.
-          </p>
-        </div>
-        {canCreate ? (
-          <DButton size="sm" leftIcon={<MapPinPlus className="size-4" />} onClick={onCreate}>
-            {copy('Add location')}
-          </DButton>
-        ) : null}
-      </div>
-      {isLoading ? (
-        <div className="mt-4 space-y-3">
-          <DSkeleton className="h-16 w-full" />
-          <DSkeleton className="h-16 w-full" />
-        </div>
-      ) : !locations?.length ? (
-        <div className="mt-4 rounded-[var(--radius-card)] border border-dashed border-[var(--color-border)] p-6 text-sm text-[var(--color-text-muted)]">
-          {copy('No selling locations have been created yet.')}
-        </div>
-      ) : (
-        <div className="mt-4 overflow-hidden rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)]">
-          <div className="divide-y divide-[var(--color-border)]">
-            {locations.map((location) => (
-              <div key={location.id} className="flex items-center justify-between gap-4 px-5 py-4">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-semibold">{location.name}</p>
-                    {location.status === 'INACTIVE' ? (
-                      <DBadge>{copy('Inactive')}</DBadge>
-                    ) : (
-                      <DBadge variant="outline">{copy('Active')}</DBadge>
-                    )}
-                  </div>
-                  <p className="mt-1 text-xs text-[var(--color-text-muted)]">{location.code}</p>
-                </div>
-                {canUpdate ? (
-                  <div className="flex items-center gap-1">
-                    <DButton
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Edit ${location.name}`}
-                      title="Edit selling location"
-                      onClick={() => onEdit(location)}
-                    >
-                      <Pencil className="size-4" />
-                    </DButton>
-                    {location.status === 'ACTIVE' ? (
-                      <DButton
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Deactivate ${location.name}`}
-                        title="Deactivate selling location"
-                        onClick={() => onDeactivate(location)}
-                      >
-                        <CircleOff className="size-4" />
-                      </DButton>
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      {locations?.length ? (
-        <div className="mt-4 flex items-center justify-end gap-2">
-          <span className="mr-auto text-xs text-[var(--color-text-muted)]">
-            Showing {offset + 1}–{offset + locations.length}
-          </span>
-          <DPagination page={page} totalPages={totalPages} onChange={(nextPage) => onOffsetChange((nextPage - 1) * locationPageLimit)} />
-        </div>
-      ) : null}
+      <DDataTable
+        columns={columns}
+        data={locations ?? []}
+        loading={isLoading}
+        rowKey="id"
+        emptyMessage={copy('No selling locations have been created yet.')}
+        headerActions={canCreate ? <DButton leftIcon={<MapPinPlus className="size-4" />} onClick={onCreate}>{copy('Add location')}</DButton> : null}
+        pagination={{ page: Math.floor(offset / pageSize) + 1, pageSize, total }}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+        actions={canUpdate ? [
+          { label: copy('Edit selling location'), icon: <Pencil className="size-4" />, onClick: onEdit },
+          { label: copy('Deactivate selling location'), icon: <CircleOff className="size-4" />, variant: 'danger', onClick: onDeactivate, show: (location) => location.status === 'ACTIVE' },
+        ] : []}
+      />
     </section>
   );
 }

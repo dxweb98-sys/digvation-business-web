@@ -26,6 +26,7 @@ const accessControlKeys = {
   permissions: ['access-control', 'permissions'] as const,
   users: ['access-control', 'users'] as const,
 };
+const defaultPageSize = 20;
 
 export function AccessControlPage() {
   const { session, createApiClient } = useBackofficeAuth();
@@ -35,6 +36,10 @@ export function AccessControlPage() {
     [createApiClient, runtime.apiBaseUrl],
   );
   const [section, setSection] = useState<'roles' | 'users'>('roles');
+  const [rolesOffset, setRolesOffset] = useState(0);
+  const [rolesPageSize, setRolesPageSize] = useState(defaultPageSize);
+  const [usersOffset, setUsersOffset] = useState(0);
+  const [usersPageSize, setUsersPageSize] = useState(defaultPageSize);
   const [editingRole, setEditingRole] = useState<AccessRole | null | undefined>(undefined);
   const [editingUser, setEditingUser] = useState<AccessUser | null>(null);
   const [deactivatingRole, setDeactivatingRole] = useState<AccessRole | null>(null);
@@ -42,16 +47,16 @@ export function AccessControlPage() {
   const { showToast } = useToast();
   const { copy } = useBackofficeLocalization();
   const rolesQuery = useQuery({
-    queryKey: accessControlKeys.roles,
-    queryFn: () => api.listRoles({ limit: 20, offset: 0 }),
+    queryKey: [...accessControlKeys.roles, rolesOffset, rolesPageSize],
+    queryFn: () => api.listRoles({ limit: rolesPageSize, offset: rolesOffset }),
   });
   const permissionsQuery = useQuery({
     queryKey: accessControlKeys.permissions,
     queryFn: () => api.listPermissions(),
   });
   const usersQuery = useQuery({
-    queryKey: accessControlKeys.users,
-    queryFn: () => api.listUsers({ limit: 20, offset: 0 }),
+    queryKey: [...accessControlKeys.users, usersOffset, usersPageSize],
+    queryFn: () => api.listUsers({ limit: usersPageSize, offset: usersOffset }),
     enabled: Boolean(session && canPerformBackofficeAction(session, 'viewUsers')),
   });
 
@@ -90,7 +95,12 @@ export function AccessControlPage() {
       {section === 'roles' ? (
         <RolesTable
           roles={rolesQuery.data?.items ?? []}
+          total={rolesQuery.data?.total ?? 0}
           isLoading={rolesQuery.isLoading}
+          offset={rolesOffset}
+          pageSize={rolesPageSize}
+          onPageChange={(page) => setRolesOffset((page - 1) * rolesPageSize)}
+          onPageSizeChange={(pageSize) => { setRolesPageSize(pageSize); setRolesOffset(0); }}
           onEdit={setEditingRole}
           onDeactivate={setDeactivatingRole}
           canEdit={canUpdateRole || canManagePermissions}
@@ -99,7 +109,12 @@ export function AccessControlPage() {
       ) : (
         <UsersTable
           users={usersQuery.data?.items ?? []}
+          total={usersQuery.data?.total ?? 0}
           isLoading={usersQuery.isLoading}
+          offset={usersOffset}
+          pageSize={usersPageSize}
+          onPageChange={(page) => setUsersOffset((page - 1) * usersPageSize)}
+          onPageSizeChange={(pageSize) => { setUsersPageSize(pageSize); setUsersOffset(0); }}
           onEdit={setEditingUser}
           canEdit={canManageUsers}
         />
@@ -156,14 +171,24 @@ export function AccessControlPage() {
 
 function RolesTable({
   roles,
+  total,
   isLoading,
+  offset,
+  pageSize,
+  onPageChange,
+  onPageSizeChange,
   onEdit,
   onDeactivate,
   canEdit,
   canDeactivate,
 }: {
   roles: AccessRole[];
+  total: number;
   isLoading: boolean;
+  offset: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
   onEdit: (role: AccessRole) => void;
   onDeactivate: (role: AccessRole) => void;
   canEdit: boolean;
@@ -206,6 +231,9 @@ function RolesTable({
         rowKey="id"
         loading={isLoading}
         emptyMessage={copy('No roles are available for this workspace.')}
+        pagination={{ page: Math.floor(offset / pageSize) + 1, pageSize, total }}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
         actions={[
           {
             label: copy('Manage role'),
@@ -228,12 +256,22 @@ function RolesTable({
 
 function UsersTable({
   users,
+  total,
   isLoading,
+  offset,
+  pageSize,
+  onPageChange,
+  onPageSizeChange,
   onEdit,
   canEdit,
 }: {
   users: AccessUser[];
+  total: number;
   isLoading: boolean;
+  offset: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
   onEdit: (user: AccessUser) => void;
   canEdit: boolean;
 }) {
@@ -265,6 +303,9 @@ function UsersTable({
         rowKey="id"
         loading={isLoading}
         emptyMessage={copy('No POS users are available for this workspace.')}
+        pagination={{ page: Math.floor(offset / pageSize) + 1, pageSize, total }}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
         actions={[
           {
             label: copy('Manage roles'),
