@@ -25,7 +25,10 @@ import { NavLink, Outlet } from 'react-router';
 import { canAccessBackoffice, type BackofficeCapability } from '../../auth/backoffice-access';
 import { useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import type { BackofficeSession } from '../../auth/auth-session';
-import { type BackofficeMessageKey, useBackofficeLocalization } from '../localization/backoffice-localization';
+import {
+  type BackofficeMessageKey,
+  useBackofficeLocalization,
+} from '../localization/backoffice-localization';
 
 interface NavigationItem {
   label: BackofficeMessageKey;
@@ -41,7 +44,10 @@ const dashboardItem: NavigationItem = {
   capability: 'dashboard',
 };
 
-const navigationSections: ReadonlyArray<{ label: BackofficeMessageKey; items: readonly NavigationItem[] }> = [
+const navigationSections: ReadonlyArray<{
+  label: BackofficeMessageKey;
+  items: readonly NavigationItem[];
+}> = [
   {
     label: 'masterData',
     items: [
@@ -56,7 +62,7 @@ const navigationSections: ReadonlyArray<{ label: BackofficeMessageKey; items: re
         label: 'financialAccounts',
         to: '/financial-accounts',
         icon: WalletCards,
-        capability: 'finance',
+        capability: 'financialAccounts',
       },
       { label: 'expenses', to: '/expenses', icon: BookOpen, capability: 'finance' },
       {
@@ -272,7 +278,14 @@ export function BackofficeShell() {
                   {t('language')}
                 </div>
                 {(['id', 'en'] as const).map((option) => (
-                  <button key={option} type="button" role="menuitemradio" aria-checked={locale === option} onClick={() => setLocale(option)} className="flex h-9 w-full items-center gap-2 rounded-[var(--radius-control)] px-2.5 text-left text-sm text-[var(--color-text)] hover:bg-[var(--color-surface-muted)]">
+                  <button
+                    key={option}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={locale === option}
+                    onClick={() => setLocale(option)}
+                    className="flex h-9 w-full items-center gap-2 rounded-[var(--radius-control)] px-2.5 text-left text-sm text-[var(--color-text)] hover:bg-[var(--color-surface-muted)]"
+                  >
                     <Globe2 className="size-4" />
                     {option === 'id' ? t('indonesian') : t('english')}
                   </button>

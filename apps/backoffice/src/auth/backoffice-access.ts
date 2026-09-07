@@ -5,6 +5,7 @@ export type BackofficeCapability =
   | 'catalog'
   | 'employees'
   | 'finance'
+  | 'financialAccounts'
   | 'reports'
   | 'configuration'
   | 'tax'
@@ -32,7 +33,10 @@ export type BackofficeAction =
   | 'updateTax'
   | 'cancelTax'
   | 'createEmployee'
-  | 'updateEmployee';
+  | 'updateEmployee'
+  | 'createFinancialAccount'
+  | 'updateFinancialAccount'
+  | 'updatePaymentRouting';
 
 interface PermissionRequirement {
   allOf?: readonly string[];
@@ -44,6 +48,7 @@ const capabilityPermissions: Record<BackofficeCapability, PermissionRequirement>
   catalog: { allOf: ['catalog:read'] },
   employees: { allOf: ['employees:read'] },
   finance: { allOf: ['payments:read'] },
+  financialAccounts: { allOf: ['financial-accounts:read', 'payment-routing:read'] },
   reports: { allOf: ['sales:read'] },
 
   configuration: {
@@ -82,6 +87,9 @@ const actionPermissions: Record<BackofficeAction, readonly string[]> = {
   cancelTax: ['tax:cancel'],
   createEmployee: ['employees:create'],
   updateEmployee: ['employees:update'],
+  createFinancialAccount: ['financial-accounts:create'],
+  updateFinancialAccount: ['financial-accounts:update'],
+  updatePaymentRouting: ['payment-routing:update'],
 };
 
 export function canAccessBackoffice(
