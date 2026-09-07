@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { useToast } from '@digvation-labs/ui';
+import { useToast } from '@digvation/ui';
 import { ApiClient } from '@digvation/pos-api';
 
 import { isBackofficeSessionExpired } from '../app/api/backoffice-api-error';
@@ -75,7 +75,8 @@ export function BackofficeAuthProvider({
     await auth.logout();
     setSession(null);
     setStatus('unauthenticated');
-  }, [auth]);
+    showToast({ variant: 'success', title: t('signedOut') });
+  }, [auth, showToast, t]);
 
   const getAccessToken = useCallback(() => auth.getAccessToken(), [auth]);
   const expireSession = useCallback(() => {

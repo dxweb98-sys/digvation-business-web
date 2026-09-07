@@ -1,5 +1,5 @@
 import { formatMoney } from '@digvation/pos-money';
-import { DButton, DSkeleton } from '@digvation-labs/ui';
+import { DButton, DSkeleton } from '@digvation/ui';
 import {
   ArrowRight,
   ArrowRightLeft,

@@ -6,7 +6,7 @@ import {
   DDialog,
   DInput,
   DSelect,
-} from '@digvation-labs/ui';
+} from '@digvation/ui';
 import {
   BadgeCheck,
   Banknote,

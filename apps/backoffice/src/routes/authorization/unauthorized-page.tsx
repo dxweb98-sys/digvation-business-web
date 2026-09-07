@@ -1,4 +1,4 @@
-import { DButton, DEmptyState } from '@digvation-labs/ui';
+import { DButton, DEmptyState } from '@digvation/ui';
 import { useNavigate } from 'react-router';
 import { BackofficePage } from '../../app/layout/backoffice-page';
 import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';

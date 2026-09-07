@@ -15,7 +15,7 @@ const messages = {
     openAccountMenu: 'Buka menu akun', userAccount: 'Akun pengguna',
     signIn: 'Masuk', signInToBackoffice: 'Masuk ke Backoffice', usernameOrPhone: 'Nama pengguna atau nomor telepon',
     password: 'Kata sandi', signInFailed: 'Masuk gagal. Periksa kredensial ruang kerja Anda lalu coba lagi.',
-    sessionExpired: 'Sesi Anda telah berakhir. Silakan masuk kembali.',
+    sessionExpired: 'Sesi Anda telah berakhir. Silakan masuk kembali.', signedOut: 'Anda telah keluar.',
     startupBlocked: 'Memulai aplikasi diblokir', startupFailed: 'Backoffice tidak dapat dimulai.', unknownStartupError: 'Kesalahan awal tidak diketahui',
     overview: 'Ringkasan', workspaceReady: 'Ruang kerja Backoffice Anda siap.',
     accessUnavailable: 'Akses tidak tersedia', accessUnavailableDescription: 'Peran Anda saat ini tidak memberikan akses ke area ini.', goToDashboard: 'Ke dasbor',
@@ -32,7 +32,7 @@ const messages = {
     openAccountMenu: 'Open account menu', userAccount: 'User account',
     signIn: 'Sign in', signInToBackoffice: 'Sign in to Backoffice', usernameOrPhone: 'Username or phone',
     password: 'Password', signInFailed: 'Sign-in failed. Check your workspace credentials and try again.',
-    sessionExpired: 'Your session has expired. Please sign in again.',
+    sessionExpired: 'Your session has expired. Please sign in again.', signedOut: 'You have signed out.',
     startupBlocked: 'Startup blocked', startupFailed: 'Backoffice could not initialize.', unknownStartupError: 'Unknown startup error',
     overview: 'Overview', workspaceReady: 'Your Backoffice workspace is ready.',
     accessUnavailable: 'Access unavailable', accessUnavailableDescription: 'Your current role does not grant access to this area.', goToDashboard: 'Go to dashboard',
@@ -53,7 +53,6 @@ const copy: Record<string, { id: string; en: string }> = {
   'Cancel': { id: 'Batal', en: 'Cancel' }, 'Save': { id: 'Simpan', en: 'Save' },
   'Previous': { id: 'Sebelumnya', en: 'Previous' }, 'Next': { id: 'Berikutnya', en: 'Next' },
   'Add selling location': { id: 'Tambah lokasi penjualan', en: 'Add selling location' },
-  'Edit selling location': { id: 'Ubah lokasi penjualan', en: 'Edit selling location' },
   'Save location': { id: 'Simpan lokasi', en: 'Save location' },
   'Location code': { id: 'Kode lokasi', en: 'Location code' }, 'Location name': { id: 'Nama lokasi', en: 'Location name' },
   'Deactivate selling location?': { id: 'Nonaktifkan lokasi penjualan?', en: 'Deactivate selling location?' },
@@ -70,6 +69,72 @@ const copy: Record<string, { id: string; en: string }> = {
   'Catalog': { id: 'Katalog', en: 'Catalog' }, 'Items': { id: 'Item', en: 'Items' }, 'Categories': { id: 'Kategori', en: 'Categories' },
   'Item': { id: 'Item', en: 'Item' }, 'Type': { id: 'Tipe', en: 'Type' }, 'Category': { id: 'Kategori', en: 'Category' },
   'Default Price': { id: 'Harga default', en: 'Default Price' }, 'Variants': { id: 'Varian', en: 'Variants' },
+  'Set your business identity and manage the selling locations available to this workspace.': { id: 'Atur identitas bisnis dan kelola lokasi penjualan yang tersedia untuk ruang kerja ini.', en: 'Set your business identity and manage the selling locations available to this workspace.' },
+  'The business name used by your POS records.': { id: 'Nama bisnis yang digunakan oleh catatan POS Anda.', en: 'The business name used by your POS records.' },
+  'Selling locations are the branches used by POS transactions and location-specific pricing.': { id: 'Lokasi penjualan adalah cabang yang digunakan oleh transaksi POS dan harga khusus lokasi.', en: 'Selling locations are the branches used by POS transactions and location-specific pricing.' },
+  'Edit selling location': { id: 'Ubah lokasi penjualan', en: 'Edit selling location' },
+  'This location will remain in historical records but cannot be used as an active selling location.': { id: 'Lokasi ini tetap ada dalam catatan historis, tetapi tidak dapat digunakan sebagai lokasi penjualan aktif.', en: 'This location will remain in historical records but cannot be used as an active selling location.' },
+  'Set the name that identifies this business in POS records.': { id: 'Atur nama yang mengidentifikasi bisnis ini dalam catatan POS.', en: 'Set the name that identifies this business in POS records.' },
+  'Save profile': { id: 'Simpan profil', en: 'Save profile' }, 'Business name': { id: 'Nama bisnis', en: 'Business name' },
+  'A selling location is the branch context for POS sales and location-specific prices.': { id: 'Lokasi penjualan adalah konteks cabang untuk penjualan POS dan harga khusus lokasi.', en: 'A selling location is the branch context for POS sales and location-specific prices.' },
+  'Location codes are permanent once created.': { id: 'Kode lokasi bersifat permanen setelah dibuat.', en: 'Location codes are permanent once created.' },
+  'Showing': { id: 'Menampilkan', en: 'Showing' },
+  'Manage items and categories.': { id: 'Kelola item dan kategori.', en: 'Manage items and categories.' },
+  'Search item name or code...': { id: 'Cari nama atau kode item...', en: 'Search item name or code...' },
+  'Search category name or code...': { id: 'Cari nama atau kode kategori...', en: 'Search category name or code...' },
+  'Add item': { id: 'Tambah item', en: 'Add item' }, 'Add category': { id: 'Tambah kategori', en: 'Add category' },
+  'View details': { id: 'Lihat detail', en: 'View details' }, 'Edit item': { id: 'Ubah item', en: 'Edit item' }, 'Edit category': { id: 'Ubah kategori', en: 'Edit category' },
+  'No matching items found.': { id: 'Tidak ada item yang sesuai.', en: 'No matching items found.' }, 'No catalog items are available.': { id: 'Belum ada item katalog.', en: 'No catalog items are available.' },
+  'No matching categories found.': { id: 'Tidak ada kategori yang sesuai.', en: 'No matching categories found.' }, 'No catalog categories are available.': { id: 'Belum ada kategori katalog.', en: 'No catalog categories are available.' },
+  'Close': { id: 'Tutup', en: 'Close' }, 'Price': { id: 'Harga', en: 'Price' }, 'Manage variant price': { id: 'Kelola harga varian', en: 'Manage variant price' },
+  'Add': { id: 'Tambah', en: 'Add' }, 'Edit': { id: 'Ubah', en: 'Edit' }, 'Variant': { id: 'Varian', en: 'Variant' },
+  'Product': { id: 'Produk', en: 'Product' }, 'Service': { id: 'Layanan', en: 'Service' }, 'Draft': { id: 'Draf', en: 'Draft' }, 'Cancelled': { id: 'Dibatalkan', en: 'Cancelled' },
+  'Manage tenant roles and user role assignments. Permissions are defined by the POS platform.': { id: 'Kelola peran tenant dan penetapan peran pengguna. Izin ditentukan oleh platform POS.', en: 'Manage tenant roles and user role assignments. Permissions are defined by the POS platform.' },
+  'Users will no longer receive this role\'s permissions.': { id: 'Pengguna tidak lagi menerima izin dari peran ini.', en: 'Users will no longer receive this role\'s permissions.' },
+  'System role': { id: 'Peran sistem', en: 'System role' }, 'No roles are available for this workspace.': { id: 'Tidak ada peran untuk ruang kerja ini.', en: 'No roles are available for this workspace.' },
+  'User': { id: 'Pengguna', en: 'User' }, 'Username': { id: 'Nama pengguna', en: 'Username' }, 'No username': { id: 'Tidak ada nama pengguna', en: 'No username' },
+  'No roles assigned': { id: 'Belum ada peran', en: 'No roles assigned' }, 'No POS users are available for this workspace.': { id: 'Tidak ada pengguna POS untuk ruang kerja ini.', en: 'No POS users are available for this workspace.' },
+  'System roles are protected by the POS authorization policy.': { id: 'Peran sistem dilindungi oleh kebijakan otorisasi POS.', en: 'System roles are protected by the POS authorization policy.' },
+  'Role permissions are assigned from the platform permission registry.': { id: 'Izin peran ditetapkan dari registri izin platform.', en: 'Role permissions are assigned from the platform permission registry.' },
+  'Not assigned': { id: 'Belum ditetapkan', en: 'Not assigned' }, 'Description': { id: 'Deskripsi', en: 'Description' }, 'No description': { id: 'Tidak ada deskripsi', en: 'No description' },
+  'Fulfillment': { id: 'Pemenuhan', en: 'Fulfillment' }, 'Service configuration': { id: 'Konfigurasi layanan', en: 'Service configuration' },
+  'Default duration': { id: 'Durasi default', en: 'Default duration' },
+  'Employee assignment': { id: 'Penugasan karyawan', en: 'Employee assignment' }, 'Employee contribution': { id: 'Kontribusi karyawan', en: 'Employee contribution' },
+  'Allowed': { id: 'Diizinkan', en: 'Allowed' }, 'Not allowed': { id: 'Tidak diizinkan', en: 'Not allowed' },
+  'Price history': { id: 'Riwayat harga', en: 'Price history' }, 'Set price': { id: 'Atur harga', en: 'Set price' }, 'Change price': { id: 'Ubah harga', en: 'Change price' },
+  'Manage variants for this item.': { id: 'Kelola varian untuk item ini.', en: 'Manage variants for this item.' }, 'Add variant': { id: 'Tambah varian', en: 'Add variant' },
+  'No variants.': { id: 'Belum ada varian.', en: 'No variants.' }, 'Edit variant': { id: 'Ubah varian', en: 'Edit variant' },
+  'Loading...': { id: 'Memuat...', en: 'Loading...' }, 'Not set': { id: 'Belum diatur', en: 'Not set' }, 'Uses default price': { id: 'Menggunakan harga default', en: 'Uses default price' },
+  'Effective from': { id: 'Berlaku mulai', en: 'Effective from' }, 'Effective until': { id: 'Berlaku sampai', en: 'Effective until' }, 'Cancel price': { id: 'Batalkan harga', en: 'Cancel price' },
+  'Basic information': { id: 'Informasi dasar', en: 'Basic information' }, 'No default price history.': { id: 'Belum ada riwayat harga default.', en: 'No default price history.' },
+  'Cancel price?': { id: 'Batalkan harga?', en: 'Cancel price?' }, 'Price history is retained, but this price no longer applies.': { id: 'Riwayat harga tetap tersimpan, tetapi harga ini tidak lagi berlaku.', en: 'Price history is retained, but this price no longer applies.' },
+  'Variant price': { id: 'Harga varian', en: 'Variant price' }, 'Change default price': { id: 'Ubah harga default', en: 'Change default price' }, 'Save price': { id: 'Simpan harga', en: 'Save price' }, 'New price': { id: 'Harga baru', en: 'New price' },
+  'Price updated.': { id: 'Harga berhasil diperbarui.', en: 'Price updated.' }, 'Price cancelled.': { id: 'Harga berhasil dibatalkan.', en: 'Price cancelled.' },
+  'Could not update price.': { id: 'Gagal memperbarui harga.', en: 'Could not update price.' }, 'Could not cancel price.': { id: 'Gagal membatalkan harga.', en: 'Could not cancel price.' },
+  'Currency:': { id: 'Mata uang:', en: 'Currency:' }, 'No variant-specific price history.': { id: 'Belum ada harga khusus untuk varian ini.', en: 'No variant-specific price history.' },
+  'Effective now': { id: 'Berlaku sekarang', en: 'Effective now' }, 'Variant prices are final prices, not differences from the default price.': { id: 'Harga varian adalah harga final, bukan selisih dari harga default.', en: 'Variant prices are final prices, not differences from the default price.' },
+  'Item added.': { id: 'Item berhasil ditambahkan.', en: 'Item added.' }, 'Item updated.': { id: 'Item berhasil diperbarui.', en: 'Item updated.' }, 'Could not save item.': { id: 'Gagal menyimpan item.', en: 'Could not save item.' },
+  'Item code': { id: 'Kode item', en: 'Item code' }, 'Item name': { id: 'Nama item', en: 'Item name' }, 'Optional, in minutes.': { id: 'Opsional, dalam menit.', en: 'Optional, in minutes.' }, 'Allow employee contribution': { id: 'Izinkan kontribusi karyawan', en: 'Allow employee contribution' },
+  'Leave blank to generate a code automatically.': { id: 'Kosongkan untuk membuat kode otomatis.', en: 'Leave blank to generate a code automatically.' }, 'Code cannot be changed after creation.': { id: 'Kode tidak dapat diubah setelah dibuat.', en: 'Code cannot be changed after creation.' },
+  'Item code and type cannot be changed after creation.': { id: 'Kode dan tipe item tidak dapat diubah setelah dibuat.', en: 'Item code and type cannot be changed after creation.' }, 'Item code and type cannot be changed.': { id: 'Kode dan tipe item tidak dapat diubah.', en: 'Item code and type cannot be changed.' },
+  'Instant': { id: 'Instan', en: 'Instant' }, 'Tracked': { id: 'Terlacak', en: 'Tracked' }, 'None': { id: 'Tidak ada', en: 'None' }, 'Optional': { id: 'Opsional', en: 'Optional' }, 'Required': { id: 'Wajib', en: 'Required' }, 'Default duration must be a positive whole number.': { id: 'Durasi default harus berupa bilangan bulat positif.', en: 'Default duration must be a positive whole number.' },
+  'Category added.': { id: 'Kategori berhasil ditambahkan.', en: 'Category added.' }, 'Category updated.': { id: 'Kategori berhasil diperbarui.', en: 'Category updated.' }, 'Could not save category.': { id: 'Gagal menyimpan kategori.', en: 'Could not save category.' },
+  'Operations': { id: 'Operasional', en: 'Operations' }, 'Backoffice foundation': { id: 'Fondasi Backoffice', en: 'Backoffice foundation' }, 'Branches': { id: 'Cabang', en: 'Branches' }, 'Pricing & Tax': { id: 'Harga & Pajak', en: 'Pricing & Tax' },
+  'No fake dashboard metrics are shown. Management capabilities appear only when their backend contract and frontend checkpoint are approved.': { id: 'Tidak ada metrik dasbor palsu yang ditampilkan. Kemampuan pengelolaan hanya muncul setelah kontrak backend dan checkpoint frontend disetujui.', en: 'No fake dashboard metrics are shown. Management capabilities appear only when their backend contract and frontend checkpoint are approved.' },
+  'Business profile updated.': { id: 'Profil bisnis berhasil diperbarui.', en: 'Business profile updated.' }, 'Could not update business profile.': { id: 'Gagal memperbarui profil bisnis.', en: 'Could not update business profile.' },
+  'Selling location added.': { id: 'Lokasi penjualan berhasil ditambahkan.', en: 'Selling location added.' }, 'Selling location updated.': { id: 'Lokasi penjualan berhasil diperbarui.', en: 'Selling location updated.' }, 'Selling location deactivated.': { id: 'Lokasi penjualan berhasil dinonaktifkan.', en: 'Selling location deactivated.' }, 'Could not save selling location.': { id: 'Gagal menyimpan lokasi penjualan.', en: 'Could not save selling location.' },
+  'Role added.': { id: 'Peran berhasil ditambahkan.', en: 'Role added.' }, 'Role updated.': { id: 'Perubahan peran berhasil disimpan.', en: 'Role updated.' }, 'Role deactivated.': { id: 'Peran berhasil dinonaktifkan.', en: 'Role deactivated.' }, 'Could not save role.': { id: 'Gagal menyimpan peran.', en: 'Could not save role.' }, 'Could not deactivate role.': { id: 'Gagal menonaktifkan peran.', en: 'Could not deactivate role.' }, 'User roles updated.': { id: 'Peran pengguna berhasil diperbarui.', en: 'User roles updated.' }, 'Could not update user roles.': { id: 'Gagal memperbarui peran pengguna.', en: 'Could not update user roles.' },
+  'A new price is added to effective history; the previous price is unchanged.': { id: 'Harga baru ditambahkan ke riwayat efektif; harga sebelumnya tidak diubah.', en: 'A new price is added to effective history; the previous price is unchanged.' },
+  'Only variant-specific prices are recorded here. The item default price is not variant history.': { id: 'Hanya harga khusus varian yang dicatat di sini. Harga default item bukan riwayat varian.', en: 'Only variant-specific prices are recorded here. The item default price is not variant history.' },
+  'Enter your username or phone number': { id: 'Masukkan nama pengguna atau nomor telepon', en: 'Enter your username or phone number' },
+  'Enter your password': { id: 'Masukkan kata sandi Anda', en: 'Enter your password' },
+  'For example, Main Store': { id: 'Contoh, Toko Utama', en: 'For example, Main Store' },
+  'For example, Central Jakarta': { id: 'Contoh, Jakarta Pusat', en: 'For example, Central Jakarta' },
+  'For example, Store Manager': { id: 'Contoh, Manajer Toko', en: 'For example, Store Manager' },
+  'For example, Coffee Latte': { id: 'Contoh, Kopi Latte', en: 'For example, Coffee Latte' },
+  'Add an optional description for this item': { id: 'Tambahkan deskripsi opsional untuk item ini', en: 'Add an optional description for this item' },
+  'For example, 100000': { id: 'Contoh, 100000', en: 'For example, 100000' },
+  'Select the date the price takes effect': { id: 'Pilih tanggal mulai berlaku harga', en: 'Select the date the price takes effect' },
 };
 
 export type BackofficeMessageKey = keyof (typeof messages)['id'];
@@ -85,13 +150,13 @@ interface BackofficeLocalizationValue {
 
 const BackofficeLocalizationContext = createContext<BackofficeLocalizationValue | null>(null);
 
-function readStoredLocale(): BackofficeLocale {
+export function readStoredBackofficeLocale(): BackofficeLocale {
   if (typeof window === 'undefined') return 'id';
   return window.localStorage.getItem(storageKey) === 'en' ? 'en' : 'id';
 }
 
 export function BackofficeLocalizationProvider({ children }: { children: ReactNode }) {
-  const [locale, setCurrentLocale] = useState<BackofficeLocale>(readStoredLocale);
+  const [locale, setCurrentLocale] = useState<BackofficeLocale>(readStoredBackofficeLocale);
   const setLocale = useCallback((nextLocale: BackofficeLocale) => {
     window.localStorage.setItem(storageKey, nextLocale);
     setCurrentLocale(nextLocale);

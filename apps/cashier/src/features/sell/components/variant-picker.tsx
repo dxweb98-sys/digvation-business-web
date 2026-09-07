@@ -1,5 +1,5 @@
 import { formatMoney } from '@digvation/pos-money';
-import { DButton, DDialog } from '@digvation-labs/ui';
+import { DButton, DDialog } from '@digvation/ui';
 import { Check, ChevronRight, X } from 'lucide-react';
 
 import type { CatalogItem, CatalogVariant } from '../cashier-transaction.types';

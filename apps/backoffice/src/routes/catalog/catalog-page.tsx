@@ -4,7 +4,9 @@ import {
   DCheckbox,
   DConfirmDialog,
   DDataTable,
+  DDatePicker,
   DDialog,
+  DCurrencyInput,
   DInput,
   DSelect,
   DSelectFilter,
@@ -12,7 +14,7 @@ import {
   DTextarea,
   useToast,
   type TableColumn,
-} from '@digvation-labs/ui';
+} from '@digvation/ui';
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { BadgeDollarSign, Ban, Eye, Pencil, Plus } from 'lucide-react';
 import { type ReactNode, useMemo, useState } from 'react';
@@ -22,6 +24,7 @@ import { canPerformBackofficeAction, type BackofficeAction } from '../../auth/ba
 import { isSessionExpiredError, useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
+import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
 import {
   CatalogApi,
   type CatalogManagementItem,
@@ -53,6 +56,7 @@ const keys = {
 
 export function CatalogPage() {
   const { session, createApiClient } = useBackofficeAuth();
+  const { copy } = useBackofficeLocalization();
   const { apiBaseUrl, currency } = useRuntime();
   const api = useMemo(
     () => new CatalogApi(createApiClient(apiBaseUrl)),
@@ -105,7 +109,7 @@ export function CatalogPage() {
   const itemColumns: TableColumn<CatalogManagementItem>[] = [
     {
       key: 'name',
-      label: 'Item',
+      label: copy('Item'),
       render: (x) => (
         <div>
           <p className="font-medium">{x.name}</p>
@@ -113,16 +117,16 @@ export function CatalogPage() {
         </div>
       ),
     },
-    { key: 'type', label: 'Type', render: (x) => humanize(x.type) },
+    { key: 'type', label: copy('Type'), render: (x) => humanize(x.type) },
     {
       key: 'categoryId',
-      label: 'Category',
+      label: copy('Category'),
       render: (x) =>
         categories.data?.items.find((category) => category.id === x.categoryId)?.name ?? '—',
     },
     {
       key: 'defaultPrice',
-      label: 'Default Price',
+      label: copy('Default Price'),
       render: (x) => (
         <PriceLabel
           price={defaultPriceByItemId.get(x.id)}
@@ -131,20 +135,20 @@ export function CatalogPage() {
         />
       ),
     },
-    { key: 'variants', label: 'Variants', render: (x) => x.variantCount },
-    { key: 'lifecycle', label: 'Status', render: (x) => <Status value={x.lifecycle} /> },
+    { key: 'variants', label: copy('Variants'), render: (x) => x.variantCount },
+    { key: 'lifecycle', label: copy('Status'), render: (x) => <Status value={x.lifecycle} /> },
   ];
   const categoryColumns: TableColumn<Category>[] = [
-    { key: 'name', label: 'Name' },
-    { key: 'code', label: 'Code' },
-    { key: 'status', label: 'Status', render: (x) => <Status value={x.status} /> },
+    { key: 'name', label: copy('Name') },
+    { key: 'code', label: copy('Code') },
+    { key: 'status', label: copy('Status'), render: (x) => <Status value={x.status} /> },
   ];
   return (
     <BackofficePage>
       <BackofficePageHeader
-        eyebrow="Master Data"
-        title="Catalog"
-        description="Manage items and categories."
+        eyebrow="Data Master"
+        title={copy('Catalog')}
+        description={copy('Manage items and categories.')}
       />
       <div className="mt-6 flex gap-1 border-b border-[var(--color-border)]">
         {(['items', 'categories'] as Section[]).map((x) => (
@@ -165,7 +169,7 @@ export function CatalogPage() {
             loading={items.isLoading}
             rowKey="id"
             searchable
-            searchPlaceholder="Cari nama atau kode item..."
+            searchPlaceholder={copy('Search item name or code...')}
             searchValue={itemQuery.q}
             onSearchChange={(q) => setItemQuery((value) => ({ ...value, q }))}
             filters={
@@ -214,19 +218,19 @@ export function CatalogPage() {
             headerActions={
               can('createCatalog') ? (
                 <DButton leftIcon={<Plus className="size-4" />} onClick={() => setItem(null)}>
-                  Tambah item
+                  {copy('Add item')}
                 </DButton>
               ) : null
             }
             emptyMessage={
               itemQuery.q || itemQuery.type || itemQuery.lifecycle || itemQuery.categoryId
-                ? 'No matching items found.'
-                : 'No catalog items are available.'
+                ? copy('No matching items found.')
+                : copy('No catalog items are available.')
             }
             actions={[
-              { label: 'View details', icon: <Eye className="size-4" />, onClick: setDetailItem },
+              { label: copy('View details'), icon: <Eye className="size-4" />, onClick: setDetailItem },
               {
-                label: 'Edit item',
+                label: copy('Edit item'),
                 icon: <Pencil className="size-4" />,
                 onClick: setItem,
                 show: () => can('updateCatalog'),
@@ -243,7 +247,7 @@ export function CatalogPage() {
             loading={categories.isLoading}
             rowKey="id"
             searchable
-            searchPlaceholder="Cari nama atau kode kategori..."
+            searchPlaceholder={copy('Search category name or code...')}
             searchValue={categoryQuery.q}
             onSearchChange={(q) => setCategoryQuery((value) => ({ ...value, q }))}
             filters={
@@ -265,17 +269,17 @@ export function CatalogPage() {
             }
             headerActions={
               can('createCatalog') ? (
-                <DButton onClick={() => setCategory(null)}>Tambah kategori</DButton>
+                <DButton onClick={() => setCategory(null)}>{copy('Add category')}</DButton>
               ) : null
             }
             emptyMessage={
               categoryQuery.q || categoryQuery.status
-                ? 'No matching categories found.'
-                : 'No catalog categories are available.'
+                ? copy('No matching categories found.')
+                : copy('No catalog categories are available.')
             }
             actions={[
               {
-                label: 'Edit category',
+                label: copy('Edit category'),
                 icon: <Pencil className="size-4" />,
                 onClick: setCategory,
                 show: () => can('updateCatalog'),
@@ -352,6 +356,7 @@ function toCategoryQuery({ q, status }: CategoryFilterState) {
   };
 }
 function Status({ value }: { value: string }) {
+  const { copy } = useBackofficeLocalization();
   const variant =
     value === 'ACTIVE'
       ? 'success'
@@ -362,7 +367,7 @@ function Status({ value }: { value: string }) {
           : value === 'CANCELLED'
             ? 'danger'
             : 'secondary';
-  return <DBadge variant={variant}>{humanize(value)}</DBadge>;
+  return <DBadge variant={variant}>{copy(humanize(value))}</DBadge>;
 }
 function Footer({
   onClose,
@@ -373,13 +378,14 @@ function Footer({
   onSave: () => void;
   disabled?: boolean;
 }) {
+  const { copy } = useBackofficeLocalization();
   return (
     <div className="flex justify-end gap-2">
       <DButton variant="secondary" onClick={onClose}>
-        Cancel
+        {copy('Cancel')}
       </DButton>
       <DButton onClick={onSave} disabled={disabled}>
-        Save
+        {copy('Save')}
       </DButton>
     </div>
   );
@@ -403,7 +409,7 @@ function NamedDialog({
 }) {
   const fresh = item === null;
   const { showToast } = useToast();
-  const displayName = entity === 'Category' ? 'Kategori' : entity;
+  const { copy } = useBackofficeLocalization();
   const [code, setCode] = useState(item?.code ?? '');
   const [name, setName] = useState(item?.name ?? '');
   const [status, setStatus] = useState(item?.status ?? 'ACTIVE');
@@ -418,7 +424,7 @@ function NamedDialog({
       onSaved();
       showToast({
         variant: 'success',
-        title: displayName + ' berhasil ' + (fresh ? 'ditambahkan.' : 'diperbarui.'),
+        title: fresh ? copy('Category added.') : copy('Category updated.'),
       });
       onClose();
     } catch (error) {
@@ -427,7 +433,7 @@ function NamedDialog({
           variant: 'danger',
           title: normalizeBackofficeApiError(
             error,
-            'Gagal menyimpan ' + displayName.toLowerCase() + '.',
+            copy('Could not save category.'),
           ).safeMessage,
         });
     }
@@ -436,24 +442,29 @@ function NamedDialog({
     <DDialog
       open={item !== undefined}
       onClose={onClose}
-      title={(fresh ? 'Add' : 'Edit') + ' ' + entity}
+      title={(fresh ? copy('Add') : copy('Edit')) + ' ' + copy(entity)}
       footer={<Footer onClose={onClose} onSave={() => void save()} disabled={!name.trim()} />}
     >
       <div className="grid gap-4 sm:grid-cols-2">
         <DInput
-          label="Code"
+          label={copy('Code')}
           hint={
             fresh
-              ? 'Kosongkan untuk membuat kode otomatis.'
-              : 'Code cannot be changed after creation.'
+              ? copy('Leave blank to generate a code automatically.')
+              : copy('Code cannot be changed after creation.')
           }
           value={code}
           onChange={setCode}
           disabled={!fresh}
         />
-        <DInput label="Name" value={name} onChange={setName} />
+        <DInput
+          label={copy('Name')}
+          value={name}
+          onChange={setName}
+          placeholder={copy('For example, Coffee Latte')}
+        />
         <DSelect
-          label="Status"
+          label={copy('Status')}
           value={status}
           onChange={(x) => setStatus(x as 'ACTIVE' | 'INACTIVE')}
           options={[
@@ -481,6 +492,7 @@ function ItemDialog({
 }) {
   const fresh = item === null;
   const { showToast } = useToast();
+  const { copy } = useBackofficeLocalization();
   const [code, setCode] = useState(item?.code ?? '');
   const [name, setName] = useState(item?.name ?? '');
   const [type, setType] = useState<Item['type']>(item?.type ?? 'PRODUCT');
@@ -534,7 +546,7 @@ function ItemDialog({
       onSaved();
       showToast({
         variant: 'success',
-        title: fresh ? 'Item berhasil ditambahkan.' : 'Item berhasil diperbarui.',
+        title: fresh ? copy('Item added.') : copy('Item updated.'),
       });
       onClose();
     } catch (error) {
@@ -543,7 +555,7 @@ function ItemDialog({
           variant: 'danger',
           title: normalizeBackofficeApiError(
             error,
-            fresh ? 'Gagal menambahkan item.' : 'Gagal memperbarui item.',
+            copy('Could not save item.'),
           ).safeMessage,
         });
     }
@@ -552,11 +564,11 @@ function ItemDialog({
     <DDialog
       open={item !== undefined}
       onClose={onClose}
-      title={(fresh ? 'Tambah' : 'Ubah') + ' item'}
+      title={(fresh ? copy('Add') : copy('Edit')) + ' ' + copy('Item')}
       description={
         fresh
-          ? 'Kode dan tipe item tidak dapat diubah setelah dibuat.'
-          : 'Kode dan tipe item tidak dapat diubah.'
+          ? copy('Item code and type cannot be changed after creation.')
+          : copy('Item code and type cannot be changed.')
       }
       footer={
         <Footer
@@ -568,76 +580,84 @@ function ItemDialog({
     >
       <div className="grid gap-4 sm:grid-cols-2">
         <DInput
-          label="Kode"
+          label={copy('Item code')}
           hint={
             fresh
-              ? 'Kosongkan untuk membuat kode otomatis.'
-              : 'Kode tidak dapat diubah setelah dibuat.'
+              ? copy('Leave blank to generate a code automatically.')
+              : copy('Code cannot be changed after creation.')
           }
           value={code}
           onChange={setCode}
           disabled={!fresh}
+          placeholder="COFFEE_LATTE"
         />
-        <DInput label="Nama" value={name} onChange={setName} />
+        <DInput
+          label={copy('Item name')}
+          value={name}
+          onChange={setName}
+          placeholder={copy('For example, Coffee Latte')}
+        />
         <DSelect
-          label="Tipe"
+          label={copy('Type')}
           value={type}
           onChange={(x) => setType(x as Item['type'])}
           disabled={!fresh}
           options={[
-            { label: 'Produk', value: 'PRODUCT' },
-            { label: 'Layanan', value: 'SERVICE' },
+            { label: copy('Product'), value: 'PRODUCT' },
+            { label: copy('Service'), value: 'SERVICE' },
           ]}
         />
         <DSelect
-          label="Status"
+          label={copy('Status')}
           value={lifecycle}
           onChange={(x) => setLifecycle(x as Item['lifecycle'])}
           options={[
-            { label: 'Draf', value: 'DRAFT' },
-            { label: 'Aktif', value: 'ACTIVE' },
-            { label: 'Nonaktif', value: 'INACTIVE' },
+            { label: copy('Draft'), value: 'DRAFT' },
+            { label: copy('Active'), value: 'ACTIVE' },
+            { label: copy('Inactive'), value: 'INACTIVE' },
           ]}
         />
         <DSelect
-          label="Kategori"
+          label={copy('Category')}
           value={categoryId}
           onChange={(x) => setCategoryId(x as string | null)}
           clearable
           options={categories.map((x) => ({ label: x.name, value: x.id }))}
         />
         <DSelect
-          label="Pemenuhan"
+          label={copy('Fulfillment')}
           value={fulfillmentBehavior}
           onChange={(x) => setFulfillmentBehavior(x as Item['fulfillmentBehavior'])}
           options={[
-            { label: 'Instan', value: 'INSTANT' },
-            { label: 'Terlacak', value: 'TRACKED' },
+            { label: copy('Instant'), value: 'INSTANT' },
+            { label: copy('Tracked'), value: 'TRACKED' },
           ]}
         />
       </div>
       <div className="mt-4">
         <DTextarea
-          label="Deskripsi"
+          label={copy('Description')}
           value={description}
           onChange={setDescription}
+          placeholder={copy('Add an optional description for this item')}
           className="min-h-28"
         />
       </div>
       {type === 'SERVICE' && (
         <section className="mt-5 border-t border-[var(--color-border)] pt-5">
-          <h2 className="text-base font-semibold">Konfigurasi Layanan</h2>
+          <h2 className="text-base font-semibold">{copy('Service configuration')}</h2>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <DInput
-              label="Durasi default"
-              hint="Opsional, dalam menit."
+              label={copy('Default duration')}
+              hint={copy('Optional, in minutes.')}
               value={defaultDurationMinutes}
               onChange={setDefaultDurationMinutes}
               type="number"
               min={1}
+              placeholder="30"
             />
             <DSelect
-              label="Penugasan karyawan"
+              label={copy('Employee assignment')}
               value={employeeAssignmentMode}
               onChange={(x) =>
                 setEmployeeAssignmentMode(
@@ -645,15 +665,15 @@ function ItemDialog({
                 )
               }
               options={[
-                { label: 'Tidak ada', value: 'NONE' },
-                { label: 'Opsional', value: 'OPTIONAL' },
-                { label: 'Wajib', value: 'REQUIRED' },
+                { label: copy('None'), value: 'NONE' },
+                { label: copy('Optional'), value: 'OPTIONAL' },
+                { label: copy('Required'), value: 'REQUIRED' },
               ]}
             />
           </div>
           {!validDefaultDuration && (
             <p className="mt-2 text-sm text-[var(--color-danger)]">
-              Durasi default harus berupa bilangan bulat positif.
+              {copy('Default duration must be a positive whole number.')}
             </p>
           )}
           <label className="mt-4 flex items-center gap-2 text-sm">
@@ -661,7 +681,7 @@ function ItemDialog({
               checked={allowEmployeeContribution}
               onChange={(event) => setAllowEmployeeContribution(event.target.checked)}
             />{' '}
-            Izinkan kontribusi karyawan
+            {copy('Allow employee contribution')}
           </label>
         </section>
       )}
@@ -705,6 +725,7 @@ function ItemDetailDialog({
   onEdit: (item: Item) => void;
 }) {
   const client = useQueryClient();
+  const { copy } = useBackofficeLocalization();
   const [editingVariant, setEditingVariant] = useState<Variant | null | undefined>();
   const [pricingTarget, setPricingTarget] = useState<'default' | Variant | null>(null);
   const variants = useQuery({
@@ -734,7 +755,7 @@ function ItemDetailDialog({
 
   const categoryName = item.categoryId
     ? (categories.find((category) => category.id === item.categoryId)?.name ?? item.categoryId)
-    : 'Not assigned';
+    : copy('Not assigned');
   const refreshVariants = () => void client.invalidateQueries({ queryKey: keys.variants(item.id) });
   const refreshVariantsAndCount = () => {
     refreshVariants();
@@ -766,25 +787,25 @@ function ItemDetailDialog({
       footer={
         <div className="flex justify-end gap-2">
           <DButton variant="secondary" onClick={onClose}>
-            Close
+            {copy('Close')}
           </DButton>
-          {canUpdate && <DButton onClick={() => onEdit(item)}>Edit item</DButton>}
+          {canUpdate && <DButton onClick={() => onEdit(item)}>{copy('Edit item')}</DButton>}
         </div>
       }
     >
       <div className="space-y-5">
         <section aria-labelledby="item-basic-information-heading">
           <h2 id="item-basic-information-heading" className="text-base font-semibold">
-            Informasi Dasar
+            {copy('Basic information')}
           </h2>
           <dl className="mt-3 space-y-3 text-sm">
-            <DetailField label="Kategori" value={categoryName} />
+            <DetailField label={copy('Category')} value={categoryName} />
             <DetailField
-              label="Deskripsi"
-              value={item.description?.trim() || 'Tidak ada deskripsi'}
+              label={copy('Description')}
+              value={item.description?.trim() || copy('No description')}
             />
             {item.type === 'PRODUCT' && (
-              <DetailField label="Pemenuhan" value={humanize(item.fulfillmentBehavior)} />
+              <DetailField label={copy('Fulfillment')} value={humanize(item.fulfillmentBehavior)} />
             )}
           </dl>
         </section>
@@ -795,30 +816,30 @@ function ItemDetailDialog({
             className="border-t border-[var(--color-border)] pt-5"
           >
             <h2 id="item-service-configuration-heading" className="text-base font-semibold">
-              Konfigurasi Layanan
+              {copy('Service configuration')}
             </h2>
             <dl className="mt-3 grid gap-x-5 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-              <DetailField label="Pemenuhan" value={humanize(item.fulfillmentBehavior)} />
+              <DetailField label={copy('Fulfillment')} value={humanize(item.fulfillmentBehavior)} />
               <DetailField
-                label="Durasi default"
+                label={copy('Default duration')}
                 value={
                   serviceDefinition?.defaultDurationMinutes != null
                     ? `${serviceDefinition.defaultDurationMinutes} menit`
-                    : 'Tidak diatur'
+                    : copy('Not configured')
                 }
               />
               <DetailField
-                label="Penugasan karyawan"
+                label={copy('Employee assignment')}
                 value={
                   serviceDefinition
                     ? humanize(serviceDefinition.employeeAssignmentMode)
-                    : 'Tidak diatur'
+                    : copy('Not configured')
                 }
               />
               <DetailField
-                label="Kontribusi karyawan"
+                label={copy('Employee contribution')}
                 value={
-                  serviceDefinition?.allowEmployeeContribution ? 'Diizinkan' : 'Tidak diizinkan'
+                  serviceDefinition?.allowEmployeeContribution ? copy('Allowed') : copy('Not allowed')
                 }
               />
             </dl>
@@ -833,24 +854,24 @@ function ItemDetailDialog({
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 id="item-pricing-heading" className="text-base font-semibold">
-                  Harga Default
+                  {copy('Default Price')}
                 </h2>
                 <div className="mt-1 text-xl font-semibold tracking-[-0.02em]">
                   <PriceLabel
                     price={defaultPrice}
                     loading={defaultPriceLoading}
-                    emptyLabel="Belum diatur"
+                    emptyLabel={copy('Not set')}
                   />
                 </div>
               </div>
               {canCreatePricing && (
                 <DButton onClick={() => setPricingTarget('default')}>
-                  {defaultPrice ? 'Ubah harga' : 'Atur harga'}
+                  {defaultPrice ? copy('Change price') : copy('Set price')}
                 </DButton>
               )}
             </div>
             <div className="mt-4">
-              <h3 className="text-sm font-semibold">Riwayat harga</h3>
+              <h3 className="text-sm font-semibold">{copy('Price history')}</h3>
               <PriceHistoryTable
                 prices={defaultHistory}
                 currency={currency}
@@ -860,7 +881,7 @@ function ItemDetailDialog({
                   await api.cancelPrice(price.id);
                   onPricingChanged();
                 }}
-                emptyMessage="Belum ada riwayat harga default."
+                emptyMessage={copy('No default price history.')}
               />
             </div>
           </section>
@@ -873,10 +894,10 @@ function ItemDetailDialog({
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 id="item-variants-heading" className="text-base font-semibold">
-                Variants
+                {copy('Variants')}
               </h2>
               <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-                Manage variants for this item.
+                {copy('Manage variants for this item.')}
               </p>
             </div>
             {canCreate && (
@@ -884,19 +905,19 @@ function ItemDetailDialog({
                 leftIcon={<Plus className="size-4" />}
                 onClick={() => setEditingVariant(null)}
               >
-                Add variant
+                {copy('Add variant')}
               </DButton>
             )}
           </div>
           <DDataTable
             columns={[
-              { key: 'code', label: 'Code' },
-              { key: 'name', label: 'Name' },
+              { key: 'code', label: copy('Code') },
+              { key: 'name', label: copy('Name') },
               ...(canViewPricing
                 ? [
                     {
                       key: 'price',
-                      label: 'Price',
+                      label: copy('Price'),
                       render: (variant: Variant) => (
                         <VariantPriceLabel
                           query={variantPriceById.get(variant.id)}
@@ -909,23 +930,23 @@ function ItemDetailDialog({
                 : []),
               {
                 key: 'status',
-                label: 'Status',
+                label: copy('Status'),
                 render: (variant: Variant) => <Status value={variant.status} />,
               },
             ]}
             data={variants.data?.items ?? []}
             loading={variants.isLoading}
             rowKey="id"
-            emptyMessage="No variants."
+            emptyMessage={copy('No variants.')}
             actions={[
               {
-                label: 'Edit variant',
+                label: copy('Edit variant'),
                 icon: <Pencil className="size-4" />,
                 onClick: setEditingVariant,
                 show: () => canUpdate,
               },
               {
-                label: 'Manage variant price',
+                label: copy('Manage variant price'),
                 icon: <BadgeDollarSign className="size-4" />,
                 onClick: setPricingTarget,
                 show: () => canViewPricing,
@@ -989,21 +1010,6 @@ function DetailField({
   );
 }
 
-function formatPrice(amount: string, currency: string) {
-  return new Intl.NumberFormat('id-ID', {
-    style: 'currency',
-    currency,
-    maximumFractionDigits: 0,
-  }).format(Number(amount));
-}
-
-function formatEffectiveAt(value: string | null) {
-  if (!value) return 'Berlaku';
-  return new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(
-    new Date(value),
-  );
-}
-
 function PriceLabel({
   price,
   loading,
@@ -1015,11 +1021,12 @@ function PriceLabel({
   available?: boolean;
   emptyLabel?: string;
 }) {
+  const { copy, formatMoney } = useBackofficeLocalization();
   if (!available) return <span className="text-[var(--color-text-muted)]">—</span>;
   if (loading)
-    return <span className="text-sm font-normal text-[var(--color-text-muted)]">Memuat...</span>;
+    return <span className="text-sm font-normal text-[var(--color-text-muted)]">{copy('Loading...')}</span>;
   return price ? (
-    <span>{formatPrice(price.amount, price.currency)}</span>
+    <span>{formatMoney(price.amount, price.currency)}</span>
   ) : (
     <span className="text-sm font-normal text-[var(--color-text-muted)]">{emptyLabel}</span>
   );
@@ -1046,16 +1053,17 @@ function VariantPriceLabel({
   variantId: string;
   currency: string;
 }) {
+  const { copy, formatMoney } = useBackofficeLocalization();
   if (!query || query.isLoading)
-    return <span className="text-[var(--color-text-muted)]">Memuat...</span>;
+    return <span className="text-[var(--color-text-muted)]">{copy('Loading...')}</span>;
   if (query.isError || !query.data)
-    return <span className="text-[var(--color-text-muted)]">Belum diatur</span>;
+    return <span className="text-[var(--color-text-muted)]">{copy('Not set')}</span>;
   const inherited = query.data.sourceScope.catalogVariantId !== variantId;
   return (
     <div>
-      <p>{formatPrice(query.data.amount, query.data.currency || currency)}</p>
+      <p>{formatMoney(query.data.amount, query.data.currency || currency)}</p>
       {inherited && (
-        <p className="text-xs text-[var(--color-text-muted)]">Menggunakan harga default</p>
+        <p className="text-xs text-[var(--color-text-muted)]">{copy('Uses default price')}</p>
       )}
     </div>
   );
@@ -1078,28 +1086,29 @@ function PriceHistoryTable({
 }) {
   const [pending, setPending] = useState<Price | null>(null);
   const { showToast } = useToast();
+  const { copy, formatDate, formatMoney } = useBackofficeLocalization();
   return (
     <>
       <DDataTable
         columns={[
           {
             key: 'amount',
-            label: 'Harga',
-            render: (price: Price) => formatPrice(price.amount, price.currency || currency),
+            label: copy('Price'),
+            render: (price: Price) => formatMoney(price.amount, price.currency || currency),
           },
           {
             key: 'effectiveFrom',
-            label: 'Berlaku mulai',
-            render: (price: Price) => formatEffectiveAt(price.effectiveFrom),
+            label: copy('Effective from'),
+            render: (price: Price) => formatDate(new Date(price.effectiveFrom), { dateStyle: 'medium', timeStyle: 'short' }),
           },
           {
             key: 'effectiveUntil',
-            label: 'Berlaku sampai',
-            render: (price: Price) => formatEffectiveAt(price.effectiveUntil),
+            label: copy('Effective until'),
+            render: (price: Price) => price.effectiveUntil ? formatDate(new Date(price.effectiveUntil), { dateStyle: 'medium', timeStyle: 'short' }) : copy('Effective now'),
           },
           {
             key: 'cancelledAt',
-            label: 'Status',
+            label: copy('Status'),
             render: (price: Price) => <Status value={price.cancelledAt ? 'CANCELLED' : 'ACTIVE'} />,
           },
         ]}
@@ -1109,7 +1118,7 @@ function PriceHistoryTable({
         emptyMessage={emptyMessage}
         actions={[
           {
-            label: 'Cancel price',
+            label: copy('Cancel price'),
             icon: <Ban className="size-4" />,
             variant: 'danger',
             onClick: setPending,
@@ -1124,21 +1133,21 @@ function PriceHistoryTable({
           if (pending)
             void onCancel(pending)
               .then(() => {
-                showToast({ variant: 'success', title: 'Harga berhasil dibatalkan.' });
+                showToast({ variant: 'success', title: copy('Price cancelled.') });
                 setPending(null);
               })
               .catch((error) => {
                 if (!isSessionExpiredError(error))
                   showToast({
                     variant: 'danger',
-                    title: normalizeBackofficeApiError(error, 'Gagal membatalkan harga.')
+                    title: normalizeBackofficeApiError(error, copy('Could not cancel price.'))
                       .safeMessage,
                   });
               });
         }}
-        title="Batalkan harga?"
-        message="Riwayat harga tetap tersimpan, tetapi harga ini tidak lagi berlaku."
-        confirmLabel="Batalkan harga"
+        title={copy('Cancel price?')}
+        message={copy('Price history is retained, but this price no longer applies.')}
+        confirmLabel={copy('Cancel price')}
         variant="danger"
       />
     </>
@@ -1169,11 +1178,13 @@ function PriceChangeDialog({
   onSaved: () => void;
 }) {
   const { showToast } = useToast();
+  const { copy } = useBackofficeLocalization();
   const [amount, setAmount] = useState('');
   const [effectiveFrom, setEffectiveFrom] = useState(() => new Date().toISOString().slice(0, 16));
   const variant = target && target !== 'default' ? target : null;
+  const hasValidEffectiveFrom = /^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d$/.test(effectiveFrom);
   const save = async () => {
-    if (!target || !amount.trim() || !effectiveFrom) return;
+    if (!target || !amount.trim() || !hasValidEffectiveFrom) return;
     try {
       await api.changePrice({
         catalogItemId: item.id,
@@ -1184,13 +1195,13 @@ function PriceChangeDialog({
         effectiveFrom: new Date(effectiveFrom).toISOString(),
       });
       onSaved();
-      showToast({ variant: 'success', title: 'Harga berhasil diperbarui.' });
+      showToast({ variant: 'success', title: copy('Price updated.') });
       onClose();
     } catch (error) {
       if (!isSessionExpiredError(error))
         showToast({
           variant: 'danger',
-          title: normalizeBackofficeApiError(error, 'Gagal memperbarui harga.').safeMessage,
+          title: normalizeBackofficeApiError(error, copy('Could not update price.')).safeMessage,
         });
     }
   };
@@ -1198,20 +1209,20 @@ function PriceChangeDialog({
     <DDialog
       open={Boolean(target)}
       onClose={onClose}
-      title={variant ? `Harga varian — ${variant.name}` : 'Ubah harga default'}
+      title={variant ? `${copy('Variant price')} — ${variant.name}` : copy('Change default price')}
       description={
         variant
-          ? 'Harga varian adalah harga final dan tidak dihitung sebagai selisih dari harga default.'
-          : 'Harga baru ditambahkan sebagai riwayat efektif; harga sebelumnya tidak diubah.'
+          ? copy('Variant prices are final prices, not differences from the default price.')
+          : copy('A new price is added to effective history; the previous price is unchanged.')
       }
       footer={
         <div className="flex justify-end gap-2">
           <DButton variant="secondary" onClick={onClose}>
-            Batal
+            {copy('Cancel')}
           </DButton>
           {canCreate && (
-            <DButton onClick={() => void save()} disabled={!amount.trim() || !effectiveFrom}>
-              Simpan harga
+            <DButton onClick={() => void save()} disabled={!amount.trim() || !hasValidEffectiveFrom}>
+              {copy('Save price')}
             </DButton>
           )}
         </div>
@@ -1220,22 +1231,27 @@ function PriceChangeDialog({
       <div className="space-y-5">
         {canCreate && (
           <div className="grid gap-4 sm:grid-cols-2">
-            <DInput label="Harga baru" value={amount} onChange={setAmount} placeholder="100000" />
-            <DInput
-              label="Berlaku mulai"
-              type="text"
+            <DCurrencyInput
+              label={copy('New price')}
+              value={amount}
+              onValueChange={setAmount}
+              placeholder={copy('For example, 100000')}
+            />
+            <DDatePicker
+              label={copy('Effective from')}
               value={effectiveFrom}
               onChange={setEffectiveFrom}
+              variant="date-time"
+              placeholder={copy('Select the date the price takes effect')}
             />
-            <p className="text-sm text-[var(--color-text-muted)]">Mata uang: {currency}</p>
+            <p className="text-sm text-[var(--color-text-muted)]">{copy('Currency:')} {currency}</p>
           </div>
         )}
         <div className="border-t border-[var(--color-border)] pt-4">
-          <h3 className="text-sm font-semibold">Riwayat harga</h3>
+          <h3 className="text-sm font-semibold">{copy('Price history')}</h3>
           {variant && (
             <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-              Hanya harga khusus varian yang dicatat di sini. Harga default item bukan riwayat
-              varian.
+              {copy('Only variant-specific prices are recorded here. The item default price is not variant history.')}
             </p>
           )}
           <div className="mt-3">
@@ -1250,8 +1266,8 @@ function PriceChangeDialog({
               }}
               emptyMessage={
                 variant
-                  ? 'Belum ada harga khusus untuk varian ini.'
-                  : 'Belum ada riwayat harga default.'
+                  ? copy('No variant-specific price history.')
+                  : copy('No default price history.')
               }
             />
           </div>

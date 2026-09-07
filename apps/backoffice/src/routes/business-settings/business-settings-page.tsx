@@ -6,7 +6,7 @@ import {
   DInput,
   DSkeleton,
   useToast,
-} from '@digvation-labs/ui';
+} from '@digvation/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Building2, CircleOff, MapPinPlus, Pencil } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -16,6 +16,7 @@ import { canPerformBackofficeAction } from '../../auth/backoffice-access';
 import { isSessionExpiredError, useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
+import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
 import {
   BusinessSettingsApi,
   type BusinessProfile,
@@ -38,6 +39,7 @@ export function BusinessSettingsPage() {
   );
   const queryClient = useQueryClient();
   const { showToast } = useToast();
+  const { copy } = useBackofficeLocalization();
   const [editingProfile, setEditingProfile] = useState<BusinessProfile | null>(null);
   const [editingLocation, setEditingLocation] = useState<SellingLocation | null | undefined>(
     undefined,
@@ -80,9 +82,9 @@ export function BusinessSettingsPage() {
   return (
     <BackofficePage>
       <BackofficePageHeader
-        eyebrow="Configuration"
+        eyebrow={copy('Configuration')}
         title="Business"
-        description="Set your business identity and manage the selling locations available to this workspace."
+        description={copy('Set your business identity and manage the selling locations available to this workspace.')}
       />
 
       {canViewProfile ? (
@@ -136,7 +138,7 @@ export function BusinessSettingsPage() {
                 invalidateLocations();
                 showToast({
                   variant: 'success',
-                  title: 'Lokasi penjualan berhasil dinonaktifkan.',
+                  title: copy('Selling location deactivated.'),
                 });
                 setDeactivatingLocation(null);
               })
@@ -146,14 +148,14 @@ export function BusinessSettingsPage() {
                     variant: 'danger',
                     title: normalizeBackofficeApiError(
                       error,
-                      'Gagal menonaktifkan lokasi penjualan.',
+                      copy('Could not save selling location.'),
                     ).safeMessage,
                   });
               });
         }}
-        title="Deactivate selling location?"
+        title={copy('Deactivate selling location?')}
         message="This location will remain in historical records but cannot be used as an active selling location."
-        confirmLabel="Deactivate"
+        confirmLabel={copy('Deactivate')}
         variant="danger"
       />
     </BackofficePage>
@@ -171,6 +173,7 @@ function ProfileCard({
   canUpdate: boolean;
   onEdit: (profile: BusinessProfile) => void;
 }) {
+  const { copy } = useBackofficeLocalization();
   return (
     <section className="mt-8 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -179,7 +182,7 @@ function ProfileCard({
             <Building2 className="size-[18px]" />
           </span>
           <div>
-            <h2 className="font-semibold">Business profile</h2>
+            <h2 className="font-semibold">{copy('Business profile')}</h2>
             <p className="mt-1 text-sm text-[var(--color-text-muted)]">
               The business name used by your POS records.
             </p>
@@ -187,14 +190,14 @@ function ProfileCard({
         </div>
         {canUpdate && profile ? (
           <DButton variant="secondary" size="sm" onClick={() => onEdit(profile)}>
-            Edit profile
+            {copy('Edit profile')}
           </DButton>
         ) : null}
       </div>
       {isLoading ? (
         <DSkeleton className="mt-5 h-6 w-52" />
       ) : (
-        <p className="mt-5 text-lg font-semibold">{profile?.name ?? 'Not configured'}</p>
+        <p className="mt-5 text-lg font-semibold">{profile?.name ?? copy('Not configured')}</p>
       )}
     </section>
   );
@@ -225,11 +228,12 @@ function LocationsPanel({
   onPrevious: () => void;
   onNext: () => void;
 }) {
+  const { copy } = useBackofficeLocalization();
   return (
     <section className="mt-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h2 className="text-lg font-semibold">Selling locations</h2>
+          <h2 className="text-lg font-semibold">{copy('Selling locations')}</h2>
           <p className="mt-1 text-sm text-[var(--color-text-muted)]">
             Selling locations are the branches used by POS transactions and location-specific
             pricing.
@@ -237,7 +241,7 @@ function LocationsPanel({
         </div>
         {canCreate ? (
           <DButton size="sm" leftIcon={<MapPinPlus className="size-4" />} onClick={onCreate}>
-            Add location
+            {copy('Add location')}
           </DButton>
         ) : null}
       </div>
@@ -248,7 +252,7 @@ function LocationsPanel({
         </div>
       ) : !locations?.length ? (
         <div className="mt-4 rounded-[var(--radius-card)] border border-dashed border-[var(--color-border)] p-6 text-sm text-[var(--color-text-muted)]">
-          No selling locations have been created yet.
+          {copy('No selling locations have been created yet.')}
         </div>
       ) : (
         <div className="mt-4 overflow-hidden rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)]">
@@ -259,9 +263,9 @@ function LocationsPanel({
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-semibold">{location.name}</p>
                     {location.status === 'INACTIVE' ? (
-                      <DBadge>Inactive</DBadge>
+                      <DBadge>{copy('Inactive')}</DBadge>
                     ) : (
-                      <DBadge variant="outline">Active</DBadge>
+                      <DBadge variant="outline">{copy('Active')}</DBadge>
                     )}
                   </div>
                   <p className="mt-1 text-xs text-[var(--color-text-muted)]">{location.code}</p>
@@ -320,19 +324,20 @@ function ProfileEditor({
   onChanged: () => void;
 }) {
   const { showToast } = useToast();
+  const { copy } = useBackofficeLocalization();
   const [name, setName] = useState(profile?.name ?? '');
   const save = async () => {
     if (!profile || !name.trim()) return;
     try {
       await api.updateProfile(profile, name.trim());
       onChanged();
-      showToast({ variant: 'success', title: 'Profil bisnis berhasil diperbarui.' });
+      showToast({ variant: 'success', title: copy('Business profile updated.') });
       onClose();
     } catch (error) {
       if (!isSessionExpiredError(error))
         showToast({
           variant: 'danger',
-          title: normalizeBackofficeApiError(error, 'Gagal memperbarui profil bisnis.').safeMessage,
+          title: normalizeBackofficeApiError(error, copy('Could not update business profile.')).safeMessage,
         });
     }
   };
@@ -340,20 +345,26 @@ function ProfileEditor({
     <DDialog
       open={Boolean(profile)}
       onClose={onClose}
-      title="Business profile"
-      description="Set the name that identifies this business in POS records."
+      title={copy('Business profile')}
+      description={copy('Set the name that identifies this business in POS records.')}
       footer={
         <div className="flex justify-end gap-2">
           <DButton variant="secondary" onClick={onClose}>
-            Cancel
+            {copy('Cancel')}
           </DButton>
           <DButton onClick={() => void save()} disabled={!name.trim()}>
-            Save profile
+            {copy('Save profile')}
           </DButton>
         </div>
       }
     >
-      <DInput label="Business name" value={name} onChange={setName} autoFocus />
+      <DInput
+        label={copy('Business name')}
+        value={name}
+        onChange={setName}
+        placeholder={copy('For example, Main Store')}
+        autoFocus
+      />
     </DDialog>
   );
 }
@@ -372,6 +383,7 @@ function LocationEditor({
   onChanged: () => void;
 }) {
   const { showToast } = useToast();
+  const { copy } = useBackofficeLocalization();
   const isNew = location === null;
   const [code, setCode] = useState('');
   const [name, setName] = useState(location?.name ?? '');
@@ -386,8 +398,8 @@ function LocationEditor({
       showToast({
         variant: 'success',
         title: isNew
-          ? 'Lokasi penjualan berhasil ditambahkan.'
-          : 'Lokasi penjualan berhasil diperbarui.',
+          ? copy('Selling location added.')
+          : copy('Selling location updated.'),
       });
       onClose();
     } catch (error) {
@@ -396,7 +408,7 @@ function LocationEditor({
           variant: 'danger',
           title: normalizeBackofficeApiError(
             error,
-            isNew ? 'Gagal menambahkan lokasi penjualan.' : 'Gagal memperbarui lokasi penjualan.',
+            copy('Could not save selling location.'),
           ).safeMessage,
         });
     }
@@ -405,30 +417,30 @@ function LocationEditor({
     <DDialog
       open={location !== undefined}
       onClose={onClose}
-      title={isNew ? 'Add selling location' : 'Edit selling location'}
+      title={isNew ? copy('Add selling location') : copy('Edit selling location')}
       description={
         isNew
-          ? 'A selling location is the branch context for POS sales and location-specific prices.'
-          : 'Location codes are permanent once created.'
+          ? copy('A selling location is the branch context for POS sales and location-specific prices.')
+          : copy('Location codes are permanent once created.')
       }
       footer={
         <div className="flex justify-end gap-2">
           <DButton variant="secondary" onClick={onClose}>
-            Cancel
+            {copy('Cancel')}
           </DButton>
           <DButton onClick={() => void save()} disabled={!name.trim() || (isNew && !code.trim())}>
-            Save location
+            {copy('Save location')}
           </DButton>
         </div>
       }
     >
       <div className="grid gap-4 sm:grid-cols-2">
         {isNew ? (
-          <DInput label="Location code" value={code} onChange={setCode} placeholder="MAIN" />
+          <DInput label={copy('Location code')} value={code} onChange={setCode} placeholder="MAIN" />
         ) : (
-          <DInput label="Location code" value={location?.code ?? ''} disabled />
+          <DInput label={copy('Location code')} value={location?.code ?? ''} disabled />
         )}
-        {<DInput label="Location name" value={name} onChange={setName} autoFocus />}
+        {<DInput label={copy('Location name')} value={name} onChange={setName} placeholder={copy('For example, Central Jakarta')} autoFocus />}
       </div>
     </DDialog>
   );

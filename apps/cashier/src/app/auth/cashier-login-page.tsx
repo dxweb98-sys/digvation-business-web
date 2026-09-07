@@ -1,4 +1,4 @@
-import { DButton, DInput, useToast } from '@digvation-labs/ui';
+import { DButton, DInput, useToast } from '@digvation/ui';
 import { ReceiptText } from 'lucide-react';
 import { useRef, useState, type FormEvent, type TransitionEvent } from 'react';
 

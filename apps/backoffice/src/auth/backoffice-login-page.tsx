@@ -1,4 +1,4 @@
-import { DButton, DInput, useToast } from '@digvation-labs/ui';
+import { DButton, DInput, useToast } from '@digvation/ui';
 import { useState, type FormEvent } from 'react';
 import { Navigate, useLocation } from 'react-router';
 
@@ -13,7 +13,7 @@ export function BackofficeLoginPage() {
   const location = useLocation();
   const { status, login } = useBackofficeAuth();
   const { showToast } = useToast();
-  const { t } = useBackofficeLocalization();
+  const { copy, t } = useBackofficeLocalization();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +60,7 @@ export function BackofficeLoginPage() {
             onChange={setIdentifier}
             autoComplete="username"
             disabled={isSubmitting}
+            placeholder={copy('Enter your username or phone number')}
           />
           <DInput
             label={t('password')}
@@ -68,6 +69,7 @@ export function BackofficeLoginPage() {
             onChange={setPassword}
             autoComplete="current-password"
             disabled={isSubmitting}
+            placeholder={copy('Enter your password')}
           />
           {error ? (
             <p role="alert" className="text-sm text-[var(--color-danger)]">

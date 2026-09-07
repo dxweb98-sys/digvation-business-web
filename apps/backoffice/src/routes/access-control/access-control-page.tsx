@@ -8,7 +8,7 @@ import {
   DInput,
   useToast,
   type TableColumn,
-} from '@digvation-labs/ui';
+} from '@digvation/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ban, Pencil, UserCog } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -70,7 +70,7 @@ export function AccessControlPage() {
       <BackofficePageHeader
         eyebrow={copy('Configuration')}
         title={copy('Access Control')}
-        description="Manage tenant roles and user role assignments. Permissions are defined by the POS platform."
+        description={copy('Manage tenant roles and user role assignments. Permissions are defined by the POS platform.')}
         actions={
           section === 'roles' && canCreateRole ? (
             <DButton onClick={() => setEditingRole(null)}>{copy('Create role')}</DButton>
@@ -133,20 +133,20 @@ export function AccessControlPage() {
               .deactivateRole(deactivatingRole)
               .then(() => {
                 invalidateRoles();
-                showToast({ variant: 'success', title: 'Role berhasil dinonaktifkan.' });
+                showToast({ variant: 'success', title: copy('Role deactivated.') });
                 setDeactivatingRole(null);
               })
               .catch((error) => {
                 if (!isSessionExpiredError(error))
                   showToast({
                     variant: 'danger',
-                    title: normalizeBackofficeApiError(error, 'Gagal menonaktifkan role.')
+                    title: normalizeBackofficeApiError(error, copy('Could not deactivate role.'))
                       .safeMessage,
                   });
               });
         }}
         title={copy('Deactivate role?')}
-        message="Users will no longer receive this role's permissions."
+        message={copy("Users will no longer receive this role's permissions.")}
         confirmLabel={copy('Deactivate')}
         variant="danger"
       />
@@ -177,7 +177,7 @@ function RolesTable({
       render: (role) => (
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-semibold">{role.name}</span>
-          {role.systemKey ? <DBadge variant="outline">System role</DBadge> : null}
+          {role.systemKey ? <DBadge variant="outline">{copy('System role')}</DBadge> : null}
         </div>
       ),
     },
@@ -205,7 +205,7 @@ function RolesTable({
         data={roles}
         rowKey="id"
         loading={isLoading}
-        emptyMessage="No roles are available for this workspace."
+        emptyMessage={copy('No roles are available for this workspace.')}
         actions={[
           {
             label: copy('Manage role'),
@@ -239,12 +239,12 @@ function UsersTable({
 }) {
   const { copy } = useBackofficeLocalization();
   const columns: TableColumn<AccessUser>[] = [
-    { key: 'displayName', label: 'User' },
-    { key: 'username', label: 'Username', render: (user) => user.username ?? 'No username' },
+    { key: 'displayName', label: copy('User') },
+    { key: 'username', label: copy('Username'), render: (user) => user.username ?? copy('No username') },
     {
       key: 'roles',
       label: copy('Roles'),
-      render: (user) => user.roles.map((role) => role.name).join(', ') || 'No roles assigned',
+      render: (user) => user.roles.map((role) => role.name).join(', ') || copy('No roles assigned'),
     },
     {
       key: 'status',
@@ -264,7 +264,7 @@ function UsersTable({
         data={users}
         rowKey="id"
         loading={isLoading}
-        emptyMessage="No POS users are available for this workspace."
+        emptyMessage={copy('No POS users are available for this workspace.')}
         actions={[
           {
             label: copy('Manage roles'),
@@ -314,7 +314,7 @@ function RoleEditor({
       onChanged();
       showToast({
         variant: 'success',
-        title: isNew ? 'Role berhasil ditambahkan.' : 'Perubahan role berhasil disimpan.',
+        title: isNew ? copy('Role added.') : copy('Role updated.'),
       });
       onClose();
     } catch (error) {
@@ -323,7 +323,7 @@ function RoleEditor({
           variant: 'danger',
           title: normalizeBackofficeApiError(
             error,
-            isNew ? 'Gagal menambahkan role.' : 'Gagal menyimpan perubahan role.',
+            copy('Could not save role.'),
           ).safeMessage,
         });
     }
@@ -339,8 +339,8 @@ function RoleEditor({
       title={isNew ? copy('Create role') : `${copy('Manage role')}: ${current?.name ?? ''}`}
       description={
         current?.systemKey
-          ? 'System roles are protected by the POS authorization policy.'
-          : 'Role permissions are assigned from the platform permission registry.'
+          ? copy('System roles are protected by the POS authorization policy.')
+          : copy('Role permissions are assigned from the platform permission registry.')
       }
       size="lg"
       footer={
@@ -366,6 +366,7 @@ function RoleEditor({
               label={copy('Role name')}
               value={name || current?.name || ''}
               onChange={setName}
+              placeholder={copy('For example, Store Manager')}
               disabled={!isNew && !canUpdate}
             />
           </div>
@@ -437,7 +438,7 @@ function UserRoleEditor({
                       onChanged();
                       showToast({
                         variant: 'success',
-                        title: 'Peran pengguna berhasil diperbarui.',
+                        title: copy('User roles updated.'),
                       });
                       onClose();
                     })
@@ -447,7 +448,7 @@ function UserRoleEditor({
                           variant: 'danger',
                           title: normalizeBackofficeApiError(
                             error,
-                            'Gagal memperbarui peran pengguna.',
+                            copy('Could not update user roles.'),
                           ).safeMessage,
                         });
                     });

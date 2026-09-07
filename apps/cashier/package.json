@@ -14,7 +14,7 @@
     "@digvation/pos-auth": "workspace:*",
     "@digvation/pos-money": "workspace:*",
     "@digvation/pos-runtime": "workspace:*",
-    "@digvation-labs/ui": "1.0.0",
+    "@digvation/ui": "1.1.0",
     "@tanstack/react-query": "5.102.8",
     "lucide-react": "1.37.0",
     "react": "19.2.8",

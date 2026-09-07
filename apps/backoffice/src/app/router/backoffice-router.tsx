@@ -30,22 +30,22 @@ export const backofficeRouter = createBrowserRouter([
           },
           {
             element: <AuthorizedRoute capability="employees" />,
-            children: [{ path: '/employees', element: <PlaceholderPage title="Employees" /> }],
+            children: [{ path: '/employees', element: <PlaceholderPage title="employees" /> }],
           },
           {
             element: <AuthorizedRoute capability="finance" />,
             children: [
               {
                 path: '/financial-accounts',
-                element: <PlaceholderPage title="Financial Accounts" />,
+                element: <PlaceholderPage title="financialAccounts" />,
               },
-              { path: '/expenses', element: <PlaceholderPage title="Expenses" /> },
-              { path: '/reconciliation', element: <PlaceholderPage title="Reconciliation" /> },
+              { path: '/expenses', element: <PlaceholderPage title="expenses" /> },
+              { path: '/reconciliation', element: <PlaceholderPage title="reconciliation" /> },
             ],
           },
           {
             element: <AuthorizedRoute capability="reports" />,
-            children: [{ path: '/reports', element: <PlaceholderPage title="Reports" /> }],
+            children: [{ path: '/reports', element: <PlaceholderPage title="reports" /> }],
           },
           {
             element: <AuthorizedRoute capability="configuration" />,

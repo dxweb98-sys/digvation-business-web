@@ -8,4 +8,4 @@ allowBuilds:
   msw: false
 
 minimumReleaseAgeExclude:
-  - '@digvation-labs/ui@1.0.0'
+  - '@digvation/ui@1.1.0'

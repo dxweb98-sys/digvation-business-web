@@ -1,5 +1,5 @@
 import { useRuntime } from '@digvation/pos-runtime';
-import { DAvatar, DBadge, DButton, DDropdown } from '@digvation-labs/ui';
+import { DAvatar, DBadge, DButton, DDropdown } from '@digvation/ui';
 import {
   Bell,
   BadgePercent,

@@ -1,18 +1,20 @@
 import { useAuth } from '@digvation/pos-auth';
 import { useRuntime } from '@digvation/pos-runtime';
-import { DCard } from '@digvation-labs/ui';
+import { DCard } from '@digvation/ui';
 
 import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
 import { getAppVersion } from '../../app/version/app-version';
+import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
 
 export function AccountPage() {
   const { session } = useAuth();
   const runtime = useRuntime();
   const version = getAppVersion();
+  const { t } = useBackofficeLocalization();
 
   return (
     <BackofficePage>
-      <BackofficePageHeader title="Account & runtime" />
+      <BackofficePageHeader title={t('accountAndRuntime')} />
       <DCard className="mt-6 p-6">
         <p className="mt-4 text-sm leading-7 text-[var(--color-text-muted)]">
           {session.identity.displayName} · {runtime.workspace} · {runtime.deploymentProfile}
