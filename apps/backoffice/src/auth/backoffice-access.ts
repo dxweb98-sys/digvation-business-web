@@ -30,7 +30,9 @@ export type BackofficeAction =
   | 'viewTax'
   | 'createTax'
   | 'updateTax'
-  | 'cancelTax';
+  | 'cancelTax'
+  | 'createEmployee'
+  | 'updateEmployee';
 
 interface PermissionRequirement {
   allOf?: readonly string[];
@@ -78,6 +80,8 @@ const actionPermissions: Record<BackofficeAction, readonly string[]> = {
   createTax: ['tax:create'],
   updateTax: ['tax:update'],
   cancelTax: ['tax:cancel'],
+  createEmployee: ['employees:create'],
+  updateEmployee: ['employees:update'],
 };
 
 export function canAccessBackoffice(

@@ -4,6 +4,7 @@ import {
   DConfirmDialog,
   DDialog,
   DInput,
+  DPagination,
   DSkeleton,
   useToast,
 } from '@digvation/ui';
@@ -108,8 +109,7 @@ export function BusinessSettingsPage() {
           hasNext={Boolean(
             locationsQuery.data && locationsQuery.data.items.length === locationsQuery.data.limit,
           )}
-          onPrevious={() => setLocationsOffset((offset) => Math.max(0, offset - locationPageLimit))}
-          onNext={() => setLocationsOffset((offset) => offset + locationPageLimit)}
+          onOffsetChange={setLocationsOffset}
         />
       ) : null}
       <ProfileEditor
@@ -213,8 +213,7 @@ function LocationsPanel({
   onDeactivate,
   offset,
   hasNext,
-  onPrevious,
-  onNext,
+  onOffsetChange,
 }: {
   locations?: SellingLocation[] | undefined;
   isLoading: boolean;
@@ -225,10 +224,11 @@ function LocationsPanel({
   onDeactivate: (location: SellingLocation) => void;
   offset: number;
   hasNext: boolean;
-  onPrevious: () => void;
-  onNext: () => void;
+  onOffsetChange: (offset: number) => void;
 }) {
   const { copy } = useBackofficeLocalization();
+  const page = Math.floor(offset / locationPageLimit) + 1;
+  const totalPages = page + (hasNext ? 1 : 0);
   return (
     <section className="mt-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -300,13 +300,12 @@ function LocationsPanel({
         </div>
       )}
       {locations?.length ? (
-        <PaginationControls
-          offset={offset}
-          count={locations.length}
-          hasNext={hasNext}
-          onPrevious={onPrevious}
-          onNext={onNext}
-        />
+        <div className="mt-4 flex items-center justify-end gap-2">
+          <span className="mr-auto text-xs text-[var(--color-text-muted)]">
+            Showing {offset + 1}–{offset + locations.length}
+          </span>
+          <DPagination page={page} totalPages={totalPages} onChange={(nextPage) => onOffsetChange((nextPage - 1) * locationPageLimit)} />
+        </div>
       ) : null}
     </section>
   );
@@ -443,33 +442,5 @@ function LocationEditor({
         {<DInput label={copy('Location name')} value={name} onChange={setName} placeholder={copy('For example, Central Jakarta')} autoFocus />}
       </div>
     </DDialog>
-  );
-}
-
-function PaginationControls({
-  offset,
-  count,
-  hasNext,
-  onPrevious,
-  onNext,
-}: {
-  offset: number;
-  count: number;
-  hasNext: boolean;
-  onPrevious: () => void;
-  onNext: () => void;
-}) {
-  return (
-    <div className="mt-4 flex items-center justify-end gap-2">
-      <span className="mr-auto text-xs text-[var(--color-text-muted)]">
-        Showing {offset + 1}–{offset + count}
-      </span>
-      <DButton variant="secondary" size="sm" disabled={offset === 0} onClick={onPrevious}>
-        Previous
-      </DButton>
-      <DButton variant="secondary" size="sm" disabled={!hasNext} onClick={onNext}>
-        Next
-      </DButton>
-    </div>
   );
 }

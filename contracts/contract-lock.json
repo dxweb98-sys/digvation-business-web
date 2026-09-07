@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "backend": {
     "repository": "https://github.com/dxweb98-sys/digvation-pos-service",
-    "release": "v0.3.0",
-    "sha": "d58327fa17322d1a98049d842f43742635e744f7"
+    "release": "v0.4.0",
+    "sha": "c402fa5e82acffd5ac07ee0448b2de83ec600347"
   },
   "auth": {
     "status": "implementation-in-progress",

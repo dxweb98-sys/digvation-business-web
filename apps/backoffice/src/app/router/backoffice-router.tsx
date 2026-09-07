@@ -11,6 +11,7 @@ import { BackofficeShell } from '../shell/backoffice-shell';
 import { BusinessSettingsPage } from '../../routes/business-settings/business-settings-page';
 import { CatalogPage } from '../../routes/catalog/catalog-page';
 import { TaxPage } from '../../routes/tax/tax-page';
+import { EmployeesPage } from '../../routes/employees/employees-page';
 
 export const backofficeRouter = createBrowserRouter([
   { path: '/login', element: <BackofficeLoginPage /> },
@@ -30,7 +31,7 @@ export const backofficeRouter = createBrowserRouter([
           },
           {
             element: <AuthorizedRoute capability="employees" />,
-            children: [{ path: '/employees', element: <PlaceholderPage title="employees" /> }],
+            children: [{ path: '/employees', element: <EmployeesPage /> }],
           },
           {
             element: <AuthorizedRoute capability="finance" />,
