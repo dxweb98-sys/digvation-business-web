@@ -4,7 +4,7 @@ import {
   normalizeDecimalInput,
   type CurrencyInputProps,
   type DecimalInputProps,
-} from '@digvation-labs/ui';
+} from '@digvation/ui';
 import { useState, type ReactNode } from 'react';
 
 function plainNumeric(value: string) {

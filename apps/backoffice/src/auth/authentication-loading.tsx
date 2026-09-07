@@ -1,4 +1,4 @@
-import { DSkeleton } from '@digvation-labs/ui';
+import { DSkeleton } from '@digvation/ui';
 
 export function AuthenticationLoading() {
   return (

@@ -1,5 +1,5 @@
 import { useRuntime } from '@digvation/pos-runtime';
-import { DAvatar, DBadge, DButton, DDropdown } from '@digvation-labs/ui';
+import { DAvatar, DBadge, DButton, DDropdown } from '@digvation/ui';
 import {
   Bell,
   BadgePercent,
@@ -7,6 +7,7 @@ import {
   Building2,
   ChartNoAxesCombined,
   CircleUserRound,
+  Globe2,
   KeyRound,
   LayoutDashboard,
   LogOut,
@@ -24,41 +25,42 @@ import { NavLink, Outlet } from 'react-router';
 import { canAccessBackoffice, type BackofficeCapability } from '../../auth/backoffice-access';
 import { useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import type { BackofficeSession } from '../../auth/auth-session';
+import { type BackofficeMessageKey, useBackofficeLocalization } from '../localization/backoffice-localization';
 
 interface NavigationItem {
-  label: string;
+  label: BackofficeMessageKey;
   to: string;
   icon: LucideIcon;
   capability: BackofficeCapability;
 }
 
 const dashboardItem: NavigationItem = {
-  label: 'Dashboard',
+  label: 'dashboard',
   to: '/',
   icon: LayoutDashboard,
   capability: 'dashboard',
 };
 
-const navigationSections: ReadonlyArray<{ label: string; items: readonly NavigationItem[] }> = [
+const navigationSections: ReadonlyArray<{ label: BackofficeMessageKey; items: readonly NavigationItem[] }> = [
   {
-    label: 'Master Data',
+    label: 'masterData',
     items: [
-      { label: 'Catalog', to: '/catalog', icon: Tags, capability: 'catalog' },
-      { label: 'Employees', to: '/employees', icon: UsersRound, capability: 'employees' },
+      { label: 'catalog', to: '/catalog', icon: Tags, capability: 'catalog' },
+      { label: 'employees', to: '/employees', icon: UsersRound, capability: 'employees' },
     ],
   },
   {
-    label: 'Finance',
+    label: 'finance',
     items: [
       {
-        label: 'Financial Accounts',
+        label: 'financialAccounts',
         to: '/financial-accounts',
         icon: WalletCards,
         capability: 'finance',
       },
-      { label: 'Expenses', to: '/expenses', icon: BookOpen, capability: 'finance' },
+      { label: 'expenses', to: '/expenses', icon: BookOpen, capability: 'finance' },
       {
-        label: 'Reconciliation',
+        label: 'reconciliation',
         to: '/reconciliation',
         icon: ChartNoAxesCombined,
         capability: 'finance',
@@ -66,16 +68,16 @@ const navigationSections: ReadonlyArray<{ label: string; items: readonly Navigat
     ],
   },
   {
-    label: 'Reporting',
-    items: [{ label: 'Reports', to: '/reports', icon: ChartNoAxesCombined, capability: 'reports' }],
+    label: 'reporting',
+    items: [{ label: 'reports', to: '/reports', icon: ChartNoAxesCombined, capability: 'reports' }],
   },
   {
-    label: 'Configuration',
+    label: 'configuration',
     items: [
-      { label: 'Business', to: '/business', icon: Building2, capability: 'configuration' },
-      { label: 'Tax', to: '/tax', icon: BadgePercent, capability: 'tax' },
+      { label: 'business', to: '/business', icon: Building2, capability: 'configuration' },
+      { label: 'tax', to: '/tax', icon: BadgePercent, capability: 'tax' },
       {
-        label: 'Access Control',
+        label: 'accessControl',
         to: '/access-control',
         icon: CircleUserRound,
         capability: 'accessControl',
@@ -86,18 +88,19 @@ const navigationSections: ReadonlyArray<{ label: string; items: readonly Navigat
 
 export function BackofficeShell() {
   const runtime = useRuntime();
+  const { locale, setLocale, t, formatDate } = useBackofficeLocalization();
   const { session, logout } = useBackofficeAuth();
   if (!session) return null;
 
   const brandSubtitle =
     runtime.branding.businessName ?? runtime.branding.companyName ?? 'Backoffice';
   const roleContext =
-    session.identity.roles.map((role) => role.name).join(', ') || 'Authenticated user';
-  const currentDate = new Intl.DateTimeFormat('id-ID', {
+    session.identity.roles.map((role) => role.name).join(', ') || t('authenticatedUser');
+  const currentDate = formatDate(new Date(), {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
-  }).format(new Date());
+  });
 
   return (
     <div className="backoffice-shell flex h-screen w-full min-w-0 overflow-hidden bg-[var(--color-background)]">
@@ -134,7 +137,7 @@ export function BackofficeShell() {
               <DAvatar
                 alt=""
                 name={session.identity.displayName}
-                fallback={<UserRound className="size-4" aria-label="User account" />}
+                fallback={<UserRound className="size-4" aria-label={t('userAccount')} />}
                 size="sm"
                 className="shrink-0 bg-[var(--color-brand)]/10 text-xs font-bold text-[var(--color-brand)]"
               />
@@ -156,7 +159,7 @@ export function BackofficeShell() {
               onClick={() => void logout()}
               className="flex h-9 w-full items-center justify-start gap-2.5 px-3 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)]"
             >
-              Logout
+              {t('logout')}
             </DButton>
           </div>
         </div>
@@ -173,7 +176,7 @@ export function BackofficeShell() {
                 minWidth={0}
                 contentClassName="w-[min(320px,calc(100vw-24px))] max-h-[calc(100vh-88px)] overflow-y-auto"
                 trigger={() => (
-                  <DButton variant="ghost" size="icon" aria-label="Open navigation menu">
+                  <DButton variant="ghost" size="icon" aria-label={t('openNavigation')}>
                     <Menu className="size-[18px]" />
                   </DButton>
                 )}
@@ -184,7 +187,7 @@ export function BackofficeShell() {
               </DDropdown>
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-[var(--color-text)]">Backoffice</p>
+              <p className="text-sm font-semibold text-[var(--color-text)]">{t('business')}</p>
               <p className="truncate text-xs text-[var(--color-text-muted)]">
                 {session.identity.workspace}
               </p>
@@ -209,9 +212,9 @@ export function BackofficeShell() {
                 className="size-1.5 rounded-full bg-[var(--color-success)]"
                 aria-hidden="true"
               />
-              Online
+              {t('online')}
             </span>
-            <DButton variant="ghost" size="icon" aria-label="Notifications">
+            <DButton variant="ghost" size="icon" aria-label={t('notifications')}>
               <Bell className="size-[18px]" />
             </DButton>
             <DDropdown
@@ -223,14 +226,14 @@ export function BackofficeShell() {
                 <button
                   type="button"
                   className="grid size-9 place-items-center border-0 bg-transparent p-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/25"
-                  aria-label="Open account menu"
+                  aria-label={t('openAccountMenu')}
                 >
                   <DAvatar
                     alt=""
                     name={session.identity.displayName}
                     fallback={
                       session.identity.displayName.trim() ? undefined : (
-                        <UserRound className="size-4" aria-label="User account" />
+                        <UserRound className="size-4" aria-label={t('userAccount')} />
                       )
                     }
                     size="sm"
@@ -254,7 +257,7 @@ export function BackofficeShell() {
                   className="mt-1 flex h-9 w-full items-center gap-2 rounded-[var(--radius-control)] px-2.5 text-left text-sm text-[var(--color-text-muted)] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <UserCircle className="size-4" />
-                  Profile
+                  {t('profile')}
                 </button>
                 <button
                   type="button"
@@ -262,8 +265,18 @@ export function BackofficeShell() {
                   className="flex h-9 w-full items-center gap-2 rounded-[var(--radius-control)] px-2.5 text-left text-sm text-[var(--color-text-muted)] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <KeyRound className="size-4" />
-                  Change Password
+                  {t('changePassword')}
                 </button>
+                <div className="my-1 border-t border-[var(--color-border)]" />
+                <div className="px-2.5 py-1.5 text-xs font-semibold text-[var(--color-text-muted)]">
+                  {t('language')}
+                </div>
+                {(['id', 'en'] as const).map((option) => (
+                  <button key={option} type="button" role="menuitemradio" aria-checked={locale === option} onClick={() => setLocale(option)} className="flex h-9 w-full items-center gap-2 rounded-[var(--radius-control)] px-2.5 text-left text-sm text-[var(--color-text)] hover:bg-[var(--color-surface-muted)]">
+                    <Globe2 className="size-4" />
+                    {option === 'id' ? t('indonesian') : t('english')}
+                  </button>
+                ))}
                 <div className="my-1 border-t border-[var(--color-border)]" />
                 <button
                   type="button"
@@ -272,7 +285,7 @@ export function BackofficeShell() {
                   className="flex h-9 w-full items-center gap-2 rounded-[var(--radius-control)] px-2.5 text-left text-sm font-medium text-[var(--color-text)] hover:bg-[var(--color-surface-muted)]"
                 >
                   <LogOut className="size-4" />
-                  Logout
+                  {t('logout')}
                 </button>
               </div>
             </DDropdown>
@@ -287,6 +300,7 @@ export function BackofficeShell() {
 }
 
 function NavigationGroups({ session }: { session: BackofficeSession }) {
+  const { t } = useBackofficeLocalization();
   return (
     <>
       <div className="mb-3">
@@ -298,7 +312,7 @@ function NavigationGroups({ session }: { session: BackofficeSession }) {
         return (
           <div key={section.label} className="mt-3">
             <p className="px-3 pb-1 text-[12px] font-semibold text-[var(--color-text-muted)]">
-              {section.label}
+              {t(section.label)}
             </p>
             <div className="space-y-0.5 pl-3">
               {items.map((item) => (
@@ -313,6 +327,7 @@ function NavigationGroups({ session }: { session: BackofficeSession }) {
 }
 
 function NavigationLink({ item, nested = false }: { item: NavigationItem; nested?: boolean }) {
+  const { t } = useBackofficeLocalization();
   const Icon = item.icon;
   return (
     <NavLink
@@ -328,7 +343,7 @@ function NavigationLink({ item, nested = false }: { item: NavigationItem; nested
       }
     >
       <Icon className="size-[18px] shrink-0" />
-      {item.label}
+      {t(item.label)}
     </NavLink>
   );
 }

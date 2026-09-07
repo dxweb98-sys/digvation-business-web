@@ -1,6 +1,6 @@
 import { useAuth } from '@digvation/pos-auth';
 import { useConnectivity, useRuntime } from '@digvation/pos-runtime';
-import { DAvatar, DButton, DDialog, useToast } from '@digvation-labs/ui';
+import { DAvatar, DButton, DDialog, useToast } from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
 import {
   Check,

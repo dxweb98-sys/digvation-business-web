@@ -1,6 +1,6 @@
 import { formatMoney } from '@digvation/pos-money';
 import { useRuntime } from '@digvation/pos-runtime';
-import { DButton } from '@digvation-labs/ui';
+import { DButton } from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Clock3, LoaderCircle, ReceiptText } from 'lucide-react';
 import { useMemo } from 'react';

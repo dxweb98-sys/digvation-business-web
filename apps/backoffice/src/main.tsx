@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 
-import '@digvation-labs/ui/styles.css';
+import '@digvation/ui/styles.css';
 import './app/app.css';
 
 import { bootstrapBackoffice } from './app/bootstrap/bootstrap-backoffice';

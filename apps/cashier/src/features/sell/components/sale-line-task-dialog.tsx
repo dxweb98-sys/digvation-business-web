@@ -1,5 +1,5 @@
 import { createDecimal, formatMoney } from '@digvation/pos-money';
-import { DButton, DCheckbox, DDecimalInput, DDialog, DInput, DSelect } from '@digvation-labs/ui';
+import { DButton, DCheckbox, DDecimalInput, DDialog, DInput, DSelect } from '@digvation/ui';
 import { CheckCircle2, CircleDot, Percent, Play, Square, UserRound, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 

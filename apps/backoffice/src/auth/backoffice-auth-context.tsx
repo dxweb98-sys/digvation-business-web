@@ -8,10 +8,11 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { useToast } from '@digvation-labs/ui';
+import { useToast } from '@digvation/ui';
 import { ApiClient } from '@digvation/pos-api';
 
 import { isBackofficeSessionExpired } from '../app/api/backoffice-api-error';
+import { useBackofficeLocalization } from '../app/localization/backoffice-localization';
 import type { BackofficeSession, LoginCredentials } from './auth-session';
 import type { HttpAuthAdapter } from './http-auth-adapter';
 
@@ -38,6 +39,7 @@ export function BackofficeAuthProvider({
   const [status, setStatus] = useState<AuthenticationStatus>('hydrating');
   const [session, setSession] = useState<BackofficeSession | null>(null);
   const { showToast } = useToast();
+  const { t } = useBackofficeLocalization();
   const sessionExpired = useRef(false);
 
   useEffect(() => {
@@ -73,7 +75,8 @@ export function BackofficeAuthProvider({
     await auth.logout();
     setSession(null);
     setStatus('unauthenticated');
-  }, [auth]);
+    showToast({ variant: 'success', title: t('signedOut') });
+  }, [auth, showToast, t]);
 
   const getAccessToken = useCallback(() => auth.getAccessToken(), [auth]);
   const expireSession = useCallback(() => {
@@ -81,9 +84,9 @@ export function BackofficeAuthProvider({
     sessionExpired.current = true;
     setSession(null);
     setStatus('unauthenticated');
-    showToast({ variant: 'warning', title: 'Sesi Anda telah berakhir. Silakan login kembali.' });
+    showToast({ variant: 'warning', title: t('sessionExpired') });
     void auth.logout();
-  }, [auth, showToast]);
+  }, [auth, showToast, t]);
   const createApiClient = useCallback(
     (baseUrl: string) => new ApiClient({ baseUrl, getAccessToken, onUnauthorized: expireSession }),
     [expireSession, getAccessToken],

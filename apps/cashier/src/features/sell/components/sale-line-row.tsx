@@ -1,5 +1,5 @@
 import { compareDecimalStrings, createDecimal, formatMoney } from '@digvation/pos-money';
-import { DBadge, DButton } from '@digvation-labs/ui';
+import { DBadge, DButton } from '@digvation/ui';
 import { Minus, Plus, SlidersHorizontal, Trash2 } from 'lucide-react';
 
 import type { SaleLine } from '../cashier-transaction.types';
