@@ -3,12 +3,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   DButton,
   DBadge,
-  DCard,
   DConnectionError,
   DDataTable,
   DDialog,
   DInput,
-  DPagination,
   DSelect,
   DTabs,
   DTabsContent,
@@ -32,7 +30,7 @@ import {
   type Settlement,
 } from './financial-operations-api';
 
-const limit = 25;
+const defaultPageSize = 25;
 const methods: PaymentMethod[] = ['CASH', 'BANK_TRANSFER', 'WALLET', 'QRIS'];
 const label = (method: PaymentMethod) =>
   method === 'BANK_TRANSFER'
@@ -89,11 +87,14 @@ function CashPanel({ api }: { api: FinancialOperationsApi }) {
   const { copy } = useBackofficeLocalization();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [offset, setOffset] = useState(0);
+  const [positionOffset, setPositionOffset] = useState(0);
+  const [positionPageSize, setPositionPageSize] = useState(defaultPageSize);
+  const [movementOffset, setMovementOffset] = useState(0);
+  const [movementPageSize, setMovementPageSize] = useState(defaultPageSize);
   const positions = useQuery({ queryKey: ['cash-position'], queryFn: () => api.positions() });
   const movements = useQuery({
-    queryKey: ['cash-movements', offset],
-    queryFn: () => api.movements({ limit, offset }),
+    queryKey: ['cash-movements', movementOffset, movementPageSize],
+    queryFn: () => api.movements({ limit: movementPageSize, offset: movementOffset }),
   });
   const columns: TableColumn<NonNullable<typeof positions.data>[number]>[] = [
     {
@@ -135,54 +136,30 @@ function CashPanel({ api }: { api: FinancialOperationsApi }) {
     );
   return (
     <section className="mt-5 space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h2 className="text-base font-bold">{copy('Cash position')}</h2>
-          <p className="mt-1 text-sm text-[var(--color-text-muted)]">{copy('Accepted cash')}</p>
-        </div>
-        {canPerformBackofficeAction(session!, 'moveCash') ? (
-          <DButton
-            leftIcon={<Plus aria-hidden="true" className="size-4" />}
-            onClick={() => setOpen(true)}
-          >
-            {copy('Record cash movement')}
-          </DButton>
-        ) : null}
-      </div>
-      {positions.isLoading ? (
-        <DDataTable columns={columns} data={[]} loading rowKey="financialAccountId" />
-      ) : positions.data?.length ? (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {positions.data.map((position) => (
-            <DCard
-              key={`${position.sellingLocationId}-${position.financialAccountId}`}
-              className="p-5"
-            >
-              <p className="text-xs font-semibold text-[var(--color-text-muted)]">
-                {position.sellingLocationName} · {position.financialAccountCode}
-              </p>
-              <p className="mt-3 text-2xl font-bold tracking-[-0.02em]">
-                {format(position.positionAmount, position.currency)}
-              </p>
-              <div className="mt-4 flex items-center justify-between gap-3 text-xs text-[var(--color-text-muted)]">
-                <span>{copy('Accepted cash')}</span>
-                <span>{format(position.paymentAmount, position.currency)}</span>
-              </div>
-              <div className="mt-2 flex items-center justify-between gap-3 text-xs text-[var(--color-text-muted)]">
-                <span>{copy('Cash movements')}</span>
-                <span>{format(position.movementAmount, position.currency)}</span>
-              </div>
-            </DCard>
-          ))}
-        </div>
-      ) : (
-        <DDataTable
-          columns={columns}
-          data={[]}
-          rowKey="financialAccountId"
-          emptyMessage={copy('No cash positions are available.')}
-        />
-      )}
+      <DDataTable
+        columns={columns}
+        data={(positions.data ?? []).slice(positionOffset, positionOffset + positionPageSize)}
+        loading={positions.isLoading}
+        rowKey={(row) => `${row.sellingLocationId}-${row.financialAccountId}`}
+        emptyMessage={copy('No cash positions are available.')}
+        headerActions={
+          canPerformBackofficeAction(session!, 'moveCash') ? (
+            <DButton leftIcon={<Plus aria-hidden="true" className="size-4" />} onClick={() => setOpen(true)}>
+              {copy('Record cash movement')}
+            </DButton>
+          ) : null
+        }
+        pagination={{
+          page: Math.floor(positionOffset / positionPageSize) + 1,
+          pageSize: positionPageSize,
+          total: positions.data?.length ?? 0,
+        }}
+        onPageChange={(page) => setPositionOffset((page - 1) * positionPageSize)}
+        onPageSizeChange={(pageSize) => {
+          setPositionPageSize(pageSize);
+          setPositionOffset(0);
+        }}
+      />
       <div>
         <h2 className="mb-3 text-base font-bold">{copy('Cash movements')}</h2>
         <DDataTable
@@ -199,9 +176,18 @@ function CashPanel({ api }: { api: FinancialOperationsApi }) {
           loading={movements.isLoading}
           rowKey="id"
           emptyMessage={copy('No cash movements are recorded.')}
+          pagination={{
+            page: Math.floor(movementOffset / movementPageSize) + 1,
+            pageSize: movementPageSize,
+            total: movements.data?.total ?? 0,
+          }}
+          onPageChange={(page) => setMovementOffset((page - 1) * movementPageSize)}
+          onPageSizeChange={(pageSize) => {
+            setMovementPageSize(pageSize);
+            setMovementOffset(0);
+          }}
         />
       </div>
-      <PageFooter offset={offset} count={movements.data?.items.length ?? 0} onChange={setOffset} />
       <MovementDialog
         open={open}
         onClose={() => setOpen(false)}
@@ -218,9 +204,10 @@ function SettlementPanel({ api }: { api: FinancialOperationsApi }) {
   const [create, setCreate] = useState(false);
   const [detail, setDetail] = useState<Settlement | null>(null);
   const [offset, setOffset] = useState(0);
+  const [pageSize, setPageSize] = useState(defaultPageSize);
   const query = useQuery({
-    queryKey: ['settlements', offset],
-    queryFn: () => api.settlements({ limit, offset }),
+    queryKey: ['settlements', offset, pageSize],
+    queryFn: () => api.settlements({ limit: pageSize, offset }),
   });
   if (query.isError)
     return (
@@ -268,6 +255,16 @@ function SettlementPanel({ api }: { api: FinancialOperationsApi }) {
             </DButton>
           ) : null
         }
+        pagination={{
+          page: Math.floor(offset / pageSize) + 1,
+          pageSize,
+          total: query.data?.total ?? 0,
+        }}
+        onPageChange={(page) => setOffset((page - 1) * pageSize)}
+        onPageSizeChange={(nextPageSize) => {
+          setPageSize(nextPageSize);
+          setOffset(0);
+        }}
         actions={[
           {
             label: copy('View details'),
@@ -276,7 +273,6 @@ function SettlementPanel({ api }: { api: FinancialOperationsApi }) {
           },
         ]}
       />
-      <PageFooter offset={offset} count={query.data?.items.length ?? 0} onChange={setOffset} />
       <SettlementDialog
         open={create}
         onClose={() => setCreate(false)}
@@ -298,9 +294,10 @@ function ReconciliationPanel({ api }: { api: FinancialOperationsApi }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [offset, setOffset] = useState(0);
+  const [pageSize, setPageSize] = useState(defaultPageSize);
   const query = useQuery({
-    queryKey: ['reconciliations', offset],
-    queryFn: () => api.reconciliations({ limit, offset }),
+    queryKey: ['reconciliations', offset, pageSize],
+    queryFn: () => api.reconciliations({ limit: pageSize, offset }),
   });
   const settlements = useQuery({
     queryKey: ['completed-settlements'],
@@ -365,6 +362,16 @@ function ReconciliationPanel({ api }: { api: FinancialOperationsApi }) {
             </DButton>
           ) : null
         }
+        pagination={{
+          page: Math.floor(offset / pageSize) + 1,
+          pageSize,
+          total: query.data?.total ?? 0,
+        }}
+        onPageChange={(page) => setOffset((page - 1) * pageSize)}
+        onPageSizeChange={(nextPageSize) => {
+          setPageSize(nextPageSize);
+          setOffset(0);
+        }}
         actions={
           canPerformBackofficeAction(session!, 'updateReconciliation')
             ? [
@@ -379,7 +386,6 @@ function ReconciliationPanel({ api }: { api: FinancialOperationsApi }) {
             : []
         }
       />
-      <PageFooter offset={offset} count={query.data?.items.length ?? 0} onChange={setOffset} />
       <ReconciliationDialog
         open={open}
         onClose={() => setOpen(false)}
@@ -728,32 +734,6 @@ function ReconciliationDialog({
     </DDialog>
   );
 }
-function PageFooter({
-  offset,
-  count,
-  onChange,
-}: {
-  offset: number;
-  count: number;
-  onChange: (value: number) => void;
-}) {
-  const { copy } = useBackofficeLocalization();
-  if (!count) return null;
-  const page = Math.floor(offset / limit) + 1;
-  return (
-    <div className="mt-4 flex flex-wrap items-center justify-end gap-3">
-      <span className="mr-auto text-xs text-[var(--color-text-muted)]">
-        {copy('Showing')} {offset + 1}–{offset + count}
-      </span>
-      <DPagination
-        page={page}
-        totalPages={page + (count === limit ? 1 : 0)}
-        onChange={(value) => onChange((value - 1) * limit)}
-      />
-    </div>
-  );
-}
-
 function SettlementBadge({ status }: { status: Settlement['status'] }) {
   const { copy } = useBackofficeLocalization();
   return (
