@@ -157,7 +157,8 @@ export function SaleCompletionDialog({
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-brand)]">
             Sale Completion
           </p>
-          <h2 className="mt-2 text-xl font-bold">Sale {sale.id.slice(0, 8)}</h2>
+          <h2 className="mt-2 text-xl font-bold">{sale.saleNumber}</h2>
+          {sale.invoiceNumber ? <p className="mt-1 text-sm font-semibold">{sale.invoiceNumber}</p> : null}
           <p className="mt-1 text-sm text-[var(--color-text-muted)]">{completionMessage}</p>
         </div>
         <DButton

@@ -431,6 +431,8 @@ export class LocalDemoCashierTransactionAdapter
     const id = `SALE-DEMO-${String(state.saleCounter++).padStart(4, '0')}`;
     const sale: Sale = {
       id,
+      saleNumber: `TRX-DEMO-${String(state.saleCounter).padStart(6, '0')}`,
+      invoiceNumber: null,
       sellingLocationId: input.sellingLocationId,
       currency: input.currency,
       status: 'OPEN',

@@ -75,7 +75,10 @@ const navigationSections: ReadonlyArray<{
   },
   {
     label: 'reporting',
-    items: [{ label: 'reports', to: '/reports', icon: ChartNoAxesCombined, capability: 'reports' }],
+    items: [
+      { label: 'transactionHistory', to: '/transactions', icon: BookOpen, capability: 'reports' },
+      { label: 'reports', to: '/reports', icon: ChartNoAxesCombined, capability: 'reports' },
+    ],
   },
   {
     label: 'configuration',
