@@ -5,6 +5,7 @@ export type BackofficeCapability =
   | 'catalog'
   | 'employees'
   | 'finance'
+  | 'expenses'
   | 'financialAccounts'
   | 'financialOperations'
   | 'reports'
@@ -39,6 +40,10 @@ export type BackofficeAction =
   | 'updateFinancialAccount'
   | 'updatePaymentRouting'
   | 'moveCash'
+  | 'createExpense'
+  | 'updateExpense'
+  | 'approveExpense'
+  | 'rejectExpense'
   | 'createSettlement'
   | 'updateSettlement'
   | 'createReconciliation'
@@ -54,6 +59,7 @@ const capabilityPermissions: Record<BackofficeCapability, PermissionRequirement>
   catalog: { allOf: ['catalog:read'] },
   employees: { allOf: ['employees:read'] },
   finance: { allOf: ['payments:read'] },
+  expenses: { allOf: ['expenses:read'] },
   financialAccounts: { allOf: ['financial-accounts:read', 'payment-routing:read'] },
   financialOperations: { allOf: ['cash:read', 'settlements:read', 'reconciliations:read'] },
   reports: { allOf: ['sales:read'] },
@@ -98,6 +104,10 @@ const actionPermissions: Record<BackofficeAction, readonly string[]> = {
   updateFinancialAccount: ['financial-accounts:update'],
   updatePaymentRouting: ['payment-routing:update'],
   moveCash: ['cash:move'],
+  createExpense: ['expenses:create'],
+  updateExpense: ['expenses:update'],
+  approveExpense: ['expenses:approve'],
+  rejectExpense: ['expenses:reject'],
   createSettlement: ['settlements:create'],
   updateSettlement: ['settlements:update'],
   createReconciliation: ['reconciliations:create'],

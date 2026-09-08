@@ -14,6 +14,7 @@ import { TaxPage } from '../../routes/tax/tax-page';
 import { EmployeesPage } from '../../routes/employees/employees-page';
 import { FinancialAccountsPage } from '../../routes/financial-accounts/financial-accounts-page';
 import { FinancialOperationsPage } from '../../routes/financial-operations/financial-operations-page';
+import { ExpensesPage } from '../../routes/expenses/expenses-page';
 
 export const backofficeRouter = createBrowserRouter([
   { path: '/login', element: <BackofficeLoginPage /> },
@@ -45,9 +46,9 @@ export const backofficeRouter = createBrowserRouter([
             ],
           },
           {
-            element: <AuthorizedRoute capability="finance" />,
+            element: <AuthorizedRoute capability="expenses" />,
             children: [
-              { path: '/expenses', element: <PlaceholderPage title="expenses" /> },
+              { path: '/expenses', element: <ExpensesPage /> },
             ],
           },
           {

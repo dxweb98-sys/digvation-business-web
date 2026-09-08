@@ -64,7 +64,7 @@ const navigationSections: ReadonlyArray<{
         icon: WalletCards,
         capability: 'financialAccounts',
       },
-      { label: 'expenses', to: '/expenses', icon: BookOpen, capability: 'finance' },
+      { label: 'expenses', to: '/expenses', icon: BookOpen, capability: 'expenses' },
       {
         label: 'reconciliation',
         to: '/reconciliation',
