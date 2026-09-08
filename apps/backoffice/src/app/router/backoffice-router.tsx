@@ -16,6 +16,7 @@ import { FinancialAccountsPage } from '../../routes/financial-accounts/financial
 import { FinancialOperationsPage } from '../../routes/financial-operations/financial-operations-page';
 import { ExpensesPage } from '../../routes/expenses/expenses-page';
 import { TransactionHistoryPage } from '../../routes/transaction-history/transaction-history-page';
+import { ReportsPage } from '../../routes/reports/reports-page';
 
 export const backofficeRouter = createBrowserRouter([
   { path: '/login', element: <BackofficeLoginPage /> },
@@ -59,7 +60,7 @@ export const backofficeRouter = createBrowserRouter([
           {
             element: <AuthorizedRoute capability="reports" />,
             children: [
-              { path: '/reports', element: <PlaceholderPage title="reports" /> },
+              { path: '/reports', element: <ReportsPage /> },
               { path: '/transactions', element: <TransactionHistoryPage /> },
             ],
           },
