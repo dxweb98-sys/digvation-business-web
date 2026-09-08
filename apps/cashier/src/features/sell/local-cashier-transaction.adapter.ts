@@ -147,6 +147,8 @@ export class LocalCashierTransactionAdapter implements SaleTransactionPort {
     const time = timestamp();
     const sale: Sale = {
       id: `demo-sale-${this.sequence++}`,
+      saleNumber: `TRX-DEMO-${this.sequence}`,
+      invoiceNumber: null,
       sellingLocationId: input.sellingLocationId,
       currency: input.currency,
       status: 'OPEN',

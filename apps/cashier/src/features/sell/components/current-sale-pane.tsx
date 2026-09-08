@@ -139,7 +139,7 @@ export function CurrentSalePane({
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-brand)]">
               Cart
             </p>
-            <h2 className="mt-1 truncate text-base font-bold">Current order</h2>
+            <h2 className="mt-1 truncate text-base font-bold">{sale.saleNumber}</h2>
             <p className="mt-1 text-xs text-[var(--color-text-muted)]">
               {viewModel.activeLines.length} items Â· {sale.status}
             </p>
