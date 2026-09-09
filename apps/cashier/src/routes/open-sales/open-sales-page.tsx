@@ -1,4 +1,5 @@
 import { formatMoney } from '@digvation/pos-money';
+import { useAuth } from '@digvation/pos-auth';
 import { useRuntime } from '@digvation/pos-runtime';
 import { DButton } from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
@@ -8,16 +9,21 @@ import { useNavigate } from 'react-router';
 
 import { useCashierSession } from '../../app/providers/cashier-session-provider';
 import { cashierTransactionKeys } from '../../features/sell/cashier-transaction-keys';
-import { createCashierTransactionAdapter } from '../../features/sell/cashier-transaction-client';
+import { createCashierTransactionAdapter } from '../../features/sell/cashier-transaction-adapter-factory';
 import type { OpenSaleSummaryViewModel } from '../../features/sell/cashier-transaction.types';
 
 export function OpenSalesPage() {
   const runtime = useRuntime();
+  const { authPort } = useAuth();
   const navigate = useNavigate();
   const { selectedLocationId, recentSaleIds, selectLocation, rememberSale } = useCashierSession();
   const transactionAdapter = useMemo(
-    () => createCashierTransactionAdapter(runtime.apiBaseUrl),
-    [runtime.apiBaseUrl],
+    () =>
+      createCashierTransactionAdapter(
+        runtime,
+        authPort.getAccessToken ? authPort.getAccessToken.bind(authPort) : undefined,
+      ),
+    [authPort, runtime],
   );
 
   const locationsQuery = useQuery({

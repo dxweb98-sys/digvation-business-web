@@ -1,5 +1,5 @@
 import type { ApiClient } from '@digvation/pos-api';
-import type { FinancialAccount, Page, PaymentMethod, RecordStatus, SellingLocation } from '../financial-accounts/financial-accounts-api';
+import type { FinancialAccount, Page, PaymentMethod, RecordStatus, SellingLocation } from './financial-accounts-api';
 interface FinancialOperationsPage<T> extends Page<T> { total: number; }
 export type SettlementStatus = 'DRAFT' | 'COMPLETED' | 'CANCELLED';
 export type ReconciliationStatus = 'MATCHED' | 'DISCREPANCY' | 'RESOLVED';

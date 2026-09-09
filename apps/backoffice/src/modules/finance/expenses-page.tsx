@@ -8,7 +8,7 @@ import { useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
 import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
 import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
-import { FinancialOperationsApi } from '../financial-operations/financial-operations-api';
+import { FinancialOperationsApi } from './financial-operations-api';
 import { ExpenseApi, type Expense } from './expense-api';
 const limit = 20;
 export function ExpensesPage() {

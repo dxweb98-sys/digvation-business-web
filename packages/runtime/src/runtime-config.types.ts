@@ -3,6 +3,8 @@ export type BrandingMode = 'DIGVATION_DEFAULT' | 'WHITE_LABEL';
 export type ThemePreset = 'DIGVATION_LIGHT' | 'CUSTOM';
 export type ThemeRadius = 'COMPACT' | 'SOFT' | 'ROUNDED';
 export type ApplicationId = 'cashier' | 'backoffice';
+export type BusinessProduct = 'POS';
+export type BusinessCapability = 'FINANCE_OPERATIONS';
 
 export interface BrandingConfig {
   mode: BrandingMode;
@@ -46,6 +48,11 @@ export interface CapabilityConfig {
   loyalty: boolean;
 }
 
+export interface EffectiveEntitlementConfig {
+  products: readonly BusinessProduct[];
+  capabilities: readonly BusinessCapability[];
+}
+
 export interface RuntimeConfig {
   apiBaseUrl: string;
   workspace: string;
@@ -54,6 +61,7 @@ export interface RuntimeConfig {
   defaultCountry: string;
   deploymentProfile: DeploymentProfile;
   applications: ApplicationAvailabilityConfig;
+  effectiveEntitlements: EffectiveEntitlementConfig;
   branding: BrandingConfig;
   theme: ThemeConfig;
   capabilities: CapabilityConfig;

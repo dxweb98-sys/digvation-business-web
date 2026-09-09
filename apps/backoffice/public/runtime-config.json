@@ -9,9 +9,13 @@
     "cashier": true,
     "backoffice": true
   },
+  "effectiveEntitlements": {
+    "products": ["POS"],
+    "capabilities": ["FINANCE_OPERATIONS"]
+  },
   "branding": {
     "mode": "DIGVATION_DEFAULT",
-    "productName": "Digvation POS",
+    "productName": "Digvation Business",
     "companyName": "Digvation",
     "businessName": "Development Workspace"
   },

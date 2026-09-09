@@ -76,7 +76,12 @@ const navigationSections: ReadonlyArray<{
   {
     label: 'reporting',
     items: [
-      { label: 'transactionHistory', to: '/transactions', icon: BookOpen, capability: 'reports' },
+      {
+        label: 'transactionHistory',
+        to: '/transactions',
+        icon: BookOpen,
+        capability: 'transactions',
+      },
       { label: 'reports', to: '/reports', icon: ChartNoAxesCombined, capability: 'reports' },
     ],
   },
@@ -317,13 +322,16 @@ export function BackofficeShell() {
 
 function NavigationGroups({ session }: { session: BackofficeSession }) {
   const { t } = useBackofficeLocalization();
+  const runtime = useRuntime();
   return (
     <>
       <div className="mb-3">
         <NavigationLink item={dashboardItem} />
       </div>
       {navigationSections.map((section) => {
-        const items = section.items.filter((item) => canAccessBackoffice(session, item.capability));
+        const items = section.items.filter((item) =>
+          canAccessBackoffice(session, item.capability, session.effectiveEntitlements),
+        );
         if (!items.length) return null;
         return (
           <div key={section.label} className="mt-3">

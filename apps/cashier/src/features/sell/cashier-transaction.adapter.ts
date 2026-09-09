@@ -19,6 +19,13 @@ import type {
 const API_PREFIX = '/api/v1';
 const PAGE_SIZE = 100;
 
+interface OperationalAccessResponse {
+  organizationWide: boolean;
+  resolution: 'DENIED' | 'AUTO_RESOLVED' | 'SELECTION_REQUIRED';
+  selectedLocationId: string | null;
+  locations: Array<{ id: string; code: string; name: string }>;
+}
+
 export interface CreateSaleInput {
   sellingLocationId: string;
   currency: string;
@@ -180,10 +187,22 @@ export class HttpCashierTransactionAdapter
 {
   public constructor(private readonly client: ApiClient) {}
 
-  public listSellingLocations(signal?: AbortSignal): Promise<ApiPage<SellingLocation>> {
-    return this.client.get<ApiPage<SellingLocation>>(pagePath(`${API_PREFIX}/locations`), {
-      signal,
-    });
+  public async listSellingLocations(signal?: AbortSignal): Promise<ApiPage<SellingLocation>> {
+    const access = await this.client.get<OperationalAccessResponse>(
+      API_PREFIX + '/operational-access/context',
+      { signal },
+    );
+    return {
+      items: access.locations.map((location) => ({
+        ...location,
+        status: 'ACTIVE',
+        version: 1,
+        createdAt: '',
+        updatedAt: '',
+      })),
+      limit: access.locations.length,
+      offset: 0,
+    };
   }
 
   public listCatalogCategories(signal?: AbortSignal): Promise<ApiPage<CatalogCategory>> {

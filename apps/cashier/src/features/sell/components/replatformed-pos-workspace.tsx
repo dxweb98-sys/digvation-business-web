@@ -42,7 +42,7 @@ import {
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { cashierTransactionKeys } from '../cashier-transaction-keys';
-import { createCashierTransactionAdapter } from '../cashier-transaction-client';
+import { createCashierTransactionAdapter } from '../cashier-transaction-adapter-factory';
 import {
   customerMemberLookup,
   type MemberCustomerLookupResult,
@@ -223,15 +223,23 @@ function workflowIssues(sale: Sale, requiresEmployeeAttribution = true) {
 
 export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }) {
   const runtime = useRuntime();
-  const { session } = useAuth();
+  const { session, authPort } = useAuth();
   const adapter = useMemo(
-    () => createCashierTransactionAdapter(runtime.apiBaseUrl),
-    [runtime.apiBaseUrl],
+    () =>
+      createCashierTransactionAdapter(
+        runtime,
+        authPort.getAccessToken ? authPort.getAccessToken.bind(authPort) : undefined,
+      ),
+    [authPort, runtime],
   );
   const transactionsQuery = useQuery({
     queryKey: cashierTransactionKeys.sales(),
     queryFn: ({ signal }) => adapter.listSales(signal),
     refetchInterval: 1_500,
+  });
+  const locationsQuery = useQuery({
+    queryKey: cashierTransactionKeys.locations(),
+    queryFn: ({ signal }) => adapter.listSellingLocations(signal),
   });
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -257,6 +265,9 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const sale = workspace.viewModel.sale;
   const lines = workspace.viewModel.activeLines;
   const total = sale?.totalAmount ?? '0.0000';
+  const activeLocation = locationsQuery.data?.items.find(
+    (location) => location.id === workspace.selectedLocationId,
+  );
 
   useEffect(() => {
     writeStoredCustomer(CURRENT_CUSTOMER_KEY, cartCustomer);
@@ -538,7 +549,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         locale={workspace.locale}
         employees={workspace.employees}
         businessName={runtime.branding.businessName ?? runtime.branding.productName}
-        branchName="Main Branch"
+        branchName={activeLocation?.name ?? workspace.selectedLocationId}
         cashierName={session.identity.displayName}
         onClose={() => {
           setQueueDetail(null);

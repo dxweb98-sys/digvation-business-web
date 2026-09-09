@@ -1,14 +1,64 @@
-import { AuthProvider, type AuthPort, type AuthSession } from '@digvation/pos-auth';
-import { ConnectivityProvider, RuntimeProvider, type RuntimeConfig } from '@digvation/pos-runtime';
+import { AuthProvider, useAuth, type AuthPort, type AuthSession } from '@digvation/pos-auth';
+import {
+  ConnectivityProvider,
+  loadAuthenticatedEntitlements,
+  RuntimeProvider,
+  useRuntime,
+  type RuntimeConfig,
+} from '@digvation/pos-runtime';
 import { DToastProvider as ToastProvider } from '@digvation/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { RouterProviderProps } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 
-import { useState, type TransitionEvent } from 'react';
+import { useEffect, useState, type ReactNode, type TransitionEvent } from 'react';
 
 import { CashierLoginPage } from '../auth/cashier-login-page';
 import { CashierSessionProvider } from './cashier-session-provider';
+
+function AuthenticatedOperationalRuntime({ children }: { children: ReactNode }) {
+  const { session, authPort } = useAuth();
+  const runtime = useRuntime();
+  const [state, setState] = useState<'loading' | 'allowed' | 'denied' | 'unavailable'>('loading');
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      const token = await authPort.getAccessToken?.();
+      if (!token) {
+        if (active) setState('denied');
+        return;
+      }
+      try {
+        const entitlements = await loadAuthenticatedEntitlements(runtime.apiBaseUrl, token);
+        if (active) setState(entitlements.products.includes('POS') ? 'allowed' : 'denied');
+      } catch {
+        if (active) setState('unavailable');
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [authPort, session.identity.userId]);
+  if (state === 'allowed') return <>{children}</>;
+  return (
+    <main className="grid min-h-screen place-items-center bg-[var(--color-background)] p-6 text-center">
+      <section className="max-w-md rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+        <h1 className="text-lg font-semibold">
+          {state === 'loading'
+            ? 'Memverifikasi akses operasional'
+            : state === 'denied'
+              ? 'Akses POS tidak tersedia'
+              : 'Konteks operasional belum tersedia'}
+        </h1>
+        <p className="mt-2 text-sm text-[var(--color-text-muted)]">
+          {state === 'loading'
+            ? 'Mohon tunggu.'
+            : 'Hubungi administrator jika akses ini seharusnya tersedia.'}
+        </p>
+      </section>
+    </main>
+  );
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -52,16 +102,20 @@ export function CashierProviders({ runtime, session, authPort, router }: Cashier
                 authPort={authPort}
                 onLogout={() => setLoggingOut(true)}
               >
-                <CashierSessionProvider>
-                  <div
-                    className={`min-h-screen transition-[opacity,transform] duration-150 ease-out ${
-                      isLoggingOut ? 'pointer-events-none -translate-y-1 opacity-0' : 'opacity-100'
-                    }`}
-                    onTransitionEnd={completeLogoutTransition}
-                  >
-                    <RouterProvider router={router} />
-                  </div>
-                </CashierSessionProvider>
+                <AuthenticatedOperationalRuntime>
+                  <CashierSessionProvider>
+                    <div
+                      className={`min-h-screen transition-[opacity,transform] duration-150 ease-out ${
+                        isLoggingOut
+                          ? 'pointer-events-none -translate-y-1 opacity-0'
+                          : 'opacity-100'
+                      }`}
+                      onTransitionEnd={completeLogoutTransition}
+                    >
+                      <RouterProvider router={router} />
+                    </div>
+                  </CashierSessionProvider>
+                </AuthenticatedOperationalRuntime>
               </AuthProvider>
             ) : (
               <CashierLoginPage authPort={authPort} onAuthenticated={setAuthenticatedSession} />

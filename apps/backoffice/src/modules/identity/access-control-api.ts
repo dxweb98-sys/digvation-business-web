@@ -35,13 +35,17 @@ export class AccessControlApi {
   public constructor(private readonly client: ApiClient) {}
 
   listRoles(page: PageRequest) {
-    return this.client.get<Page<AccessRole>>(`/api/v1/roles?limit=${page.limit}&offset=${page.offset}`);
+    return this.client.get<Page<AccessRole>>(
+      `/api/v1/roles?limit=${page.limit}&offset=${page.offset}`,
+    );
   }
   listPermissions() {
     return this.client.get<Page<{ key: string }>>('/api/v1/roles/permissions');
   }
   listUsers(page: PageRequest) {
-    return this.client.get<Page<AccessUser>>(`/api/v1/users?limit=${page.limit}&offset=${page.offset}`);
+    return this.client.get<Page<AccessUser>>(
+      `/api/v1/users?limit=${page.limit}&offset=${page.offset}`,
+    );
   }
   createRole(input: { code: string; name: string; permissions: string[] }) {
     return this.client.post<AccessRole>('/api/v1/roles', input);
