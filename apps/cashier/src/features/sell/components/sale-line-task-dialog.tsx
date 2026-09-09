@@ -169,7 +169,7 @@ export function SaleLineTaskDialog({
     setFormError(null);
     const value = discountValueForApi(discountType, discountValue);
     if (!value || discountReason.trim() === '') {
-      setFormError('Discount value and reason are required. Percentage uses 0Ã¢â‚¬â€œ100%.');
+      setFormError('Discount value and reason are required. Percentage uses 0–100%.');
       return;
     }
     onSetLineDiscount(line, { type: discountType, value, reason: discountReason.trim() });

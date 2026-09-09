@@ -156,7 +156,7 @@ function employeeSummary(line: SaleLine, employees: readonly Employee[]): string
         : '';
       return `${employee?.displayName ?? participation.employeeId}${share}`;
     })
-    .join(' Â· ');
+    .join(' · ');
 }
 
 function queueStatus(sale: Sale): QueueStatus {
@@ -927,7 +927,7 @@ function ReferenceQueueCard({
       <div className="mb-3 flex items-end justify-between gap-2">
         <div>
           <p className="text-xs text-[var(--color-text-muted)]">
-            {sale.lines.filter((line) => !line.removedAt).length} item Â·{' '}
+            {sale.lines.filter((line) => !line.removedAt).length} item ·{' '}
             {new Intl.DateTimeFormat('id-ID', { hour: '2-digit', minute: '2-digit' }).format(
               new Date(sale.createdAt),
             )}
@@ -1187,9 +1187,9 @@ function ReferenceCartPanel({
                     </p>
                     <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
                       {money(line.effectiveUnitPrice, locale)}
-                      {line.variantNameSnapshot ? ` Â· ${line.variantNameSnapshot}` : ''}
+                      {line.variantNameSnapshot ? ` · ${line.variantNameSnapshot}` : ''}
                       {line.itemTypeSnapshot === 'SERVICE' ? (
-                        <span className="ml-1 font-semibold text-cyan-700">Â· Jasa</span>
+                        <span className="ml-1 font-semibold text-cyan-700">· Jasa</span>
                       ) : null}
                     </p>
                   </div>
@@ -1394,7 +1394,7 @@ function ReferenceCustomerDialog({
                 options={memberResults.map((member) => ({
                   value: member.customerId,
                   label: member.name,
-                  detail: `${member.phone} Â· ${member.membership.memberCode}`,
+                  detail: `${member.phone} · ${member.membership.memberCode}`,
                 }))}
                 onChange={(customerId) => {
                   setSelectedMember(
@@ -1417,7 +1417,7 @@ function ReferenceCustomerDialog({
                       <span className="block truncate">{option.label}</span>
                       {member ? (
                         <span className="mt-0.5 block truncate text-xs font-normal text-[var(--color-text-muted)]">
-                          {member.phone} Â· {member.membership.memberCode}
+                          {member.phone} · {member.membership.memberCode}
                         </span>
                       ) : null}
                     </span>
@@ -1577,10 +1577,10 @@ function ReferencePaymentDialog({
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold">{line.itemNameSnapshot}</p>
                       <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
-                        {quantity(line.quantity)} Ã— {money(line.effectiveUnitPrice, locale)}
+                        {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
                         {line.itemTypeSnapshot === 'SERVICE' ? (
                           <span className="ml-1 font-semibold text-[var(--color-brand)]">
-                            Â· Jasa
+                            · Jasa
                           </span>
                         ) : null}
                       </p>
@@ -1791,7 +1791,7 @@ function ReferenceTransactionDetail({
                     <p className="shrink-0 font-bold">{money(line.totalAmount, locale)}</p>
                   </div>
                   <p className="mt-1 text-slate-500">
-                    {quantity(line.quantity)} Ã— {money(line.effectiveUnitPrice, locale)}
+                    {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
                   </p>
                   {line.itemTypeSnapshot === 'SERVICE' &&
                   line.participations.some((participation) => participation.assigned) ? (
@@ -1813,7 +1813,7 @@ function ReferenceTransactionDetail({
               {sale.discountAmount !== '0.0000' ? (
                 <div className="flex justify-between gap-3">
                   <dt className="text-slate-500">Diskon</dt>
-                  <dd>âˆ’{money(sale.discountAmount, locale)}</dd>
+                  <dd>−{money(sale.discountAmount, locale)}</dd>
                 </div>
               ) : null}
               <div className="flex justify-between gap-3">
@@ -1852,7 +1852,7 @@ function ReferenceTransactionDetail({
             </section>
 
             <div className="my-4 border-t border-dashed border-slate-300" />
-            <p className="text-center text-xs font-bold">LUNAS Â· FINALIZED</p>
+            <p className="text-center text-xs font-bold">LUNAS · FINALIZED</p>
             <p className="mt-2 text-center text-[11px] text-slate-500">
               Terima kasih telah bertransaksi.
             </p>
@@ -1917,8 +1917,8 @@ function ReferenceTransactionDetail({
                     <div>
                       <p className="text-sm font-semibold">{line.itemNameSnapshot}</p>
                       <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                        {quantity(line.quantity)} Ã— {money(line.effectiveUnitPrice, locale)}
-                        {line.variantNameSnapshot ? ` Â· ${line.variantNameSnapshot}` : ''}
+                        {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
+                        {line.variantNameSnapshot ? ` · ${line.variantNameSnapshot}` : ''}
                       </p>
                     </div>
                     <p className="text-sm font-bold">{money(line.totalAmount, locale)}</p>
@@ -2012,7 +2012,7 @@ function ReferenceReviewDialog({
           <div>
             <h2 className="text-lg font-semibold">Review &amp; Selesaikan</h2>
             <p className="mt-0.5 text-sm text-[var(--color-text-muted)]">
-              {transactionNumber(sale.id)} Â· {saleCustomer(sale.id).name}
+              {transactionNumber(sale.id)} · {saleCustomer(sale.id).name}
             </p>
           </div>
           <button
@@ -2057,8 +2057,8 @@ function ReferenceReviewDialog({
                       <div className="min-w-0">
                         <p className="text-sm font-semibold">{line.itemNameSnapshot}</p>
                         <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
-                          {quantity(line.quantity)} Ã— {money(line.effectiveUnitPrice, locale)}
-                          {line.variantNameSnapshot ? ` Â· ${line.variantNameSnapshot}` : ''}
+                          {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
+                          {line.variantNameSnapshot ? ` · ${line.variantNameSnapshot}` : ''}
                         </p>
                         {line.itemTypeSnapshot === 'SERVICE' ? (
                           <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
@@ -2160,7 +2160,7 @@ function ReferenceReviewDialog({
             onClick={onComplete}
             leftIcon={<CheckCircle2 className="size-3.5" />}
           >
-            {active ? 'Selesaikan Transaksi' : 'Memuat transaksiâ€¦'}
+            {active ? 'Selesaikan Transaksi' : 'Memuat transaksi…'}
           </Button>
         </footer>
       </div>
@@ -2340,7 +2340,7 @@ function ReferenceEmployeeDialog({
               <div>
                 <p className="text-sm font-semibold">{line.itemNameSnapshot}</p>
                 <p className="text-xs text-[var(--color-text-muted)]">
-                  Qty {quantity(line.quantity)} Â· {money(line.totalAmount, locale)}
+                  Qty {quantity(line.quantity)} · {money(line.totalAmount, locale)}
                 </p>
               </div>
               <span

@@ -7,7 +7,7 @@ import { backofficeRouter } from '../router/backoffice-router';
 export async function bootstrapBackoffice() {
   const runtimePort = new HttpRuntimeConfigAdapter();
   const runtime = await runtimePort.load();
-  document.title = `${runtime.branding.productName} â€” Backoffice`;
+  document.title = `${runtime.branding.productName} — Backoffice`;
 
   assertApplicationEnabled(runtime, 'backoffice');
   const auth = new HttpAuthAdapter(runtime.apiBaseUrl, runtime.workspace);

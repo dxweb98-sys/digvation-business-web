@@ -76,7 +76,7 @@ export function OpenSalesPage() {
           <div>
             <h1 className="text-xl font-bold tracking-[-0.03em]">Open Sales</h1>
             <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-              Continue a transaction from todayÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢s active workspace.
+              Continue a transaction from today’s active workspace.
             </p>
           </div>
           <div className="flex gap-2">
@@ -89,8 +89,7 @@ export function OpenSalesPage() {
         <div className="mt-4">
           {salesQuery.isLoading ? (
             <div className="flex min-h-52 items-center justify-center rounded-[var(--radius-panel)] border border-[var(--color-border)] bg-[var(--color-surface)] text-sm text-[var(--color-text-muted)]">
-              <LoaderCircle className="mr-2 size-4 animate-spin" /> Loading open
-              SalesÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦
+              <LoaderCircle className="mr-2 size-4 animate-spin" /> Loading open Sales…
             </div>
           ) : openSales.length === 0 ? (
             <div className="rounded-[var(--radius-card)] border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] p-10 text-center">
@@ -113,7 +112,7 @@ export function OpenSalesPage() {
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-brand)]">
-                        {sale.locationName} Ãƒâ€šÃ‚Â· Open
+                        {sale.locationName} · Open
                       </p>
                       <h2 className="mt-2 text-base font-bold">Sale {sale.id.slice(0, 8)}</h2>
                     </div>

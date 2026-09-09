@@ -2,7 +2,7 @@ import { ApiError } from '@digvation/business-api';
 
 export function cashierTransactionErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
-    return error.requestId ? `${error.message} Â· Request ${error.requestId}` : error.message;
+    return error.requestId ? `${error.message} · Request ${error.requestId}` : error.message;
   }
   return error instanceof Error ? error.message : 'Unexpected transaction error.';
 }

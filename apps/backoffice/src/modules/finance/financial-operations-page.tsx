@@ -100,12 +100,12 @@ function CashPanel({ api }: { api: FinancialOperationsApi }) {
     {
       key: 'location',
       label: copy('Selling location'),
-      render: (row) => `${row.sellingLocationName} Â· ${row.sellingLocationCode}`,
+      render: (row) => `${row.sellingLocationName} · ${row.sellingLocationCode}`,
     },
     {
       key: 'account',
       label: copy('Cash account'),
-      render: (row) => `${row.financialAccountName} Â· ${row.financialAccountCode}`,
+      render: (row) => `${row.financialAccountName} · ${row.financialAccountCode}`,
     },
     {
       key: 'payments',
@@ -144,7 +144,10 @@ function CashPanel({ api }: { api: FinancialOperationsApi }) {
         emptyMessage={copy('No cash positions are available.')}
         headerActions={
           canPerformBackofficeAction(session!, 'moveCash') ? (
-            <DButton leftIcon={<Plus aria-hidden="true" className="size-4" />} onClick={() => setOpen(true)}>
+            <DButton
+              leftIcon={<Plus aria-hidden="true" className="size-4" />}
+              onClick={() => setOpen(true)}
+            >
               {copy('Record cash movement')}
             </DButton>
           ) : null
@@ -170,7 +173,7 @@ function CashPanel({ api }: { api: FinancialOperationsApi }) {
               label: copy('Amount'),
               render: (row) => format(row.amount, row.currency),
             },
-            { key: 'note', label: copy('Note'), render: (row) => row.note ?? 'â€”' },
+            { key: 'note', label: copy('Note'), render: (row) => row.note ?? '—' },
           ]}
           data={movements.data?.items ?? []}
           loading={movements.isLoading}
@@ -719,7 +722,7 @@ function ReconciliationDialog({
           value={settlementId}
           options={settlements.map((x) => ({
             value: x.id,
-            label: `${x.sellingLocationName} Â· ${format(x.expectedAmount, x.currency)}`,
+            label: `${x.sellingLocationName} · ${format(x.expectedAmount, x.currency)}`,
           }))}
           onChange={(v) => setSettlementId(String(v))}
         />

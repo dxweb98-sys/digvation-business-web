@@ -17,10 +17,10 @@ export function AccountPage() {
       <BackofficePageHeader title={t('accountAndRuntime')} />
       <DCard className="mt-6 p-6">
         <p className="mt-4 text-sm leading-7 text-[var(--color-text-muted)]">
-          {session.identity.displayName} Â· {runtime.workspace} Â· {runtime.deploymentProfile}
+          {session.identity.displayName} · {runtime.workspace} · {runtime.deploymentProfile}
         </p>
         <p className="mt-2 text-xs text-[var(--color-text-muted)]">
-          Version {version.version} Â· Build {version.revision}
+          Version {version.version} · Build {version.revision}
         </p>
       </DCard>
     </BackofficePage>

@@ -140,7 +140,7 @@ function AccountsPanel({ api }: { api: FinancialAccountsApi }) {
       render: (account) =>
         account.type === 'CASH'
           ? copy('On-site cash')
-          : `${account.institutionName} Â· ${account.accountReference}`,
+          : `${account.institutionName} · ${account.accountReference}`,
     },
     {
       key: 'status',
@@ -213,9 +213,16 @@ function AccountsPanel({ api }: { api: FinancialAccountsApi }) {
             </DButton>
           ) : null
         }
-        pagination={{ page: Math.floor(offset / pageSize) + 1, pageSize, total: accounts.data?.total ?? 0 }}
+        pagination={{
+          page: Math.floor(offset / pageSize) + 1,
+          pageSize,
+          total: accounts.data?.total ?? 0,
+        }}
         onPageChange={(page) => setOffset((page - 1) * pageSize)}
-        onPageSizeChange={(nextPageSize) => { setPageSize(nextPageSize); setOffset(0); }}
+        onPageSizeChange={(nextPageSize) => {
+          setPageSize(nextPageSize);
+          setOffset(0);
+        }}
         emptyMessage={
           q || status || type
             ? copy('No matching financial accounts found.')
@@ -475,7 +482,7 @@ function RoutingPanel({ api }: { api: FinancialAccountsApi }) {
     {
       key: 'location',
       label: copy('Selling location'),
-      render: (route) => `${route.sellingLocationName} Â· ${route.sellingLocationCode}`,
+      render: (route) => `${route.sellingLocationName} · ${route.sellingLocationCode}`,
     },
     {
       key: 'paymentMethod',
@@ -485,7 +492,7 @@ function RoutingPanel({ api }: { api: FinancialAccountsApi }) {
     {
       key: 'destination',
       label: copy('Settlement destination'),
-      render: (route) => `${route.financialAccountName} Â· ${route.financialAccountCode}`,
+      render: (route) => `${route.financialAccountName} · ${route.financialAccountCode}`,
     },
     { key: 'currency', label: copy('Currency') },
     {
@@ -553,9 +560,16 @@ function RoutingPanel({ api }: { api: FinancialAccountsApi }) {
             </DButton>
           ) : null
         }
-        pagination={{ page: Math.floor(offset / pageSize) + 1, pageSize, total: routes.data?.total ?? 0 }}
+        pagination={{
+          page: Math.floor(offset / pageSize) + 1,
+          pageSize,
+          total: routes.data?.total ?? 0,
+        }}
         onPageChange={(page) => setOffset((page - 1) * pageSize)}
-        onPageSizeChange={(nextPageSize) => { setPageSize(nextPageSize); setOffset(0); }}
+        onPageSizeChange={(nextPageSize) => {
+          setPageSize(nextPageSize);
+          setOffset(0);
+        }}
         actions={
           canUpdate
             ? [
@@ -613,13 +627,13 @@ function RouteEditor({
   });
   const accountOptions = (accounts.data?.items ?? []).map((account) => ({
     value: account.id,
-    label: `${account.name} Â· ${account.code} Â· ${account.currency}`,
+    label: `${account.name} · ${account.code} · ${account.currency}`,
     disabled: !compatibleTypes[method].includes(account.type),
   }));
   if (route && !accountOptions.some((option) => option.value === route.financialAccountId))
     accountOptions.unshift({
       value: route.financialAccountId,
-      label: `${route.financialAccountName} Â· ${route.financialAccountCode} Â· ${route.currency}`,
+      label: `${route.financialAccountName} · ${route.financialAccountCode} · ${route.currency}`,
       disabled: false,
     });
   const valid = Boolean((route || locationId) && accountId);
@@ -667,7 +681,7 @@ function RouteEditor({
         {route ? (
           <DInput
             label={copy('Selling location')}
-            value={`${route.sellingLocationName} Â· ${route.sellingLocationCode}`}
+            value={`${route.sellingLocationName} · ${route.sellingLocationCode}`}
             disabled
           />
         ) : (
@@ -677,7 +691,7 @@ function RouteEditor({
             onChange={setLocationId}
             options={(locations.data?.items ?? []).map((location) => ({
               value: location.id,
-              label: `${location.name} Â· ${location.code}`,
+              label: `${location.name} · ${location.code}`,
               disabled: location.status !== 'ACTIVE',
             }))}
             loading={locations.isLoading}
@@ -797,7 +811,7 @@ function PageFooter({
   return (
     <div className={`${compact ? 'mt-2' : 'mt-4'} flex flex-wrap items-center justify-end gap-3`}>
       <span className="mr-auto text-xs text-[var(--color-text-muted)]">
-        {copy('Showing')} {offset + 1}â€“{offset + count}
+        {copy('Showing')} {offset + 1}–{offset + count}
       </span>
       <DPagination
         page={page}

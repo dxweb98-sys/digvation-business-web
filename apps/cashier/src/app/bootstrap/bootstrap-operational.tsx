@@ -7,7 +7,7 @@ import { operationalRouter } from '../router/operational-router';
 export async function bootstrapOperational() {
   const runtimePort = new HttpRuntimeConfigAdapter();
   const runtime = await runtimePort.load();
-  document.title = `${runtime.branding.productName} â€” Operational`;
+  document.title = `${runtime.branding.productName} — Operational`;
   const authPort = new HttpAuthAdapter(runtime.apiBaseUrl, runtime.workspace, 'operational');
 
   assertApplicationEnabled(runtime, 'cashier');

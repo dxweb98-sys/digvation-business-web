@@ -141,7 +141,7 @@ export function CurrentSalePane({
             </p>
             <h2 className="mt-1 truncate text-base font-bold">{sale.saleNumber}</h2>
             <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-              {viewModel.activeLines.length} items Ã‚Â· {sale.status}
+              {viewModel.activeLines.length} items · {sale.status}
             </p>
           </div>
           <DButton variant="ghost" onClick={onOpenSales} className="px-3" aria-label="Open Sales">
@@ -217,7 +217,7 @@ export function CurrentSalePane({
             <div className="flex justify-between gap-4 text-[var(--color-text-muted)]">
               <dt>Discount</dt>
               <dd className="tabular-nums">
-                Ã¢Ë†â€™{formatMoney(sale.discountAmount, sale.currency, locale)}
+                −{formatMoney(sale.discountAmount, sale.currency, locale)}
               </dd>
             </div>
           ) : null}

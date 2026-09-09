@@ -122,7 +122,7 @@ export function CatalogPage() {
       key: 'categoryId',
       label: copy('Category'),
       render: (x) =>
-        categories.data?.items.find((category) => category.id === x.categoryId)?.name ?? 'â€”',
+        categories.data?.items.find((category) => category.id === x.categoryId)?.name ?? '—',
     },
     {
       key: 'defaultPrice',
@@ -228,7 +228,11 @@ export function CatalogPage() {
                 : copy('No catalog items are available.')
             }
             actions={[
-              { label: copy('View details'), icon: <Eye className="size-4" />, onClick: setDetailItem },
+              {
+                label: copy('View details'),
+                icon: <Eye className="size-4" />,
+                onClick: setDetailItem,
+              },
               {
                 label: copy('Edit item'),
                 icon: <Pencil className="size-4" />,
@@ -431,10 +435,7 @@ function NamedDialog({
       if (!isSessionExpiredError(error))
         showToast({
           variant: 'danger',
-          title: normalizeBackofficeApiError(
-            error,
-            copy('Could not save category.'),
-          ).safeMessage,
+          title: normalizeBackofficeApiError(error, copy('Could not save category.')).safeMessage,
         });
     }
   };
@@ -553,10 +554,7 @@ function ItemDialog({
       if (!isSessionExpiredError(error))
         showToast({
           variant: 'danger',
-          title: normalizeBackofficeApiError(
-            error,
-            copy('Could not save item.'),
-          ).safeMessage,
+          title: normalizeBackofficeApiError(error, copy('Could not save item.')).safeMessage,
         });
     }
   };
@@ -783,7 +781,7 @@ function ItemDetailDialog({
           <Status value={item.lifecycle} />
         </div>
       }
-      description={`${item.code} Â· ${humanize(item.type)}`}
+      description={`${item.code} · ${humanize(item.type)}`}
       footer={
         <div className="flex justify-end gap-2">
           <DButton variant="secondary" onClick={onClose}>
@@ -839,7 +837,9 @@ function ItemDetailDialog({
               <DetailField
                 label={copy('Employee contribution')}
                 value={
-                  serviceDefinition?.allowEmployeeContribution ? copy('Allowed') : copy('Not allowed')
+                  serviceDefinition?.allowEmployeeContribution
+                    ? copy('Allowed')
+                    : copy('Not allowed')
                 }
               />
             </dl>
@@ -1022,9 +1022,13 @@ function PriceLabel({
   emptyLabel?: string;
 }) {
   const { copy, formatMoney } = useBackofficeLocalization();
-  if (!available) return <span className="text-[var(--color-text-muted)]">â€”</span>;
+  if (!available) return <span className="text-[var(--color-text-muted)]">—</span>;
   if (loading)
-    return <span className="text-sm font-normal text-[var(--color-text-muted)]">{copy('Loading...')}</span>;
+    return (
+      <span className="text-sm font-normal text-[var(--color-text-muted)]">
+        {copy('Loading...')}
+      </span>
+    );
   return price ? (
     <span>{formatMoney(price.amount, price.currency)}</span>
   ) : (
@@ -1099,12 +1103,22 @@ function PriceHistoryTable({
           {
             key: 'effectiveFrom',
             label: copy('Effective from'),
-            render: (price: Price) => formatDate(new Date(price.effectiveFrom), { dateStyle: 'medium', timeStyle: 'short' }),
+            render: (price: Price) =>
+              formatDate(new Date(price.effectiveFrom), {
+                dateStyle: 'medium',
+                timeStyle: 'short',
+              }),
           },
           {
             key: 'effectiveUntil',
             label: copy('Effective until'),
-            render: (price: Price) => price.effectiveUntil ? formatDate(new Date(price.effectiveUntil), { dateStyle: 'medium', timeStyle: 'short' }) : copy('Effective now'),
+            render: (price: Price) =>
+              price.effectiveUntil
+                ? formatDate(new Date(price.effectiveUntil), {
+                    dateStyle: 'medium',
+                    timeStyle: 'short',
+                  })
+                : copy('Effective now'),
           },
           {
             key: 'cancelledAt',
@@ -1209,7 +1223,7 @@ function PriceChangeDialog({
     <DDialog
       open={Boolean(target)}
       onClose={onClose}
-      title={variant ? `${copy('Variant price')} â€” ${variant.name}` : copy('Change default price')}
+      title={variant ? `${copy('Variant price')} — ${variant.name}` : copy('Change default price')}
       description={
         variant
           ? copy('Variant prices are final prices, not differences from the default price.')
@@ -1221,7 +1235,10 @@ function PriceChangeDialog({
             {copy('Cancel')}
           </DButton>
           {canCreate && (
-            <DButton onClick={() => void save()} disabled={!amount.trim() || !hasValidEffectiveFrom}>
+            <DButton
+              onClick={() => void save()}
+              disabled={!amount.trim() || !hasValidEffectiveFrom}
+            >
               {copy('Save price')}
             </DButton>
           )}
@@ -1244,14 +1261,18 @@ function PriceChangeDialog({
               variant="date-time"
               placeholder={copy('Select the date the price takes effect')}
             />
-            <p className="text-sm text-[var(--color-text-muted)]">{copy('Currency:')} {currency}</p>
+            <p className="text-sm text-[var(--color-text-muted)]">
+              {copy('Currency:')} {currency}
+            </p>
           </div>
         )}
         <div className="border-t border-[var(--color-border)] pt-4">
           <h3 className="text-sm font-semibold">{copy('Price history')}</h3>
           {variant && (
             <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-              {copy('Only variant-specific prices are recorded here. The item default price is not variant history.')}
+              {copy(
+                'Only variant-specific prices are recorded here. The item default price is not variant history.',
+              )}
             </p>
           )}
           <div className="mt-3">

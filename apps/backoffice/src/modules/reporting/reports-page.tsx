@@ -403,7 +403,7 @@ export function ReportsPage() {
     queryFn: () => api.get<Page<Option>>('/api/v1/financial-accounts?limit=100&offset=0'),
     enabled: Boolean(
       session?.effectiveEntitlements.capabilities.includes('FINANCE_OPERATIONS') &&
-        session?.identity.permissions.includes('financial-accounts:read'),
+      session?.identity.permissions.includes('financial-accounts:read'),
     ),
   });
   const locationSelectionReady =
@@ -431,7 +431,7 @@ export function ReportsPage() {
           ? integer(Number(v ?? 0))
           : quantity(k)
             ? new Intl.NumberFormat('id-ID', { maximumFractionDigits: 4 }).format(Number(v ?? 0))
-            : copy(String(v ?? 'â€”')),
+            : copy(String(v ?? '—')),
     [copy, formatMoney],
   );
   const columns = useMemo<TableColumn<Row>[]>(
@@ -747,7 +747,7 @@ export function ReportsPage() {
             >
               <span>{label}</span>
               <span aria-hidden="true" className="text-sm leading-none">
-                Ã—
+                ×
               </span>
             </button>
           ))}
@@ -778,7 +778,7 @@ export function ReportsPage() {
       <section className="mt-5 grid gap-4 lg:grid-cols-3">
         <AnalyticsLineChart
           title={copy(visual.trend)}
-          subtitle={`${copy('Selected period')}: ${from} â€” ${to}`}
+          subtitle={`${copy('Selected period')}: ${from} — ${to}`}
           data={data?.analytics.trend ?? []}
           formatValue={(v) => formatMoney(v, 'IDR')}
           emptyMessage={empty}

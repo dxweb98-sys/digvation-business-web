@@ -42,7 +42,7 @@ export function SaleLineRow({
         <div className="min-w-0">
           <p className="truncate text-sm font-bold">{line.itemNameSnapshot}</p>
           <p className="mt-1 truncate text-xs text-[var(--color-text-muted)]">
-            {line.variantNameSnapshot ? `${line.variantNameSnapshot} Ãƒâ€šÃ‚Â· ` : ''}
+            {line.variantNameSnapshot ? `${line.variantNameSnapshot} · ` : ''}
             {line.itemCodeSnapshot}
           </p>
         </div>

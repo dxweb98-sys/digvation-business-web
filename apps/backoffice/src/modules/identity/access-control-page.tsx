@@ -633,7 +633,7 @@ function formatPermission(key: string) {
   return key
     .split(':')
     .map((part) => part.replaceAll('-', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()))
-    .join(' Â· ');
+    .join(' · ');
 }
 
 function formatUserStatus(status: AccessUser['status']) {
