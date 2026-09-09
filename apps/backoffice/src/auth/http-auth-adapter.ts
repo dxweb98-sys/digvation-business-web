@@ -1,5 +1,5 @@
 import type { BackofficeSession, LoginCredentials } from './auth-session';
-import { loadAuthenticatedEntitlements } from '@digvation/pos-runtime';
+import { loadAuthenticatedEntitlements } from '@digvation/business-runtime';
 
 interface SessionCredentials {
   accessToken: string;

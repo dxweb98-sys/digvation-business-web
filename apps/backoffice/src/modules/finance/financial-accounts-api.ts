@@ -1,4 +1,4 @@
-import type { ApiClient } from '@digvation/pos-api';
+import type { ApiClient } from '@digvation/business-api';
 
 export type RecordStatus = 'ACTIVE' | 'INACTIVE';
 export type FinancialAccountType = 'CASH' | 'BANK' | 'E_WALLET';

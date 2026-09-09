@@ -1,11 +1,11 @@
-import { AuthProvider, useAuth, type AuthPort, type AuthSession } from '@digvation/pos-auth';
+import { AuthProvider, useAuth, type AuthPort, type AuthSession } from '@digvation/business-auth';
 import {
   ConnectivityProvider,
   loadAuthenticatedEntitlements,
   RuntimeProvider,
   useRuntime,
   type RuntimeConfig,
-} from '@digvation/pos-runtime';
+} from '@digvation/business-runtime';
 import { DToastProvider as ToastProvider } from '@digvation/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { RouterProviderProps } from 'react-router';
@@ -13,8 +13,9 @@ import { RouterProvider } from 'react-router/dom';
 
 import { useEffect, useState, type ReactNode, type TransitionEvent } from 'react';
 
-import { CashierLoginPage } from '../auth/cashier-login-page';
-import { CashierSessionProvider } from './cashier-session-provider';
+import { OperationalLoginPage } from '../../modules/operational/operational-login-page';
+import { OperationalSessionProvider } from '../../modules/operational/operational-session-provider';
+import { PosOperationalSessionProvider } from '../../modules/pos/pos-operational-session-provider';
 
 function AuthenticatedOperationalRuntime({ children }: { children: ReactNode }) {
   const { session, authPort } = useAuth();
@@ -73,14 +74,19 @@ const queryClient = new QueryClient({
   },
 });
 
-interface CashierProvidersProps {
+interface OperationalProvidersProps {
   runtime: RuntimeConfig;
   session: AuthSession | null;
   authPort: AuthPort;
   router: RouterProviderProps['router'];
 }
 
-export function CashierProviders({ runtime, session, authPort, router }: CashierProvidersProps) {
+export function OperationalProviders({
+  runtime,
+  session,
+  authPort,
+  router,
+}: OperationalProvidersProps) {
   const [authenticatedSession, setAuthenticatedSession] = useState(session);
   const [isLoggingOut, setLoggingOut] = useState(false);
 
@@ -103,22 +109,24 @@ export function CashierProviders({ runtime, session, authPort, router }: Cashier
                 onLogout={() => setLoggingOut(true)}
               >
                 <AuthenticatedOperationalRuntime>
-                  <CashierSessionProvider>
-                    <div
-                      className={`min-h-screen transition-[opacity,transform] duration-150 ease-out ${
-                        isLoggingOut
-                          ? 'pointer-events-none -translate-y-1 opacity-0'
-                          : 'opacity-100'
-                      }`}
-                      onTransitionEnd={completeLogoutTransition}
-                    >
-                      <RouterProvider router={router} />
-                    </div>
-                  </CashierSessionProvider>
+                  <OperationalSessionProvider>
+                    <PosOperationalSessionProvider>
+                      <div
+                        className={`min-h-screen transition-[opacity,transform] duration-150 ease-out ${
+                          isLoggingOut
+                            ? 'pointer-events-none -translate-y-1 opacity-0'
+                            : 'opacity-100'
+                        }`}
+                        onTransitionEnd={completeLogoutTransition}
+                      >
+                        <RouterProvider router={router} />
+                      </div>
+                    </PosOperationalSessionProvider>
+                  </OperationalSessionProvider>
                 </AuthenticatedOperationalRuntime>
               </AuthProvider>
             ) : (
-              <CashierLoginPage authPort={authPort} onAuthenticated={setAuthenticatedSession} />
+              <OperationalLoginPage authPort={authPort} onAuthenticated={setAuthenticatedSession} />
             )}
           </ToastProvider>
         </QueryClientProvider>

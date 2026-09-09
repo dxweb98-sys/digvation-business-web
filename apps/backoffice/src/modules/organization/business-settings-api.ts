@@ -1,4 +1,4 @@
-import { ApiClient } from '@digvation/pos-api';
+import { ApiClient } from '@digvation/business-api';
 
 export interface BusinessProfile {
   name: string | null;

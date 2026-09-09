@@ -1,4 +1,4 @@
-import type { ApiClient } from '@digvation/pos-api';
+import type { ApiClient } from '@digvation/business-api';
 
 export type SaleStatus = 'OPEN' | 'FINALIZED' | 'VOIDED';
 export type PaymentStatus = 'PENDING' | 'SUCCEEDED' | 'FAILED' | 'CANCELLED' | 'EXPIRED';

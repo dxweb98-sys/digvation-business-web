@@ -1,5 +1,5 @@
-import { createDecimal } from '@digvation/pos-money';
-import type { ConnectivityState } from '@digvation/pos-runtime';
+import { createDecimal } from '@digvation/business-money';
+import type { ConnectivityState } from '@digvation/business-runtime';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';

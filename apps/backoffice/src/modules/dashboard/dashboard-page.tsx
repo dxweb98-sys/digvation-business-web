@@ -1,4 +1,4 @@
-import { useRuntime } from '@digvation/pos-runtime';
+import { useRuntime } from '@digvation/business-runtime';
 import { useQuery } from '@tanstack/react-query';
 import { CircleDollarSign, ReceiptText, WalletCards } from 'lucide-react';
 

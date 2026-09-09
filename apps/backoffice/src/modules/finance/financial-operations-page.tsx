@@ -16,7 +16,7 @@ import {
   type TableColumn,
 } from '@digvation/ui';
 import { CircleCheck, Eye, Plus } from 'lucide-react';
-import { useRuntime } from '@digvation/pos-runtime';
+import { useRuntime } from '@digvation/business-runtime';
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
 import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
 import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
@@ -100,12 +100,12 @@ function CashPanel({ api }: { api: FinancialOperationsApi }) {
     {
       key: 'location',
       label: copy('Selling location'),
-      render: (row) => `${row.sellingLocationName} · ${row.sellingLocationCode}`,
+      render: (row) => `${row.sellingLocationName} Â· ${row.sellingLocationCode}`,
     },
     {
       key: 'account',
       label: copy('Cash account'),
-      render: (row) => `${row.financialAccountName} · ${row.financialAccountCode}`,
+      render: (row) => `${row.financialAccountName} Â· ${row.financialAccountCode}`,
     },
     {
       key: 'payments',
@@ -170,7 +170,7 @@ function CashPanel({ api }: { api: FinancialOperationsApi }) {
               label: copy('Amount'),
               render: (row) => format(row.amount, row.currency),
             },
-            { key: 'note', label: copy('Note'), render: (row) => row.note ?? '—' },
+            { key: 'note', label: copy('Note'), render: (row) => row.note ?? 'â€”' },
           ]}
           data={movements.data?.items ?? []}
           loading={movements.isLoading}
@@ -719,7 +719,7 @@ function ReconciliationDialog({
           value={settlementId}
           options={settlements.map((x) => ({
             value: x.id,
-            label: `${x.sellingLocationName} · ${format(x.expectedAmount, x.currency)}`,
+            label: `${x.sellingLocationName} Â· ${format(x.expectedAmount, x.currency)}`,
           }))}
           onChange={(v) => setSettlementId(String(v))}
         />

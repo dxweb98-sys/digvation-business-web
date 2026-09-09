@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { EffectiveEntitlementConfig } from '@digvation/pos-runtime';
+import type { EffectiveEntitlementConfig } from '@digvation/business-runtime';
 
 import type { BackofficeSession } from './auth-session';
 import { canAccessBackoffice } from './backoffice-access';

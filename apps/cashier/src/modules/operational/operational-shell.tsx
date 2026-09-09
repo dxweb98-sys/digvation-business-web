@@ -1,29 +1,16 @@
-import { useAuth } from '@digvation/pos-auth';
-import { useConnectivity, useRuntime } from '@digvation/pos-runtime';
+import { useAuth } from '@digvation/business-auth';
+import { useConnectivity, useRuntime } from '@digvation/business-runtime';
+import { ApiClient } from '@digvation/business-api';
 import { DAvatar, DButton, DDialog, useToast } from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
-import {
-  Check,
-  ChevronDown,
-  LayoutGrid,
-  LogOut,
-  MapPin,
-  ReceiptText,
-  Rows3,
-  UserRound,
-} from 'lucide-react';
+import { Check, ChevronDown, LogOut, MapPin, Building2, UserRound } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 
-import { cashierTransactionKeys } from '../../features/sell/cashier-transaction-keys';
-import { createCashierTransactionAdapter } from '../../features/sell/cashier-transaction-adapter-factory';
-import { useCashierSession } from '../providers/cashier-session-provider';
-import { getAppVersion } from '../version/app-version';
-
-const NAVIGATION = [
-  { to: '/sell', label: 'Sell', icon: LayoutGrid },
-  { to: '/open-sales', label: 'Open Sales', icon: Rows3 },
-] as const;
+import { getAppVersion } from '../../app/version/app-version';
+import { OperationalAccessApi, operationalAccessKeys } from './operational-access-api';
+import { useOperationalSession } from './operational-session-provider';
+import type { OperationalNavigationItem } from './operational-navigation';
 
 function formatCurrentDate(locale: string): string {
   return new Intl.DateTimeFormat(locale, {
@@ -46,7 +33,11 @@ function identityInitials(displayName: string, initials?: string): string | null
   return derived || null;
 }
 
-export function CashierShell() {
+interface OperationalShellProps {
+  navigationItems: readonly OperationalNavigationItem[];
+}
+
+export function OperationalShell({ navigationItems }: OperationalShellProps) {
   const runtime = useRuntime();
   const connectivity = useConnectivity();
   const { session, authPort, logout } = useAuth();
@@ -60,25 +51,29 @@ export function CashierShell() {
     isBranchPickerOpen,
     openBranchPicker,
     closeBranchPicker,
-  } = useCashierSession();
+  } = useOperationalSession();
   const navigate = useNavigate();
   const routerLocation = useLocation();
   const version = getAppVersion();
-  const transactionAdapter = useMemo(
+  const operationalAccess = useMemo(
     () =>
-      createCashierTransactionAdapter(
-        runtime,
-        authPort.getAccessToken ? authPort.getAccessToken.bind(authPort) : undefined,
+      new OperationalAccessApi(
+        new ApiClient({
+          baseUrl: runtime.apiBaseUrl,
+          ...(authPort.getAccessToken
+            ? { getAccessToken: authPort.getAccessToken.bind(authPort) }
+            : {}),
+        }),
       ),
     [authPort, runtime],
   );
-  const locationsQuery = useQuery({
-    queryKey: cashierTransactionKeys.locations(),
-    queryFn: ({ signal }) => transactionAdapter.listSellingLocations(signal),
+  const operationalAccessQuery = useQuery({
+    queryKey: operationalAccessKeys.context(),
+    queryFn: ({ signal }) => operationalAccess.context(signal),
   });
   const locations = useMemo(
-    () => (locationsQuery.data?.items ?? []).filter((location) => location.status === 'ACTIVE'),
-    [locationsQuery.data],
+    () => operationalAccessQuery.data?.locations ?? [],
+    [operationalAccessQuery.data],
   );
   const selectedLocation = locations.find((location) => location.id === selectedLocationId) ?? null;
   const brandSubtitle =
@@ -95,7 +90,7 @@ export function CashierShell() {
       selectLocation(null);
   }, [locations, selectLocation, selectedLocationId]);
 
-  if (locationsQuery.isSuccess && locations.length === 0) {
+  if (operationalAccessQuery.isSuccess && locations.length === 0) {
     return (
       <main className="grid min-h-screen place-items-center bg-[var(--color-background)] p-6 text-center">
         <section className="max-w-md rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
@@ -187,7 +182,7 @@ export function CashierShell() {
                 className="size-full object-contain p-1"
               />
             ) : (
-              <ReceiptText className="size-5" strokeWidth={2.2} />
+              <Building2 className="size-5" strokeWidth={2.2} />
             )}
           </div>
           <div className="min-w-0">
@@ -212,7 +207,7 @@ export function CashierShell() {
               </span>
               <span className="mt-0.5 block truncate text-sm font-semibold text-[var(--color-text)]">
                 {selectedLocation?.name ??
-                  (locationsQuery.isLoading ? 'Loading branch' : 'Choose branch')}
+                  (operationalAccessQuery.isLoading ? 'Loading branch' : 'Choose branch')}
               </span>
             </span>
             {locations.length > 1 ? (
@@ -222,7 +217,7 @@ export function CashierShell() {
         </div>
 
         <nav className="mt-3 flex gap-1 px-3 lg:flex-col">
-          {NAVIGATION.map(({ to, label, icon: Icon }) => (
+          {navigationItems.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
@@ -326,11 +321,11 @@ export function CashierShell() {
           </p>
           <h2 className="mt-1 text-lg font-bold">Choose active branch</h2>
           <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-            Sales and catalog pricing use this branch context.
+            Pilih lokasi yang digunakan untuk operasi aktif Anda.
           </p>
         </div>
         <div className="max-h-[min(420px,60vh)] overflow-y-auto p-3">
-          {locationsQuery.isLoading ? (
+          {operationalAccessQuery.isLoading ? (
             <p className="p-3 text-sm text-[var(--color-text-muted)]">Loading branches...</p>
           ) : locations.length === 0 ? (
             <div className="p-3 text-sm text-[var(--color-text-muted)]">
@@ -376,7 +371,7 @@ export function CashierShell() {
         open={isAccountDialogOpen}
         onClose={() => setAccountDialogOpen(false)}
         title="Account"
-        description="Informasi akun Cashier yang sedang aktif."
+        description="Informasi akun operasional yang sedang aktif."
         ariaLabel="Account information"
         closeOnEscape
         closeOnOverlay

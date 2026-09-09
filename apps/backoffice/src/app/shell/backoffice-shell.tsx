@@ -1,4 +1,4 @@
-import { useRuntime } from '@digvation/pos-runtime';
+import { useRuntime } from '@digvation/business-runtime';
 import { DAvatar, DBadge, DButton, DDropdown } from '@digvation/ui';
 import {
   Bell,
@@ -12,7 +12,6 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
-  ReceiptText,
   Tags,
   UserRound,
   UserCircle,
@@ -128,7 +127,7 @@ export function BackofficeShell() {
                 className="size-full object-contain p-1"
               />
             ) : (
-              <ReceiptText className="size-[18px]" strokeWidth={2.2} />
+              <Building2 className="size-[18px]" strokeWidth={2.2} />
             )}
           </div>
           <div className="min-w-0">

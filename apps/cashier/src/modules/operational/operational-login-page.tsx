@@ -1,10 +1,11 @@
 import { DButton, DInput, useToast } from '@digvation/ui';
-import { ReceiptText } from 'lucide-react';
+import { Building2 } from 'lucide-react';
 import { useRef, useState, type FormEvent, type TransitionEvent } from 'react';
 
-import type { AuthPort, AuthSession } from '@digvation/pos-auth';
+import type { AuthPort, AuthSession } from '@digvation/business-auth';
+import { useRuntime } from '@digvation/business-runtime';
 
-interface CashierLoginPageProps {
+interface OperationalLoginPageProps {
   authPort: AuthPort;
   onAuthenticated: (session: AuthSession) => void;
 }
@@ -16,8 +17,9 @@ function loginFailureMessage(error: unknown) {
   return 'Login belum dapat diproses. Silakan coba lagi.';
 }
 
-/** App-owned login composition using the canonical shared field, button, and toast primitives. */
-export function CashierLoginPage({ authPort, onAuthenticated }: CashierLoginPageProps) {
+/** Operational-owned login composition using the canonical shared field, button, and toast primitives. */
+export function OperationalLoginPage({ authPort, onAuthenticated }: OperationalLoginPageProps) {
+  const runtime = useRuntime();
   const { showToast } = useToast();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -79,26 +81,26 @@ export function CashierLoginPage({ authPort, onAuthenticated }: CashierLoginPage
       <section className="relative w-full max-w-sm">
         <header className="mb-8 text-center">
           <div className="relative mx-auto mb-4 grid size-14 place-items-center rounded-2xl bg-[var(--color-brand)] text-white shadow-lg shadow-[var(--color-brand)]/20">
-            <ReceiptText className="size-6" aria-hidden="true" />
+            <Building2 className="size-6" aria-hidden="true" />
             <span className="absolute inset-0 -z-10 rounded-2xl bg-[var(--color-brand)]/20 animate-ping [animation-duration:2s]" />
           </div>
           <h1 className="text-3xl font-bold tracking-[-0.04em] text-[var(--color-text)]">
-            Digvation POS
+            {runtime.branding.productName}
           </h1>
           <p className="mt-2 text-sm text-[var(--color-text-muted)]">
-            Masuk untuk membuka ruang kerja kasir.
+            Masuk untuk membuka ruang kerja bisnis Anda.
           </p>
         </header>
 
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-[var(--shadow-panel)]">
           <h2 className="text-lg font-semibold text-[var(--color-text)]">Masuk</h2>
           <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-            Gunakan akun Anda untuk memulai transaksi.
+            Gunakan akun Anda untuk melanjutkan ke ruang kerja yang tersedia.
           </p>
 
           <form autoComplete="on" className="mt-6 space-y-4" onSubmit={submit}>
             <DInput
-              id="cashier-identifier"
+              id="operational-identifier"
               name="username"
               label="ID pengguna"
               value={identifier}
@@ -110,7 +112,7 @@ export function CashierLoginPage({ authPort, onAuthenticated }: CashierLoginPage
               spellCheck={false}
             />
             <DInput
-              id="cashier-password"
+              id="operational-password"
               name="password"
               label="Kata sandi"
               type="password"
@@ -121,7 +123,7 @@ export function CashierLoginPage({ authPort, onAuthenticated }: CashierLoginPage
               autoComplete="current-password"
             />
             <DButton type="submit" fullWidth loading={isSubmitting} className="mt-2">
-              {isLeaving ? 'Membuka POS...' : isSubmitting ? 'Memverifikasi...' : 'Masuk'}
+              {isLeaving ? 'Membuka ruang kerja...' : isSubmitting ? 'Memverifikasi...' : 'Masuk'}
             </DButton>
           </form>
         </div>

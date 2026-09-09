@@ -1,10 +1,11 @@
-import { useConnectivity, useRuntime } from '@digvation/pos-runtime';
-import { useAuth } from '@digvation/pos-auth';
+import { useConnectivity, useRuntime } from '@digvation/business-runtime';
+import { useAuth } from '@digvation/business-auth';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 
-import { useCashierSession } from '../../app/providers/cashier-session-provider';
+import { useOperationalSession } from '../../modules/operational/operational-session-provider';
+import { usePosOperationalSession } from '../../modules/pos/pos-operational-session-provider';
 import { cashierTransactionErrorMessage } from './cashier-transaction-errors';
 import { cashierTransactionKeys } from './cashier-transaction-keys';
 import type { CatalogItem, PaymentMethod, Sale, SaleLine } from './cashier-transaction.types';
@@ -28,7 +29,8 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
   const queryClient = useQueryClient();
   const connectivity = useConnectivity();
   const navigate = useNavigate();
-  const { selectedLocationId, selectLocation, rememberSale } = useCashierSession();
+  const { selectedLocationId, selectLocation } = useOperationalSession();
+  const { rememberSale } = usePosOperationalSession();
   const [variantPicker, setVariantPicker] = useState<VariantPickerState | null>(null);
   const [lineTaskId, setLineTaskId] = useState<string | null>(null);
   const [isCompletionOpen, setCompletionOpen] = useState(false);

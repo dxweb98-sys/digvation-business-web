@@ -3,7 +3,7 @@ import type {
   BusinessCapability,
   BusinessProduct,
   EffectiveEntitlementConfig,
-} from '@digvation/pos-runtime';
+} from '@digvation/business-runtime';
 
 export type BackofficeCapability =
   | 'dashboard'

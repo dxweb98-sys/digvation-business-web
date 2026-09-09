@@ -1,4 +1,4 @@
-import { useRuntime } from '@digvation/pos-runtime';
+import { useRuntime } from '@digvation/business-runtime';
 import {
   DButton,
   DDataTable,
@@ -431,7 +431,7 @@ export function ReportsPage() {
           ? integer(Number(v ?? 0))
           : quantity(k)
             ? new Intl.NumberFormat('id-ID', { maximumFractionDigits: 4 }).format(Number(v ?? 0))
-            : copy(String(v ?? '—')),
+            : copy(String(v ?? 'â€”')),
     [copy, formatMoney],
   );
   const columns = useMemo<TableColumn<Row>[]>(
@@ -747,7 +747,7 @@ export function ReportsPage() {
             >
               <span>{label}</span>
               <span aria-hidden="true" className="text-sm leading-none">
-                ×
+                Ã—
               </span>
             </button>
           ))}
@@ -778,7 +778,7 @@ export function ReportsPage() {
       <section className="mt-5 grid gap-4 lg:grid-cols-3">
         <AnalyticsLineChart
           title={copy(visual.trend)}
-          subtitle={`${copy('Selected period')}: ${from} — ${to}`}
+          subtitle={`${copy('Selected period')}: ${from} â€” ${to}`}
           data={data?.analytics.trend ?? []}
           formatValue={(v) => formatMoney(v, 'IDR')}
           emptyMessage={empty}

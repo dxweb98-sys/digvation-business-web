@@ -2,12 +2,13 @@ import { Navigate, createBrowserRouter } from 'react-router';
 
 import { OpenSalesPage } from '../../routes/open-sales/open-sales-page';
 import { SellPage } from '../../routes/sell/sell-page';
-import { CashierShell } from '../../app/shell/cashier-shell';
+import { OperationalShell } from '../../modules/operational/operational-shell';
+import { posOperationalNavigation } from '../../modules/pos/pos-operational-navigation';
 
-export const posOperationalRouter = createBrowserRouter([
+export const operationalRouter = createBrowserRouter([
   { path: '/login', element: <Navigate to="/sell" replace /> },
   {
-    element: <CashierShell />,
+    element: <OperationalShell navigationItems={posOperationalNavigation} />,
     children: [
       { index: true, element: <Navigate to="/sell" replace /> },
       { path: '/sell', element: <SellPage /> },

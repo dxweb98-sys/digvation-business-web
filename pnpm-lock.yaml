@@ -71,13 +71,13 @@ importers:
 
   apps/backoffice:
     dependencies:
-      '@digvation/pos-api':
+      '@digvation/business-api':
         specifier: workspace:*
         version: link:../../packages/api
-      '@digvation/pos-auth':
+      '@digvation/business-auth':
         specifier: workspace:*
         version: link:../../packages/auth
-      '@digvation/pos-runtime':
+      '@digvation/business-runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
       '@digvation/ui':
@@ -108,16 +108,16 @@ importers:
 
   apps/cashier:
     dependencies:
-      '@digvation/pos-api':
+      '@digvation/business-api':
         specifier: workspace:*
         version: link:../../packages/api
-      '@digvation/pos-auth':
+      '@digvation/business-auth':
         specifier: workspace:*
         version: link:../../packages/auth
-      '@digvation/pos-money':
+      '@digvation/business-money':
         specifier: workspace:*
         version: link:../../packages/money
-      '@digvation/pos-runtime':
+      '@digvation/business-runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
       '@digvation/ui':

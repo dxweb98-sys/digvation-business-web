@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useToast } from '@digvation/ui';
-import { ApiClient } from '@digvation/pos-api';
+import { ApiClient } from '@digvation/business-api';
 
 import { isBackofficeSessionExpired } from '../app/api/backoffice-api-error';
 import { useBackofficeLocalization } from '../app/localization/backoffice-localization';

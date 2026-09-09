@@ -1,5 +1,5 @@
-import { ApiClient } from '@digvation/pos-api';
-import type { RuntimeConfig } from '@digvation/pos-runtime';
+import { ApiClient } from '@digvation/business-api';
+import type { RuntimeConfig } from '@digvation/business-runtime';
 
 import {
   HttpCashierTransactionAdapter,

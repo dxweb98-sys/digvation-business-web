@@ -1,4 +1,4 @@
-import type { ApiClient } from '@digvation/pos-api';
+import type { ApiClient } from '@digvation/business-api';
 export type ExpenseStatus = 'PENDING' | 'APPROVED' | 'REJECTED'; export type ExpenseOrigin = 'BACKOFFICE' | 'CASHIER';
 export interface Expense { id: string; sellingLocationId: string; sellingLocationName: string; financialAccountId: string; financialAccountName: string; origin: ExpenseOrigin; status: ExpenseStatus; currency: string; amount: string; note: string | null; occurredAt: string; version: number; rejectionNote: string | null; }
 export interface Page<T> { items: T[]; total: number; limit: number; offset: number; }

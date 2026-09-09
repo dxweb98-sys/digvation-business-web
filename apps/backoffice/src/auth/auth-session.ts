@@ -23,4 +23,4 @@ export interface LoginCredentials {
   identifier: string;
   password: string;
 }
-import type { EffectiveEntitlementConfig } from '@digvation/pos-runtime';
+import type { EffectiveEntitlementConfig } from '@digvation/business-runtime';

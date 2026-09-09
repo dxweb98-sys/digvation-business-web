@@ -13,7 +13,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ban, Pencil, UserCog } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-import { useRuntime } from '@digvation/pos-runtime';
+import { useRuntime } from '@digvation/business-runtime';
 import { canPerformBackofficeAction } from '../../auth/backoffice-access';
 import { isSessionExpiredError, useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
@@ -633,7 +633,7 @@ function formatPermission(key: string) {
   return key
     .split(':')
     .map((part) => part.replaceAll('-', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()))
-    .join(' · ');
+    .join(' Â· ');
 }
 
 function formatUserStatus(status: AccessUser['status']) {

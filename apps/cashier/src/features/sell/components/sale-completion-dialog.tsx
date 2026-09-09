@@ -1,4 +1,4 @@
-import { createDecimal, formatMoney } from '@digvation/pos-money';
+import { createDecimal, formatMoney } from '@digvation/business-money';
 import {
   DButton,
   DCurrencyInput,
@@ -127,7 +127,7 @@ export function SaleCompletionDialog({
     setFormError(null);
     const value = discountToApiValue(discountType, discountValue);
     if (!value || discountReason.trim() === '') {
-      setFormError('Order discount value and reason are required. Percentage uses 0â€“100%.');
+      setFormError('Order discount value and reason are required. Percentage uses 0Ã¢â‚¬â€œ100%.');
       return;
     }
     onSetOrderDiscount({ type: discountType, value, reason: discountReason.trim() });
@@ -135,7 +135,7 @@ export function SaleCompletionDialog({
 
   const completionMessage =
     viewModel.primaryMode === 'PAID_WORK_REMAINING'
-      ? 'Payment complete Â· service work still needs attention.'
+      ? 'Payment complete Ã‚Â· service work still needs attention.'
       : viewModel.primaryMode === 'READY_TO_FINALIZE'
         ? 'Domain readiness is complete. Finalization can be submitted.'
         : viewModel.primaryMode === 'FINALIZED'

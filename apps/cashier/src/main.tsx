@@ -6,7 +6,7 @@ import './app/app.css';
 
 import { AppBootScreen } from './app/bootstrap/app-boot-screen';
 import { BootstrapTransition } from './app/bootstrap/bootstrap-transition';
-import { bootstrapCashier } from './app/bootstrap/bootstrap-cashier';
+import { bootstrapOperational } from './app/bootstrap/bootstrap-operational';
 
 function renderBootstrapFailure(error: unknown) {
   const message = error instanceof Error ? error.message : 'Unknown startup error';
@@ -18,7 +18,7 @@ function renderBootstrapFailure(error: unknown) {
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-(--color-danger)">
             Startup blocked
           </p>
-          <h1 className="mt-3 text-xl font-bold">Cashier could not initialize.</h1>
+          <h1 className="mt-3 text-xl font-bold">Digvation Business could not initialize.</h1>
           <p className="mt-3 text-sm leading-6 text-(--color-text-muted)">{message}</p>
         </section>
       </main>
@@ -34,7 +34,7 @@ root.render(
   </React.StrictMode>,
 );
 
-void bootstrapCashier()
+void bootstrapOperational()
   .then((app) => {
     root.render(
       <React.StrictMode>

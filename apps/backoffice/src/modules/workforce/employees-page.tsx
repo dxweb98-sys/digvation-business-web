@@ -5,7 +5,7 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CircleCheck, CircleOff, Eye, Pencil, Plus } from 'lucide-react';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
-import { useRuntime } from '@digvation/pos-runtime';
+import { useRuntime } from '@digvation/business-runtime';
 
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
 import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
@@ -185,7 +185,7 @@ function LifecycleHistory({ employee, copy, formatDate }: { employee: EmployeeDe
     { key: 'event', label: copy('Event'), render: (event) => copy(event.event === 'JOINED' ? 'Joined' : event.event === 'DEACTIVATED' ? 'Deactivated' : 'Reactivated') },
     { key: 'occurredAt', label: copy('Date / Time'), render: (event) => formatDate(new Date(event.occurredAt), { dateStyle: 'medium', timeStyle: event.event === 'JOINED' ? undefined : 'short' }) },
     { key: 'reason', label: copy('Reason'), render: (event) => event.reason ?? copy('Not set') },
-    { key: 'actor', label: copy('Changed by'), render: (event) => event.actorId ? `${copy(event.actorKind === 'machine' ? 'Machine' : 'User')} · ${event.actorId}` : copy('Not set') },
+    { key: 'actor', label: copy('Changed by'), render: (event) => event.actorId ? `${copy(event.actorKind === 'machine' ? 'Machine' : 'User')} Â· ${event.actorId}` : copy('Not set') },
   ];
   return <DDataTable columns={columns} data={events} rowKey="id" emptyMessage={copy('No employee history is available.')} />;
 }

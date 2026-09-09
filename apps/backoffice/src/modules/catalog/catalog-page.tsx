@@ -18,7 +18,7 @@ import {
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { BadgeDollarSign, Ban, Eye, Pencil, Plus } from 'lucide-react';
 import { type ReactNode, useMemo, useState } from 'react';
-import { useRuntime } from '@digvation/pos-runtime';
+import { useRuntime } from '@digvation/business-runtime';
 
 import { canPerformBackofficeAction, type BackofficeAction } from '../../auth/backoffice-access';
 import { isSessionExpiredError, useBackofficeAuth } from '../../auth/backoffice-auth-context';
@@ -122,7 +122,7 @@ export function CatalogPage() {
       key: 'categoryId',
       label: copy('Category'),
       render: (x) =>
-        categories.data?.items.find((category) => category.id === x.categoryId)?.name ?? '—',
+        categories.data?.items.find((category) => category.id === x.categoryId)?.name ?? 'â€”',
     },
     {
       key: 'defaultPrice',
@@ -783,7 +783,7 @@ function ItemDetailDialog({
           <Status value={item.lifecycle} />
         </div>
       }
-      description={`${item.code} · ${humanize(item.type)}`}
+      description={`${item.code} Â· ${humanize(item.type)}`}
       footer={
         <div className="flex justify-end gap-2">
           <DButton variant="secondary" onClick={onClose}>
@@ -1022,7 +1022,7 @@ function PriceLabel({
   emptyLabel?: string;
 }) {
   const { copy, formatMoney } = useBackofficeLocalization();
-  if (!available) return <span className="text-[var(--color-text-muted)]">—</span>;
+  if (!available) return <span className="text-[var(--color-text-muted)]">â€”</span>;
   if (loading)
     return <span className="text-sm font-normal text-[var(--color-text-muted)]">{copy('Loading...')}</span>;
   return price ? (
@@ -1209,7 +1209,7 @@ function PriceChangeDialog({
     <DDialog
       open={Boolean(target)}
       onClose={onClose}
-      title={variant ? `${copy('Variant price')} — ${variant.name}` : copy('Change default price')}
+      title={variant ? `${copy('Variant price')} â€” ${variant.name}` : copy('Change default price')}
       description={
         variant
           ? copy('Variant prices are final prices, not differences from the default price.')

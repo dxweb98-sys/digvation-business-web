@@ -1,22 +1,24 @@
-import { formatMoney } from '@digvation/pos-money';
-import { useAuth } from '@digvation/pos-auth';
-import { useRuntime } from '@digvation/pos-runtime';
+import { formatMoney } from '@digvation/business-money';
+import { useAuth } from '@digvation/business-auth';
+import { useRuntime } from '@digvation/business-runtime';
 import { DButton } from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Clock3, LoaderCircle, ReceiptText } from 'lucide-react';
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router';
 
-import { useCashierSession } from '../../app/providers/cashier-session-provider';
 import { cashierTransactionKeys } from '../../features/sell/cashier-transaction-keys';
 import { createCashierTransactionAdapter } from '../../features/sell/cashier-transaction-adapter-factory';
 import type { OpenSaleSummaryViewModel } from '../../features/sell/cashier-transaction.types';
+import { useOperationalSession } from '../../modules/operational/operational-session-provider';
+import { usePosOperationalSession } from '../../modules/pos/pos-operational-session-provider';
 
 export function OpenSalesPage() {
   const runtime = useRuntime();
   const { authPort } = useAuth();
   const navigate = useNavigate();
-  const { selectedLocationId, recentSaleIds, selectLocation, rememberSale } = useCashierSession();
+  const { selectedLocationId, selectLocation } = useOperationalSession();
+  const { recentSaleIds, rememberSale } = usePosOperationalSession();
   const transactionAdapter = useMemo(
     () =>
       createCashierTransactionAdapter(
@@ -74,7 +76,7 @@ export function OpenSalesPage() {
           <div>
             <h1 className="text-xl font-bold tracking-[-0.03em]">Open Sales</h1>
             <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-              Continue a transaction from todayÃ¢â‚¬â„¢s active workspace.
+              Continue a transaction from todayÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢s active workspace.
             </p>
           </div>
           <div className="flex gap-2">
@@ -87,7 +89,8 @@ export function OpenSalesPage() {
         <div className="mt-4">
           {salesQuery.isLoading ? (
             <div className="flex min-h-52 items-center justify-center rounded-[var(--radius-panel)] border border-[var(--color-border)] bg-[var(--color-surface)] text-sm text-[var(--color-text-muted)]">
-              <LoaderCircle className="mr-2 size-4 animate-spin" /> Loading open SalesÃ¢â‚¬Â¦
+              <LoaderCircle className="mr-2 size-4 animate-spin" /> Loading open
+              SalesÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦
             </div>
           ) : openSales.length === 0 ? (
             <div className="rounded-[var(--radius-card)] border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] p-10 text-center">
@@ -110,7 +113,7 @@ export function OpenSalesPage() {
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-brand)]">
-                        {sale.locationName} Ã‚Â· Open
+                        {sale.locationName} Ãƒâ€šÃ‚Â· Open
                       </p>
                       <h2 className="mt-2 text-base font-bold">Sale {sale.id.slice(0, 8)}</h2>
                     </div>

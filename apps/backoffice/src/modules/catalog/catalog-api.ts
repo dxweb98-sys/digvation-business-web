@@ -1,4 +1,4 @@
-import type { ApiClient } from '@digvation/pos-api';
+import type { ApiClient } from '@digvation/business-api';
 
 export interface Page<T> {
   items: T[];

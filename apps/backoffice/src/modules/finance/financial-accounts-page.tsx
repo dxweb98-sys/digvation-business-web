@@ -19,7 +19,7 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CircleCheck, CircleOff, Eye, Pencil, Plus } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
-import { useRuntime } from '@digvation/pos-runtime';
+import { useRuntime } from '@digvation/business-runtime';
 
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
 import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
@@ -140,7 +140,7 @@ function AccountsPanel({ api }: { api: FinancialAccountsApi }) {
       render: (account) =>
         account.type === 'CASH'
           ? copy('On-site cash')
-          : `${account.institutionName} · ${account.accountReference}`,
+          : `${account.institutionName} Â· ${account.accountReference}`,
     },
     {
       key: 'status',
@@ -475,7 +475,7 @@ function RoutingPanel({ api }: { api: FinancialAccountsApi }) {
     {
       key: 'location',
       label: copy('Selling location'),
-      render: (route) => `${route.sellingLocationName} · ${route.sellingLocationCode}`,
+      render: (route) => `${route.sellingLocationName} Â· ${route.sellingLocationCode}`,
     },
     {
       key: 'paymentMethod',
@@ -485,7 +485,7 @@ function RoutingPanel({ api }: { api: FinancialAccountsApi }) {
     {
       key: 'destination',
       label: copy('Settlement destination'),
-      render: (route) => `${route.financialAccountName} · ${route.financialAccountCode}`,
+      render: (route) => `${route.financialAccountName} Â· ${route.financialAccountCode}`,
     },
     { key: 'currency', label: copy('Currency') },
     {
@@ -613,13 +613,13 @@ function RouteEditor({
   });
   const accountOptions = (accounts.data?.items ?? []).map((account) => ({
     value: account.id,
-    label: `${account.name} · ${account.code} · ${account.currency}`,
+    label: `${account.name} Â· ${account.code} Â· ${account.currency}`,
     disabled: !compatibleTypes[method].includes(account.type),
   }));
   if (route && !accountOptions.some((option) => option.value === route.financialAccountId))
     accountOptions.unshift({
       value: route.financialAccountId,
-      label: `${route.financialAccountName} · ${route.financialAccountCode} · ${route.currency}`,
+      label: `${route.financialAccountName} Â· ${route.financialAccountCode} Â· ${route.currency}`,
       disabled: false,
     });
   const valid = Boolean((route || locationId) && accountId);
@@ -667,7 +667,7 @@ function RouteEditor({
         {route ? (
           <DInput
             label={copy('Selling location')}
-            value={`${route.sellingLocationName} · ${route.sellingLocationCode}`}
+            value={`${route.sellingLocationName} Â· ${route.sellingLocationCode}`}
             disabled
           />
         ) : (
@@ -677,7 +677,7 @@ function RouteEditor({
             onChange={setLocationId}
             options={(locations.data?.items ?? []).map((location) => ({
               value: location.id,
-              label: `${location.name} · ${location.code}`,
+              label: `${location.name} Â· ${location.code}`,
               disabled: location.status !== 'ACTIVE',
             }))}
             loading={locations.isLoading}
@@ -797,7 +797,7 @@ function PageFooter({
   return (
     <div className={`${compact ? 'mt-2' : 'mt-4'} flex flex-wrap items-center justify-end gap-3`}>
       <span className="mr-auto text-xs text-[var(--color-text-muted)]">
-        {copy('Showing')} {offset + 1}–{offset + count}
+        {copy('Showing')} {offset + 1}â€“{offset + count}
       </span>
       <DPagination
         page={page}
