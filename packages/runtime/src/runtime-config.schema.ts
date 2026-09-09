@@ -13,6 +13,10 @@ export const runtimeConfigSchema = z.object({
     cashier: z.boolean(),
     backoffice: z.boolean(),
   }),
+  effectiveEntitlements: z.object({
+    products: z.array(z.enum(['POS'])),
+    capabilities: z.array(z.enum(['FINANCE_OPERATIONS'])),
+  }),
   branding: z.object({
     mode: z.enum(['DIGVATION_DEFAULT', 'WHITE_LABEL']),
     productName: z.string().min(1),

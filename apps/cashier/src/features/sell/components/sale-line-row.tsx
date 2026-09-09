@@ -1,4 +1,4 @@
-import { compareDecimalStrings, createDecimal, formatMoney } from '@digvation/pos-money';
+import { compareDecimalStrings, createDecimal, formatMoney } from '@digvation/business-money';
 import { DBadge, DButton } from '@digvation/ui';
 import { Minus, Plus, SlidersHorizontal, Trash2 } from 'lucide-react';
 
@@ -42,7 +42,7 @@ export function SaleLineRow({
         <div className="min-w-0">
           <p className="truncate text-sm font-bold">{line.itemNameSnapshot}</p>
           <p className="mt-1 truncate text-xs text-[var(--color-text-muted)]">
-            {line.variantNameSnapshot ? `${line.variantNameSnapshot} Ã‚Â· ` : ''}
+            {line.variantNameSnapshot ? `${line.variantNameSnapshot} · ` : ''}
             {line.itemCodeSnapshot}
           </p>
         </div>

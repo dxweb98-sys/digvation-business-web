@@ -1,4 +1,4 @@
-import { formatMoney } from '@digvation/pos-money';
+import { formatMoney } from '@digvation/business-money';
 import { DButton, DInput, DSkeleton } from '@digvation/ui';
 import { PackageSearch, Search, ShoppingBag, Wrench } from 'lucide-react';
 

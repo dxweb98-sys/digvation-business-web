@@ -1,4 +1,4 @@
-import { RuntimeProvider, type RuntimeConfig } from '@digvation/pos-runtime';
+import { RuntimeProvider, type RuntimeConfig } from '@digvation/business-runtime';
 import { DLocalizationProvider, DToastProvider } from '@digvation/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { RouterProviderProps } from 'react-router';

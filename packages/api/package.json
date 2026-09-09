@@ -1,5 +1,5 @@
 {
-  "name": "@digvation/pos-api",
+  "name": "@digvation/business-api",
   "version": "0.1.0-alpha.0",
   "private": true,
   "type": "module",

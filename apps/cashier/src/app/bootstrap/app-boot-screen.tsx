@@ -1,4 +1,4 @@
-import { ReceiptText } from 'lucide-react';
+import { Building2 } from 'lucide-react';
 
 interface AppBootScreenProps {
   productName?: string;
@@ -6,7 +6,7 @@ interface AppBootScreenProps {
 }
 
 export function AppBootScreen({
-  productName = 'Digvation POS',
+  productName = 'Digvation Business',
   message = 'Preparing your workspace',
 }: AppBootScreenProps) {
   return (
@@ -20,7 +20,7 @@ export function AppBootScreen({
       <section className="relative w-full max-w-sm">
         <div className="relative mx-auto grid size-14 place-items-center rounded-[var(--radius-card)] bg-[var(--color-brand)] text-white shadow-lg shadow-[var(--color-brand)]/20">
           <span className="absolute inset-0 rounded-[var(--radius-card)] bg-[var(--color-brand)]/20 animate-ping [animation-duration:2s]" />
-          <ReceiptText className="relative size-6" />
+          <Building2 className="relative size-6" />
         </div>
         <h1 className="mt-5 text-2xl font-bold tracking-[-0.04em]">{productName}</h1>
         <p className="mt-2 text-sm text-[var(--color-text-muted)]">{message}</p>

@@ -2,7 +2,7 @@ import { DButton, DInput, useToast } from '@digvation/ui';
 import { useState, type FormEvent } from 'react';
 import { Navigate, useLocation } from 'react-router';
 
-import { useRuntime } from '@digvation/pos-runtime';
+import { useRuntime } from '@digvation/business-runtime';
 import { normalizeBackofficeApiError } from '../app/api/backoffice-api-error';
 import { useBackofficeLocalization } from '../app/localization/backoffice-localization';
 import { AuthenticationLoading } from './authentication-loading';

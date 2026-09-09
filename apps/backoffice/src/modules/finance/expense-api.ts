@@ -1,0 +1,7 @@
+import type { ApiClient } from '@digvation/business-api';
+export type ExpenseStatus = 'PENDING' | 'APPROVED' | 'REJECTED'; export type ExpenseOrigin = 'BACKOFFICE' | 'CASHIER';
+export interface Expense { id: string; sellingLocationId: string; sellingLocationName: string; financialAccountId: string; financialAccountName: string; origin: ExpenseOrigin; status: ExpenseStatus; currency: string; amount: string; note: string | null; occurredAt: string; version: number; rejectionNote: string | null; }
+export interface Page<T> { items: T[]; total: number; limit: number; offset: number; }
+type Query = Record<string, string | number | undefined>;
+const qs = (query: Query) => new URLSearchParams(Object.entries(query).filter(([, value]) => value !== undefined && value !== '') as [string, string][]).toString();
+export class ExpenseApi { constructor(private readonly client: ApiClient) {} list(query: Query) { return this.client.get<Page<Expense>>(`/api/v1/expenses?${qs(query)}`); } create(input: Record<string, string | null>) { return this.client.post<Expense>('/api/v1/expenses', input); } update(item: Expense, input: Record<string, string | null>) { return this.client.patch<Expense>(`/api/v1/expenses/${item.id}`, { ...input, expectedVersion: item.version }); } approve(item: Expense) { return this.client.post<Expense>(`/api/v1/expenses/${item.id}/approve`, { expectedVersion: item.version }); } reject(item: Expense, note?: string) { return this.client.post<Expense>(`/api/v1/expenses/${item.id}/reject`, { expectedVersion: item.version, note }); } }

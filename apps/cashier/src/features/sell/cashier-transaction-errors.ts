@@ -1,4 +1,4 @@
-import { ApiError } from '@digvation/pos-api';
+import { ApiError } from '@digvation/business-api';
 
 export function cashierTransactionErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {

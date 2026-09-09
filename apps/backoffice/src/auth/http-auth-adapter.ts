@@ -1,4 +1,5 @@
 import type { BackofficeSession, LoginCredentials } from './auth-session';
+import { loadAuthenticatedEntitlements } from '@digvation/business-runtime';
 
 interface SessionCredentials {
   accessToken: string;
@@ -111,6 +112,7 @@ export class HttpAuthAdapter {
       return { id, code, name, systemKey };
     });
 
+    const effectiveEntitlements = await loadAuthenticatedEntitlements(this.apiBaseUrl, accessToken);
     return {
       identity: {
         userId: user.id,
@@ -119,6 +121,7 @@ export class HttpAuthAdapter {
         permissions: [...permissions],
         roles,
       },
+      effectiveEntitlements,
     };
   }
 

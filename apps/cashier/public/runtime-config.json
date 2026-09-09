@@ -1,6 +1,6 @@
 {
   "apiBaseUrl": "http://127.0.0.1:4003",
-  "workspace": "local-development",
+  "workspace": "local",
   "locale": "id-ID",
   "currency": "IDR",
   "defaultCountry": "ID",
@@ -9,9 +9,13 @@
     "cashier": true,
     "backoffice": true
   },
+  "effectiveEntitlements": {
+    "products": ["POS"],
+    "capabilities": ["FINANCE_OPERATIONS"]
+  },
   "branding": {
     "mode": "DIGVATION_DEFAULT",
-    "productName": "Digvation POS",
+    "productName": "Digvation Business",
     "companyName": "Digvation",
     "businessName": "Development Workspace"
   },

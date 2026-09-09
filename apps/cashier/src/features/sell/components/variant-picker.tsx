@@ -1,4 +1,4 @@
-import { formatMoney } from '@digvation/pos-money';
+import { formatMoney } from '@digvation/business-money';
 import { DButton, DDialog } from '@digvation/ui';
 import { Check, ChevronRight, X } from 'lucide-react';
 

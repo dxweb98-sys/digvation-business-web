@@ -1,4 +1,4 @@
-import type { ConnectivityState } from '@digvation/pos-runtime';
+import type { ConnectivityState } from '@digvation/business-runtime';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 

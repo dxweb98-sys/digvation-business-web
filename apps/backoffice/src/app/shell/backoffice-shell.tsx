@@ -1,4 +1,4 @@
-import { useRuntime } from '@digvation/pos-runtime';
+import { useRuntime } from '@digvation/business-runtime';
 import { DAvatar, DBadge, DButton, DDropdown } from '@digvation/ui';
 import {
   Bell,
@@ -12,7 +12,6 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
-  ReceiptText,
   Tags,
   UserRound,
   UserCircle,
@@ -76,7 +75,12 @@ const navigationSections: ReadonlyArray<{
   {
     label: 'reporting',
     items: [
-      { label: 'transactionHistory', to: '/transactions', icon: BookOpen, capability: 'reports' },
+      {
+        label: 'transactionHistory',
+        to: '/transactions',
+        icon: BookOpen,
+        capability: 'transactions',
+      },
       { label: 'reports', to: '/reports', icon: ChartNoAxesCombined, capability: 'reports' },
     ],
   },
@@ -123,7 +127,7 @@ export function BackofficeShell() {
                 className="size-full object-contain p-1"
               />
             ) : (
-              <ReceiptText className="size-[18px]" strokeWidth={2.2} />
+              <Building2 className="size-[18px]" strokeWidth={2.2} />
             )}
           </div>
           <div className="min-w-0">
@@ -317,13 +321,16 @@ export function BackofficeShell() {
 
 function NavigationGroups({ session }: { session: BackofficeSession }) {
   const { t } = useBackofficeLocalization();
+  const runtime = useRuntime();
   return (
     <>
       <div className="mb-3">
         <NavigationLink item={dashboardItem} />
       </div>
       {navigationSections.map((section) => {
-        const items = section.items.filter((item) => canAccessBackoffice(session, item.capability));
+        const items = section.items.filter((item) =>
+          canAccessBackoffice(session, item.capability, session.effectiveEntitlements),
+        );
         if (!items.length) return null;
         return (
           <div key={section.label} className="mt-3">

@@ -1,5 +1,5 @@
-import { useAuth } from '@digvation/pos-auth';
-import { useRuntime } from '@digvation/pos-runtime';
+import { useAuth } from '@digvation/business-auth';
+import { useRuntime } from '@digvation/business-runtime';
 import { DCard } from '@digvation/ui';
 
 import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';

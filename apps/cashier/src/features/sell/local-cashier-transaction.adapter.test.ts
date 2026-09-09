@@ -1,4 +1,4 @@
-import { createDecimal } from '@digvation/pos-money';
+import { createDecimal } from '@digvation/business-money';
 import { describe, expect, it } from 'vitest';
 
 import { LocalCashierTransactionAdapter } from './local-cashier-transaction.adapter';

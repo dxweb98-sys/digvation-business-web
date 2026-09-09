@@ -15,6 +15,7 @@ export interface BackofficeIdentity {
 
 export interface BackofficeSession {
   identity: BackofficeIdentity;
+  effectiveEntitlements: EffectiveEntitlementConfig;
 }
 
 export interface LoginCredentials {
@@ -22,3 +23,4 @@ export interface LoginCredentials {
   identifier: string;
   password: string;
 }
+import type { EffectiveEntitlementConfig } from '@digvation/business-runtime';

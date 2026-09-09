@@ -1,12 +1,5 @@
-import { createDecimal, formatMoney } from '@digvation/pos-money';
-import {
-  DButton,
-  DCurrencyInput,
-  DDecimalInput,
-  DDialog,
-  DInput,
-  DSelect,
-} from '@digvation/ui';
+import { createDecimal, formatMoney } from '@digvation/business-money';
+import { DButton, DCurrencyInput, DDecimalInput, DDialog, DInput, DSelect } from '@digvation/ui';
 import {
   BadgeCheck,
   Banknote,
@@ -127,7 +120,7 @@ export function SaleCompletionDialog({
     setFormError(null);
     const value = discountToApiValue(discountType, discountValue);
     if (!value || discountReason.trim() === '') {
-      setFormError('Order discount value and reason are required. Percentage uses 0â€“100%.');
+      setFormError('Order discount value and reason are required. Percentage uses 0–100%.');
       return;
     }
     onSetOrderDiscount({ type: discountType, value, reason: discountReason.trim() });
@@ -135,7 +128,7 @@ export function SaleCompletionDialog({
 
   const completionMessage =
     viewModel.primaryMode === 'PAID_WORK_REMAINING'
-      ? 'Payment complete Â· service work still needs attention.'
+      ? 'Payment complete · service work still needs attention.'
       : viewModel.primaryMode === 'READY_TO_FINALIZE'
         ? 'Domain readiness is complete. Finalization can be submitted.'
         : viewModel.primaryMode === 'FINALIZED'
@@ -158,7 +151,9 @@ export function SaleCompletionDialog({
             Sale Completion
           </p>
           <h2 className="mt-2 text-xl font-bold">{sale.saleNumber}</h2>
-          {sale.invoiceNumber ? <p className="mt-1 text-sm font-semibold">{sale.invoiceNumber}</p> : null}
+          {sale.invoiceNumber ? (
+            <p className="mt-1 text-sm font-semibold">{sale.invoiceNumber}</p>
+          ) : null}
           <p className="mt-1 text-sm text-[var(--color-text-muted)]">{completionMessage}</p>
         </div>
         <DButton

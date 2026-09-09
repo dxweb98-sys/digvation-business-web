@@ -4,19 +4,20 @@ import { AuthenticatedRoute } from '../../auth/authenticated-route';
 import { AuthorizedRoute } from '../../auth/authorized-route';
 import { BackofficeLoginPage } from '../../auth/backoffice-login-page';
 import { UnauthorizedPage } from '../../routes/authorization/unauthorized-page';
-import { AccessControlPage } from '../../routes/access-control/access-control-page';
-import { DashboardPage } from '../../routes/dashboard/dashboard-page';
-import { PlaceholderPage } from '../../routes/placeholder/placeholder-page';
+import { DashboardPage } from '../../modules/dashboard/dashboard-page';
 import { BackofficeShell } from '../shell/backoffice-shell';
-import { BusinessSettingsPage } from '../../routes/business-settings/business-settings-page';
-import { CatalogPage } from '../../routes/catalog/catalog-page';
-import { TaxPage } from '../../routes/tax/tax-page';
-import { EmployeesPage } from '../../routes/employees/employees-page';
-import { FinancialAccountsPage } from '../../routes/financial-accounts/financial-accounts-page';
-import { FinancialOperationsPage } from '../../routes/financial-operations/financial-operations-page';
-import { ExpensesPage } from '../../routes/expenses/expenses-page';
-import { TransactionHistoryPage } from '../../routes/transaction-history/transaction-history-page';
-import { ReportsPage } from '../../routes/reports/reports-page';
+import { AccessControlPage } from '../../modules/identity';
+import { BusinessSettingsPage } from '../../modules/organization';
+import { CatalogPage } from '../../modules/catalog';
+import { TaxPage } from '../../modules/tax';
+import { EmployeesPage } from '../../modules/workforce';
+import {
+  ExpensesPage,
+  FinancialAccountsPage,
+  FinancialOperationsPage,
+} from '../../modules/finance';
+import { TransactionHistoryPage } from '../../modules/pos';
+import { ReportsPage } from '../../modules/reporting';
 
 export const backofficeRouter = createBrowserRouter([
   { path: '/login', element: <BackofficeLoginPage /> },
@@ -49,9 +50,7 @@ export const backofficeRouter = createBrowserRouter([
           },
           {
             element: <AuthorizedRoute capability="expenses" />,
-            children: [
-              { path: '/expenses', element: <ExpensesPage /> },
-            ],
+            children: [{ path: '/expenses', element: <ExpensesPage /> }],
           },
           {
             element: <AuthorizedRoute capability="financialOperations" />,
@@ -59,10 +58,11 @@ export const backofficeRouter = createBrowserRouter([
           },
           {
             element: <AuthorizedRoute capability="reports" />,
-            children: [
-              { path: '/reports', element: <ReportsPage /> },
-              { path: '/transactions', element: <TransactionHistoryPage /> },
-            ],
+            children: [{ path: '/reports', element: <ReportsPage /> }],
+          },
+          {
+            element: <AuthorizedRoute capability="transactions" />,
+            children: [{ path: '/transactions', element: <TransactionHistoryPage /> }],
           },
           {
             element: <AuthorizedRoute capability="configuration" />,

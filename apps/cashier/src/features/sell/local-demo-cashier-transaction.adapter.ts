@@ -1,4 +1,4 @@
-import { createDecimal } from '@digvation/pos-money';
+import { createDecimal } from '@digvation/business-money';
 
 import type {
   AddSaleLineInput,

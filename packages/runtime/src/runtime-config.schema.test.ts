@@ -15,6 +15,10 @@ describe('runtime config schema', () => {
         cashier: true,
         backoffice: false,
       },
+      effectiveEntitlements: {
+        products: ['POS'],
+        capabilities: [],
+      },
       branding: {
         mode: 'WHITE_LABEL',
         productName: 'Point of Sale',
@@ -40,6 +44,7 @@ describe('runtime config schema', () => {
     expect(parsed.deploymentProfile).toBe('DEDICATED');
     expect(parsed.branding.mode).toBe('WHITE_LABEL');
     expect(parsed.applications.backoffice).toBe(false);
+    expect(parsed.effectiveEntitlements.products).toEqual(['POS']);
     expect(parsed.theme.preset).toBe('CUSTOM');
   });
 });
