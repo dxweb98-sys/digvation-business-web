@@ -1,4 +1,9 @@
 import type { BackofficeSession } from './auth-session';
+import type {
+  BusinessCapability,
+  BusinessProduct,
+  EffectiveEntitlementConfig,
+} from '@digvation/pos-runtime';
 
 export type BackofficeCapability =
   | 'dashboard'
@@ -9,6 +14,7 @@ export type BackofficeCapability =
   | 'financialAccounts'
   | 'financialOperations'
   | 'reports'
+  | 'transactions'
   | 'configuration'
   | 'tax'
   | 'accessControl';
@@ -19,6 +25,8 @@ export type BackofficeAction =
   | 'manageRolePermissions'
   | 'viewUsers'
   | 'manageUserRoles'
+  | 'viewOperationalAccess'
+  | 'manageOperationalAccess'
   | 'viewBusinessProfile'
   | 'updateBusinessProfile'
   | 'viewSellingLocations'
@@ -52,17 +60,45 @@ export type BackofficeAction =
 interface PermissionRequirement {
   allOf?: readonly string[];
   anyOf?: readonly string[];
+  product?: BusinessProduct;
+  capability?: BusinessCapability;
 }
 
 const capabilityPermissions: Record<BackofficeCapability, PermissionRequirement> = {
   dashboard: { allOf: ['auth:self'] },
   catalog: { allOf: ['catalog:read'] },
   employees: { allOf: ['employees:read'] },
-  finance: { allOf: ['payments:read'] },
-  expenses: { allOf: ['expenses:read'] },
-  financialAccounts: { allOf: ['financial-accounts:read', 'payment-routing:read'] },
-  financialOperations: { allOf: ['cash:read', 'settlements:read', 'reconciliations:read'] },
-  reports: { allOf: ['sales:read'] },
+  finance: {
+    allOf: ['payments:read'],
+    capability: 'FINANCE_OPERATIONS',
+  },
+  expenses: {
+    allOf: ['expenses:read'],
+    capability: 'FINANCE_OPERATIONS',
+  },
+  financialAccounts: {
+    allOf: ['financial-accounts:read', 'payment-routing:read'],
+    capability: 'FINANCE_OPERATIONS',
+  },
+  financialOperations: {
+    allOf: ['cash:read', 'settlements:read', 'reconciliations:read'],
+    capability: 'FINANCE_OPERATIONS',
+  },
+  reports: {
+    anyOf: [
+      'sales:read',
+      'payments:read',
+      'catalog:read',
+      'employees:read',
+      'expenses:read',
+      'cash:read',
+      'settlements:read',
+      'reconciliations:read',
+      'tax:read',
+      'locations:read',
+    ],
+  },
+  transactions: { allOf: ['sales:read'], product: 'POS' },
 
   configuration: {
     anyOf: ['business-profile:read', 'locations:read'],
@@ -81,6 +117,8 @@ const actionPermissions: Record<BackofficeAction, readonly string[]> = {
   manageRolePermissions: ['roles:permissions'],
   viewUsers: ['users:read'],
   manageUserRoles: ['users:roles'],
+  viewOperationalAccess: ['operational-access:read'],
+  manageOperationalAccess: ['operational-access:update'],
 
   viewBusinessProfile: ['business-profile:read'],
   updateBusinessProfile: ['business-profile:update'],
@@ -117,6 +155,7 @@ const actionPermissions: Record<BackofficeAction, readonly string[]> = {
 export function canAccessBackoffice(
   session: BackofficeSession,
   capability: BackofficeCapability,
+  entitlements: EffectiveEntitlementConfig,
 ): boolean {
   const requirement = capabilityPermissions[capability];
 
@@ -128,7 +167,11 @@ export function canAccessBackoffice(
     !requirement.anyOf ||
     requirement.anyOf.some((permission) => session.identity.permissions.includes(permission));
 
-  return hasAll && hasAny;
+  const hasProduct = !requirement.product || entitlements.products.includes(requirement.product);
+  const hasCapability =
+    !requirement.capability || entitlements.capabilities.includes(requirement.capability);
+
+  return hasAll && hasAny && hasProduct && hasCapability;
 }
 
 export function canPerformBackofficeAction(

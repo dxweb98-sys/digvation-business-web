@@ -2,9 +2,9 @@ import { Navigate, createBrowserRouter } from 'react-router';
 
 import { OpenSalesPage } from '../../routes/open-sales/open-sales-page';
 import { SellPage } from '../../routes/sell/sell-page';
-import { CashierShell } from '../shell/cashier-shell';
+import { CashierShell } from '../../app/shell/cashier-shell';
 
-export const cashierRouter = createBrowserRouter([
+export const posOperationalRouter = createBrowserRouter([
   { path: '/login', element: <Navigate to="/sell" replace /> },
   {
     element: <CashierShell />,

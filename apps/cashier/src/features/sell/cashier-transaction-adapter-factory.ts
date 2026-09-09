@@ -10,7 +10,7 @@ import { LocalCashierTransactionAdapter } from './local-cashier-transaction.adap
 let localDemoAdapter: LocalCashierTransactionAdapter | null = null;
 
 export function isLocalCashierDemoEnabled(): boolean {
-  return import.meta.env.DEV && import.meta.env.VITE_CASHIER_DEMO !== 'false';
+  return import.meta.env.DEV && import.meta.env.VITE_CASHIER_DEMO === 'true';
 }
 
 /** Selects the transaction boundary once; Cashier presentation never selects a transport. */

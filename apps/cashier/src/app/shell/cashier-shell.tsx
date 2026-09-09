@@ -16,7 +16,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 
 import { cashierTransactionKeys } from '../../features/sell/cashier-transaction-keys';
-import { createCashierTransactionAdapter } from '../../features/sell/cashier-transaction-client';
+import { createCashierTransactionAdapter } from '../../features/sell/cashier-transaction-adapter-factory';
 import { useCashierSession } from '../providers/cashier-session-provider';
 import { getAppVersion } from '../version/app-version';
 
@@ -65,8 +65,12 @@ export function CashierShell() {
   const routerLocation = useLocation();
   const version = getAppVersion();
   const transactionAdapter = useMemo(
-    () => createCashierTransactionAdapter(runtime.apiBaseUrl),
-    [runtime.apiBaseUrl],
+    () =>
+      createCashierTransactionAdapter(
+        runtime,
+        authPort.getAccessToken ? authPort.getAccessToken.bind(authPort) : undefined,
+      ),
+    [authPort, runtime],
   );
   const locationsQuery = useQuery({
     queryKey: cashierTransactionKeys.locations(),
@@ -82,10 +86,30 @@ export function CashierShell() {
   const userInitials = identityInitials(session.identity.displayName, session.identity.initials);
 
   useEffect(() => {
-    if (!selectedLocationId && locations.length > 0) {
+    if (locations.length === 1 && selectedLocationId !== locations[0]!.id)
       selectLocation(locations[0]!.id);
-    }
+    else if (
+      selectedLocationId &&
+      !locations.some((location) => location.id === selectedLocationId)
+    )
+      selectLocation(null);
   }, [locations, selectLocation, selectedLocationId]);
+
+  if (locationsQuery.isSuccess && locations.length === 0) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[var(--color-background)] p-6 text-center">
+        <section className="max-w-md rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+          <h1 className="text-lg font-semibold">Akses lokasi operasional tidak tersedia</h1>
+          <p className="mt-2 text-sm text-[var(--color-text-muted)]">
+            Akun ini belum memiliki lokasi operasional yang diizinkan.
+          </p>
+          <DButton className="mt-5" variant="secondary" onClick={() => void logout()}>
+            Keluar
+          </DButton>
+        </section>
+      </main>
+    );
+  }
 
   const handleLocationSelect = (locationId: string) => {
     if (locationId === selectedLocationId) {
@@ -175,9 +199,11 @@ export function CashierShell() {
         </div>
 
         <div className="px-3 pt-3">
-          <div
+          <button
+            type="button"
             onClick={openBranchPicker}
-            className="flex min-w-0 w-full items-center gap-2.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)]/55 px-3 py-2.5 text-left transition-[background-color,border-color,box-shadow,transform] duration-200 ease-out hover:-translate-y-px hover:border-[var(--color-brand)]/30 hover:bg-[var(--color-surface-muted)] hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
+            disabled={locations.length <= 1}
+            className="flex min-w-0 w-full items-center gap-2.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)]/55 px-3 py-2.5 text-left transition-[background-color,border-color,box-shadow] duration-200 ease-out enabled:hover:border-[var(--color-brand)]/30 enabled:hover:bg-[var(--color-surface-muted)] enabled:hover:shadow-sm disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
           >
             <MapPin className="size-3.5 shrink-0 text-[var(--color-brand)]" />
             <span className="min-w-0 flex-1">
@@ -189,8 +215,10 @@ export function CashierShell() {
                   (locationsQuery.isLoading ? 'Loading branch' : 'Choose branch')}
               </span>
             </span>
-            <ChevronDown className="size-3.5 shrink-0 self-center text-[var(--color-text-muted)]" />
-          </div>
+            {locations.length > 1 ? (
+              <ChevronDown className="size-3.5 shrink-0 self-center text-[var(--color-text-muted)]" />
+            ) : null}
+          </button>
         </div>
 
         <nav className="mt-3 flex gap-1 px-3 lg:flex-col">

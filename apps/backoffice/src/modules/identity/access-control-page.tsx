@@ -20,6 +20,7 @@ import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffic
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
 import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
 import { AccessControlApi, type AccessRole, type AccessUser } from './access-control-api';
+import { OperationalAccessApi } from '../operational-access/operational-access-api';
 
 const accessControlKeys = {
   roles: ['access-control', 'roles'] as const,
@@ -33,6 +34,10 @@ export function AccessControlPage() {
   const runtime = useRuntime();
   const api = useMemo(
     () => new AccessControlApi(createApiClient(runtime.apiBaseUrl)),
+    [createApiClient, runtime.apiBaseUrl],
+  );
+  const operationalAccess = useMemo(
+    () => new OperationalAccessApi(createApiClient(runtime.apiBaseUrl)),
     [createApiClient, runtime.apiBaseUrl],
   );
   const [section, setSection] = useState<'roles' | 'users'>('roles');
@@ -65,6 +70,8 @@ export function AccessControlPage() {
   const canUpdateRole = canPerformBackofficeAction(session, 'updateRole');
   const canManagePermissions = canPerformBackofficeAction(session, 'manageRolePermissions');
   const canManageUsers = canPerformBackofficeAction(session, 'manageUserRoles');
+  const canViewOperationalAccess = canPerformBackofficeAction(session, 'viewOperationalAccess');
+  const canManageOperationalAccess = canPerformBackofficeAction(session, 'manageOperationalAccess');
   const invalidateRoles = () =>
     void queryClient.invalidateQueries({ queryKey: accessControlKeys.roles });
   const invalidateUsers = () =>
@@ -75,7 +82,9 @@ export function AccessControlPage() {
       <BackofficePageHeader
         eyebrow={copy('Configuration')}
         title={copy('Access Control')}
-        description={copy('Manage tenant roles and user role assignments. Permissions are defined by the POS platform.')}
+        description={copy(
+          'Manage business accounts, roles, permissions, and operational location access.',
+        )}
         actions={
           section === 'roles' && canCreateRole ? (
             <DButton onClick={() => setEditingRole(null)}>{copy('Create role')}</DButton>
@@ -100,7 +109,10 @@ export function AccessControlPage() {
           offset={rolesOffset}
           pageSize={rolesPageSize}
           onPageChange={(page) => setRolesOffset((page - 1) * rolesPageSize)}
-          onPageSizeChange={(pageSize) => { setRolesPageSize(pageSize); setRolesOffset(0); }}
+          onPageSizeChange={(pageSize) => {
+            setRolesPageSize(pageSize);
+            setRolesOffset(0);
+          }}
           onEdit={setEditingRole}
           onDeactivate={setDeactivatingRole}
           canEdit={canUpdateRole || canManagePermissions}
@@ -114,9 +126,12 @@ export function AccessControlPage() {
           offset={usersOffset}
           pageSize={usersPageSize}
           onPageChange={(page) => setUsersOffset((page - 1) * usersPageSize)}
-          onPageSizeChange={(pageSize) => { setUsersPageSize(pageSize); setUsersOffset(0); }}
+          onPageSizeChange={(pageSize) => {
+            setUsersPageSize(pageSize);
+            setUsersOffset(0);
+          }}
           onEdit={setEditingUser}
-          canEdit={canManageUsers}
+          canEdit={canManageUsers || canManageOperationalAccess}
         />
       )}
 
@@ -137,7 +152,10 @@ export function AccessControlPage() {
         onClose={() => setEditingUser(null)}
         onChanged={invalidateUsers}
         api={api}
+        operationalAccess={operationalAccess}
         canManage={canManageUsers}
+        canViewOperationalAccess={canViewOperationalAccess || canManageOperationalAccess}
+        canManageOperationalAccess={canManageOperationalAccess}
       />
       <DConfirmDialog
         open={Boolean(deactivatingRole)}
@@ -278,7 +296,11 @@ function UsersTable({
   const { copy } = useBackofficeLocalization();
   const columns: TableColumn<AccessUser>[] = [
     { key: 'displayName', label: copy('User') },
-    { key: 'username', label: copy('Username'), render: (user) => user.username ?? copy('No username') },
+    {
+      key: 'username',
+      label: copy('Username'),
+      render: (user) => user.username ?? copy('No username'),
+    },
     {
       key: 'roles',
       label: copy('Roles'),
@@ -302,7 +324,7 @@ function UsersTable({
         data={users}
         rowKey="id"
         loading={isLoading}
-        emptyMessage={copy('No POS users are available for this workspace.')}
+        emptyMessage={copy('No business users are available for this workspace.')}
         pagination={{ page: Math.floor(offset / pageSize) + 1, pageSize, total }}
         onPageChange={onPageChange}
         onPageSizeChange={onPageSizeChange}
@@ -362,10 +384,7 @@ function RoleEditor({
       if (!isSessionExpiredError(error))
         showToast({
           variant: 'danger',
-          title: normalizeBackofficeApiError(
-            error,
-            copy('Could not save role.'),
-          ).safeMessage,
+          title: normalizeBackofficeApiError(error, copy('Could not save role.')).safeMessage,
         });
     }
   };
@@ -380,7 +399,7 @@ function RoleEditor({
       title={isNew ? copy('Create role') : `${copy('Manage role')}: ${current?.name ?? ''}`}
       description={
         current?.systemKey
-          ? copy('System roles are protected by the POS authorization policy.')
+          ? copy('System roles are protected by the Business Runtime authorization policy.')
           : copy('Role permissions are assigned from the platform permission registry.')
       }
       size="lg"
@@ -401,7 +420,12 @@ function RoleEditor({
         {!current?.systemKey ? (
           <div className="grid gap-4 sm:grid-cols-2">
             {isNew ? (
-              <DInput label={copy('Role code')} value={code} onChange={setCode} placeholder="MANAGER" />
+              <DInput
+                label={copy('Role code')}
+                value={code}
+                onChange={setCode}
+                placeholder="MANAGER"
+              />
             ) : null}
             <DInput
               label={copy('Role name')}
@@ -441,23 +465,46 @@ function UserRoleEditor({
   onClose,
   onChanged,
   api,
+  operationalAccess,
   canManage,
+  canViewOperationalAccess,
+  canManageOperationalAccess,
 }: {
   user: AccessUser | null;
   roles: AccessRole[];
   onClose: () => void;
   onChanged: () => void;
   api: AccessControlApi;
+  operationalAccess: OperationalAccessApi;
   canManage: boolean;
+  canViewOperationalAccess: boolean;
+  canManageOperationalAccess: boolean;
 }) {
   const { showToast } = useToast();
   const { copy } = useBackofficeLocalization();
   const [selected, setSelected] = useState<string[]>(user?.roles.map((role) => role.id) ?? []);
+  const [selectedLocationsOverride, setSelectedLocationsOverride] = useState<string[] | null>(null);
+  const locationAccess = useQuery({
+    queryKey: ['access-control', 'operational-locations', user?.id],
+    queryFn: async () => ({
+      available: await operationalAccess.context(),
+      assigned: await operationalAccess.listUserLocations(user!.id),
+    }),
+    enabled: Boolean(user && canViewOperationalAccess),
+  });
+  const selectedLocations =
+    selectedLocationsOverride ?? locationAccess.data?.assigned.map((location) => location.id) ?? [];
   const current = selected;
   const toggle = (id: string) =>
     setSelected((value) =>
       value.includes(id) ? value.filter((item) => item !== id) : [...value, id],
     );
+  const toggleLocation = (id: string) =>
+    setSelectedLocationsOverride((override) => {
+      const value = override ?? selectedLocations;
+      return value.includes(id) ? value.filter((item) => item !== id) : [...value, id];
+    });
+  const isOwner = Boolean(user?.roles.some((role) => role.systemKey === 'OWNER'));
   return (
     <DDialog
       open={Boolean(user)}
@@ -469,17 +516,22 @@ function UserRoleEditor({
           <DButton variant="secondary" onClick={onClose}>
             {copy('Cancel')}
           </DButton>
-          {canManage ? (
+          {canManage || (canManageOperationalAccess && !isOwner) ? (
             <DButton
               onClick={() => {
                 if (user)
-                  void api
-                    .replaceUserRoles(user, current)
+                  void Promise.resolve()
+                    .then(() => (canManage ? api.replaceUserRoles(user, current) : undefined))
+                    .then(() =>
+                      canManageOperationalAccess && !isOwner
+                        ? operationalAccess.replaceUserLocations(user.id, selectedLocations)
+                        : undefined,
+                    )
                     .then(() => {
                       onChanged();
                       showToast({
                         variant: 'success',
-                        title: copy('User roles updated.'),
+                        title: copy('User access updated.'),
                       });
                       onClose();
                     })
@@ -489,7 +541,7 @@ function UserRoleEditor({
                           variant: 'danger',
                           title: normalizeBackofficeApiError(
                             error,
-                            copy('Could not update user roles.'),
+                            copy('Could not update user access.'),
                           ).safeMessage,
                         });
                     });
@@ -516,6 +568,43 @@ function UserRoleEditor({
             {role.systemKey ? <DBadge variant="outline">{copy('Protected')}</DBadge> : null}
           </label>
         ))}
+        {canViewOperationalAccess ? (
+          <div className="mt-5 border-t border-[var(--color-border)] pt-5">
+            <p className="text-sm font-semibold">{copy('Operational locations')}</p>
+            <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+              {isOwner
+                ? copy('Owner access applies to every organization location.')
+                : copy('Operational accounts may use only their assigned locations.')}
+            </p>
+            {!isOwner ? (
+              <div className="mt-3 space-y-2">
+                {(locationAccess.data?.available.locations ?? []).map((location) => (
+                  <label
+                    key={location.id}
+                    className="flex items-center gap-3 rounded-lg border border-[var(--color-border)] px-3 py-3 text-sm"
+                  >
+                    <DCheckbox
+                      checked={selectedLocations.includes(location.id)}
+                      disabled={!canManageOperationalAccess}
+                      onChange={() => toggleLocation(location.id)}
+                    />
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium">{location.name}</span>
+                      <span className="block font-mono text-xs text-[var(--color-text-muted)]">
+                        {location.code}
+                      </span>
+                    </span>
+                  </label>
+                ))}
+                {!locationAccess.isLoading && !locationAccess.data?.available.locations.length ? (
+                  <p className="text-sm text-[var(--color-text-muted)]">
+                    {copy('No operational locations are available.')}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </DDialog>
   );
