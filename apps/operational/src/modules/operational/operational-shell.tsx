@@ -10,7 +10,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { getAppVersion } from '../../app/version/app-version';
 import { OperationalAccessApi, operationalAccessKeys } from './operational-access-api';
 import { useOperationalSession } from './operational-session-provider';
-import type { OperationalNavigationItem } from './operational-navigation';
+import type { OperationalNavigationSection } from './operational-navigation';
 
 function formatCurrentDate(locale: string): string {
   return new Intl.DateTimeFormat(locale, {
@@ -34,10 +34,10 @@ function identityInitials(displayName: string, initials?: string): string | null
 }
 
 interface OperationalShellProps {
-  navigationItems: readonly OperationalNavigationItem[];
+  navigationSections: readonly OperationalNavigationSection[];
 }
 
-export function OperationalShell({ navigationItems }: OperationalShellProps) {
+export function OperationalShell({ navigationSections }: OperationalShellProps) {
   const runtime = useRuntime();
   const connectivity = useConnectivity();
   const { session, authPort, logout } = useAuth();
@@ -216,23 +216,32 @@ export function OperationalShell({ navigationItems }: OperationalShellProps) {
           </button>
         </div>
 
-        <nav className="mt-3 flex gap-1 px-3 lg:flex-col">
-          {navigationItems.map(({ to, label, icon: Icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              className={({ isActive }) =>
-                [
-                  'flex min-h-10 items-center justify-start gap-2.5 rounded-lg px-3 text-sm font-medium transition-colors duration-150',
-                  isActive
-                    ? 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]'
-                    : 'text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)]',
-                ].join(' ')
-              }
-            >
-              <Icon className="size-[18px] shrink-0" />
-              {label}
-            </NavLink>
+        <nav className="mt-3 flex min-h-0 gap-4 overflow-x-auto px-3 pb-3 lg:flex-1 lg:flex-col lg:overflow-x-visible lg:overflow-y-auto lg:pb-4">
+          {navigationSections.map((section) => (
+            <section key={section.label} className="min-w-max lg:min-w-0">
+              <p className="mb-1 hidden px-3 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--color-text-muted)] lg:block">
+                {section.label}
+              </p>
+              <div className="flex gap-1 lg:flex-col">
+                {section.items.map(({ to, label, icon: Icon }) => (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    className={({ isActive }) =>
+                      [
+                        'flex min-h-10 items-center justify-start gap-2.5 rounded-lg px-3 text-sm font-medium transition-colors duration-150',
+                        isActive
+                          ? 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]'
+                          : 'text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)]',
+                      ].join(' ')
+                    }
+                  >
+                    <Icon className="size-[18px] shrink-0" />
+                    {label}
+                  </NavLink>
+                ))}
+              </div>
+            </section>
           ))}
         </nav>
 
