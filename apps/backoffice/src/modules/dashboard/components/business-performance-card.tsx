@@ -37,7 +37,9 @@ function Delta({ value }: { value: number | null }) {
     <span
       className={[
         'rounded-full bg-[var(--color-surface-muted)] px-2 py-0.5 text-[10px] font-semibold tabular-nums',
-        value >= 0 ? 'text-[var(--color-success)]' : 'text-[var(--color-danger)]',
+        value >= 0
+          ? 'text-[var(--color-brand)]'
+          : 'text-[var(--color-text-muted)]',
       ].join(' ')}
     >
       {value >= 0 ? '+' : ''}
