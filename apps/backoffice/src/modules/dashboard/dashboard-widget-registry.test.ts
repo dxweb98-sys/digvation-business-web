@@ -38,7 +38,6 @@ describe('dashboard widget registry', () => {
       'topItems',
       'topEmployees',
       'paymentMix',
-      'locationPerformance',
       'businessInsight',
     ]);
   });
