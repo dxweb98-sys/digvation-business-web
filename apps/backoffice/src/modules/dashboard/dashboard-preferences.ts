@@ -12,7 +12,7 @@ export function dashboardPreferenceKey(input: {
   workspace: string;
   userId: string;
 }): string {
-  return `digvation.backoffice.dashboard.widgets.v3:${input.workspace}:${input.userId}`;
+  return `digvation.backoffice.dashboard.widgets.v4:${input.workspace}:${input.userId}`;
 }
 
 export function loadDashboardPreferences(key: string): DashboardWidgetId[] {
