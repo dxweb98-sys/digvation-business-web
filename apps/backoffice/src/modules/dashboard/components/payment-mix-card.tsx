@@ -2,6 +2,7 @@ import { DCard } from '@digvation/ui';
 import { CreditCard } from 'lucide-react';
 
 import type { DashboardAnalyticsPoint } from '../dashboard.types';
+import { DashboardCardHeader } from './dashboard-card-header';
 
 function numeric(value: string | number | null | undefined): number {
   const parsed = Number(value ?? 0);
@@ -20,11 +21,13 @@ export function PaymentMixCard({
   points,
   emptyMessage,
   formatValue,
+  seeAllHref,
 }: {
   title: string;
   points: readonly DashboardAnalyticsPoint[];
   emptyMessage: string;
   formatValue(value: number): string;
+  seeAllHref?: string;
 }) {
   const sorted = [...points]
     .sort((a, b) => numeric(b.value) - numeric(a.value))
@@ -48,17 +51,12 @@ export function PaymentMixCard({
       variant="elevated"
       className="h-full rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-[0_16px_40px_-34px_var(--color-text)]"
     >
-      <div className="flex items-start gap-3">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[var(--color-surface-muted)] text-[var(--color-brand)]">
-          <CreditCard aria-hidden="true" className="size-4" />
-        </span>
-        <div>
-          <h2 className="text-sm font-semibold tracking-tight">{title}</h2>
-          <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
-            Share by transaction value
-          </p>
-        </div>
-      </div>
+      <DashboardCardHeader
+        title={title}
+        subtitle="Share by transaction value"
+        icon={<CreditCard aria-hidden="true" className="size-4" />}
+        actionHref={seeAllHref}
+      />
 
       {sorted.length ? (
         <div className="mt-5 grid items-center gap-5 sm:grid-cols-[150px_minmax(0,1fr)]">
@@ -91,7 +89,9 @@ export function PaymentMixCard({
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="truncate text-xs font-medium">{point.label}</p>
+                      <p className="truncate text-xs font-medium">
+                        {point.label}
+                      </p>
                       <p className="shrink-0 text-xs font-semibold tabular-nums">
                         {ratio.toFixed(1)}%
                       </p>
