@@ -1,0 +1,44 @@
+import { ArrowUpRight } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { Link } from 'react-router';
+
+export function DashboardCardHeader({
+  title,
+  subtitle,
+  icon,
+  actionHref,
+  actionLabel = 'See all',
+}: {
+  title: string;
+  subtitle?: string;
+  icon: ReactNode;
+  actionHref?: string;
+  actionLabel?: string;
+}) {
+  return (
+    <div className="-mx-5 flex min-h-[58px] items-center gap-3 border-b border-[var(--color-border)] px-5 pb-4">
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--color-accent-sky)] text-[var(--color-brand)]">
+        {icon}
+      </span>
+      <div className="min-w-0 flex-1">
+        <h2 className="truncate text-sm font-semibold tracking-tight text-[var(--color-text)]">
+          {title}
+        </h2>
+        {subtitle ? (
+          <p className="mt-0.5 truncate text-[11px] text-[var(--color-text-muted)]">
+            {subtitle}
+          </p>
+        ) : null}
+      </div>
+      {actionHref ? (
+        <Link
+          to={actionHref}
+          className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-semibold text-[var(--color-brand)] transition-colors hover:bg-[var(--color-accent-sky)]"
+        >
+          {actionLabel}
+          <ArrowUpRight aria-hidden="true" className="size-3" />
+        </Link>
+      ) : null}
+    </div>
+  );
+}
