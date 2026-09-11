@@ -6,11 +6,10 @@ import type { DashboardWidgetDefinition } from '../dashboard-widget-registry';
 import type { DashboardWidgetId } from '../dashboard.types';
 
 const REQUIRED = [
-  'Revenue',
-  'Transactions',
-  'Average transaction',
-  'Quantity sold',
-  "Today's transactions",
+  'Revenue today',
+  'Transactions today',
+  'Average transaction today',
+  'Quantity sold today',
 ] as const;
 
 export function DashboardConfigurator({
@@ -66,7 +65,7 @@ export function DashboardConfigurator({
                   Customize dashboard
                 </h2>
                 <p className="mt-1 text-xs leading-5 text-[var(--color-text-muted)]">
-                  Choose optional analytics. Required business KPIs always remain visible.
+                  Keep the daily pulse fixed and choose the optional summaries that matter to you.
                 </p>
               </div>
               <button
@@ -90,7 +89,12 @@ export function DashboardConfigurator({
                       key={label}
                       className="flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-2.5"
                     >
-                      <input type="checkbox" checked readOnly className="size-4 accent-[var(--color-brand)]" />
+                      <input
+                        type="checkbox"
+                        checked
+                        readOnly
+                        className="size-4 accent-[var(--color-brand)]"
+                      />
                       <span className="flex-1 text-sm font-medium">{label}</span>
                       <LockKeyhole
                         aria-label="Required"
@@ -104,7 +108,7 @@ export function DashboardConfigurator({
               <section className="mt-6">
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--color-text-muted)]">
-                    Pro analytics
+                    Optional dashboard widgets
                   </p>
                   <button
                     type="button"
@@ -130,7 +134,9 @@ export function DashboardConfigurator({
                           onChange={() => toggle(widget.id)}
                         />
                         <span className="min-w-0">
-                          <span className="block text-sm font-medium">{widget.label}</span>
+                          <span className="block text-sm font-medium">
+                            {widget.label}
+                          </span>
                           <span className="mt-0.5 block text-xs leading-5 text-[var(--color-text-muted)]">
                             {widget.description}
                           </span>
