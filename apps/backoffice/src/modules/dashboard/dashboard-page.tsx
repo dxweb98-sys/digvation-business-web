@@ -226,7 +226,6 @@ export function DashboardPage() {
   const canReadSales = permissions.includes('sales:read');
   const canReadCatalog = permissions.includes('catalog:read');
   const canReadEmployees = permissions.includes('employees:read');
-  const canReadLocations = permissions.includes('locations:read');
 
   const todayPerformance = useQuery({
     queryKey: ['dashboard', 'business-performance', todayFilters],
@@ -242,7 +241,10 @@ export function DashboardPage() {
     queryKey: ['dashboard', 'business-performance', activityFilters],
     queryFn: () => api.report('business-performance', activityFilters),
     enabled: Boolean(
-      session && canReadSales && locationReady && widgetEnabled('businessPerformance'),
+      session &&
+        canReadSales &&
+        locationReady &&
+        widgetEnabled('businessPerformance'),
     ),
   });
   const previousActivityPerformance = useQuery({
@@ -254,7 +256,10 @@ export function DashboardPage() {
     ],
     queryFn: () => api.report('business-performance', previousActivityFilters),
     enabled: Boolean(
-      session && canReadSales && locationReady && widgetEnabled('businessPerformance'),
+      session &&
+        canReadSales &&
+        locationReady &&
+        widgetEnabled('businessPerformance'),
     ),
   });
   const monthPerformance = useQuery({
@@ -276,35 +281,40 @@ export function DashboardPage() {
     ],
     queryFn: () => api.report('business-performance', previousMonthFilters),
     enabled: Boolean(
-      session && canReadSales && locationReady && widgetEnabled('businessInsight'),
+      session &&
+        canReadSales &&
+        locationReady &&
+        widgetEnabled('businessInsight'),
     ),
   });
   const lastTransactions = useQuery({
     queryKey: ['dashboard', 'last-transactions', recentFilters],
     queryFn: () => api.report('transactions', recentFilters, 6),
     enabled: Boolean(
-      session && canReadSales && locationReady && widgetEnabled('lastTransactions'),
+      session &&
+        canReadSales &&
+        locationReady &&
+        widgetEnabled('lastTransactions'),
     ),
   });
   const catalogPerformance = useQuery({
     queryKey: ['dashboard', 'catalog-performance', monthFilters],
     queryFn: () => api.report('catalog-performance', monthFilters, 5),
     enabled: Boolean(
-      session && canReadCatalog && locationReady && widgetEnabled('topItems'),
+      session &&
+        canReadCatalog &&
+        locationReady &&
+        widgetEnabled('topItems'),
     ),
   });
   const employeePerformance = useQuery({
     queryKey: ['dashboard', 'employee-performance', monthFilters],
     queryFn: () => api.report('employee-performance', monthFilters, 5),
     enabled: Boolean(
-      session && canReadEmployees && locationReady && widgetEnabled('topEmployees'),
-    ),
-  });
-  const locationPerformance = useQuery({
-    queryKey: ['dashboard', 'locations', monthFilters],
-    queryFn: () => api.report('locations', monthFilters, 8),
-    enabled: Boolean(
-      session && canReadLocations && locationReady && widgetEnabled('locationPerformance'),
+      session &&
+        canReadEmployees &&
+        locationReady &&
+        widgetEnabled('topEmployees'),
     ),
   });
 
@@ -352,9 +362,13 @@ export function DashboardPage() {
   const revenueToday = numberValue(todayData?.summary.finalRevenue);
   const revenueYesterday = numberValue(yesterdayData?.summary.finalRevenue);
   const transactionsToday = numberValue(todayData?.summary.transactionCount);
-  const transactionsYesterday = numberValue(yesterdayData?.summary.transactionCount);
+  const transactionsYesterday = numberValue(
+    yesterdayData?.summary.transactionCount,
+  );
   const averageToday = numberValue(todayData?.summary.averageTransactionValue);
-  const averageYesterday = numberValue(yesterdayData?.summary.averageTransactionValue);
+  const averageYesterday = numberValue(
+    yesterdayData?.summary.averageTransactionValue,
+  );
   const quantityToday = numberValue(todayData?.summary.quantitySold);
   const quantityYesterday = numberValue(yesterdayData?.summary.quantitySold);
 
@@ -362,7 +376,9 @@ export function DashboardPage() {
   const previousActivityRevenue = numberValue(
     previousActivityData?.summary.finalRevenue,
   );
-  const activityTransactions = numberValue(activityData?.summary.transactionCount);
+  const activityTransactions = numberValue(
+    activityData?.summary.transactionCount,
+  );
   const previousActivityTransactions = numberValue(
     previousActivityData?.summary.transactionCount,
   );
@@ -387,13 +403,6 @@ export function DashboardPage() {
       secondary: `${formatInteger(numberValue(row.contributedTransactions))} tx · ${String(row.topCatalogItem ?? '—')}`,
       value: money(row.contributionRevenue),
     }));
-  const topLocations = (locationPerformance.data?.items ?? [])
-    .slice(0, 8)
-    .map((row) => ({
-      label: String(row.locationName ?? '—'),
-      secondary: `${formatInteger(numberValue(row.transactionCount))} tx`,
-      value: money(row.finalRevenue),
-    }));
 
   const locationOptions = [...(locations.data?.locations ?? [])].sort(
     (left, right) => {
@@ -416,10 +425,10 @@ export function DashboardPage() {
     />
   ) : undefined;
 
-  const optionalSummaryVisible =
+  const rankingSummaryVisible =
     widgetEnabled('topItems') || widgetEnabled('topEmployees');
-  const secondarySummaryVisible =
-    widgetEnabled('paymentMix') || widgetEnabled('locationPerformance');
+  const insightSummaryVisible =
+    widgetEnabled('paymentMix') || widgetEnabled('businessInsight');
 
   return (
     <BackofficePage>
@@ -576,7 +585,7 @@ export function DashboardPage() {
             </section>
           ) : null}
 
-          {premium && optionalSummaryVisible ? (
+          {premium && rankingSummaryVisible ? (
             <section className="mt-4 grid gap-4 lg:grid-cols-2">
               {widgetEnabled('topItems') ? (
                 <RankingCard
@@ -597,8 +606,15 @@ export function DashboardPage() {
             </section>
           ) : null}
 
-          {premium && secondarySummaryVisible ? (
-            <section className="mt-4 grid gap-4 lg:grid-cols-2">
+          {premium && insightSummaryVisible ? (
+            <section
+              className={[
+                'mt-4 grid gap-4',
+                widgetEnabled('paymentMix') && widgetEnabled('businessInsight')
+                  ? 'lg:grid-cols-2'
+                  : 'grid-cols-1',
+              ].join(' ')}
+            >
               {widgetEnabled('paymentMix') ? (
                 <PaymentMixCard
                   title={copy('Payment mix · This month')}
@@ -607,25 +623,14 @@ export function DashboardPage() {
                   formatValue={moneyNumber}
                 />
               ) : null}
-              {widgetEnabled('locationPerformance') ? (
-                <RankingCard
-                  title={copy('Location performance')}
-                  subtitle={copy('This month')}
-                  items={topLocations}
-                  emptyMessage={empty}
+              {widgetEnabled('businessInsight') ? (
+                <BusinessInsightWidget
+                  current={monthData}
+                  previous={previousMonthData}
+                  currency={runtime.currency}
+                  formatMoney={formatMoney}
                 />
               ) : null}
-            </section>
-          ) : null}
-
-          {premium && widgetEnabled('businessInsight') ? (
-            <section className="mt-4">
-              <BusinessInsightWidget
-                current={monthData}
-                previous={previousMonthData}
-                currency={runtime.currency}
-                formatMoney={formatMoney}
-              />
             </section>
           ) : null}
         </>
