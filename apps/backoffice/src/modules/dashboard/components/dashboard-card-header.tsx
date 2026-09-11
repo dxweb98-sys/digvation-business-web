@@ -2,12 +2,14 @@ import { ArrowUpRight } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 
+import { useDashboardI18n } from '../dashboard-i18n';
+
 export function DashboardCardHeader({
   title,
   subtitle,
   icon,
   actionHref,
-  actionLabel = 'See all',
+  actionLabel,
 }: {
   title: string;
   subtitle?: string;
@@ -15,6 +17,9 @@ export function DashboardCardHeader({
   actionHref?: string;
   actionLabel?: string;
 }) {
+  const { text } = useDashboardI18n();
+  const resolvedActionLabel = actionLabel ?? text('seeAll');
+
   return (
     <div className="-mx-5 flex min-h-[58px] items-center gap-3 border-b border-[var(--color-border)] px-5 pb-4">
       <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--color-accent-sky)] text-[var(--color-brand)]">
@@ -35,7 +40,7 @@ export function DashboardCardHeader({
           to={actionHref}
           className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-semibold text-[var(--color-brand)] transition-colors hover:bg-[var(--color-accent-sky)]"
         >
-          {actionLabel}
+          {resolvedActionLabel}
           <ArrowUpRight aria-hidden="true" className="size-3" />
         </Link>
       ) : null}
