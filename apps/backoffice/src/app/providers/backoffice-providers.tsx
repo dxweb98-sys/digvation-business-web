@@ -5,8 +5,9 @@ import type { RouterProviderProps } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 
 import { BackofficeAuthProvider } from '../../auth/backoffice-auth-context';
-import { BackofficeLocalizationProvider, useBackofficeLocalization } from '../localization/backoffice-localization';
 import type { HttpAuthAdapter } from '../../auth/http-auth-adapter';
+import { BackofficeLocalizationProvider, useBackofficeLocalization } from '../localization/backoffice-localization';
+import { BusinessLocationProvider } from './business-location-context';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -39,7 +40,9 @@ function BackofficeDesignSystemProviders({ auth, router }: Omit<BackofficeProvid
       <DToastProvider>
         <BackofficeAuthProvider auth={auth}>
           <QueryClientProvider client={queryClient}>
-            <RouterProvider router={router} />
+            <BusinessLocationProvider>
+              <RouterProvider router={router} />
+            </BusinessLocationProvider>
           </QueryClientProvider>
         </BackofficeAuthProvider>
       </DToastProvider>
