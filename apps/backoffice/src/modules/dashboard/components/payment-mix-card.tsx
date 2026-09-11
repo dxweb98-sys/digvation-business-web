@@ -1,6 +1,7 @@
 import { DCard } from '@digvation/ui';
 import { CreditCard } from 'lucide-react';
 
+import { useDashboardI18n } from '../dashboard-i18n';
 import type { DashboardAnalyticsPoint } from '../dashboard.types';
 import { DashboardCardHeader } from './dashboard-card-header';
 
@@ -9,12 +10,7 @@ function numeric(value: string | number | null | undefined): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-const SEGMENT_COLORS = [
-  'var(--color-brand)',
-  'var(--color-accent-mint-strong, var(--color-accent-mint))',
-  'var(--color-text-muted)',
-  'var(--color-border)',
-] as const;
+const SEGMENT_COLORS = ['#3b82f6', '#10b981', '#8b5cf6', '#f97316'] as const;
 
 export function PaymentMixCard({
   title,
@@ -29,6 +25,7 @@ export function PaymentMixCard({
   formatValue(value: number): string;
   seeAllHref?: string;
 }) {
+  const { text } = useDashboardI18n();
   const sorted = [...points]
     .sort((a, b) => numeric(b.value) - numeric(a.value))
     .slice(0, 4);
@@ -53,24 +50,21 @@ export function PaymentMixCard({
     >
       <DashboardCardHeader
         title={title}
-        subtitle="Share by transaction value"
+        subtitle={text('paymentShare')}
         icon={<CreditCard aria-hidden="true" className="size-4" />}
         actionHref={seeAllHref}
       />
 
       {sorted.length ? (
-        <div className="mt-5 grid items-center gap-5 sm:grid-cols-[150px_minmax(0,1fr)]">
-          <div className="relative mx-auto size-[142px]">
-            <div
-              className="absolute inset-0 rounded-full"
-              style={{ background: donut }}
-            />
-            <div className="absolute inset-[24px] flex flex-col items-center justify-center rounded-full bg-[var(--color-surface)] text-center">
-              <p className="text-base font-semibold tracking-tight tabular-nums">
+        <div className="mt-5 grid items-center gap-5 sm:grid-cols-[140px_minmax(0,1fr)]">
+          <div className="relative mx-auto size-[136px]">
+            <div className="absolute inset-0 rounded-full" style={{ background: donut }} />
+            <div className="absolute inset-[23px] flex flex-col items-center justify-center rounded-full bg-[var(--color-surface)] text-center">
+              <p className="text-sm font-semibold tracking-tight tabular-nums">
                 {formatValue(total)}
               </p>
               <p className="mt-1 text-[9px] uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
-                total value
+                {text('totalValue')}
               </p>
             </div>
           </div>
@@ -83,15 +77,11 @@ export function PaymentMixCard({
                 <div key={point.label} className="flex items-center gap-3">
                   <span
                     className="size-2.5 shrink-0 rounded-full"
-                    style={{
-                      background: SEGMENT_COLORS[index % SEGMENT_COLORS.length],
-                    }}
+                    style={{ background: SEGMENT_COLORS[index % SEGMENT_COLORS.length] }}
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="truncate text-xs font-medium">
-                        {point.label}
-                      </p>
+                      <p className="truncate text-xs font-medium">{point.label}</p>
                       <p className="shrink-0 text-xs font-semibold tabular-nums">
                         {ratio.toFixed(1)}%
                       </p>
