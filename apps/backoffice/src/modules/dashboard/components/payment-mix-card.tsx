@@ -55,6 +55,7 @@ export function PaymentMixCard({
         subtitle={text('paymentShare')}
         icon={<CreditCard aria-hidden="true" className="size-4" />}
         actionHref={seeAllHref}
+        tone="mint"
       />
 
       {sorted.length ? (
