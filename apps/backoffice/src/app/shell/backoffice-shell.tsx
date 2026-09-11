@@ -28,6 +28,7 @@ import {
   type BackofficeMessageKey,
   useBackofficeLocalization,
 } from '../localization/backoffice-localization';
+import { ActiveBranchHeaderSelector } from './active-branch-header-selector';
 
 interface NavigationItem {
   label: BackofficeMessageKey;
@@ -180,7 +181,7 @@ export function BackofficeShell() {
 
       <main className="backoffice-shell__main flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden">
         <header className="flex h-16 w-full shrink-0 items-center justify-between gap-4 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-5 shadow-[0_1px_0_var(--color-border)] md:px-6 lg:px-8">
-          <div className="flex min-w-0 items-center gap-2 md:gap-0">
+          <div className="flex min-w-0 items-center gap-2">
             <div className="backoffice-shell__mobile-navigation md:hidden">
               <DDropdown
                 placement="bottom-start"
@@ -199,12 +200,7 @@ export function BackofficeShell() {
                 </nav>
               </DDropdown>
             </div>
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-[var(--color-text)]">{t('business')}</p>
-              <p className="truncate text-xs text-[var(--color-text-muted)]">
-                {session.identity.workspace}
-              </p>
-            </div>
+            <ActiveBranchHeaderSelector />
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
             <p className="backoffice-shell__header-date hidden text-xs text-[var(--color-text-muted)] md:block">
@@ -321,7 +317,6 @@ export function BackofficeShell() {
 
 function NavigationGroups({ session }: { session: BackofficeSession }) {
   const { t } = useBackofficeLocalization();
-  const runtime = useRuntime();
   return (
     <>
       <div className="mb-3">
