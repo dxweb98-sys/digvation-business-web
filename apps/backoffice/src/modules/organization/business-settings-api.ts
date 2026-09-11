@@ -13,6 +13,7 @@ export interface SellingLocation {
   name: string;
   status: 'ACTIVE' | 'INACTIVE';
   version: number;
+  isMain: boolean;
 }
 
 export interface Page<T> {
@@ -30,9 +31,42 @@ export interface PageRequest {
 export class BusinessSettingsApi {
   public constructor(private readonly client: ApiClient) {}
 
-  getProfile() { return this.client.get<BusinessProfile>('/api/v1/business-profile'); }
-  updateProfile(profile: BusinessProfile, name: string) { return this.client.patch<BusinessProfile>('/api/v1/business-profile', { expectedVersion: profile.version, name }); }
-  listLocations(page: PageRequest) { return this.client.get<Page<SellingLocation>>(`/api/v1/locations?limit=${page.limit}&offset=${page.offset}`); }
-  createLocation(input: { code: string; name: string }) { return this.client.post<SellingLocation>('/api/v1/locations', input); }
-  updateLocation(location: SellingLocation, input: { name?: string; status?: SellingLocation['status'] }) { return this.client.patch<SellingLocation>(`/api/v1/locations/${location.id}`, { expectedVersion: location.version, ...input }); }
+  getProfile() {
+    return this.client.get<BusinessProfile>('/api/v1/business-profile');
+  }
+
+  updateProfile(profile: BusinessProfile, name: string) {
+    return this.client.patch<BusinessProfile>('/api/v1/business-profile', {
+      expectedVersion: profile.version,
+      name,
+    });
+  }
+
+  listLocations(page: PageRequest) {
+    return this.client.get<Page<SellingLocation>>(
+      `/api/v1/locations?limit=${page.limit}&offset=${page.offset}`,
+    );
+  }
+
+  createLocation(input: {
+    code: string;
+    name: string;
+    setAsMain?: boolean;
+  }) {
+    return this.client.post<SellingLocation>('/api/v1/locations', input);
+  }
+
+  updateLocation(
+    location: SellingLocation,
+    input: {
+      name?: string;
+      status?: SellingLocation['status'];
+      setAsMain?: boolean;
+    },
+  ) {
+    return this.client.patch<SellingLocation>(
+      `/api/v1/locations/${location.id}`,
+      { expectedVersion: location.version, ...input },
+    );
+  }
 }
