@@ -14,12 +14,12 @@ function change(current: number, previous: number): number | null {
 export function BusinessInsightWidget({
   current,
   previous,
-  currency,
+  currency = 'IDR',
   formatMoney,
 }: {
   current?: DashboardDataset;
   previous?: DashboardDataset;
-  currency: string;
+  currency?: string;
   formatMoney(value: string, currency: string): string;
 }) {
   const revenue = numeric(current?.summary.finalRevenue);
