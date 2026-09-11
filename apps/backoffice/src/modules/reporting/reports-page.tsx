@@ -322,6 +322,31 @@ const money = (k: string) =>
   /amount|revenue|gross|discount|tax|cash|difference|base|value/i.test(k) && !/count|rate/i.test(k);
 const count = (k: string) => /count|attempts|items|transactions/i.test(k);
 const quantity = (k: string) => /quantity/i.test(k);
+const dateKey = /^\d{4}-\d{2}-\d{2}$/;
+function requestedType(value: string | null): Type {
+  return types.some(([candidate]) => candidate === value)
+    ? (value as Type)
+    : 'business-performance';
+}
+function initialReportState(today: string) {
+  if (typeof window === 'undefined') {
+    return {
+      from: today,
+      to: today,
+      type: 'business-performance' as Type,
+      locationId: '',
+    };
+  }
+  const search = new URLSearchParams(window.location.search);
+  const from = search.get('dateFrom');
+  const to = search.get('dateTo');
+  return {
+    from: from && dateKey.test(from) ? from : today,
+    to: to && dateKey.test(to) ? to : today,
+    type: requestedType(search.get('type')),
+    locationId: search.get('sellingLocationId') ?? '',
+  };
+}
 function MetricIcon({ metric }: { metric: string }) {
   const Icon = money(metric)
     ? CircleDollarSign
@@ -356,10 +381,11 @@ export function ReportsPage() {
     [session?.effectiveEntitlements, session?.identity.permissions],
   );
   const today = new Date().toISOString().slice(0, 10);
-  const [from, setFrom] = useState(today),
-    [to, setTo] = useState(today),
-    [selectedType, setType] = useState<Type>('business-performance'),
-    [selectedLocationId, setLocationId] = useState(''),
+  const initial = useMemo(() => initialReportState(today), [today]);
+  const [from, setFrom] = useState(initial.from),
+    [to, setTo] = useState(initial.to),
+    [selectedType, setType] = useState<Type>(initial.type),
+    [selectedLocationId, setLocationId] = useState(initial.locationId),
     [filters, setFilters] = useState<Record<string, string>>({}),
     [page, setPage] = useState(1),
     [pageSize, setPageSize] = useState(25);
@@ -370,8 +396,12 @@ export function ReportsPage() {
   const type = availableTypes.some(([candidate]) => candidate === selectedType)
     ? selectedType
     : (availableTypes[0]?.[0] ?? 'business-performance');
+  const requestedLocationIsAvailable = Boolean(
+    selectedLocationId &&
+      locations.data?.locations.some((location) => location.id === selectedLocationId),
+  );
   const locationId =
-    selectedLocationId ||
+    (requestedLocationIsAvailable ? selectedLocationId : '') ||
     (locations.data?.resolution === 'AUTO_RESOLVED'
       ? (locations.data.selectedLocationId ?? '')
       : '');
