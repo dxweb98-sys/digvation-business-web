@@ -2,6 +2,7 @@ import { DCard } from '@digvation/ui';
 import { Lightbulb } from 'lucide-react';
 
 import type { DashboardDataset } from '../dashboard.types';
+import { DashboardCardHeader } from './dashboard-card-header';
 
 function numeric(value: string | number | null | undefined): number {
   const parsed = Number(value ?? 0);
@@ -18,11 +19,13 @@ export function BusinessInsightWidget({
   previous,
   currency = 'IDR',
   formatMoney,
+  seeAllHref,
 }: {
   current: DashboardDataset | undefined;
   previous: DashboardDataset | undefined;
   currency?: string;
   formatMoney(value: string, currency: string): string;
+  seeAllHref?: string;
 }) {
   const revenue = numeric(current?.summary.finalRevenue);
   const transactions = numeric(current?.summary.transactionCount);
@@ -63,17 +66,12 @@ export function BusinessInsightWidget({
       variant="elevated"
       className="h-full rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-[0_16px_40px_-34px_var(--color-text)]"
     >
-      <div className="flex items-start gap-3">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[var(--color-accent-mint)] text-[var(--color-brand)]">
-          <Lightbulb aria-hidden="true" className="size-4" />
-        </span>
-        <div>
-          <h2 className="text-sm font-semibold tracking-tight">Business insight</h2>
-          <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
-            This month compared with the previous month
-          </p>
-        </div>
-      </div>
+      <DashboardCardHeader
+        title="Business insight"
+        subtitle="This month compared with the previous month"
+        icon={<Lightbulb aria-hidden="true" className="size-4" />}
+        actionHref={seeAllHref}
+      />
 
       <div className="mt-4 grid gap-2 sm:grid-cols-2">
         {insights.map((insight) => (
