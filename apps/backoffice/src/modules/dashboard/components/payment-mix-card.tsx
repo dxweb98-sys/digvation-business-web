@@ -76,15 +76,21 @@ export function PaymentMixCard({
             {sorted.map((point, index) => {
               const value = numeric(point.value);
               const ratio = total > 0 ? (value / total) * 100 : 0;
+              const label = copy(point.label);
               return (
-                <div key={point.label} className="flex items-center gap-3">
+                <div key={point.label} className="flex items-start gap-3">
                   <span
-                    className="size-2.5 shrink-0 rounded-full"
+                    className="mt-1 size-2.5 shrink-0 rounded-full"
                     style={{ background: SEGMENT_COLORS[index % SEGMENT_COLORS.length] }}
                   />
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="truncate text-xs font-medium">{copy(point.label)}</p>
+                    <div className="flex items-start justify-between gap-2">
+                      <p
+                        className="line-clamp-2 text-xs font-medium leading-4"
+                        title={label}
+                      >
+                        {label}
+                      </p>
                       <p className="shrink-0 text-xs font-semibold tabular-nums">
                         {ratio.toFixed(1)}%
                       </p>
