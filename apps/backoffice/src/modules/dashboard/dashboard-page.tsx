@@ -293,7 +293,7 @@ export function DashboardPage() {
     <BackofficePage>
       <section className="pt-2">
         <p className="text-sm font-medium text-[var(--color-text-muted)]">
-          {welcome.greeting} <span aria-hidden="true">👋</span>
+          {welcome.greeting}
         </p>
         <h1 className="mt-1 text-[clamp(1.65rem,2vw,2.15rem)] font-semibold tracking-[-0.035em] text-[var(--color-text)]">
           {welcome.title}
