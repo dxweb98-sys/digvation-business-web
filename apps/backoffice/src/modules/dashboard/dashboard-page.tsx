@@ -1,5 +1,5 @@
 import { useRuntime } from '@digvation/business-runtime';
-import { DCard, DDateRangeFilter, DSelect } from '@digvation/ui';
+import { DCard, DSelect } from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
 import {
   CircleDollarSign,
@@ -39,7 +39,7 @@ import type {
 } from './dashboard.types';
 
 const DAY_MS = 86_400_000;
-type PeriodPreset = 'today' | '7d' | 'month' | 'year' | 'custom';
+type ActivityPeriod = 'today' | '7d' | 'month' | 'year';
 
 function localDateKey(date = new Date()): string {
   const year = date.getFullYear();
@@ -48,18 +48,15 @@ function localDateKey(date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
-function periodRange(
-  preset: Exclude<PeriodPreset, 'custom'>,
-  date = new Date(),
-) {
+function periodRange(period: ActivityPeriod, date = new Date()) {
   const to = localDateKey(date);
-  if (preset === 'today') return { from: to, to };
-  if (preset === '7d') {
+  if (period === 'today') return { from: to, to };
+  if (period === '7d') {
     const from = new Date(date);
     from.setDate(from.getDate() - 6);
     return { from: localDateKey(from), to };
   }
-  if (preset === 'month') {
+  if (period === 'month') {
     return {
       from: localDateKey(new Date(date.getFullYear(), date.getMonth(), 1)),
       to,
@@ -69,6 +66,13 @@ function periodRange(
     from: localDateKey(new Date(date.getFullYear(), 0, 1)),
     to,
   };
+}
+
+function recentRange(days: number, date = new Date()) {
+  const to = localDateKey(date);
+  const from = new Date(date);
+  from.setDate(from.getDate() - Math.max(0, days - 1));
+  return { from: localDateKey(from), to };
 }
 
 function previousRange(
@@ -113,7 +117,7 @@ function saveLocationPreference(key: string, locationId: string): void {
   try {
     window.localStorage.setItem(key, locationId);
   } catch {
-    // Dashboard preferences are convenience state only.
+    // Dashboard location is convenience state only.
   }
 }
 
@@ -121,11 +125,8 @@ export function DashboardPage() {
   const { session, createApiClient } = useBackofficeAuth();
   const runtime = useRuntime();
   const { copy, formatMoney } = useBackofficeLocalization();
-  const today = localDateKey();
-  const initialRange = periodRange('month');
-  const [periodPreset, setPeriodPreset] = useState<PeriodPreset>('month');
-  const [from, setFrom] = useState(initialRange.from);
-  const [to, setTo] = useState(initialRange.to);
+  const [activityPeriod, setActivityPeriod] =
+    useState<ActivityPeriod>('month');
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(
     null,
   );
@@ -145,7 +146,7 @@ export function DashboardPage() {
         workspace: session.identity.workspace,
         userId: session.identity.userId,
       })
-    : 'digvation.backoffice.dashboard.widgets.v2:anonymous';
+    : 'digvation.backoffice.dashboard.widgets.v3:anonymous';
   const locationPreferenceKey = session
     ? `digvation.backoffice.dashboard.location.v1:${session.identity.workspace}:${session.identity.userId}`
     : 'digvation.backoffice.dashboard.location.v1:anonymous';
@@ -184,9 +185,7 @@ export function DashboardPage() {
   );
   const explicitLocationIsValid =
     selectedLocationId !== null &&
-    (selectedLocationId === ''
-      ? Boolean(locations.data?.organizationWide)
-      : accessibleLocationIds.has(selectedLocationId));
+    accessibleLocationIds.has(selectedLocationId);
   const defaultLocationId =
     locations.data?.mainLocationId ??
     (locations.data?.resolution === 'AUTO_RESOLVED'
@@ -195,77 +194,117 @@ export function DashboardPage() {
   const locationId = explicitLocationIsValid
     ? (selectedLocationId ?? '')
     : defaultLocationId;
-  const allLocationsSelected =
-    explicitLocationIsValid &&
-    selectedLocationId === '' &&
-    Boolean(locations.data?.organizationWide);
   const locationReady = Boolean(
     locations.data &&
       locations.data.resolution !== 'DENIED' &&
-      (locations.data.resolution !== 'SELECTION_REQUIRED' ||
-        Boolean(locationId) ||
-        allLocationsSelected),
+      locationId &&
+      accessibleLocationIds.has(locationId),
   );
-  const filters: DashboardFilterState = { from, to, locationId };
-  const todayFilters: DashboardFilterState = {
-    from: today,
-    to: today,
+
+  const today = periodRange('today');
+  const yesterday = previousRange(today.from, today.to);
+  const month = periodRange('month');
+  const previousMonth = previousRange(month.from, month.to);
+  const activity = periodRange(activityPeriod);
+  const previousActivity = previousRange(activity.from, activity.to);
+  const recent = recentRange(30);
+
+  const todayFilters: DashboardFilterState = { ...today, locationId };
+  const yesterdayFilters: DashboardFilterState = { ...yesterday, locationId };
+  const monthFilters: DashboardFilterState = { ...month, locationId };
+  const previousMonthFilters: DashboardFilterState = {
+    ...previousMonth,
     locationId,
   };
+  const activityFilters: DashboardFilterState = { ...activity, locationId };
+  const previousActivityFilters: DashboardFilterState = {
+    ...previousActivity,
+    locationId,
+  };
+  const recentFilters: DashboardFilterState = { ...recent, locationId };
+
   const canReadSales = permissions.includes('sales:read');
   const canReadCatalog = permissions.includes('catalog:read');
   const canReadEmployees = permissions.includes('employees:read');
   const canReadLocations = permissions.includes('locations:read');
 
-  const performance = useQuery({
-    queryKey: ['dashboard', 'business-performance', filters],
-    queryFn: () => api.report('business-performance', filters),
+  const todayPerformance = useQuery({
+    queryKey: ['dashboard', 'business-performance', todayFilters],
+    queryFn: () => api.report('business-performance', todayFilters),
     enabled: Boolean(session && canReadSales && locationReady),
   });
-  const todayTransactions = useQuery({
-    queryKey: ['dashboard', 'today-transactions', todayFilters],
-    queryFn: () => api.report('transactions', todayFilters, 6),
+  const yesterdayPerformance = useQuery({
+    queryKey: ['dashboard', 'business-performance', yesterdayFilters],
+    queryFn: () => api.report('business-performance', yesterdayFilters),
     enabled: Boolean(session && canReadSales && locationReady),
   });
-
-  const previous = previousRange(from, to);
-  const previousFilters: DashboardFilterState = {
-    ...previous,
-    locationId,
-  };
-  const previousPerformance = useQuery({
-    queryKey: ['dashboard', 'business-performance', 'previous', previousFilters],
-    queryFn: () => api.report('business-performance', previousFilters),
-    enabled: Boolean(session && canReadSales && locationReady),
+  const activityPerformance = useQuery({
+    queryKey: ['dashboard', 'business-performance', activityFilters],
+    queryFn: () => api.report('business-performance', activityFilters),
+    enabled: Boolean(
+      session && canReadSales && locationReady && widgetEnabled('businessPerformance'),
+    ),
   });
-  const catalogPerformance = useQuery({
-    queryKey: ['dashboard', 'catalog-performance', filters],
-    queryFn: () => api.report('catalog-performance', filters, 5),
+  const previousActivityPerformance = useQuery({
+    queryKey: [
+      'dashboard',
+      'business-performance',
+      'previous-activity',
+      previousActivityFilters,
+    ],
+    queryFn: () => api.report('business-performance', previousActivityFilters),
+    enabled: Boolean(
+      session && canReadSales && locationReady && widgetEnabled('businessPerformance'),
+    ),
+  });
+  const monthPerformance = useQuery({
+    queryKey: ['dashboard', 'business-performance', monthFilters],
+    queryFn: () => api.report('business-performance', monthFilters),
     enabled: Boolean(
       session &&
-        canReadCatalog &&
+        canReadSales &&
         locationReady &&
-        widgetEnabled('topItems'),
+        (widgetEnabled('paymentMix') || widgetEnabled('businessInsight')),
+    ),
+  });
+  const previousMonthPerformance = useQuery({
+    queryKey: [
+      'dashboard',
+      'business-performance',
+      'previous-month',
+      previousMonthFilters,
+    ],
+    queryFn: () => api.report('business-performance', previousMonthFilters),
+    enabled: Boolean(
+      session && canReadSales && locationReady && widgetEnabled('businessInsight'),
+    ),
+  });
+  const lastTransactions = useQuery({
+    queryKey: ['dashboard', 'last-transactions', recentFilters],
+    queryFn: () => api.report('transactions', recentFilters, 6),
+    enabled: Boolean(
+      session && canReadSales && locationReady && widgetEnabled('lastTransactions'),
+    ),
+  });
+  const catalogPerformance = useQuery({
+    queryKey: ['dashboard', 'catalog-performance', monthFilters],
+    queryFn: () => api.report('catalog-performance', monthFilters, 5),
+    enabled: Boolean(
+      session && canReadCatalog && locationReady && widgetEnabled('topItems'),
     ),
   });
   const employeePerformance = useQuery({
-    queryKey: ['dashboard', 'employee-performance', filters],
-    queryFn: () => api.report('employee-performance', filters, 5),
+    queryKey: ['dashboard', 'employee-performance', monthFilters],
+    queryFn: () => api.report('employee-performance', monthFilters, 5),
     enabled: Boolean(
-      session &&
-        canReadEmployees &&
-        locationReady &&
-        widgetEnabled('topEmployees'),
+      session && canReadEmployees && locationReady && widgetEnabled('topEmployees'),
     ),
   });
   const locationPerformance = useQuery({
-    queryKey: ['dashboard', 'locations', filters],
-    queryFn: () => api.report('locations', filters, 8),
+    queryKey: ['dashboard', 'locations', monthFilters],
+    queryFn: () => api.report('locations', monthFilters, 8),
     enabled: Boolean(
-      session &&
-        canReadLocations &&
-        locationReady &&
-        widgetEnabled('locationPerformance'),
+      session && canReadLocations && locationReady && widgetEnabled('locationPerformance'),
     ),
   });
 
@@ -279,21 +318,9 @@ export function DashboardPage() {
     availableIds.has(id),
   );
 
-  const setPreset = (value: string) => {
-    const next = value as PeriodPreset;
-    setPeriodPreset(next);
-    if (next === 'custom') return;
-    const range = periodRange(next);
-    setFrom(range.from);
-    setTo(range.to);
-  };
-
   const selectLocation = (value: unknown) => {
     const next = String(value ?? '');
-    if (!locations.data?.organizationWide && next === '') {
-      setSelectedLocationId(null);
-      return;
-    }
+    if (!accessibleLocationIds.has(next)) return;
     setSelectedLocationId(next);
     saveLocationPreference(locationPreferenceKey, next);
   };
@@ -313,24 +340,38 @@ export function DashboardPage() {
     formatMoney(String(value ?? 0), runtime.currency);
   const moneyNumber = (value: number) =>
     formatMoney(String(value), runtime.currency);
-  const empty = copy('No analytics data is available for this period.');
-  const data = performance.data;
-  const previousData = previousPerformance.data;
+  const empty = copy('No summary data is available for this month.');
+
+  const todayData = todayPerformance.data;
+  const yesterdayData = yesterdayPerformance.data;
+  const activityData = activityPerformance.data;
+  const previousActivityData = previousActivityPerformance.data;
+  const monthData = monthPerformance.data;
+  const previousMonthData = previousMonthPerformance.data;
+
+  const revenueToday = numberValue(todayData?.summary.finalRevenue);
+  const revenueYesterday = numberValue(yesterdayData?.summary.finalRevenue);
+  const transactionsToday = numberValue(todayData?.summary.transactionCount);
+  const transactionsYesterday = numberValue(yesterdayData?.summary.transactionCount);
+  const averageToday = numberValue(todayData?.summary.averageTransactionValue);
+  const averageYesterday = numberValue(yesterdayData?.summary.averageTransactionValue);
+  const quantityToday = numberValue(todayData?.summary.quantitySold);
+  const quantityYesterday = numberValue(yesterdayData?.summary.quantitySold);
+
+  const activityRevenue = numberValue(activityData?.summary.finalRevenue);
+  const previousActivityRevenue = numberValue(
+    previousActivityData?.summary.finalRevenue,
+  );
+  const activityTransactions = numberValue(activityData?.summary.transactionCount);
+  const previousActivityTransactions = numberValue(
+    previousActivityData?.summary.transactionCount,
+  );
+
   const paymentMix =
-    data?.analytics.breakdowns?.paymentMethod ?? data?.analytics.breakdown ?? [];
-  const transactions = todayTransactions.data?.items ?? [];
-  const revenue = numberValue(data?.summary.finalRevenue);
-  const previousRevenue = numberValue(previousData?.summary.finalRevenue);
-  const transactionCount = numberValue(data?.summary.transactionCount);
-  const previousTransactionCount = numberValue(
-    previousData?.summary.transactionCount,
-  );
-  const averageTransaction = numberValue(data?.summary.averageTransactionValue);
-  const previousAverageTransaction = numberValue(
-    previousData?.summary.averageTransactionValue,
-  );
-  const quantitySold = numberValue(data?.summary.quantitySold);
-  const previousQuantitySold = numberValue(previousData?.summary.quantitySold);
+    monthData?.analytics.breakdowns?.paymentMethod ??
+    monthData?.analytics.breakdown ??
+    [];
+  const recentTransactions = lastTransactions.data?.items ?? [];
 
   const topItems = (catalogPerformance.data?.items ?? [])
     .slice(0, 5)
@@ -354,17 +395,6 @@ export function DashboardPage() {
       value: money(row.finalRevenue),
     }));
 
-  const periodLabel =
-    periodPreset === 'today'
-      ? copy('Today')
-      : periodPreset === '7d'
-        ? copy('Last 7 days')
-        : periodPreset === 'month'
-          ? copy('This month')
-          : periodPreset === 'year'
-            ? copy('This year')
-            : `${from} — ${to}`;
-
   const locationOptions = [...(locations.data?.locations ?? [])].sort(
     (left, right) => {
       if (left.id === locations.data?.mainLocationId) return -1;
@@ -386,6 +416,11 @@ export function DashboardPage() {
     />
   ) : undefined;
 
+  const optionalSummaryVisible =
+    widgetEnabled('topItems') || widgetEnabled('topEmployees');
+  const secondarySummaryVisible =
+    widgetEnabled('paymentMix') || widgetEnabled('locationPerformance');
+
   return (
     <BackofficePage>
       <div className="pt-2">
@@ -394,74 +429,32 @@ export function DashboardPage() {
           title={copy('Dashboard')}
           description={copy(
             premium
-              ? 'Daily business pulse with configurable analytics from your entitled business data.'
-              : 'Daily business pulse from your permitted business data.',
+              ? 'A concise daily business pulse with configurable summaries.'
+              : 'A concise daily business pulse from your permitted business data.',
           )}
           actions={headerAction}
         />
       </div>
 
-      <div className="mt-5 grid grid-cols-1 items-end gap-3 md:grid-cols-2 xl:grid-cols-[220px_minmax(280px,1fr)_260px_auto]">
-        <DSelect
-          label={copy('Period')}
-          value={periodPreset}
-          options={[
-            { value: 'today', label: copy('Today') },
-            { value: '7d', label: copy('Last 7 days') },
-            { value: 'month', label: copy('This month') },
-            { value: 'year', label: copy('This year') },
-            { value: 'custom', label: copy('Custom range') },
-          ]}
-          onChange={(value) => setPreset(String(value ?? 'month'))}
-        />
-        <div
-          className={periodPreset === 'custom' ? 'min-w-0' : 'hidden xl:block'}
-        >
-          {periodPreset === 'custom' ? (
-            <DDateRangeFilter
-              from={from}
-              to={to}
-              onFromChange={setFrom}
-              onToChange={setTo}
-            />
-          ) : (
-            <div className="pb-2 text-xs text-[var(--color-text-muted)]">
-              {from} — {to}
-            </div>
-          )}
-        </div>
+      <div className="mt-5 flex flex-col gap-2 sm:max-w-xl">
         <DSelect
           label={copy('Location')}
           value={locationId}
-          options={[
-            {
-              value: '',
-              label: copy(
-                locations.data?.organizationWide
-                  ? 'All locations'
-                  : 'Select location',
-              ),
-            },
-            ...locationOptions.map((location) => ({
-              value: location.id,
-              label: `${location.name ?? location.displayName ?? location.code}${
-                location.id === locations.data?.mainLocationId
-                  ? ` · ${copy('Main Branch')}`
-                  : ''
-              }`,
-            })),
-          ]}
+          options={locationOptions.map((location) => ({
+            value: location.id,
+            label: `${location.name ?? location.displayName ?? location.code}${
+              location.id === locations.data?.mainLocationId
+                ? ` · ${copy('Main Branch')}`
+                : ''
+            }`,
+          }))}
           onChange={selectLocation}
         />
-        <div className="pb-1 text-xs text-[var(--color-text-muted)]">
-          {premium ? (
-            <span className="inline-flex rounded-full bg-[var(--color-accent-mint)] px-2.5 py-1 font-medium text-[var(--color-text)]">
-              Business Analytics enabled
-            </span>
-          ) : (
-            <span>{copy('Standard dashboard')}</span>
-          )}
-        </div>
+        <p className="text-[11px] text-[var(--color-text-muted)]">
+          {premium
+            ? copy('PRO dashboard · Main Branch is used by default.')
+            : copy('Standard dashboard · Main Branch is used by default.')}
+        </p>
       </div>
 
       {!canReadSales ? (
@@ -474,7 +467,7 @@ export function DashboardPage() {
           </p>
           <p className="mt-1 text-xs leading-5 text-[var(--color-text-muted)]">
             {copy(
-              'Your role does not include permission to read sales reporting data.',
+              'Your role does not include permission to read sales summary data.',
             )}
           </p>
         </DCard>
@@ -488,7 +481,7 @@ export function DashboardPage() {
           <p className="text-sm font-semibold">{copy('Select a location')}</p>
           <p className="mt-1 text-xs leading-5 text-[var(--color-text-muted)]">
             {copy(
-              'Choose an authorized selling location before loading dashboard data.',
+              'Choose one authorized branch before loading dashboard summaries.',
             )}
           </p>
         </DCard>
@@ -498,82 +491,97 @@ export function DashboardPage() {
         <>
           <section className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <DashboardKpiCard
-              label={copy('Revenue')}
-              value={money(data?.summary.finalRevenue)}
-              context={periodLabel}
-              delta={percentageChange(revenue, previousRevenue)}
+              label={copy('Revenue today')}
+              value={money(todayData?.summary.finalRevenue)}
+              context={copy('Compared with yesterday')}
+              delta={percentageChange(revenueToday, revenueYesterday)}
               emphasis
               icon={
                 <CircleDollarSign aria-hidden="true" className="size-4" />
               }
             />
             <DashboardKpiCard
-              label={copy('Transactions')}
-              value={formatInteger(transactionCount)}
-              context={periodLabel}
+              label={copy('Transactions today')}
+              value={formatInteger(transactionsToday)}
+              context={copy('Compared with yesterday')}
               delta={percentageChange(
-                transactionCount,
-                previousTransactionCount,
+                transactionsToday,
+                transactionsYesterday,
               )}
               icon={<ReceiptText aria-hidden="true" className="size-4" />}
             />
             <DashboardKpiCard
-              label={copy('Average transaction')}
-              value={money(data?.summary.averageTransactionValue)}
-              context={copy('Revenue per transaction')}
-              delta={percentageChange(
-                averageTransaction,
-                previousAverageTransaction,
-              )}
+              label={copy('Average transaction today')}
+              value={money(todayData?.summary.averageTransactionValue)}
+              context={copy('Compared with yesterday')}
+              delta={percentageChange(averageToday, averageYesterday)}
               icon={<Hash aria-hidden="true" className="size-4" />}
             />
             <DashboardKpiCard
-              label={copy('Quantity sold')}
-              value={formatInteger(quantitySold)}
-              context={copy('Items and services sold')}
-              delta={percentageChange(quantitySold, previousQuantitySold)}
+              label={copy('Quantity sold today')}
+              value={formatInteger(quantityToday)}
+              context={copy('Compared with yesterday')}
+              delta={percentageChange(quantityToday, quantityYesterday)}
               icon={<PackageCheck aria-hidden="true" className="size-4" />}
             />
           </section>
 
-          <section
-            className={[
-              'mt-5 grid gap-4',
-              widgetEnabled('businessPerformance')
-                ? 'lg:grid-cols-[minmax(0,1.65fr)_minmax(320px,0.85fr)]'
-                : 'grid-cols-1',
-            ].join(' ')}
-          >
-            {widgetEnabled('businessPerformance') ? (
-              <BusinessPerformanceCard
-                title={copy('Business performance')}
-                periodLabel={periodLabel}
-                revenue={revenue}
-                transactions={transactionCount}
-                previousRevenue={previousRevenue}
-                previousTransactions={previousTransactionCount}
-                trend={data?.analytics.trend ?? []}
-                formatMoney={moneyNumber}
-              />
-            ) : null}
-            <TransactionsCard
-              title={copy("Today's transactions")}
-              periodLabel={copy('Today')}
-              total={todayTransactions.data?.total ?? 0}
-              transactions={transactions}
-              emptyMessage={copy('No transactions have been recorded today.')}
-              formatDateTime={formatDateTime}
-              formatMoney={money}
-            />
-          </section>
-
           {premium &&
-          (widgetEnabled('topItems') || widgetEnabled('topEmployees')) ? (
+          (widgetEnabled('businessPerformance') ||
+            widgetEnabled('lastTransactions')) ? (
+            <section
+              className={[
+                'mt-5 grid gap-4',
+                widgetEnabled('businessPerformance') &&
+                widgetEnabled('lastTransactions')
+                  ? 'lg:grid-cols-[minmax(0,1.65fr)_minmax(320px,0.85fr)]'
+                  : 'grid-cols-1',
+              ].join(' ')}
+            >
+              {widgetEnabled('businessPerformance') ? (
+                <BusinessPerformanceCard
+                  title={copy('Transaction activity')}
+                  period={activityPeriod}
+                  periodOptions={[
+                    { value: 'today', label: copy('Today') },
+                    { value: '7d', label: copy('Last 7 days') },
+                    { value: 'month', label: copy('This month') },
+                    { value: 'year', label: copy('This year') },
+                  ]}
+                  onPeriodChange={(value) =>
+                    setActivityPeriod(value as ActivityPeriod)
+                  }
+                  revenue={activityRevenue}
+                  transactions={activityTransactions}
+                  previousRevenue={previousActivityRevenue}
+                  previousTransactions={previousActivityTransactions}
+                  trend={activityData?.analytics.trend ?? []}
+                  formatMoney={moneyNumber}
+                />
+              ) : null}
+
+              {widgetEnabled('lastTransactions') ? (
+                <TransactionsCard
+                  title={copy('Last transactions')}
+                  periodLabel={copy('Last 30 days')}
+                  total={lastTransactions.data?.total ?? 0}
+                  transactions={recentTransactions}
+                  emptyMessage={copy(
+                    'No transactions have been recorded in the last 30 days.',
+                  )}
+                  formatDateTime={formatDateTime}
+                  formatMoney={money}
+                />
+              ) : null}
+            </section>
+          ) : null}
+
+          {premium && optionalSummaryVisible ? (
             <section className="mt-4 grid gap-4 lg:grid-cols-2">
               {widgetEnabled('topItems') ? (
                 <RankingCard
                   title={copy('Top 5 items')}
-                  subtitle={periodLabel}
+                  subtitle={copy('This month')}
                   items={topItems}
                   emptyMessage={empty}
                 />
@@ -581,7 +589,7 @@ export function DashboardPage() {
               {widgetEnabled('topEmployees') ? (
                 <RankingCard
                   title={copy('Top 5 employees')}
-                  subtitle={periodLabel}
+                  subtitle={copy('This month')}
                   items={topEmployees}
                   emptyMessage={empty}
                 />
@@ -589,13 +597,11 @@ export function DashboardPage() {
             </section>
           ) : null}
 
-          {premium &&
-          (widgetEnabled('paymentMix') ||
-            widgetEnabled('locationPerformance')) ? (
+          {premium && secondarySummaryVisible ? (
             <section className="mt-4 grid gap-4 lg:grid-cols-2">
               {widgetEnabled('paymentMix') ? (
                 <PaymentMixCard
-                  title={copy('Payment mix')}
+                  title={copy('Payment mix · This month')}
                   points={paymentMix}
                   emptyMessage={empty}
                   formatValue={moneyNumber}
@@ -604,7 +610,7 @@ export function DashboardPage() {
               {widgetEnabled('locationPerformance') ? (
                 <RankingCard
                   title={copy('Location performance')}
-                  subtitle={periodLabel}
+                  subtitle={copy('This month')}
                   items={topLocations}
                   emptyMessage={empty}
                 />
@@ -615,8 +621,8 @@ export function DashboardPage() {
           {premium && widgetEnabled('businessInsight') ? (
             <section className="mt-4">
               <BusinessInsightWidget
-                current={data}
-                previous={previousData}
+                current={monthData}
+                previous={previousMonthData}
                 currency={runtime.currency}
                 formatMoney={formatMoney}
               />
