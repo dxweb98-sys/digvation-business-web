@@ -30,16 +30,24 @@ export function DashboardCardHeader({
   const resolvedActionLabel = actionLabel ?? text('seeAll');
 
   return (
-    <div className="-mx-5 flex min-h-[58px] items-center gap-3 border-b border-[var(--color-border)] px-5 pb-4">
-      <span className={`flex size-9 shrink-0 items-center justify-center rounded-full ${tones[tone]}`}>
+    <div className="-mx-5 flex min-h-[58px] items-start gap-3 border-b border-[var(--color-border)] px-5 pb-4">
+      <span
+        className={`flex size-9 shrink-0 items-center justify-center rounded-full ${tones[tone]}`}
+      >
         {icon}
       </span>
-      <div className="min-w-0 flex-1">
-        <h2 className="truncate text-sm font-semibold tracking-tight text-[var(--color-text)]">
+      <div className="min-w-0 flex-1 pt-0.5">
+        <h2
+          className="line-clamp-2 text-sm font-semibold leading-5 tracking-tight text-[var(--color-text)]"
+          title={title}
+        >
           {title}
         </h2>
         {subtitle ? (
-          <p className="mt-0.5 truncate text-[11px] text-[var(--color-text-muted)]">
+          <p
+            className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-[var(--color-text-muted)]"
+            title={subtitle}
+          >
             {subtitle}
           </p>
         ) : null}
