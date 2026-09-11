@@ -6,13 +6,11 @@ import {
 } from './dashboard-widget-registry';
 
 describe('dashboard widget registry', () => {
-  it('keeps optional widget defaults independent from entitlement authority', () => {
+  it('keeps the default premium dashboard focused', () => {
     expect(DEFAULT_DASHBOARD_WIDGETS).toEqual([
-      'salesTrend',
-      'paymentMix',
+      'businessPerformance',
       'topItems',
       'topEmployees',
-      'locationPerformance',
       'businessInsight',
     ]);
   });
@@ -21,9 +19,8 @@ describe('dashboard widget registry', () => {
     expect(
       availableDashboardWidgets(['sales:read']).map(({ id }) => id),
     ).toEqual([
-      'salesTrend',
+      'businessPerformance',
       'paymentMix',
-      'locationPerformance',
       'businessInsight',
     ]);
 
@@ -32,12 +29,13 @@ describe('dashboard widget registry', () => {
         'sales:read',
         'catalog:read',
         'employees:read',
+        'locations:read',
       ]).map(({ id }) => id),
     ).toEqual([
-      'salesTrend',
-      'paymentMix',
+      'businessPerformance',
       'topItems',
       'topEmployees',
+      'paymentMix',
       'locationPerformance',
       'businessInsight',
     ]);
