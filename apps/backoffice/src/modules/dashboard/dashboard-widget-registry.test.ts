@@ -20,6 +20,7 @@ describe('dashboard widget registry', () => {
       availableDashboardWidgets(['sales:read']).map(({ id }) => id),
     ).toEqual([
       'businessPerformance',
+      'lastTransactions',
       'paymentMix',
       'businessInsight',
     ]);
@@ -33,6 +34,7 @@ describe('dashboard widget registry', () => {
       ]).map(({ id }) => id),
     ).toEqual([
       'businessPerformance',
+      'lastTransactions',
       'topItems',
       'topEmployees',
       'paymentMix',
