@@ -39,12 +39,6 @@ export const DASHBOARD_WIDGETS: readonly DashboardWidgetDefinition[] = [
     permission: 'sales:read',
   },
   {
-    id: 'locationPerformance',
-    label: 'Location performance',
-    description: 'Current-month revenue comparison between available locations.',
-    permission: 'locations:read',
-  },
-  {
     id: 'businessInsight',
     label: 'Business insight',
     description: 'Low-cost deterministic insight from this month and the previous month.',
