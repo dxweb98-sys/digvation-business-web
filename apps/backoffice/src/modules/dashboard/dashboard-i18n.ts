@@ -17,6 +17,8 @@ const dashboardCopy = {
   thisYear: { id: 'Tahun ini', en: 'This year' },
   revenue: { id: 'Pendapatan', en: 'Revenue' },
   transactions: { id: 'Transaksi', en: 'Transactions' },
+  sold: { id: 'terjual', en: 'sold' },
+  txShort: { id: 'trx', en: 'tx' },
   noActivity: { id: 'Belum ada aktivitas pada periode ini.', en: 'No activity has been recorded for this period yet.' },
   transactionCompletion: { id: 'Penyelesaian transaksi', en: 'Transaction completion' },
   finalizedSalesToday: { id: 'Transaksi final hari ini', en: 'Finalized sales today' },
@@ -40,6 +42,15 @@ const dashboardCopy = {
   salesUnavailableDescription: { id: 'Peran Anda tidak memiliki izin untuk membaca ringkasan penjualan.', en: 'Your role does not include permission to read sales summary data.' },
   selectLocation: { id: 'Pilih cabang', en: 'Select a location' },
   selectLocationDescription: { id: 'Pilih satu cabang yang diizinkan sebelum memuat ringkasan dasbor.', en: 'Choose one authorized branch before loading dashboard summaries.' },
+  revenueHigher: { id: 'Pendapatan lebih tinggi', en: 'Revenue is higher' },
+  revenueLower: { id: 'Pendapatan lebih rendah', en: 'Revenue is lower' },
+  transactionHigher: { id: 'Volume transaksi lebih tinggi', en: 'Transaction volume is higher' },
+  transactionLower: { id: 'Volume transaksi lebih rendah', en: 'Transaction volume is lower' },
+  previousMonthSuffix: { id: 'dibanding bulan sebelumnya.', en: 'than the previous month.' },
+  averageTransactionValue: { id: 'Rata-rata nilai transaksi', en: 'Average transaction value' },
+  leadingPayment: { id: 'adalah metode pembayaran utama bulan ini.', en: 'is the leading payment method this month.' },
+  noRevenueMonth: { id: 'Belum ada pendapatan yang tercatat bulan ini.', en: 'No revenue activity was recorded this month.' },
+  noTransactionsMonth: { id: 'Belum ada transaksi yang tercatat bulan ini.', en: 'No transactions were recorded this month.' },
 } as const;
 
 export type DashboardCopyKey = keyof typeof dashboardCopy;
