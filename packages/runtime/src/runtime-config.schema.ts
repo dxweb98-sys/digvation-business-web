@@ -15,7 +15,7 @@ export const runtimeConfigSchema = z.object({
   }),
   effectiveEntitlements: z.object({
     products: z.array(z.enum(['POS'])),
-    capabilities: z.array(z.enum(['FINANCE_OPERATIONS'])),
+    capabilities: z.array(z.enum(['FINANCE_OPERATIONS', 'BUSINESS_ANALYTICS'])),
   }),
   branding: z.object({
     mode: z.enum(['DIGVATION_DEFAULT', 'WHITE_LABEL']),
