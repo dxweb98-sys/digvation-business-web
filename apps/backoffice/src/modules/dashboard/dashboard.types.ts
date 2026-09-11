@@ -46,7 +46,7 @@ export interface DashboardFilterState {
 }
 
 export type DashboardWidgetId =
-  | 'salesTrend'
+  | 'businessPerformance'
   | 'paymentMix'
   | 'topItems'
   | 'topEmployees'
