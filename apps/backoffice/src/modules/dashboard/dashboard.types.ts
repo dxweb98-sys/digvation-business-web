@@ -45,9 +45,12 @@ export interface DashboardFilterState {
   locationId: string;
 }
 
+/**
+ * User-configurable PRO widgets only. The daily KPI row, transaction activity,
+ * transaction completion, and last transactions are part of the required
+ * dashboard pulse and intentionally cannot be hidden.
+ */
 export type DashboardWidgetId =
-  | 'businessPerformance'
-  | 'lastTransactions'
   | 'paymentMix'
   | 'topItems'
   | 'topEmployees'
