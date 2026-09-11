@@ -1,5 +1,5 @@
 import { useRuntime } from '@digvation/business-runtime';
-import { DCard, DSelect } from '@digvation/ui';
+import { DCard } from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
 import {
   CircleDollarSign,
@@ -15,12 +15,14 @@ import {
 } from '../../app/layout/backoffice-page';
 import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
 import { useBackofficeAuth } from '../../auth/backoffice-auth-context';
+import { BranchContextCard } from './components/branch-context-card';
 import { BusinessInsightWidget } from './components/business-insight-widget';
 import { BusinessPerformanceCard } from './components/business-performance-card';
 import { DashboardConfigurator } from './components/dashboard-configurator';
 import { DashboardKpiCard } from './components/dashboard-kpi-card';
 import { PaymentMixCard } from './components/payment-mix-card';
 import { RankingCard } from './components/ranking-card';
+import { TransactionCompletionCard } from './components/transaction-completion-card';
 import { TransactionsCard } from './components/transactions-card';
 import { DashboardApi } from './dashboard-api';
 import {
@@ -146,7 +148,7 @@ export function DashboardPage() {
         workspace: session.identity.workspace,
         userId: session.identity.userId,
       })
-    : 'digvation.backoffice.dashboard.widgets.v3:anonymous';
+    : 'digvation.backoffice.dashboard.widgets.v4:anonymous';
   const locationPreferenceKey = session
     ? `digvation.backoffice.dashboard.location.v1:${session.identity.workspace}:${session.identity.userId}`
     : 'digvation.backoffice.dashboard.location.v1:anonymous';
@@ -237,15 +239,15 @@ export function DashboardPage() {
     queryFn: () => api.report('business-performance', yesterdayFilters),
     enabled: Boolean(session && canReadSales && locationReady),
   });
+  const todayTransactions = useQuery({
+    queryKey: ['dashboard', 'today-transaction-summary', todayFilters],
+    queryFn: () => api.report('transactions', todayFilters, 1),
+    enabled: Boolean(session && canReadSales && locationReady),
+  });
   const activityPerformance = useQuery({
     queryKey: ['dashboard', 'business-performance', activityFilters],
     queryFn: () => api.report('business-performance', activityFilters),
-    enabled: Boolean(
-      session &&
-        canReadSales &&
-        locationReady &&
-        widgetEnabled('businessPerformance'),
-    ),
+    enabled: Boolean(session && canReadSales && locationReady),
   });
   const previousActivityPerformance = useQuery({
     queryKey: [
@@ -255,12 +257,12 @@ export function DashboardPage() {
       previousActivityFilters,
     ],
     queryFn: () => api.report('business-performance', previousActivityFilters),
-    enabled: Boolean(
-      session &&
-        canReadSales &&
-        locationReady &&
-        widgetEnabled('businessPerformance'),
-    ),
+    enabled: Boolean(session && canReadSales && locationReady),
+  });
+  const lastTransactions = useQuery({
+    queryKey: ['dashboard', 'last-transactions', recentFilters],
+    queryFn: () => api.report('transactions', recentFilters, 6),
+    enabled: Boolean(session && canReadSales && locationReady),
   });
   const monthPerformance = useQuery({
     queryKey: ['dashboard', 'business-performance', monthFilters],
@@ -285,16 +287,6 @@ export function DashboardPage() {
         canReadSales &&
         locationReady &&
         widgetEnabled('businessInsight'),
-    ),
-  });
-  const lastTransactions = useQuery({
-    queryKey: ['dashboard', 'last-transactions', recentFilters],
-    queryFn: () => api.report('transactions', recentFilters, 6),
-    enabled: Boolean(
-      session &&
-        canReadSales &&
-        locationReady &&
-        widgetEnabled('lastTransactions'),
     ),
   });
   const catalogPerformance = useQuery({
@@ -328,11 +320,10 @@ export function DashboardPage() {
     availableIds.has(id),
   );
 
-  const selectLocation = (value: unknown) => {
-    const next = String(value ?? '');
-    if (!accessibleLocationIds.has(next)) return;
-    setSelectedLocationId(next);
-    saveLocationPreference(locationPreferenceKey, next);
+  const selectLocation = (value: string) => {
+    if (!accessibleLocationIds.has(value)) return;
+    setSelectedLocationId(value);
+    saveLocationPreference(locationPreferenceKey, value);
   };
 
   const formatInteger = (value: number | string) =>
@@ -354,6 +345,7 @@ export function DashboardPage() {
 
   const todayData = todayPerformance.data;
   const yesterdayData = yesterdayPerformance.data;
+  const todayTransactionData = todayTransactions.data;
   const activityData = activityPerformance.data;
   const previousActivityData = previousActivityPerformance.data;
   const monthData = monthPerformance.data;
@@ -382,6 +374,12 @@ export function DashboardPage() {
   const previousActivityTransactions = numberValue(
     previousActivityData?.summary.transactionCount,
   );
+
+  const transactionTotalToday = numberValue(
+    todayTransactionData?.summary.transactionCount,
+  );
+  const finalizedToday = numberValue(todayTransactionData?.summary.finalizedCount);
+  const voidedToday = numberValue(todayTransactionData?.summary.voidedCount);
 
   const paymentMix =
     monthData?.analytics.breakdowns?.paymentMethod ??
@@ -425,45 +423,39 @@ export function DashboardPage() {
     />
   ) : undefined;
 
-  const rankingSummaryVisible =
-    widgetEnabled('topItems') || widgetEnabled('topEmployees');
-  const insightSummaryVisible =
-    widgetEnabled('paymentMix') || widgetEnabled('businessInsight');
+  const optionalSummaryCount =
+    Number(widgetEnabled('topItems')) +
+    Number(widgetEnabled('topEmployees')) +
+    Number(widgetEnabled('paymentMix'));
+  const summaryGridClass =
+    optionalSummaryCount === 0
+      ? 'grid-cols-1'
+      : optionalSummaryCount === 1
+        ? 'lg:grid-cols-2'
+        : 'lg:grid-cols-2 xl:grid-cols-3';
 
   return (
     <BackofficePage>
-      <div className="pt-2">
+      <div className="grid gap-4 pt-2 lg:grid-cols-[minmax(0,1fr)_minmax(360px,520px)] lg:items-end">
         <BackofficePageHeader
           eyebrow={copy('Overview')}
           title={copy('Dashboard')}
           description={copy(
             premium
-              ? 'A concise daily business pulse with configurable summaries.'
+              ? 'A concise daily business pulse with configurable PRO summaries.'
               : 'A concise daily business pulse from your permitted business data.',
           )}
           actions={headerAction}
         />
-      </div>
 
-      <div className="mt-5 flex flex-col gap-2 sm:max-w-xl">
-        <DSelect
-          label={copy('Location')}
-          value={locationId}
-          options={locationOptions.map((location) => ({
-            value: location.id,
-            label: `${location.name ?? location.displayName ?? location.code}${
-              location.id === locations.data?.mainLocationId
-                ? ` · ${copy('Main Branch')}`
-                : ''
-            }`,
-          }))}
-          onChange={selectLocation}
-        />
-        <p className="text-[11px] text-[var(--color-text-muted)]">
-          {premium
-            ? copy('PRO dashboard · Main Branch is used by default.')
-            : copy('Standard dashboard · Main Branch is used by default.')}
-        </p>
+        {locations.data && locationReady ? (
+          <BranchContextCard
+            locations={locationOptions}
+            selectedId={locationId}
+            mainLocationId={locations.data.mainLocationId}
+            onChange={selectLocation}
+          />
+        ) : null}
       </div>
 
       {!canReadSales ? (
@@ -535,102 +527,83 @@ export function DashboardPage() {
             />
           </section>
 
-          {premium &&
-          (widgetEnabled('businessPerformance') ||
-            widgetEnabled('lastTransactions')) ? (
-            <section
-              className={[
-                'mt-5 grid gap-4',
-                widgetEnabled('businessPerformance') &&
-                widgetEnabled('lastTransactions')
-                  ? 'lg:grid-cols-[minmax(0,1.65fr)_minmax(320px,0.85fr)]'
-                  : 'grid-cols-1',
-              ].join(' ')}
-            >
-              {widgetEnabled('businessPerformance') ? (
-                <BusinessPerformanceCard
-                  title={copy('Transaction activity')}
-                  period={activityPeriod}
-                  periodOptions={[
-                    { value: 'today', label: copy('Today') },
-                    { value: '7d', label: copy('Last 7 days') },
-                    { value: 'month', label: copy('This month') },
-                    { value: 'year', label: copy('This year') },
-                  ]}
-                  onPeriodChange={(value) =>
-                    setActivityPeriod(value as ActivityPeriod)
-                  }
-                  revenue={activityRevenue}
-                  transactions={activityTransactions}
-                  previousRevenue={previousActivityRevenue}
-                  previousTransactions={previousActivityTransactions}
-                  trend={activityData?.analytics.trend ?? []}
-                  formatMoney={moneyNumber}
-                />
-              ) : null}
+          <section className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.8fr)_minmax(300px,0.7fr)]">
+            <BusinessPerformanceCard
+              title={copy('Transaction activity')}
+              period={activityPeriod}
+              periodOptions={[
+                { value: 'today', label: copy('Today') },
+                { value: '7d', label: copy('Last 7 days') },
+                { value: 'month', label: copy('This month') },
+                { value: 'year', label: copy('This year') },
+              ]}
+              onPeriodChange={(value) =>
+                setActivityPeriod(value as ActivityPeriod)
+              }
+              revenue={activityRevenue}
+              transactions={activityTransactions}
+              previousRevenue={previousActivityRevenue}
+              previousTransactions={previousActivityTransactions}
+              trend={activityData?.analytics.trend ?? []}
+              formatMoney={moneyNumber}
+            />
 
-              {widgetEnabled('lastTransactions') ? (
-                <TransactionsCard
-                  title={copy('Last transactions')}
-                  periodLabel={copy('Last 30 days')}
-                  total={lastTransactions.data?.total ?? 0}
-                  transactions={recentTransactions}
-                  emptyMessage={copy(
-                    'No transactions have been recorded in the last 30 days.',
-                  )}
-                  formatDateTime={formatDateTime}
-                  formatMoney={money}
-                />
-              ) : null}
-            </section>
-          ) : null}
+            <TransactionCompletionCard
+              finalized={finalizedToday}
+              total={transactionTotalToday}
+              voided={voidedToday}
+            />
+          </section>
 
-          {premium && rankingSummaryVisible ? (
-            <section className="mt-4 grid gap-4 lg:grid-cols-2">
-              {widgetEnabled('topItems') ? (
-                <RankingCard
-                  title={copy('Top 5 items')}
-                  subtitle={copy('This month')}
-                  items={topItems}
-                  emptyMessage={empty}
-                />
-              ) : null}
-              {widgetEnabled('topEmployees') ? (
-                <RankingCard
-                  title={copy('Top 5 employees')}
-                  subtitle={copy('This month')}
-                  items={topEmployees}
-                  emptyMessage={empty}
-                />
-              ) : null}
-            </section>
-          ) : null}
+          <section className={`mt-4 grid gap-4 ${summaryGridClass}`}>
+            {widgetEnabled('topItems') ? (
+              <RankingCard
+                title={copy('Top 5 items')}
+                subtitle={copy('This month')}
+                items={topItems}
+                emptyMessage={empty}
+              />
+            ) : null}
 
-          {premium && insightSummaryVisible ? (
-            <section
-              className={[
-                'mt-4 grid gap-4',
-                widgetEnabled('paymentMix') && widgetEnabled('businessInsight')
-                  ? 'lg:grid-cols-2'
-                  : 'grid-cols-1',
-              ].join(' ')}
-            >
-              {widgetEnabled('paymentMix') ? (
-                <PaymentMixCard
-                  title={copy('Payment mix · This month')}
-                  points={paymentMix}
-                  emptyMessage={empty}
-                  formatValue={moneyNumber}
-                />
-              ) : null}
-              {widgetEnabled('businessInsight') ? (
-                <BusinessInsightWidget
-                  current={monthData}
-                  previous={previousMonthData}
-                  currency={runtime.currency}
-                  formatMoney={formatMoney}
-                />
-              ) : null}
+            {widgetEnabled('topEmployees') ? (
+              <RankingCard
+                title={copy('Top 5 employees')}
+                subtitle={copy('This month')}
+                items={topEmployees}
+                emptyMessage={empty}
+              />
+            ) : null}
+
+            {widgetEnabled('paymentMix') ? (
+              <PaymentMixCard
+                title={copy('Payment mix · This month')}
+                points={paymentMix}
+                emptyMessage={empty}
+                formatValue={moneyNumber}
+              />
+            ) : null}
+
+            <TransactionsCard
+              title={copy('Last transactions')}
+              periodLabel={copy('Latest')}
+              total={lastTransactions.data?.total ?? 0}
+              transactions={recentTransactions}
+              emptyMessage={copy(
+                'No transactions have been recorded in the last 30 days.',
+              )}
+              formatDateTime={formatDateTime}
+              formatMoney={money}
+            />
+          </section>
+
+          {widgetEnabled('businessInsight') ? (
+            <section className="mt-4">
+              <BusinessInsightWidget
+                current={monthData}
+                previous={previousMonthData}
+                currency={runtime.currency}
+                formatMoney={formatMoney}
+              />
             </section>
           ) : null}
         </>
