@@ -10,38 +10,44 @@ export interface DashboardWidgetDefinition {
 export const DASHBOARD_WIDGETS: readonly DashboardWidgetDefinition[] = [
   {
     id: 'businessPerformance',
-    label: 'Business performance',
-    description: 'Revenue and transaction movement across the selected period.',
+    label: 'Transaction activity',
+    description: 'Revenue and transaction movement with its own period selector.',
+    permission: 'sales:read',
+  },
+  {
+    id: 'lastTransactions',
+    label: 'Last transactions',
+    description: 'Compact list of the latest transactions for the selected branch.',
     permission: 'sales:read',
   },
   {
     id: 'topItems',
     label: 'Top 5 items',
-    description: 'Best-performing catalog items by final revenue.',
+    description: 'Best-performing catalog items for the current month.',
     permission: 'catalog:read',
   },
   {
     id: 'topEmployees',
     label: 'Top 5 employees',
-    description: 'Highest employee contribution for the selected period.',
+    description: 'Highest employee contribution for the current month.',
     permission: 'employees:read',
   },
   {
     id: 'paymentMix',
     label: 'Payment mix',
-    description: 'Compact payment-method composition for completed sales.',
+    description: 'Compact payment-method composition for the current month.',
     permission: 'sales:read',
   },
   {
     id: 'locationPerformance',
     label: 'Location performance',
-    description: 'Revenue comparison between available selling locations.',
+    description: 'Current-month revenue comparison between available locations.',
     permission: 'locations:read',
   },
   {
     id: 'businessInsight',
     label: 'Business insight',
-    description: 'Low-cost deterministic insight from current and previous periods.',
+    description: 'Low-cost deterministic insight from this month and the previous month.',
     permission: 'sales:read',
   },
 ] as const;
