@@ -1,6 +1,7 @@
 import { DCard } from '@digvation/ui';
 import { CreditCard } from 'lucide-react';
 
+import { useBackofficeLocalization } from '../../../app/localization/backoffice-localization';
 import { useDashboardI18n } from '../dashboard-i18n';
 import type { DashboardAnalyticsPoint } from '../dashboard.types';
 import { DashboardCardHeader } from './dashboard-card-header';
@@ -25,6 +26,7 @@ export function PaymentMixCard({
   formatValue(value: number): string;
   seeAllHref?: string;
 }) {
+  const { copy } = useBackofficeLocalization();
   const { text } = useDashboardI18n();
   const sorted = [...points]
     .sort((a, b) => numeric(b.value) - numeric(a.value))
@@ -81,7 +83,7 @@ export function PaymentMixCard({
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="truncate text-xs font-medium">{point.label}</p>
+                      <p className="truncate text-xs font-medium">{copy(point.label)}</p>
                       <p className="shrink-0 text-xs font-semibold tabular-nums">
                         {ratio.toFixed(1)}%
                       </p>
