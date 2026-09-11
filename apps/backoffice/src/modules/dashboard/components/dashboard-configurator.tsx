@@ -10,6 +10,9 @@ const REQUIRED = [
   'Transactions today',
   'Average transaction today',
   'Quantity sold today',
+  'Transaction activity',
+  'Transaction completion',
+  'Last transactions',
 ] as const;
 
 export function DashboardConfigurator({
@@ -65,7 +68,7 @@ export function DashboardConfigurator({
                   Customize dashboard
                 </h2>
                 <p className="mt-1 text-xs leading-5 text-[var(--color-text-muted)]">
-                  Keep the daily pulse fixed and choose the optional summaries that matter to you.
+                  The daily business pulse stays visible. Choose only the optional PRO summaries you want to add.
                 </p>
               </div>
               <button
@@ -108,7 +111,7 @@ export function DashboardConfigurator({
               <section className="mt-6">
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--color-text-muted)]">
-                    Optional dashboard widgets
+                    Optional PRO widgets
                   </p>
                   <button
                     type="button"
