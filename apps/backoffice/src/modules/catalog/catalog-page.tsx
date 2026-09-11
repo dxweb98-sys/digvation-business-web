@@ -1,16 +1,10 @@
-import {
-  DButton,
-  DDataTable,
-  DSelectFilter,
-  type TableColumn,
-} from '@digvation/ui';
+import { useRuntime } from '@digvation/business-runtime';
+import { DButton, DDataTable, DSelectFilter, type TableColumn } from '@digvation/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Eye, Pencil, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { useRuntime } from '@digvation/business-runtime';
 
 import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
-import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
 import { canPerformBackofficeAction, type BackofficeAction } from '../../auth/backoffice-access';
 import { useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import {
@@ -19,8 +13,9 @@ import {
   type Category,
   type Item,
 } from './catalog-api';
-import { CatalogItemDialog } from './catalog-item-dialog';
 import { CatalogItemDetailDialog } from './catalog-item-detail-dialog';
+import { CatalogItemDialog } from './catalog-item-dialog';
+import { useCatalogLocalization } from './catalog-localization';
 import { CatalogNamedRecordDialog } from './catalog-record-dialog';
 import { PriceLabel, Status, TablePagination, humanize } from './catalog-shared';
 
@@ -45,7 +40,7 @@ const keys = {
 
 export function CatalogPage() {
   const { session, createApiClient } = useBackofficeAuth();
-  const { copy } = useBackofficeLocalization();
+  const { copy } = useCatalogLocalization();
   const { apiBaseUrl, currency } = useRuntime();
   const api = useMemo(
     () => new CatalogApi(createApiClient(apiBaseUrl)),
@@ -62,76 +57,73 @@ export function CatalogPage() {
     lifecycle: '',
     categoryId: '',
   });
-  const [categoryQuery, setCategoryQuery] = useState<CategoryFilterState>({
-    q: '',
-    status: '',
-  });
+  const [categoryQuery, setCategoryQuery] = useState<CategoryFilterState>({ q: '', status: '' });
   const [itemPage, setItemPage] = useState(1);
   const [itemPageSize, setItemPageSize] = useState(10);
   const [categoryPage, setCategoryPage] = useState(1);
   const [categoryPageSize, setCategoryPageSize] = useState(10);
   const [pricingEffectiveAt, setPricingEffectiveAt] = useState(() => new Date().toISOString());
 
-  if (!session) return null;
-  const can = (action: BackofficeAction) => canPerformBackofficeAction(session, action);
+  const can = (action: BackofficeAction) =>
+    Boolean(session && canPerformBackofficeAction(session, action));
   const canViewTax = can('viewTax');
 
   const categoryOptions = useQuery({
     queryKey: keys.categoryOptions,
     queryFn: () => api.listCategories({ limit: 100, offset: 0 }),
+    enabled: Boolean(session),
   });
   const items = useQuery({
-    queryKey: [
-      ...keys.items,
-      itemQuery,
-      itemPage,
-      itemPageSize,
-    ],
+    queryKey: [...keys.items, itemQuery, itemPage, itemPageSize],
     queryFn: () =>
       api.listItems({
         ...toItemQuery(itemQuery),
-        limit: itemPageSize,
+        limit: itemPageSize + 1,
         offset: (itemPage - 1) * itemPageSize,
       }),
+    enabled: Boolean(session),
   });
   const categories = useQuery({
-    queryKey: [
-      ...keys.categories,
-      categoryQuery,
-      categoryPage,
-      categoryPageSize,
-    ],
+    queryKey: [...keys.categories, categoryQuery, categoryPage, categoryPageSize],
     queryFn: () =>
       api.listCategories({
         ...toCategoryQuery(categoryQuery),
-        limit: categoryPageSize,
+        limit: categoryPageSize + 1,
         offset: (categoryPage - 1) * categoryPageSize,
       }),
+    enabled: Boolean(session),
   });
   const taxCategories = useQuery({
     queryKey: keys.taxCategories,
     queryFn: () => api.listTaxCategories(),
-    enabled: canViewTax,
+    enabled: Boolean(session && canViewTax),
   });
   const taxProfile = useQuery({
     queryKey: keys.taxProfile,
     queryFn: () => api.getTaxProfile(),
-    enabled: canViewTax,
+    enabled: Boolean(session && canViewTax),
   });
+
+  const visibleItems = (items.data?.items ?? []).slice(0, itemPageSize);
+  const visibleCategories = (categories.data?.items ?? []).slice(0, categoryPageSize);
+  const hasNextItemPage = (items.data?.items.length ?? 0) > itemPageSize;
+  const hasNextCategoryPage = (categories.data?.items.length ?? 0) > categoryPageSize;
   const defaultPrices = useQuery({
     queryKey: keys.defaults(
-      items.data?.items.map((candidate) => candidate.id) ?? [],
+      visibleItems.map((candidate) => candidate.id),
       currency,
       pricingEffectiveAt,
     ),
     queryFn: () =>
       api.listDefaultPrices(
-        items.data?.items.map((candidate) => candidate.id) ?? [],
+        visibleItems.map((candidate) => candidate.id),
         currency,
         pricingEffectiveAt,
       ),
-    enabled: Boolean(can('viewPricing') && items.data?.items.length),
+    enabled: Boolean(session && can('viewPricing') && visibleItems.length),
   });
+
+  if (!session) return null;
 
   const refreshItems = () => {
     void client.invalidateQueries({ queryKey: keys.items });
@@ -202,7 +194,9 @@ export function CatalogPage() {
       <BackofficePageHeader
         eyebrow={copy('Master Data')}
         title={copy('Catalog')}
-        description={copy('Manage items, categories, pricing, variants, and tax assignment from one catalog workspace.')}
+        description={copy(
+          'Manage items, categories, pricing, variants, and tax assignment from one catalog workspace.',
+        )}
       />
 
       <div className="mt-6 flex gap-1 border-b border-[var(--color-border)]">
@@ -226,7 +220,7 @@ export function CatalogPage() {
         <section className="mt-6">
           <DDataTable
             columns={itemColumns}
-            data={items.data?.items ?? []}
+            data={visibleItems}
             loading={items.isLoading}
             rowKey="id"
             searchable
@@ -251,7 +245,9 @@ export function CatalogPage() {
                   label={copy('Status')}
                   value={itemQuery.lifecycle || null}
                   onChange={(lifecycle) =>
-                    changeItemFilter({ lifecycle: (lifecycle ?? '') as '' | Item['lifecycle'] })
+                    changeItemFilter({
+                      lifecycle: (lifecycle ?? '') as '' | Item['lifecycle'],
+                    })
                   }
                   clearable
                   options={[
@@ -303,7 +299,7 @@ export function CatalogPage() {
           <TablePagination
             page={itemPage}
             pageSize={itemPageSize}
-            itemCount={items.data?.items.length ?? 0}
+            hasNext={hasNextItemPage}
             onPageChange={setItemPage}
             onPageSizeChange={(size) => {
               setItemPageSize(size);
@@ -315,7 +311,7 @@ export function CatalogPage() {
         <section className="mt-6">
           <DDataTable
             columns={categoryColumns}
-            data={categories.data?.items ?? []}
+            data={visibleCategories}
             loading={categories.isLoading}
             rowKey="id"
             searchable
@@ -327,7 +323,9 @@ export function CatalogPage() {
                 label={copy('Status')}
                 value={categoryQuery.status || null}
                 onChange={(status) =>
-                  changeCategoryFilter({ status: (status ?? '') as '' | Category['status'] })
+                  changeCategoryFilter({
+                    status: (status ?? '') as '' | Category['status'],
+                  })
                 }
                 clearable
                 options={[
@@ -360,7 +358,7 @@ export function CatalogPage() {
           <TablePagination
             page={categoryPage}
             pageSize={categoryPageSize}
-            itemCount={categories.data?.items.length ?? 0}
+            hasNext={hasNextCategoryPage}
             onPageChange={setCategoryPage}
             onPageSizeChange={(size) => {
               setCategoryPageSize(size);
