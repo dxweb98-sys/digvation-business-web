@@ -1,5 +1,5 @@
 import { DCard } from '@digvation/ui';
-import { ArrowDownRight, ArrowUpRight, Package, Users } from 'lucide-react';
+import { Package, Users } from 'lucide-react';
 
 import { DashboardCardHeader } from './dashboard-card-header';
 
@@ -45,40 +45,45 @@ export function RankingCard({
           items.map((item, index) => (
             <div
               key={`${item.label}:${index}`}
-              className="flex items-center gap-3 border-b border-[var(--color-border)] py-3 last:border-b-0"
+              className="flex items-start gap-3 border-b border-[var(--color-border)] py-3 last:border-b-0"
             >
               <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--color-surface-muted)] text-[11px] font-semibold text-[var(--color-brand)]">
                 {String(index + 1).padStart(2, '0')}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-[var(--color-text)]">
+                <p
+                  className="line-clamp-2 text-sm font-semibold leading-5 text-[var(--color-text)]"
+                  title={item.label}
+                >
                   {item.label}
                 </p>
                 {item.secondary ? (
-                  <p className="mt-0.5 truncate text-[11px] text-[var(--color-text-muted)]">
+                  <p
+                    className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-[var(--color-text-muted)]"
+                    title={item.secondary}
+                  >
                     {item.secondary}
                   </p>
                 ) : null}
               </div>
               <div className="shrink-0 text-right">
-                <p className="text-sm font-semibold tabular-nums text-[var(--color-text)]">
+                <p className="whitespace-nowrap text-sm font-semibold tabular-nums text-[var(--color-text)]">
                   {item.value}
                 </p>
                 {item.delta != null ? (
                   <span
                     className={[
-                      'mt-0.5 inline-flex items-center gap-0.5 text-[10px] font-semibold tabular-nums',
-                      item.delta >= 0
-                        ? 'text-[var(--color-brand)]'
-                        : 'text-[var(--color-text-muted)]',
+                      'mt-0.5 inline-block text-[10px] font-semibold tabular-nums',
+                      Math.abs(item.delta) < 0.05
+                        ? 'text-[var(--color-text-muted)]'
+                        : item.delta > 0
+                          ? 'text-emerald-600'
+                          : 'text-red-600',
                     ].join(' ')}
                   >
-                    {item.delta >= 0 ? (
-                      <ArrowUpRight aria-hidden="true" className="size-3" />
-                    ) : (
-                      <ArrowDownRight aria-hidden="true" className="size-3" />
-                    )}
-                    {Math.abs(item.delta).toFixed(1)}%
+                    {Math.abs(item.delta) < 0.05
+                      ? '0.0%'
+                      : `${item.delta > 0 ? '+' : '-'}${Math.abs(item.delta).toFixed(1)}%`}
                   </span>
                 ) : null}
               </div>
