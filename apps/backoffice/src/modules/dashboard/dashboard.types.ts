@@ -48,6 +48,7 @@ export interface DashboardFilterState {
 
 export type DashboardWidgetId =
   | 'businessPerformance'
+  | 'lastTransactions'
   | 'paymentMix'
   | 'topItems'
   | 'topEmployees'
