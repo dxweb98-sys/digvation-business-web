@@ -145,6 +145,7 @@ interface RouteState {
   currentSale: ReturnType<typeof createEmptySale> | ReturnType<typeof createSaleWithLine>;
   createRequests: number;
   addRequests: number;
+  salesListRequests: number;
   quantityExpectedVersions: number[];
   removeExpectedVersions: number[];
   conflictOnNextQuantity: boolean;
@@ -156,6 +157,7 @@ async function installRoutes(page: Page, options: Partial<RouteState> = {}) {
     currentSale: createEmptySale(),
     createRequests: 0,
     addRequests: 0,
+    salesListRequests: 0,
     quantityExpectedVersions: [],
     removeExpectedVersions: [],
     conflictOnNextQuantity: false,
@@ -224,6 +226,7 @@ async function installRoutes(page: Page, options: Partial<RouteState> = {}) {
       return;
     }
     if (method === 'GET' && url.pathname === '/api/v1/sales') {
+      state.salesListRequests += 1;
       await route.fulfill({
         json: envelope({ items: [state.currentSale], limit: 100, offset: 0 }),
       });
@@ -293,6 +296,36 @@ async function startSaleFromFirstItem(page: Page) {
   await expect(page.getByText(/Rp\s?125\.000/)).toBeVisible();
   await page.getByRole('button', { name: 'Add Hair Cut', exact: true }).click();
 }
+
+test('idle Sell does not poll the Sales list continuously', async ({ page }) => {
+  const state = await installRoutes(page);
+
+  await page.goto('/sell');
+  await expect(page.getByRole('button', { name: /Active branch Main Branch/i })).toBeVisible();
+  await expect.poll(() => state.salesListRequests).toBeGreaterThan(0);
+  const baseline = state.salesListRequests;
+
+  await page.waitForTimeout(2_200);
+
+  expect(state.salesListRequests).toBe(baseline);
+});
+
+test('Operational keeps a fixed left sidebar below the old lg breakpoint', async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 800 });
+  await installRoutes(page);
+
+  await page.goto('/sell');
+  await expect(page.getByRole('button', { name: /Active branch Main Branch/i })).toBeVisible();
+  await expect(page.getByText('Point of Sale', { exact: true })).toBeVisible();
+
+  const sidebarBox = await page.locator('aside').boundingBox();
+  const contentBox = await page.locator('main').first().boundingBox();
+  expect(sidebarBox).not.toBeNull();
+  expect(contentBox).not.toBeNull();
+  expect(sidebarBox!.width).toBeGreaterThanOrEqual(250);
+  expect(sidebarBox!.width).toBeLessThanOrEqual(260);
+  expect(contentBox!.x).toBeGreaterThanOrEqual(sidebarBox!.width);
+});
 
 test('lazy start creates the Sale only when the first item is added', async ({ page }) => {
   const state = await installRoutes(page);
