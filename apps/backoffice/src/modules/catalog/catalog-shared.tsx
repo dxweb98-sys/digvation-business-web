@@ -1,7 +1,7 @@
 import { DBadge, DButton } from '@digvation/ui';
 import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
+import { useCatalogLocalization } from './catalog-localization';
 import type { DefaultPrice } from './catalog-api';
 
 export function humanize(value: string) {
@@ -12,7 +12,7 @@ export function humanize(value: string) {
 }
 
 export function Status({ value }: { value: string }) {
-  const { copy } = useBackofficeLocalization();
+  const { copy } = useCatalogLocalization();
   const variant =
     value === 'ACTIVE'
       ? 'success'
@@ -35,7 +35,7 @@ export function DialogFooter({
   onSave: () => void;
   disabled?: boolean;
 }) {
-  const { copy } = useBackofficeLocalization();
+  const { copy } = useCatalogLocalization();
   return (
     <div className="flex justify-end gap-2">
       <DButton variant="secondary" onClick={onClose}>
@@ -59,7 +59,7 @@ export function PriceLabel({
   available?: boolean;
   emptyLabel?: string;
 }) {
-  const { copy, formatMoney } = useBackofficeLocalization();
+  const { copy, formatMoney } = useCatalogLocalization();
   if (!available) return <span className="text-[var(--color-text-muted)]">—</span>;
   if (loading)
     return (
@@ -152,16 +152,14 @@ export function TablePagination({
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
 }) {
-  const { copy } = useBackofficeLocalization();
+  const { copy } = useCatalogLocalization();
   const hasNext = itemCount === pageSize;
   return (
     <div className="mt-3 flex flex-col gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
-        <label htmlFor={`catalog-page-size-${page}`} className="whitespace-nowrap">
-          {copy('Rows per page')}
-        </label>
+        <span>{copy('Rows per page')}</span>
         <select
-          id={`catalog-page-size-${page}`}
+          aria-label={copy('Rows per page')}
           value={pageSize}
           onChange={(event) => onPageSizeChange(Number(event.target.value))}
           className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1.5 text-xs text-[var(--color-text)] outline-none focus:border-[var(--color-brand)]"
