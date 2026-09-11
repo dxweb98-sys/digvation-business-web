@@ -1,8 +1,8 @@
 import { DBadge, DButton } from '@digvation/ui';
 import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useCatalogLocalization } from './catalog-localization';
 import type { DefaultPrice } from './catalog-api';
+import { useCatalogLocalization } from './catalog-localization';
 
 export function humanize(value: string) {
   return value
@@ -142,18 +142,17 @@ export function CatalogAccordion({
 export function TablePagination({
   page,
   pageSize,
-  itemCount,
+  hasNext,
   onPageChange,
   onPageSizeChange,
 }: {
   page: number;
   pageSize: number;
-  itemCount: number;
+  hasNext: boolean;
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
 }) {
   const { copy } = useCatalogLocalization();
-  const hasNext = itemCount === pageSize;
   return (
     <div className="mt-3 flex flex-col gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
@@ -183,11 +182,7 @@ export function TablePagination({
             {copy('Previous')}
           </span>
         </DButton>
-        <DButton
-          variant="secondary"
-          disabled={!hasNext}
-          onClick={() => onPageChange(page + 1)}
-        >
+        <DButton variant="secondary" disabled={!hasNext} onClick={() => onPageChange(page + 1)}>
           <span className="inline-flex items-center gap-1.5">
             {copy('Next')}
             <ChevronRight aria-hidden="true" className="size-4" />
