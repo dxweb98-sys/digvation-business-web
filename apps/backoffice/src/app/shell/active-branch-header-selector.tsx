@@ -1,13 +1,17 @@
 import { DBadge, DButton, DDropdown } from '@digvation/ui';
 import { Building2, Check, ChevronDown } from 'lucide-react';
 
+import { useBackofficeLocalization } from '../localization/backoffice-localization';
 import { useBusinessLocation } from '../providers/business-location-context';
-import { useDashboardI18n } from '../../modules/dashboard/dashboard-i18n';
 
 export function ActiveBranchHeaderSelector() {
+  const { locale } = useBackofficeLocalization();
   const { locations, selectedLocationId, mainLocationId, isReady, selectLocation } =
     useBusinessLocation();
-  const { text } = useDashboardI18n();
+  const labels =
+    locale === 'id'
+      ? { activeBranch: 'Cabang aktif', mainBranch: 'Cabang Utama' }
+      : { activeBranch: 'Active branch', mainBranch: 'Main Branch' };
 
   if (!isReady) return null;
 
@@ -29,14 +33,14 @@ export function ActiveBranchHeaderSelector() {
           type="button"
           className="h-11 max-w-[min(360px,62vw)] justify-start gap-2 rounded-[var(--radius-control)] px-2.5"
           leftIcon={
-            <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[var(--color-accent-sky)] text-[var(--color-brand)]">
+            <span className="grid size-8 shrink-0 place-items-center rounded-full bg-blue-50 text-blue-600">
               <Building2 className="size-4" />
             </span>
           }
         >
           <span className="min-w-0 text-left">
             <span className="block text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">
-              {text('activeBranch')}
+              {labels.activeBranch}
             </span>
             <span className="mt-0.5 flex min-w-0 items-center gap-2">
               <span className="truncate text-sm font-semibold text-[var(--color-text)]">
@@ -44,7 +48,7 @@ export function ActiveBranchHeaderSelector() {
               </span>
               {selectedIsMain ? (
                 <DBadge variant="outline" className="hidden shrink-0 sm:inline-flex">
-                  {text('mainBranch')}
+                  {labels.mainBranch}
                 </DBadge>
               ) : null}
               <ChevronDown className="size-3.5 shrink-0 text-[var(--color-text-muted)]" />
@@ -73,7 +77,7 @@ export function ActiveBranchHeaderSelector() {
                   {name}
                 </span>
                 <span className="mt-0.5 block text-[10px] text-[var(--color-text-muted)]">
-                  {isMain ? text('mainBranch') : location.code}
+                  {isMain ? labels.mainBranch : location.code}
                 </span>
               </span>
               {active ? <Check className="size-4 shrink-0 text-[var(--color-brand)]" /> : null}
