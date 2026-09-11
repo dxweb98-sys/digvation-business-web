@@ -37,6 +37,7 @@ export function RankingCard({
         subtitle={subtitle}
         icon={<Icon aria-hidden="true" className="size-4" />}
         actionHref={seeAllHref}
+        tone={kind === 'items' ? 'violet' : 'warm'}
       />
 
       <div className="mt-3 space-y-0.5">
