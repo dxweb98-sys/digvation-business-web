@@ -1,6 +1,7 @@
 import { DCard } from '@digvation/ui';
 import { Lightbulb } from 'lucide-react';
 
+import { useBackofficeLocalization } from '../../../app/localization/backoffice-localization';
 import { useDashboardI18n } from '../dashboard-i18n';
 import type { DashboardDataset } from '../dashboard.types';
 import { DashboardCardHeader } from './dashboard-card-header';
@@ -28,6 +29,7 @@ export function BusinessInsightWidget({
   formatMoney(value: string, currency: string): string;
   seeAllHref?: string;
 }) {
+  const { copy } = useBackofficeLocalization();
   const { locale, text } = useDashboardI18n();
   const revenue = numeric(current?.summary.finalRevenue);
   const transactions = numeric(current?.summary.transactionCount);
@@ -70,7 +72,7 @@ export function BusinessInsightWidget({
       ? `${text('averageTransactionValue')} ${locale === 'id' ? 'adalah' : 'is'} ${formatMoney(String(average), currency)}.`
       : null,
     dominantPayment
-      ? `${dominantPayment.label} ${text('leadingPayment')}`
+      ? `${copy(dominantPayment.label)} ${text('leadingPayment')}`
       : null,
   ].filter((value): value is string => Boolean(value));
 
