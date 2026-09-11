@@ -36,6 +36,7 @@ export interface DashboardOperationalAccess {
   organizationWide: boolean;
   resolution: 'DENIED' | 'AUTO_RESOLVED' | 'SELECTION_REQUIRED';
   selectedLocationId: string | null;
+  mainLocationId: string | null;
   locations: DashboardLocationOption[];
 }
 
