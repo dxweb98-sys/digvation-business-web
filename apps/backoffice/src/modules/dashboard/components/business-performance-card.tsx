@@ -109,7 +109,7 @@ export function BusinessPerformanceCard({
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-3">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--color-accent-mint)] text-[var(--color-brand)]">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--color-accent-sky)] text-[var(--color-brand)]">
             <ChartNoAxesCombined aria-hidden="true" className="size-4" />
           </span>
           <div>
@@ -142,7 +142,7 @@ export function BusinessPerformanceCard({
         </div>
       </div>
 
-      <div className="mt-5 flex flex-wrap items-end gap-x-8 gap-y-3">
+      <div className="mt-5 flex flex-wrap items-end gap-x-8 gap-y-3 border-t border-[var(--color-border)] pt-4">
         <div>
           <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
             Revenue
