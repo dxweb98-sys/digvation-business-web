@@ -4,22 +4,18 @@ import type { ReactNode } from 'react';
 const toneStyle = {
   sky: {
     icon: 'bg-blue-50 text-blue-600',
-    delta: 'bg-blue-50 text-blue-600',
     stroke: '#3b82f6',
   },
   mint: {
     icon: 'bg-emerald-50 text-emerald-600',
-    delta: 'bg-emerald-50 text-emerald-600',
     stroke: '#10b981',
   },
   violet: {
     icon: 'bg-violet-50 text-violet-600',
-    delta: 'bg-violet-50 text-violet-600',
     stroke: '#8b5cf6',
   },
   warm: {
     icon: 'bg-orange-50 text-orange-600',
-    delta: 'bg-orange-50 text-orange-600',
     stroke: '#f97316',
   },
 } as const;
@@ -39,6 +35,19 @@ function sparkline(start: number, end: number) {
     area: `${path} L 78 46 L 2 46 Z`,
     endY,
   };
+}
+
+function deltaText(delta: number | null | undefined): string | null {
+  if (delta == null) return null;
+  if (Math.abs(delta) < 0.05) return '0.0%';
+  return `${delta > 0 ? '+' : '-'}${Math.abs(delta).toFixed(1)}%`;
+}
+
+function deltaClass(delta: number | null | undefined): string {
+  if (delta == null || Math.abs(delta) < 0.05) {
+    return 'text-[var(--color-text-muted)]';
+  }
+  return delta > 0 ? 'text-emerald-600' : 'text-red-600';
 }
 
 export function DashboardKpiCard({
@@ -61,52 +70,37 @@ export function DashboardKpiCard({
   tone?: keyof typeof toneStyle;
 }) {
   const visual = toneStyle[tone];
-  const deltaLabel =
-    delta == null ? null : `${delta >= 0 ? '↗ ' : '↘ '}${Math.abs(delta).toFixed(1)}%`;
+  const resolvedDelta = deltaText(delta);
   const { path, area, endY } = sparkline(trendStart, trendEnd);
   const gradientId = `dashboard-kpi-${tone}`;
 
   return (
     <DCard
       variant="elevated"
-      className="min-h-[118px] overflow-hidden rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[0_14px_34px_-30px_var(--color-text)]"
+      className="min-h-[122px] overflow-hidden rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[0_14px_34px_-30px_var(--color-text)]"
     >
-      <div className="flex h-full min-w-0 items-center gap-3">
+      <div className="grid h-full min-w-0 grid-cols-[auto_minmax(0,1fr)_64px] items-center gap-x-3 gap-y-1 sm:grid-cols-[auto_minmax(0,1fr)_72px]">
         <span
-          className={`flex size-10 shrink-0 items-center justify-center rounded-full ${visual.icon}`}
+          className={`row-span-3 flex size-10 shrink-0 self-start items-center justify-center rounded-full ${visual.icon}`}
         >
           {icon}
         </span>
 
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[11px] font-medium text-[var(--color-text-muted)]">
-            {label}
-          </p>
-          <p className="mt-1 truncate text-[21px] font-semibold tracking-[-0.025em] tabular-nums text-[var(--color-text)]">
-            {value}
-          </p>
-          <div className="mt-2 flex min-w-0 items-center gap-2 text-[10px]">
-            {deltaLabel ? (
-              <span
-                className={`shrink-0 rounded-full px-2 py-0.5 font-semibold tabular-nums ${visual.delta}`}
-              >
-                {deltaLabel}
-              </span>
-            ) : null}
-            <span className="truncate text-[var(--color-text-muted)]">
-              {context ?? '—'}
-            </span>
-          </div>
-        </div>
+        <p
+          className="line-clamp-2 min-h-8 text-[11px] font-medium leading-4 text-[var(--color-text-muted)]"
+          title={label}
+        >
+          {label}
+        </p>
 
         <svg
           viewBox="0 0 80 48"
-          className="h-12 w-[76px] shrink-0 self-end overflow-visible"
+          className="row-span-3 h-12 w-full self-end overflow-visible"
           aria-hidden="true"
         >
           <defs>
             <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={visual.stroke} stopOpacity="0.22" />
+              <stop offset="0%" stopColor={visual.stroke} stopOpacity="0.18" />
               <stop offset="100%" stopColor={visual.stroke} stopOpacity="0" />
             </linearGradient>
           </defs>
@@ -115,14 +109,29 @@ export function DashboardKpiCard({
             d={path}
             fill="none"
             stroke={visual.stroke}
-            strokeWidth="2.2"
+            strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
             vectorEffect="non-scaling-stroke"
           />
-          <circle cx="78" cy={endY} r="2.8" fill={visual.stroke} />
-          <circle cx="78" cy={endY} r="5.5" fill={visual.stroke} opacity="0.10" />
+          <circle cx="78" cy={endY} r="2.5" fill={visual.stroke} />
         </svg>
+
+        <p
+          className="whitespace-nowrap text-[clamp(1.1rem,1.5vw,1.35rem)] font-semibold tracking-[-0.025em] tabular-nums text-[var(--color-text)]"
+          title={value}
+        >
+          {value}
+        </p>
+
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[10px] leading-4">
+          {resolvedDelta ? (
+            <span className={`shrink-0 font-semibold tabular-nums ${deltaClass(delta)}`}>
+              {resolvedDelta}
+            </span>
+          ) : null}
+          <span className="text-[var(--color-text-muted)]">{context ?? '—'}</span>
+        </div>
       </div>
     </DCard>
   );
