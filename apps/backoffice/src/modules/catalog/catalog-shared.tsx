@@ -157,9 +157,11 @@ export function TablePagination({
   return (
     <div className="mt-3 flex flex-col gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
-        <span>{copy('Rows per page')}</span>
+        <label htmlFor={`catalog-page-size-${page}`} className="whitespace-nowrap">
+          {copy('Rows per page')}
+        </label>
         <select
-          aria-label={copy('Rows per page')}
+          id={`catalog-page-size-${page}`}
           value={pageSize}
           onChange={(event) => onPageSizeChange(Number(event.target.value))}
           className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1.5 text-xs text-[var(--color-text)] outline-none focus:border-[var(--color-brand)]"
@@ -175,21 +177,23 @@ export function TablePagination({
       <div className="flex items-center gap-2">
         <DButton
           variant="secondary"
-          size="sm"
-          leftIcon={<ChevronLeft className="size-4" />}
           disabled={page <= 1}
           onClick={() => onPageChange(Math.max(1, page - 1))}
         >
-          {copy('Previous')}
+          <span className="inline-flex items-center gap-1.5">
+            <ChevronLeft aria-hidden="true" className="size-4" />
+            {copy('Previous')}
+          </span>
         </DButton>
         <DButton
           variant="secondary"
-          size="sm"
-          rightIcon={<ChevronRight className="size-4" />}
           disabled={!hasNext}
           onClick={() => onPageChange(page + 1)}
         >
-          {copy('Next')}
+          <span className="inline-flex items-center gap-1.5">
+            {copy('Next')}
+            <ChevronRight aria-hidden="true" className="size-4" />
+          </span>
         </DButton>
       </div>
     </div>
