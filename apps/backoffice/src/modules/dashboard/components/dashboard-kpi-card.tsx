@@ -1,80 +1,95 @@
 import { DCard } from '@digvation/ui';
 import type { ReactNode } from 'react';
 
+function sparklinePath(start: number, end: number): string {
+  const values = [start, end];
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = Math.max(1, max - min);
+  const y = (value: number) => 26 - ((value - min) / range) * 18;
+  const startY = y(start);
+  const endY = y(end);
+  return `M 3 ${startY.toFixed(2)} C 18 ${startY.toFixed(2)}, 34 ${endY.toFixed(2)}, 53 ${endY.toFixed(2)}`;
+}
+
 export function DashboardKpiCard({
   label,
   value,
   context,
   delta,
   icon,
-  emphasis = false,
+  trendStart = 0,
+  trendEnd = 0,
 }: {
   label: string;
   value: string;
   context?: string;
   delta?: number | null;
   icon: ReactNode;
-  emphasis?: boolean;
+  trendStart?: number;
+  trendEnd?: number;
 }) {
   const deltaLabel =
-    delta == null
-      ? null
-      : `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%`;
+    delta == null ? null : `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%`;
+  const path = sparklinePath(trendStart, trendEnd);
+  const positive = (delta ?? 0) >= 0;
 
   return (
     <DCard
       variant="elevated"
-      className={[
-        'min-h-[116px] rounded-[var(--radius-card)] border p-4 shadow-[0_14px_34px_-30px_var(--color-text)]',
-        emphasis
-          ? 'border-transparent bg-[var(--color-brand)] text-white'
-          : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)]',
-      ].join(' ')}
+      className="min-h-[116px] rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[0_14px_34px_-30px_var(--color-text)]"
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p
-            className={[
-              'text-xs font-medium',
-              emphasis ? 'text-white/75' : 'text-[var(--color-text-muted)]',
-            ].join(' ')}
-          >
-            {label}
-          </p>
-          <p className="mt-2 truncate text-[22px] font-semibold tracking-tight tabular-nums">
-            {value}
-          </p>
-        </div>
-        <span
-          className={[
-            'flex size-9 shrink-0 items-center justify-center rounded-xl',
-            emphasis
-              ? 'bg-white/14 text-white'
-              : 'bg-[var(--color-surface-muted)] text-[var(--color-brand)]',
-          ].join(' ')}
-        >
+      <div className="flex h-full items-center gap-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--color-accent-mint)] text-[var(--color-brand)]">
           {icon}
         </span>
-      </div>
 
-      <div className="mt-3 flex items-center justify-between gap-2 text-[11px]">
-        <span className={emphasis ? 'text-white/70' : 'text-[var(--color-text-muted)]'}>
-          {context ?? '—'}
-        </span>
-        {deltaLabel ? (
-          <span
-            className={[
-              'rounded-full px-2 py-0.5 font-semibold tabular-nums',
-              emphasis
-                ? 'bg-white/14 text-white'
-                : delta! >= 0
-                  ? 'bg-[var(--color-accent-mint)] text-[var(--color-text)]'
-                  : 'bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]',
-            ].join(' ')}
-          >
-            {deltaLabel}
-          </span>
-        ) : null}
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[11px] font-medium text-[var(--color-text-muted)]">
+            {label}
+          </p>
+          <p className="mt-1 truncate text-[22px] font-semibold tracking-tight tabular-nums text-[var(--color-text)]">
+            {value}
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px]">
+            {deltaLabel ? (
+              <span
+                className={[
+                  'rounded-full px-2 py-0.5 font-semibold tabular-nums',
+                  positive
+                    ? 'bg-[var(--color-accent-mint)] text-[var(--color-brand)]'
+                    : 'bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]',
+                ].join(' ')}
+              >
+                {deltaLabel}
+              </span>
+            ) : null}
+            <span className="truncate text-[var(--color-text-muted)]">
+              {context ?? '—'}
+            </span>
+          </div>
+        </div>
+
+        <svg
+          viewBox="0 0 56 32"
+          className="h-9 w-16 shrink-0 overflow-visible"
+          aria-hidden="true"
+        >
+          <path
+            d={path}
+            fill="none"
+            stroke="var(--color-brand)"
+            strokeWidth="2"
+            strokeLinecap="round"
+            vectorEffect="non-scaling-stroke"
+          />
+          <circle
+            cx="53"
+            cy={trendStart === trendEnd ? 17 : trendEnd >= trendStart ? 8 : 26}
+            r="2.5"
+            fill="var(--color-brand)"
+          />
+        </svg>
       </div>
     </DCard>
   );
