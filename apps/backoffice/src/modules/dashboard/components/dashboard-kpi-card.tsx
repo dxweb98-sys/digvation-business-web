@@ -12,6 +12,14 @@ function sparklinePath(start: number, end: number): string {
   return `M 3 ${startY.toFixed(2)} C 18 ${startY.toFixed(2)}, 34 ${endY.toFixed(2)}, 53 ${endY.toFixed(2)}`;
 }
 
+const toneClass = {
+  sky: 'bg-[var(--color-accent-sky)] text-[var(--color-brand)]',
+  mint: 'bg-[var(--color-accent-mint)] text-[var(--color-brand)]',
+  violet:
+    'bg-[var(--color-accent-lilac,var(--color-accent-sky))] text-[var(--color-brand)]',
+  warm: 'bg-[var(--color-accent-peach,var(--color-accent-mint))] text-[var(--color-brand)]',
+} as const;
+
 export function DashboardKpiCard({
   label,
   value,
@@ -20,6 +28,7 @@ export function DashboardKpiCard({
   icon,
   trendStart = 0,
   trendEnd = 0,
+  tone = 'sky',
 }: {
   label: string;
   value: string;
@@ -28,6 +37,7 @@ export function DashboardKpiCard({
   icon: ReactNode;
   trendStart?: number;
   trendEnd?: number;
+  tone?: keyof typeof toneClass;
 }) {
   const deltaLabel =
     delta == null ? null : `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%`;
@@ -40,7 +50,9 @@ export function DashboardKpiCard({
       className="min-h-[116px] rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[0_14px_34px_-30px_var(--color-text)]"
     >
       <div className="flex h-full items-center gap-3">
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--color-accent-mint)] text-[var(--color-brand)]">
+        <span
+          className={`flex size-10 shrink-0 items-center justify-center rounded-full ${toneClass[tone]}`}
+        >
           {icon}
         </span>
 
