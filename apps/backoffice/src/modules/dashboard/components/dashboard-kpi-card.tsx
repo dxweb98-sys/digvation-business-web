@@ -69,7 +69,7 @@ export function DashboardKpiCard({
                 ? 'bg-white/14 text-white'
                 : delta! >= 0
                   ? 'bg-[var(--color-accent-mint)] text-[var(--color-text)]'
-                  : 'bg-[var(--color-danger-soft)] text-[var(--color-danger)]',
+                  : 'bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]',
             ].join(' ')}
           >
             {deltaLabel}
