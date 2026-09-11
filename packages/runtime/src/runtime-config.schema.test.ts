@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { runtimeConfigSchema } from './runtime-config.schema';
 
 describe('runtime config schema', () => {
-  it('keeps deployment topology, branding, applications, and theme independent', () => {
+  it('keeps deployment topology, branding, applications, and entitlements independent', () => {
     const parsed = runtimeConfigSchema.parse({
       apiBaseUrl: 'http://127.0.0.1:4003',
       workspace: 'digvation-demo',
@@ -17,7 +17,7 @@ describe('runtime config schema', () => {
       },
       effectiveEntitlements: {
         products: ['POS'],
-        capabilities: [],
+        capabilities: ['BUSINESS_ANALYTICS'],
       },
       branding: {
         mode: 'WHITE_LABEL',
@@ -45,6 +45,32 @@ describe('runtime config schema', () => {
     expect(parsed.branding.mode).toBe('WHITE_LABEL');
     expect(parsed.applications.backoffice).toBe(false);
     expect(parsed.effectiveEntitlements.products).toEqual(['POS']);
+    expect(parsed.effectiveEntitlements.capabilities).toEqual([
+      'BUSINESS_ANALYTICS',
+    ]);
     expect(parsed.theme.preset).toBe('CUSTOM');
+  });
+
+  it('does not infer analytics from a dedicated deployment profile', () => {
+    const parsed = runtimeConfigSchema.parse({
+      apiBaseUrl: 'http://127.0.0.1:4003',
+      workspace: 'standard-dedicated',
+      locale: 'id-ID',
+      currency: 'IDR',
+      defaultCountry: 'ID',
+      deploymentProfile: 'DEDICATED',
+      applications: { cashier: true, backoffice: true },
+      effectiveEntitlements: { products: ['POS'], capabilities: [] },
+      branding: { mode: 'DIGVATION_DEFAULT', productName: 'Digvation' },
+      theme: { preset: 'DIGVATION_LIGHT', radius: 'SOFT' },
+      capabilities: {
+        notifications: false,
+        fulfillment: false,
+        customers: false,
+        loyalty: false,
+      },
+    });
+
+    expect(parsed.effectiveEntitlements.capabilities).toEqual([]);
   });
 });
