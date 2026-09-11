@@ -9,7 +9,7 @@ import {
   isSaleVersionConflict,
 } from './cashier-transaction-errors';
 import { cashierTransactionKeys } from './cashier-transaction-keys';
-import type { Sale } from './cashier-transaction.types';
+import type { ApiPage, Sale } from './cashier-transaction.types';
 import type { SynchronizationState } from './sale-workspace-view-model';
 
 interface UseSaleCommandCoordinatorOptions {
@@ -29,7 +29,22 @@ export function useSaleCommandCoordinator({
   const commitSale = useCallback(
     (sale: Sale) => {
       queryClient.setQueryData(cashierTransactionKeys.sale(sale.id), sale);
-      void queryClient.invalidateQueries({ queryKey: cashierTransactionKeys.sales() });
+      queryClient.setQueryData<ApiPage<Sale>>(cashierTransactionKeys.sales(), (page) => {
+        if (!page) return page;
+
+        const existingIndex = page.items.findIndex((item) => item.id === sale.id);
+        if (existingIndex === -1) {
+          return {
+            ...page,
+            items: [sale, ...page.items].slice(0, page.limit),
+          };
+        }
+
+        return {
+          ...page,
+          items: page.items.map((item) => (item.id === sale.id ? sale : item)),
+        };
+      });
       rememberSale(sale.id);
       setSynchronization('CLEAN');
       setNotice(null);

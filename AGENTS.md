@@ -2,7 +2,7 @@
 
 This repository is governed by the Digvation Lifecycle engineering system.
 
-The current repository/path may still be named `digvation-pos-web` for historical reasons.
+The current repository/path may still be named `digvation-business-web` for historical reasons.
 That name is not the current architecture boundary.
 
 Project meaning:
@@ -55,7 +55,7 @@ Source-code presence does not grant a product/capability. Optional domains/add-o
 
 When Codebase Memory MCP is available:
 
-- select the graph for the current repository name, currently `digvation-pos-web` unless it has been renamed;
+- select the graph for the current repository name, currently `digvation-business-web` unless it has been renamed;
 - use it before broad repository-wide grep/find;
 - query only symbols, routes, dependencies, callers/callees, ownership, and change impact relevant to the current work unit;
 - verify important findings against current source;

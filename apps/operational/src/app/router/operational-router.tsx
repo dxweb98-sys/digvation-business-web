@@ -8,7 +8,7 @@ import { posOperationalNavigation } from '../../modules/pos/pos-operational-navi
 export const operationalRouter = createBrowserRouter([
   { path: '/login', element: <Navigate to="/sell" replace /> },
   {
-    element: <OperationalShell navigationItems={posOperationalNavigation} />,
+    element: <OperationalShell navigationSections={posOperationalNavigation} />,
     children: [
       { index: true, element: <Navigate to="/sell" replace /> },
       { path: '/sell', element: <SellPage /> },

@@ -5,3 +5,8 @@ export interface OperationalNavigationItem {
   label: string;
   icon: LucideIcon;
 }
+
+export interface OperationalNavigationSection {
+  label: string;
+  items: readonly OperationalNavigationItem[];
+}
