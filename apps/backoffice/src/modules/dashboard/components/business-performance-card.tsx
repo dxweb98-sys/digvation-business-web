@@ -8,44 +8,37 @@ function numeric(value: string | number | null | undefined): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function pathFor(values: readonly number[]): string {
-  if (!values.length) return '';
+function pointCoordinates(values: readonly number[]) {
+  if (!values.length) return [];
   const min = Math.min(...values);
   const max = Math.max(...values);
   const range = Math.max(1, max - min);
-  const width = 100;
-  const height = 40;
-
-  return values
-    .map((value, index) => {
-      const x =
-        values.length === 1 ? width / 2 : (index / (values.length - 1)) * width;
-      const y = height - ((value - min) / range) * (height - 10) - 5;
-      return `${index === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
-    })
-    .join(' ');
+  return values.map((value, index) => ({
+    x: values.length === 1 ? 50 : (index / (values.length - 1)) * 100,
+    y: 38 - ((value - min) / range) * 28 - 5,
+  }));
 }
 
-function areaFor(values: readonly number[]): string {
-  const line = pathFor(values);
-  if (!line) return '';
-  const firstX = values.length === 1 ? 50 : 0;
-  const lastX = values.length === 1 ? 50 : 100;
-  return `${line} L ${lastX} 40 L ${firstX} 40 Z`;
+function smoothPath(values: readonly number[]): string {
+  const points = pointCoordinates(values);
+  if (!points.length) return '';
+  if (points.length === 1) return `M ${points[0]!.x} ${points[0]!.y}`;
+
+  let path = `M ${points[0]!.x.toFixed(2)} ${points[0]!.y.toFixed(2)}`;
+  for (let index = 1; index < points.length; index += 1) {
+    const previous = points[index - 1]!;
+    const current = points[index]!;
+    const controlX = (previous.x + current.x) / 2;
+    path += ` C ${controlX.toFixed(2)} ${previous.y.toFixed(2)}, ${controlX.toFixed(2)} ${current.y.toFixed(2)}, ${current.x.toFixed(2)} ${current.y.toFixed(2)}`;
+  }
+  return path;
 }
 
-function pointPosition(values: readonly number[], index: number) {
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = Math.max(1, max - min);
-  const width = 100;
-  const height = 40;
-  const value = values[index] ?? 0;
-  return {
-    x:
-      values.length === 1 ? width / 2 : (index / (values.length - 1)) * width,
-    y: height - ((value - min) / range) * (height - 10) - 5,
-  };
+function areaPath(values: readonly number[]): string {
+  const path = smoothPath(values);
+  const points = pointCoordinates(values);
+  if (!path || !points.length) return '';
+  return `${path} L ${points[points.length - 1]!.x.toFixed(2)} 40 L ${points[0]!.x.toFixed(2)} 40 Z`;
 }
 
 function change(current: number, previous: number): number | null {
@@ -104,17 +97,17 @@ export function BusinessPerformanceCard({
   const transactionChange = change(transactions, previousTransactions);
   const revenueValues = trend.map((point) => numeric(point.value));
   const transactionValues = trend.map((point) => Number(point.count ?? 0));
-  const revenuePath = pathFor(revenueValues);
-  const revenueArea = areaFor(revenueValues);
-  const transactionPath = pathFor(transactionValues);
+  const revenuePath = smoothPath(revenueValues);
+  const revenueArea = areaPath(revenueValues);
+  const transactionPath = smoothPath(transactionValues);
   const labels = axisLabels(trend);
 
   return (
     <DCard
       variant="elevated"
-      className="h-full rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-[0_16px_40px_-32px_var(--color-text)] sm:p-6"
+      className="h-full rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-[0_16px_40px_-34px_var(--color-text)] sm:p-6"
     >
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-3">
           <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--color-accent-mint)] text-[var(--color-brand)]">
             <ChartNoAxesCombined aria-hidden="true" className="size-4" />
@@ -122,7 +115,7 @@ export function BusinessPerformanceCard({
           <div>
             <h2 className="text-sm font-semibold tracking-tight">{title}</h2>
             <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
-              Revenue and transaction movement for the selected branch
+              Revenue and transaction movement
             </p>
           </div>
         </div>
@@ -149,30 +142,24 @@ export function BusinessPerformanceCard({
         </div>
       </div>
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-2">
-        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3">
-          <div className="flex items-center gap-2">
-            <span className="size-2 rounded-full bg-[var(--color-brand)]" />
-            <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-text-muted)]">
-              Revenue
-            </p>
-          </div>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <p className="text-xl font-semibold tracking-tight tabular-nums">
+      <div className="mt-5 flex flex-wrap items-end gap-x-8 gap-y-3">
+        <div>
+          <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+            Revenue
+          </p>
+          <div className="mt-1 flex items-center gap-2">
+            <p className="text-[24px] font-semibold tracking-tight tabular-nums">
               {formatMoney(revenue)}
             </p>
             <Delta value={revenueChange} />
           </div>
         </div>
-        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3">
-          <div className="flex items-center gap-2">
-            <span className="size-2 rounded-full bg-[var(--color-text-muted)]" />
-            <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-text-muted)]">
-              Transactions
-            </p>
-          </div>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <p className="text-xl font-semibold tracking-tight tabular-nums">
+        <div>
+          <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+            Transactions
+          </p>
+          <div className="mt-1 flex items-center gap-2">
+            <p className="text-[24px] font-semibold tracking-tight tabular-nums">
               {new Intl.NumberFormat('id-ID').format(transactions)}
             </p>
             <Delta value={transactionChange} />
@@ -180,9 +167,9 @@ export function BusinessPerformanceCard({
         </div>
       </div>
 
-      <div className="relative mt-5 min-h-[250px] overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 pb-8 pt-4 sm:min-h-[280px]">
-        <div className="pointer-events-none absolute inset-x-3 bottom-8 top-4 flex flex-col justify-between">
-          {[0, 1, 2, 3, 4].map((line) => (
+      <div className="relative mt-4 h-[200px] overflow-hidden rounded-2xl bg-[linear-gradient(180deg,var(--color-surface-muted),transparent)] px-3 pb-8 pt-3 sm:h-[220px]">
+        <div className="pointer-events-none absolute inset-x-3 bottom-8 top-3 flex flex-col justify-between">
+          {[0, 1, 2, 3].map((line) => (
             <span
               key={line}
               className="block border-t border-dashed border-[var(--color-border)]"
@@ -194,23 +181,25 @@ export function BusinessPerformanceCard({
           <svg
             viewBox="0 0 100 40"
             preserveAspectRatio="none"
-            className="relative z-10 h-[210px] w-full overflow-visible sm:h-[235px]"
+            className="relative z-10 h-full w-full overflow-visible pb-5"
             role="img"
             aria-label={`${title} trend`}
           >
             <defs>
               <linearGradient id="dashboardRevenueArea" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--color-brand)" stopOpacity="0.18" />
+                <stop offset="0%" stopColor="var(--color-brand)" stopOpacity="0.20" />
                 <stop offset="100%" stopColor="var(--color-brand)" stopOpacity="0" />
               </linearGradient>
             </defs>
-            {revenueArea ? <path d={revenueArea} fill="url(#dashboardRevenueArea)" /> : null}
+            {revenueArea ? (
+              <path d={revenueArea} fill="url(#dashboardRevenueArea)" />
+            ) : null}
             {revenuePath ? (
               <path
                 d={revenuePath}
                 fill="none"
                 stroke="var(--color-brand)"
-                strokeWidth="1.7"
+                strokeWidth="1.8"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 vectorEffect="non-scaling-stroke"
@@ -227,33 +216,9 @@ export function BusinessPerformanceCard({
                 vectorEffect="non-scaling-stroke"
               />
             ) : null}
-            {trend.length === 1 ? (
-              <>
-                {(() => {
-                  const revenuePoint = pointPosition(revenueValues, 0);
-                  const transactionPoint = pointPosition(transactionValues, 0);
-                  return (
-                    <>
-                      <circle
-                        cx={revenuePoint.x}
-                        cy={revenuePoint.y}
-                        r="1.8"
-                        fill="var(--color-brand)"
-                      />
-                      <circle
-                        cx={transactionPoint.x}
-                        cy={transactionPoint.y}
-                        r="1.6"
-                        fill="var(--color-text-muted)"
-                      />
-                    </>
-                  );
-                })()}
-              </>
-            ) : null}
           </svg>
         ) : (
-          <div className="relative z-10 flex h-[210px] items-center justify-center text-center text-xs text-[var(--color-text-muted)] sm:h-[235px]">
+          <div className="relative z-10 flex h-full items-center justify-center pb-5 text-center text-xs text-[var(--color-text-muted)]">
             No activity has been recorded for this period yet.
           </div>
         )}
