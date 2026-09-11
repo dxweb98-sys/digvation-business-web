@@ -2,7 +2,8 @@ export type DashboardReportType =
   | 'business-performance'
   | 'transactions'
   | 'catalog-performance'
-  | 'employee-performance';
+  | 'employee-performance'
+  | 'locations';
 
 export type DashboardRow = Record<string, string | number | null>;
 
