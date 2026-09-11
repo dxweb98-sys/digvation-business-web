@@ -106,7 +106,7 @@ importers:
         specifier: 4.3.3
         version: 4.3.3
 
-  apps/cashier:
+  apps/operational:
     dependencies:
       '@digvation/business-api':
         specifier: workspace:*

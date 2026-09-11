@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "backend": {
-    "repository": "https://github.com/dxweb98-sys/digvation-pos-service",
+    "repository": "https://github.com/dxweb98-sys/digvation-business-runtime",
     "release": "v0.4.0",
     "sha": "c402fa5e82acffd5ac07ee0448b2de83ec600347"
   },
