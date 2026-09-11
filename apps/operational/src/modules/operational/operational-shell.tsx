@@ -171,8 +171,8 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
   };
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-[var(--color-background)] lg:grid lg:grid-cols-[256px_minmax(0,1fr)]">
-      <aside className="shrink-0 border-b border-[var(--color-border)] bg-[var(--color-surface)] lg:flex lg:h-screen lg:flex-col lg:border-b-0 lg:border-r">
+    <div className="flex h-screen flex-col overflow-hidden bg-[var(--color-background)] md:grid md:grid-cols-[256px_minmax(0,1fr)]">
+      <aside className="shrink-0 border-b border-[var(--color-border)] bg-[var(--color-surface)] md:flex md:h-screen md:flex-col md:border-b-0 md:border-r">
         <div className="flex h-16 items-center gap-3 border-b border-[var(--color-border)] px-5">
           <div className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-[var(--color-brand)]/10 text-[var(--color-brand)]">
             {runtime.branding.logoUrl ? (
@@ -216,13 +216,13 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
           </button>
         </div>
 
-        <nav className="mt-3 flex min-h-0 gap-4 overflow-x-auto px-3 pb-3 lg:flex-1 lg:flex-col lg:overflow-x-visible lg:overflow-y-auto lg:pb-4">
+        <nav className="mt-3 flex min-h-0 gap-4 overflow-x-auto px-3 pb-3 md:flex-1 md:flex-col md:overflow-x-visible md:overflow-y-auto md:pb-4">
           {navigationSections.map((section) => (
-            <section key={section.label} className="min-w-max lg:min-w-0">
-              <p className="mb-1 hidden px-3 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--color-text-muted)] lg:block">
+            <section key={section.label} className="min-w-max md:min-w-0">
+              <p className="mb-1 hidden px-3 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--color-text-muted)] md:block">
                 {section.label}
               </p>
-              <div className="flex gap-1 lg:flex-col">
+              <div className="flex gap-1 md:flex-col">
                 {section.items.map(({ to, label, icon: Icon }) => (
                   <NavLink
                     key={to}
@@ -245,7 +245,7 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
           ))}
         </nav>
 
-        <div className="mt-auto hidden border-t border-[var(--color-border)] lg:block">
+        <div className="mt-auto hidden border-t border-[var(--color-border)] md:block">
           <div className="px-5 py-3 text-xs text-[var(--color-text-muted)]">
             v{version.version}
             {' \u00b7 '}
@@ -267,7 +267,7 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
       </aside>
 
       <main className="grid min-h-0 min-w-0 flex-1 grid-rows-[64px_minmax(0,1fr)] overflow-hidden">
-        <header className="flex h-16 items-center justify-between gap-4 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-5 lg:px-6">
+        <header className="flex h-16 items-center justify-between gap-4 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-5 md:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <span
               className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-bold ${
