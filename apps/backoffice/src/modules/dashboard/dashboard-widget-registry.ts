@@ -9,15 +9,9 @@ export interface DashboardWidgetDefinition {
 
 export const DASHBOARD_WIDGETS: readonly DashboardWidgetDefinition[] = [
   {
-    id: 'salesTrend',
-    label: 'Sales trend',
-    description: 'Revenue movement across the selected period.',
-    permission: 'sales:read',
-  },
-  {
-    id: 'paymentMix',
-    label: 'Payment mix',
-    description: 'How completed payments are distributed by payment method.',
+    id: 'businessPerformance',
+    label: 'Business performance',
+    description: 'Revenue and transaction movement across the selected period.',
     permission: 'sales:read',
   },
   {
@@ -33,6 +27,12 @@ export const DASHBOARD_WIDGETS: readonly DashboardWidgetDefinition[] = [
     permission: 'employees:read',
   },
   {
+    id: 'paymentMix',
+    label: 'Payment mix',
+    description: 'Compact payment-method composition for completed sales.',
+    permission: 'sales:read',
+  },
+  {
     id: 'locationPerformance',
     label: 'Location performance',
     description: 'Revenue comparison between available selling locations.',
@@ -46,9 +46,12 @@ export const DASHBOARD_WIDGETS: readonly DashboardWidgetDefinition[] = [
   },
 ] as const;
 
-export const DEFAULT_DASHBOARD_WIDGETS = DASHBOARD_WIDGETS.map(
-  ({ id }) => id,
-);
+export const DEFAULT_DASHBOARD_WIDGETS: readonly DashboardWidgetId[] = [
+  'businessPerformance',
+  'topItems',
+  'topEmployees',
+  'businessInsight',
+];
 
 export function availableDashboardWidgets(
   permissions: readonly string[],
