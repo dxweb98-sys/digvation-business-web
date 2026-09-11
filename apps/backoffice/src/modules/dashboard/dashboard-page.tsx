@@ -26,6 +26,8 @@ import type { DashboardFilterState, DashboardRow } from './dashboard.types';
 const DAY_MS = 86_400_000;
 type ActivityPeriod = 'today' | '7d' | 'month' | 'year';
 
+type DateRange = { from: string; to: string };
+
 function localDateKey(date = new Date()): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -33,7 +35,7 @@ function localDateKey(date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
-function periodRange(period: ActivityPeriod, date = new Date()) {
+function periodRange(period: ActivityPeriod, date = new Date()): DateRange {
   const to = localDateKey(date);
   if (period === 'today') return { from: to, to };
   if (period === '7d') {
@@ -53,7 +55,7 @@ function periodRange(period: ActivityPeriod, date = new Date()) {
   };
 }
 
-function recentRange(days: number, date = new Date()) {
+function recentRange(days: number, date = new Date()): DateRange {
   const to = localDateKey(date);
   const from = new Date(date);
   from.setDate(from.getDate() - Math.max(0, days - 1));
@@ -75,6 +77,16 @@ function previousRange(
     from: previousStart.toISOString().slice(0, 10),
     to: previousEnd.toISOString().slice(0, 10),
   };
+}
+
+function reportHref(type: string, locationId: string, range: DateRange): string {
+  const params = new URLSearchParams({
+    type,
+    sellingLocationId: locationId,
+    dateFrom: range.from,
+    dateTo: range.to,
+  });
+  return `/reports?${params.toString()}`;
 }
 
 function numberValue(value: DashboardRow[string] | undefined): number {
@@ -119,7 +131,8 @@ function welcomeCopy(locale: string, name: string, hour: number) {
     return {
       greeting: `${greeting}, ${name}!`,
       title: 'Berikut ringkasan bisnis Anda',
-      description: 'Pantau performa cabang hari ini dan aktivitas bisnis terbaru dalam satu tampilan.',
+      description:
+        'Pantau performa cabang hari ini dan aktivitas bisnis terbaru dalam satu tampilan.',
     };
   }
 
@@ -128,7 +141,8 @@ function welcomeCopy(locale: string, name: string, hour: number) {
   return {
     greeting: `${greeting}, ${name}!`,
     title: "Here's your business overview",
-    description: 'See how your branch is performing today and catch up on the latest business activity.',
+    description:
+      'See how your branch is performing today and catch up on the latest business activity.',
   };
 }
 
@@ -208,6 +222,7 @@ export function DashboardPage() {
   const canReadSales = permissions.includes('sales:read');
   const canReadCatalog = permissions.includes('catalog:read');
   const canReadEmployees = permissions.includes('employees:read');
+  const canReadPayments = permissions.includes('payments:read');
 
   const todayPerformance = useQuery({
     queryKey: ['dashboard', 'business-performance', todayFilters],
@@ -367,6 +382,22 @@ export function DashboardPage() {
   const firstName = session.identity.displayName.trim().split(/\s+/)[0] || 'there';
   const welcome = welcomeCopy(runtime.locale, firstName, new Date().getHours());
 
+  const transactionReportHref = reportHref('transactions', locationId, recent);
+  const catalogReportHref = reportHref('catalog-performance', locationId, month);
+  const employeeReportHref = reportHref(
+    'employee-performance',
+    locationId,
+    month,
+  );
+  const paymentReportHref = canReadPayments
+    ? reportHref('payments', locationId, month)
+    : undefined;
+  const performanceReportHref = reportHref(
+    'business-performance',
+    locationId,
+    month,
+  );
+
   return (
     <BackofficePage>
       <section className="grid gap-4 pt-2 lg:grid-cols-[minmax(0,1fr)_minmax(360px,460px)] lg:items-center">
@@ -432,15 +463,20 @@ export function DashboardPage() {
               delta={percentageChange(revenueToday, revenueYesterday)}
               trendStart={revenueYesterday}
               trendEnd={revenueToday}
+              tone="sky"
               icon={<CircleDollarSign aria-hidden="true" className="size-4" />}
             />
             <DashboardKpiCard
               label={copy('Transactions today')}
               value={formatInteger(transactionsToday)}
               context={copy('vs yesterday')}
-              delta={percentageChange(transactionsToday, transactionsYesterday)}
+              delta={percentageChange(
+                transactionsToday,
+                transactionsYesterday,
+              )}
               trendStart={transactionsYesterday}
               trendEnd={transactionsToday}
+              tone="mint"
               icon={<ReceiptText aria-hidden="true" className="size-4" />}
             />
             <DashboardKpiCard
@@ -450,6 +486,7 @@ export function DashboardPage() {
               delta={percentageChange(averageToday, averageYesterday)}
               trendStart={averageYesterday}
               trendEnd={averageToday}
+              tone="violet"
               icon={<Hash aria-hidden="true" className="size-4" />}
             />
             <DashboardKpiCard
@@ -459,11 +496,12 @@ export function DashboardPage() {
               delta={percentageChange(quantityToday, quantityYesterday)}
               trendStart={quantityYesterday}
               trendEnd={quantityToday}
+              tone="warm"
               icon={<PackageCheck aria-hidden="true" className="size-4" />}
             />
           </section>
 
-          <section className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.9fr)_minmax(280px,0.72fr)]">
+          <section className="mt-4 grid items-start gap-4 xl:grid-cols-[minmax(0,1.9fr)_minmax(280px,0.72fr)]">
             <BusinessPerformanceCard
               title={copy('Transaction activity')}
               period={activityPeriod}
@@ -491,13 +529,15 @@ export function DashboardPage() {
             />
           </section>
 
-          <section className="mt-4 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+          <section className="mt-4 grid items-stretch gap-4 lg:grid-cols-2 xl:grid-cols-3">
             {canReadCatalog ? (
               <RankingCard
                 title={copy('Top 5 items')}
                 subtitle={copy('This month')}
                 items={topItems}
                 emptyMessage={empty}
+                kind="items"
+                seeAllHref={catalogReportHref}
               />
             ) : null}
 
@@ -506,6 +546,7 @@ export function DashboardPage() {
               points={paymentMix}
               emptyMessage={empty}
               formatValue={moneyNumber}
+              seeAllHref={paymentReportHref}
             />
 
             <TransactionsCard
@@ -518,16 +559,19 @@ export function DashboardPage() {
               )}
               formatDateTime={formatDateTime}
               formatMoney={money}
+              seeAllHref={transactionReportHref}
             />
           </section>
 
-          <section className="mt-4 grid gap-4 lg:grid-cols-2">
+          <section className="mt-4 grid items-stretch gap-4 lg:grid-cols-2">
             {canReadEmployees ? (
               <RankingCard
                 title={copy('Top 5 employees')}
                 subtitle={copy('This month')}
                 items={topEmployees}
                 emptyMessage={empty}
+                kind="employees"
+                seeAllHref={employeeReportHref}
               />
             ) : null}
 
@@ -536,6 +580,7 @@ export function DashboardPage() {
               previous={previousMonthData}
               currency={runtime.currency}
               formatMoney={formatMoney}
+              seeAllHref={performanceReportHref}
             />
           </section>
         </>
