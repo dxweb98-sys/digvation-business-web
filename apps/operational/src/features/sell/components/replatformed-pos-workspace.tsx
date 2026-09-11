@@ -235,7 +235,6 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const transactionsQuery = useQuery({
     queryKey: cashierTransactionKeys.sales(),
     queryFn: ({ signal }) => adapter.listSales(signal),
-    refetchInterval: 1_500,
   });
   const locationsQuery = useQuery({
     queryKey: cashierTransactionKeys.locations(),
