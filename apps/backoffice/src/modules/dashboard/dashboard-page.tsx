@@ -9,7 +9,10 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
-import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
+import {
+  BackofficePage,
+  BackofficePageHeader,
+} from '../../app/layout/backoffice-page';
 import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
 import { useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import { BusinessInsightWidget } from './components/business-insight-widget';
@@ -45,7 +48,10 @@ function localDateKey(date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
-function periodRange(preset: Exclude<PeriodPreset, 'custom'>, date = new Date()) {
+function periodRange(
+  preset: Exclude<PeriodPreset, 'custom'>,
+  date = new Date(),
+) {
   const to = localDateKey(date);
   if (preset === 'today') return { from: to, to };
   if (preset === '7d') {
@@ -92,6 +98,25 @@ function percentageChange(current: number, previous: number): number | null {
   return ((current - previous) / Math.abs(previous)) * 100;
 }
 
+function loadLocationPreference(key: string): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const value = window.localStorage.getItem(key);
+    return value === null ? null : value;
+  } catch {
+    return null;
+  }
+}
+
+function saveLocationPreference(key: string, locationId: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(key, locationId);
+  } catch {
+    // Dashboard preferences are convenience state only.
+  }
+}
+
 export function DashboardPage() {
   const { session, createApiClient } = useBackofficeAuth();
   const runtime = useRuntime();
@@ -101,7 +126,9 @@ export function DashboardPage() {
   const [periodPreset, setPeriodPreset] = useState<PeriodPreset>('month');
   const [from, setFrom] = useState(initialRange.from);
   const [to, setTo] = useState(initialRange.to);
-  const [selectedLocationId, setSelectedLocationId] = useState('');
+  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(
+    null,
+  );
   const [configOpen, setConfigOpen] = useState(false);
 
   const api = useMemo(
@@ -119,6 +146,9 @@ export function DashboardPage() {
         userId: session.identity.userId,
       })
     : 'digvation.backoffice.dashboard.widgets.v2:anonymous';
+  const locationPreferenceKey = session
+    ? `digvation.backoffice.dashboard.location.v1:${session.identity.workspace}:${session.identity.userId}`
+    : 'digvation.backoffice.dashboard.location.v1:anonymous';
   const [enabledWidgets, setEnabledWidgets] = useState<DashboardWidgetId[]>(() =>
     loadDashboardPreferences(preferenceKey),
   );
@@ -126,6 +156,10 @@ export function DashboardPage() {
   useEffect(() => {
     setEnabledWidgets(loadDashboardPreferences(preferenceKey));
   }, [preferenceKey]);
+
+  useEffect(() => {
+    setSelectedLocationId(loadLocationPreference(locationPreferenceKey));
+  }, [locationPreferenceKey]);
 
   const availableWidgets = useMemo(
     () => availableDashboardWidgets(permissions),
@@ -143,13 +177,32 @@ export function DashboardPage() {
     queryFn: () => api.operationalAccess(),
     enabled: Boolean(session),
   });
-  const locationId =
-    selectedLocationId ||
+
+  const accessibleLocationIds = useMemo(
+    () => new Set((locations.data?.locations ?? []).map((location) => location.id)),
+    [locations.data?.locations],
+  );
+  const explicitLocationIsValid =
+    selectedLocationId !== null &&
+    (selectedLocationId === ''
+      ? Boolean(locations.data?.organizationWide)
+      : accessibleLocationIds.has(selectedLocationId));
+  const defaultLocationId =
+    locations.data?.mainLocationId ??
     (locations.data?.resolution === 'AUTO_RESOLVED'
       ? (locations.data.selectedLocationId ?? '')
       : '');
+  const locationId = explicitLocationIsValid
+    ? (selectedLocationId ?? '')
+    : defaultLocationId;
+  const allLocationsSelected =
+    explicitLocationIsValid &&
+    selectedLocationId === '' &&
+    Boolean(locations.data?.organizationWide);
   const locationReady =
-    locations.data?.resolution !== 'SELECTION_REQUIRED' || Boolean(locationId);
+    locations.data?.resolution !== 'SELECTION_REQUIRED' ||
+    Boolean(locationId) ||
+    allLocationsSelected;
   const filters: DashboardFilterState = { from, to, locationId };
   const todayFilters: DashboardFilterState = {
     from: today,
@@ -232,6 +285,16 @@ export function DashboardPage() {
     setTo(range.to);
   };
 
+  const selectLocation = (value: unknown) => {
+    const next = String(value ?? '');
+    if (!locations.data?.organizationWide && next === '') {
+      setSelectedLocationId(null);
+      return;
+    }
+    setSelectedLocationId(next);
+    saveLocationPreference(locationPreferenceKey, next);
+  };
+
   const formatInteger = (value: number | string) =>
     new Intl.NumberFormat('id-ID').format(Number(value) || 0);
   const formatDateTime = (value: DashboardRow[string] | undefined) => {
@@ -266,11 +329,13 @@ export function DashboardPage() {
   const quantitySold = numberValue(data?.summary.quantitySold);
   const previousQuantitySold = numberValue(previousData?.summary.quantitySold);
 
-  const topItems = (catalogPerformance.data?.items ?? []).slice(0, 5).map((row) => ({
-    label: String(row.itemName ?? '—'),
-    secondary: `${formatInteger(numberValue(row.quantitySold))} sold · ${formatInteger(numberValue(row.transactionCount))} tx`,
-    value: money(row.finalRevenue),
-  }));
+  const topItems = (catalogPerformance.data?.items ?? [])
+    .slice(0, 5)
+    .map((row) => ({
+      label: String(row.itemName ?? '—'),
+      secondary: `${formatInteger(numberValue(row.quantitySold))} sold · ${formatInteger(numberValue(row.transactionCount))} tx`,
+      value: money(row.finalRevenue),
+    }));
   const topEmployees = (employeePerformance.data?.items ?? [])
     .slice(0, 5)
     .map((row) => ({
@@ -296,6 +361,16 @@ export function DashboardPage() {
           : periodPreset === 'year'
             ? copy('This year')
             : `${from} — ${to}`;
+
+  const locationOptions = [...(locations.data?.locations ?? [])].sort(
+    (left, right) => {
+      if (left.id === locations.data?.mainLocationId) return -1;
+      if (right.id === locations.data?.mainLocationId) return 1;
+      return (left.name ?? left.displayName ?? left.code).localeCompare(
+        right.name ?? right.displayName ?? right.code,
+      );
+    },
+  );
 
   const headerAction = premium ? (
     <DashboardConfigurator
@@ -336,7 +411,9 @@ export function DashboardPage() {
           ]}
           onChange={(value) => setPreset(String(value ?? 'month'))}
         />
-        <div className={periodPreset === 'custom' ? 'min-w-0' : 'hidden xl:block'}>
+        <div
+          className={periodPreset === 'custom' ? 'min-w-0' : 'hidden xl:block'}
+        >
           {periodPreset === 'custom' ? (
             <DDateRangeFilter
               from={from}
@@ -362,12 +439,16 @@ export function DashboardPage() {
                   : 'Select location',
               ),
             },
-            ...(locations.data?.locations ?? []).map((location) => ({
+            ...locationOptions.map((location) => ({
               value: location.id,
-              label: location.name ?? location.displayName ?? location.code,
+              label: `${location.name ?? location.displayName ?? location.code}${
+                location.id === locations.data?.mainLocationId
+                  ? ` · ${copy('Main Branch')}`
+                  : ''
+              }`,
             })),
           ]}
-          onChange={(value) => setSelectedLocationId(String(value ?? ''))}
+          onChange={selectLocation}
         />
         <div className="pb-1 text-xs text-[var(--color-text-muted)]">
           {premium ? (
@@ -385,9 +466,13 @@ export function DashboardPage() {
           variant="elevated"
           className="mt-5 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5"
         >
-          <p className="text-sm font-semibold">{copy('Sales reporting unavailable')}</p>
+          <p className="text-sm font-semibold">
+            {copy('Sales reporting unavailable')}
+          </p>
           <p className="mt-1 text-xs leading-5 text-[var(--color-text-muted)]">
-            {copy('Your role does not include permission to read sales reporting data.')}
+            {copy(
+              'Your role does not include permission to read sales reporting data.',
+            )}
           </p>
         </DCard>
       ) : null}
@@ -399,7 +484,9 @@ export function DashboardPage() {
         >
           <p className="text-sm font-semibold">{copy('Select a location')}</p>
           <p className="mt-1 text-xs leading-5 text-[var(--color-text-muted)]">
-            {copy('Choose an authorized selling location before loading dashboard data.')}
+            {copy(
+              'Choose an authorized selling location before loading dashboard data.',
+            )}
           </p>
         </DCard>
       ) : null}
@@ -413,13 +500,18 @@ export function DashboardPage() {
               context={periodLabel}
               delta={percentageChange(revenue, previousRevenue)}
               emphasis
-              icon={<CircleDollarSign aria-hidden="true" className="size-4" />}
+              icon={
+                <CircleDollarSign aria-hidden="true" className="size-4" />
+              }
             />
             <DashboardKpiCard
               label={copy('Transactions')}
               value={formatInteger(transactionCount)}
               context={periodLabel}
-              delta={percentageChange(transactionCount, previousTransactionCount)}
+              delta={percentageChange(
+                transactionCount,
+                previousTransactionCount,
+              )}
               icon={<ReceiptText aria-hidden="true" className="size-4" />}
             />
             <DashboardKpiCard
@@ -472,7 +564,8 @@ export function DashboardPage() {
             />
           </section>
 
-          {premium && (widgetEnabled('topItems') || widgetEnabled('topEmployees')) ? (
+          {premium &&
+          (widgetEnabled('topItems') || widgetEnabled('topEmployees')) ? (
             <section className="mt-4 grid gap-4 lg:grid-cols-2">
               {widgetEnabled('topItems') ? (
                 <RankingCard
@@ -494,7 +587,8 @@ export function DashboardPage() {
           ) : null}
 
           {premium &&
-          (widgetEnabled('paymentMix') || widgetEnabled('locationPerformance')) ? (
+          (widgetEnabled('paymentMix') ||
+            widgetEnabled('locationPerformance')) ? (
             <section className="mt-4 grid gap-4 lg:grid-cols-2">
               {widgetEnabled('paymentMix') ? (
                 <PaymentMixCard
