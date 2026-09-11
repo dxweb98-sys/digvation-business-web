@@ -199,10 +199,13 @@ export function DashboardPage() {
     explicitLocationIsValid &&
     selectedLocationId === '' &&
     Boolean(locations.data?.organizationWide);
-  const locationReady =
-    locations.data?.resolution !== 'SELECTION_REQUIRED' ||
-    Boolean(locationId) ||
-    allLocationsSelected;
+  const locationReady = Boolean(
+    locations.data &&
+      locations.data.resolution !== 'DENIED' &&
+      (locations.data.resolution !== 'SELECTION_REQUIRED' ||
+        Boolean(locationId) ||
+        allLocationsSelected),
+  );
   const filters: DashboardFilterState = { from, to, locationId };
   const todayFilters: DashboardFilterState = {
     from: today,
@@ -477,7 +480,7 @@ export function DashboardPage() {
         </DCard>
       ) : null}
 
-      {!locationReady ? (
+      {locations.data && !locationReady ? (
         <DCard
           variant="elevated"
           className="mt-5 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5"
