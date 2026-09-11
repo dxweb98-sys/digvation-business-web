@@ -1,16 +1,24 @@
+import { ApiClient } from '@digvation/business-api';
 import { useAuth } from '@digvation/business-auth';
 import { useConnectivity, useRuntime } from '@digvation/business-runtime';
-import { ApiClient } from '@digvation/business-api';
-import { DAvatar, DButton, DDialog, useToast } from '@digvation/ui';
+import { DAvatar, DButton, DDialog, DDropdown, useToast } from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
-import { Check, ChevronDown, LogOut, MapPin, Building2, UserRound } from 'lucide-react';
+import {
+  Building2,
+  Check,
+  ChevronDown,
+  LogOut,
+  MapPin,
+  Menu,
+  UserRound,
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 
 import { getAppVersion } from '../../app/version/app-version';
 import { OperationalAccessApi, operationalAccessKeys } from './operational-access-api';
-import { useOperationalSession } from './operational-session-provider';
 import type { OperationalNavigationSection } from './operational-navigation';
+import { useOperationalSession } from './operational-session-provider';
 
 function formatCurrentDate(locale: string): string {
   return new Intl.DateTimeFormat(locale, {
@@ -75,10 +83,14 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
     () => operationalAccessQuery.data?.locations ?? [],
     [operationalAccessQuery.data],
   );
-  const selectedLocation = locations.find((location) => location.id === selectedLocationId) ?? null;
+  const selectedLocation =
+    locations.find((location) => location.id === selectedLocationId) ?? null;
   const brandSubtitle =
     runtime.branding.businessName ?? runtime.branding.companyName ?? runtime.workspace;
-  const userInitials = identityInitials(session.identity.displayName, session.identity.initials);
+  const userInitials = identityInitials(
+    session.identity.displayName,
+    session.identity.initials,
+  );
 
   useEffect(() => {
     if (locations.length === 1 && selectedLocationId !== locations[0]!.id)
@@ -170,11 +182,15 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
     }
   };
 
+  const branchLabel =
+    selectedLocation?.name ??
+    (operationalAccessQuery.isLoading ? 'Loading branch' : 'Choose branch');
+
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-[var(--color-background)] md:grid md:grid-cols-[256px_minmax(0,1fr)]">
-      <aside className="shrink-0 border-b border-[var(--color-border)] bg-[var(--color-surface)] md:flex md:h-screen md:flex-col md:border-b-0 md:border-r">
-        <div className="flex h-16 items-center gap-3 border-b border-[var(--color-border)] px-5">
-          <div className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-[var(--color-brand)]/10 text-[var(--color-brand)]">
+    <div className="operational-shell flex h-screen w-full min-w-0 overflow-hidden bg-[var(--color-background)]">
+      <aside className="operational-shell__sidebar hidden min-h-0 shrink-0 flex-col border-r border-[var(--color-border)] bg-[var(--color-surface)] shadow-[1px_0_0_var(--color-border)] md:flex md:w-[232px] lg:w-[280px]">
+        <div className="flex min-h-16 items-center gap-3 border-b border-[var(--color-border)] px-5 py-3">
+          <div className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-[var(--radius-control)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]">
             {runtime.branding.logoUrl ? (
               <img
                 src={runtime.branding.logoUrl}
@@ -182,83 +198,62 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
                 className="size-full object-contain p-1"
               />
             ) : (
-              <Building2 className="size-5" strokeWidth={2.2} />
+              <Building2 className="size-[18px]" strokeWidth={2.2} />
             )}
           </div>
           <div className="min-w-0">
-            <p className="truncate text-sm font-bold text-[var(--color-text)]">
+            <p className="truncate text-sm font-semibold leading-5 text-[var(--color-text)]">
               {runtime.branding.productName}
             </p>
-            <p className="truncate text-xs text-[var(--color-text-muted)]">{brandSubtitle}</p>
+            <p className="truncate text-xs leading-4 text-[var(--color-text-muted)]">
+              {brandSubtitle}
+            </p>
           </div>
         </div>
 
         <div className="px-3 pt-3">
-          <button
-            type="button"
+          <BranchButton
+            branchLabel={branchLabel}
+            canChoose={locations.length > 1}
             onClick={openBranchPicker}
-            disabled={locations.length <= 1}
-            className="flex min-w-0 w-full items-center gap-2.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)]/55 px-3 py-2.5 text-left transition-[background-color,border-color,box-shadow] duration-200 ease-out enabled:hover:border-[var(--color-brand)]/30 enabled:hover:bg-[var(--color-surface-muted)] enabled:hover:shadow-sm disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
-          >
-            <MapPin className="size-3.5 shrink-0 text-[var(--color-brand)]" />
-            <span className="min-w-0 flex-1">
-              <span className="block text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">
-                Active branch
-              </span>
-              <span className="mt-0.5 block truncate text-sm font-semibold text-[var(--color-text)]">
-                {selectedLocation?.name ??
-                  (operationalAccessQuery.isLoading ? 'Loading branch' : 'Choose branch')}
-              </span>
-            </span>
-            {locations.length > 1 ? (
-              <ChevronDown className="size-3.5 shrink-0 self-center text-[var(--color-text-muted)]" />
-            ) : null}
-          </button>
+          />
         </div>
 
-        <nav className="mt-3 flex min-h-0 gap-4 overflow-x-auto px-3 pb-3 md:flex-1 md:flex-col md:overflow-x-visible md:overflow-y-auto md:pb-4">
-          {navigationSections.map((section) => (
-            <section key={section.label} className="min-w-max md:min-w-0">
-              <p className="mb-1 hidden px-3 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--color-text-muted)] md:block">
-                {section.label}
-              </p>
-              <div className="flex gap-1 md:flex-col">
-                {section.items.map(({ to, label, icon: Icon }) => (
-                  <NavLink
-                    key={to}
-                    to={to}
-                    className={({ isActive }) =>
-                      [
-                        'flex min-h-10 items-center justify-start gap-2.5 rounded-lg px-3 text-sm font-medium transition-colors duration-150',
-                        isActive
-                          ? 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]'
-                          : 'text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)]',
-                      ].join(' ')
-                    }
-                  >
-                    <Icon className="size-[18px] shrink-0" />
-                    {label}
-                  </NavLink>
-                ))}
-              </div>
-            </section>
-          ))}
+        <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+          <OperationalNavigationGroups navigationSections={navigationSections} />
         </nav>
 
-        <div className="mt-auto hidden border-t border-[var(--color-border)] md:block">
-          <div className="px-5 py-3 text-xs text-[var(--color-text-muted)]">
-            v{version.version}
-            {' \u00b7 '}
-            {version.revision}
+        <div className="mt-auto border-t border-[var(--color-border)]">
+          <div className="px-4 py-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <DAvatar
+                {...(session.identity.avatarUrl ? { src: session.identity.avatarUrl } : {})}
+                alt=""
+                name={session.identity.displayName}
+                fallback={
+                  userInitials ?? <UserRound className="size-4" aria-label="User account" />
+                }
+                size="sm"
+                className="shrink-0 bg-[var(--color-brand)]/10 text-xs font-bold text-[var(--color-brand)]"
+              />
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-medium leading-5 text-[var(--color-text)]">
+                  {session.identity.displayName}
+                </span>
+                <span className="block truncate text-xs leading-4 text-[var(--color-text-muted)]">
+                  v{version.version} · {version.revision}
+                </span>
+              </span>
+            </div>
           </div>
-          <div className="px-3 pb-3">
+          <div className="border-t border-[var(--color-border)] px-3 py-2">
             <DButton
               variant="ghost"
               type="button"
-              rightIcon={<LogOut className="size-[18px] shrink-0" />}
+              leftIcon={<LogOut className="size-4 shrink-0" />}
               loading={isLoggingOut}
               onClick={() => void handleLogout()}
-              className="flex h-10 w-full items-center justify-start gap-2.5 px-3 text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 hover:text-[var(--color-danger)]"
+              className="flex h-9 w-full items-center justify-start gap-2.5 px-3 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)]"
             >
               Logout
             </DButton>
@@ -266,9 +261,34 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
         </div>
       </aside>
 
-      <main className="grid min-h-0 min-w-0 flex-1 grid-rows-[64px_minmax(0,1fr)] overflow-hidden">
-        <header className="flex h-16 items-center justify-between gap-4 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-5 md:px-6">
-          <div className="flex min-w-0 items-center gap-3">
+      <main className="operational-shell__main flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden">
+        <header className="flex h-16 w-full shrink-0 items-center justify-between gap-4 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-5 shadow-[0_1px_0_var(--color-border)] md:px-6 lg:px-8">
+          <div className="flex min-w-0 items-center gap-2 md:gap-3">
+            <div className="operational-shell__mobile-navigation md:hidden">
+              <DDropdown
+                placement="bottom-start"
+                contentPadding={false}
+                closeOnItemClick
+                minWidth={0}
+                contentClassName="w-[min(320px,calc(100vw-24px))] max-h-[calc(100vh-88px)] overflow-y-auto"
+                trigger={() => (
+                  <DButton variant="ghost" size="icon" aria-label="Open navigation">
+                    <Menu className="size-[18px]" />
+                  </DButton>
+                )}
+              >
+                <div className="border-b border-[var(--color-border)] p-3">
+                  <BranchButton
+                    branchLabel={branchLabel}
+                    canChoose={locations.length > 1}
+                    onClick={openBranchPicker}
+                  />
+                </div>
+                <nav className="p-3">
+                  <OperationalNavigationGroups navigationSections={navigationSections} />
+                </nav>
+              </DDropdown>
+            </div>
             <span
               className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-bold ${
                 connectivity.state === 'OFFLINE'
@@ -278,19 +298,20 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
             >
               <span className="size-1.5 rounded-full bg-current" /> {connectivity.state}
             </span>
-            <span className="hidden text-xs text-[var(--color-text-muted)] sm:inline">
+            <span className="operational-shell__header-date hidden text-xs text-[var(--color-text-muted)] md:inline">
               {formatCurrentDate(runtime.locale)}
             </span>
           </div>
+
           <button
             type="button"
             onClick={() => setAccountDialogOpen(true)}
             aria-label="Open account information"
             aria-haspopup="dialog"
             aria-expanded={isAccountDialogOpen}
-            className="flex h-[50px] min-w-0 max-w-[min(50vw,340px)] items-center gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)]/45 px-3 text-left transition-colors duration-150 hover:bg-[var(--color-surface-muted)] hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/20"
+            className="flex h-[42px] min-w-0 max-w-[min(50vw,340px)] items-center gap-3 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface-muted)]/45 px-2.5 text-left transition-colors duration-150 hover:bg-[var(--color-surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/20"
           >
-            <span className="hidden min-w-0 flex-1 flex-col justify-center gap-0.5 sm:flex">
+            <span className="hidden min-w-0 flex-1 flex-col justify-center sm:flex">
               <span className="truncate text-sm font-semibold leading-5 text-[var(--color-text)]">
                 {session.identity.displayName}
               </span>
@@ -302,14 +323,16 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
               {...(session.identity.avatarUrl ? { src: session.identity.avatarUrl } : {})}
               alt=""
               name={session.identity.displayName}
-              fallback={userInitials ?? <UserRound className="size-4" aria-label="User account" />}
-              size="md"
-              className="shrink-0 bg-[var(--color-brand)]/10 text-xs font-bold text-[var(--color-brand)] ring-1 ring-[var(--color-brand)]/15"
+              fallback={
+                userInitials ?? <UserRound className="size-4" aria-label="User account" />
+              }
+              size="sm"
+              className="shrink-0 bg-[var(--color-brand)]/10 text-xs font-bold text-[var(--color-brand)]"
             />
           </button>
         </header>
 
-        <div className="min-h-0 overflow-y-auto overscroll-contain">
+        <div className="min-h-0 min-w-0 w-full flex-1 overflow-y-auto overscroll-contain">
           <Outlet />
         </div>
       </main>
@@ -356,10 +379,13 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
                         : 'hover:bg-[var(--color-surface-muted)]'
                     }`}
                   >
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-semibold">{location.name}</span>
-                      <span className="mt-0.5 block font-mono text-[10px] text-[var(--color-text-muted)]">
-                        {location.code}
+                    <span className="flex min-w-0 items-center gap-3">
+                      <MapPin className="size-4 shrink-0" />
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold">{location.name}</span>
+                        <span className="mt-0.5 block truncate text-xs text-[var(--color-text-muted)]">
+                          {location.code}
+                        </span>
                       </span>
                     </span>
                     {isSelected ? <Check className="size-4 shrink-0" /> : null}
@@ -369,8 +395,8 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
             </div>
           )}
         </div>
-        <div className="border-t border-[var(--color-border)] p-3">
-          <DButton variant="secondary" className="w-full" onClick={closeBranchPicker}>
+        <div className="border-t border-[var(--color-border)] px-5 py-3 text-right">
+          <DButton variant="secondary" onClick={closeBranchPicker}>
             Close
           </DButton>
         </div>
@@ -405,26 +431,27 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
               {...(session.identity.avatarUrl ? { src: session.identity.avatarUrl } : {})}
               alt=""
               name={session.identity.displayName}
-              fallback={userInitials ?? <UserRound className="size-4" aria-label="User account" />}
+              fallback={
+                userInitials ?? <UserRound className="size-5" aria-label="User account" />
+              }
               size="lg"
-              className="shrink-0 bg-[var(--color-brand)]/10 font-bold text-[var(--color-brand)]"
+              className="shrink-0 bg-[var(--color-brand)]/10 text-sm font-bold text-[var(--color-brand)]"
             />
             <div className="min-w-0">
-              <p className="truncate text-base font-bold text-[var(--color-text)]">
+              <p className="truncate text-base font-semibold text-[var(--color-text)]">
                 {session.identity.displayName}
               </p>
-              <p className="mt-1 truncate text-sm text-[var(--color-text-muted)]">
+              <p className="mt-0.5 truncate text-sm text-[var(--color-text-muted)]">
                 {session.identity.email ?? session.identity.userId}
               </p>
             </div>
           </div>
-
           {selectedLocation ? (
-            <div className="mt-5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)]/45 px-3 py-2.5">
-              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">
+            <div className="mt-5 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface-muted)]/45 p-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">
                 Active branch
               </p>
-              <p className="mt-1 truncate text-sm font-semibold text-[var(--color-text)]">
+              <p className="mt-1 text-sm font-semibold text-[var(--color-text)]">
                 {selectedLocation.name}
               </p>
             </div>
@@ -432,5 +459,75 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
         </div>
       </DDialog>
     </div>
+  );
+}
+
+function BranchButton({
+  branchLabel,
+  canChoose,
+  onClick,
+}: {
+  branchLabel: string;
+  canChoose: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!canChoose}
+      aria-label={`Active branch ${branchLabel}`}
+      className="flex min-w-0 w-full items-center gap-2.5 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface-muted)]/55 px-3 py-2.5 text-left transition-[background-color,border-color,box-shadow] duration-150 enabled:hover:border-[var(--color-brand)]/30 enabled:hover:bg-[var(--color-surface-muted)] disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
+    >
+      <MapPin className="size-3.5 shrink-0 text-[var(--color-brand)]" />
+      <span className="min-w-0 flex-1">
+        <span className="block text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">
+          Active branch
+        </span>
+        <span className="mt-0.5 block truncate text-sm font-semibold text-[var(--color-text)]">
+          {branchLabel}
+        </span>
+      </span>
+      {canChoose ? (
+        <ChevronDown className="size-3.5 shrink-0 text-[var(--color-text-muted)]" />
+      ) : null}
+    </button>
+  );
+}
+
+function OperationalNavigationGroups({
+  navigationSections,
+}: {
+  navigationSections: readonly OperationalNavigationSection[];
+}) {
+  return (
+    <>
+      {navigationSections.map((section) => (
+        <div key={section.label} className="mt-3 first:mt-0">
+          <p className="px-3 pb-1 text-[12px] font-semibold text-[var(--color-text-muted)]">
+            {section.label}
+          </p>
+          <div className="space-y-0.5 pl-3">
+            {section.items.map(({ to, label, icon: Icon }) => (
+              <NavLink
+                key={to}
+                to={to}
+                className={({ isActive }) =>
+                  [
+                    'flex h-9 items-center justify-start gap-2 rounded-[var(--radius-control)] px-3 text-sm font-medium transition-colors duration-150',
+                    isActive
+                      ? 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]'
+                      : 'text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)]',
+                  ].join(' ')
+                }
+              >
+                <Icon className="size-[18px] shrink-0" />
+                {label}
+              </NavLink>
+            ))}
+          </div>
+        </div>
+      ))}
+    </>
   );
 }
