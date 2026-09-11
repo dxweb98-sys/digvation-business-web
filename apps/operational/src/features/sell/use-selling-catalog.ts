@@ -32,7 +32,10 @@ export function useSellingCatalog({
     queryKey: cashierTransactionKeys.items(sellingLocationId, currency),
     queryFn: ({ signal }) => {
       if (query.listSellingCatalogItems && sellingLocationId && currency) {
-        return query.listSellingCatalogItems({ sellingLocationId, currency }, signal);
+        return query.listSellingCatalogItems(
+          { sellingLocationId, currency },
+          signal,
+        );
       }
       return query.listCatalogItems(signal);
     },
@@ -53,18 +56,6 @@ export function useSellingCatalog({
     });
   }, [activeItems, itemType, locale, search]);
 
-  const priceByItemId = useMemo(
-    () =>
-      new Map(
-        items.flatMap((item) =>
-          item.displayPrice?.kind === 'EXACT'
-            ? [[item.id, { amount: item.displayPrice.amount }]]
-            : [],
-        ),
-      ),
-    [items],
-  );
-
   const loadActiveVariants = async (item: CatalogItem): Promise<CatalogVariant[]> => {
     const page = await queryClient.fetchQuery({
       queryKey: cashierTransactionKeys.variants(item.id),
@@ -76,7 +67,6 @@ export function useSellingCatalog({
 
   return {
     items,
-    priceByItemId,
     categories: (categoriesQuery.data?.items ?? []).filter(
       (category) => category.status === 'ACTIVE',
     ),

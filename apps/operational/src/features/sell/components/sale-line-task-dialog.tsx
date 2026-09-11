@@ -1,5 +1,5 @@
-import { createDecimal, formatMoney } from '@digvation/business-money';
-import { DButton, DCheckbox, DDecimalInput, DDialog, DInput, DSelect } from '@digvation/ui';
+import { createDecimal, formatMoney } from '@digvation/pos-money';
+import { DButton, DCheckbox, DDecimalInput, DDialog, DInput, DSelect } from '@digvation-labs/ui';
 import { CheckCircle2, CircleDot, Percent, Play, Square, UserRound, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
@@ -169,7 +169,7 @@ export function SaleLineTaskDialog({
     setFormError(null);
     const value = discountValueForApi(discountType, discountValue);
     if (!value || discountReason.trim() === '') {
-      setFormError('Discount value and reason are required. Percentage uses 0–100%.');
+      setFormError('Discount value and reason are required. Percentage uses 0â€“100%.');
       return;
     }
     onSetLineDiscount(line, { type: discountType, value, reason: discountReason.trim() });

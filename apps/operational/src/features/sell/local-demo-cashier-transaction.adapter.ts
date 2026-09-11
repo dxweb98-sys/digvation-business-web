@@ -1,4 +1,4 @@
-import { createDecimal } from '@digvation/business-money';
+import { createDecimal } from '@digvation/pos-money';
 
 import type {
   AddSaleLineInput,
@@ -15,6 +15,7 @@ import type {
   SaleTransactionClient,
   SellingCatalogQuery,
   SetSaleLineQuantityInput,
+  StartSaleInput,
 } from './cashier-transaction.adapter';
 import type {
   ApiPage,
@@ -42,12 +43,12 @@ const categories: CatalogCategory[] = [
 ];
 
 const items: CatalogItem[] = [
-  serviceItem('svc-hair-cut', 'SVC-HAIRCUT', 'Hair Cut', 'Hair', 45),
-  serviceItem('svc-creambath', 'SVC-CREAMBATH', 'Creambath', 'Treatment', 60),
-  serviceItem('svc-facial-care', 'SVC-FACIAL', 'Facial Care', 'Treatment', 60),
-  serviceItem('svc-hair-coloring', 'SVC-COLOR', 'Hair Coloring', 'Hair', 90),
-  productItem('prd-shampoo', 'PRD-SHAMPOO', 'Shampoo', 'Retail'),
-  productItem('prd-hair-serum', 'PRD-SERUM', 'Hair Serum', 'Retail'),
+  serviceItem('svc-hair-cut', 'SVC-HAIRCUT', 'Hair Cut', 'Hair', 45, false),
+  serviceItem('svc-creambath', 'SVC-CREAMBATH', 'Creambath', 'Treatment', 60, false),
+  serviceItem('svc-facial-care', 'SVC-FACIAL', 'Facial Care', 'Treatment', 60, true),
+  serviceItem('svc-hair-coloring', 'SVC-COLOR', 'Hair Coloring', 'Hair', 90, true),
+  productItem('prd-shampoo', 'PRD-SHAMPOO', 'Shampoo', 'Retail', false),
+  productItem('prd-hair-serum', 'PRD-SERUM', 'Hair Serum', 'Retail', true),
 ];
 
 const variants: CatalogVariant[] = [
@@ -117,7 +118,9 @@ function serviceItem(
   name: string,
   categoryId: string,
   duration: number,
+  hasVariants: boolean,
 ): CatalogItem {
+  void hasVariants;
   return {
     id,
     code,
@@ -139,7 +142,14 @@ function serviceItem(
   };
 }
 
-function productItem(id: string, code: string, name: string, categoryId: string): CatalogItem {
+function productItem(
+  id: string,
+  code: string,
+  name: string,
+  categoryId: string,
+  hasVariants: boolean,
+): CatalogItem {
+  void hasVariants;
   return {
     id,
     code,
@@ -353,12 +363,6 @@ function validateReadyToFinalize(sale: Sale): void {
   }
   for (const line of active) {
     if (
-      line.fulfillmentBehaviorSnapshot === 'TRACKED' &&
-      line.fulfillment?.status !== 'COMPLETED'
-    ) {
-      throw new Error(`${line.itemNameSnapshot}: pekerjaan belum selesai.`);
-    }
-    if (
       line.employeeAssignmentModeSnapshot === 'REQUIRED' &&
       !line.participations.some((participation) => participation.assigned)
     ) {
@@ -426,13 +430,12 @@ export class LocalDemoCashierTransactionAdapter
     return clone(requireSale(saleId));
   }
 
-  public async createSale(input: CreateSaleInput): Promise<Sale> {
+  public async createSale(input: CreateSaleInput, idempotencyKey: string): Promise<Sale> {
+    void idempotencyKey;
     const createdAt = now();
     const id = `SALE-DEMO-${String(state.saleCounter++).padStart(4, '0')}`;
     const sale: Sale = {
       id,
-      saleNumber: `TRX-DEMO-${String(state.saleCounter).padStart(6, '0')}`,
-      invoiceNumber: null,
       sellingLocationId: input.sellingLocationId,
       currency: input.currency,
       status: 'OPEN',
@@ -457,7 +460,37 @@ export class LocalDemoCashierTransactionAdapter
     return clone(sale);
   }
 
-  public async addSaleLine(saleId: string, input: AddSaleLineInput): Promise<Sale> {
+  public async startSale(input: StartSaleInput, idempotencyKey: string): Promise<Sale> {
+    const saleCounter = state.saleCounter;
+    const lineCounter = state.lineCounter;
+    let createdSaleId: string | null = null;
+    try {
+      let sale = await this.createSale(input, idempotencyKey);
+      createdSaleId = sale.id;
+      for (const [index, line] of input.lines.entries()) {
+        sale = await this.addSaleLine(
+          sale.id,
+          { ...line, expectedVersion: sale.version },
+          `${idempotencyKey}:line:${index}`,
+        );
+      }
+      const started = { ...sale, version: 1 };
+      state.sales.set(started.id, started);
+      return clone(started);
+    } catch (error) {
+      if (createdSaleId) state.sales.delete(createdSaleId);
+      state.saleCounter = saleCounter;
+      state.lineCounter = lineCounter;
+      throw error;
+    }
+  }
+
+  public async addSaleLine(
+    saleId: string,
+    input: AddSaleLineInput,
+    idempotencyKey: string,
+  ): Promise<Sale> {
+    void idempotencyKey;
     const sale = requireOpenSale(saleId);
     const item = items.find((candidate) => candidate.id === input.catalogItemId);
     if (!item) throw new Error('Catalog item was not found.');
@@ -471,6 +504,30 @@ export class LocalDemoCashierTransactionAdapter
       sale.sellingLocationId,
       sale.currency,
     );
+    const compatibleLine = sale.lines.find(
+      (line) =>
+        line.removedAt === null &&
+        line.catalogItemId === item.id &&
+        line.catalogVariantId === (input.catalogVariantId ?? null) &&
+        line.catalogPriceId === price.catalogPriceId &&
+        line.resolvedUnitPrice === price.amount &&
+        line.effectiveUnitPrice === price.amount &&
+        line.overrideAmount === null &&
+        line.discountType === null &&
+        line.fulfillment?.status !== 'IN_PROGRESS' &&
+        line.fulfillment?.status !== 'COMPLETED' &&
+        !line.participations.some((participation) => participation.assigned) &&
+        line.contributions.length === 0,
+    );
+    if (compatibleLine) {
+      compatibleLine.quantity = decimal(compatibleLine.quantity)
+        .plus(decimal(input.quantity))
+        .toFixed(4);
+      compatibleLine.updatedAt = now();
+      recalculateSale(sale);
+      touch(sale);
+      return clone(sale);
+    }
     const lineId = `line-demo-${String(state.lineCounter++).padStart(4, '0')}`;
     const createdAt = now();
     const service = item.serviceDefinition;

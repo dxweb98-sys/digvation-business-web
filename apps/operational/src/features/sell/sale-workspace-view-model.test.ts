@@ -77,8 +77,6 @@ function createPayment(overrides: Partial<Payment> = {}): Payment {
 function createSale(overrides: Partial<Sale> = {}): Sale {
   return {
     id: SALE_ID,
-    saleNumber: 'TRX-20260902-000001',
-    invoiceNumber: null,
     sellingLocationId: '11111111-1111-4111-8111-111111111111',
     currency: 'IDR',
     status: 'OPEN',

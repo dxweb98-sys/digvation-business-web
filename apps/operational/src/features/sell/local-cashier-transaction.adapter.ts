@@ -1,4 +1,4 @@
-import { createDecimal } from '@digvation/business-money';
+import { createDecimal } from '@digvation/pos-money';
 
 import type {
   AddSaleLineInput,
@@ -12,6 +12,7 @@ import type {
   PriceOverrideInput,
   SaleTransactionPort,
   SetSaleLineQuantityInput,
+  StartSaleInput,
 } from './cashier-transaction.adapter';
 import type {
   ApiPage,
@@ -147,8 +148,6 @@ export class LocalCashierTransactionAdapter implements SaleTransactionPort {
     const time = timestamp();
     const sale: Sale = {
       id: `demo-sale-${this.sequence++}`,
-      saleNumber: `TRX-DEMO-${this.sequence}`,
-      invoiceNumber: null,
       sellingLocationId: input.sellingLocationId,
       currency: input.currency,
       status: 'OPEN',
@@ -171,6 +170,29 @@ export class LocalCashierTransactionAdapter implements SaleTransactionPort {
     };
     this.sales.set(sale.id, sale);
     return clone(sale);
+  }
+
+  public async startSale(input: StartSaleInput, idempotencyKey: string): Promise<Sale> {
+    const sequence = this.sequence;
+    let createdSaleId: string | null = null;
+    try {
+      let sale = await this.createSale(input, idempotencyKey);
+      createdSaleId = sale.id;
+      for (const [index, line] of input.lines.entries()) {
+        sale = await this.addSaleLine(
+          sale.id,
+          { ...line, expectedVersion: sale.version },
+          `${idempotencyKey}:line:${index}`,
+        );
+      }
+      const started = { ...sale, version: 1 };
+      this.sales.set(started.id, started);
+      return clone(started);
+    } catch (error) {
+      if (createdSaleId) this.sales.delete(createdSaleId);
+      this.sequence = sequence;
+      throw error;
+    }
   }
 
   public async addSaleLine(

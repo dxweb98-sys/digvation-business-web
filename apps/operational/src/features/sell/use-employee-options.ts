@@ -3,11 +3,12 @@ import { useQuery } from '@tanstack/react-query';
 import type { EmployeeQuery } from './cashier-transaction.adapter';
 import { cashierTransactionKeys } from './cashier-transaction-keys';
 
-export function useEmployeeOptions(query: EmployeeQuery) {
+export function useEmployeeOptions(query: EmployeeQuery, enabled: boolean) {
   const employeesQuery = useQuery({
     queryKey: cashierTransactionKeys.employees(),
     queryFn: ({ signal }) => query.listEmployees(signal),
-    staleTime: 30_000,
+    staleTime: 180_000,
+    enabled,
   });
 
   return {

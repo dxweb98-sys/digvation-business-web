@@ -1,4 +1,4 @@
-import type { ConnectivityState } from '@digvation/business-runtime';
+import type { ConnectivityState } from '@digvation/pos-runtime';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -213,6 +213,11 @@ export function useSaleCoreController({
     mutation.mutate(intent);
   };
 
+  const mutateAsync = async (intent: CoreCommandIntent): Promise<Sale> => {
+    if (isRetryableIntent(intent)) setRetryIntent(intent);
+    return mutation.mutateAsync(intent);
+  };
+
   const withSale = <T>(createIntent: (currentSale: Sale) => T): T | null => {
     if (!sale || sale.status !== 'OPEN') return null;
     return createIntent(sale);
@@ -309,7 +314,10 @@ export function useSaleCoreController({
       }));
       if (intent) mutate(intent);
     },
-    transitionFulfillment: (line: SaleLine, status: Exclude<FulfillmentStatus, 'WAITING'>) => {
+    transitionFulfillment: async (
+      line: SaleLine,
+      status: Exclude<FulfillmentStatus, 'WAITING'>,
+    ) => {
       const intent = withSale((currentSale) => ({
         kind: 'fulfillment' as const,
         saleId: currentSale.id,
@@ -317,9 +325,10 @@ export function useSaleCoreController({
         expectedVersion: currentSale.version,
         status,
       }));
-      if (intent) mutate(intent);
+      if (!intent) throw new Error('No active Sale is available for fulfillment update.');
+      return mutateAsync(intent);
     },
-    createPayment: (
+    createPayment: async (
       method: PaymentMethod,
       appliedAmount: string,
       tenderedAmount?: string,
@@ -335,7 +344,8 @@ export function useSaleCoreController({
         ...(providerReference ? { providerReference } : {}),
         idempotencyKey: createIdempotencyKey('payment'),
       }));
-      if (intent) mutate(intent);
+      if (!intent) throw new Error('No active Sale is available for payment.');
+      return mutateAsync(intent);
     },
     transitionPayment: (payment: Payment, status: Exclude<PaymentStatus, 'PENDING'>) => {
       const intent = withSale((currentSale) => ({
@@ -356,14 +366,15 @@ export function useSaleCoreController({
       }));
       if (intent) mutate(intent);
     },
-    voidSale: () => {
+    voidSale: async () => {
       const intent = withSale((currentSale) => ({
         kind: 'void' as const,
         saleId: currentSale.id,
         expectedVersion: currentSale.version,
         idempotencyKey: createIdempotencyKey('void'),
       }));
-      if (intent) mutate(intent);
+      if (!intent) throw new Error('No active Sale is available for cancellation.');
+      return mutateAsync(intent);
     },
   };
 }

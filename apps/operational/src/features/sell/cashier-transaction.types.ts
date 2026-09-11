@@ -189,8 +189,6 @@ export interface SaleLine {
 
 export interface Sale {
   id: string;
-  saleNumber: string;
-  invoiceNumber: string | null;
   sellingLocationId: string;
   currency: string;
   status: SaleStatus;

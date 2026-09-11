@@ -1,13 +1,29 @@
-import { createDecimal } from '@digvation/business-money';
-import type { ConnectivityState } from '@digvation/business-runtime';
+import { createDecimal } from '@digvation/pos-money';
+import type { ConnectivityState } from '@digvation/pos-runtime';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 
 import type { SaleTransactionClient } from './cashier-transaction.adapter';
+import {
+  addCartDraftSelection,
+  cartDraftDisplayLines,
+  cartDraftEstimatedTotal,
+  cartDraftStartInput,
+  emptyCartDraft,
+  removeCartDraftLine,
+  saleDisplayLines,
+  setCartDraftQuantity,
+  type CartDraft,
+} from './cart-draft';
 import { isKnownApiFailure } from './cashier-transaction-errors';
 import { cashierTransactionKeys } from './cashier-transaction-keys';
-import type { CatalogItem, ResolvedPrice, SaleLine } from './cashier-transaction.types';
+import type {
+  CatalogItem,
+  CatalogVariant,
+  ResolvedPrice,
+  SaleLine,
+} from './cashier-transaction.types';
 import { createSaleWorkspaceViewModel } from './sale-workspace-view-model';
 import type { SaleCommandCoordinator } from './use-sale-command-coordinator';
 
@@ -17,17 +33,20 @@ interface AddItemIntent {
   catalogItemId: string;
   catalogVariantId?: string;
   quantity: string;
-  sellingLocationId: string;
-  currency: string;
-  createIdempotencyKey: string;
   addIdempotencyKey: string;
-  saleId?: string;
-  expectedVersion?: number;
+  saleId: string;
+  expectedVersion: number;
 }
 
 interface AddItemConfiguration {
   catalogItem: CatalogItem;
+  catalogVariant: CatalogVariant | null;
   resolvedPrice: ResolvedPrice;
+}
+
+interface CommitDraftIntent {
+  draft: CartDraft;
+  idempotencyKey: string;
 }
 
 interface UseSaleWorkspaceControllerOptions {
@@ -90,13 +109,16 @@ export function useSaleWorkspaceController({
   rememberSale,
 }: UseSaleWorkspaceControllerOptions) {
   const navigate = useNavigate();
-  const createdSaleIdRef = useRef<string | null>(null);
   const [retryIntent, setRetryIntent] = useState<AddItemIntent | null>(null);
+  const [draft, setDraft] = useState<CartDraft | null>(null);
+  const [retryCommitIntent, setRetryCommitIntent] = useState<CommitDraftIntent | null>(null);
+  const previousLocationIdRef = useRef(selectedLocationId);
 
   const saleQuery = useQuery({
     queryKey: cashierTransactionKeys.sale(routeSaleId ?? 'idle'),
     queryFn: ({ signal }) => client.getSale(routeSaleId!, signal),
     enabled: Boolean(routeSaleId),
+    staleTime: 10_000,
   });
 
   useEffect(() => {
@@ -106,59 +128,56 @@ export function useSaleWorkspaceController({
     if (selectedLocationId !== sale.sellingLocationId) selectLocation(sale.sellingLocationId);
   }, [rememberSale, saleQuery.data, selectLocation, selectedLocationId]);
 
+  useEffect(() => {
+    if (previousLocationIdRef.current !== selectedLocationId) {
+      previousLocationIdRef.current = selectedLocationId;
+      setDraft(null);
+      setRetryCommitIntent(null);
+    }
+  }, [selectedLocationId]);
+
   const addItemMutation = useMutation({
     mutationFn: (intent: AddItemIntent) =>
       command.runMutation(async () => {
         if (connectivity === 'OFFLINE') throw new Error('Reconnect before changing this Sale.');
 
-        let saleId = intent.saleId;
-        let expectedVersion = intent.expectedVersion;
-        let createdSale: typeof saleQuery.data | null = null;
-        createdSaleIdRef.current = saleId ?? null;
-
-        if (!saleId || expectedVersion === undefined) {
-          createdSale = await client.createSale(
-            { sellingLocationId: intent.sellingLocationId, currency: intent.currency },
-            intent.createIdempotencyKey,
-          );
-          saleId = createdSale.id;
-          expectedVersion = createdSale.version;
-          createdSaleIdRef.current = createdSale.id;
-          selectLocation(createdSale.sellingLocationId);
-          setRetryIntent({ ...intent, saleId, expectedVersion });
-        }
-
-        try {
-          const updatedSale = await client.addSaleLine(
-            saleId,
-            {
-              expectedVersion,
-              catalogItemId: intent.catalogItemId,
-              ...(intent.catalogVariantId ? { catalogVariantId: intent.catalogVariantId } : {}),
-              quantity: intent.quantity,
-            },
-            intent.addIdempotencyKey,
-          );
-          command.commitSale(updatedSale);
-          if (createdSale) navigate(`/sell/${createdSale.id}`, { replace: true });
-          return updatedSale;
-        } catch (error) {
-          if (createdSale) {
-            command.commitSale(createdSale);
-            navigate(`/sell/${createdSale.id}`, { replace: true });
-          }
-          throw error;
-        }
+        return client.addSaleLine(
+          intent.saleId,
+          {
+            expectedVersion: intent.expectedVersion,
+            catalogItemId: intent.catalogItemId,
+            ...(intent.catalogVariantId ? { catalogVariantId: intent.catalogVariantId } : {}),
+            quantity: intent.quantity,
+          },
+          intent.addIdempotencyKey,
+        );
       }),
     onSuccess: (sale) => {
       command.commitSale(sale);
-      createdSaleIdRef.current = null;
       setRetryIntent(null);
     },
     onError: async (error, intent) => {
-      const saleId = intent.saleId ?? createdSaleIdRef.current ?? undefined;
       if (isKnownApiFailure(error)) setRetryIntent(null);
-      await command.recoverFailure(error, saleId);
+      await command.recoverFailure(error, intent.saleId);
+    },
+  });
+
+  const commitDraftMutation = useMutation({
+    mutationFn: (intent: CommitDraftIntent) =>
+      command.runMutation(async () => {
+        if (connectivity === 'OFFLINE') throw new Error('Reconnect before starting this Sale.');
+        return client.startSale(cartDraftStartInput(intent.draft), intent.idempotencyKey);
+      }),
+    onSuccess: (sale) => {
+      command.commitSale(sale);
+      selectLocation(sale.sellingLocationId);
+      setDraft(null);
+      setRetryCommitIntent(null);
+      navigate(`/sell/${sale.id}`, { replace: true });
+    },
+    onError: async (error) => {
+      if (isKnownApiFailure(error)) setRetryCommitIntent(null);
+      await command.recoverFailure(error);
     },
   });
 
@@ -208,6 +227,22 @@ export function useSaleWorkspaceController({
     if (viewModel.monetaryMutation.state !== 'AVAILABLE') return;
 
     const currentSale = saleQuery.data;
+    if (!currentSale) {
+      if (!configuration) {
+        command.reportError(new Error('Resolve the selected price before adding this item.'));
+        return;
+      }
+      setRetryCommitIntent(null);
+      setDraft((current) =>
+        addCartDraftSelection(
+          current ?? emptyCartDraft(selectedLocationId, currency),
+          configuration.catalogItem,
+          configuration.catalogVariant,
+          configuration.resolvedPrice,
+        ),
+      );
+      return;
+    }
     const compatibleLine = configuration
       ? currentSale?.lines.find((line) => isCompatibleLine(line, catalogVariantId, configuration))
       : undefined;
@@ -219,11 +254,9 @@ export function useSaleWorkspaceController({
       catalogItemId,
       ...(catalogVariantId ? { catalogVariantId } : {}),
       quantity: '1',
-      sellingLocationId: currentSale?.sellingLocationId ?? selectedLocationId,
-      currency: currentSale?.currency ?? currency,
-      createIdempotencyKey: createIdempotencyKey('create-sale'),
       addIdempotencyKey: createIdempotencyKey('add-line'),
-      ...(currentSale ? { saleId: currentSale.id, expectedVersion: currentSale.version } : {}),
+      saleId: currentSale.id,
+      expectedVersion: currentSale.version,
     };
 
     setRetryIntent(intent);
@@ -253,18 +286,64 @@ export function useSaleWorkspaceController({
     removeMutation.mutate({ saleId: sale.id, saleLineId: line.id, expectedVersion: sale.version });
   };
 
+  const commitDraft = async () => {
+    if (!draft?.lines.length) throw new Error('Add at least one item before checkout.');
+    const intent =
+      retryCommitIntent?.draft === draft
+        ? retryCommitIntent
+        : { draft, idempotencyKey: createIdempotencyKey('start-sale') };
+    setRetryCommitIntent(intent);
+    return commitDraftMutation.mutateAsync(intent);
+  };
+
+  const activeSaleLines = viewModel.activeLines;
+  const draftLines = cartDraftDisplayLines(draft);
+  const cartLines = saleQuery.data ? saleDisplayLines(activeSaleLines) : draftLines;
+  const cartTotal = saleQuery.data?.totalAmount ?? cartDraftEstimatedTotal(draft);
+
   return {
     sale: saleQuery.data ?? null,
     viewModel,
     isLoading: Boolean(routeSaleId) && saleQuery.isLoading,
-    canRetryLastAdd: Boolean(retryIntent) && !addItemMutation.isPending,
+    cart: {
+      lines: cartLines,
+      grossAmount: saleQuery.data?.grossAmount ?? cartTotal,
+      totalAmount: cartTotal,
+      discountAmount: saleQuery.data?.discountAmount ?? '0.0000',
+      isLocalDraft: !saleQuery.data && draftLines.length > 0,
+    },
+    canRetryLastAdd:
+      (Boolean(retryIntent) && !addItemMutation.isPending) ||
+      (Boolean(retryCommitIntent) && !commitDraftMutation.isPending),
     addItem,
     changeQuantity,
     removeLine,
+    changeDraftQuantity: (lineId: string, quantity: string) => {
+      try {
+        setRetryCommitIntent(null);
+        setDraft((current) =>
+          current ? setCartDraftQuantity(current, lineId, quantity) : current,
+        );
+      } catch (error) {
+        command.reportError(error);
+      }
+    },
+    removeDraftLine: (lineId: string) => {
+      setRetryCommitIntent(null);
+      setDraft((current) => (current ? removeCartDraftLine(current, lineId) : current));
+    },
+    commitDraft,
+    clearDraft: () => {
+      setDraft(null);
+      setRetryCommitIntent(null);
+    },
     retryLastAdd: () => {
-      if (!retryIntent || addItemMutation.isPending) return;
       command.clearNotice();
-      addItemMutation.mutate(retryIntent);
+      if (retryCommitIntent && !commitDraftMutation.isPending) {
+        commitDraftMutation.mutate(retryCommitIntent);
+      } else if (retryIntent && !addItemMutation.isPending) {
+        addItemMutation.mutate(retryIntent);
+      }
     },
     saleQueryError: saleQuery.error,
   };

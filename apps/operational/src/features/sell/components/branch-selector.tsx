@@ -1,6 +1,6 @@
 import { MapPin } from 'lucide-react';
 
-import { DSelect } from '@digvation/ui';
+import { DSelect } from '@digvation-labs/ui';
 
 import type { SellingLocation } from '../cashier-transaction.types';
 

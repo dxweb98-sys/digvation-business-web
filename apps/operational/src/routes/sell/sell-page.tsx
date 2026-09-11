@@ -11,7 +11,7 @@ export function SellPage() {
   return (
     <section className="h-full min-h-0 overflow-hidden">
       <ReplatformedPosWorkspace workspace={workspace} />
-      {workspace.variantPicker ? (
+      {workspace.variantPicker?.context !== 'TRANSACTION_ADJUSTMENT' && workspace.variantPicker ? (
         <VariantPicker
           {...workspace.variantPicker}
           onSelect={workspace.selectVariant}
