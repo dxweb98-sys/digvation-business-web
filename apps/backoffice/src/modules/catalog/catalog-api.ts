@@ -27,6 +27,14 @@ export interface NamedRecord {
   version: number;
 }
 export interface Category extends NamedRecord {}
+export interface TaxCategory extends NamedRecord {}
+export interface TaxProfile {
+  itemTaxEnabled: boolean;
+  transactionTaxEnabled: boolean;
+  version: number;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
 export interface Variant extends NamedRecord {
   catalogItemId: string;
 }
@@ -87,12 +95,20 @@ export interface CreateCatalogItemInput extends Omit<
   serviceDefinition?: Item['serviceDefinition'];
 }
 
+function queryString(input: Record<string, unknown>) {
+  return new URLSearchParams(
+    Object.entries(input)
+      .filter(([, value]) => value !== undefined && value !== '')
+      .map(([key, value]) => [key, String(value)]),
+  ).toString();
+}
+
 const page = '?limit=50&offset=0';
 export class CatalogApi {
   constructor(private readonly client: ApiClient) {}
   listItems(query: ItemQuery = {}) {
     return this.client.get<Page<CatalogManagementItem>>(
-      `/api/v1/catalog/items?${new URLSearchParams(Object.entries({ limit: 50, offset: 0, ...query }).filter(([, value]) => value !== undefined && value !== '') as [string, string][]).toString()}`,
+      `/api/v1/catalog/items?${queryString({ limit: 50, offset: 0, ...query })}`,
     );
   }
   getItem(id: string) {
@@ -114,7 +130,7 @@ export class CatalogApi {
   }
   listCategories(query: CategoryQuery = {}) {
     return this.client.get<Page<Category>>(
-      `/api/v1/catalog/categories?${new URLSearchParams(Object.entries({ limit: 50, offset: 0, ...query }).filter(([, value]) => value !== undefined && value !== '') as [string, string][]).toString()}`,
+      `/api/v1/catalog/categories?${queryString({ limit: 50, offset: 0, ...query })}`,
     );
   }
   createCategory(input: { code?: string; name: string; status?: Category['status'] }) {
@@ -125,6 +141,12 @@ export class CatalogApi {
       expectedVersion: item.version,
       ...input,
     });
+  }
+  listTaxCategories() {
+    return this.client.get<Page<TaxCategory>>('/api/v1/tax/categories?limit=100&offset=0');
+  }
+  getTaxProfile() {
+    return this.client.get<TaxProfile>('/api/v1/tax/profile');
   }
   listVariants(itemId: string) {
     return this.client.get<Page<Variant>>(`/api/v1/catalog/items/${itemId}/variants${page}`);
@@ -161,7 +183,7 @@ export class CatalogApi {
     effectiveAt: string;
   }) {
     return this.client.get<ResolvedPrice>(
-      `/api/v1/pricing/resolve?${new URLSearchParams(Object.entries(input).filter(([, value]) => value != null) as [string, string][]).toString()}`,
+      `/api/v1/pricing/resolve?${queryString(input)}`,
     );
   }
   createPrice(input: {
