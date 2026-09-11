@@ -11,15 +11,14 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
 import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
-import {
-  AnalyticsDonutChart,
-  AnalyticsHorizontalBarChart,
-  AnalyticsLineChart,
-} from '../../components/analytics/analytics-charts';
-import { AnalyticsKpiCard } from '../../components/analytics/analytics-kpi-card';
 import { useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import { BusinessInsightWidget } from './components/business-insight-widget';
+import { BusinessPerformanceCard } from './components/business-performance-card';
 import { DashboardConfigurator } from './components/dashboard-configurator';
+import { DashboardKpiCard } from './components/dashboard-kpi-card';
+import { PaymentMixCard } from './components/payment-mix-card';
+import { RankingCard } from './components/ranking-card';
+import { TransactionsCard } from './components/transactions-card';
 import { DashboardApi } from './dashboard-api';
 import {
   dashboardPreferenceKey,
@@ -37,12 +36,33 @@ import type {
 } from './dashboard.types';
 
 const DAY_MS = 86_400_000;
+type PeriodPreset = 'today' | '7d' | 'month' | 'year' | 'custom';
 
 function localDateKey(date = new Date()): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+function periodRange(preset: Exclude<PeriodPreset, 'custom'>, date = new Date()) {
+  const to = localDateKey(date);
+  if (preset === 'today') return { from: to, to };
+  if (preset === '7d') {
+    const from = new Date(date);
+    from.setDate(from.getDate() - 6);
+    return { from: localDateKey(from), to };
+  }
+  if (preset === 'month') {
+    return {
+      from: localDateKey(new Date(date.getFullYear(), date.getMonth(), 1)),
+      to,
+    };
+  }
+  return {
+    from: localDateKey(new Date(date.getFullYear(), 0, 1)),
+    to,
+  };
 }
 
 function previousRange(
@@ -67,13 +87,20 @@ function numberValue(value: DashboardRow[string] | undefined): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function percentageChange(current: number, previous: number): number | null {
+  if (previous === 0) return current === 0 ? 0 : null;
+  return ((current - previous) / Math.abs(previous)) * 100;
+}
+
 export function DashboardPage() {
   const { session, createApiClient } = useBackofficeAuth();
   const runtime = useRuntime();
   const { copy, formatMoney } = useBackofficeLocalization();
   const today = localDateKey();
-  const [from, setFrom] = useState(today);
-  const [to, setTo] = useState(today);
+  const initialRange = periodRange('month');
+  const [periodPreset, setPeriodPreset] = useState<PeriodPreset>('month');
+  const [from, setFrom] = useState(initialRange.from);
+  const [to, setTo] = useState(initialRange.to);
   const [selectedLocationId, setSelectedLocationId] = useState('');
   const [configOpen, setConfigOpen] = useState(false);
 
@@ -91,7 +118,7 @@ export function DashboardPage() {
         workspace: session.identity.workspace,
         userId: session.identity.userId,
       })
-    : 'digvation.backoffice.dashboard.widgets:anonymous';
+    : 'digvation.backoffice.dashboard.widgets.v2:anonymous';
   const [enabledWidgets, setEnabledWidgets] = useState<DashboardWidgetId[]>(() =>
     loadDashboardPreferences(preferenceKey),
   );
@@ -132,6 +159,7 @@ export function DashboardPage() {
   const canReadSales = permissions.includes('sales:read');
   const canReadCatalog = permissions.includes('catalog:read');
   const canReadEmployees = permissions.includes('employees:read');
+  const canReadLocations = permissions.includes('locations:read');
 
   const performance = useQuery({
     queryKey: ['dashboard', 'business-performance', filters],
@@ -152,12 +180,7 @@ export function DashboardPage() {
   const previousPerformance = useQuery({
     queryKey: ['dashboard', 'business-performance', 'previous', previousFilters],
     queryFn: () => api.report('business-performance', previousFilters),
-    enabled: Boolean(
-      session &&
-        canReadSales &&
-        locationReady &&
-        widgetEnabled('businessInsight'),
-    ),
+    enabled: Boolean(session && canReadSales && locationReady),
   });
   const catalogPerformance = useQuery({
     queryKey: ['dashboard', 'catalog-performance', filters],
@@ -179,6 +202,16 @@ export function DashboardPage() {
         widgetEnabled('topEmployees'),
     ),
   });
+  const locationPerformance = useQuery({
+    queryKey: ['dashboard', 'locations', filters],
+    queryFn: () => api.report('locations', filters, 8),
+    enabled: Boolean(
+      session &&
+        canReadLocations &&
+        locationReady &&
+        widgetEnabled('locationPerformance'),
+    ),
+  });
 
   if (!session) return null;
 
@@ -186,17 +219,18 @@ export function DashboardPage() {
     setEnabledWidgets(next);
     saveDashboardPreferences(preferenceKey, next);
   };
-  const toggleWidget = (id: DashboardWidgetId) => {
-    updateWidgets(
-      enabledWidgets.includes(id)
-        ? enabledWidgets.filter((candidate) => candidate !== id)
-        : [...enabledWidgets, id],
-    );
+  const defaultWidgets = DEFAULT_DASHBOARD_WIDGETS.filter((id) =>
+    availableIds.has(id),
+  );
+
+  const setPreset = (value: string) => {
+    const next = value as PeriodPreset;
+    setPeriodPreset(next);
+    if (next === 'custom') return;
+    const range = periodRange(next);
+    setFrom(range.from);
+    setTo(range.to);
   };
-  const resetWidgets = () =>
-    updateWidgets(
-      DEFAULT_DASHBOARD_WIDGETS.filter((id) => availableIds.has(id)),
-    );
 
   const formatInteger = (value: number | string) =>
     new Intl.NumberFormat('id-ID').format(Number(value) || 0);
@@ -211,26 +245,66 @@ export function DashboardPage() {
   };
   const money = (value: DashboardRow[string] | undefined) =>
     formatMoney(String(value ?? 0), runtime.currency);
+  const moneyNumber = (value: number) =>
+    formatMoney(String(value), runtime.currency);
   const empty = copy('No analytics data is available for this period.');
   const data = performance.data;
+  const previousData = previousPerformance.data;
   const paymentMix =
     data?.analytics.breakdowns?.paymentMethod ?? data?.analytics.breakdown ?? [];
-  const topItems = (catalogPerformance.data?.analytics.ranking ?? []).slice(0, 5);
-  const topEmployees = (employeePerformance.data?.analytics.ranking ?? []).slice(
-    0,
-    5,
-  );
-  const locationPerformance = (data?.analytics.ranking ?? []).slice(0, 8);
   const transactions = todayTransactions.data?.items ?? [];
+  const revenue = numberValue(data?.summary.finalRevenue);
+  const previousRevenue = numberValue(previousData?.summary.finalRevenue);
+  const transactionCount = numberValue(data?.summary.transactionCount);
+  const previousTransactionCount = numberValue(
+    previousData?.summary.transactionCount,
+  );
+  const averageTransaction = numberValue(data?.summary.averageTransactionValue);
+  const previousAverageTransaction = numberValue(
+    previousData?.summary.averageTransactionValue,
+  );
+  const quantitySold = numberValue(data?.summary.quantitySold);
+  const previousQuantitySold = numberValue(previousData?.summary.quantitySold);
+
+  const topItems = (catalogPerformance.data?.items ?? []).slice(0, 5).map((row) => ({
+    label: String(row.itemName ?? '—'),
+    secondary: `${formatInteger(numberValue(row.quantitySold))} sold · ${formatInteger(numberValue(row.transactionCount))} tx`,
+    value: money(row.finalRevenue),
+  }));
+  const topEmployees = (employeePerformance.data?.items ?? [])
+    .slice(0, 5)
+    .map((row) => ({
+      label: String(row.employeeName ?? '—'),
+      secondary: `${formatInteger(numberValue(row.contributedTransactions))} tx · ${String(row.topCatalogItem ?? '—')}`,
+      value: money(row.contributionRevenue),
+    }));
+  const topLocations = (locationPerformance.data?.items ?? [])
+    .slice(0, 8)
+    .map((row) => ({
+      label: String(row.locationName ?? '—'),
+      secondary: `${formatInteger(numberValue(row.transactionCount))} tx`,
+      value: money(row.finalRevenue),
+    }));
+
+  const periodLabel =
+    periodPreset === 'today'
+      ? copy('Today')
+      : periodPreset === '7d'
+        ? copy('Last 7 days')
+        : periodPreset === 'month'
+          ? copy('This month')
+          : periodPreset === 'year'
+            ? copy('This year')
+            : `${from} — ${to}`;
 
   const headerAction = premium ? (
     <DashboardConfigurator
       widgets={availableWidgets}
       enabled={enabledWidgets}
+      defaults={defaultWidgets}
       open={configOpen}
       onOpenChange={setConfigOpen}
-      onToggle={toggleWidget}
-      onReset={resetWidgets}
+      onSave={updateWidgets}
     />
   ) : undefined;
 
@@ -249,37 +323,52 @@ export function DashboardPage() {
         />
       </div>
 
-      <div className="mt-5 grid grid-cols-1 items-end gap-3 md:grid-cols-[360px_260px_auto]">
-        <div className="min-w-0">
-          <DDateRangeFilter
-            from={from}
-            to={to}
-            onFromChange={setFrom}
-            onToChange={setTo}
-          />
+      <div className="mt-5 grid grid-cols-1 items-end gap-3 md:grid-cols-2 xl:grid-cols-[220px_minmax(280px,1fr)_260px_auto]">
+        <DSelect
+          label={copy('Period')}
+          value={periodPreset}
+          options={[
+            { value: 'today', label: copy('Today') },
+            { value: '7d', label: copy('Last 7 days') },
+            { value: 'month', label: copy('This month') },
+            { value: 'year', label: copy('This year') },
+            { value: 'custom', label: copy('Custom range') },
+          ]}
+          onChange={(value) => setPreset(String(value ?? 'month'))}
+        />
+        <div className={periodPreset === 'custom' ? 'min-w-0' : 'hidden xl:block'}>
+          {periodPreset === 'custom' ? (
+            <DDateRangeFilter
+              from={from}
+              to={to}
+              onFromChange={setFrom}
+              onToChange={setTo}
+            />
+          ) : (
+            <div className="pb-2 text-xs text-[var(--color-text-muted)]">
+              {from} — {to}
+            </div>
+          )}
         </div>
-        <div className="min-w-0">
-          <DSelect
-            label={copy('Location')}
-            value={locationId}
-            options={[
-              {
-                value: '',
-                label: copy(
-                  locations.data?.organizationWide
-                    ? 'All locations'
-                    : 'Select location',
-                ),
-              },
-              ...(locations.data?.locations ?? []).map((location) => ({
-                value: location.id,
-                label:
-                  location.name ?? location.displayName ?? location.code,
-              })),
-            ]}
-            onChange={(value) => setSelectedLocationId(String(value ?? ''))}
-          />
-        </div>
+        <DSelect
+          label={copy('Location')}
+          value={locationId}
+          options={[
+            {
+              value: '',
+              label: copy(
+                locations.data?.organizationWide
+                  ? 'All locations'
+                  : 'Select location',
+              ),
+            },
+            ...(locations.data?.locations ?? []).map((location) => ({
+              value: location.id,
+              label: location.name ?? location.displayName ?? location.code,
+            })),
+          ]}
+          onChange={(value) => setSelectedLocationId(String(value ?? ''))}
+        />
         <div className="pb-1 text-xs text-[var(--color-text-muted)]">
           {premium ? (
             <span className="inline-flex rounded-full bg-[var(--color-accent-mint)] px-2.5 py-1 font-medium text-[var(--color-text)]">
@@ -318,201 +407,122 @@ export function DashboardPage() {
       {canReadSales && locationReady ? (
         <>
           <section className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <AnalyticsKpiCard
+            <DashboardKpiCard
               label={copy('Revenue')}
               value={money(data?.summary.finalRevenue)}
-              context={`${from} — ${to}`}
-              icon={
-                <span className="flex size-8 items-center justify-center rounded-lg bg-[var(--color-accent-sky)] text-[var(--color-brand)]">
-                  <CircleDollarSign aria-hidden="true" className="size-4" />
-                </span>
-              }
+              context={periodLabel}
+              delta={percentageChange(revenue, previousRevenue)}
+              emphasis
+              icon={<CircleDollarSign aria-hidden="true" className="size-4" />}
             />
-            <AnalyticsKpiCard
+            <DashboardKpiCard
               label={copy('Transactions')}
-              value={formatInteger(numberValue(data?.summary.transactionCount))}
-              context={`${from} — ${to}`}
-              icon={
-                <span className="flex size-8 items-center justify-center rounded-lg bg-[var(--color-accent-mint)] text-[var(--color-brand)]">
-                  <ReceiptText aria-hidden="true" className="size-4" />
-                </span>
-              }
+              value={formatInteger(transactionCount)}
+              context={periodLabel}
+              delta={percentageChange(transactionCount, previousTransactionCount)}
+              icon={<ReceiptText aria-hidden="true" className="size-4" />}
             />
-            <AnalyticsKpiCard
+            <DashboardKpiCard
               label={copy('Average transaction')}
               value={money(data?.summary.averageTransactionValue)}
-              context={copy('Final revenue per transaction')}
-              icon={
-                <span className="flex size-8 items-center justify-center rounded-lg bg-[var(--color-accent-yellow)] text-[var(--color-brand)]">
-                  <Hash aria-hidden="true" className="size-4" />
-                </span>
-              }
+              context={copy('Revenue per transaction')}
+              delta={percentageChange(
+                averageTransaction,
+                previousAverageTransaction,
+              )}
+              icon={<Hash aria-hidden="true" className="size-4" />}
             />
-            <AnalyticsKpiCard
+            <DashboardKpiCard
               label={copy('Quantity sold')}
-              value={formatInteger(numberValue(data?.summary.quantitySold))}
+              value={formatInteger(quantitySold)}
               context={copy('Items and services sold')}
-              icon={
-                <span className="flex size-8 items-center justify-center rounded-lg bg-[var(--color-accent-lavender)] text-[var(--color-brand)]">
-                  <PackageCheck aria-hidden="true" className="size-4" />
-                </span>
-              }
+              delta={percentageChange(quantitySold, previousQuantitySold)}
+              icon={<PackageCheck aria-hidden="true" className="size-4" />}
             />
           </section>
 
-          <section className="mt-5">
-            <DCard
-              variant="elevated"
-              className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-[0_14px_34px_-28px_var(--color-text)] sm:p-6"
-            >
-              <div className="flex flex-wrap items-end justify-between gap-3">
-                <div>
-                  <h2 className="text-sm font-semibold tracking-tight">
-                    {copy("Today's transactions")}
-                  </h2>
-                  <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                    {copy(
-                      'Latest sales recorded today. This section always remains on the dashboard.',
-                    )}
-                  </p>
-                </div>
-                <span className="text-xs font-medium text-[var(--color-text-muted)]">
-                  {formatInteger(todayTransactions.data?.total ?? 0)}{' '}
-                  {copy('transactions')}
-                </span>
-              </div>
-
-              <div className="mt-4 overflow-x-auto">
-                <table className="w-full min-w-[720px] border-collapse text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-[var(--color-border)] text-xs text-[var(--color-text-muted)]">
-                      <th className="px-2 py-2 font-medium">{copy('Sale')}</th>
-                      <th className="px-2 py-2 font-medium">{copy('Time')}</th>
-                      <th className="px-2 py-2 font-medium">{copy('Location')}</th>
-                      <th className="px-2 py-2 font-medium">{copy('Status')}</th>
-                      <th className="px-2 py-2 text-right font-medium">
-                        {copy('Total')}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {transactions.length ? (
-                      transactions.map((transaction, index) => (
-                        <tr
-                          key={String(
-                            transaction.saleNumber ??
-                              transaction.invoiceNumber ??
-                              index,
-                          )}
-                          className="border-b border-[var(--color-border)] last:border-0"
-                        >
-                          <td className="px-2 py-3 font-medium">
-                            {String(
-                              transaction.saleNumber ??
-                                transaction.invoiceNumber ??
-                                '—',
-                            )}
-                          </td>
-                          <td className="px-2 py-3 text-[var(--color-text-muted)]">
-                            {formatDateTime(transaction.occurredAt)}
-                          </td>
-                          <td className="px-2 py-3 text-[var(--color-text-muted)]">
-                            {String(transaction.sellingLocation ?? '—')}
-                          </td>
-                          <td className="px-2 py-3">
-                            <span className="rounded-full bg-[var(--color-surface-muted)] px-2 py-1 text-xs font-medium">
-                              {copy(String(transaction.saleStatus ?? '—'))}
-                            </span>
-                          </td>
-                          <td className="px-2 py-3 text-right font-semibold tabular-nums">
-                            {money(transaction.total)}
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td
-                          colSpan={5}
-                          className="px-4 py-10 text-center text-xs text-[var(--color-text-muted)]"
-                        >
-                          {copy('No transactions have been recorded today.')}
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </DCard>
+          <section
+            className={[
+              'mt-5 grid gap-4',
+              widgetEnabled('businessPerformance')
+                ? 'lg:grid-cols-[minmax(0,1.65fr)_minmax(320px,0.85fr)]'
+                : 'grid-cols-1',
+            ].join(' ')}
+          >
+            {widgetEnabled('businessPerformance') ? (
+              <BusinessPerformanceCard
+                title={copy('Business performance')}
+                periodLabel={periodLabel}
+                revenue={revenue}
+                transactions={transactionCount}
+                previousRevenue={previousRevenue}
+                previousTransactions={previousTransactionCount}
+                trend={data?.analytics.trend ?? []}
+                formatMoney={moneyNumber}
+              />
+            ) : null}
+            <TransactionsCard
+              title={copy("Today's transactions")}
+              periodLabel={copy('Today')}
+              total={todayTransactions.data?.total ?? 0}
+              transactions={transactions}
+              emptyMessage={copy('No transactions have been recorded today.')}
+              formatDateTime={formatDateTime}
+              formatMoney={money}
+            />
           </section>
 
-          {premium ? (
-            <section className="mt-5 grid gap-4 lg:grid-cols-3">
-              {widgetEnabled('salesTrend') ? (
-                <AnalyticsLineChart
-                  title={copy('Sales trend')}
-                  subtitle={`${copy('Selected period')}: ${from} — ${to}`}
-                  data={data?.analytics.trend ?? []}
-                  formatValue={(value) =>
-                    formatMoney(value, runtime.currency)
-                  }
-                  emptyMessage={empty}
-                  pointsLabel={copy('data points')}
-                />
-              ) : null}
-
-              {widgetEnabled('paymentMix') ? (
-                <AnalyticsDonutChart
-                  title={copy('Payment mix')}
-                  data={paymentMix}
-                  emptyMessage={empty}
-                  totalLabel={copy('Total')}
-                  formatValue={(value) => formatInteger(value)}
-                />
-              ) : null}
-
+          {premium && (widgetEnabled('topItems') || widgetEnabled('topEmployees')) ? (
+            <section className="mt-4 grid gap-4 lg:grid-cols-2">
               {widgetEnabled('topItems') ? (
-                <AnalyticsHorizontalBarChart
+                <RankingCard
                   title={copy('Top 5 items')}
-                  data={topItems}
-                  formatValue={(value) =>
-                    formatMoney(value, runtime.currency)
-                  }
+                  subtitle={periodLabel}
+                  items={topItems}
                   emptyMessage={empty}
                 />
               ) : null}
-
               {widgetEnabled('topEmployees') ? (
-                <AnalyticsHorizontalBarChart
+                <RankingCard
                   title={copy('Top 5 employees')}
-                  data={topEmployees}
-                  formatValue={(value) =>
-                    formatMoney(value, runtime.currency)
-                  }
+                  subtitle={periodLabel}
+                  items={topEmployees}
                   emptyMessage={empty}
                 />
               ) : null}
+            </section>
+          ) : null}
 
-              {widgetEnabled('locationPerformance') &&
-              locations.data?.locations.length &&
-              locationPerformance.length ? (
-                <AnalyticsHorizontalBarChart
+          {premium &&
+          (widgetEnabled('paymentMix') || widgetEnabled('locationPerformance')) ? (
+            <section className="mt-4 grid gap-4 lg:grid-cols-2">
+              {widgetEnabled('paymentMix') ? (
+                <PaymentMixCard
+                  title={copy('Payment mix')}
+                  points={paymentMix}
+                  emptyMessage={empty}
+                  formatValue={moneyNumber}
+                />
+              ) : null}
+              {widgetEnabled('locationPerformance') ? (
+                <RankingCard
                   title={copy('Location performance')}
-                  data={locationPerformance}
-                  formatValue={(value) =>
-                    formatMoney(value, runtime.currency)
-                  }
+                  subtitle={periodLabel}
+                  items={topLocations}
                   emptyMessage={empty}
                 />
               ) : null}
+            </section>
+          ) : null}
 
-              {widgetEnabled('businessInsight') ? (
-                <BusinessInsightWidget
-                  current={data}
-                  previous={previousPerformance.data}
-                  currency={runtime.currency}
-                  formatMoney={formatMoney}
-                />
-              ) : null}
+          {premium && widgetEnabled('businessInsight') ? (
+            <section className="mt-4">
+              <BusinessInsightWidget
+                current={data}
+                previous={previousData}
+                currency={runtime.currency}
+                formatMoney={formatMoney}
+              />
             </section>
           ) : null}
         </>
