@@ -86,6 +86,7 @@ export function BusinessInsightWidget({
         subtitle={text('insightComparison')}
         icon={<Lightbulb aria-hidden="true" className="size-4" />}
         actionHref={seeAllHref}
+        tone="violet"
       />
 
       <div className="mt-4 grid gap-2 sm:grid-cols-2">
