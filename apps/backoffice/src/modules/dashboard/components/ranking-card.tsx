@@ -60,8 +60,8 @@ export function RankingCard({
                     className={[
                       'mt-0.5 inline-flex items-center gap-0.5 text-[10px] font-semibold tabular-nums',
                       item.delta >= 0
-                        ? 'text-[var(--color-success)]'
-                        : 'text-[var(--color-danger)]',
+                        ? 'text-[var(--color-brand)]'
+                        : 'text-[var(--color-text-muted)]',
                     ].join(' ')}
                   >
                     {item.delta >= 0 ? (
