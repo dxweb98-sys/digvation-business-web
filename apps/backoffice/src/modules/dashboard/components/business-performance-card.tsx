@@ -1,6 +1,7 @@
 import { DCard } from '@digvation/ui';
 import { ChartNoAxesCombined } from 'lucide-react';
 
+import { useDashboardI18n } from '../dashboard-i18n';
 import type { DashboardAnalyticsPoint } from '../dashboard.types';
 
 function numeric(value: string | number | null | undefined): number {
@@ -14,8 +15,8 @@ function pointCoordinates(values: readonly number[]) {
   const max = Math.max(...values);
   const range = Math.max(1, max - min);
   return values.map((value, index) => ({
-    x: values.length === 1 ? 50 : (index / (values.length - 1)) * 100,
-    y: 38 - ((value - min) / range) * 28 - 5,
+    x: values.length === 1 ? 50 : 3 + (index / (values.length - 1)) * 94,
+    y: 32 - ((value - min) / range) * 23,
   }));
 }
 
@@ -38,7 +39,7 @@ function areaPath(values: readonly number[]): string {
   const path = smoothPath(values);
   const points = pointCoordinates(values);
   if (!path || !points.length) return '';
-  return `${path} L ${points[points.length - 1]!.x.toFixed(2)} 40 L ${points[0]!.x.toFixed(2)} 40 Z`;
+  return `${path} L ${points[points.length - 1]!.x.toFixed(2)} 36 L ${points[0]!.x.toFixed(2)} 36 Z`;
 }
 
 function change(current: number, previous: number): number | null {
@@ -48,26 +49,33 @@ function change(current: number, previous: number): number | null {
 
 function Delta({ value }: { value: number | null }) {
   if (value == null) return null;
+  const positive = value >= 0;
   return (
     <span
       className={[
-        'rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums',
-        value >= 0
-          ? 'bg-[var(--color-accent-mint)] text-[var(--color-brand)]'
-          : 'bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]',
+        'rounded-full px-1.5 py-0.5 text-[9px] font-semibold tabular-nums',
+        positive
+          ? 'bg-emerald-50 text-emerald-600'
+          : 'bg-rose-50 text-rose-600',
       ].join(' ')}
     >
-      {value >= 0 ? '+' : ''}
-      {value.toFixed(1)}%
+      {positive ? '↗ ' : '↘ '}
+      {Math.abs(value).toFixed(1)}%
     </span>
   );
 }
 
 function axisLabels(trend: readonly DashboardAnalyticsPoint[]): string[] {
   if (!trend.length) return [];
-  if (trend.length <= 3) return trend.map((point) => point.label);
-  const middle = Math.floor((trend.length - 1) / 2);
-  return [trend[0]!.label, trend[middle]!.label, trend[trend.length - 1]!.label];
+  if (trend.length <= 4) return trend.map((point) => point.label);
+  const oneThird = Math.floor((trend.length - 1) / 3);
+  const twoThird = Math.floor(((trend.length - 1) * 2) / 3);
+  return [
+    trend[0]!.label,
+    trend[oneThird]!.label,
+    trend[twoThird]!.label,
+    trend[trend.length - 1]!.label,
+  ];
 }
 
 export function BusinessPerformanceCard({
@@ -93,6 +101,7 @@ export function BusinessPerformanceCard({
   trend: readonly DashboardAnalyticsPoint[];
   formatMoney(value: number): string;
 }) {
+  const { locale, text } = useDashboardI18n();
   const revenueChange = change(revenue, previousRevenue);
   const transactionChange = change(transactions, previousTransactions);
   const revenueValues = trend.map((point) => numeric(point.value));
@@ -100,22 +109,26 @@ export function BusinessPerformanceCard({
   const revenuePath = smoothPath(revenueValues);
   const revenueArea = areaPath(revenueValues);
   const transactionPath = smoothPath(transactionValues);
+  const transactionArea = areaPath(transactionValues);
+  const revenuePoints = pointCoordinates(revenueValues);
+  const transactionPoints = pointCoordinates(transactionValues);
   const labels = axisLabels(trend);
+  const integer = new Intl.NumberFormat(locale === 'id' ? 'id-ID' : 'en-US');
 
   return (
     <DCard
       variant="elevated"
-      className="h-full rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-[0_16px_40px_-34px_var(--color-text)] sm:p-6"
+      className="overflow-hidden rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-[0_16px_40px_-34px_var(--color-text)] xl:h-[326px]"
     >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-start gap-3">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--color-accent-sky)] text-[var(--color-brand)]">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600">
             <ChartNoAxesCombined aria-hidden="true" className="size-4" />
           </span>
           <div>
             <h2 className="text-sm font-semibold tracking-tight">{title}</h2>
-            <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
-              Revenue and transaction movement
+            <p className="mt-0.5 text-[10px] text-[var(--color-text-muted)]">
+              {text('transactionMovement')}
             </p>
           </div>
         </div>
@@ -129,9 +142,9 @@ export function BusinessPerformanceCard({
                 type="button"
                 onClick={() => onPeriodChange(option.value)}
                 className={[
-                  'shrink-0 rounded-lg px-3 py-1.5 text-[10px] font-semibold transition-colors',
+                  'shrink-0 rounded-lg px-3 py-1.5 text-[9px] font-semibold transition-colors',
                   active
-                    ? 'bg-[var(--color-brand)] text-white shadow-sm'
+                    ? 'bg-blue-600 text-white shadow-sm'
                     : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]',
                 ].join(' ')}
               >
@@ -142,63 +155,69 @@ export function BusinessPerformanceCard({
         </div>
       </div>
 
-      <div className="mt-5 flex flex-wrap items-end gap-x-8 gap-y-3 border-t border-[var(--color-border)] pt-4">
-        <div>
-          <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
-            Revenue
-          </p>
+      <div className="mt-3 flex items-center gap-7 border-t border-[var(--color-border)] pt-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <span className="size-2 rounded-full bg-blue-500" />
+            <p className="text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+              {text('revenue')}
+            </p>
+          </div>
           <div className="mt-1 flex items-center gap-2">
-            <p className="text-[24px] font-semibold tracking-tight tabular-nums">
+            <p className="truncate text-[18px] font-semibold tracking-tight tabular-nums">
               {formatMoney(revenue)}
             </p>
             <Delta value={revenueChange} />
           </div>
         </div>
-        <div>
-          <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
-            Transactions
-          </p>
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <span className="size-2 rounded-full bg-emerald-500" />
+            <p className="text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+              {text('transactions')}
+            </p>
+          </div>
           <div className="mt-1 flex items-center gap-2">
-            <p className="text-[24px] font-semibold tracking-tight tabular-nums">
-              {new Intl.NumberFormat('id-ID').format(transactions)}
+            <p className="text-[18px] font-semibold tracking-tight tabular-nums">
+              {integer.format(transactions)}
             </p>
             <Delta value={transactionChange} />
           </div>
         </div>
       </div>
 
-      <div className="relative mt-4 h-[200px] overflow-hidden rounded-2xl bg-[linear-gradient(180deg,var(--color-surface-muted),transparent)] px-3 pb-8 pt-3 sm:h-[220px]">
-        <div className="pointer-events-none absolute inset-x-3 bottom-8 top-3 flex flex-col justify-between">
+      <div className="relative mt-2 h-[142px] overflow-hidden rounded-xl bg-[linear-gradient(180deg,var(--color-surface-muted),transparent)] px-2 pb-6 pt-2">
+        <div className="pointer-events-none absolute inset-x-2 bottom-6 top-2 flex flex-col justify-between">
           {[0, 1, 2, 3].map((line) => (
-            <span
-              key={line}
-              className="block border-t border-dashed border-[var(--color-border)]"
-            />
+            <span key={line} className="block border-t border-dashed border-[var(--color-border)]" />
           ))}
         </div>
 
         {trend.length ? (
           <svg
-            viewBox="0 0 100 40"
+            viewBox="0 0 100 36"
             preserveAspectRatio="none"
-            className="relative z-10 h-full w-full overflow-visible pb-5"
+            className="relative z-10 h-full w-full overflow-visible pb-3"
             role="img"
-            aria-label={`${title} trend`}
+            aria-label={title}
           >
             <defs>
               <linearGradient id="dashboardRevenueArea" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--color-brand)" stopOpacity="0.20" />
-                <stop offset="100%" stopColor="var(--color-brand)" stopOpacity="0" />
+                <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.18" />
+                <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
+              </linearGradient>
+              <linearGradient id="dashboardTransactionArea" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#10b981" stopOpacity="0.12" />
+                <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
               </linearGradient>
             </defs>
-            {revenueArea ? (
-              <path d={revenueArea} fill="url(#dashboardRevenueArea)" />
-            ) : null}
+            {revenueArea ? <path d={revenueArea} fill="url(#dashboardRevenueArea)" /> : null}
+            {transactionArea ? <path d={transactionArea} fill="url(#dashboardTransactionArea)" /> : null}
             {revenuePath ? (
               <path
                 d={revenuePath}
                 fill="none"
-                stroke="var(--color-brand)"
+                stroke="#3b82f6"
                 strokeWidth="1.8"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -209,38 +228,33 @@ export function BusinessPerformanceCard({
               <path
                 d={transactionPath}
                 fill="none"
-                stroke="var(--color-text-muted)"
-                strokeWidth="1.35"
+                stroke="#10b981"
+                strokeWidth="1.6"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 vectorEffect="non-scaling-stroke"
               />
             ) : null}
+            {revenuePoints.map((point, index) => (
+              <circle key={`r:${index}`} cx={point.x} cy={point.y} r="0.9" fill="#3b82f6" />
+            ))}
+            {transactionPoints.map((point, index) => (
+              <circle key={`t:${index}`} cx={point.x} cy={point.y} r="0.8" fill="#10b981" />
+            ))}
           </svg>
         ) : (
-          <div className="relative z-10 flex h-full items-center justify-center pb-5 text-center text-xs text-[var(--color-text-muted)]">
-            No activity has been recorded for this period yet.
+          <div className="relative z-10 flex h-full items-center justify-center pb-3 text-center text-[11px] text-[var(--color-text-muted)]">
+            {text('noActivity')}
           </div>
         )}
 
         {labels.length ? (
-          <div className="absolute inset-x-4 bottom-2 flex items-center justify-between text-[9px] text-[var(--color-text-muted)]">
+          <div className="absolute inset-x-3 bottom-1.5 flex items-center justify-between text-[8px] text-[var(--color-text-muted)]">
             {labels.map((label, index) => (
               <span key={`${label}:${index}`}>{label}</span>
             ))}
           </div>
         ) : null}
-      </div>
-
-      <div className="mt-3 flex flex-wrap items-center gap-4 text-[10px] font-medium text-[var(--color-text-muted)]">
-        <span className="inline-flex items-center gap-1.5">
-          <span className="size-2 rounded-full bg-[var(--color-brand)]" />
-          Revenue
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="size-2 rounded-full bg-[var(--color-text-muted)]" />
-          Transactions
-        </span>
       </div>
     </DCard>
   );
