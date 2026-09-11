@@ -30,6 +30,28 @@
   animation: pos-control-popover-in 0.14s ease-out;
 }
 
+@keyframes pos-queue-content-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.pos-queue-content-enter {
+  animation: pos-queue-content-in 0.18s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pos-queue-content-enter {
+    animation: none;
+  }
+}
+
 .no-scrollbar {
   scrollbar-width: none;
 }
@@ -38,34 +60,98 @@
   display: none;
 }
 
+.pos-receipt-print {
+  display: none;
+  width: min(100%, 80mm);
+  margin-inline: auto;
+  background: white;
+}
+
+.pos-receipt-preview {
+  width: min(100%, 80mm);
+  margin-inline: auto;
+}
+
+.pos-receipt-print--58 {
+  max-width: 58mm;
+}
+
+.pos-receipt-preview.pos-receipt-print--58 {
+  max-width: 58mm;
+}
+
+.pos-receipt-tear {
+  height: 10mm;
+  margin-top: 5mm;
+  border-top: 1px dashed #cbd5e1;
+}
+
 @media print {
   @page {
-    margin: 8mm;
+    margin: 0;
   }
 
-  body * {
-    visibility: hidden !important;
+  @page pos-thermal-58 {
+    size: 58mm auto;
+    margin: 0;
   }
 
-  .pos-receipt-print,
-  .pos-receipt-print * {
-    visibility: visible !important;
+  @page pos-thermal-80 {
+    size: 80mm auto;
+    margin: 0;
+  }
+
+  html,
+  body {
+    width: auto !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+  }
+
+  body > *:not(.pos-receipt-print) {
+    display: none !important;
   }
 
   .pos-receipt-print {
-    position: fixed;
-    inset: 0;
-    width: 80mm;
-    max-width: 80mm;
-    height: auto;
-    margin: 0 auto;
+    display: block !important;
+    min-height: 0 !important;
+    height: auto !important;
+    margin: 0 !important;
     overflow: visible !important;
     background: white !important;
     color: black !important;
     box-shadow: none !important;
   }
 
-  .pos-receipt-actions {
-    display: none !important;
+  .pos-receipt-print--58 {
+    page: pos-thermal-58;
+    width: 58mm !important;
+    max-width: 58mm !important;
+    padding: 3mm !important;
+    font-size: 9px;
+    line-height: 1.35;
+  }
+
+  .pos-receipt-print--58 .text-lg {
+    font-size: 14px !important;
+  }
+
+  .pos-receipt-print--58 .text-xs {
+    font-size: 9px !important;
+    line-height: 1.35 !important;
+  }
+
+  .pos-receipt-print--58 .text-\[11px\] {
+    font-size: 8px !important;
+    line-height: 1.3 !important;
+  }
+
+  .pos-receipt-print--80 {
+    page: pos-thermal-80;
+    width: 80mm !important;
+    max-width: 80mm !important;
+    padding: 4mm !important;
   }
 }

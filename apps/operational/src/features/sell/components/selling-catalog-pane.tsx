@@ -1,5 +1,5 @@
-import { formatMoney } from '@digvation/business-money';
-import { DButton, DInput, DSkeleton } from '@digvation/ui';
+import { formatMoney } from '@digvation/pos-money';
+import { DButton, DInput, DSkeleton } from '@digvation-labs/ui';
 import { PackageSearch, Search, ShoppingBag, Wrench } from 'lucide-react';
 
 import type { CatalogItem, ResolvedPrice } from '../cashier-transaction.types';

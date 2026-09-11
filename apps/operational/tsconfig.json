@@ -1,7 +1,14 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "tsBuildInfoFile": "./node_modules/.cache/cashier.tsbuildinfo"
+    "tsBuildInfoFile": "./node_modules/.cache/operational.tsbuildinfo",
+    "paths": {
+      "@digvation/pos-api": ["./src/compat/pos-api.ts"],
+      "@digvation/pos-auth": ["./src/compat/pos-auth.ts"],
+      "@digvation/pos-money": ["./src/compat/pos-money.ts"],
+      "@digvation/pos-runtime": ["./src/compat/pos-runtime.ts"],
+      "@digvation-labs/ui": ["./src/compat/digvation-labs-ui.ts"]
+    }
   },
   "include": ["src", "vite.config.ts"]
 }

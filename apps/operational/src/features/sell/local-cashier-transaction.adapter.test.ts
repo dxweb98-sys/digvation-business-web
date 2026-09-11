@@ -1,9 +1,31 @@
-import { createDecimal } from '@digvation/business-money';
+import { createDecimal } from '@digvation/pos-money';
 import { describe, expect, it } from 'vitest';
 
 import { LocalCashierTransactionAdapter } from './local-cashier-transaction.adapter';
 
 describe('LocalCashierTransactionAdapter', () => {
+  it('rolls back the local boundary when an atomic draft line is invalid', async () => {
+    const adapter = new LocalCashierTransactionAdapter();
+    const branch = (await adapter.listSellingLocations()).items[0]!;
+    const item = (await adapter.listCatalogItems()).items[0]!;
+
+    await expect(
+      adapter.startSale(
+        {
+          sellingLocationId: branch.id,
+          currency: 'IDR',
+          lines: [
+            { catalogItemId: item.id, quantity: '1' },
+            { catalogItemId: 'missing-item', quantity: '1' },
+          ],
+        },
+        'atomic-rollback',
+      ),
+    ).rejects.toThrow();
+
+    expect((await adapter.listSales()).items).toEqual([]);
+  });
+
   it('runs the demo Sale lifecycle through the same transaction port', async () => {
     const adapter = new LocalCashierTransactionAdapter();
     const branch = (await adapter.listSellingLocations()).items[0]!;
@@ -21,20 +43,21 @@ describe('LocalCashierTransactionAdapter', () => {
     });
     expect(price.amount).toBe('165000.0000');
 
-    let sale = await adapter.createSale(
-      { sellingLocationId: branch.id, currency: 'IDR' },
-      'create',
-    );
-    sale = await adapter.addSaleLine(
-      sale.id,
+    let sale = await adapter.startSale(
       {
-        expectedVersion: sale.version,
-        catalogItemId: hairStyling.id,
-        catalogVariantId: hairVariant.id,
-        quantity: '1',
+        sellingLocationId: branch.id,
+        currency: 'IDR',
+        lines: [
+          {
+            catalogItemId: hairStyling.id,
+            catalogVariantId: hairVariant.id,
+            quantity: '1',
+          },
+        ],
       },
-      'add-one',
+      'start',
     );
+    expect(sale.version).toBe(1);
     sale = await adapter.addSaleLine(
       sale.id,
       {

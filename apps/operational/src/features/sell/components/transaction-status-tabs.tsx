@@ -1,7 +1,7 @@
 import { CheckCircle2, CircleDotDashed, Clock3, XCircle } from 'lucide-react';
 import { useState } from 'react';
 
-import { DButton } from '@digvation/ui';
+import { DButton } from '@digvation-labs/ui';
 
 const STATUS_OPTIONS = [
   { id: 'DRAFT', label: 'Draft', count: 12, icon: CircleDotDashed },
