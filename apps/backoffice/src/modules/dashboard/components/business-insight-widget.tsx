@@ -17,8 +17,8 @@ export function BusinessInsightWidget({
   currency = 'IDR',
   formatMoney,
 }: {
-  current?: DashboardDataset;
-  previous?: DashboardDataset;
+  current: DashboardDataset | undefined;
+  previous: DashboardDataset | undefined;
   currency?: string;
   formatMoney(value: string, currency: string): string;
 }) {
