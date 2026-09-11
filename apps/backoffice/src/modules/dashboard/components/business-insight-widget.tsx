@@ -1,6 +1,7 @@
 import { DCard } from '@digvation/ui';
 import { Lightbulb } from 'lucide-react';
 
+import { useDashboardI18n } from '../dashboard-i18n';
 import type { DashboardDataset } from '../dashboard.types';
 import { DashboardCardHeader } from './dashboard-card-header';
 
@@ -27,6 +28,7 @@ export function BusinessInsightWidget({
   formatMoney(value: string, currency: string): string;
   seeAllHref?: string;
 }) {
+  const { locale, text } = useDashboardI18n();
   const revenue = numeric(current?.summary.finalRevenue);
   const transactions = numeric(current?.summary.transactionCount);
   const average = numeric(current?.summary.averageTransactionValue);
@@ -41,23 +43,34 @@ export function BusinessInsightWidget({
   ];
   paymentPoints.sort((a, b) => numeric(b.value) - numeric(a.value));
   const dominantPayment = paymentPoints[0];
+  const integer = new Intl.NumberFormat(locale === 'id' ? 'id-ID' : 'en-US');
 
-  const insights = [
+  const revenueInsight =
     revenueChange === null
       ? revenue > 0
-        ? `Revenue reached ${formatMoney(String(revenue), currency)} with no comparable revenue in the previous period.`
-        : 'No revenue activity was recorded this month.'
-      : `Revenue is ${Math.abs(revenueChange).toFixed(1)}% ${revenueChange >= 0 ? 'higher' : 'lower'} than the previous month.`,
+        ? locale === 'id'
+          ? `Pendapatan mencapai ${formatMoney(String(revenue), currency)} tanpa pembanding pada bulan sebelumnya.`
+          : `Revenue reached ${formatMoney(String(revenue), currency)} with no comparable revenue in the previous month.`
+        : text('noRevenueMonth')
+      : `${revenueChange >= 0 ? text('revenueHigher') : text('revenueLower')} ${Math.abs(revenueChange).toFixed(1)}% ${text('previousMonthSuffix')}`;
+
+  const transactionInsight =
     transactionChange === null
       ? transactions > 0
-        ? `${transactions.toLocaleString('id-ID')} transactions were recorded while the previous month had none.`
-        : 'No transactions were recorded in either comparison month.'
-      : `Transaction volume is ${Math.abs(transactionChange).toFixed(1)}% ${transactionChange >= 0 ? 'higher' : 'lower'} than the previous month.`,
+        ? locale === 'id'
+          ? `${integer.format(transactions)} transaksi tercatat, sementara bulan sebelumnya belum memiliki transaksi.`
+          : `${integer.format(transactions)} transactions were recorded while the previous month had none.`
+        : text('noTransactionsMonth')
+      : `${transactionChange >= 0 ? text('transactionHigher') : text('transactionLower')} ${Math.abs(transactionChange).toFixed(1)}% ${text('previousMonthSuffix')}`;
+
+  const insights = [
+    revenueInsight,
+    transactionInsight,
     transactions > 0
-      ? `Average transaction value is ${formatMoney(String(average), currency)}.`
+      ? `${text('averageTransactionValue')} ${locale === 'id' ? 'adalah' : 'is'} ${formatMoney(String(average), currency)}.`
       : null,
     dominantPayment
-      ? `${dominantPayment.label} is the leading payment method this month.`
+      ? `${dominantPayment.label} ${text('leadingPayment')}`
       : null,
   ].filter((value): value is string => Boolean(value));
 
@@ -67,8 +80,8 @@ export function BusinessInsightWidget({
       className="h-full rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-[0_16px_40px_-34px_var(--color-text)]"
     >
       <DashboardCardHeader
-        title="Business insight"
-        subtitle="This month compared with the previous month"
+        title={text('businessInsight')}
+        subtitle={text('insightComparison')}
         icon={<Lightbulb aria-hidden="true" className="size-4" />}
         actionHref={seeAllHref}
       />
@@ -85,7 +98,7 @@ export function BusinessInsightWidget({
       </div>
 
       <p className="mt-4 text-[10px] leading-4 text-[var(--color-text-muted)]">
-        Generated from report aggregates only. No external AI request or model cost is used.
+        {text('insightSource')}
       </p>
     </DCard>
   );
