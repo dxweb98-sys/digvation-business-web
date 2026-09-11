@@ -1,5 +1,6 @@
 import { DCard } from '@digvation/ui';
 import { ArrowDownRight, ArrowUpRight } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 export interface RankingCardItem {
   label: string;
@@ -13,18 +14,25 @@ export function RankingCard({
   subtitle,
   items,
   emptyMessage,
+  icon,
 }: {
   title: string;
   subtitle?: string;
   items: readonly RankingCardItem[];
   emptyMessage: string;
+  icon?: ReactNode;
 }) {
   return (
     <DCard
       variant="elevated"
       className="h-full rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-[0_16px_40px_-34px_var(--color-text)]"
     >
-      <div className="flex items-end justify-between gap-3">
+      <div className="flex items-start gap-3">
+        {icon ? (
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[var(--color-surface-muted)] text-[var(--color-brand)]">
+            {icon}
+          </span>
+        ) : null}
         <div>
           <h2 className="text-sm font-semibold tracking-tight">{title}</h2>
           {subtitle ? (
@@ -40,7 +48,7 @@ export function RankingCard({
           items.map((item, index) => (
             <div
               key={`${item.label}:${index}`}
-              className="flex items-center gap-3 rounded-xl px-1 py-2.5"
+              className="flex items-center gap-3 rounded-xl border-b border-[var(--color-border)] px-1 py-2.5 last:border-b-0"
             >
               <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--color-surface-muted)] text-[11px] font-semibold text-[var(--color-brand)]">
                 {String(index + 1).padStart(2, '0')}
@@ -76,7 +84,7 @@ export function RankingCard({
             </div>
           ))
         ) : (
-          <div className="flex min-h-40 items-center justify-center text-center text-xs text-[var(--color-text-muted)]">
+          <div className="flex min-h-44 items-center justify-center text-center text-xs text-[var(--color-text-muted)]">
             {emptyMessage}
           </div>
         )}
