@@ -1,9 +1,9 @@
 import { DDialog, DInput, DSelect, useToast } from '@digvation/ui';
 import { useState } from 'react';
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
-import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
 import { isSessionExpiredError } from '../../auth/backoffice-auth-context';
 import type { NamedRecord } from './catalog-api';
+import { useCatalogLocalization } from './catalog-localization';
 import { DialogFooter } from './catalog-shared';
 
 export function CatalogNamedRecordDialog({
@@ -13,7 +13,7 @@ export function CatalogNamedRecordDialog({
   onSave,
   onSaved,
 }: {
-  entity: string;
+  entity: 'Category' | 'Variant';
   item: NamedRecord | null | undefined;
   onClose: () => void;
   onSave: (
@@ -24,7 +24,7 @@ export function CatalogNamedRecordDialog({
 }) {
   const fresh = item === null;
   const { showToast } = useToast();
-  const { copy } = useBackofficeLocalization();
+  const { copy } = useCatalogLocalization();
   const [code, setCode] = useState(item?.code ?? '');
   const [name, setName] = useState(item?.name ?? '');
   const [status, setStatus] = useState(item?.status ?? 'ACTIVE');
