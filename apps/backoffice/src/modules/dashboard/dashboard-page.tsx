@@ -31,7 +31,6 @@ import {
   DEFAULT_DASHBOARD_WIDGETS,
 } from './dashboard-widget-registry';
 import type {
-  DashboardDataset,
   DashboardFilterState,
   DashboardRow,
   DashboardWidgetId,
@@ -46,12 +45,17 @@ function localDateKey(date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
-function previousRange(from: string, to: string): Pick<DashboardFilterState, 'from' | 'to'> {
+function previousRange(
+  from: string,
+  to: string,
+): Pick<DashboardFilterState, 'from' | 'to'> {
   const start = Date.parse(`${from}T00:00:00Z`);
   const end = Date.parse(`${to}T00:00:00Z`);
   const spanDays = Math.max(1, Math.round((end - start) / DAY_MS) + 1);
   const previousEnd = new Date(start - DAY_MS);
-  const previousStart = new Date(previousEnd.getTime() - (spanDays - 1) * DAY_MS);
+  const previousStart = new Date(
+    previousEnd.getTime() - (spanDays - 1) * DAY_MS,
+  );
   return {
     from: previousStart.toISOString().slice(0, 10),
     to: previousEnd.toISOString().slice(0, 10),
@@ -212,7 +216,10 @@ export function DashboardPage() {
   const paymentMix =
     data?.analytics.breakdowns?.paymentMethod ?? data?.analytics.breakdown ?? [];
   const topItems = (catalogPerformance.data?.analytics.ranking ?? []).slice(0, 5);
-  const topEmployees = (employeePerformance.data?.analytics.ranking ?? []).slice(0, 5);
+  const topEmployees = (employeePerformance.data?.analytics.ranking ?? []).slice(
+    0,
+    5,
+  );
   const locationPerformance = (data?.analytics.ranking ?? []).slice(0, 8);
   const transactions = todayTransactions.data?.items ?? [];
 
@@ -284,6 +291,18 @@ export function DashboardPage() {
         </div>
       </div>
 
+      {!canReadSales ? (
+        <DCard
+          variant="elevated"
+          className="mt-5 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5"
+        >
+          <p className="text-sm font-semibold">{copy('Sales reporting unavailable')}</p>
+          <p className="mt-1 text-xs leading-5 text-[var(--color-text-muted)]">
+            {copy('Your role does not include permission to read sales reporting data.')}
+          </p>
+        </DCard>
+      ) : null}
+
       {!locationReady ? (
         <DCard
           variant="elevated"
@@ -296,181 +315,207 @@ export function DashboardPage() {
         </DCard>
       ) : null}
 
-      <section className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <AnalyticsKpiCard
-          label={copy('Revenue')}
-          value={money(data?.summary.finalRevenue)}
-          context={`${from} — ${to}`}
-          icon={
-            <span className="flex size-8 items-center justify-center rounded-lg bg-[var(--color-accent-sky)] text-[var(--color-brand)]">
-              <CircleDollarSign aria-hidden="true" className="size-4" />
-            </span>
-          }
-        />
-        <AnalyticsKpiCard
-          label={copy('Transactions')}
-          value={formatInteger(numberValue(data?.summary.transactionCount))}
-          context={`${from} — ${to}`}
-          icon={
-            <span className="flex size-8 items-center justify-center rounded-lg bg-[var(--color-accent-mint)] text-[var(--color-brand)]">
-              <ReceiptText aria-hidden="true" className="size-4" />
-            </span>
-          }
-        />
-        <AnalyticsKpiCard
-          label={copy('Average transaction')}
-          value={money(data?.summary.averageTransactionValue)}
-          context={copy('Final revenue per transaction')}
-          icon={
-            <span className="flex size-8 items-center justify-center rounded-lg bg-[var(--color-accent-yellow)] text-[var(--color-brand)]">
-              <Hash aria-hidden="true" className="size-4" />
-            </span>
-          }
-        />
-        <AnalyticsKpiCard
-          label={copy('Quantity sold')}
-          value={formatInteger(numberValue(data?.summary.quantitySold))}
-          context={copy('Items and services sold')}
-          icon={
-            <span className="flex size-8 items-center justify-center rounded-lg bg-[var(--color-accent-lavender)] text-[var(--color-brand)]">
-              <PackageCheck aria-hidden="true" className="size-4" />
-            </span>
-          }
-        />
-      </section>
+      {canReadSales && locationReady ? (
+        <>
+          <section className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <AnalyticsKpiCard
+              label={copy('Revenue')}
+              value={money(data?.summary.finalRevenue)}
+              context={`${from} — ${to}`}
+              icon={
+                <span className="flex size-8 items-center justify-center rounded-lg bg-[var(--color-accent-sky)] text-[var(--color-brand)]">
+                  <CircleDollarSign aria-hidden="true" className="size-4" />
+                </span>
+              }
+            />
+            <AnalyticsKpiCard
+              label={copy('Transactions')}
+              value={formatInteger(numberValue(data?.summary.transactionCount))}
+              context={`${from} — ${to}`}
+              icon={
+                <span className="flex size-8 items-center justify-center rounded-lg bg-[var(--color-accent-mint)] text-[var(--color-brand)]">
+                  <ReceiptText aria-hidden="true" className="size-4" />
+                </span>
+              }
+            />
+            <AnalyticsKpiCard
+              label={copy('Average transaction')}
+              value={money(data?.summary.averageTransactionValue)}
+              context={copy('Final revenue per transaction')}
+              icon={
+                <span className="flex size-8 items-center justify-center rounded-lg bg-[var(--color-accent-yellow)] text-[var(--color-brand)]">
+                  <Hash aria-hidden="true" className="size-4" />
+                </span>
+              }
+            />
+            <AnalyticsKpiCard
+              label={copy('Quantity sold')}
+              value={formatInteger(numberValue(data?.summary.quantitySold))}
+              context={copy('Items and services sold')}
+              icon={
+                <span className="flex size-8 items-center justify-center rounded-lg bg-[var(--color-accent-lavender)] text-[var(--color-brand)]">
+                  <PackageCheck aria-hidden="true" className="size-4" />
+                </span>
+              }
+            />
+          </section>
 
-      <section className="mt-5">
-        <DCard
-          variant="elevated"
-          className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-[0_14px_34px_-28px_var(--color-text)] sm:p-6"
-        >
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-semibold tracking-tight">
-                {copy("Today's transactions")}
-              </h2>
-              <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                {copy('Latest sales recorded today. This section always remains on the dashboard.')}
-              </p>
-            </div>
-            <span className="text-xs font-medium text-[var(--color-text-muted)]">
-              {formatInteger(todayTransactions.data?.total ?? 0)} {copy('transactions')}
-            </span>
-          </div>
+          <section className="mt-5">
+            <DCard
+              variant="elevated"
+              className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-[0_14px_34px_-28px_var(--color-text)] sm:p-6"
+            >
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <h2 className="text-sm font-semibold tracking-tight">
+                    {copy("Today's transactions")}
+                  </h2>
+                  <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                    {copy(
+                      'Latest sales recorded today. This section always remains on the dashboard.',
+                    )}
+                  </p>
+                </div>
+                <span className="text-xs font-medium text-[var(--color-text-muted)]">
+                  {formatInteger(todayTransactions.data?.total ?? 0)}{' '}
+                  {copy('transactions')}
+                </span>
+              </div>
 
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[720px] border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b border-[var(--color-border)] text-xs text-[var(--color-text-muted)]">
-                  <th className="px-2 py-2 font-medium">{copy('Sale')}</th>
-                  <th className="px-2 py-2 font-medium">{copy('Time')}</th>
-                  <th className="px-2 py-2 font-medium">{copy('Location')}</th>
-                  <th className="px-2 py-2 font-medium">{copy('Status')}</th>
-                  <th className="px-2 py-2 text-right font-medium">{copy('Total')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {transactions.length ? (
-                  transactions.map((transaction, index) => (
-                    <tr
-                      key={String(transaction.saleNumber ?? transaction.invoiceNumber ?? index)}
-                      className="border-b border-[var(--color-border)] last:border-0"
-                    >
-                      <td className="px-2 py-3 font-medium">
-                        {String(transaction.saleNumber ?? transaction.invoiceNumber ?? '—')}
-                      </td>
-                      <td className="px-2 py-3 text-[var(--color-text-muted)]">
-                        {formatDateTime(transaction.occurredAt)}
-                      </td>
-                      <td className="px-2 py-3 text-[var(--color-text-muted)]">
-                        {String(transaction.sellingLocation ?? '—')}
-                      </td>
-                      <td className="px-2 py-3">
-                        <span className="rounded-full bg-[var(--color-surface-muted)] px-2 py-1 text-xs font-medium">
-                          {copy(String(transaction.saleStatus ?? '—'))}
-                        </span>
-                      </td>
-                      <td className="px-2 py-3 text-right font-semibold tabular-nums">
-                        {money(transaction.total)}
-                      </td>
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full min-w-[720px] border-collapse text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-[var(--color-border)] text-xs text-[var(--color-text-muted)]">
+                      <th className="px-2 py-2 font-medium">{copy('Sale')}</th>
+                      <th className="px-2 py-2 font-medium">{copy('Time')}</th>
+                      <th className="px-2 py-2 font-medium">{copy('Location')}</th>
+                      <th className="px-2 py-2 font-medium">{copy('Status')}</th>
+                      <th className="px-2 py-2 text-right font-medium">
+                        {copy('Total')}
+                      </th>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td
-                      colSpan={5}
-                      className="px-4 py-10 text-center text-xs text-[var(--color-text-muted)]"
-                    >
-                      {copy('No transactions have been recorded today.')}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </DCard>
-      </section>
+                  </thead>
+                  <tbody>
+                    {transactions.length ? (
+                      transactions.map((transaction, index) => (
+                        <tr
+                          key={String(
+                            transaction.saleNumber ??
+                              transaction.invoiceNumber ??
+                              index,
+                          )}
+                          className="border-b border-[var(--color-border)] last:border-0"
+                        >
+                          <td className="px-2 py-3 font-medium">
+                            {String(
+                              transaction.saleNumber ??
+                                transaction.invoiceNumber ??
+                                '—',
+                            )}
+                          </td>
+                          <td className="px-2 py-3 text-[var(--color-text-muted)]">
+                            {formatDateTime(transaction.occurredAt)}
+                          </td>
+                          <td className="px-2 py-3 text-[var(--color-text-muted)]">
+                            {String(transaction.sellingLocation ?? '—')}
+                          </td>
+                          <td className="px-2 py-3">
+                            <span className="rounded-full bg-[var(--color-surface-muted)] px-2 py-1 text-xs font-medium">
+                              {copy(String(transaction.saleStatus ?? '—'))}
+                            </span>
+                          </td>
+                          <td className="px-2 py-3 text-right font-semibold tabular-nums">
+                            {money(transaction.total)}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td
+                          colSpan={5}
+                          className="px-4 py-10 text-center text-xs text-[var(--color-text-muted)]"
+                        >
+                          {copy('No transactions have been recorded today.')}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </DCard>
+          </section>
 
-      {premium ? (
-        <section className="mt-5 grid gap-4 lg:grid-cols-3">
-          {widgetEnabled('salesTrend') ? (
-            <AnalyticsLineChart
-              title={copy('Sales trend')}
-              subtitle={`${copy('Selected period')}: ${from} — ${to}`}
-              data={data?.analytics.trend ?? []}
-              formatValue={(value) => formatMoney(value, runtime.currency)}
-              emptyMessage={empty}
-              pointsLabel={copy('data points')}
-            />
-          ) : null}
+          {premium ? (
+            <section className="mt-5 grid gap-4 lg:grid-cols-3">
+              {widgetEnabled('salesTrend') ? (
+                <AnalyticsLineChart
+                  title={copy('Sales trend')}
+                  subtitle={`${copy('Selected period')}: ${from} — ${to}`}
+                  data={data?.analytics.trend ?? []}
+                  formatValue={(value) =>
+                    formatMoney(value, runtime.currency)
+                  }
+                  emptyMessage={empty}
+                  pointsLabel={copy('data points')}
+                />
+              ) : null}
 
-          {widgetEnabled('paymentMix') ? (
-            <AnalyticsDonutChart
-              title={copy('Payment mix')}
-              data={paymentMix}
-              emptyMessage={empty}
-              totalLabel={copy('Total')}
-              formatValue={(value) => formatInteger(value)}
-            />
-          ) : null}
+              {widgetEnabled('paymentMix') ? (
+                <AnalyticsDonutChart
+                  title={copy('Payment mix')}
+                  data={paymentMix}
+                  emptyMessage={empty}
+                  totalLabel={copy('Total')}
+                  formatValue={(value) => formatInteger(value)}
+                />
+              ) : null}
 
-          {widgetEnabled('topItems') ? (
-            <AnalyticsHorizontalBarChart
-              title={copy('Top 5 items')}
-              data={topItems}
-              formatValue={(value) => formatMoney(value, runtime.currency)}
-              emptyMessage={empty}
-            />
-          ) : null}
+              {widgetEnabled('topItems') ? (
+                <AnalyticsHorizontalBarChart
+                  title={copy('Top 5 items')}
+                  data={topItems}
+                  formatValue={(value) =>
+                    formatMoney(value, runtime.currency)
+                  }
+                  emptyMessage={empty}
+                />
+              ) : null}
 
-          {widgetEnabled('topEmployees') ? (
-            <AnalyticsHorizontalBarChart
-              title={copy('Top 5 employees')}
-              data={topEmployees}
-              formatValue={(value) => formatMoney(value, runtime.currency)}
-              emptyMessage={empty}
-            />
-          ) : null}
+              {widgetEnabled('topEmployees') ? (
+                <AnalyticsHorizontalBarChart
+                  title={copy('Top 5 employees')}
+                  data={topEmployees}
+                  formatValue={(value) =>
+                    formatMoney(value, runtime.currency)
+                  }
+                  emptyMessage={empty}
+                />
+              ) : null}
 
-          {widgetEnabled('locationPerformance') &&
-          locations.data?.locations.length &&
-          locationPerformance.length ? (
-            <AnalyticsHorizontalBarChart
-              title={copy('Location performance')}
-              data={locationPerformance}
-              formatValue={(value) => formatMoney(value, runtime.currency)}
-              emptyMessage={empty}
-            />
-          ) : null}
+              {widgetEnabled('locationPerformance') &&
+              locations.data?.locations.length &&
+              locationPerformance.length ? (
+                <AnalyticsHorizontalBarChart
+                  title={copy('Location performance')}
+                  data={locationPerformance}
+                  formatValue={(value) =>
+                    formatMoney(value, runtime.currency)
+                  }
+                  emptyMessage={empty}
+                />
+              ) : null}
 
-          {widgetEnabled('businessInsight') ? (
-            <BusinessInsightWidget
-              current={data}
-              previous={previousPerformance.data}
-              formatMoney={formatMoney}
-            />
+              {widgetEnabled('businessInsight') ? (
+                <BusinessInsightWidget
+                  current={data}
+                  previous={previousPerformance.data}
+                  currency={runtime.currency}
+                  formatMoney={formatMoney}
+                />
+              ) : null}
+            </section>
           ) : null}
-        </section>
+        </>
       ) : null}
     </BackofficePage>
   );
