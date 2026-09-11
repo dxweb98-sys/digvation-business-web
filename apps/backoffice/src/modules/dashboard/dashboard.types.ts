@@ -2,8 +2,7 @@ export type DashboardReportType =
   | 'business-performance'
   | 'transactions'
   | 'catalog-performance'
-  | 'employee-performance'
-  | 'locations';
+  | 'employee-performance';
 
 export type DashboardRow = Record<string, string | number | null>;
 
@@ -52,5 +51,4 @@ export type DashboardWidgetId =
   | 'paymentMix'
   | 'topItems'
   | 'topEmployees'
-  | 'locationPerformance'
   | 'businessInsight';
