@@ -14,10 +14,12 @@ function change(current: number, previous: number): number | null {
 export function BusinessInsightWidget({
   current,
   previous,
+  currency,
   formatMoney,
 }: {
   current?: DashboardDataset;
   previous?: DashboardDataset;
+  currency: string;
   formatMoney(value: string, currency: string): string;
 }) {
   const revenue = numeric(current?.summary.finalRevenue);
@@ -27,14 +29,18 @@ export function BusinessInsightWidget({
   const previousTransactions = numeric(previous?.summary.transactionCount);
   const revenueChange = change(revenue, previousRevenue);
   const transactionChange = change(transactions, previousTransactions);
-  const dominantPayment = (
-    current?.analytics.breakdowns?.paymentMethod ?? current?.analytics.breakdown ?? []
-  ).toSorted((a, b) => numeric(b.value) - numeric(a.value))[0];
+  const paymentPoints = [
+    ...(current?.analytics.breakdowns?.paymentMethod ??
+      current?.analytics.breakdown ??
+      []),
+  ];
+  paymentPoints.sort((a, b) => numeric(b.value) - numeric(a.value));
+  const dominantPayment = paymentPoints[0];
 
   const insights = [
     revenueChange === null
       ? revenue > 0
-        ? `Revenue reached ${formatMoney(String(revenue), 'IDR')} with no comparable revenue in the previous period.`
+        ? `Revenue reached ${formatMoney(String(revenue), currency)} with no comparable revenue in the previous period.`
         : 'No revenue activity was recorded in the selected period.'
       : `Revenue is ${Math.abs(revenueChange).toFixed(1)}% ${revenueChange >= 0 ? 'higher' : 'lower'} than the previous comparable period.`,
     transactionChange === null
@@ -43,7 +49,7 @@ export function BusinessInsightWidget({
         : 'No transactions were recorded in either comparison period.'
       : `Transaction volume is ${Math.abs(transactionChange).toFixed(1)}% ${transactionChange >= 0 ? 'higher' : 'lower'} than the previous period.`,
     transactions > 0
-      ? `Average transaction value is ${formatMoney(String(average), 'IDR')}.`
+      ? `Average transaction value is ${formatMoney(String(average), currency)}.`
       : null,
     dominantPayment
       ? `${dominantPayment.label} is the leading payment mix for this period.`
