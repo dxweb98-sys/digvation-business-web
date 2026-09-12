@@ -35,6 +35,14 @@ export class ApiClient {
     return this.withJsonBody<T>('PATCH', path, body, options);
   }
 
+  public delete<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
+    return this.request<T>(path, {
+      method: 'DELETE',
+      signal: options.signal ?? null,
+      headers: new Headers(options.headers),
+    });
+  }
+
   private withJsonBody<T>(
     method: 'POST' | 'PUT' | 'PATCH',
     path: string,
