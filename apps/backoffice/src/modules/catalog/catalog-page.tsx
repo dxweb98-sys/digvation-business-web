@@ -17,7 +17,7 @@ import { CatalogItemDetailDialog } from './catalog-item-detail-dialog';
 import { CatalogItemDialog } from './catalog-item-dialog';
 import { useCatalogLocalization } from './catalog-localization';
 import { CatalogNamedRecordDialog } from './catalog-record-dialog';
-import { PriceLabel, Status, TablePagination, humanize } from './catalog-shared';
+import { PriceLabel, Status, humanize } from './catalog-shared';
 
 type Section = 'items' | 'categories';
 type ItemFilterState = {
@@ -78,7 +78,7 @@ export function CatalogPage() {
     queryFn: () =>
       api.listItems({
         ...toItemQuery(itemQuery),
-        limit: itemPageSize + 1,
+        limit: itemPageSize,
         offset: (itemPage - 1) * itemPageSize,
       }),
     enabled: Boolean(session),
@@ -88,7 +88,7 @@ export function CatalogPage() {
     queryFn: () =>
       api.listCategories({
         ...toCategoryQuery(categoryQuery),
-        limit: categoryPageSize + 1,
+        limit: categoryPageSize,
         offset: (categoryPage - 1) * categoryPageSize,
       }),
     enabled: Boolean(session),
@@ -103,24 +103,20 @@ export function CatalogPage() {
     queryFn: () => api.getTaxProfile(),
     enabled: Boolean(session && canViewTax),
   });
-
-  const visibleItems = (items.data?.items ?? []).slice(0, itemPageSize);
-  const visibleCategories = (categories.data?.items ?? []).slice(0, categoryPageSize);
-  const hasNextItemPage = (items.data?.items.length ?? 0) > itemPageSize;
-  const hasNextCategoryPage = (categories.data?.items.length ?? 0) > categoryPageSize;
+  const itemRows = items.data?.items ?? [];
   const defaultPrices = useQuery({
     queryKey: keys.defaults(
-      visibleItems.map((candidate) => candidate.id),
+      itemRows.map((candidate) => candidate.id),
       currency,
       pricingEffectiveAt,
     ),
     queryFn: () =>
       api.listDefaultPrices(
-        visibleItems.map((candidate) => candidate.id),
+        itemRows.map((candidate) => candidate.id),
         currency,
         pricingEffectiveAt,
       ),
-    enabled: Boolean(session && can('viewPricing') && visibleItems.length),
+    enabled: Boolean(session && can('viewPricing') && itemRows.length),
   });
 
   if (!session) return null;
@@ -220,7 +216,7 @@ export function CatalogPage() {
         <section className="mt-6">
           <DDataTable
             columns={itemColumns}
-            data={visibleItems}
+            data={itemRows}
             loading={items.isLoading}
             rowKey="id"
             searchable
@@ -282,6 +278,16 @@ export function CatalogPage() {
                 ? copy('No matching items found.')
                 : copy('No catalog items are available.')
             }
+            pagination={{
+              page: itemPage,
+              pageSize: itemPageSize,
+              total: items.data?.total ?? 0,
+            }}
+            onPageChange={setItemPage}
+            onPageSizeChange={(size) => {
+              setItemPageSize(size);
+              setItemPage(1);
+            }}
             actions={[
               {
                 label: copy('View details'),
@@ -296,22 +302,12 @@ export function CatalogPage() {
               },
             ]}
           />
-          <TablePagination
-            page={itemPage}
-            pageSize={itemPageSize}
-            hasNext={hasNextItemPage}
-            onPageChange={setItemPage}
-            onPageSizeChange={(size) => {
-              setItemPageSize(size);
-              setItemPage(1);
-            }}
-          />
         </section>
       ) : (
         <section className="mt-6">
           <DDataTable
             columns={categoryColumns}
-            data={visibleCategories}
+            data={categories.data?.items ?? []}
             loading={categories.isLoading}
             rowKey="id"
             searchable
@@ -346,6 +342,16 @@ export function CatalogPage() {
                 ? copy('No matching categories found.')
                 : copy('No catalog categories are available.')
             }
+            pagination={{
+              page: categoryPage,
+              pageSize: categoryPageSize,
+              total: categories.data?.total ?? 0,
+            }}
+            onPageChange={setCategoryPage}
+            onPageSizeChange={(size) => {
+              setCategoryPageSize(size);
+              setCategoryPage(1);
+            }}
             actions={[
               {
                 label: copy('Edit category'),
@@ -354,16 +360,6 @@ export function CatalogPage() {
                 show: () => can('updateCatalog'),
               },
             ]}
-          />
-          <TablePagination
-            page={categoryPage}
-            pageSize={categoryPageSize}
-            hasNext={hasNextCategoryPage}
-            onPageChange={setCategoryPage}
-            onPageSizeChange={(size) => {
-              setCategoryPageSize(size);
-              setCategoryPage(1);
-            }}
           />
         </section>
       )}
