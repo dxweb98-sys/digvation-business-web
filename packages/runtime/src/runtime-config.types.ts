@@ -22,6 +22,25 @@ export type BusinessFoundation =
 export type BusinessLocale = 'id-ID' | 'en-US';
 export type BusinessDateFormat = 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD';
 export type BusinessTimeFormat = 'HH:mm' | 'hh:mm a';
+export type BusinessDashboardWidget =
+  | 'TOP_ITEMS'
+  | 'PAYMENT_MIX'
+  | 'RECENT_TRANSACTIONS'
+  | 'TOP_EMPLOYEES'
+  | 'BUSINESS_INSIGHT';
+export type BusinessReport =
+  | 'business-performance'
+  | 'transactions'
+  | 'catalog-performance'
+  | 'employee-performance'
+  | 'attendance'
+  | 'payments'
+  | 'expenses'
+  | 'cash'
+  | 'settlements'
+  | 'reconciliations'
+  | 'tax'
+  | 'locations';
 
 export interface BrandingConfig {
   mode: BrandingMode;
@@ -88,9 +107,18 @@ export interface EffectiveBusinessPreferences {
   updatedAt: string | null;
 }
 
+export interface EffectiveBusinessExperience {
+  hiddenDashboardWidgets: readonly BusinessDashboardWidget[];
+  hiddenReports: readonly BusinessReport[];
+  version: number;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
 export interface EffectiveBusinessConfiguration {
   profile: EffectiveBusinessProfileConfiguration;
   preferences: EffectiveBusinessPreferences;
+  experience: EffectiveBusinessExperience;
 }
 
 export interface RuntimeAvailabilityConfig {
