@@ -1,5 +1,8 @@
 export { assertApplicationEnabled } from './application-availability';
-export { loadAuthenticatedEntitlements } from './authenticated-runtime-context';
+export {
+  loadAuthenticatedEntitlements,
+  loadAuthenticatedRuntimeAvailability,
+} from './authenticated-runtime-context';
 export { ConnectivityProvider, useConnectivity } from './connectivity-context';
 export type { ConnectivityState } from './connectivity-context';
 export { RuntimeProvider, useRuntime } from './runtime-context';
@@ -11,10 +14,12 @@ export type {
   BrandingConfig,
   BrandingMode,
   BusinessCapability,
+  BusinessFoundation,
   BusinessProduct,
   CapabilityConfig,
   DeploymentProfile,
   EffectiveEntitlementConfig,
+  RuntimeAvailabilityConfig,
   RuntimeConfig,
   RuntimeConfigPort,
   ThemeColorConfig,
