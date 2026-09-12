@@ -29,6 +29,8 @@ interface BackofficeAuthContextValue {
 }
 
 const BackofficeAuthContext = createContext<BackofficeAuthContextValue | null>(null);
+const BUSINESS_CONFIGURATION_CHANGED_EVENT =
+  'digvation:business-configuration-changed';
 
 export function BackofficeAuthProvider({
   auth,
@@ -90,6 +92,21 @@ export function BackofficeAuthProvider({
     setSession(restored);
     setStatus('authenticated');
   }, [auth]);
+
+  useEffect(() => {
+    const handleConfigurationChanged = () => {
+      void refresh();
+    };
+    window.addEventListener(
+      BUSINESS_CONFIGURATION_CHANGED_EVENT,
+      handleConfigurationChanged,
+    );
+    return () =>
+      window.removeEventListener(
+        BUSINESS_CONFIGURATION_CHANGED_EVENT,
+        handleConfigurationChanged,
+      );
+  }, [refresh]);
 
   const getAccessToken = useCallback(() => auth.getAccessToken(), [auth]);
   const expireSession = useCallback(() => {
