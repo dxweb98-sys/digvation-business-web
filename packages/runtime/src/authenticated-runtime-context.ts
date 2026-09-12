@@ -1,9 +1,18 @@
-import type { EffectiveEntitlementConfig } from './runtime-config.types';
+import type {
+  BusinessCapability,
+  EffectiveEntitlementConfig,
+} from './runtime-config.types';
 
 interface RuntimeContextResponse {
   success: boolean;
   data?: { effectiveProducts: string[]; effectiveCapabilities: string[] };
 }
+
+const BUSINESS_CAPABILITIES = new Set<BusinessCapability>([
+  'FINANCE_OPERATIONS',
+  'BUSINESS_ANALYTICS',
+  'WORKFORCE_ATTENDANCE',
+]);
 
 /** Reads business availability from the authenticated backend runtime context. */
 export async function loadAuthenticatedEntitlements(
@@ -18,9 +27,12 @@ export async function loadAuthenticatedEntitlements(
   if (!response.ok || !payload.success || !payload.data)
     throw new Error('RUNTIME_CONTEXT_UNAVAILABLE');
   return {
-    products: payload.data.effectiveProducts.filter((value): value is 'POS' => value === 'POS'),
+    products: payload.data.effectiveProducts.filter(
+      (value): value is 'POS' => value === 'POS',
+    ),
     capabilities: payload.data.effectiveCapabilities.filter(
-      (value): value is 'FINANCE_OPERATIONS' => value === 'FINANCE_OPERATIONS',
+      (value): value is BusinessCapability =>
+        BUSINESS_CAPABILITIES.has(value as BusinessCapability),
     ),
   };
 }
