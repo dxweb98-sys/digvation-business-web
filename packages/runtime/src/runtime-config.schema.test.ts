@@ -17,7 +17,14 @@ describe('runtime config schema', () => {
       },
       effectiveEntitlements: {
         products: ['POS'],
-        capabilities: ['BUSINESS_ANALYTICS', 'WORKFORCE_ATTENDANCE'],
+        capabilities: [
+          'FINANCE_OPERATIONS',
+          'BUSINESS_ANALYTICS',
+          'WORKFORCE_ATTENDANCE',
+          'MEMBERSHIP',
+          'LOYALTY_POINTS',
+          'TAX_FISCAL',
+        ],
       },
       branding: {
         mode: 'WHITE_LABEL',
@@ -46,8 +53,12 @@ describe('runtime config schema', () => {
     expect(parsed.applications.backoffice).toBe(false);
     expect(parsed.effectiveEntitlements.products).toEqual(['POS']);
     expect(parsed.effectiveEntitlements.capabilities).toEqual([
+      'FINANCE_OPERATIONS',
       'BUSINESS_ANALYTICS',
       'WORKFORCE_ATTENDANCE',
+      'MEMBERSHIP',
+      'LOYALTY_POINTS',
+      'TAX_FISCAL',
     ]);
     expect(parsed.theme.preset).toBe('CUSTOM');
   });
