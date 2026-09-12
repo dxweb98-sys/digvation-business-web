@@ -1,3 +1,4 @@
+import { useRuntime } from '@digvation/business-runtime';
 import {
   DBadge,
   DButton,
@@ -12,9 +13,8 @@ import {
   type TableColumn,
 } from '@digvation/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { CircleCheck, CircleOff, Eye, Pencil, Plus } from 'lucide-react';
+import { CircleCheck, CircleOff, Eye, Pencil, Plus, UserRound } from 'lucide-react';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
-import { useRuntime } from '@digvation/business-runtime';
 
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
 import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
@@ -31,10 +31,39 @@ import {
 const defaultPageSize = 20;
 const employeeKey = ['employees'] as const;
 
+const employeeCopy: Record<string, { id: string; en: string }> = {
+  Position: { id: 'Jabatan', en: 'Position' },
+  'Employee profile': { id: 'Profil karyawan', en: 'Employee profile' },
+  'Employment information': { id: 'Informasi kepegawaian', en: 'Employment information' },
+  'Lifecycle history': { id: 'Riwayat status', en: 'Lifecycle history' },
+  'Status changes remain auditable and do not remove historical employee references.': {
+    id: 'Perubahan status tetap dapat diaudit dan tidak menghapus referensi historis karyawan.',
+    en: 'Status changes remain auditable and do not remove historical employee references.',
+  },
+  'System information': { id: 'Informasi sistem', en: 'System information' },
+  'Record version': { id: 'Versi data', en: 'Record version' },
+  'For example, Supervisor, Manager, or Staff': {
+    id: 'Contoh: Supervisor, Manajer, atau Staf',
+    en: 'For example, Supervisor, Manager, or Staff',
+  },
+  'Position is descriptive for now. Service assignment and contribution rules remain configured on service catalog items.': {
+    id: 'Jabatan saat ini bersifat deskriptif. Aturan penugasan jasa dan kontribusi tetap dikonfigurasi pada item jasa di katalog.',
+    en: 'Position is descriptive for now. Service assignment and contribution rules remain configured on service catalog items.',
+  },
+  'Position not set': { id: 'Jabatan belum diatur', en: 'Position not set' },
+};
+
+function useEmployeeLocalization() {
+  const localization = useBackofficeLocalization();
+  const copy = (value: string) =>
+    employeeCopy[value]?.[localization.locale] ?? localization.copy(value);
+  return { ...localization, copy };
+}
+
 export function EmployeesPage() {
   const { session, createApiClient } = useBackofficeAuth();
   const { apiBaseUrl } = useRuntime();
-  const { copy, formatDate } = useBackofficeLocalization();
+  const { copy, formatDate } = useEmployeeLocalization();
   const { showToast } = useToast();
   const queryClient = useQueryClient();
   const api = useMemo(
@@ -49,6 +78,7 @@ export function EmployeesPage() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [statusTarget, setStatusTarget] = useState<Employee | null>(null);
   const [statusReason, setStatusReason] = useState('');
+
   const canCreate = Boolean(session && canPerformBackofficeAction(session, 'createEmployee'));
   const canUpdate = Boolean(session && canPerformBackofficeAction(session, 'updateEmployee'));
   const employees = useQuery({
@@ -68,6 +98,7 @@ export function EmployeesPage() {
     queryFn: () => api.get(selectedEmployeeId!),
     enabled: Boolean(session && selectedEmployeeId),
   });
+
   const refresh = () => void queryClient.invalidateQueries({ queryKey: employeeKey });
   const openStatusChange = (employee: Employee) => {
     setStatusReason('');
@@ -91,10 +122,17 @@ export function EmployeesPage() {
       handleMutationError(error, refresh, copy, showToast, () => setStatusTarget(null));
     }
   };
+
   if (!session) return null;
+
   const columns: TableColumn<Employee>[] = [
     { key: 'code', label: copy('Employee code') },
     { key: 'displayName', label: copy('Display name') },
+    {
+      key: 'position',
+      label: copy('Position'),
+      render: (employee) => employee.position || copy('Not set'),
+    },
     {
       key: 'joinedOn',
       label: copy('Join date'),
@@ -107,6 +145,7 @@ export function EmployeesPage() {
     },
   ];
   const nextStatus = statusTarget?.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+
   return (
     <BackofficePage>
       <BackofficePageHeader
@@ -114,6 +153,7 @@ export function EmployeesPage() {
         title={copy('Employees')}
         description={copy('Manage employees available to POS operations.')}
       />
+
       <section className="mt-6">
         <DDataTable
           columns={columns}
@@ -190,6 +230,7 @@ export function EmployeesPage() {
           ]}
         />
       </section>
+
       <EmployeeEditor
         open={editorId !== null}
         employee={editorId === 'create' ? null : detail.data}
@@ -199,13 +240,14 @@ export function EmployeesPage() {
         onClose={() => setEditorId(null)}
         onSaved={refresh}
       />
-      <EmployeeDetail
+      <EmployeeDetailDialog
         open={detailId !== null}
         employee={detailId ? detail.data : undefined}
         isLoading={Boolean(detailId && detail.isLoading)}
         isError={Boolean(detailId && detail.isError)}
         onClose={() => setDetailId(null)}
       />
+
       <DDialog
         open={Boolean(statusTarget)}
         onClose={() => setStatusTarget(null)}
@@ -234,7 +276,9 @@ export function EmployeesPage() {
         <div className="space-y-4">
           <div className="rounded-[var(--radius-card)] bg-[var(--color-surface-muted)] p-4">
             <p className="font-semibold">{statusTarget?.displayName}</p>
-            <p className="mt-1 text-sm text-[var(--color-text-muted)]">{statusTarget?.code}</p>
+            <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+              {[statusTarget?.code, statusTarget?.position].filter(Boolean).join(' · ')}
+            </p>
           </div>
           <DTextarea
             label={copy('Reason')}
@@ -250,7 +294,7 @@ export function EmployeesPage() {
 }
 
 function StatusBadge({ status }: { status: Employee['status'] }) {
-  const { copy } = useBackofficeLocalization();
+  const { copy } = useEmployeeLocalization();
   return (
     <DBadge variant={status === 'ACTIVE' ? 'success' : 'secondary'}>
       {copy(status === 'ACTIVE' ? 'Active' : 'Inactive')}
@@ -275,34 +319,45 @@ function EmployeeEditor({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const { copy } = useBackofficeLocalization();
+  const { copy } = useEmployeeLocalization();
   const { showToast } = useToast();
   const fresh = employee === null;
   const [code, setCode] = useState(employee?.code ?? '');
   const [displayName, setDisplayName] = useState(employee?.displayName ?? '');
+  const [position, setPosition] = useState(employee?.position ?? '');
   const [joinedOn, setJoinedOn] = useState(employee?.joinedOn ?? '');
+
   useEffect(() => {
     if (employee) {
       setCode(employee.code);
       setDisplayName(employee.displayName);
+      setPosition(employee.position ?? '');
       setJoinedOn(employee.joinedOn ?? '');
     } else if (fresh) {
       setCode('');
       setDisplayName('');
+      setPosition('');
       setJoinedOn('');
     }
   }, [employee, fresh]);
+
   const save = async () => {
     if (!displayName.trim()) return;
     try {
-      if (fresh)
+      if (fresh) {
         await api.create({
           ...(code.trim() ? { code: code.trim().toUpperCase() } : {}),
           displayName: displayName.trim(),
+          position: position.trim() || null,
           ...(joinedOn ? { joinedOn } : {}),
         });
-      else if (employee)
-        await api.update(employee, { displayName: displayName.trim(), joinedOn: joinedOn || null });
+      } else if (employee) {
+        await api.update(employee, {
+          displayName: displayName.trim(),
+          position: position.trim() || null,
+          joinedOn: joinedOn || null,
+        });
+      }
       onSaved();
       showToast({
         variant: 'success',
@@ -314,6 +369,7 @@ function EmployeeEditor({
         handleMutationError(error, onSaved, copy, showToast, onClose);
     }
   };
+
   return (
     <DDialog
       open={open}
@@ -361,6 +417,15 @@ function EmployeeEditor({
             onChange={setDisplayName}
             placeholder={copy('For example, Ari Pratama')}
           />
+          <DInput
+            label={copy('Position')}
+            value={position}
+            onChange={setPosition}
+            placeholder={copy('For example, Supervisor, Manager, or Staff')}
+            hint={copy(
+              'Position is descriptive for now. Service assignment and contribution rules remain configured on service catalog items.',
+            )}
+          />
           <DDatePicker
             label={copy('Join date')}
             value={joinedOn}
@@ -376,7 +441,7 @@ function EmployeeEditor({
   );
 }
 
-function EmployeeDetail({
+function EmployeeDetailDialog({
   open,
   employee,
   isLoading,
@@ -389,12 +454,15 @@ function EmployeeDetail({
   isError: boolean;
   onClose: () => void;
 }) {
-  const { copy, formatDate } = useBackofficeLocalization();
+  const { copy, formatDate } = useEmployeeLocalization();
+
   return (
     <DDialog
       open={open}
       onClose={onClose}
+      size="xl"
       title={copy('Employee details')}
+      description={employee ? `${employee.code} · ${employee.position || copy('Position not set')}` : undefined}
       footer={
         <div className="flex justify-end">
           <DButton variant="secondary" onClick={onClose}>
@@ -409,48 +477,88 @@ function EmployeeDetail({
         <DialogLoadError />
       ) : (
         employee && (
-          <div className="space-y-8">
-            <div className="border-b border-[var(--color-border)] pb-6">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-xl font-semibold">{employee.displayName}</h2>
-                  <p className="mt-1 text-sm text-[var(--color-text-muted)]">{employee.code}</p>
+          <div className="space-y-5">
+            <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4 sm:p-5">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex min-w-0 items-start gap-3">
+                  <div className="grid size-12 shrink-0 place-items-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
+                    <UserRound aria-hidden="true" className="size-5 text-[var(--color-text-muted)]" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+                      {copy('Employee profile')}
+                    </p>
+                    <h2 className="mt-1 break-words text-xl font-semibold tracking-tight">
+                      {employee.displayName}
+                    </h2>
+                    <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+                      {employee.code}
+                    </p>
+                  </div>
                 </div>
                 <StatusBadge status={employee.status} />
               </div>
-              <div className="mt-5 flex flex-wrap gap-x-8 gap-y-3 text-sm">
+
+              <div className="mt-5 grid gap-4 border-t border-[var(--color-border)] pt-4 sm:grid-cols-3">
+                <SummaryFact label={copy('Position')} value={employee.position || copy('Not set')} />
                 <SummaryFact
                   label={copy('Join date')}
                   value={formatJoinedOn(employee.joinedOn, formatDate, copy)}
                 />
                 <SummaryFact label={copy('Tenure')} value={formatTenure(employee.joinedOn, copy)} />
               </div>
-            </div>
-            <DetailSection title={copy('Employee Information')}>
-              <Field
-                label={copy('Current status')}
-                value={<StatusBadge status={employee.status} />}
-              />
-            </DetailSection>
-            <DetailSection title={copy('Employee History')}>
+            </section>
+
+            <DetailCard
+              title={copy('Employment information')}
+              description={copy(
+                'Position is descriptive for now. Service assignment and contribution rules remain configured on service catalog items.',
+              )}
+            >
+              <DetailGrid>
+                <Field label={copy('Employee code')} value={employee.code} />
+                <Field label={copy('Display name')} value={employee.displayName} />
+                <Field label={copy('Position')} value={employee.position || copy('Not set')} />
+                <Field
+                  label={copy('Current status')}
+                  value={<StatusBadge status={employee.status} />}
+                />
+                <Field
+                  label={copy('Join date')}
+                  value={formatJoinedOn(employee.joinedOn, formatDate, copy)}
+                />
+                <Field label={copy('Tenure')} value={formatTenure(employee.joinedOn, copy)} />
+              </DetailGrid>
+            </DetailCard>
+
+            <DetailCard
+              title={copy('Lifecycle history')}
+              description={copy(
+                'Status changes remain auditable and do not remove historical employee references.',
+              )}
+            >
               <LifecycleHistory employee={employee} copy={copy} formatDate={formatDate} />
-            </DetailSection>
-            <DetailSection title={copy('System Information')}>
-              <Field
-                label={copy('Created')}
-                value={formatDate(new Date(employee.createdAt), {
-                  dateStyle: 'medium',
-                  timeStyle: 'short',
-                })}
-              />
-              <Field
-                label={copy('Updated')}
-                value={formatDate(new Date(employee.updatedAt), {
-                  dateStyle: 'medium',
-                  timeStyle: 'short',
-                })}
-              />
-            </DetailSection>
+            </DetailCard>
+
+            <DetailCard title={copy('System information')}>
+              <DetailGrid>
+                <Field
+                  label={copy('Created')}
+                  value={formatDate(new Date(employee.createdAt), {
+                    dateStyle: 'medium',
+                    timeStyle: 'short',
+                  })}
+                />
+                <Field
+                  label={copy('Updated')}
+                  value={formatDate(new Date(employee.updatedAt), {
+                    dateStyle: 'medium',
+                    timeStyle: 'short',
+                  })}
+                />
+                <Field label={copy('Record version')} value={String(employee.version)} />
+              </DetailGrid>
+            </DetailCard>
           </div>
         )
       )}
@@ -459,7 +567,7 @@ function EmployeeDetail({
 }
 
 function DialogLoading() {
-  const { copy } = useBackofficeLocalization();
+  const { copy } = useEmployeeLocalization();
   return (
     <div className="space-y-4" aria-live="polite">
       <p className="text-sm text-[var(--color-text-muted)]">{copy('Loading...')}</p>
@@ -470,7 +578,7 @@ function DialogLoading() {
 }
 
 function DialogLoadError() {
-  const { copy } = useBackofficeLocalization();
+  const { copy } = useEmployeeLocalization();
   return (
     <p className="text-sm text-[var(--color-text-muted)]">
       {copy('Could not load employee details.')}
@@ -512,7 +620,11 @@ function LifecycleHistory({
           timeStyle: event.event === 'JOINED' ? undefined : 'short',
         }),
     },
-    { key: 'reason', label: copy('Reason'), render: (event) => event.reason ?? copy('Not set') },
+    {
+      key: 'reason',
+      label: copy('Reason'),
+      render: (event) => event.reason ?? copy('Not set'),
+    },
     {
       key: 'actor',
       label: copy('Changed by'),
@@ -540,6 +652,7 @@ interface LifecycleEvent {
   actorId: string | null;
   actorKind: string | null;
 }
+
 function lifecycleEvents(employee: EmployeeDetail): LifecycleEvent[] {
   const joined = employee.joinedOn
     ? [
@@ -555,6 +668,7 @@ function lifecycleEvents(employee: EmployeeDetail): LifecycleEvent[] {
     : [];
   return [...joined, ...employee.statusHistory.map(historyEvent)];
 }
+
 function historyEvent(entry: EmployeeStatusHistoryEntry): LifecycleEvent {
   return {
     id: entry.id,
@@ -565,30 +679,51 @@ function historyEvent(entry: EmployeeStatusHistoryEntry): LifecycleEvent {
     actorKind: entry.actorKind,
   };
 }
+
 function SummaryFact({ label, value }: { label: string; value: string }) {
   return (
-    <div>
+    <div className="min-w-0">
       <p className="text-xs font-medium text-[var(--color-text-muted)]">{label}</p>
-      <p className="mt-1 font-medium">{value}</p>
+      <p className="mt-1 break-words font-medium">{value}</p>
     </div>
   );
 }
-function DetailSection({ title, children }: { title: string; children: ReactNode }) {
+
+function DetailCard({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: ReactNode;
+}) {
   return (
-    <section>
-      <h3 className="text-sm font-semibold">{title}</h3>
-      <dl className="mt-3 grid gap-4 sm:grid-cols-2">{children}</dl>
+    <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:p-5">
+      <div>
+        <h3 className="text-sm font-semibold text-[var(--color-text)]">{title}</h3>
+        {description ? (
+          <p className="mt-1 max-w-3xl text-sm text-[var(--color-text-muted)]">{description}</p>
+        ) : null}
+      </div>
+      <div className="mt-4 min-w-0">{children}</div>
     </section>
   );
 }
+
+function DetailGrid({ children }: { children: ReactNode }) {
+  return <dl className="grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">{children}</dl>;
+}
+
 function Field({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div>
+    <div className="min-w-0">
       <dt className="text-xs font-medium text-[var(--color-text-muted)]">{label}</dt>
-      <dd className="mt-1 break-words">{value}</dd>
+      <dd className="mt-1 break-words text-[var(--color-text)]">{value}</dd>
     </div>
   );
 }
+
 function formatJoinedOn(
   joinedOn: string | null,
   formatDate: (value: Date, options?: Intl.DateTimeFormatOptions) => string,
@@ -598,6 +733,7 @@ function formatJoinedOn(
     ? formatDate(new Date(`${joinedOn}T00:00:00`), { dateStyle: 'medium' })
     : copy('Not set');
 }
+
 function formatTenure(joinedOn: string | null, copy: (value: string) => string) {
   if (!joinedOn) return copy('Not set');
   const [year = 0, month = 0, day = 0] = joinedOn.split('-').map(Number);
@@ -626,6 +762,7 @@ function formatTenure(joinedOn: string | null, copy: (value: string) => string) 
   ].filter(Boolean);
   return parts.join(' ') || `0 ${copy('days')}`;
 }
+
 function addCalendarMonths(date: Date, months: number) {
   const target = new Date(date.getFullYear(), date.getMonth() + months, 1);
   return new Date(
@@ -634,6 +771,7 @@ function addCalendarMonths(date: Date, months: number) {
     Math.min(date.getDate(), new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate()),
   );
 }
+
 function handleMutationError(
   error: unknown,
   refresh: () => void,
