@@ -15,7 +15,7 @@ interface FinancialAccountPage<T> extends Page<T> {
 
 export interface FinancialAccount {
   id: string;
-  code: string;
+  code: string | null;
   name: string;
   type: FinancialAccountType;
   currency: string;
@@ -36,7 +36,7 @@ export interface PaymentRoute {
   paymentMethod: PaymentMethod;
   currency: string;
   financialAccountId: string;
-  financialAccountCode: string;
+  financialAccountCode: string | null;
   financialAccountName: string;
   financialAccountType: FinancialAccountType;
   status: RecordStatus;

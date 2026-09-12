@@ -14,7 +14,6 @@ import { EmployeesPage } from '../../modules/workforce';
 import {
   ExpensesPage,
   FinancialAccountsPage,
-  FinancialOperationsPage,
 } from '../../modules/finance';
 import { TransactionHistoryPage } from '../../modules/pos';
 import { ReportsPage } from '../../modules/reporting';
@@ -51,10 +50,6 @@ export const backofficeRouter = createBrowserRouter([
           {
             element: <AuthorizedRoute capability="expenses" />,
             children: [{ path: '/expenses', element: <ExpensesPage /> }],
-          },
-          {
-            element: <AuthorizedRoute capability="financialOperations" />,
-            children: [{ path: '/reconciliation', element: <FinancialOperationsPage /> }],
           },
           {
             element: <AuthorizedRoute capability="reports" />,

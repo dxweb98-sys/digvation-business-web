@@ -65,12 +65,6 @@ const navigationSections: ReadonlyArray<{
         capability: 'financialAccounts',
       },
       { label: 'expenses', to: '/expenses', icon: BookOpen, capability: 'expenses' },
-      {
-        label: 'reconciliation',
-        to: '/reconciliation',
-        icon: ChartNoAxesCombined,
-        capability: 'financialOperations',
-      },
     ],
   },
   {

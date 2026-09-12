@@ -1,6 +1,6 @@
 import type { ApiClient } from '@digvation/business-api';
 export type ExpenseStatus = 'PENDING' | 'APPROVED' | 'REJECTED'; export type ExpenseOrigin = 'BACKOFFICE' | 'CASHIER';
-export interface Expense { id: string; sellingLocationId: string; sellingLocationName: string; financialAccountId: string; financialAccountName: string; origin: ExpenseOrigin; status: ExpenseStatus; currency: string; amount: string; note: string | null; occurredAt: string; version: number; rejectionNote: string | null; }
+export interface Expense { id: string; sellingLocationId: string; sellingLocationName: string; financialAccountId: string; financialAccountName: string; financialAccountType: 'CASH' | 'BANK' | 'E_WALLET'; origin: ExpenseOrigin; categoryCode: string; status: ExpenseStatus; currency: string; amount: string; note: string | null; occurredAt: string; version: number; createdByActorId: string; approvedAt: string | null; approvedByActorId: string | null; rejectedAt: string | null; rejectedByActorId: string | null; rejectionNote: string | null; }
 export interface Page<T> { items: T[]; total: number; limit: number; offset: number; }
 type Query = Record<string, string | number | undefined>;
 const qs = (query: Query) => new URLSearchParams(Object.entries(query).filter(([, value]) => value !== undefined && value !== '') as [string, string][]).toString();

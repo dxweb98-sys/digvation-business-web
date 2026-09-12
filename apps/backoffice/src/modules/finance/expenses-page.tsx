@@ -1,7 +1,6 @@
 import {
   DBadge,
   DButton,
-  DConfirmDialog,
   DCurrencyInput,
   DDataTable,
   DDatePicker,
@@ -42,7 +41,9 @@ export function ExpensesPage() {
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
   const [editing, setEditing] = useState<Expense | null | undefined>();
+  const [detail, setDetail] = useState<Expense | null>(null);
   const [rejecting, setRejecting] = useState<Expense | null>(null);
+  const [rejectionNote, setRejectionNote] = useState('');
   const list = useQuery({
     queryKey: ['expenses', offset, size, q, status],
     queryFn: () => api.list({ q, status, limit: size, offset }),
@@ -55,7 +56,8 @@ export function ExpensesPage() {
       render: (x) => formatDate(new Date(x.occurredAt), { dateStyle: 'medium' }),
     },
     { key: 'location', label: copy('Selling location'), render: (x) => x.sellingLocationName },
-    { key: 'account', label: copy('Cash account'), render: (x) => x.financialAccountName },
+    { key: 'account', label: copy('Source account'), render: (x) => x.financialAccountName },
+    { key: 'category', label: copy('Category'), render: (x) => x.categoryCode },
     { key: 'description', label: copy('Description'), render: (x) => x.note || '—' },
     { key: 'amount', label: copy('Amount'), render: (x) => formatMoney(x.amount, x.currency) },
     { key: 'status', label: copy('Status'), render: (x) => <Badge status={x.status} /> },
@@ -65,7 +67,7 @@ export function ExpensesPage() {
       <BackofficePageHeader
         eyebrow={copy('Finance')}
         title={copy('Expenses')}
-        description={copy('Record, review, and approve cash expenses.')}
+        description={copy('Record, review, and approve Finance expenses.')}
       />
       <section className="mt-6">
         <DDataTable
@@ -110,7 +112,7 @@ export function ExpensesPage() {
             {
               label: copy('View expense'),
               icon: <Eye aria-hidden="true" className="size-4" />,
-              onClick: setEditing,
+              onClick: setDetail,
             },
             {
               label: copy('Edit expense'),
@@ -158,20 +160,60 @@ export function ExpensesPage() {
         onClose={() => setEditing(undefined)}
         onSaved={refresh}
       />
-      <DConfirmDialog
+      <ExpenseDetail item={detail} onClose={() => setDetail(null)} />
+      <DDialog
         open={Boolean(rejecting)}
-        onClose={() => setRejecting(null)}
-        onConfirm={() => {
-          if (rejecting) void api.reject(rejecting).then(refresh);
-          setRejecting(null);
-        }}
+        onClose={() => { setRejecting(null); setRejectionNote(''); }}
         title={copy('Reject expense?')}
-        message={copy('This expense will not post a cash movement.')}
-        confirmLabel={copy('Reject')}
-        variant="danger"
-      />
+        description={copy('This expense will not be realized. A rejection note is required.')}
+        footer={<div className="flex justify-end gap-2"><DButton variant="secondary" onClick={() => { setRejecting(null); setRejectionNote(''); }}>{copy('Cancel')}</DButton><DButton variant="danger" disabled={!rejectionNote.trim()} onClick={() => { if (rejecting) void api.reject(rejecting, rejectionNote).then(refresh); setRejecting(null); setRejectionNote(''); }}>{copy('Reject')}</DButton></div>}
+      >
+        <DTextarea label={copy('Rejection note')} value={rejectionNote} onChange={setRejectionNote} />
+      </DDialog>
     </BackofficePage>
   );
+}
+function ExpenseDetail({ item, onClose }: { item: Expense | null; onClose: () => void }) {
+  const { copy, formatDate, formatMoney } = useBackofficeLocalization();
+  const facts: Array<[string, string]> = item ? [
+    [copy('Category'), expenseCategoryLabel(item.categoryCode, copy)],
+    [copy('Amount'), formatMoney(item.amount, item.currency)],
+    [copy('Occurred date'), formatDate(new Date(item.occurredAt), { dateStyle: 'medium' })],
+    [copy('Source financial account'), item.financialAccountName],
+    [copy('Location'), item.sellingLocationName],
+    [copy('Description'), item.note || '—'],
+    [copy('Origin'), copy(item.origin)],
+    [copy('Requested by'), item.createdByActorId],
+    [copy('Status'), item.status],
+    ...(item.approvedAt ? [[copy('Approved by'), item.approvedByActorId || '—'] as [string, string], [copy('Decision time'), formatDate(new Date(item.approvedAt), { dateStyle: 'medium', timeStyle: 'short' })] as [string, string]] : []),
+    ...(item.rejectedAt ? [[copy('Rejected by'), item.rejectedByActorId || '—'] as [string, string], [copy('Decision time'), formatDate(new Date(item.rejectedAt), { dateStyle: 'medium', timeStyle: 'short' })] as [string, string], [copy('Decision note'), item.rejectionNote || '—'] as [string, string]] : []),
+  ] : [];
+  const Field = ({ fact }: { fact: [string, string] }) => (
+    <div className="min-w-0">
+      <dt className="text-xs font-medium text-[var(--color-text-muted)]">{fact[0]}</dt>
+      <dd className="mt-1 break-words text-sm text-[var(--color-text)]">{fact[1]}</dd>
+    </div>
+  );
+  return (
+    <DDialog open={Boolean(item)} onClose={onClose} title={copy('Expense details')} footer={<div className="flex justify-end"><DButton variant="secondary" onClick={onClose}>{copy('Close')}</DButton></div>}>
+      {item ? <div className="space-y-5">
+        <section className="border-b border-[var(--color-border)] pb-4">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div><p className="text-xs font-medium text-[var(--color-text-muted)]">{copy('Amount')}</p><p className="mt-1 text-2xl font-bold tracking-tight">{formatMoney(item.amount, item.currency)}</p></div>
+            <Badge status={item.status} />
+          </div>
+          <dl className="mt-4 grid gap-4 sm:grid-cols-2"><Field fact={facts[0]!} /><Field fact={facts[2]!} /></dl>
+        </section>
+        <section><h3 className="mb-3 text-sm font-semibold">{copy('Expense information')}</h3><dl className="grid gap-4 sm:grid-cols-2"><Field fact={facts[5]!} /><Field fact={facts[3]!} /><Field fact={facts[4]!} /></dl></section>
+        <section className="border-t border-[var(--color-border)] pt-4"><h3 className="mb-3 text-sm font-semibold">{copy('Request information')}</h3><dl className="grid gap-4 sm:grid-cols-2"><Field fact={facts[6]!} /><Field fact={facts[7]!} /></dl></section>
+        {facts.length > 9 ? <section className="border-t border-[var(--color-border)] pt-4"><h3 className="mb-3 text-sm font-semibold">{copy('Decision and audit')}</h3><dl className="grid gap-4 sm:grid-cols-2">{facts.slice(9).map((fact) => <Field key={fact[0]} fact={fact} />)}</dl></section> : null}
+      </div> : null}
+    </DDialog>
+  );
+}
+function expenseCategoryLabel(categoryCode: string, copy: (value: string) => string) {
+  const labels: Record<string, string> = { OPERATIONS: 'Operations', TRANSPORT: 'Transport', SUPPLIES: 'Supplies', OTHER: 'Other' };
+  return copy(labels[categoryCode] ?? categoryCode);
 }
 function ExpenseDialog({
   item,
@@ -192,6 +234,7 @@ function ExpenseDialog({
   const [locationId, setLocationId] = useState(item?.sellingLocationId ?? '');
   const [accountId, setAccountId] = useState(item?.financialAccountId ?? '');
   const [amount, setAmount] = useState(item?.amount ?? '');
+  const [categoryCode, setCategoryCode] = useState(item?.categoryCode ?? '');
   const [note, setNote] = useState(item?.note ?? '');
   const [date, setDate] = useState(item?.occurredAt ?? new Date().toISOString());
   const locations = useQuery({
@@ -209,12 +252,13 @@ function ExpenseDialog({
       const input = {
         sellingLocationId: locationId,
         financialAccountId: accountId,
+        categoryCode,
         amount,
         note: note || null,
         occurredAt: date,
       };
       if (item) await api.update(item, input);
-      else await api.create({ ...input, origin: 'BACKOFFICE' });
+      else await api.create(input);
       showToast({
         variant: 'success',
         title: copy(item ? 'Expense updated.' : 'Expense recorded.'),
@@ -238,7 +282,7 @@ function ExpenseDialog({
           <DButton variant="secondary" onClick={onClose}>
             {copy('Cancel')}
           </DButton>
-          <DButton disabled={!locationId || !accountId || !amount} onClick={() => void save()}>
+          <DButton disabled={!locationId || !accountId || !amount || !categoryCode} onClick={() => void save()}>
             {copy('Save')}
           </DButton>
         </div>
@@ -254,12 +298,23 @@ function ExpenseDialog({
           onChange={(x) => setLocationId(String(x))}
         />
         <DSelect
-          label={copy('Cash account')}
+          label={copy('Source financial account')}
           value={accountId}
           options={(accounts.data?.items ?? [])
-            .filter((x) => x.status === 'ACTIVE' && x.type === 'CASH')
+            .filter((x) => x.status === 'ACTIVE' && ['CASH', 'BANK', 'E_WALLET'].includes(x.type))
             .map((x) => ({ value: x.id, label: x.name }))}
           onChange={(x) => setAccountId(String(x))}
+        />
+        <DSelect
+          label={copy('Category')}
+          value={categoryCode}
+          options={[
+            { value: 'OPERATIONS', label: copy('Operations') },
+            { value: 'TRANSPORT', label: copy('Transport') },
+            { value: 'SUPPLIES', label: copy('Supplies') },
+            { value: 'OTHER', label: copy('Other') },
+          ]}
+          onChange={(x) => setCategoryCode(String(x))}
         />
         <DCurrencyInput label={copy('Amount')} value={amount} onValueChange={setAmount} />
         <DDatePicker label={copy('Date')} value={date} onChange={setDate} />

@@ -291,7 +291,6 @@ function AccountEditor({
   const [accountReference, setAccountReference] = useState(account?.accountReference ?? '');
   const [accountHolderName, setAccountHolderName] = useState(account?.accountHolderName ?? '');
   const valid = Boolean(
-    code.trim() &&
     name.trim() &&
     /^[A-Z]{3}$/.test(currency.trim().toUpperCase()) &&
     (type === 'CASH' || (institutionName.trim() && accountReference.trim())),
@@ -310,7 +309,7 @@ function AccountEditor({
       if (account) await api.updateAccount(account, { name: name.trim(), ...details });
       else
         await api.createAccount({
-          code: code.trim().toUpperCase(),
+          code: code.trim().toUpperCase() || null,
           name: name.trim(),
           type,
           currency: currency.trim().toUpperCase(),
@@ -349,11 +348,11 @@ function AccountEditor({
     >
       <div className="grid gap-4 sm:grid-cols-2">
         <DInput
-          label={copy('Account code')}
+          label={copy('Account code (optional)')}
           value={code}
           onChange={setCode}
           disabled={Boolean(account)}
-          placeholder="MAIN_BANK"
+          placeholder={copy('Leave blank when no manual code is needed')}
           autoFocus
         />
         <DInput
@@ -641,12 +640,13 @@ function RouteEditor({
     if (!valid) return;
     try {
       if (route) await api.updateRoute(route, { financialAccountId: accountId, status });
-      else
-        await api.createRoute({
-          sellingLocationId: locationId,
-          paymentMethod: method,
-          financialAccountId: accountId,
-        });
+      else {
+        const account = (accounts.data?.items ?? []).find((item) => item.id === accountId);
+        const existing = await api.listRoutes({ sellingLocationId: locationId, paymentMethod: method, limit: 100, offset: 0 });
+        const sameScope = existing.items.find((item) => item.currency === account?.currency);
+        if (sameScope) await api.updateRoute(sameScope, { financialAccountId: accountId, status: 'ACTIVE' });
+        else await api.createRoute({ sellingLocationId: locationId, paymentMethod: method, financialAccountId: accountId });
+      }
       onSaved();
       onClose();
       showToast({
