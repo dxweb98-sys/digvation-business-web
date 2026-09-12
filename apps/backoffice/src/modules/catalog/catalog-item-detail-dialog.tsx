@@ -3,12 +3,13 @@ import {
   DAccordionItem,
   DBadge,
   DButton,
+  DConfirmDialog,
   DDataTable,
   DDialog,
   type TableColumn,
 } from '@digvation/ui';
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
-import { BadgeDollarSign, Pencil, Plus } from 'lucide-react';
+import { BadgeDollarSign, Pencil, Plus, Power, RotateCcw } from 'lucide-react';
 import { useState } from 'react';
 import type {
   CatalogApi,
@@ -18,6 +19,7 @@ import type {
   TaxCategory,
   Variant,
 } from './catalog-api';
+import { CatalogItemThumbnail } from './catalog-item-thumbnail';
 import { useCatalogLocalization } from './catalog-localization';
 import { PriceChangeDialog, PriceHistoryTable, VariantPriceLabel } from './catalog-pricing';
 import { CatalogNamedRecordDialog } from './catalog-record-dialog';
@@ -73,6 +75,8 @@ export function CatalogItemDetailDialog({
   const { copy } = useCatalogLocalization();
   const [editingVariant, setEditingVariant] = useState<Variant | null | undefined>();
   const [pricingTarget, setPricingTarget] = useState<'default' | Variant | null>(null);
+  const [statusTarget, setStatusTarget] = useState<Variant | null>(null);
+  const [changingStatus, setChangingStatus] = useState(false);
   const variants = useQuery({
     queryKey: keys.variants(item?.id ?? ''),
     queryFn: () => api.listVariants(item!.id),
@@ -142,6 +146,21 @@ export function CatalogItemDetailDialog({
     },
   ];
 
+  const confirmVariantStatus = async () => {
+    if (!statusTarget || changingStatus) return;
+    setChangingStatus(true);
+    try {
+      await api.updateVariant(item.id, statusTarget, {
+        status: statusTarget.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE',
+      });
+      setStatusTarget(null);
+      refreshVariantsAndCount();
+      void client.invalidateQueries({ queryKey: ['catalog', 'default-prices'] });
+    } finally {
+      setChangingStatus(false);
+    }
+  };
+
   return (
     <DDialog
       open
@@ -164,46 +183,54 @@ export function CatalogItemDetailDialog({
     >
       <div className="space-y-4">
         <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
-                {copy('Item overview')}
-              </p>
-              <h2 className="mt-1 text-lg font-semibold tracking-tight">{item.name}</h2>
-              <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">{item.code}</p>
-            </div>
-            <Status value={item.lifecycle} />
-          </div>
-          <dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-            <DetailField label={copy('Type')} value={copy(humanize(item.type))} />
-            <DetailField label={copy('Category')} value={categoryName} />
-            <DetailField
-              label={copy('Default Price')}
-              value={
-                <PriceLabel
-                  price={defaultPrice}
-                  loading={defaultPriceLoading}
-                  available={canViewPricing}
-                  emptyLabel={copy('Not set')}
+          <div className="grid gap-5 md:grid-cols-[auto_minmax(0,1fr)]">
+            <CatalogItemThumbnail api={api} itemId={item.id} itemName={item.name} size="detail" />
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+                    {copy('Item overview')}
+                  </p>
+                  <h2 className="mt-1 break-words text-xl font-semibold tracking-tight">{item.name}</h2>
+                  <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">{item.code}</p>
+                </div>
+                <Status value={item.lifecycle} />
+              </div>
+              <dl className="mt-4 grid gap-x-5 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
+                <DetailField
+                  label={copy('Default Price')}
+                  value={
+                    <PriceLabel
+                      price={defaultPrice}
+                      loading={defaultPriceLoading}
+                      available={canViewPricing}
+                      emptyLabel={copy('Not set')}
+                    />
+                  }
+                  emphasized
                 />
-              }
-              emphasized
-            />
-            <DetailField label={copy('Tax')} value={canViewTax ? taxCategoryName : '—'} />
-            <DetailField label={copy('Variants')} value={item.variantCount} />
-          </dl>
-          <dl className="mt-4 grid gap-4 border-t border-[var(--color-border)] pt-4 sm:grid-cols-2">
+                <DetailField label={copy('Tax')} value={canViewTax ? taxCategoryName : '—'} />
+                <DetailField label={copy('Category')} value={categoryName} />
+                <DetailField label={copy('Variants')} value={item.variantCount} />
+              </dl>
+            </div>
+          </div>
+
+          <dl className="mt-5 grid gap-4 border-t border-[var(--color-border)] pt-4 sm:grid-cols-2 lg:grid-cols-4">
+            <DetailField label={copy('Type')} value={copy(humanize(item.type))} />
             <DetailField
               label={copy('Fulfillment')}
               value={copy(humanize(item.fulfillmentBehavior))}
             />
-            <DetailField
-              label={copy('Description')}
-              value={item.description?.trim() || copy('No description')}
-            />
+            <div className="sm:col-span-2">
+              <DetailField
+                label={copy('Description')}
+                value={item.description?.trim() || copy('No description')}
+              />
+            </div>
           </dl>
           {canViewTax ? (
-            <p className="mt-3 text-xs leading-5 text-[var(--color-text-muted)]">
+            <p className="mt-4 border-t border-[var(--color-border)] pt-3 text-xs leading-5 text-[var(--color-text-muted)]">
               {item.taxCategoryId
                 ? copy(
                     'This item uses its assigned item tax category. Transaction tax may also apply when enabled.',
@@ -299,6 +326,18 @@ export function CatalogItemDetailDialog({
                   onClick: setPricingTarget,
                   show: () => canViewPricing,
                 },
+                {
+                  label: copy('Deactivate variant'),
+                  icon: <Power className="size-4" />,
+                  onClick: setStatusTarget,
+                  show: (variant) => canUpdate && variant.status === 'ACTIVE',
+                },
+                {
+                  label: copy('Reactivate variant'),
+                  icon: <RotateCcw className="size-4" />,
+                  onClick: setStatusTarget,
+                  show: (variant) => canUpdate && variant.status === 'INACTIVE',
+                },
               ]}
             />
           </DAccordionItem>
@@ -388,6 +427,28 @@ export function CatalogItemDetailDialog({
         api={api}
         onClose={() => setPricingTarget(null)}
         onSaved={onPricingChanged}
+      />
+      <DConfirmDialog
+        open={Boolean(statusTarget)}
+        onClose={() => setStatusTarget(null)}
+        onConfirm={() => void confirmVariantStatus()}
+        loading={changingStatus}
+        variant={statusTarget?.status === 'ACTIVE' ? 'danger' : 'primary'}
+        title={
+          statusTarget?.status === 'ACTIVE'
+            ? copy('Deactivate variant?')
+            : copy('Reactivate variant?')
+        }
+        message={
+          statusTarget?.status === 'ACTIVE'
+            ? copy('This variant will stop appearing in active selling choices. Existing transaction and price history will be preserved.')
+            : copy('This variant will become available for active selling choices again.')
+        }
+        confirmLabel={
+          statusTarget?.status === 'ACTIVE'
+            ? copy('Deactivate variant')
+            : copy('Reactivate variant')
+        }
       />
     </DDialog>
   );
