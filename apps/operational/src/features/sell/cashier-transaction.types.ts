@@ -26,10 +26,23 @@ export interface NamedRecord {
 export type SellingLocation = NamedRecord;
 export type CatalogCategory = NamedRecord;
 
+export interface EmployeePosition {
+  id: string;
+  code: string;
+  name: string;
+  serviceAssignmentEnabled: boolean;
+  status: RecordStatus;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Employee {
   id: string;
   code: string;
   displayName: string;
+  positionId?: string | null;
+  position?: EmployeePosition | null;
   status: RecordStatus;
   version: number;
   createdAt: string;
