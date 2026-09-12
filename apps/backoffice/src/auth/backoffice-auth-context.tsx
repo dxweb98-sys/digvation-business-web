@@ -23,6 +23,7 @@ interface BackofficeAuthContextValue {
   session: BackofficeSession | null;
   login(input: LoginCredentials): Promise<void>;
   logout(): Promise<void>;
+  refresh(): Promise<void>;
   getAccessToken(): Promise<string | null>;
   createApiClient(baseUrl: string): ApiClient;
 }
@@ -78,6 +79,18 @@ export function BackofficeAuthProvider({
     showToast({ variant: 'success', title: t('signedOut') });
   }, [auth, showToast, t]);
 
+  const refresh = useCallback(async () => {
+    const restored = await auth.restore();
+    if (!restored) {
+      setSession(null);
+      setStatus('unauthenticated');
+      return;
+    }
+    sessionExpired.current = false;
+    setSession(restored);
+    setStatus('authenticated');
+  }, [auth]);
+
   const getAccessToken = useCallback(() => auth.getAccessToken(), [auth]);
   const expireSession = useCallback(() => {
     if (sessionExpired.current) return;
@@ -93,8 +106,8 @@ export function BackofficeAuthProvider({
   );
 
   const value = useMemo(
-    () => ({ status, session, login, logout, getAccessToken, createApiClient }),
-    [createApiClient, getAccessToken, login, logout, session, status],
+    () => ({ status, session, login, logout, refresh, getAccessToken, createApiClient }),
+    [createApiClient, getAccessToken, login, logout, refresh, session, status],
   );
   return <BackofficeAuthContext.Provider value={value}>{children}</BackofficeAuthContext.Provider>;
 }
