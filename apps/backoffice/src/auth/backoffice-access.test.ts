@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import type { EffectiveEntitlementConfig } from '@digvation/business-runtime';
-
 import type { BackofficeSession } from './auth-session';
 import { canAccessBackoffice } from './backoffice-access';
 
@@ -15,60 +13,29 @@ function sessionWith(...permissions: string[]): BackofficeSession {
       roles: [],
     },
     effectiveEntitlements: { products: [], capabilities: [] },
+    effectiveFoundations: ['IDENTITY_ACCESS', 'AUDIT_ACTIVITY'],
   };
 }
 
-const platformOnly: EffectiveEntitlementConfig = {
-  products: [],
-  capabilities: [],
-};
-
-describe('Backoffice entitlement access', () => {
-  it('requires POS for the transaction contribution', () => {
-    const session = sessionWith('sales:read');
-
-    expect(canAccessBackoffice(session, 'transactions', platformOnly)).toBe(false);
-    expect(
-      canAccessBackoffice(session, 'transactions', {
-        ...platformOnly,
-        products: ['POS'],
-      }),
-    ).toBe(true);
+describe('Backoffice effective permission access', () => {
+  it('shows a contribution when Runtime projected its read permission', () => {
+    expect(canAccessBackoffice(sessionWith('sales:read'), 'transactions')).toBe(true);
+    expect(canAccessBackoffice(sessionWith(), 'transactions')).toBe(false);
   });
 
-  it('requires Finance Operations for finance contributions', () => {
-    const session = sessionWith('expenses:read');
-
-    expect(canAccessBackoffice(session, 'expenses', platformOnly)).toBe(false);
-    expect(
-      canAccessBackoffice(session, 'expenses', {
-        ...platformOnly,
-        capabilities: ['FINANCE_OPERATIONS'],
-      }),
-    ).toBe(true);
+  it('does not duplicate Finance entitlement rules in the Web layer', () => {
+    expect(canAccessBackoffice(sessionWith('expenses:read'), 'expenses')).toBe(true);
+    expect(canAccessBackoffice(sessionWith(), 'expenses')).toBe(false);
   });
 
-  it('requires Workforce Attendance plus read permission for attendance', () => {
-    const session = sessionWith('attendance:read');
-
-    expect(canAccessBackoffice(session, 'attendance', platformOnly)).toBe(false);
-    expect(
-      canAccessBackoffice(session, 'attendance', {
-        ...platformOnly,
-        capabilities: ['WORKFORCE_ATTENDANCE'],
-      }),
-    ).toBe(true);
-    expect(
-      canAccessBackoffice(sessionWith(), 'attendance', {
-        ...platformOnly,
-        capabilities: ['WORKFORCE_ATTENDANCE'],
-      }),
-    ).toBe(false);
+  it('uses projected Attendance permission as the visibility authority', () => {
+    expect(canAccessBackoffice(sessionWith('attendance:read'), 'attendance')).toBe(true);
+    expect(canAccessBackoffice(sessionWith(), 'attendance')).toBe(false);
   });
 
   it('allows shared reporting for any readable authoritative projection', () => {
-    expect(canAccessBackoffice(sessionWith('employees:read'), 'reports', platformOnly)).toBe(true);
-    expect(canAccessBackoffice(sessionWith('attendance:read'), 'reports', platformOnly)).toBe(true);
-    expect(canAccessBackoffice(sessionWith(), 'reports', platformOnly)).toBe(false);
+    expect(canAccessBackoffice(sessionWith('employees:read'), 'reports')).toBe(true);
+    expect(canAccessBackoffice(sessionWith('attendance:read'), 'reports')).toBe(true);
+    expect(canAccessBackoffice(sessionWith(), 'reports')).toBe(false);
   });
 });
