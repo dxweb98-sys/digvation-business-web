@@ -6,7 +6,7 @@ import {
 } from '@digvation/business-runtime';
 import { DLocalizationProvider, DToastProvider } from '@digvation/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import type { RouterProviderProps } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 
@@ -57,6 +57,7 @@ function AuthenticatedBackofficeProviders({
 }: Pick<BackofficeProvidersProps, 'router'>) {
   const bootstrapRuntime = useRuntime();
   const { session } = useBackofficeAuth();
+  const { locale, setLocale } = useBackofficeLocalization();
   const runtime = useMemo(
     () =>
       applyEffectiveBusinessConfiguration(
@@ -65,6 +66,13 @@ function AuthenticatedBackofficeProviders({
       ),
     [bootstrapRuntime, session?.businessConfiguration],
   );
+  const configuredLocale = session?.businessConfiguration?.preferences.defaultLocale;
+
+  useEffect(() => {
+    if (!configuredLocale) return;
+    const nextLocale = configuredLocale === 'en-US' ? 'en' : 'id';
+    if (nextLocale !== locale) setLocale(nextLocale);
+  }, [configuredLocale, locale, setLocale]);
 
   return (
     <RuntimeProvider config={runtime}>
