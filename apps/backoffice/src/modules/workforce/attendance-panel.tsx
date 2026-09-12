@@ -464,9 +464,11 @@ function AttendanceAdjustmentDialog({
       )
       .sort((left, right) => left.displayName.localeCompare(right.displayName));
   }, [employees, positionId, query]);
-  const selectableEmployees = filteredEmployees.filter(
-    (employee) => attendanceByEmployee.get(employee.id)?.source !== 'HRIS',
-  );
+  const selectableEmployees = attendance.isSuccess
+    ? filteredEmployees.filter(
+        (employee) => attendanceByEmployee.get(employee.id)?.source !== 'HRIS',
+      )
+    : [];
   const positionOptions = [
     { value: 'ALL', label: copy('All positions') },
     ...positions
@@ -512,14 +514,30 @@ function AttendanceAdjustmentDialog({
     setSaving(true);
     try {
       const results = await Promise.allSettled(
-        [...selectedIds].map((employeeId) =>
-          api.upsertAttendance(employeeId, date, {
+        [...selectedIds].map((employeeId) => {
+          const existing = attendanceByEmployee.get(employeeId);
+          const sameStatus = existing?.status === status;
+          return api.upsertAttendance(employeeId, date, {
             status,
-            checkInAt: status === 'PRESENT' && checkIn ? toIso(date, checkIn) : null,
-            checkOutAt: status === 'PRESENT' && checkOut ? toIso(date, checkOut) : null,
-            note: note.trim() || null,
-          }),
-        ),
+            checkInAt:
+              status !== 'PRESENT'
+                ? null
+                : checkIn
+                  ? toIso(date, checkIn)
+                  : sameStatus
+                    ? (existing?.checkInAt ?? null)
+                    : null,
+            checkOutAt:
+              status !== 'PRESENT'
+                ? null
+                : checkOut
+                  ? toIso(date, checkOut)
+                  : sameStatus
+                    ? (existing?.checkOutAt ?? null)
+                    : null,
+            note: note.trim() || (sameStatus ? (existing?.note ?? null) : null),
+          });
+        }),
       );
       const failed = results.filter((result) => result.status === 'rejected').length;
       await Promise.all([
@@ -596,7 +614,7 @@ function AttendanceAdjustmentDialog({
               />
             </div>
             <div className="flex flex-wrap gap-2">
-              <DButton variant="secondary" onClick={selectVisible}>
+              <DButton variant="secondary" disabled={!selectableEmployees.length} onClick={selectVisible}>
                 {copy('Select visible')}
               </DButton>
               {selectedIds.size ? (
@@ -619,12 +637,13 @@ function AttendanceAdjustmentDialog({
               filteredEmployees.map((employee) => {
                 const existing = attendanceByEmployee.get(employee.id);
                 const readOnly = existing?.source === 'HRIS';
+                const selectionDisabled = !attendance.isSuccess || readOnly;
                 const selected = selectedIds.has(employee.id);
                 return (
                   <label
                     key={employee.id}
                     className={`flex items-start gap-3 rounded-lg border p-3 transition-colors ${
-                      readOnly
+                      selectionDisabled
                         ? 'cursor-not-allowed border-[var(--color-border)] opacity-60'
                         : selected
                           ? 'cursor-pointer border-[var(--color-brand)] bg-[var(--color-surface)]'
@@ -634,7 +653,7 @@ function AttendanceAdjustmentDialog({
                     <DCheckbox
                       className="mt-1"
                       checked={selected}
-                      disabled={readOnly}
+                      disabled={selectionDisabled}
                       onChange={() => toggleEmployee(employee.id)}
                     />
                     <div className="min-w-0 flex-1">
