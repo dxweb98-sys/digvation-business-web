@@ -4,7 +4,10 @@ export type ThemePreset = 'DIGVATION_LIGHT' | 'CUSTOM';
 export type ThemeRadius = 'COMPACT' | 'SOFT' | 'ROUNDED';
 export type ApplicationId = 'cashier' | 'backoffice';
 export type BusinessProduct = 'POS';
-export type BusinessCapability = 'FINANCE_OPERATIONS' | 'BUSINESS_ANALYTICS';
+export type BusinessCapability =
+  | 'FINANCE_OPERATIONS'
+  | 'BUSINESS_ANALYTICS'
+  | 'WORKFORCE_ATTENDANCE';
 
 export interface BrandingConfig {
   mode: BrandingMode;
