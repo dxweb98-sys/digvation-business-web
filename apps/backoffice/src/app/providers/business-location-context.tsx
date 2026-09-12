@@ -62,6 +62,9 @@ export function BusinessLocationProvider({ children }: { children: ReactNode }) 
     () => createApiClient(runtime.apiBaseUrl),
     [createApiClient, runtime.apiBaseUrl],
   );
+  const canReadOperationalAccess = Boolean(
+    session?.identity.permissions.includes('operational-access:read'),
+  );
   const preferenceKey = session
     ? `digvation.backoffice.dashboard.location.v1:${session.identity.workspace}:${session.identity.userId}`
     : 'digvation.backoffice.dashboard.location.v1:anonymous';
@@ -74,10 +77,11 @@ export function BusinessLocationProvider({ children }: { children: ReactNode }) 
   const query = useQuery({
     queryKey: ['operational-location-context'],
     queryFn: () => api.get<OperationalAccess>('/api/v1/operational-access/context'),
-    enabled: Boolean(session),
+    enabled: canReadOperationalAccess,
   });
 
   const locations = useMemo(() => {
+    if (!canReadOperationalAccess) return [];
     const all = [...(query.data?.locations ?? [])];
     all.sort((left, right) => {
       if (left.id === query.data?.mainLocationId) return -1;
@@ -87,7 +91,7 @@ export function BusinessLocationProvider({ children }: { children: ReactNode }) 
       );
     });
     return all;
-  }, [query.data?.locations, query.data?.mainLocationId]);
+  }, [canReadOperationalAccess, query.data?.locations, query.data?.mainLocationId]);
 
   const accessibleIds = useMemo(
     () => new Set(locations.map((location) => location.id)),
@@ -106,9 +110,10 @@ export function BusinessLocationProvider({ children }: { children: ReactNode }) 
   const selectedLocationId = preferredIsValid
     ? (preferredLocationId ?? '')
     : fallbackLocationId;
-  const isDenied = query.data?.resolution === 'DENIED';
+  const isDenied = canReadOperationalAccess && query.data?.resolution === 'DENIED';
   const isReady = Boolean(
-    query.data &&
+    canReadOperationalAccess &&
+      query.data &&
       !isDenied &&
       selectedLocationId &&
       accessibleIds.has(selectedLocationId),
@@ -118,17 +123,20 @@ export function BusinessLocationProvider({ children }: { children: ReactNode }) 
     () => ({
       locations,
       selectedLocationId,
-      mainLocationId: query.data?.mainLocationId ?? null,
+      mainLocationId: canReadOperationalAccess
+        ? (query.data?.mainLocationId ?? null)
+        : null,
       isReady,
       isDenied,
       selectLocation(locationId: string) {
-        if (!accessibleIds.has(locationId)) return;
+        if (!canReadOperationalAccess || !accessibleIds.has(locationId)) return;
         setPreferredLocationId(locationId);
         writePreference(preferenceKey, locationId);
       },
     }),
     [
       accessibleIds,
+      canReadOperationalAccess,
       isDenied,
       isReady,
       locations,

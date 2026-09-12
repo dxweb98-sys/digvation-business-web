@@ -27,6 +27,7 @@ import {
 import { AnalyticsKpiCard } from '../../components/analytics/analytics-kpi-card';
 import { useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import { useWorkforceLocalization } from '../workforce/workforce-localization';
+import { canAccessReport } from './report-availability';
 
 const types = [
   ['business-performance', 'Business Performance Summary'],
@@ -196,45 +197,6 @@ const details: Record<Type, string[]> = {
   ],
 };
 
-const permissionByType: Record<Type, string> = {
-  'business-performance': 'sales:read',
-  transactions: 'sales:read',
-  'catalog-performance': 'catalog:read',
-  'employee-performance': 'employees:read',
-  attendance: 'attendance:read',
-  payments: 'payments:read',
-  expenses: 'expenses:read',
-  cash: 'cash:read',
-  settlements: 'settlements:read',
-  reconciliations: 'reconciliations:read',
-  tax: 'tax:read',
-  locations: 'locations:read',
-};
-
-function reportTypeIsAvailable(
-  type: Type,
-  permissions: readonly string[],
-  products: readonly string[],
-  capabilities: readonly string[],
-) {
-  if (!permissions.includes(permissionByType[type])) return false;
-  if (
-    ['business-performance', 'transactions', 'payments'].includes(type) &&
-    !products.includes('POS')
-  )
-    return false;
-  if (
-    ['expenses', 'cash', 'settlements', 'reconciliations'].includes(type) &&
-    !capabilities.includes('FINANCE_OPERATIONS')
-  )
-    return false;
-  if (
-    type === 'attendance' &&
-    !capabilities.includes('WORKFORCE_ATTENDANCE')
-  )
-    return false;
-  return true;
-}
 const metrics: Record<Type, string[]> = {
   'business-performance': [
     'finalRevenue',
@@ -404,16 +366,8 @@ export function ReportsPage() {
   const { copy, formatDate, formatMoney } = useWorkforceLocalization();
   const api = useMemo(() => createApiClient(apiBaseUrl), [apiBaseUrl, createApiClient]);
   const availableTypes = useMemo(
-    () =>
-      types.filter(([candidate]) =>
-        reportTypeIsAvailable(
-          candidate,
-          session?.identity.permissions ?? [],
-          session?.effectiveEntitlements.products ?? [],
-          session?.effectiveEntitlements.capabilities ?? [],
-        ),
-      ),
-    [session?.effectiveEntitlements, session?.identity.permissions],
+    () => types.filter(([candidate]) => canAccessReport(session, candidate)),
+    [session],
   );
   const today = new Date().toISOString().slice(0, 10);
   const initial = useMemo(() => initialReportState(today), [today]);
@@ -473,10 +427,7 @@ export function ReportsPage() {
   const accounts = useQuery({
     queryKey: ['report-accounts'],
     queryFn: () => api.get<Page<Option>>('/api/v1/financial-accounts?limit=100&offset=0'),
-    enabled: Boolean(
-      session?.effectiveEntitlements.capabilities.includes('FINANCE_OPERATIONS') &&
-      session?.identity.permissions.includes('financial-accounts:read'),
-    ),
+    enabled: Boolean(session?.identity.permissions.includes('financial-accounts:read')),
   });
   const locationSelectionReady =
     !locationScoped ||

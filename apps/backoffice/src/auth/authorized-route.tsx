@@ -5,7 +5,7 @@ import { useBackofficeAuth } from './backoffice-auth-context';
 
 export function AuthorizedRoute({ capability }: { capability: BackofficeCapability }) {
   const { session } = useBackofficeAuth();
-  if (!session || !canAccessBackoffice(session, capability, session.effectiveEntitlements))
+  if (!session || !canAccessBackoffice(session, capability))
     return <Navigate to="/unauthorized" replace />;
   return <Outlet />;
 }
