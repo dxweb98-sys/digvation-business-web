@@ -1,3 +1,8 @@
+import type {
+  BusinessFoundation,
+  EffectiveEntitlementConfig,
+} from '@digvation/business-runtime';
+
 export interface BackofficeRole {
   id: string;
   code: string;
@@ -16,6 +21,7 @@ export interface BackofficeIdentity {
 export interface BackofficeSession {
   identity: BackofficeIdentity;
   effectiveEntitlements: EffectiveEntitlementConfig;
+  effectiveFoundations: readonly BusinessFoundation[];
 }
 
 export interface LoginCredentials {
@@ -23,4 +29,3 @@ export interface LoginCredentials {
   identifier: string;
   password: string;
 }
-import type { EffectiveEntitlementConfig } from '@digvation/business-runtime';
