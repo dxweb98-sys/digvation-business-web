@@ -1,5 +1,9 @@
 import type { ApiClient } from '@digvation/business-api';
 
+export const CATALOG_IMAGE_MAX_BYTES = 1024 * 1024;
+export const CATALOG_IMAGE_CONTENT_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
+export type CatalogImageContentType = (typeof CATALOG_IMAGE_CONTENT_TYPES)[number];
+
 export interface Page<T> {
   items: T[];
   limit: number;
@@ -58,6 +62,13 @@ export interface Item {
 }
 export interface CatalogManagementItem extends Item {
   variantCount: number;
+}
+export interface CatalogItemImage {
+  catalogItemId: string;
+  contentType: CatalogImageContentType;
+  sizeBytes: number;
+  updatedAt: string;
+  url: string;
 }
 export interface Price {
   id: string;
@@ -128,6 +139,19 @@ export class CatalogApi {
       expectedVersion: item.version,
       ...input,
     });
+  }
+  getItemImage(itemId: string) {
+    return this.client.get<CatalogItemImage | null>(`/api/v1/catalog/items/${itemId}/image`);
+  }
+  replaceItemImage(itemId: string, file: File) {
+    return this.client.putBinary<CatalogItemImage>(
+      `/api/v1/catalog/items/${itemId}/image`,
+      file,
+      file.type,
+    );
+  }
+  removeItemImage(itemId: string) {
+    return this.client.delete<null>(`/api/v1/catalog/items/${itemId}/image`);
   }
   listCategories(query: CategoryQuery = {}) {
     return this.client.get<Page<Category>>(
