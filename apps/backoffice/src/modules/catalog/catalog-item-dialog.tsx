@@ -8,7 +8,7 @@ import {
   DTextarea,
   useToast,
 } from '@digvation/ui';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
@@ -73,6 +73,7 @@ export function CatalogItemDialog({
   onSaved: () => void;
 }) {
   const fresh = item === null;
+  const client = useQueryClient();
   const { showToast } = useToast();
   const { copy } = useCatalogLocalization();
   const [code, setCode] = useState(item?.code ?? '');
@@ -216,8 +217,10 @@ export function CatalogItemDialog({
       if (persistedItem && canManageImage) {
         if (selectedImage) {
           await api.replaceItemImage(persistedItem.id, selectedImage);
+          void client.invalidateQueries({ queryKey: ['catalog', 'image', persistedItem.id] });
         } else if (removeImageRequested && existingImage.data) {
           await api.removeItemImage(persistedItem.id);
+          void client.invalidateQueries({ queryKey: ['catalog', 'image', persistedItem.id] });
         }
       }
 
