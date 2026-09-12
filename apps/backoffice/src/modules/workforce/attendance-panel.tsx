@@ -1,6 +1,7 @@
 import {
   DBadge,
   DButton,
+  DCheckbox,
   DDataTable,
   DDatePicker,
   DDialog,
@@ -553,6 +554,7 @@ function AttendanceAdjustmentDialog({
     <DDialog
       open={open}
       onClose={onClose}
+      size="xl"
       title={copy('Adjust attendance')}
       description={copy('Select one or more employees, then apply the same attendance adjustment.')}
       footer={
@@ -560,10 +562,8 @@ function AttendanceAdjustmentDialog({
           <DButton variant="secondary" onClick={onClose}>
             {copy('Cancel')}
           </DButton>
-          <DButton disabled={!selectedIds.size || saving} onClick={() => void save()}>
-            {saving
-              ? copy('Saving...')
-              : `${copy('Save')} (${selectedIds.size})`}
+          <DButton loading={saving} disabled={!selectedIds.size} onClick={() => void save()}>
+            {`${copy('Save')} (${selectedIds.size})`}
           </DButton>
         </div>
       }
@@ -595,7 +595,7 @@ function AttendanceAdjustmentDialog({
                 placeholder={copy('Search employee code or name...')}
               />
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <DButton variant="secondary" onClick={selectVisible}>
                 {copy('Select visible')}
               </DButton>
@@ -631,9 +631,8 @@ function AttendanceAdjustmentDialog({
                           : 'cursor-pointer border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-brand)]'
                     }`}
                   >
-                    <input
-                      type="checkbox"
-                      className="mt-1 size-4 accent-[var(--color-brand)]"
+                    <DCheckbox
+                      className="mt-1"
                       checked={selected}
                       disabled={readOnly}
                       onChange={() => toggleEmployee(employee.id)}
