@@ -127,6 +127,9 @@ export class HttpAuthAdapter {
       },
       effectiveEntitlements: availability.effectiveEntitlements,
       effectiveFoundations: availability.effectiveFoundations,
+      ...(availability.businessConfiguration
+        ? { businessConfiguration: availability.businessConfiguration }
+        : {}),
     };
   }
 
