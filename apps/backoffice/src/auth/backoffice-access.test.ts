@@ -68,6 +68,7 @@ describe('Backoffice entitlement access', () => {
 
   it('allows shared reporting for any readable authoritative projection', () => {
     expect(canAccessBackoffice(sessionWith('employees:read'), 'reports', platformOnly)).toBe(true);
+    expect(canAccessBackoffice(sessionWith('attendance:read'), 'reports', platformOnly)).toBe(true);
     expect(canAccessBackoffice(sessionWith(), 'reports', platformOnly)).toBe(false);
   });
 });
