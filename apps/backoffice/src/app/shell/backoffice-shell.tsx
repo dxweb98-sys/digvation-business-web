@@ -324,7 +324,7 @@ function NavigationGroups({ session }: { session: BackofficeSession }) {
       </div>
       {navigationSections.map((section) => {
         const items = section.items.filter((item) =>
-          canAccessBackoffice(session, item.capability, session.effectiveEntitlements),
+          canAccessBackoffice(session, item.capability),
         );
         if (!items.length) return null;
         return (
