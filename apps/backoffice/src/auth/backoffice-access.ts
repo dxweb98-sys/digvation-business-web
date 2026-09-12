@@ -96,6 +96,7 @@ const capabilityPermissions: Record<BackofficeCapability, PermissionRequirement>
       'payments:read',
       'catalog:read',
       'employees:read',
+      'attendance:read',
       'expenses:read',
       'cash:read',
       'settlements:read',
