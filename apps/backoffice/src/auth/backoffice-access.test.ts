@@ -48,8 +48,27 @@ describe('Backoffice entitlement access', () => {
     ).toBe(true);
   });
 
+  it('requires Workforce Attendance plus read permission for attendance', () => {
+    const session = sessionWith('attendance:read');
+
+    expect(canAccessBackoffice(session, 'attendance', platformOnly)).toBe(false);
+    expect(
+      canAccessBackoffice(session, 'attendance', {
+        ...platformOnly,
+        capabilities: ['WORKFORCE_ATTENDANCE'],
+      }),
+    ).toBe(true);
+    expect(
+      canAccessBackoffice(sessionWith(), 'attendance', {
+        ...platformOnly,
+        capabilities: ['WORKFORCE_ATTENDANCE'],
+      }),
+    ).toBe(false);
+  });
+
   it('allows shared reporting for any readable authoritative projection', () => {
     expect(canAccessBackoffice(sessionWith('employees:read'), 'reports', platformOnly)).toBe(true);
+    expect(canAccessBackoffice(sessionWith('attendance:read'), 'reports', platformOnly)).toBe(true);
     expect(canAccessBackoffice(sessionWith(), 'reports', platformOnly)).toBe(false);
   });
 });

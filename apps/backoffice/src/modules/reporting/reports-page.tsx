@@ -18,7 +18,6 @@ import {
 } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
-import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
 import {
   AnalyticsDonutChart,
   AnalyticsHorizontalBarChart,
@@ -27,12 +26,14 @@ import {
 } from '../../components/analytics/analytics-charts';
 import { AnalyticsKpiCard } from '../../components/analytics/analytics-kpi-card';
 import { useBackofficeAuth } from '../../auth/backoffice-auth-context';
+import { useWorkforceLocalization } from '../workforce/workforce-localization';
 
 const types = [
   ['business-performance', 'Business Performance Summary'],
   ['transactions', 'Transaction Report'],
   ['catalog-performance', 'Catalog Performance'],
   ['employee-performance', 'Employee Performance'],
+  ['attendance', 'Attendance Report'],
   ['payments', 'Payment Report'],
   ['expenses', 'Expense Report'],
   ['cash', 'Cash Report'],
@@ -100,6 +101,17 @@ const details: Record<Type, string[]> = {
     'contributionRevenue',
     'averageContributionPerTransaction',
     'topCatalogItem',
+  ],
+  attendance: [
+    'attendanceDate',
+    'employeeCode',
+    'employeeName',
+    'position',
+    'status',
+    'checkIn',
+    'checkOut',
+    'source',
+    'note',
   ],
   payments: [
     'saleNumber',
@@ -189,6 +201,7 @@ const permissionByType: Record<Type, string> = {
   transactions: 'sales:read',
   'catalog-performance': 'catalog:read',
   'employee-performance': 'employees:read',
+  attendance: 'attendance:read',
   payments: 'payments:read',
   expenses: 'expenses:read',
   cash: 'cash:read',
@@ -215,6 +228,11 @@ function reportTypeIsAvailable(
     !capabilities.includes('FINANCE_OPERATIONS')
   )
     return false;
+  if (
+    type === 'attendance' &&
+    !capabilities.includes('WORKFORCE_ATTENDANCE')
+  )
+    return false;
   return true;
 }
 const metrics: Record<Type, string[]> = {
@@ -237,6 +255,7 @@ const metrics: Record<Type, string[]> = {
     'contributedTransactions',
     'averageContribution',
   ],
+  attendance: ['totalRecords', 'presentCount', 'absentCount', 'leaveCount', 'sickCount'],
   payments: ['successfulAmount', 'attemptCount', 'successfulPayments', 'failedPayments'],
   expenses: ['approvedExpenseTotal', 'expenseCount', 'pendingCount', 'rejectedCount'],
   cash: ['cashIn', 'cashOut', 'netMovement', 'movementCount'],
@@ -267,6 +286,10 @@ const visuals: Record<Type, { trend: string; insights: [string, string][]; ranki
     trend: 'Contribution activity',
     insights: [['primary', 'Contribution mix']],
     ranking: 'Top contributors',
+  },
+  attendance: {
+    trend: 'Attendance activity',
+    insights: [['primary', 'Attendance status']],
   },
   payments: { trend: 'Payment activity', insights: [['primary', 'Payment status insight']] },
   expenses: { trend: 'Expense activity', insights: [['primary', 'Expense status']] },
@@ -300,6 +323,10 @@ const filterFields: Record<Type, [string, string, string[]][]> = {
     ['catalogLifecycle', 'Catalog lifecycle', ['DRAFT', 'ACTIVE', 'INACTIVE', 'ARCHIVED']],
   ],
   'employee-performance': [['employeeStatus', 'Employee status', ['ACTIVE', 'INACTIVE']]],
+  attendance: [
+    ['attendanceStatus', 'Attendance status', ['PRESENT', 'ABSENT', 'LEAVE', 'SICK']],
+    ['attendanceSource', 'Source', ['LOCAL', 'HRIS']],
+  ],
   payments: [
     ['paymentStatus', 'Payment status', ['PENDING', 'SUCCEEDED', 'FAILED', 'CANCELLED', 'EXPIRED']],
     ['paymentMethod', 'Payment method', ['CASH', 'BANK_TRANSFER', 'WALLET', 'QRIS']],
@@ -320,9 +347,17 @@ const filterFields: Record<Type, [string, string, string[]][]> = {
 const title = (k: string) => k.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
 const money = (k: string) =>
   /amount|revenue|gross|discount|tax|cash|difference|base|value/i.test(k) && !/count|rate/i.test(k);
-const count = (k: string) => /count|attempts|items|transactions/i.test(k);
+const count = (k: string) => /count|attempts|items|transactions|records/i.test(k);
 const quantity = (k: string) => /quantity/i.test(k);
 const dateKey = /^\d{4}-\d{2}-\d{2}$/;
+const attendanceLabels: Record<string, string> = {
+  PRESENT: 'Present',
+  ABSENT: 'Absent',
+  LEAVE: 'Leave',
+  SICK: 'Sick',
+  LOCAL: 'Local',
+  HRIS: 'HRIS',
+};
 function requestedType(value: string | null): Type {
   return types.some(([candidate]) => candidate === value)
     ? (value as Type)
@@ -366,7 +401,7 @@ export function ReportsPage() {
   const { createApiClient, getAccessToken, session } = useBackofficeAuth();
   const runtime = useRuntime();
   const { apiBaseUrl } = runtime;
-  const { copy, formatMoney } = useBackofficeLocalization();
+  const { copy, formatDate, formatMoney } = useWorkforceLocalization();
   const api = useMemo(() => createApiClient(apiBaseUrl), [apiBaseUrl, createApiClient]);
   const availableTypes = useMemo(
     () =>
@@ -389,13 +424,15 @@ export function ReportsPage() {
     [filters, setFilters] = useState<Record<string, string>>({}),
     [page, setPage] = useState(1),
     [pageSize, setPageSize] = useState(25);
-  const locations = useQuery({
-    queryKey: ['operational-location-context'],
-    queryFn: () => api.get<OperationalAccess>('/api/v1/operational-access/context'),
-  });
   const type = availableTypes.some(([candidate]) => candidate === selectedType)
     ? selectedType
     : (availableTypes[0]?.[0] ?? 'business-performance');
+  const locationScoped = type !== 'attendance';
+  const locations = useQuery({
+    queryKey: ['operational-location-context'],
+    queryFn: () => api.get<OperationalAccess>('/api/v1/operational-access/context'),
+    enabled: locationScoped,
+  });
   const requestedLocationIsAvailable = Boolean(
     selectedLocationId &&
       locations.data?.locations.some((location) => location.id === selectedLocationId),
@@ -428,6 +465,11 @@ export function ReportsPage() {
     queryFn: () => api.get<Page<Option>>('/api/v1/employees?limit=100&offset=0'),
     enabled: Boolean(session?.identity.permissions.includes('employees:read')),
   });
+  const positions = useQuery({
+    queryKey: ['report-employee-positions'],
+    queryFn: () => api.get<Page<Option>>('/api/v1/employees/positions?limit=100&offset=0'),
+    enabled: Boolean(session?.identity.permissions.includes('employees:read')),
+  });
   const accounts = useQuery({
     queryKey: ['report-accounts'],
     queryFn: () => api.get<Page<Option>>('/api/v1/financial-accounts?limit=100&offset=0'),
@@ -437,13 +479,15 @@ export function ReportsPage() {
     ),
   });
   const locationSelectionReady =
-    locations.data?.resolution !== 'SELECTION_REQUIRED' || Boolean(locationId);
+    !locationScoped ||
+    locations.data?.resolution !== 'SELECTION_REQUIRED' ||
+    Boolean(locationId);
   const params = new URLSearchParams({
     dateFrom: from,
     dateTo: to,
     page: String(page),
     pageSize: String(pageSize),
-    ...(locationId ? { sellingLocationId: locationId } : {}),
+    ...(locationScoped && locationId ? { sellingLocationId: locationId } : {}),
     ...filters,
   }).toString();
   const query = useQuery({
@@ -454,15 +498,24 @@ export function ReportsPage() {
   const data = query.data;
   const integer = (v: number) => new Intl.NumberFormat('id-ID').format(v);
   const format = useCallback(
-    (k: string, v: Row[string] | undefined) =>
-      money(k)
+    (k: string, v: Row[string] | undefined) => {
+      if (type === 'attendance') {
+        if (k === 'attendanceDate' && v)
+          return formatDate(new Date(`${String(v).slice(0, 10)}T00:00:00`));
+        if (['checkIn', 'checkOut'].includes(k))
+          return v ? formatDate(new Date(String(v)), { timeStyle: 'short' }) : '—';
+        const attendanceLabel = attendanceLabels[String(v ?? '')];
+        if (attendanceLabel) return copy(attendanceLabel);
+      }
+      return money(k)
         ? formatMoney(String(v ?? 0), 'IDR')
         : count(k)
           ? integer(Number(v ?? 0))
           : quantity(k)
             ? new Intl.NumberFormat('id-ID', { maximumFractionDigits: 4 }).format(Number(v ?? 0))
-            : copy(String(v ?? '—')),
-    [copy, formatMoney],
+            : copy(String(v ?? '—'));
+    },
+    [copy, formatDate, formatMoney, type],
   );
   const columns = useMemo<TableColumn<Row>[]>(
     () =>
@@ -490,7 +543,10 @@ export function ReportsPage() {
           l,
           [
             { value: '', label: copy('All') },
-            ...values.map((value) => ({ value, label: copy(value) })),
+            ...values.map((value) => ({
+              value,
+              label: copy(attendanceLabels[value] ?? value),
+            })),
           ],
         ] as [string, string, { value: string; label: string }[]],
     );
@@ -526,6 +582,25 @@ export function ReportsPage() {
         [
           { value: '', label: copy('All') },
           ...(employees.data?.items ?? []).map((i) => ({ value: i.id, label: option(i) })),
+        ],
+      ],
+    ],
+    attendance: [
+      ...choices(filterFields.attendance),
+      [
+        'employeeId',
+        'Employee',
+        [
+          { value: '', label: copy('All') },
+          ...(employees.data?.items ?? []).map((i) => ({ value: i.id, label: option(i) })),
+        ],
+      ],
+      [
+        'positionId',
+        'Position',
+        [
+          { value: '', label: copy('All') },
+          ...(positions.data?.items ?? []).map((i) => ({ value: i.id, label: option(i) })),
         ],
       ],
     ],
@@ -601,12 +676,12 @@ export function ReportsPage() {
       ],
     ],
   };
-  const download = async (kind: 'xlsx' | 'pdf') => {
+  const download = async (kind: 'xlsx' | 'pdf' | 'csv') => {
     const token = await getAccessToken();
     const p = new URLSearchParams({
       dateFrom: from,
       dateTo: to,
-      ...(locationId ? { sellingLocationId: locationId } : {}),
+      ...(locationScoped && locationId ? { sellingLocationId: locationId } : {}),
       ...filters,
     });
     const response = await fetch(`${apiBaseUrl}/api/v1/reports/${type}/export.${kind}?${p}`, {
@@ -627,10 +702,13 @@ export function ReportsPage() {
         data?.analytics.breakdowns?.[k] ??
         (k === 'primary' ? data?.analytics.breakdown : []) ??
         []
-      ).map((p) => ({ ...p, label: copy(p.label) }));
+      ).map((p) => ({
+        ...p,
+        label: copy(attendanceLabels[p.label] ?? p.label),
+      }));
   const activeFilters = Object.entries(filters).map(([k, v]) => ({
     key: k,
-    label: `${copy(title(k))}: ${copy(v)}`,
+    label: `${copy(title(k))}: ${copy(attendanceLabels[v] ?? v)}`,
   }));
   const exportMenu = (
     <DDropdown
@@ -645,12 +723,21 @@ export function ReportsPage() {
       >
         {copy('Export Excel')}
       </button>
-      <button
-        className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--color-surface-muted)]"
-        onClick={() => void download('pdf')}
-      >
-        {copy('Export PDF')}
-      </button>
+      {type === 'attendance' ? (
+        <button
+          className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--color-surface-muted)]"
+          onClick={() => void download('csv')}
+        >
+          {copy('Export CSV')}
+        </button>
+      ) : (
+        <button
+          className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--color-surface-muted)]"
+          onClick={() => void download('pdf')}
+        >
+          {copy('Export PDF')}
+        </button>
+      )}
     </DDropdown>
   );
   return (
@@ -665,7 +752,13 @@ export function ReportsPage() {
           actions={exportMenu}
         />
       </div>
-      <div className="mt-4 grid grid-cols-1 items-end gap-3 md:grid-cols-[300px_360px_240px_auto] md:gap-3">
+      <div
+        className={`mt-4 grid grid-cols-1 items-end gap-3 md:gap-3 ${
+          locationScoped
+            ? 'md:grid-cols-[300px_360px_240px_auto]'
+            : 'md:grid-cols-[300px_360px_auto]'
+        }`}
+      >
         <div className="min-w-0">
           <DSelect
             label={copy('Report type')}
@@ -695,26 +788,28 @@ export function ReportsPage() {
             }}
           />
         </div>
-        <div className="min-w-0">
-          <DSelect
-            label={copy('Location')}
-            value={locationId}
-            options={[
-              {
-                value: '',
-                label: copy(locations.data?.organizationWide ? 'All locations' : 'Select location'),
-              },
-              ...(locations.data?.locations ?? []).map((i) => ({
-                value: i.id,
-                label: option(i),
-              })),
-            ]}
-            onChange={(v) => {
-              setLocationId(String(v ?? ''));
-              setPage(1);
-            }}
-          />
-        </div>
+        {locationScoped ? (
+          <div className="min-w-0">
+            <DSelect
+              label={copy('Location')}
+              value={locationId}
+              options={[
+                {
+                  value: '',
+                  label: copy(locations.data?.organizationWide ? 'All locations' : 'Select location'),
+                },
+                ...(locations.data?.locations ?? []).map((i) => ({
+                  value: i.id,
+                  label: option(i),
+                })),
+              ]}
+              onChange={(v) => {
+                setLocationId(String(v ?? ''));
+                setPage(1);
+              }}
+            />
+          </div>
+        ) : null}
         <div className="min-w-0">
           <DDropdown
             placement="bottom-start"
@@ -731,6 +826,13 @@ export function ReportsPage() {
               {type === 'transactions' ? (
                 <DInput
                   label={copy('Search transaction or invoice number')}
+                  value={filters.search ?? ''}
+                  onChange={(v) => update('search', v)}
+                />
+              ) : null}
+              {type === 'attendance' ? (
+                <DInput
+                  label={copy('Search employee code or name')}
                   value={filters.search ?? ''}
                   onChange={(v) => update('search', v)}
                 />
@@ -793,7 +895,11 @@ export function ReportsPage() {
           </button>
         </div>
       ) : null}
-      <section className="mt-5 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+      <section
+        className={`mt-5 grid gap-3 md:grid-cols-2 ${
+          type === 'attendance' ? 'xl:grid-cols-5' : 'lg:grid-cols-4'
+        }`}
+      >
         {metrics[type]
           .filter((k) => k in (data?.summary ?? {}))
           .map((k) => (
@@ -810,7 +916,9 @@ export function ReportsPage() {
           title={copy(visual.trend)}
           subtitle={`${copy('Selected period')}: ${from} — ${to}`}
           data={data?.analytics.trend ?? []}
-          formatValue={(v) => formatMoney(v, 'IDR')}
+          formatValue={(v) =>
+            type === 'attendance' ? integer(Number(v)) : formatMoney(v, 'IDR')
+          }
           emptyMessage={empty}
           pointsLabel={copy('data points')}
         />
