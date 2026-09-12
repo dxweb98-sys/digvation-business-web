@@ -1,9 +1,10 @@
-import type { BackofficeSession } from './auth-session';
 import type {
   BusinessCapability,
+  BusinessFoundation,
   BusinessProduct,
   EffectiveEntitlementConfig,
 } from '@digvation/business-runtime';
+import type { BackofficeSession } from './auth-session';
 
 export type BackofficeCapability =
   | 'dashboard'
@@ -64,15 +65,17 @@ interface PermissionRequirement {
   anyOf?: readonly string[];
   product?: BusinessProduct;
   capability?: BusinessCapability;
+  foundation?: BusinessFoundation;
 }
 
 const capabilityPermissions: Record<BackofficeCapability, PermissionRequirement> = {
   dashboard: { allOf: ['auth:self'] },
-  catalog: { allOf: ['catalog:read'] },
-  employees: { allOf: ['employees:read'] },
+  catalog: { allOf: ['catalog:read'], foundation: 'CATALOG' },
+  employees: { allOf: ['employees:read'], foundation: 'WORKFORCE' },
   attendance: {
     allOf: ['attendance:read'],
     capability: 'WORKFORCE_ATTENDANCE',
+    foundation: 'WORKFORCE',
   },
   finance: {
     allOf: ['payments:read'],
@@ -96,6 +99,7 @@ const capabilityPermissions: Record<BackofficeCapability, PermissionRequirement>
       'payments:read',
       'catalog:read',
       'employees:read',
+      'attendance:read',
       'expenses:read',
       'cash:read',
       'settlements:read',
@@ -106,7 +110,7 @@ const capabilityPermissions: Record<BackofficeCapability, PermissionRequirement>
   },
   transactions: { allOf: ['sales:read'], product: 'POS' },
   configuration: { anyOf: ['business-profile:read', 'locations:read'] },
-  tax: { allOf: ['tax:read'] },
+  tax: { allOf: ['tax:read'], capability: 'TAX_FISCAL' },
   accessControl: { allOf: ['roles:read'] },
 };
 
@@ -165,7 +169,9 @@ export function canAccessBackoffice(
   const hasProduct = !requirement.product || entitlements.products.includes(requirement.product);
   const hasCapability =
     !requirement.capability || entitlements.capabilities.includes(requirement.capability);
-  return hasAll && hasAny && hasProduct && hasCapability;
+  const hasFoundation =
+    !requirement.foundation || session.effectiveFoundations.includes(requirement.foundation);
+  return hasAll && hasAny && hasProduct && hasCapability && hasFoundation;
 }
 
 export function canPerformBackofficeAction(
