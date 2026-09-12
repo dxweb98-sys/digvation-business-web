@@ -8,6 +8,7 @@ import {
   DTextarea,
   useToast,
 } from '@digvation/ui';
+import { useQuery } from '@tanstack/react-query';
 import { Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
@@ -19,6 +20,7 @@ import type {
   TaxCategory,
   TaxProfile,
 } from './catalog-api';
+import { CatalogItemImageField } from './catalog-item-image-field';
 import { useCatalogLocalization } from './catalog-localization';
 import { DialogFooter } from './catalog-shared';
 
@@ -53,6 +55,7 @@ export function CatalogItemDialog({
   canViewTax,
   canCreatePricing,
   canCreateVariants,
+  canManageImage,
   onClose,
   onSaved,
 }: {
@@ -65,6 +68,7 @@ export function CatalogItemDialog({
   canViewTax: boolean;
   canCreatePricing: boolean;
   canCreateVariants: boolean;
+  canManageImage: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -83,6 +87,8 @@ export function CatalogItemDialog({
   );
   const [defaultPrice, setDefaultPrice] = useState('');
   const [variants, setVariants] = useState<DraftVariant[]>([]);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [removeImageRequested, setRemoveImageRequested] = useState(false);
   const [defaultDurationMinutes, setDefaultDurationMinutes] = useState(
     item?.serviceDefinition?.defaultDurationMinutes?.toString() ?? '',
   );
@@ -93,6 +99,13 @@ export function CatalogItemDialog({
     item?.serviceDefinition?.allowEmployeeContribution ?? false,
   );
   const [saving, setSaving] = useState(false);
+
+  const existingImage = useQuery({
+    queryKey: ['catalog', 'image', item?.id ?? 'new'],
+    queryFn: () => api.getItemImage(item!.id),
+    enabled: Boolean(item),
+    staleTime: 60_000,
+  });
 
   const parsedDefaultDuration = defaultDurationMinutes.trim()
     ? Number(defaultDurationMinutes)
@@ -128,7 +141,8 @@ export function CatalogItemDialog({
   const save = async () => {
     if (disabled) return;
     setSaving(true);
-    let createdItem: Item | null = null;
+    let persistedItem: Item | null = null;
+    let createdItem = false;
     try {
       const serviceDefinition =
         type === 'SERVICE'
@@ -148,17 +162,18 @@ export function CatalogItemDialog({
       };
 
       if (fresh) {
-        createdItem = await api.createItem({
+        persistedItem = await api.createItem({
           ...baseInput,
           ...(code.trim() ? { code: code.trim().toUpperCase() } : {}),
           type,
           ...(canViewTax ? { taxCategoryId } : {}),
         });
+        createdItem = true;
 
         const createdVariants: Array<{ id: string; draft: DraftVariant }> = [];
         if (canCreateVariants) {
           for (const variant of variants.filter((candidate) => candidate.name.trim())) {
-            const created = await api.createVariant(createdItem.id, {
+            const created = await api.createVariant(persistedItem.id, {
               ...(variant.code.trim() ? { code: variant.code.trim().toUpperCase() } : {}),
               name: variant.name.trim(),
               status: 'ACTIVE',
@@ -171,7 +186,7 @@ export function CatalogItemDialog({
           const effectiveFrom = new Date().toISOString();
           if (defaultPrice.trim()) {
             await api.createPrice({
-              catalogItemId: createdItem.id,
+              catalogItemId: persistedItem.id,
               catalogVariantId: null,
               locationId: null,
               currency,
@@ -182,7 +197,7 @@ export function CatalogItemDialog({
           for (const variant of createdVariants) {
             if (!variant.draft.price.trim()) continue;
             await api.createPrice({
-              catalogItemId: createdItem.id,
+              catalogItemId: persistedItem.id,
               catalogVariantId: variant.id,
               locationId: null,
               currency,
@@ -192,10 +207,18 @@ export function CatalogItemDialog({
           }
         }
       } else if (item) {
-        await api.updateItem(item, {
+        persistedItem = await api.updateItem(item, {
           ...baseInput,
           ...(canViewTax && taxCategoryId !== item.taxCategoryId ? { taxCategoryId } : {}),
         });
+      }
+
+      if (persistedItem && canManageImage) {
+        if (selectedImage) {
+          await api.replaceItemImage(persistedItem.id, selectedImage);
+        } else if (removeImageRequested && existingImage.data) {
+          await api.removeItemImage(persistedItem.id);
+        }
       }
 
       onSaved();
@@ -205,11 +228,13 @@ export function CatalogItemDialog({
       });
       onClose();
     } catch (error) {
-      if (createdItem) {
+      if (persistedItem) {
         onSaved();
         showToast({
           variant: 'danger',
-          title: copy('Item created, but its initial setup is incomplete.'),
+          title: createdItem
+            ? copy('Item created, but its initial setup is incomplete.')
+            : copy('Item was saved, but its image or related setup could not be completed.'),
         });
         onClose();
       } else if (!isSessionExpiredError(error)) {
@@ -301,6 +326,21 @@ export function CatalogItemDialog({
             />
           </div>
         </section>
+
+        {canManageImage ? (
+          <CatalogItemImageField
+            itemName={name}
+            existingImage={existingImage.data}
+            selectedFile={selectedImage}
+            removeRequested={removeImageRequested}
+            disabled={saving}
+            onFileChange={(file) => {
+              setSelectedImage(file);
+              if (file) setRemoveImageRequested(false);
+            }}
+            onRemove={() => setRemoveImageRequested(true)}
+          />
+        ) : null}
 
         {canViewTax || (fresh && canCreatePricing) ? (
           <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] p-4">
