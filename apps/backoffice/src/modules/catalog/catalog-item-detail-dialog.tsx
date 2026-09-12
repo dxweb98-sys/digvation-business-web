@@ -1,4 +1,12 @@
-import { DButton, DDataTable, DDialog, type TableColumn } from '@digvation/ui';
+import {
+  DAccordion,
+  DAccordionItem,
+  DBadge,
+  DButton,
+  DDataTable,
+  DDialog,
+  type TableColumn,
+} from '@digvation/ui';
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { BadgeDollarSign, Pencil, Plus } from 'lucide-react';
 import { useState } from 'react';
@@ -13,7 +21,7 @@ import type {
 import { useCatalogLocalization } from './catalog-localization';
 import { PriceChangeDialog, PriceHistoryTable, VariantPriceLabel } from './catalog-pricing';
 import { CatalogNamedRecordDialog } from './catalog-record-dialog';
-import { CatalogAccordion, DetailField, PriceLabel, Status, humanize } from './catalog-shared';
+import { DetailField, PriceLabel, Status, humanize } from './catalog-shared';
 
 const keys = {
   prices: (itemId: string) => ['catalog', 'prices', itemId] as const,
@@ -143,7 +151,9 @@ export function CatalogItemDetailDialog({
       description={`${item.code} · ${copy(humanize(item.type))}`}
       footer={
         <div className="flex justify-end gap-2">
-          <DButton variant="secondary" onClick={onClose}>{copy('Close')}</DButton>
+          <DButton variant="secondary" onClick={onClose}>
+            {copy('Close')}
+          </DButton>
           {canUpdate ? (
             <DButton leftIcon={<Pencil className="size-4" />} onClick={() => onEdit(item)}>
               {copy('Edit item')}
@@ -169,21 +179,38 @@ export function CatalogItemDetailDialog({
             <DetailField label={copy('Category')} value={categoryName} />
             <DetailField
               label={copy('Default Price')}
-              value={<PriceLabel price={defaultPrice} loading={defaultPriceLoading} available={canViewPricing} emptyLabel={copy('Not set')} />}
+              value={
+                <PriceLabel
+                  price={defaultPrice}
+                  loading={defaultPriceLoading}
+                  available={canViewPricing}
+                  emptyLabel={copy('Not set')}
+                />
+              }
               emphasized
             />
             <DetailField label={copy('Tax')} value={canViewTax ? taxCategoryName : '—'} />
             <DetailField label={copy('Variants')} value={item.variantCount} />
           </dl>
           <dl className="mt-4 grid gap-4 border-t border-[var(--color-border)] pt-4 sm:grid-cols-2">
-            <DetailField label={copy('Fulfillment')} value={copy(humanize(item.fulfillmentBehavior))} />
-            <DetailField label={copy('Description')} value={item.description?.trim() || copy('No description')} />
+            <DetailField
+              label={copy('Fulfillment')}
+              value={copy(humanize(item.fulfillmentBehavior))}
+            />
+            <DetailField
+              label={copy('Description')}
+              value={item.description?.trim() || copy('No description')}
+            />
           </dl>
           {canViewTax ? (
             <p className="mt-3 text-xs leading-5 text-[var(--color-text-muted)]">
               {item.taxCategoryId
-                ? copy('This item uses its assigned item tax category. Transaction tax may also apply when enabled.')
-                : copy('No item-specific tax is assigned. Transaction tax may still apply when enabled.')}
+                ? copy(
+                    'This item uses its assigned item tax category. Transaction tax may also apply when enabled.',
+                  )
+                : copy(
+                    'No item-specific tax is assigned. Transaction tax may still apply when enabled.',
+                  )}
             </p>
           ) : null}
         </section>
@@ -197,86 +224,135 @@ export function CatalogItemDetailDialog({
             <dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <DetailField
                 label={copy('Default duration')}
-                value={serviceDefinition?.defaultDurationMinutes != null ? `${serviceDefinition.defaultDurationMinutes} ${copy('minutes')}` : copy('Not configured')}
+                value={
+                  serviceDefinition?.defaultDurationMinutes != null
+                    ? `${serviceDefinition.defaultDurationMinutes} ${copy('minutes')}`
+                    : copy('Not configured')
+                }
               />
               <DetailField
                 label={copy('Employee assignment')}
-                value={serviceDefinition ? copy(humanize(serviceDefinition.employeeAssignmentMode)) : copy('Not configured')}
+                value={
+                  serviceDefinition
+                    ? copy(humanize(serviceDefinition.employeeAssignmentMode))
+                    : copy('Not configured')
+                }
               />
               <DetailField
                 label={copy('Employee contribution')}
-                value={serviceDefinition?.allowEmployeeContribution ? copy('Allowed') : copy('Not allowed')}
+                value={
+                  serviceDefinition?.allowEmployeeContribution
+                    ? copy('Allowed')
+                    : copy('Not allowed')
+                }
               />
-              <DetailField label={copy('Fulfillment')} value={copy(humanize(item.fulfillmentBehavior))} />
+              <DetailField
+                label={copy('Fulfillment')}
+                value={copy(humanize(item.fulfillmentBehavior))}
+              />
             </dl>
           </section>
         ) : null}
 
-        <CatalogAccordion
-          title={copy('Variants')}
-          count={variants.data?.items.length ?? item.variantCount}
-          description={copy('Open only when you need to review or maintain variant-specific configuration.')}
-        >
-          <div className="mb-3 flex justify-end">
-            {canCreate ? (
-              <DButton leftIcon={<Plus className="size-4" />} onClick={() => setEditingVariant(null)}>
-                {copy('Add variant')}
-              </DButton>
-            ) : null}
-          </div>
-          <DDataTable
-            columns={variantColumns}
-            data={variants.data?.items ?? []}
-            loading={variants.isLoading}
-            rowKey="id"
-            emptyMessage={copy('No variants.')}
-            actions={[
-              {
-                label: copy('Edit variant'),
-                icon: <Pencil className="size-4" />,
-                onClick: setEditingVariant,
-                show: () => canUpdate,
-              },
-              {
-                label: copy('Manage variant price'),
-                icon: <BadgeDollarSign className="size-4" />,
-                onClick: setPricingTarget,
-                show: () => canViewPricing,
-              },
-            ]}
-          />
-        </CatalogAccordion>
-
-        {canViewPricing ? (
-          <CatalogAccordion
-            title={copy('Price history')}
-            count={defaultHistory.length}
-            description={copy('Historical default prices stay immutable so past sales remain auditable.')}
+        <DAccordion type="multiple" variant="separated">
+          <DAccordionItem
+            value="variants"
+            title={
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <span className="flex items-center gap-2">
+                  <span className="font-semibold">{copy('Variants')}</span>
+                  <DBadge variant="secondary">
+                    {variants.data?.items.length ?? item.variantCount}
+                  </DBadge>
+                </span>
+                <span className="text-xs font-normal text-[var(--color-text-muted)]">
+                  {copy(
+                    'Open only when you need to review or maintain variant-specific configuration.',
+                  )}
+                </span>
+              </span>
+            }
           >
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[var(--color-surface-muted)] p-3">
-              <div>
-                <p className="text-xs text-[var(--color-text-muted)]">{copy('Current default price')}</p>
-                <p className="mt-1 text-lg font-semibold"><PriceLabel price={defaultPrice} loading={defaultPriceLoading} emptyLabel={copy('Not set')} /></p>
-              </div>
-              {canCreatePricing ? (
-                <DButton onClick={() => setPricingTarget('default')}>
-                  {defaultPrice ? copy('Change price') : copy('Set price')}
+            <div className="mb-3 flex justify-end">
+              {canCreate ? (
+                <DButton leftIcon={<Plus className="size-4" />} onClick={() => setEditingVariant(null)}>
+                  {copy('Add variant')}
                 </DButton>
               ) : null}
             </div>
-            <PriceHistoryTable
-              prices={defaultHistory}
-              currency={currency}
-              loading={priceHistory.isLoading}
-              canCancel={canCancelPricing}
-              onCancel={async (price) => {
-                await api.cancelPrice(price.id);
-                onPricingChanged();
-              }}
-              emptyMessage={copy('No default price history.')}
+            <DDataTable
+              columns={variantColumns}
+              data={variants.data?.items ?? []}
+              loading={variants.isLoading}
+              rowKey="id"
+              emptyMessage={copy('No variants.')}
+              actions={[
+                {
+                  label: copy('Edit variant'),
+                  icon: <Pencil className="size-4" />,
+                  onClick: setEditingVariant,
+                  show: () => canUpdate,
+                },
+                {
+                  label: copy('Manage variant price'),
+                  icon: <BadgeDollarSign className="size-4" />,
+                  onClick: setPricingTarget,
+                  show: () => canViewPricing,
+                },
+              ]}
             />
-          </CatalogAccordion>
-        ) : null}
+          </DAccordionItem>
+
+          {canViewPricing ? (
+            <DAccordionItem
+              value="price-history"
+              title={
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <span className="flex items-center gap-2">
+                    <span className="font-semibold">{copy('Price history')}</span>
+                    <DBadge variant="secondary">{defaultHistory.length}</DBadge>
+                  </span>
+                  <span className="text-xs font-normal text-[var(--color-text-muted)]">
+                    {copy(
+                      'Historical default prices stay immutable so past sales remain auditable.',
+                    )}
+                  </span>
+                </span>
+              }
+            >
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[var(--color-surface-muted)] p-3">
+                <div>
+                  <p className="text-xs text-[var(--color-text-muted)]">
+                    {copy('Current default price')}
+                  </p>
+                  <p className="mt-1 text-lg font-semibold">
+                    <PriceLabel
+                      price={defaultPrice}
+                      loading={defaultPriceLoading}
+                      emptyLabel={copy('Not set')}
+                    />
+                  </p>
+                </div>
+                {canCreatePricing ? (
+                  <DButton onClick={() => setPricingTarget('default')}>
+                    {defaultPrice ? copy('Change price') : copy('Set price')}
+                  </DButton>
+                ) : null}
+              </div>
+              <PriceHistoryTable
+                prices={defaultHistory}
+                currency={currency}
+                loading={priceHistory.isLoading}
+                canCancel={canCancelPricing}
+                onCancel={async (price) => {
+                  await api.cancelPrice(price.id);
+                  onPricingChanged();
+                }}
+                emptyMessage={copy('No default price history.')}
+              />
+            </DAccordionItem>
+          ) : null}
+        </DAccordion>
       </div>
 
       <CatalogNamedRecordDialog
@@ -285,7 +361,9 @@ export function CatalogItemDetailDialog({
         item={editingVariant}
         onClose={() => setEditingVariant(undefined)}
         onSave={async (existing, input) =>
-          existing ? api.updateVariant(item.id, existing as Variant, input) : api.createVariant(item.id, input)
+          existing
+            ? api.updateVariant(item.id, existing as Variant, input)
+            : api.createVariant(item.id, input)
         }
         onSaved={refreshVariantsAndCount}
       />
@@ -294,7 +372,16 @@ export function CatalogItemDetailDialog({
         target={pricingTarget}
         item={item}
         currency={currency}
-        prices={pricingTarget === 'default' ? defaultHistory : pricingTarget ? (priceHistory.data?.items ?? []).filter((price) => price.catalogVariantId === pricingTarget.id && price.locationId === null) : []}
+        prices={
+          pricingTarget === 'default'
+            ? defaultHistory
+            : pricingTarget
+              ? (priceHistory.data?.items ?? []).filter(
+                  (price) =>
+                    price.catalogVariantId === pricingTarget.id && price.locationId === null,
+                )
+              : []
+        }
         historyLoading={priceHistory.isLoading}
         canCreate={canCreatePricing}
         canCancel={canCancelPricing}
