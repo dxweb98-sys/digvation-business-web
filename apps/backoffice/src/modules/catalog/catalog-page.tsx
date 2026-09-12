@@ -15,6 +15,7 @@ import {
 } from './catalog-api';
 import { CatalogItemDetailDialog } from './catalog-item-detail-dialog';
 import { CatalogItemDialog } from './catalog-item-dialog';
+import { CatalogItemThumbnail } from './catalog-item-thumbnail';
 import { useCatalogLocalization } from './catalog-localization';
 import { CatalogNamedRecordDialog } from './catalog-record-dialog';
 import { PriceLabel, Status, humanize } from './catalog-shared';
@@ -124,6 +125,7 @@ export function CatalogPage() {
   const refreshItems = () => {
     void client.invalidateQueries({ queryKey: keys.items });
     void client.invalidateQueries({ queryKey: ['catalog', 'default-prices'] });
+    void client.invalidateQueries({ queryKey: ['catalog', 'image'] });
   };
   const refreshCategories = () => {
     void client.invalidateQueries({ queryKey: keys.categories });
@@ -139,9 +141,14 @@ export function CatalogPage() {
       key: 'name',
       label: copy('Item'),
       render: (candidate) => (
-        <div className="min-w-0">
-          <p className="font-medium text-[var(--color-text)]">{candidate.name}</p>
-          <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">{candidate.code}</p>
+        <div className="flex min-w-0 items-center gap-3">
+          <CatalogItemThumbnail api={api} itemId={candidate.id} itemName={candidate.name} />
+          <div className="min-w-0">
+            <p className="line-clamp-2 font-medium text-[var(--color-text)]" title={candidate.name}>
+              {candidate.name}
+            </p>
+            <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">{candidate.code}</p>
+          </div>
         </div>
       ),
     },
@@ -375,6 +382,7 @@ export function CatalogPage() {
         canViewTax={canViewTax}
         canCreatePricing={can('createPricing')}
         canCreateVariants={can('createCatalog')}
+        canManageImage={can('updateCatalog')}
         onClose={() => setItem(undefined)}
         onSaved={refreshItems}
       />
