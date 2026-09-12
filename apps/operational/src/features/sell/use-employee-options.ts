@@ -13,7 +13,10 @@ export function useEmployeeOptions(query: EmployeeQuery, enabled: boolean) {
 
   return {
     employees: (employeesQuery.data?.items ?? []).filter(
-      (employee) => employee.status === 'ACTIVE',
+      (employee) =>
+        employee.status === 'ACTIVE' &&
+        employee.position?.status === 'ACTIVE' &&
+        employee.position.serviceAssignmentEnabled,
     ),
     isLoading: employeesQuery.isLoading,
     error: employeesQuery.error,
