@@ -11,7 +11,13 @@ import {
   type TableColumn,
 } from '@digvation/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarDays, Clock3, History as HistoryIcon, Pencil, RotateCcw } from 'lucide-react';
+import {
+  CalendarDays,
+  Clock3,
+  History as HistoryIcon,
+  Pencil,
+  RotateCcw,
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
@@ -20,6 +26,7 @@ import {
   type AttendanceStatus,
   type Employee,
   type EmployeeAttendance,
+  type EmployeePosition,
   EmployeesApi,
 } from './employees-api';
 import { useWorkforceLocalization } from './workforce-localization';
@@ -100,11 +107,14 @@ export function AttendancePanel({
   );
   const dailyAttendance = useMemo(
     () =>
-      (attendance.data ?? []).filter((record) => activeEmployeeIds.has(record.employeeId)),
+      (attendance.data ?? []).filter((record) =>
+        activeEmployeeIds.has(record.employeeId),
+      ),
     [activeEmployeeIds, attendance.data],
   );
   const attendanceByEmployee = useMemo(
-    () => new Map(dailyAttendance.map((record) => [record.employeeId, record])),
+    () =>
+      new Map(dailyAttendance.map((record) => [record.employeeId, record])),
     [dailyAttendance],
   );
   const counts = useMemo(() => {
@@ -117,7 +127,10 @@ export function AttendancePanel({
     for (const record of dailyAttendance) result[record.status] += 1;
     return result;
   }, [dailyAttendance]);
-  const unsetCount = Math.max(0, activeEmployeeIds.size - dailyAttendance.length);
+  const unsetCount = Math.max(
+    0,
+    activeEmployeeIds.size - dailyAttendance.length,
+  );
 
   const historyRange = useMemo(
     () =>
@@ -144,7 +157,9 @@ export function AttendancePanel({
       api.listAttendance({
         from: historyRange.from,
         to: historyRange.to,
-        ...(historyEmployeeId !== 'ALL' ? { employeeId: historyEmployeeId } : {}),
+        ...(historyEmployeeId !== 'ALL'
+          ? { employeeId: historyEmployeeId }
+          : {}),
         ...(historyStatus !== 'ALL' ? { status: historyStatus } : {}),
         limit: historyPageSize,
         offset: historyOffset,
@@ -159,13 +174,20 @@ export function AttendancePanel({
       historyEmployeeId,
     ],
     queryFn: async () => {
-      const statuses: AttendanceStatus[] = ['PRESENT', 'ABSENT', 'LEAVE', 'SICK'];
+      const statuses: AttendanceStatus[] = [
+        'PRESENT',
+        'ABSENT',
+        'LEAVE',
+        'SICK',
+      ];
       const pages = await Promise.all(
         statuses.map((status) =>
           api.listAttendance({
             from: historyRange.from,
             to: historyRange.to,
-            ...(historyEmployeeId !== 'ALL' ? { employeeId: historyEmployeeId } : {}),
+            ...(historyEmployeeId !== 'ALL'
+              ? { employeeId: historyEmployeeId }
+              : {}),
             status,
             limit: 1,
             offset: 0,
@@ -183,7 +205,13 @@ export function AttendancePanel({
   });
 
   const employeeById = useMemo(
-    () => new Map((employeeDirectory.data ?? []).map((employee) => [employee.id, employee])),
+    () =>
+      new Map(
+        (employeeDirectory.data ?? []).map((employee) => [
+          employee.id,
+          employee,
+        ]),
+      ),
     [employeeDirectory.data],
   );
   const positionOptions = useMemo(
@@ -200,7 +228,9 @@ export function AttendancePanel({
       { value: 'ALL', label: copy('All employees') },
       ...(employeeDirectory.data ?? [])
         .slice()
-        .sort((left, right) => left.displayName.localeCompare(right.displayName))
+        .sort((left, right) =>
+          left.displayName.localeCompare(right.displayName),
+        )
         .map((employee) => ({
           value: employee.id,
           label: `${employee.displayName} · ${employee.code}`,
@@ -226,7 +256,11 @@ export function AttendancePanel({
       label: copy('Attendance status'),
       render: (employee) => {
         const record = attendanceByEmployee.get(employee.id);
-        return record ? <AttendanceBadge status={record.status} /> : copy('Not set');
+        return record ? (
+          <AttendanceBadge status={record.status} />
+        ) : (
+          copy('Not set')
+        );
       },
     },
     {
@@ -244,7 +278,9 @@ export function AttendancePanel({
       label: copy('Source'),
       render: (employee) => {
         const source = attendanceByEmployee.get(employee.id)?.source;
-        return source ? copy(source === 'LOCAL' ? 'Local' : 'HRIS') : copy('Not set');
+        return source
+          ? copy(source === 'LOCAL' ? 'Local' : 'HRIS')
+          : copy('Not set');
       },
     },
   ];
@@ -253,7 +289,8 @@ export function AttendancePanel({
     {
       key: 'attendanceDate',
       label: copy('Attendance date'),
-      render: (record) => formatDate(new Date(`${record.attendanceDate}T00:00:00`)),
+      render: (record) =>
+        formatDate(new Date(`${record.attendanceDate}T00:00:00`)),
     },
     {
       key: 'employee',
@@ -262,8 +299,12 @@ export function AttendancePanel({
         const employee = employeeById.get(record.employeeId);
         return employee ? (
           <div>
-            <p className="font-medium text-[var(--color-text)]">{employee.displayName}</p>
-            <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">{employee.code}</p>
+            <p className="font-medium text-[var(--color-text)]">
+              {employee.displayName}
+            </p>
+            <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
+              {employee.code}
+            </p>
           </div>
         ) : (
           record.employeeId
@@ -273,7 +314,8 @@ export function AttendancePanel({
     {
       key: 'position',
       label: copy('Position'),
-      render: (record) => employeeById.get(record.employeeId)?.position?.name ?? copy('Not set'),
+      render: (record) =>
+        employeeById.get(record.employeeId)?.position?.name ?? copy('Not set'),
     },
     {
       key: 'status',
@@ -329,7 +371,9 @@ export function AttendancePanel({
             <div className="max-w-xl">
               <div className="flex items-center gap-2 text-[var(--color-text)]">
                 <CalendarDays className="size-4" aria-hidden="true" />
-                <h3 className="text-sm font-semibold">{copy('Attendance summary')}</h3>
+                <h3 className="text-sm font-semibold">
+                  {copy('Attendance summary')}
+                </h3>
               </div>
               <p className="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">
                 {copy(
@@ -391,7 +435,9 @@ export function AttendancePanel({
           columns={columns}
           data={employees.data?.items ?? []}
           loading={
-            employees.isLoading || attendance.isLoading || employeeDirectory.isLoading
+            employees.isLoading ||
+            attendance.isLoading ||
+            employeeDirectory.isLoading
           }
           rowKey="id"
           searchable
@@ -421,14 +467,16 @@ export function AttendancePanel({
               label: copy('Record attendance'),
               icon: <Clock3 className="size-4" />,
               onClick: (employee) => setTarget(employee),
-              show: (employee) => canManage && !attendanceByEmployee.has(employee.id),
+              show: (employee) =>
+                canManage && !attendanceByEmployee.has(employee.id),
             },
             {
               label: copy('Edit attendance'),
               icon: <Pencil className="size-4" />,
               onClick: (employee) => setTarget(employee),
               show: (employee) =>
-                canManage && attendanceByEmployee.get(employee.id)?.source === 'LOCAL',
+                canManage &&
+                attendanceByEmployee.get(employee.id)?.source === 'LOCAL',
             },
           ]}
         />
@@ -438,10 +486,14 @@ export function AttendancePanel({
         <div>
           <div className="flex items-center gap-2 text-[var(--color-text)]">
             <HistoryIcon className="size-4" aria-hidden="true" />
-            <h3 className="text-base font-semibold">{copy('Attendance history')}</h3>
+            <h3 className="text-base font-semibold">
+              {copy('Attendance history')}
+            </h3>
           </div>
           <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-            {copy('Review attendance history by day, month, or a custom date range.')}
+            {copy(
+              'Review attendance history by day, month, or a custom date range.',
+            )}
           </p>
         </div>
 
@@ -547,7 +599,9 @@ export function AttendancePanel({
 
           <div className="mt-4 flex flex-col gap-3 border-t border-[var(--color-border)] pt-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs text-[var(--color-text-muted)]">
-              {copy('Showing attendance records for the selected period and filters.')}
+              {copy(
+                'Showing attendance records for the selected period and filters.',
+              )}
             </p>
             <DButton
               variant="secondary"
@@ -568,8 +622,14 @@ export function AttendancePanel({
             label={copy('Absent')}
             value={historyCounts.data?.ABSENT ?? 0}
           />
-          <AttendanceStat label={copy('Leave')} value={historyCounts.data?.LEAVE ?? 0} />
-          <AttendanceStat label={copy('Sick')} value={historyCounts.data?.SICK ?? 0} />
+          <AttendanceStat
+            label={copy('Leave')}
+            value={historyCounts.data?.LEAVE ?? 0}
+          />
+          <AttendanceStat
+            label={copy('Sick')}
+            value={historyCounts.data?.SICK ?? 0}
+          />
         </div>
 
         <DDataTable
@@ -583,7 +643,9 @@ export function AttendancePanel({
             pageSize: historyPageSize,
             total: history.data?.total ?? 0,
           }}
-          onPageChange={(page) => setHistoryOffset((page - 1) * historyPageSize)}
+          onPageChange={(page) =>
+            setHistoryOffset((page - 1) * historyPageSize)
+          }
           onPageSizeChange={(nextPageSize) => {
             setHistoryPageSize(nextPageSize);
             setHistoryOffset(0);
@@ -595,7 +657,9 @@ export function AttendancePanel({
         open={target !== null}
         employee={target}
         date={date}
-        existing={target ? attendanceByEmployee.get(target.id) : undefined}
+        existing={
+          target ? attendanceByEmployee.get(target.id) : undefined
+        }
         api={api}
         onClose={() => setTarget(null)}
       />
@@ -638,8 +702,10 @@ function AttendanceEditor({
     try {
       await api.upsertAttendance(employee.id, date, {
         status,
-        checkInAt: status === 'PRESENT' && checkIn ? toIso(date, checkIn) : null,
-        checkOutAt: status === 'PRESENT' && checkOut ? toIso(date, checkOut) : null,
+        checkInAt:
+          status === 'PRESENT' && checkIn ? toIso(date, checkIn) : null,
+        checkOutAt:
+          status === 'PRESENT' && checkOut ? toIso(date, checkOut) : null,
         note: note.trim() || null,
       });
       await Promise.all([
@@ -652,7 +718,10 @@ function AttendanceEditor({
       if (!isSessionExpiredError(error)) {
         showToast({
           variant: 'danger',
-          title: normalizeBackofficeApiError(error, copy('Could not save attendance.')).safeMessage,
+          title: normalizeBackofficeApiError(
+            error,
+            copy('Could not save attendance.'),
+          ).safeMessage,
         });
       }
     }
@@ -663,7 +732,11 @@ function AttendanceEditor({
       open={open}
       onClose={onClose}
       title={copy(existing ? 'Edit attendance' : 'Record attendance')}
-      description={employee ? `${employee.code} · ${employee.displayName} · ${date}` : undefined}
+      description={
+        employee
+          ? `${employee.code} · ${employee.displayName} · ${date}`
+          : undefined
+      }
       footer={
         <div className="flex justify-end gap-2">
           <DButton variant="secondary" onClick={onClose}>
@@ -684,7 +757,9 @@ function AttendanceEditor({
             { value: 'LEAVE', label: copy('Leave') },
             { value: 'SICK', label: copy('Sick') },
           ]}
-          onValueChange={(value) => setStatus(value as AttendanceStatus)}
+          onValueChange={(value) =>
+            setStatus(value as AttendanceStatus)
+          }
         />
         {status === 'PRESENT' ? (
           <div className="space-y-2">
@@ -729,7 +804,15 @@ export function AttendanceBadge({ status }: { status: AttendanceStatus }) {
           ? 'Leave'
           : 'Sick';
   return (
-    <DBadge variant={status === 'PRESENT' ? 'success' : status === 'ABSENT' ? 'danger' : 'secondary'}>
+    <DBadge
+      variant={
+        status === 'PRESENT'
+          ? 'success'
+          : status === 'ABSENT'
+            ? 'danger'
+            : 'secondary'
+      }
+    >
       {copy(label)}
     </DBadge>
   );
@@ -738,8 +821,12 @@ export function AttendanceBadge({ status }: { status: AttendanceStatus }) {
 function AttendanceStat({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-      <p className="text-xs font-medium text-[var(--color-text-muted)]">{label}</p>
-      <p className="mt-1 text-2xl font-semibold tabular-nums text-[var(--color-text)]">{value}</p>
+      <p className="text-xs font-medium text-[var(--color-text-muted)]">
+        {label}
+      </p>
+      <p className="mt-1 text-2xl font-semibold tabular-nums text-[var(--color-text)]">
+        {value}
+      </p>
     </div>
   );
 }
@@ -759,11 +846,14 @@ async function loadAllEmployees(api: EmployeesApi) {
 }
 
 async function loadAllPositions(api: EmployeesApi) {
-  const items: Awaited<ReturnType<EmployeesApi['listPositions']>>['items'] = [];
+  const items: EmployeePosition[] = [];
   let offset = 0;
   let total = Number.POSITIVE_INFINITY;
   while (items.length < total) {
-    const page = await api.listPositions({ limit: PAGE_BATCH_SIZE, offset });
+    const page = await api.listPositions({
+      limit: PAGE_BATCH_SIZE,
+      offset,
+    });
     items.push(...page.items);
     total = page.total;
     if (!page.items.length) break;
@@ -808,7 +898,8 @@ function resolveHistoryRange(input: {
 }
 
 function monthRange(month: string): HistoryRange {
-  const [year, monthNumber] = month.split('-').map(Number);
+  const year = Number(month.slice(0, 4));
+  const monthNumber = Number(month.slice(5, 7));
   const lastDay = new Date(year, monthNumber, 0).getDate();
   return {
     from: `${month}-01`,
@@ -817,7 +908,10 @@ function monthRange(month: string): HistoryRange {
 }
 
 function createMonthOptions(locale: string) {
-  const formatter = new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' });
+  const formatter = new Intl.DateTimeFormat(locale, {
+    month: 'long',
+    year: 'numeric',
+  });
   const now = new Date();
   return Array.from({ length: 24 }, (_, index) => {
     const date = new Date(now.getFullYear(), now.getMonth() - index, 1);
@@ -839,7 +933,9 @@ function localDateKey(date: Date) {
 
 function localTime(value: string) {
   const date = new Date(value);
-  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  return `${String(date.getHours()).padStart(2, '0')}:${String(
+    date.getMinutes(),
+  ).padStart(2, '0')}`;
 }
 
 function toIso(date: string, time: string) {
