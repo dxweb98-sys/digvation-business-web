@@ -66,6 +66,27 @@ const catalogCopy: Record<string, { id: string; en: string }> = {
     id: 'Item berhasil dibuat, tetapi konfigurasi awalnya belum lengkap.',
     en: 'Item created, but its initial setup is incomplete.',
   },
+  'Item was saved, but its image or related setup could not be completed.': {
+    id: 'Item sudah tersimpan, tetapi gambar atau konfigurasi terkait belum berhasil diselesaikan.',
+    en: 'Item was saved, but its image or related setup could not be completed.',
+  },
+  'Item image': { id: 'Gambar item', en: 'Item image' },
+  'Catalog item image': { id: 'Gambar item katalog', en: 'Catalog item image' },
+  'JPEG, PNG, or WebP. Maximum 1 MB. One primary image is kept per item.': {
+    id: 'JPEG, PNG, atau WebP. Maksimum 1 MB. Satu gambar utama disimpan untuk setiap item.',
+    en: 'JPEG, PNG, or WebP. Maximum 1 MB. One primary image is kept per item.',
+  },
+  'Choose image': { id: 'Pilih gambar', en: 'Choose image' },
+  'Replace image': { id: 'Ganti gambar', en: 'Replace image' },
+  'Remove image': { id: 'Hapus gambar', en: 'Remove image' },
+  'Use a JPEG, PNG, or WebP image.': {
+    id: 'Gunakan gambar JPEG, PNG, atau WebP.',
+    en: 'Use a JPEG, PNG, or WebP image.',
+  },
+  'Image must be 1 MB or smaller.': {
+    id: 'Ukuran gambar harus 1 MB atau lebih kecil.',
+    en: 'Image must be 1 MB or smaller.',
+  },
   'Item overview': { id: 'Ringkasan item', en: 'Item overview' },
   'No item-specific tax': { id: 'Tanpa pajak khusus item', en: 'No item-specific tax' },
   'This item uses its assigned item tax category. Transaction tax may also apply when enabled.': {
@@ -84,6 +105,18 @@ const catalogCopy: Record<string, { id: string; en: string }> = {
   'Open only when you need to review or maintain variant-specific configuration.': {
     id: 'Buka hanya saat Anda perlu meninjau atau mengelola konfigurasi khusus varian.',
     en: 'Open only when you need to review or maintain variant-specific configuration.',
+  },
+  'Deactivate variant': { id: 'Nonaktifkan varian', en: 'Deactivate variant' },
+  'Reactivate variant': { id: 'Aktifkan kembali varian', en: 'Reactivate variant' },
+  'Deactivate variant?': { id: 'Nonaktifkan varian?', en: 'Deactivate variant?' },
+  'Reactivate variant?': { id: 'Aktifkan kembali varian?', en: 'Reactivate variant?' },
+  'This variant will stop appearing in active selling choices. Existing transaction and price history will be preserved.': {
+    id: 'Varian ini tidak akan lagi muncul pada pilihan penjualan aktif. Riwayat transaksi dan harga yang sudah ada tetap dipertahankan.',
+    en: 'This variant will stop appearing in active selling choices. Existing transaction and price history will be preserved.',
+  },
+  'This variant will become available for active selling choices again.': {
+    id: 'Varian ini akan kembali tersedia pada pilihan penjualan aktif.',
+    en: 'This variant will become available for active selling choices again.',
   },
   'Historical default prices stay immutable so past sales remain auditable.': {
     id: 'Riwayat harga default tetap tidak berubah agar penjualan terdahulu tetap dapat diaudit.',
