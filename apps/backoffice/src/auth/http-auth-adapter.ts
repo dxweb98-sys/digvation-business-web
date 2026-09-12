@@ -1,5 +1,5 @@
+import { loadAuthenticatedRuntimeAvailability } from '@digvation/business-runtime';
 import type { BackofficeSession, LoginCredentials } from './auth-session';
-import { loadAuthenticatedEntitlements } from '@digvation/business-runtime';
 
 interface SessionCredentials {
   accessToken: string;
@@ -112,7 +112,10 @@ export class HttpAuthAdapter {
       return { id, code, name, systemKey };
     });
 
-    const effectiveEntitlements = await loadAuthenticatedEntitlements(this.apiBaseUrl, accessToken);
+    const availability = await loadAuthenticatedRuntimeAvailability(
+      this.apiBaseUrl,
+      accessToken,
+    );
     return {
       identity: {
         userId: user.id,
@@ -121,7 +124,8 @@ export class HttpAuthAdapter {
         permissions: [...permissions],
         roles,
       },
-      effectiveEntitlements,
+      effectiveEntitlements: availability.effectiveEntitlements,
+      effectiveFoundations: availability.effectiveFoundations,
     };
   }
 
