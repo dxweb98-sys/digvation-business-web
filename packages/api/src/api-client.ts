@@ -31,8 +31,32 @@ export class ApiClient {
     return this.withJsonBody<T>('PUT', path, body, options);
   }
 
+  public putBinary<T>(
+    path: string,
+    body: Blob,
+    contentType: string,
+    options: ApiRequestOptions = {},
+  ): Promise<T> {
+    const headers = new Headers(options.headers);
+    headers.set('content-type', contentType);
+    return this.request<T>(path, {
+      method: 'PUT',
+      signal: options.signal ?? null,
+      headers,
+      body,
+    });
+  }
+
   public patch<T>(path: string, body: unknown, options: ApiRequestOptions = {}): Promise<T> {
     return this.withJsonBody<T>('PATCH', path, body, options);
+  }
+
+  public delete<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
+    return this.request<T>(path, {
+      method: 'DELETE',
+      signal: options.signal ?? null,
+      headers: new Headers(options.headers),
+    });
   }
 
   private withJsonBody<T>(
