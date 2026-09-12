@@ -17,7 +17,7 @@ describe('runtime config schema', () => {
       },
       effectiveEntitlements: {
         products: ['POS'],
-        capabilities: ['BUSINESS_ANALYTICS'],
+        capabilities: ['BUSINESS_ANALYTICS', 'WORKFORCE_ATTENDANCE'],
       },
       branding: {
         mode: 'WHITE_LABEL',
@@ -47,11 +47,12 @@ describe('runtime config schema', () => {
     expect(parsed.effectiveEntitlements.products).toEqual(['POS']);
     expect(parsed.effectiveEntitlements.capabilities).toEqual([
       'BUSINESS_ANALYTICS',
+      'WORKFORCE_ATTENDANCE',
     ]);
     expect(parsed.theme.preset).toBe('CUSTOM');
   });
 
-  it('does not infer analytics from a dedicated deployment profile', () => {
+  it('does not infer capabilities from a dedicated deployment profile', () => {
     const parsed = runtimeConfigSchema.parse({
       apiBaseUrl: 'http://127.0.0.1:4003',
       workspace: 'standard-dedicated',
