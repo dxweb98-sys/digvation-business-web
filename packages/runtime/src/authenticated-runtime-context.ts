@@ -1,6 +1,10 @@
 import type {
   BusinessCapability,
+  BusinessDateFormat,
   BusinessFoundation,
+  BusinessLocale,
+  BusinessTimeFormat,
+  EffectiveBusinessConfiguration,
   EffectiveEntitlementConfig,
   RuntimeAvailabilityConfig,
 } from './runtime-config.types';
@@ -12,6 +16,24 @@ interface RuntimeContextResponse {
     effectiveCapabilities: string[];
     effectiveFoundations: string[];
     effectivePermissions: string[];
+    businessConfiguration?: {
+      profile: {
+        name: string;
+        configured: boolean;
+        version: number;
+        createdAt: string | null;
+        updatedAt: string | null;
+      };
+      preferences: {
+        defaultLocale: string;
+        timezone: string;
+        dateFormat: string;
+        timeFormat: string;
+        version: number;
+        createdAt: string | null;
+        updatedAt: string | null;
+      };
+    };
   };
 }
 
@@ -34,6 +56,38 @@ const BUSINESS_FOUNDATIONS = new Set<BusinessFoundation>([
   'CUSTOMER_IDENTITY',
 ]);
 
+const BUSINESS_LOCALES = new Set<BusinessLocale>(['id-ID', 'en-US']);
+const BUSINESS_DATE_FORMATS = new Set<BusinessDateFormat>([
+  'DD/MM/YYYY',
+  'MM/DD/YYYY',
+  'YYYY-MM-DD',
+]);
+const BUSINESS_TIME_FORMATS = new Set<BusinessTimeFormat>(['HH:mm', 'hh:mm a']);
+
+function normalizeBusinessConfiguration(
+  value: NonNullable<RuntimeContextResponse['data']>['businessConfiguration'],
+): EffectiveBusinessConfiguration | undefined {
+  if (!value) return undefined;
+  const { profile, preferences } = value;
+  if (
+    !profile.name.trim() ||
+    !BUSINESS_LOCALES.has(preferences.defaultLocale as BusinessLocale) ||
+    !preferences.timezone.trim() ||
+    !BUSINESS_DATE_FORMATS.has(preferences.dateFormat as BusinessDateFormat) ||
+    !BUSINESS_TIME_FORMATS.has(preferences.timeFormat as BusinessTimeFormat)
+  )
+    return undefined;
+  return {
+    profile: { ...profile },
+    preferences: {
+      ...preferences,
+      defaultLocale: preferences.defaultLocale as BusinessLocale,
+      dateFormat: preferences.dateFormat as BusinessDateFormat,
+      timeFormat: preferences.timeFormat as BusinessTimeFormat,
+    },
+  };
+}
+
 /** Reads the authenticated business composition resolved by Business Runtime. */
 export async function loadAuthenticatedRuntimeAvailability(
   apiBaseUrl: string,
@@ -47,6 +101,9 @@ export async function loadAuthenticatedRuntimeAvailability(
   if (!response.ok || !payload.success || !payload.data)
     throw new Error('RUNTIME_CONTEXT_UNAVAILABLE');
 
+  const businessConfiguration = normalizeBusinessConfiguration(
+    payload.data.businessConfiguration,
+  );
   return {
     effectiveEntitlements: {
       products: payload.data.effectiveProducts.filter(
@@ -62,6 +119,7 @@ export async function loadAuthenticatedRuntimeAvailability(
         BUSINESS_FOUNDATIONS.has(value as BusinessFoundation),
     ),
     effectivePermissions: [...new Set(payload.data.effectivePermissions)],
+    ...(businessConfiguration ? { businessConfiguration } : {}),
   };
 }
 
