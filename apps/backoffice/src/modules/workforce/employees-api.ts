@@ -4,6 +4,7 @@ export interface Employee {
   id: string;
   code: string;
   displayName: string;
+  position: string | null;
   joinedOn: string | null;
   status: 'ACTIVE' | 'INACTIVE';
   version: number;
@@ -39,6 +40,21 @@ export interface EmployeeQuery {
   offset: number;
 }
 
+export interface CreateEmployeeInput {
+  code?: string;
+  displayName: string;
+  position?: string | null;
+  joinedOn?: string | null;
+}
+
+export interface UpdateEmployeeInput {
+  displayName?: string;
+  position?: string | null;
+  status?: Employee['status'];
+  joinedOn?: string | null;
+  statusReason?: string | null;
+}
+
 export class EmployeesApi {
   public constructor(private readonly client: ApiClient) {}
 
@@ -56,16 +72,11 @@ export class EmployeesApi {
     return this.client.get<EmployeeDetail>(`/api/v1/employees/${id}`);
   }
 
-  create(input: { code?: string; displayName: string; joinedOn?: string | null }) {
+  create(input: CreateEmployeeInput) {
     return this.client.post<Employee>('/api/v1/employees', input);
   }
 
-  update(employee: Employee, input: {
-    displayName?: string;
-    status?: Employee['status'];
-    joinedOn?: string | null;
-    statusReason?: string | null;
-  }) {
+  update(employee: Employee, input: UpdateEmployeeInput) {
     return this.client.patch<Employee>(`/api/v1/employees/${employee.id}`, {
       expectedVersion: employee.version,
       ...input,
