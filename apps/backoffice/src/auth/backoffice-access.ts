@@ -9,6 +9,7 @@ export type BackofficeCapability =
   | 'dashboard'
   | 'catalog'
   | 'employees'
+  | 'attendance'
   | 'finance'
   | 'expenses'
   | 'financialAccounts'
@@ -44,6 +45,7 @@ export type BackofficeAction =
   | 'cancelTax'
   | 'createEmployee'
   | 'updateEmployee'
+  | 'manageAttendance'
   | 'createFinancialAccount'
   | 'updateFinancialAccount'
   | 'updatePaymentRouting'
@@ -68,6 +70,10 @@ const capabilityPermissions: Record<BackofficeCapability, PermissionRequirement>
   dashboard: { allOf: ['auth:self'] },
   catalog: { allOf: ['catalog:read'] },
   employees: { allOf: ['employees:read'] },
+  attendance: {
+    allOf: ['attendance:read'],
+    capability: 'WORKFORCE_ATTENDANCE',
+  },
   finance: {
     allOf: ['payments:read'],
     capability: 'FINANCE_OPERATIONS',
@@ -90,6 +96,7 @@ const capabilityPermissions: Record<BackofficeCapability, PermissionRequirement>
       'payments:read',
       'catalog:read',
       'employees:read',
+      'attendance:read',
       'expenses:read',
       'cash:read',
       'settlements:read',
@@ -99,16 +106,9 @@ const capabilityPermissions: Record<BackofficeCapability, PermissionRequirement>
     ],
   },
   transactions: { allOf: ['sales:read'], product: 'POS' },
-
-  configuration: {
-    anyOf: ['business-profile:read', 'locations:read'],
-  },
-
+  configuration: { anyOf: ['business-profile:read', 'locations:read'] },
   tax: { allOf: ['tax:read'] },
-
-  accessControl: {
-    allOf: ['roles:read'],
-  },
+  accessControl: { allOf: ['roles:read'] },
 };
 
 const actionPermissions: Record<BackofficeAction, readonly string[]> = {
@@ -119,10 +119,8 @@ const actionPermissions: Record<BackofficeAction, readonly string[]> = {
   manageUserRoles: ['users:roles'],
   viewOperationalAccess: ['operational-access:read'],
   manageOperationalAccess: ['operational-access:update'],
-
   viewBusinessProfile: ['business-profile:read'],
   updateBusinessProfile: ['business-profile:update'],
-
   viewSellingLocations: ['locations:read'],
   createSellingLocation: ['locations:create'],
   updateSellingLocation: ['locations:update'],
@@ -138,6 +136,7 @@ const actionPermissions: Record<BackofficeAction, readonly string[]> = {
   cancelTax: ['tax:cancel'],
   createEmployee: ['employees:create'],
   updateEmployee: ['employees:update'],
+  manageAttendance: ['attendance:manage'],
   createFinancialAccount: ['financial-accounts:create'],
   updateFinancialAccount: ['financial-accounts:update'],
   updatePaymentRouting: ['payment-routing:update'],
@@ -158,19 +157,15 @@ export function canAccessBackoffice(
   entitlements: EffectiveEntitlementConfig,
 ): boolean {
   const requirement = capabilityPermissions[capability];
-
   const hasAll = (requirement.allOf ?? []).every((permission) =>
     session.identity.permissions.includes(permission),
   );
-
   const hasAny =
     !requirement.anyOf ||
     requirement.anyOf.some((permission) => session.identity.permissions.includes(permission));
-
   const hasProduct = !requirement.product || entitlements.products.includes(requirement.product);
   const hasCapability =
     !requirement.capability || entitlements.capabilities.includes(requirement.capability);
-
   return hasAll && hasAny && hasProduct && hasCapability;
 }
 
