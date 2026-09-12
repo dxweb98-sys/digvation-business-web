@@ -62,6 +62,7 @@ export interface Item {
 }
 export interface CatalogManagementItem extends Item {
   variantCount: number;
+  image?: CatalogItemImage | null;
 }
 export interface CatalogItemImage {
   catalogItemId: string;
@@ -117,11 +118,17 @@ function queryString(input: Record<string, unknown>) {
 
 const page = '?limit=50&offset=0';
 export class CatalogApi {
+  private readonly itemImages = new Map<string, CatalogItemImage | null>();
+
   constructor(private readonly client: ApiClient) {}
-  listItems(query: ItemQuery = {}) {
-    return this.client.get<Page<CatalogManagementItem>>(
+  async listItems(query: ItemQuery = {}) {
+    const result = await this.client.get<Page<CatalogManagementItem>>(
       `/api/v1/catalog/items?${queryString({ limit: 50, offset: 0, ...query })}`,
     );
+    result.items.forEach((item) => {
+      if (item.image !== undefined) this.itemImages.set(item.id, item.image);
+    });
+    return result;
   }
   getItem(id: string) {
     return this.client.get<Item>(`/api/v1/catalog/items/${id}`);
@@ -141,17 +148,24 @@ export class CatalogApi {
     });
   }
   getItemImage(itemId: string) {
+    if (this.itemImages.has(itemId)) {
+      return Promise.resolve(this.itemImages.get(itemId) ?? null);
+    }
     return this.client.get<CatalogItemImage | null>(`/api/v1/catalog/items/${itemId}/image`);
   }
-  replaceItemImage(itemId: string, file: File) {
-    return this.client.putBinary<CatalogItemImage>(
+  async replaceItemImage(itemId: string, file: File) {
+    const image = await this.client.putBinary<CatalogItemImage>(
       `/api/v1/catalog/items/${itemId}/image`,
       file,
       file.type,
     );
+    this.itemImages.set(itemId, image);
+    return image;
   }
-  removeItemImage(itemId: string) {
-    return this.client.delete<null>(`/api/v1/catalog/items/${itemId}/image`);
+  async removeItemImage(itemId: string) {
+    const result = await this.client.delete<null>(`/api/v1/catalog/items/${itemId}/image`);
+    this.itemImages.set(itemId, null);
+    return result;
   }
   listCategories(query: CategoryQuery = {}) {
     return this.client.get<Page<Category>>(
