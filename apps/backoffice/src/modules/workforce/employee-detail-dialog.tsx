@@ -138,10 +138,16 @@ export function EmployeeDetailDialog({
                   value={
                     employee.position ? (
                       <DBadge
-                        variant={employee.position.serviceAssignmentEnabled ? 'success' : 'secondary'}
+                        variant={
+                          employee.position.status === 'ACTIVE' &&
+                          employee.position.serviceAssignmentEnabled
+                            ? 'success'
+                            : 'secondary'
+                        }
                       >
                         {copy(
-                          employee.position.serviceAssignmentEnabled
+                          employee.position.status === 'ACTIVE' &&
+                            employee.position.serviceAssignmentEnabled
                             ? 'Can perform services'
                             : 'Cannot perform services',
                         )}
