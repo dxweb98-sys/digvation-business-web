@@ -4,6 +4,7 @@ import {
   DDataTable,
   DDatePicker,
   DDialog,
+  DInput,
   DSelect,
   DTextarea,
   DTimePicker,
@@ -11,13 +12,7 @@ import {
   type TableColumn,
 } from '@digvation/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  CalendarDays,
-  Clock3,
-  History as HistoryIcon,
-  Pencil,
-  RotateCcw,
-} from 'lucide-react';
+import { Clock3, History as HistoryIcon, RotateCcw, Users } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
@@ -31,11 +26,10 @@ import {
 } from './employees-api';
 import { useWorkforceLocalization } from './workforce-localization';
 
-const attendanceKey = ['employees', 'attendance'] as const;
-const employeesKey = ['employees', 'attendance-roster'] as const;
 const directoryKey = ['employees', 'attendance-directory'] as const;
 const positionsKey = ['employees', 'attendance-positions'] as const;
 const historyKey = ['employees', 'attendance-history'] as const;
+const adjustmentKey = ['employees', 'attendance-adjustment'] as const;
 const PAGE_BATCH_SIZE = 100;
 
 type HistoryPeriodMode = 'DAY' | 'MONTH' | 'RANGE';
@@ -55,13 +49,6 @@ export function AttendancePanel({
 }) {
   const { copy, formatDate, locale } = useWorkforceLocalization();
   const today = localDateKey(new Date());
-  const [date, setDate] = useState(today);
-  const [query, setQuery] = useState('');
-  const [positionId, setPositionId] = useState('ALL');
-  const [offset, setOffset] = useState(0);
-  const [pageSize, setPageSize] = useState(20);
-  const [target, setTarget] = useState<Employee | null>(null);
-
   const [historyMode, setHistoryMode] = useState<HistoryPeriodMode>('MONTH');
   const [historyDay, setHistoryDay] = useState(today);
   const [historyMonth, setHistoryMonth] = useState(today.slice(0, 7));
@@ -71,6 +58,7 @@ export function AttendancePanel({
   const [historyStatus, setHistoryStatus] = useState<HistoryStatusFilter>('ALL');
   const [historyOffset, setHistoryOffset] = useState(0);
   const [historyPageSize, setHistoryPageSize] = useState(20);
+  const [adjustmentOpen, setAdjustmentOpen] = useState(false);
 
   const employeeDirectory = useQuery({
     queryKey: directoryKey,
@@ -80,57 +68,6 @@ export function AttendancePanel({
     queryKey: positionsKey,
     queryFn: () => loadAllPositions(api),
   });
-  const employees = useQuery({
-    queryKey: [...employeesKey, query, positionId, offset, pageSize],
-    queryFn: () =>
-      api.list({
-        status: 'ACTIVE',
-        ...(query.trim() ? { q: query.trim() } : {}),
-        ...(positionId !== 'ALL' ? { positionId } : {}),
-        limit: pageSize,
-        offset,
-      }),
-  });
-  const attendance = useQuery({
-    queryKey: [...attendanceKey, 'daily', date],
-    queryFn: () => loadAllAttendance(api, { from: date, to: date }),
-  });
-
-  const activeEmployeeIds = useMemo(
-    () =>
-      new Set(
-        (employeeDirectory.data ?? [])
-          .filter((employee) => employee.status === 'ACTIVE')
-          .map((employee) => employee.id),
-      ),
-    [employeeDirectory.data],
-  );
-  const dailyAttendance = useMemo(
-    () =>
-      (attendance.data ?? []).filter((record) =>
-        activeEmployeeIds.has(record.employeeId),
-      ),
-    [activeEmployeeIds, attendance.data],
-  );
-  const attendanceByEmployee = useMemo(
-    () =>
-      new Map(dailyAttendance.map((record) => [record.employeeId, record])),
-    [dailyAttendance],
-  );
-  const counts = useMemo(() => {
-    const result: Record<AttendanceStatus, number> = {
-      PRESENT: 0,
-      ABSENT: 0,
-      LEAVE: 0,
-      SICK: 0,
-    };
-    for (const record of dailyAttendance) result[record.status] += 1;
-    return result;
-  }, [dailyAttendance]);
-  const unsetCount = Math.max(
-    0,
-    activeEmployeeIds.size - dailyAttendance.length,
-  );
 
   const historyRange = useMemo(
     () =>
@@ -143,6 +80,7 @@ export function AttendancePanel({
       }),
     [historyDay, historyFrom, historyMode, historyMonth, historyTo],
   );
+
   const history = useQuery({
     queryKey: [
       ...historyKey,
@@ -165,6 +103,7 @@ export function AttendancePanel({
         offset: historyOffset,
       }),
   });
+
   const historyCounts = useQuery({
     queryKey: [
       ...historyKey,
@@ -174,12 +113,7 @@ export function AttendancePanel({
       historyEmployeeId,
     ],
     queryFn: async () => {
-      const statuses: AttendanceStatus[] = [
-        'PRESENT',
-        'ABSENT',
-        'LEAVE',
-        'SICK',
-      ];
+      const statuses: AttendanceStatus[] = ['PRESENT', 'ABSENT', 'LEAVE', 'SICK'];
       const pages = await Promise.all(
         statuses.map((status) =>
           api.listAttendance({
@@ -207,30 +141,16 @@ export function AttendancePanel({
   const employeeById = useMemo(
     () =>
       new Map(
-        (employeeDirectory.data ?? []).map((employee) => [
-          employee.id,
-          employee,
-        ]),
+        (employeeDirectory.data ?? []).map((employee) => [employee.id, employee]),
       ),
     [employeeDirectory.data],
-  );
-  const positionOptions = useMemo(
-    () => [
-      { value: 'ALL', label: copy('All positions') },
-      ...(positions.data ?? [])
-        .filter((position) => position.status === 'ACTIVE')
-        .map((position) => ({ value: position.id, label: position.name })),
-    ],
-    [copy, positions.data],
   );
   const employeeOptions = useMemo(
     () => [
       { value: 'ALL', label: copy('All employees') },
       ...(employeeDirectory.data ?? [])
         .slice()
-        .sort((left, right) =>
-          left.displayName.localeCompare(right.displayName),
-        )
+        .sort((left, right) => left.displayName.localeCompare(right.displayName))
         .map((employee) => ({
           value: employee.id,
           label: `${employee.displayName} · ${employee.code}`,
@@ -243,54 +163,11 @@ export function AttendancePanel({
     [locale],
   );
 
-  const columns: TableColumn<Employee>[] = [
-    { key: 'code', label: copy('Employee code') },
-    { key: 'displayName', label: copy('Display name') },
-    {
-      key: 'position',
-      label: copy('Position'),
-      render: (employee) => employee.position?.name ?? copy('Not set'),
-    },
-    {
-      key: 'attendance',
-      label: copy('Attendance status'),
-      render: (employee) => {
-        const record = attendanceByEmployee.get(employee.id);
-        return record ? (
-          <AttendanceBadge status={record.status} />
-        ) : (
-          copy('Not set')
-        );
-      },
-    },
-    {
-      key: 'time',
-      label: copy('Check in'),
-      render: (employee) => {
-        const record = attendanceByEmployee.get(employee.id);
-        return record?.checkInAt
-          ? formatDate(new Date(record.checkInAt), { timeStyle: 'short' })
-          : copy('Not set');
-      },
-    },
-    {
-      key: 'source',
-      label: copy('Source'),
-      render: (employee) => {
-        const source = attendanceByEmployee.get(employee.id)?.source;
-        return source
-          ? copy(source === 'LOCAL' ? 'Local' : 'HRIS')
-          : copy('Not set');
-      },
-    },
-  ];
-
   const historyColumns: TableColumn<EmployeeAttendance>[] = [
     {
       key: 'attendanceDate',
       label: copy('Attendance date'),
-      render: (record) =>
-        formatDate(new Date(`${record.attendanceDate}T00:00:00`)),
+      render: (record) => formatDate(new Date(`${record.attendanceDate}T00:00:00`)),
     },
     {
       key: 'employee',
@@ -299,12 +176,8 @@ export function AttendancePanel({
         const employee = employeeById.get(record.employeeId);
         return employee ? (
           <div>
-            <p className="font-medium text-[var(--color-text)]">
-              {employee.displayName}
-            </p>
-            <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
-              {employee.code}
-            </p>
+            <p className="font-medium text-[var(--color-text)]">{employee.displayName}</p>
+            <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">{employee.code}</p>
           </div>
         ) : (
           record.employeeId
@@ -345,12 +218,6 @@ export function AttendancePanel({
     },
   ];
 
-  const resetDailyFilters = () => {
-    setDate(localDateKey(new Date()));
-    setQuery('');
-    setPositionId('ALL');
-    setOffset(0);
-  };
   const resetHistoryFilters = () => {
     const current = localDateKey(new Date());
     setHistoryMode('MONTH');
@@ -363,357 +230,310 @@ export function AttendancePanel({
     setHistoryOffset(0);
   };
 
+  const counts = historyCounts.data ?? {
+    PRESENT: 0,
+    ABSENT: 0,
+    LEAVE: 0,
+    SICK: 0,
+  };
+  const totalRecords = counts.PRESENT + counts.ABSENT + counts.LEAVE + counts.SICK;
+
   return (
-    <div className="space-y-8">
-      <section className="space-y-4">
-        <div className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:p-5">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-            <div className="max-w-xl">
-              <div className="flex items-center gap-2 text-[var(--color-text)]">
-                <CalendarDays className="size-4" aria-hidden="true" />
-                <h3 className="text-sm font-semibold">
-                  {copy('Attendance summary')}
-                </h3>
-              </div>
-              <p className="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">
-                {copy(
-                  'Review the daily roster, find an employee quickly, and record attendance without leaving this view.',
-                )}
-              </p>
-            </div>
-
-            <div className="grid w-full gap-3 sm:grid-cols-2 xl:max-w-3xl xl:grid-cols-[minmax(12rem,1fr)_minmax(12rem,1fr)_auto]">
-              <DDatePicker
-                label={copy('Attendance date')}
-                value={date}
-                onChange={(value) => {
-                  if (value) {
-                    setDate(value);
-                    setOffset(0);
-                  }
-                }}
-                variant="date"
-              />
-              <DSelect
-                label={copy('Position')}
-                value={positionId}
-                clearable={false}
-                options={positionOptions}
-                onValueChange={(value) => {
-                  setPositionId(value);
-                  setOffset(0);
-                }}
-              />
-              <div className="self-end">
-                <DButton
-                  variant="secondary"
-                  leftIcon={<RotateCcw className="size-4" />}
-                  onClick={resetDailyFilters}
-                >
-                  {copy('Reset filters')}
-                </DButton>
-              </div>
-            </div>
-          </div>
-
-          <p className="mt-4 border-t border-[var(--color-border)] pt-3 text-xs leading-5 text-[var(--color-text-muted)]">
-            {copy(
-              'Attendance is recorded by authorized supervisors or managers. HRIS-sourced records remain read-only locally.',
-            )}
-          </p>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          <AttendanceStat label={copy('Present')} value={counts.PRESENT} />
-          <AttendanceStat label={copy('Absent')} value={counts.ABSENT} />
-          <AttendanceStat label={copy('Leave')} value={counts.LEAVE} />
-          <AttendanceStat label={copy('Sick')} value={counts.SICK} />
-          <AttendanceStat label={copy('Not set')} value={unsetCount} />
-        </div>
-
-        <DDataTable
-          columns={columns}
-          data={employees.data?.items ?? []}
-          loading={
-            employees.isLoading ||
-            attendance.isLoading ||
-            employeeDirectory.isLoading
-          }
-          rowKey="id"
-          searchable
-          searchPlaceholder={copy('Search employee code or name...')}
-          searchValue={query}
-          onSearchChange={(value) => {
-            setQuery(value);
-            setOffset(0);
-          }}
-          emptyMessage={
-            query || positionId !== 'ALL'
-              ? copy('No matching employees found.')
-              : copy('No employees are available.')
-          }
-          pagination={{
-            page: Math.floor(offset / pageSize) + 1,
-            pageSize,
-            total: employees.data?.total ?? 0,
-          }}
-          onPageChange={(page) => setOffset((page - 1) * pageSize)}
-          onPageSizeChange={(nextPageSize) => {
-            setPageSize(nextPageSize);
-            setOffset(0);
-          }}
-          actions={[
-            {
-              label: copy('Record attendance'),
-              icon: <Clock3 className="size-4" />,
-              onClick: (employee) => setTarget(employee),
-              show: (employee) =>
-                canManage && !attendanceByEmployee.has(employee.id),
-            },
-            {
-              label: copy('Edit attendance'),
-              icon: <Pencil className="size-4" />,
-              onClick: (employee) => setTarget(employee),
-              show: (employee) =>
-                canManage &&
-                attendanceByEmployee.get(employee.id)?.source === 'LOCAL',
-            },
-          ]}
-        />
-      </section>
-
-      <section className="space-y-4">
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex items-center gap-2 text-[var(--color-text)]">
             <HistoryIcon className="size-4" aria-hidden="true" />
-            <h3 className="text-base font-semibold">
-              {copy('Attendance history')}
-            </h3>
+            <h3 className="text-base font-semibold">{copy('Attendance history')}</h3>
           </div>
-          <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-            {copy(
-              'Review attendance history by day, month, or a custom date range.',
-            )}
+          <p className="mt-1 max-w-2xl text-sm text-[var(--color-text-muted)]">
+            {copy('Review attendance history by day, month, or a custom date range.')}
           </p>
         </div>
+        {canManage ? (
+          <DButton
+            leftIcon={<Clock3 className="size-4" />}
+            onClick={() => setAdjustmentOpen(true)}
+          >
+            {copy('Adjust attendance')}
+          </DButton>
+        ) : null}
+      </div>
 
-        <div className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:p-5">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:p-5">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <DSelect
+            label={copy('Period')}
+            value={historyMode}
+            clearable={false}
+            options={[
+              { value: 'DAY', label: copy('Daily') },
+              { value: 'MONTH', label: copy('Monthly') },
+              { value: 'RANGE', label: copy('Date range') },
+            ]}
+            onValueChange={(value) => {
+              setHistoryMode(value as HistoryPeriodMode);
+              setHistoryOffset(0);
+            }}
+          />
+
+          {historyMode === 'DAY' ? (
+            <DDatePicker
+              label={copy('Attendance date')}
+              value={historyDay}
+              onChange={(value) => {
+                if (value) {
+                  setHistoryDay(value);
+                  setHistoryOffset(0);
+                }
+              }}
+              variant="date"
+            />
+          ) : null}
+
+          {historyMode === 'MONTH' ? (
             <DSelect
-              label={copy('Period')}
-              value={historyMode}
+              label={copy('Month')}
+              value={historyMonth}
               clearable={false}
-              options={[
-                { value: 'DAY', label: copy('Daily') },
-                { value: 'MONTH', label: copy('Monthly') },
-                { value: 'RANGE', label: copy('Date range') },
-              ]}
+              options={monthOptions}
               onValueChange={(value) => {
-                setHistoryMode(value as HistoryPeriodMode);
+                setHistoryMonth(value);
                 setHistoryOffset(0);
               }}
             />
+          ) : null}
 
-            {historyMode === 'DAY' ? (
+          {historyMode === 'RANGE' ? (
+            <>
               <DDatePicker
-                label={copy('Attendance date')}
-                value={historyDay}
+                label={copy('From date')}
+                value={historyFrom}
                 onChange={(value) => {
-                  if (value) {
-                    setHistoryDay(value);
-                    setHistoryOffset(0);
-                  }
+                  if (!value) return;
+                  setHistoryFrom(value);
+                  if (value > historyTo) setHistoryTo(value);
+                  setHistoryOffset(0);
                 }}
                 variant="date"
               />
-            ) : null}
-
-            {historyMode === 'MONTH' ? (
-              <DSelect
-                label={copy('Month')}
-                value={historyMonth}
-                clearable={false}
-                options={monthOptions}
-                onValueChange={(value) => {
-                  setHistoryMonth(value);
+              <DDatePicker
+                label={copy('To date')}
+                value={historyTo}
+                onChange={(value) => {
+                  if (!value) return;
+                  setHistoryTo(value);
+                  if (value < historyFrom) setHistoryFrom(value);
                   setHistoryOffset(0);
                 }}
+                variant="date"
               />
-            ) : null}
+            </>
+          ) : null}
 
-            {historyMode === 'RANGE' ? (
-              <>
-                <DDatePicker
-                  label={copy('From date')}
-                  value={historyFrom}
-                  onChange={(value) => {
-                    if (!value) return;
-                    setHistoryFrom(value);
-                    if (value > historyTo) setHistoryTo(value);
-                    setHistoryOffset(0);
-                  }}
-                  variant="date"
-                />
-                <DDatePicker
-                  label={copy('To date')}
-                  value={historyTo}
-                  onChange={(value) => {
-                    if (!value) return;
-                    setHistoryTo(value);
-                    if (value < historyFrom) setHistoryFrom(value);
-                    setHistoryOffset(0);
-                  }}
-                  variant="date"
-                />
-              </>
-            ) : null}
-
-            <DSelect
-              label={copy('Employee')}
-              value={historyEmployeeId}
-              clearable={false}
-              options={employeeOptions}
-              onValueChange={(value) => {
-                setHistoryEmployeeId(value);
-                setHistoryOffset(0);
-              }}
-            />
-
-            <DSelect
-              label={copy('Attendance status')}
-              value={historyStatus}
-              clearable={false}
-              options={[
-                { value: 'ALL', label: copy('All statuses') },
-                { value: 'PRESENT', label: copy('Present') },
-                { value: 'ABSENT', label: copy('Absent') },
-                { value: 'LEAVE', label: copy('Leave') },
-                { value: 'SICK', label: copy('Sick') },
-              ]}
-              onValueChange={(value) => {
-                setHistoryStatus(value as HistoryStatusFilter);
-                setHistoryOffset(0);
-              }}
-            />
-          </div>
-
-          <div className="mt-4 flex flex-col gap-3 border-t border-[var(--color-border)] pt-4 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs text-[var(--color-text-muted)]">
-              {copy(
-                'Showing attendance records for the selected period and filters.',
-              )}
-            </p>
-            <DButton
-              variant="secondary"
-              leftIcon={<RotateCcw className="size-4" />}
-              onClick={resetHistoryFilters}
-            >
-              {copy('Reset filters')}
-            </DButton>
-          </div>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <AttendanceStat
-            label={copy('Present')}
-            value={historyCounts.data?.PRESENT ?? 0}
+          <DSelect
+            label={copy('Employee')}
+            value={historyEmployeeId}
+            clearable={false}
+            options={employeeOptions}
+            onValueChange={(value) => {
+              setHistoryEmployeeId(value);
+              setHistoryOffset(0);
+            }}
           />
-          <AttendanceStat
-            label={copy('Absent')}
-            value={historyCounts.data?.ABSENT ?? 0}
-          />
-          <AttendanceStat
-            label={copy('Leave')}
-            value={historyCounts.data?.LEAVE ?? 0}
-          />
-          <AttendanceStat
-            label={copy('Sick')}
-            value={historyCounts.data?.SICK ?? 0}
+
+          <DSelect
+            label={copy('Attendance status')}
+            value={historyStatus}
+            clearable={false}
+            options={[
+              { value: 'ALL', label: copy('All statuses') },
+              { value: 'PRESENT', label: copy('Present') },
+              { value: 'ABSENT', label: copy('Absent') },
+              { value: 'LEAVE', label: copy('Leave') },
+              { value: 'SICK', label: copy('Sick') },
+            ]}
+            onValueChange={(value) => {
+              setHistoryStatus(value as HistoryStatusFilter);
+              setHistoryOffset(0);
+            }}
           />
         </div>
 
-        <DDataTable
-          columns={historyColumns}
-          data={history.data?.items ?? []}
-          loading={history.isLoading || employeeDirectory.isLoading}
-          rowKey="id"
-          emptyMessage={copy('No attendance history is available.')}
-          pagination={{
-            page: Math.floor(historyOffset / historyPageSize) + 1,
-            pageSize: historyPageSize,
-            total: history.data?.total ?? 0,
-          }}
-          onPageChange={(page) =>
-            setHistoryOffset((page - 1) * historyPageSize)
-          }
-          onPageSizeChange={(nextPageSize) => {
-            setHistoryPageSize(nextPageSize);
-            setHistoryOffset(0);
-          }}
-        />
-      </section>
+        <div className="mt-4 flex flex-col gap-3 border-t border-[var(--color-border)] pt-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-muted)]">
+            <span className="font-semibold text-[var(--color-text)]">
+              {totalRecords} {copy('attendance records')}
+            </span>
+            <span aria-hidden="true">·</span>
+            <span>{copy('Present')} {counts.PRESENT}</span>
+            <span aria-hidden="true">·</span>
+            <span>{copy('Absent')} {counts.ABSENT}</span>
+            <span aria-hidden="true">·</span>
+            <span>{copy('Leave')} {counts.LEAVE}</span>
+            <span aria-hidden="true">·</span>
+            <span>{copy('Sick')} {counts.SICK}</span>
+          </div>
+          <DButton
+            variant="secondary"
+            leftIcon={<RotateCcw className="size-4" />}
+            onClick={resetHistoryFilters}
+          >
+            {copy('Reset filters')}
+          </DButton>
+        </div>
+      </div>
 
-      <AttendanceEditor
-        open={target !== null}
-        employee={target}
-        date={date}
-        existing={
-          target ? attendanceByEmployee.get(target.id) : undefined
-        }
+      <DDataTable
+        columns={historyColumns}
+        data={history.data?.items ?? []}
+        loading={history.isLoading || employeeDirectory.isLoading}
+        rowKey="id"
+        emptyMessage={copy('No attendance history is available.')}
+        pagination={{
+          page: Math.floor(historyOffset / historyPageSize) + 1,
+          pageSize: historyPageSize,
+          total: history.data?.total ?? 0,
+        }}
+        onPageChange={(page) => setHistoryOffset((page - 1) * historyPageSize)}
+        onPageSizeChange={(nextPageSize) => {
+          setHistoryPageSize(nextPageSize);
+          setHistoryOffset(0);
+        }}
+      />
+
+      <AttendanceAdjustmentDialog
+        open={adjustmentOpen}
         api={api}
-        onClose={() => setTarget(null)}
+        employees={employeeDirectory.data ?? []}
+        positions={positions.data ?? []}
+        onClose={() => setAdjustmentOpen(false)}
       />
     </div>
   );
 }
 
-function AttendanceEditor({
+function AttendanceAdjustmentDialog({
   open,
-  employee,
-  date,
-  existing,
   api,
+  employees,
+  positions,
   onClose,
 }: {
   open: boolean;
-  employee: Employee | null;
-  date: string;
-  existing: EmployeeAttendance | undefined;
   api: EmployeesApi;
+  employees: Employee[];
+  positions: EmployeePosition[];
   onClose: () => void;
 }) {
   const { copy } = useWorkforceLocalization();
   const { showToast } = useToast();
   const queryClient = useQueryClient();
+  const today = localDateKey(new Date());
+  const [date, setDate] = useState(today);
+  const [query, setQuery] = useState('');
+  const [positionId, setPositionId] = useState('ALL');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [status, setStatus] = useState<AttendanceStatus>('PRESENT');
   const [checkIn, setCheckIn] = useState('');
   const [checkOut, setCheckOut] = useState('');
   const [note, setNote] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const attendance = useQuery({
+    queryKey: [...adjustmentKey, date],
+    queryFn: () => loadAllAttendance(api, { from: date, to: date }),
+    enabled: open,
+  });
+  const attendanceByEmployee = useMemo(
+    () => new Map((attendance.data ?? []).map((record) => [record.employeeId, record])),
+    [attendance.data],
+  );
+  const filteredEmployees = useMemo(() => {
+    const search = query.trim().toLowerCase();
+    return employees
+      .filter((employee) => employee.status === 'ACTIVE')
+      .filter((employee) => positionId === 'ALL' || employee.positionId === positionId)
+      .filter((employee) =>
+        !search
+          ? true
+          : `${employee.code} ${employee.displayName} ${employee.position?.name ?? ''}`
+              .toLowerCase()
+              .includes(search),
+      )
+      .sort((left, right) => left.displayName.localeCompare(right.displayName));
+  }, [employees, positionId, query]);
+  const selectableEmployees = filteredEmployees.filter(
+    (employee) => attendanceByEmployee.get(employee.id)?.source !== 'HRIS',
+  );
+  const positionOptions = [
+    { value: 'ALL', label: copy('All positions') },
+    ...positions
+      .filter((position) => position.status === 'ACTIVE')
+      .map((position) => ({ value: position.id, label: position.name })),
+  ];
 
   useEffect(() => {
-    setStatus(existing?.status ?? 'PRESENT');
-    setCheckIn(existing?.checkInAt ? localTime(existing.checkInAt) : '');
-    setCheckOut(existing?.checkOutAt ? localTime(existing.checkOutAt) : '');
-    setNote(existing?.note ?? '');
-  }, [existing, employee?.id, date, open]);
+    if (!open) return;
+    setDate(today);
+    setQuery('');
+    setPositionId('ALL');
+    setSelectedIds(new Set());
+    setStatus('PRESENT');
+    setCheckIn('');
+    setCheckOut('');
+    setNote('');
+  }, [open, today]);
+
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [date]);
+
+  const toggleEmployee = (employeeId: string) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(employeeId)) next.delete(employeeId);
+      else next.add(employeeId);
+      return next;
+    });
+  };
+
+  const selectVisible = () => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      selectableEmployees.forEach((employee) => next.add(employee.id));
+      return next;
+    });
+  };
 
   const save = async () => {
-    if (!employee) return;
+    if (!selectedIds.size || saving) return;
+    setSaving(true);
     try {
-      await api.upsertAttendance(employee.id, date, {
-        status,
-        checkInAt:
-          status === 'PRESENT' && checkIn ? toIso(date, checkIn) : null,
-        checkOutAt:
-          status === 'PRESENT' && checkOut ? toIso(date, checkOut) : null,
-        note: note.trim() || null,
-      });
+      const results = await Promise.allSettled(
+        [...selectedIds].map((employeeId) =>
+          api.upsertAttendance(employeeId, date, {
+            status,
+            checkInAt: status === 'PRESENT' && checkIn ? toIso(date, checkIn) : null,
+            checkOutAt: status === 'PRESENT' && checkOut ? toIso(date, checkOut) : null,
+            note: note.trim() || null,
+          }),
+        ),
+      );
+      const failed = results.filter((result) => result.status === 'rejected').length;
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: attendanceKey }),
         queryClient.invalidateQueries({ queryKey: historyKey }),
+        queryClient.invalidateQueries({ queryKey: adjustmentKey }),
       ]);
-      showToast({ variant: 'success', title: copy('Attendance saved.') });
-      onClose();
+      if (failed === 0) {
+        showToast({ variant: 'success', title: copy('Attendance adjustment saved.') });
+        onClose();
+      } else {
+        showToast({
+          variant: 'danger',
+          title: `${selectedIds.size - failed}/${selectedIds.size} ${copy('employees updated')}`,
+        });
+      }
     } catch (error) {
       if (!isSessionExpiredError(error)) {
         showToast({
@@ -724,6 +544,8 @@ function AttendanceEditor({
           ).safeMessage,
         });
       }
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -731,63 +553,161 @@ function AttendanceEditor({
     <DDialog
       open={open}
       onClose={onClose}
-      title={copy(existing ? 'Edit attendance' : 'Record attendance')}
-      description={
-        employee
-          ? `${employee.code} · ${employee.displayName} · ${date}`
-          : undefined
-      }
+      title={copy('Adjust attendance')}
+      description={copy('Select one or more employees, then apply the same attendance adjustment.')}
       footer={
-        <div className="flex justify-end gap-2">
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <DButton variant="secondary" onClick={onClose}>
             {copy('Cancel')}
           </DButton>
-          <DButton onClick={() => void save()}>{copy('Save')}</DButton>
+          <DButton disabled={!selectedIds.size || saving} onClick={() => void save()}>
+            {saving
+              ? copy('Saving...')
+              : `${copy('Save')} (${selectedIds.size})`}
+          </DButton>
         </div>
       }
     >
-      <div className="space-y-4">
-        <DSelect
-          label={copy('Attendance status')}
-          value={status}
-          clearable={false}
-          options={[
-            { value: 'PRESENT', label: copy('Present') },
-            { value: 'ABSENT', label: copy('Absent') },
-            { value: 'LEAVE', label: copy('Leave') },
-            { value: 'SICK', label: copy('Sick') },
-          ]}
-          onValueChange={(value) =>
-            setStatus(value as AttendanceStatus)
-          }
-        />
-        {status === 'PRESENT' ? (
-          <div className="space-y-2">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <DTimePicker
-                label={copy('Check in (optional)')}
-                value={checkIn}
-                onChange={setCheckIn}
-                onClear={() => setCheckIn('')}
-              />
-              <DTimePicker
-                label={copy('Check out (optional)')}
-                value={checkOut}
-                onChange={setCheckOut}
-                onClear={() => setCheckOut('')}
+      <div className="space-y-5">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <DDatePicker
+            label={copy('Attendance date')}
+            value={date}
+            onChange={(value) => value && setDate(value)}
+            variant="date"
+          />
+          <DSelect
+            label={copy('Position')}
+            value={positionId}
+            clearable={false}
+            options={positionOptions}
+            onValueChange={setPositionId}
+          />
+        </div>
+
+        <div className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3 sm:p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="min-w-0 flex-1">
+              <DInput
+                label={copy('Search employee code or name')}
+                value={query}
+                onChange={setQuery}
+                placeholder={copy('Search employee code or name...')}
               />
             </div>
-            <p className="text-xs leading-5 text-[var(--color-text-muted)]">
-              {copy('Check-in and check-out times are optional for now.')}
-            </p>
+            <div className="flex gap-2">
+              <DButton variant="secondary" onClick={selectVisible}>
+                {copy('Select visible')}
+              </DButton>
+              {selectedIds.size ? (
+                <DButton variant="secondary" onClick={() => setSelectedIds(new Set())}>
+                  {copy('Clear selection')}
+                </DButton>
+              ) : null}
+            </div>
           </div>
-        ) : null}
-        <DTextarea
-          label={copy('Note')}
-          value={note}
-          onChange={setNote}
-          placeholder={copy('Not set')}
-        />
+
+          <div className="mt-3 flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
+            <Users className="size-4" aria-hidden="true" />
+            <span>
+              {selectedIds.size} {copy('employees selected')}
+            </span>
+          </div>
+
+          <div className="mt-3 max-h-72 space-y-2 overflow-y-auto pr-1">
+            {filteredEmployees.length ? (
+              filteredEmployees.map((employee) => {
+                const existing = attendanceByEmployee.get(employee.id);
+                const readOnly = existing?.source === 'HRIS';
+                const selected = selectedIds.has(employee.id);
+                return (
+                  <label
+                    key={employee.id}
+                    className={`flex items-start gap-3 rounded-lg border p-3 transition-colors ${
+                      readOnly
+                        ? 'cursor-not-allowed border-[var(--color-border)] opacity-60'
+                        : selected
+                          ? 'cursor-pointer border-[var(--color-brand)] bg-[var(--color-surface)]'
+                          : 'cursor-pointer border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-brand)]'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="mt-1 size-4 accent-[var(--color-brand)]"
+                      checked={selected}
+                      disabled={readOnly}
+                      onChange={() => toggleEmployee(employee.id)}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium text-[var(--color-text)]">
+                          {employee.displayName}
+                        </span>
+                        {existing ? <AttendanceBadge status={existing.status} /> : null}
+                        {readOnly ? <DBadge variant="secondary">HRIS</DBadge> : null}
+                      </div>
+                      <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                        {[employee.code, employee.position?.name].filter(Boolean).join(' · ')}
+                      </p>
+                    </div>
+                  </label>
+                );
+              })
+            ) : (
+              <p className="py-8 text-center text-sm text-[var(--color-text-muted)]">
+                {copy('No matching employees found.')}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="border-t border-[var(--color-border)] pt-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <DSelect
+              label={copy('Attendance status')}
+              value={status}
+              clearable={false}
+              options={[
+                { value: 'PRESENT', label: copy('Present') },
+                { value: 'ABSENT', label: copy('Absent') },
+                { value: 'LEAVE', label: copy('Leave') },
+                { value: 'SICK', label: copy('Sick') },
+              ]}
+              onValueChange={(value) => setStatus(value as AttendanceStatus)}
+            />
+          </div>
+
+          {status === 'PRESENT' ? (
+            <div className="mt-4 space-y-2">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <DTimePicker
+                  label={copy('Check in (optional)')}
+                  value={checkIn}
+                  onChange={setCheckIn}
+                  onClear={() => setCheckIn('')}
+                />
+                <DTimePicker
+                  label={copy('Check out (optional)')}
+                  value={checkOut}
+                  onChange={setCheckOut}
+                  onClear={() => setCheckOut('')}
+                />
+              </div>
+              <p className="text-xs leading-5 text-[var(--color-text-muted)]">
+                {copy('Check-in and check-out times are optional for now.')}
+              </p>
+            </div>
+          ) : null}
+
+          <div className="mt-4">
+            <DTextarea
+              label={copy('Note')}
+              value={note}
+              onChange={setNote}
+              placeholder={copy('Not set')}
+            />
+          </div>
+        </div>
       </div>
     </DDialog>
   );
@@ -818,19 +738,6 @@ export function AttendanceBadge({ status }: { status: AttendanceStatus }) {
   );
 }
 
-function AttendanceStat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-      <p className="text-xs font-medium text-[var(--color-text-muted)]">
-        {label}
-      </p>
-      <p className="mt-1 text-2xl font-semibold tabular-nums text-[var(--color-text)]">
-        {value}
-      </p>
-    </div>
-  );
-}
-
 async function loadAllEmployees(api: EmployeesApi) {
   const items: Employee[] = [];
   let offset = 0;
@@ -850,10 +757,7 @@ async function loadAllPositions(api: EmployeesApi) {
   let offset = 0;
   let total = Number.POSITIVE_INFINITY;
   while (items.length < total) {
-    const page = await api.listPositions({
-      limit: PAGE_BATCH_SIZE,
-      offset,
-    });
+    const page = await api.listPositions({ limit: PAGE_BATCH_SIZE, offset });
     items.push(...page.items);
     total = page.total;
     if (!page.items.length) break;
@@ -929,13 +833,6 @@ function localDateKey(date: Date) {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
-}
-
-function localTime(value: string) {
-  const date = new Date(value);
-  return `${String(date.getHours()).padStart(2, '0')}:${String(
-    date.getMinutes(),
-  ).padStart(2, '0')}`;
 }
 
 function toIso(date: string, time: string) {
