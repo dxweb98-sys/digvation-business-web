@@ -6,11 +6,14 @@ import {
   DConfirmDialog,
   DDataTable,
   DDialog,
+  useToast,
   type TableColumn,
 } from '@digvation/ui';
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { BadgeDollarSign, Pencil, Plus, Power, RotateCcw } from 'lucide-react';
 import { useState } from 'react';
+import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
+import { isSessionExpiredError } from '../../auth/backoffice-auth-context';
 import type {
   CatalogApi,
   CatalogManagementItem,
@@ -73,6 +76,7 @@ export function CatalogItemDetailDialog({
 }) {
   const client = useQueryClient();
   const { copy } = useCatalogLocalization();
+  const { showToast } = useToast();
   const [editingVariant, setEditingVariant] = useState<Variant | null | undefined>();
   const [pricingTarget, setPricingTarget] = useState<'default' | Variant | null>(null);
   const [statusTarget, setStatusTarget] = useState<Variant | null>(null);
@@ -156,6 +160,14 @@ export function CatalogItemDetailDialog({
       setStatusTarget(null);
       refreshVariantsAndCount();
       void client.invalidateQueries({ queryKey: ['catalog', 'default-prices'] });
+      showToast({ variant: 'success', title: copy('Variant updated.') });
+    } catch (error) {
+      if (!isSessionExpiredError(error)) {
+        showToast({
+          variant: 'danger',
+          title: normalizeBackofficeApiError(error, copy('Could not save variant.')).safeMessage,
+        });
+      }
     } finally {
       setChangingStatus(false);
     }
