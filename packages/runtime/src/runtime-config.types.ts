@@ -7,7 +7,18 @@ export type BusinessProduct = 'POS';
 export type BusinessCapability =
   | 'FINANCE_OPERATIONS'
   | 'BUSINESS_ANALYTICS'
-  | 'WORKFORCE_ATTENDANCE';
+  | 'WORKFORCE_ATTENDANCE'
+  | 'MEMBERSHIP'
+  | 'LOYALTY_POINTS'
+  | 'TAX_FISCAL';
+export type BusinessFoundation =
+  | 'IDENTITY_ACCESS'
+  | 'AUDIT_ACTIVITY'
+  | 'ORGANIZATION_LOCATION'
+  | 'CATALOG'
+  | 'OPERATIONAL_ACCESS'
+  | 'WORKFORCE'
+  | 'CUSTOMER_IDENTITY';
 
 export interface BrandingConfig {
   mode: BrandingMode;
@@ -54,6 +65,12 @@ export interface CapabilityConfig {
 export interface EffectiveEntitlementConfig {
   products: readonly BusinessProduct[];
   capabilities: readonly BusinessCapability[];
+}
+
+export interface RuntimeAvailabilityConfig {
+  effectiveEntitlements: EffectiveEntitlementConfig;
+  effectiveFoundations: readonly BusinessFoundation[];
+  effectivePermissions: readonly string[];
 }
 
 export interface RuntimeConfig {
