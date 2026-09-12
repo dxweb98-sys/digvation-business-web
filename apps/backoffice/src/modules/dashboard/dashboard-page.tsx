@@ -13,6 +13,7 @@ import { BackofficePage } from '../../app/layout/backoffice-page';
 import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
 import { useBusinessLocation } from '../../app/providers/business-location-context';
 import { useBackofficeAuth } from '../../auth/backoffice-auth-context';
+import { canAccessReport } from '../reporting/report-availability';
 import { BusinessInsightWidget } from './components/business-insight-widget';
 import { BusinessPerformanceCard } from './components/business-performance-card';
 import { DashboardKpiCard } from './components/dashboard-kpi-card';
@@ -143,11 +144,10 @@ export function DashboardPage() {
     () => new DashboardApi(createApiClient(runtime.apiBaseUrl)),
     [createApiClient, runtime.apiBaseUrl],
   );
-  const permissions = session?.identity.permissions ?? [];
-  const canReadSales = permissions.includes('sales:read');
-  const canReadCatalog = permissions.includes('catalog:read');
-  const canReadEmployees = permissions.includes('employees:read');
-  const canReadPayments = permissions.includes('payments:read');
+  const canReadSales = canAccessReport(session, 'business-performance');
+  const canReadCatalog = canAccessReport(session, 'catalog-performance');
+  const canReadEmployees = canAccessReport(session, 'employee-performance');
+  const canReadPayments = canAccessReport(session, 'payments');
 
   const today = periodRange('today');
   const yesterday = previousRange(today.from, today.to);
