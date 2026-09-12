@@ -57,7 +57,7 @@ function AuthenticatedBackofficeProviders({
 }: Pick<BackofficeProvidersProps, 'router'>) {
   const bootstrapRuntime = useRuntime();
   const { session } = useBackofficeAuth();
-  const { locale, setLocale } = useBackofficeLocalization();
+  const { setLocale } = useBackofficeLocalization();
   const runtime = useMemo(
     () =>
       applyEffectiveBusinessConfiguration(
@@ -69,10 +69,8 @@ function AuthenticatedBackofficeProviders({
   const configuredLocale = session?.businessConfiguration?.preferences.defaultLocale;
 
   useEffect(() => {
-    if (!configuredLocale) return;
-    const nextLocale = configuredLocale === 'en-US' ? 'en' : 'id';
-    if (nextLocale !== locale) setLocale(nextLocale);
-  }, [configuredLocale, locale, setLocale]);
+    if (configuredLocale) setLocale(configuredLocale === 'en-US' ? 'en' : 'id');
+  }, [configuredLocale, setLocale]);
 
   return (
     <RuntimeProvider config={runtime}>
