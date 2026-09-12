@@ -1,5 +1,6 @@
 import { loadAuthenticatedRuntimeAvailability } from '@digvation/business-runtime';
 import type { BackofficeSession, LoginCredentials } from './auth-session';
+import { effectiveBusinessPermissions } from './effective-business-permissions';
 
 interface SessionCredentials {
   accessToken: string;
@@ -106,9 +107,9 @@ export class HttpAuthAdapter {
       method: 'GET',
       accessToken,
     });
-    const permissions = new Set<string>(['auth:self']);
+    const grantedPermissions = new Set<string>(['auth:self']);
     const roles = user.roles.map(({ id, code, name, systemKey, permissions: rolePermissions }) => {
-      rolePermissions.forEach((permission) => permissions.add(permission));
+      rolePermissions.forEach((permission) => grantedPermissions.add(permission));
       return { id, code, name, systemKey };
     });
 
@@ -116,12 +117,16 @@ export class HttpAuthAdapter {
       this.apiBaseUrl,
       accessToken,
     );
+    const permissions = effectiveBusinessPermissions(
+      grantedPermissions,
+      availability,
+    );
     return {
       identity: {
         userId: user.id,
         displayName: user.displayName,
         workspace,
-        permissions: [...permissions],
+        permissions,
         roles,
       },
       effectiveEntitlements: availability.effectiveEntitlements,
