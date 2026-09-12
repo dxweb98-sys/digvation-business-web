@@ -18,7 +18,6 @@ import {
 } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
-import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
 import {
   AnalyticsDonutChart,
   AnalyticsHorizontalBarChart,
@@ -27,6 +26,7 @@ import {
 } from '../../components/analytics/analytics-charts';
 import { AnalyticsKpiCard } from '../../components/analytics/analytics-kpi-card';
 import { useBackofficeAuth } from '../../auth/backoffice-auth-context';
+import { useWorkforceLocalization } from '../workforce/workforce-localization';
 
 const types = [
   ['business-performance', 'Business Performance Summary'],
@@ -255,7 +255,7 @@ const metrics: Record<Type, string[]> = {
     'contributedTransactions',
     'averageContribution',
   ],
-  attendance: ['totalRecords', 'employeeCount', 'presentCount', 'absentCount'],
+  attendance: ['totalRecords', 'presentCount', 'absentCount', 'leaveCount', 'sickCount'],
   payments: ['successfulAmount', 'attemptCount', 'successfulPayments', 'failedPayments'],
   expenses: ['approvedExpenseTotal', 'expenseCount', 'pendingCount', 'rejectedCount'],
   cash: ['cashIn', 'cashOut', 'netMovement', 'movementCount'],
@@ -401,7 +401,7 @@ export function ReportsPage() {
   const { createApiClient, getAccessToken, session } = useBackofficeAuth();
   const runtime = useRuntime();
   const { apiBaseUrl } = runtime;
-  const { copy, formatDate, formatMoney } = useBackofficeLocalization();
+  const { copy, formatDate, formatMoney } = useWorkforceLocalization();
   const api = useMemo(() => createApiClient(apiBaseUrl), [apiBaseUrl, createApiClient]);
   const availableTypes = useMemo(
     () =>
@@ -895,7 +895,11 @@ export function ReportsPage() {
           </button>
         </div>
       ) : null}
-      <section className="mt-5 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+      <section
+        className={`mt-5 grid gap-3 md:grid-cols-2 ${
+          type === 'attendance' ? 'xl:grid-cols-5' : 'lg:grid-cols-4'
+        }`}
+      >
         {metrics[type]
           .filter((k) => k in (data?.summary ?? {}))
           .map((k) => (
