@@ -17,6 +17,7 @@ import {
 } from '../../modules/finance';
 import { TransactionHistoryPage } from '../../modules/pos';
 import { ReportsPage } from '../../modules/reporting';
+import { ActivityPage } from '../../modules/activity';
 
 export const backofficeRouter = createBrowserRouter([
   { path: '/login', element: <BackofficeLoginPage /> },
@@ -66,6 +67,10 @@ export const backofficeRouter = createBrowserRouter([
           {
             element: <AuthorizedRoute capability="tax" />,
             children: [{ path: '/tax', element: <TaxPage /> }],
+          },
+          {
+            element: <AuthorizedRoute capability="activity" />,
+            children: [{ path: '/activity', element: <ActivityPage /> }],
           },
           {
             element: <AuthorizedRoute capability="accessControl" />,

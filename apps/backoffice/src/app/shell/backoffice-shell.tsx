@@ -6,6 +6,7 @@ import {
   BookOpen,
   Building2,
   ChartNoAxesCombined,
+  ClipboardList,
   CircleUserRound,
   KeyRound,
   LayoutDashboard,
@@ -41,6 +42,10 @@ const dashboardItem: NavigationItem = {
   to: '/',
   icon: LayoutDashboard,
   capability: 'dashboard',
+};
+
+const activityItem: NavigationItem = {
+  label: 'activity', to: '/activity', icon: ClipboardList, capability: 'activity',
 };
 
 const navigationSections: ReadonlyArray<{
@@ -316,6 +321,11 @@ function NavigationGroups({ session }: { session: BackofficeSession }) {
           </div>
         );
       })}
+      {canAccessBackoffice(session, 'activity') ? (
+        <div className="mt-3">
+          <NavigationLink item={activityItem} />
+        </div>
+      ) : null}
     </>
   );
 }
