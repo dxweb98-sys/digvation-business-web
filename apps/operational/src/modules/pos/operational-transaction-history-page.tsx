@@ -5,8 +5,8 @@ import {
   DBadge,
   DConnectionError,
   DDataTable,
-  DDatePicker,
   DDialog,
+  DRangeDatePicker,
   type TableColumn,
 } from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
@@ -139,24 +139,15 @@ export function OperationalTransactionHistoryPage() {
           loading={list.isLoading || !selectedLocationId}
           rowKey="id"
           filters={
-            <div className="flex flex-wrap gap-2">
-              <DDatePicker
-                label={copy('From')}
-                value={createdFrom}
-                onChange={(value) => {
-                  setCreatedFrom(value);
-                  setOffset(0);
-                }}
-              />
-              <DDatePicker
-                label={copy('To')}
-                value={createdTo}
-                onChange={(value) => {
-                  setCreatedTo(value);
-                  setOffset(0);
-                }}
-              />
-            </div>
+            <DRangeDatePicker
+              label={copy('Period')}
+              value={{ start: createdFrom, end: createdTo }}
+              onChange={(range) => {
+                setCreatedFrom(range.start ?? '');
+                setCreatedTo(range.end ?? '');
+                setOffset(0);
+              }}
+            />
           }
           actions={[
             {
