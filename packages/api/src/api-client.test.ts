@@ -90,6 +90,7 @@ describe('ApiClient', () => {
     const getAccessToken = vi
       .fn<(forceRefresh?: boolean) => Promise<string | null>>()
       .mockResolvedValueOnce('expired-access')
+      .mockResolvedValueOnce('expired-access')
       .mockResolvedValueOnce('fresh-access')
       .mockResolvedValueOnce('fresh-access');
 
@@ -100,9 +101,31 @@ describe('ApiClient', () => {
 
     await expect(client.get('/api/v1/sales/sale-1')).resolves.toEqual({ id: 'sale-1' });
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(getAccessToken).toHaveBeenNthCalledWith(2, true);
+    expect(getAccessToken).toHaveBeenNthCalledWith(3, true);
     const [, retryInit] = fetchMock.mock.calls[1] as [string, RequestInit];
     expect(new Headers(retryInit.headers).get('authorization')).toBe('Bearer fresh-access');
+  });
+
+  it('reuses a token already refreshed by another request', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(failureResponse(401, 'UNAUTHORIZED'))
+      .mockResolvedValueOnce(successResponse({ id: 'sale-2' }));
+    vi.stubGlobal('fetch', fetchMock);
+    const getAccessToken = vi
+      .fn<(forceRefresh?: boolean) => Promise<string | null>>()
+      .mockResolvedValueOnce('expired-access')
+      .mockResolvedValueOnce('fresh-access')
+      .mockResolvedValueOnce('fresh-access');
+
+    const client = new ApiClient({
+      baseUrl: 'https://pos.example.test',
+      getAccessToken,
+    });
+
+    await expect(client.get('/api/v1/sales/sale-2')).resolves.toEqual({ id: 'sale-2' });
+    expect(getAccessToken).toHaveBeenCalledTimes(3);
+    expect(getAccessToken.mock.calls.some(([forceRefresh]) => forceRefresh === true)).toBe(false);
   });
 
   it('does not treat 403 as session expiry or attempt refresh', async () => {
