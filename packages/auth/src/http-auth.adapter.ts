@@ -1,9 +1,12 @@
-import type { AuthLoginInput, AuthPort, AuthSession } from './auth.types';
+import type {
+  AuthLoginInput,
+  AuthPort,
+  AuthRefreshResult,
+  AuthSession,
+  SessionEndReason,
+} from './auth.types';
+import { BrowserSessionClient } from './browser-session-client';
 
-interface Credentials {
-  accessToken: string;
-  refreshToken: string;
-}
 interface AuthUser {
   id: string;
   displayName: string;
@@ -17,67 +20,69 @@ interface ApiResponse<T> {
 
 /** Browser adapter for authenticated Business Web experiences. */
 export class HttpAuthAdapter implements AuthPort {
-  private readonly storageKey: string;
+  private readonly sessionClient: BrowserSessionClient;
+
   public constructor(
     private readonly apiBaseUrl: string,
     private readonly workspace: string,
     storageNamespace = 'business-web',
   ) {
-    this.storageKey = `digvation.${storageNamespace}.auth-session.v1`;
+    this.sessionClient = new BrowserSessionClient(apiBaseUrl, storageNamespace);
   }
+
   public async me(): Promise<AuthSession | null> {
-    const credentials = this.readCredentials();
-    if (!credentials) return null;
+    const accessToken = this.sessionClient.getAccessToken();
+    if (!accessToken) return null;
     try {
-      return await this.currentUser(credentials.accessToken);
+      return await this.currentUser(accessToken);
     } catch (error) {
-      if (!isAuthenticationFailure(error)) throw error;
+      if (!isUnauthorized(error)) throw error;
     }
+
+    const refreshed = await this.sessionClient.refreshAccessToken();
+    if (refreshed.kind !== 'refreshed') return null;
     try {
-      const refreshed = await this.request<Credentials>('/api/v1/auth/refresh', {
-        method: 'POST',
-        body: { refreshToken: credentials.refreshToken },
-      });
-      this.writeCredentials(refreshed);
       return await this.currentUser(refreshed.accessToken);
     } catch (error) {
-      this.clearCredentials();
-      if (isAuthenticationFailure(error)) return null;
+      if (isUnauthorized(error)) return null;
       throw error;
     }
   }
+
   public async login(input: AuthLoginInput): Promise<AuthSession> {
-    const credentials = await this.request<Credentials>('/api/v1/auth/login', {
-      method: 'POST',
-      body: { workspace: this.workspace, identifier: input.identifier, password: input.password },
-    });
-    this.writeCredentials(credentials);
+    const accessToken = await this.sessionClient.login(
+      this.workspace,
+      input.identifier,
+      input.password,
+    );
     try {
-      return await this.currentUser(credentials.accessToken);
+      return await this.currentUser(accessToken);
     } catch (error) {
-      this.clearCredentials();
+      this.sessionClient.clearClientSession();
       throw error;
     }
   }
-  public async logout(): Promise<void> {
-    const credentials = this.readCredentials();
-    this.clearCredentials();
-    if (!credentials) return;
-    try {
-      await this.request('/api/v1/auth/logout', {
-        method: 'POST',
-        body: { refreshToken: credentials.refreshToken },
-      });
-    } catch {
-      /* local logout is complete */
-    }
+
+  public logout(): Promise<void> {
+    return this.sessionClient.logout();
   }
+
   public async requestPasswordChange(): Promise<void> {
     throw new Error('PASSWORD_CHANGE_NOT_SUPPORTED');
   }
+
   public async getAccessToken(): Promise<string | null> {
-    return this.readCredentials()?.accessToken ?? null;
+    return this.sessionClient.getAccessToken();
   }
+
+  public refreshAccessToken(): Promise<AuthRefreshResult> {
+    return this.sessionClient.refreshAccessToken();
+  }
+
+  public subscribeSessionEnded(listener: (reason: SessionEndReason) => void): () => void {
+    return this.sessionClient.subscribeSessionEnded(listener);
+  }
+
   private async currentUser(accessToken: string): Promise<AuthSession> {
     const user = await this.request<AuthUser>('/api/v1/auth/me', { method: 'GET', accessToken });
     return {
@@ -89,41 +94,25 @@ export class HttpAuthAdapter implements AuthPort {
       },
     };
   }
+
   private async request<T>(
     path: string,
-    options: { method: 'GET' | 'POST'; body?: unknown; accessToken?: string },
+    options: { method: 'GET'; accessToken: string },
   ): Promise<T> {
     const headers = new Headers();
-    if (options.body !== undefined) headers.set('content-type', 'application/json');
-    if (options.accessToken) headers.set('authorization', `Bearer ${options.accessToken}`);
+    headers.set('authorization', `Bearer ${options.accessToken}`);
     const response = await fetch(`${this.apiBaseUrl}${path}`, {
       method: options.method,
       headers,
-      ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
-      credentials: 'omit',
+      credentials: 'include',
     });
     const payload = (await response.json()) as ApiResponse<T>;
     if (!response.ok || !payload.success || payload.data === undefined)
       throw new AuthenticationError(response.status, payload.error?.code ?? 'AUTH_REQUEST_FAILED');
     return payload.data;
   }
-  private readCredentials(): Credentials | null {
-    try {
-      const raw = window.sessionStorage.getItem(this.storageKey);
-      if (!raw) return null;
-      const value: unknown = JSON.parse(raw);
-      return isCredentials(value) ? value : null;
-    } catch {
-      return null;
-    }
-  }
-  private writeCredentials(credentials: Credentials) {
-    window.sessionStorage.setItem(this.storageKey, JSON.stringify(credentials));
-  }
-  private clearCredentials() {
-    window.sessionStorage.removeItem(this.storageKey);
-  }
 }
+
 class AuthenticationError extends Error {
   public constructor(
     public readonly status: number,
@@ -132,14 +121,7 @@ class AuthenticationError extends Error {
     super(code);
   }
 }
-function isAuthenticationFailure(error: unknown): boolean {
-  return error instanceof AuthenticationError && (error.status === 401 || error.status === 403);
-}
-function isCredentials(value: unknown): value is Credentials {
-  return (
-    Boolean(value) &&
-    typeof value === 'object' &&
-    typeof (value as Credentials).accessToken === 'string' &&
-    typeof (value as Credentials).refreshToken === 'string'
-  );
+
+function isUnauthorized(error: unknown): boolean {
+  return error instanceof AuthenticationError && error.status === 401;
 }
