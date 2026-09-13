@@ -19,6 +19,7 @@ import {
   DSkeleton as Skeleton,
   useToast,
 } from '@digvation-labs/ui';
+import { DTabs, DTabsContent, DTabsList, DTabsTrigger } from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
 import {
   AlertCircle,
@@ -1481,8 +1482,6 @@ function ReferenceQueueBoard({
 }) {
   const statuses = Object.keys(statusMeta) as QueueStatus[];
   const count = groups.QUEUED.length + groups.PROGRESS.length;
-  const list = groups[active];
-  const contentKey = `${active}:${list.map((sale) => `${sale.id}:${sale.version}`).join('|')}`;
   return (
     <div className="mb-4 shrink-0">
       <div className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm">
@@ -1536,67 +1535,61 @@ function ReferenceQueueBoard({
           className={`grid transition-all duration-300 ease-out ${open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
         >
           <div className="overflow-hidden">
-            <div
-              key={contentKey}
-              className="pos-queue-content-enter space-y-3 border-t border-[var(--color-border)] p-3"
+            <DTabs
+              value={active}
+              onValueChange={(value) => onChangeTab(value as QueueStatus)}
+              className="border-t border-[var(--color-border)] p-3"
             >
-              <div className="no-scrollbar flex items-center gap-2 overflow-x-auto">
-                {statuses.map((status) => {
-                  const meta = statusMeta[status];
-                  const selected = status === active;
-                  return (
-                    <button
-                      key={status}
-                      type="button"
-                      onClick={() => onChangeTab(status)}
-                      className={`inline-flex shrink-0 items-center gap-2 rounded-2xl border px-4 py-2.5 text-xs font-bold transition-all active:scale-[.98] ${selected ? 'bg-[var(--color-background)] text-[var(--color-text)] shadow-sm ring-1 ring-[var(--color-border)]' : 'border-transparent bg-[var(--color-surface-muted)]/45 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]'}`}
-                    >
-                      <span
-                        className={`inline-flex size-6 items-center justify-center rounded-full ${selected ? meta.tone : 'bg-[var(--color-background)] text-[var(--color-text-muted)]'}`}
-                      >
-                        {meta.icon}
-                      </span>
-                      <span>{meta.label}</span>
-                      <span
-                        className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-black ${selected ? meta.tone : 'bg-[var(--color-background)] text-[var(--color-text-muted)]'}`}
-                      >
-                        {groups[status].length}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-              {list.length ? (
-                <div className="no-scrollbar cursor-grab overflow-x-auto overflow-y-hidden pb-3 select-none">
-                  <div className="flex w-max gap-4 px-0.5">
-                    {list.map((sale) => (
-                      <ReferenceQueueCard
-                        key={sale.id}
-                        sale={sale}
-                        status={active}
-                        locale={locale}
-                        issues={issues[sale.id] ?? []}
-                        onStartWork={onStartWork}
-                        onAdjust={onAdjust}
-                        onPay={onPay}
-                        onCancel={onCancel}
-                        onView={onView}
-                        onViewReceipt={onViewReceipt}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)]/20 py-7 text-center">
-                  <p className="text-sm font-semibold">
-                    Tidak ada transaksi {statusMeta[active].label.toLowerCase()}
-                  </p>
-                  <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                    Transaksi akan muncul di sini ketika sudah dibuat.
-                  </p>
-                </div>
-              )}
-            </div>
+              <DTabsList className="max-w-full overflow-x-auto">
+                {statuses.map((status) => (
+                  <DTabsTrigger key={status} value={status}>
+                    {statusMeta[status].label} ({groups[status].length})
+                  </DTabsTrigger>
+                ))}
+              </DTabsList>
+              {statuses.map((status) => {
+                const list = groups[status];
+                const contentKey = `${status}:${list
+                  .map((sale) => `${sale.id}:${sale.version}`)
+                  .join('|')}`;
+                return (
+                  <DTabsContent key={status} value={status} className="mt-3">
+                    <div key={contentKey} className="pos-queue-content-enter space-y-3">
+                      {list.length ? (
+                        <div className="no-scrollbar cursor-grab overflow-x-auto overflow-y-hidden pb-3 select-none">
+                          <div className="flex w-max gap-4 px-0.5">
+                            {list.map((sale) => (
+                              <ReferenceQueueCard
+                                key={sale.id}
+                                sale={sale}
+                                status={status}
+                                locale={locale}
+                                issues={issues[sale.id] ?? []}
+                                onStartWork={onStartWork}
+                                onAdjust={onAdjust}
+                                onPay={onPay}
+                                onCancel={onCancel}
+                                onView={onView}
+                                onViewReceipt={onViewReceipt}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)]/20 py-7 text-center">
+                          <p className="text-sm font-semibold">
+                            Tidak ada transaksi {statusMeta[status].label.toLowerCase()}
+                          </p>
+                          <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                            Transaksi akan muncul di sini ketika sudah dibuat.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </DTabsContent>
+                );
+              })}
+            </DTabs>
           </div>
         </div>
       </div>
