@@ -1,6 +1,7 @@
 import { Navigate, createBrowserRouter } from 'react-router';
 import type { ReactNode } from 'react';
 
+import { useOperationalLocalization } from '../localization/operational-localization';
 import { useOperationalAvailability } from '../providers/operational-availability-context';
 import { SellPage } from '../../routes/sell/sell-page';
 import { OperationalShell } from '../../modules/operational/operational-shell';
@@ -30,15 +31,31 @@ function useOperationalSurfaceAccess() {
 
 function OperationalLayout() {
   const access = useOperationalSurfaceAccess();
+  const { copy } = useOperationalLocalization();
   const salesItems = [
     ...(access.canSell ? posSellOperationalNavigation.items : []),
     ...(access.canReadSales ? posHistoryOperationalNavigation.items : []),
   ];
   const navigationSections: OperationalNavigationSection[] = [
     ...(salesItems.length
-      ? [{ label: posSellOperationalNavigation.label, items: salesItems }]
+      ? [
+          {
+            label: copy(posSellOperationalNavigation.label),
+            items: salesItems.map((item) => ({ ...item, label: copy(item.label) })),
+          },
+        ]
       : []),
-    ...(access.canReadExpenses ? [financeOperationalNavigation] : []),
+    ...(access.canReadExpenses
+      ? [
+          {
+            label: copy(financeOperationalNavigation.label),
+            items: financeOperationalNavigation.items.map((item) => ({
+              ...item,
+              label: copy(item.label),
+            })),
+          },
+        ]
+      : []),
   ];
   return <OperationalShell navigationSections={navigationSections} />;
 }
