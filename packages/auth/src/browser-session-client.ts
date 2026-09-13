@@ -14,11 +14,13 @@ interface ApiResponse<T> {
 
 const IDLE_TIMEOUT_MS = 60 * 60 * 1000;
 const ACTIVITY_THROTTLE_MS = 15_000;
+const SESSION_CHANNEL_HEADER = 'X-Digvation-Session-Channel';
 
 export class BrowserSessionClient {
   private readonly accessTokenKey: string;
   private readonly accessExpiryKey: string;
   private readonly lastActivityKey: string;
+  private readonly sessionChannel: string;
   private refreshPromise: Promise<AuthRefreshResult> | null = null;
   private idleTimer: number | null = null;
   private lastRecordedActivity = 0;
@@ -29,6 +31,10 @@ export class BrowserSessionClient {
     private readonly apiBaseUrl: string,
     storageNamespace: string,
   ) {
+    if (!/^[a-z0-9-]{1,32}$/.test(storageNamespace)) {
+      throw new Error('INVALID_AUTH_STORAGE_NAMESPACE');
+    }
+    this.sessionChannel = storageNamespace;
     const prefix = `digvation.${storageNamespace}.auth-session.v2`;
     this.accessTokenKey = `${prefix}.access-token`;
     this.accessExpiryKey = `${prefix}.access-expires-at`;
@@ -194,6 +200,7 @@ export class BrowserSessionClient {
     options: { method: 'POST'; body?: unknown },
   ): Promise<T> {
     const headers = new Headers();
+    headers.set(SESSION_CHANNEL_HEADER, this.sessionChannel);
     if (options.body !== undefined) headers.set('content-type', 'application/json');
     const response = await fetch(`${this.apiBaseUrl}${path}`, {
       method: options.method,
