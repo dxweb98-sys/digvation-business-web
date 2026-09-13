@@ -105,7 +105,9 @@ function AuthenticatedOperationalRuntime({ children }: { children: ReactNode }) 
     return (
       <RuntimeProvider config={effectiveRuntime}>
         <OperationalAvailabilityProvider availability={availability}>
-          <DLocalizationProvider locale={effectiveRuntime.locale}>
+          <DLocalizationProvider
+            locale={effectiveRuntime.locale === 'en-US' ? 'en-US' : 'id-ID'}
+          >
             {children}
           </DLocalizationProvider>
         </OperationalAvailabilityProvider>
