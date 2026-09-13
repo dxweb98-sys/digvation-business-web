@@ -34,7 +34,7 @@ export interface AuthPort {
   login(input: AuthLoginInput): Promise<AuthSession>;
   logout(): Promise<void>;
   requestPasswordChange(input: AuthPasswordChangeRequestInput): Promise<void>;
-  getAccessToken?(): Promise<string | null>;
+  getAccessToken?(forceRefresh?: boolean): Promise<string | null>;
   refreshAccessToken?(): Promise<AuthRefreshResult>;
   subscribeSessionEnded?(listener: (reason: SessionEndReason) => void): () => void;
 }
