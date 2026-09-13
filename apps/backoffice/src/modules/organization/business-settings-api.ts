@@ -3,6 +3,27 @@ import { ApiClient } from '@digvation/business-api';
 export const BUSINESS_CONFIGURATION_CHANGED_EVENT =
   'digvation:business-configuration-changed';
 
+export type NumberingNamespace = 'SALE' | 'EMPLOYEE' | 'INVOICE';
+export type DashboardWidget =
+  | 'TOP_ITEMS'
+  | 'PAYMENT_MIX'
+  | 'RECENT_TRANSACTIONS'
+  | 'TOP_EMPLOYEES'
+  | 'BUSINESS_INSIGHT';
+export type ConfigurableReport =
+  | 'business-performance'
+  | 'transactions'
+  | 'catalog-performance'
+  | 'employee-performance'
+  | 'attendance'
+  | 'payments'
+  | 'expenses'
+  | 'cash'
+  | 'settlements'
+  | 'reconciliations'
+  | 'tax'
+  | 'locations';
+
 export interface BusinessProfile {
   name: string | null;
   version: number;
@@ -23,6 +44,24 @@ export interface BusinessPreferences {
 export interface EffectiveBusinessConfiguration {
   profile: BusinessProfile & { configured: boolean };
   preferences: BusinessPreferences;
+}
+
+export interface NumberingPreference {
+  namespace: NumberingNamespace;
+  prefix: string;
+  padding: number;
+  currentSequence: number;
+  version: number;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface BusinessExperiencePreferences {
+  hiddenDashboardWidgets: DashboardWidget[];
+  hiddenReports: ConfigurableReport[];
+  version: number;
+  createdAt: string | null;
+  updatedAt: string | null;
 }
 
 export interface SellingLocation {
@@ -84,6 +123,45 @@ export class BusinessSettingsApi {
         expectedVersion: preferences.version,
         ...input,
       }),
+    );
+  }
+
+  getNumbering() {
+    return this.client.get<NumberingPreference[]>(
+      '/api/v1/business-configuration/numbering',
+    );
+  }
+
+  updateNumbering(
+    preference: NumberingPreference,
+    input: Pick<NumberingPreference, 'prefix' | 'padding'>,
+  ) {
+    return this.client.patch<NumberingPreference>(
+      `/api/v1/business-configuration/numbering/${preference.namespace}`,
+      {
+        expectedVersion: preference.version,
+        prefix: input.prefix,
+        padding: input.padding,
+      },
+    );
+  }
+
+  getExperience() {
+    return this.client.get<BusinessExperiencePreferences>(
+      '/api/v1/business-configuration/experience',
+    );
+  }
+
+  updateExperience(preferences: BusinessExperiencePreferences) {
+    return configurationChanged(
+      this.client.patch<BusinessExperiencePreferences>(
+        '/api/v1/business-configuration/experience',
+        {
+          expectedVersion: preferences.version,
+          hiddenDashboardWidgets: preferences.hiddenDashboardWidgets,
+          hiddenReports: preferences.hiddenReports,
+        },
+      ),
     );
   }
 
