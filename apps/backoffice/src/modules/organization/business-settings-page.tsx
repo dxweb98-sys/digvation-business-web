@@ -5,12 +5,7 @@ import {
   DDialog,
   DDataTable,
   DInput,
-  DSelect,
   DSkeleton,
-  DTabs,
-  DTabsContent,
-  DTabsList,
-  DTabsTrigger,
   useToast,
   type TableColumn,
 } from '@digvation/ui';
@@ -32,13 +27,12 @@ import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error'
 import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
 import {
   BusinessSettingsApi,
-  type BusinessPreferences,
   type BusinessProfile,
   type SellingLocation,
 } from './business-settings-api';
 
 const businessSettingsKeys = {
-  configuration: ['business-settings', 'configuration'] as const,
+  profile: ['business-settings', 'profile'] as const,
   locations: ['business-settings', 'locations'] as const,
 };
 
@@ -55,8 +49,6 @@ export function BusinessSettingsPage() {
   const { showToast } = useToast();
   const { copy } = useBackofficeLocalization();
   const [editingProfile, setEditingProfile] = useState<BusinessProfile | null>(null);
-  const [editingPreferences, setEditingPreferences] =
-    useState<BusinessPreferences | null>(null);
   const [editingLocation, setEditingLocation] = useState<
     SellingLocation | null | undefined
   >(undefined);
@@ -81,9 +73,9 @@ export function BusinessSettingsPage() {
   const canUpdateLocation = session
     ? canPerformBackofficeAction(session, 'updateSellingLocation')
     : false;
-  const configurationQuery = useQuery({
-    queryKey: businessSettingsKeys.configuration,
-    queryFn: () => api.getConfiguration(),
+  const profileQuery = useQuery({
+    queryKey: businessSettingsKeys.profile,
+    queryFn: () => api.getProfile(),
     enabled: canViewProfile,
   });
   const locationsQuery = useQuery({
@@ -99,9 +91,9 @@ export function BusinessSettingsPage() {
       }),
     enabled: canViewLocations,
   });
-  const invalidateConfiguration = () =>
+  const invalidateProfile = () =>
     void queryClient.invalidateQueries({
-      queryKey: businessSettingsKeys.configuration,
+      queryKey: businessSettingsKeys.profile,
     });
   const invalidateLocations = () =>
     void queryClient.invalidateQueries({
@@ -119,74 +111,47 @@ export function BusinessSettingsPage() {
     <BackofficePage>
       <BackofficePageHeader
         eyebrow={copy('Configuration')}
-        title={copy('Business')}
+        title="Business"
         description={copy(
           'Set your business identity and manage the selling locations available to this workspace.',
         )}
       />
 
-      <DTabs defaultValue="profile" className="mt-6">
-        <DTabsList>
-          <DTabsTrigger value="profile">{copy('Profile')}</DTabsTrigger>
-          <DTabsTrigger value="localization">
-            {copy('Localization')}
-          </DTabsTrigger>
-        </DTabsList>
-        <DTabsContent value="profile" className="mt-4">
-          {canViewProfile ? (
-            <ProfileCard
-              profile={configurationQuery.data?.profile}
-              isLoading={configurationQuery.isLoading}
-              canUpdate={canUpdateProfile}
-              onEdit={setEditingProfile}
-            />
-          ) : null}
-          {canViewLocations ? (
-            <LocationsPanel
-              locations={locationsQuery.data?.items}
-              total={locationsQuery.data?.total ?? 0}
-              isLoading={locationsQuery.isLoading}
-              canCreate={canCreateLocation}
-              canUpdate={canUpdateLocation}
-              onCreate={() => setEditingLocation(null)}
-              onEdit={setEditingLocation}
-              onDeactivate={setDeactivatingLocation}
-              offset={locationsQuery.data?.offset ?? locationsOffset}
-              pageSize={locationsPageSize}
-              onPageChange={(page) =>
-                setLocationsOffset((page - 1) * locationsPageSize)
-              }
-              onPageSizeChange={(pageSize) => {
-                setLocationsPageSize(pageSize);
-                setLocationsOffset(0);
-              }}
-            />
-          ) : null}
-        </DTabsContent>
-        <DTabsContent value="localization" className="mt-4">
-          {canViewProfile ? (
-            <LocalizationPanel
-              preferences={configurationQuery.data?.preferences}
-              isLoading={configurationQuery.isLoading}
-              canUpdate={canUpdateProfile}
-              onEdit={setEditingPreferences}
-            />
-          ) : null}
-        </DTabsContent>
-      </DTabs>
+      {canViewProfile ? (
+        <ProfileCard
+          profile={profileQuery.data}
+          isLoading={profileQuery.isLoading}
+          canUpdate={canUpdateProfile}
+          onEdit={setEditingProfile}
+        />
+      ) : null}
+      {canViewLocations ? (
+        <LocationsPanel
+          locations={locationsQuery.data?.items}
+          total={locationsQuery.data?.total ?? 0}
+          isLoading={locationsQuery.isLoading}
+          canCreate={canCreateLocation}
+          canUpdate={canUpdateLocation}
+          onCreate={() => setEditingLocation(null)}
+          onEdit={setEditingLocation}
+          onDeactivate={setDeactivatingLocation}
+          offset={locationsQuery.data?.offset ?? locationsOffset}
+          pageSize={locationsPageSize}
+          onPageChange={(page) =>
+            setLocationsOffset((page - 1) * locationsPageSize)
+          }
+          onPageSizeChange={(pageSize) => {
+            setLocationsPageSize(pageSize);
+            setLocationsOffset(0);
+          }}
+        />
+      ) : null}
       <ProfileEditor
         key={editingProfile?.version ?? 'closed'}
         profile={editingProfile}
         api={api}
         onClose={() => setEditingProfile(null)}
-        onChanged={invalidateConfiguration}
-      />
-      <LocalizationEditor
-        key={editingPreferences?.version ?? 'closed'}
-        preferences={editingPreferences}
-        api={api}
-        onClose={() => setEditingPreferences(null)}
-        onChanged={invalidateConfiguration}
+        onChanged={invalidateProfile}
       />
       <LocationEditor
         key={editingLocation?.id ?? (editingLocation === null ? 'new' : 'closed')}
@@ -255,7 +220,7 @@ function ProfileCard({
           <div>
             <h2 className="font-semibold">{copy('Business profile')}</h2>
             <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-              {copy('The business name used by your POS records.')}
+              The business name used by your POS records.
             </p>
           </div>
         </div>
@@ -278,75 +243,6 @@ function ProfileCard({
       )}
     </section>
   );
-}
-
-function LocalizationPanel({
-  preferences,
-  isLoading,
-  canUpdate,
-  onEdit,
-}: {
-  preferences?: BusinessPreferences | undefined;
-  isLoading: boolean;
-  canUpdate: boolean;
-  onEdit: (preferences: BusinessPreferences) => void;
-}) {
-  const { copy } = useBackofficeLocalization();
-  return (
-    <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 sm:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h2 className="font-semibold">{copy('Localization')}</h2>
-          <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-            {copy(
-              'Set the default language, timezone, and time formats for this business.',
-            )}
-          </p>
-        </div>
-        {canUpdate && preferences ? (
-          <DButton
-            variant="secondary"
-            size="sm"
-            onClick={() => onEdit(preferences)}
-          >
-            {copy('Edit localization')}
-          </DButton>
-        ) : null}
-      </div>
-      {isLoading ? (
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          <DSkeleton className="h-11" />
-          <DSkeleton className="h-11" />
-        </div>
-      ) : preferences ? (
-        <dl className="mt-5 grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
-          <PreferenceFact
-            label={copy('Default language')}
-            value={localizeLocale(preferences.defaultLocale, copy)}
-          />
-          <PreferenceFact label={copy('Timezone')} value={preferences.timezone} />
-          <PreferenceFact label={copy('Date format')} value={preferences.dateFormat} />
-          <PreferenceFact label={copy('Time format')} value={preferences.timeFormat} />
-        </dl>
-      ) : null}
-    </section>
-  );
-}
-
-function PreferenceFact({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="text-xs text-[var(--color-text-muted)]">{label}</dt>
-      <dd className="mt-1 font-medium">{value}</dd>
-    </div>
-  );
-}
-
-function localizeLocale(
-  locale: BusinessPreferences['defaultLocale'],
-  copy: (value: string) => string,
-) {
-  return locale === 'id-ID' ? copy('Indonesian') : copy('English');
 }
 
 function LocationsPanel({
@@ -513,129 +409,6 @@ function ProfileEditor({
         placeholder={copy('For example, Main Store')}
         autoFocus
       />
-    </DDialog>
-  );
-}
-
-function LocalizationEditor({
-  preferences,
-  api,
-  onClose,
-  onChanged,
-}: {
-  preferences: BusinessPreferences | null;
-  api: BusinessSettingsApi;
-  onClose: () => void;
-  onChanged: () => void;
-}) {
-  const { showToast } = useToast();
-  const { copy } = useBackofficeLocalization();
-  const [defaultLocale, setDefaultLocale] = useState<BusinessPreferences['defaultLocale']>(
-    preferences?.defaultLocale ?? 'id-ID',
-  );
-  const [timezone, setTimezone] = useState(preferences?.timezone ?? 'Asia/Jakarta');
-  const [dateFormat, setDateFormat] = useState<BusinessPreferences['dateFormat']>(
-    preferences?.dateFormat ?? 'DD/MM/YYYY',
-  );
-  const [timeFormat, setTimeFormat] = useState<BusinessPreferences['timeFormat']>(
-    preferences?.timeFormat ?? 'HH:mm',
-  );
-  const [saving, setSaving] = useState(false);
-
-  const save = async () => {
-    if (!preferences || !timezone.trim() || saving) return;
-    setSaving(true);
-    try {
-      await api.updatePreferences(preferences, {
-        defaultLocale,
-        timezone: timezone.trim(),
-        dateFormat,
-        timeFormat,
-      });
-      onChanged();
-      showToast({ variant: 'success', title: copy('Localization updated.') });
-      onClose();
-    } catch (error) {
-      if (!isSessionExpiredError(error))
-        showToast({
-          variant: 'danger',
-          title: normalizeBackofficeApiError(
-            error,
-            copy('Could not update localization.'),
-          ).safeMessage,
-        });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <DDialog
-      open={Boolean(preferences)}
-      onClose={onClose}
-      title={copy('Localization')}
-      description={copy(
-        'Set the default language and time presentation for this business.',
-      )}
-      footer={
-        <div className="flex justify-end gap-2">
-          <DButton variant="secondary" onClick={onClose}>
-            {copy('Cancel')}
-          </DButton>
-          <DButton
-            onClick={() => void save()}
-            disabled={!timezone.trim() || saving}
-          >
-            {copy('Save localization')}
-          </DButton>
-        </div>
-      }
-    >
-      <div className="grid gap-4 sm:grid-cols-2">
-        <DSelect
-          label={copy('Default language')}
-          value={defaultLocale}
-          clearable={false}
-          options={[
-            { value: 'id-ID', label: copy('Indonesian') },
-            { value: 'en-US', label: copy('English') },
-          ]}
-          onValueChange={(value) =>
-            setDefaultLocale(value as BusinessPreferences['defaultLocale'])
-          }
-        />
-        <DInput
-          label={copy('Timezone')}
-          value={timezone}
-          onChange={setTimezone}
-          placeholder="Asia/Jakarta"
-        />
-        <DSelect
-          label={copy('Date format')}
-          value={dateFormat}
-          clearable={false}
-          options={[
-            { value: 'DD/MM/YYYY', label: 'DD/MM/YYYY' },
-            { value: 'MM/DD/YYYY', label: 'MM/DD/YYYY' },
-            { value: 'YYYY-MM-DD', label: 'YYYY-MM-DD' },
-          ]}
-          onValueChange={(value) =>
-            setDateFormat(value as BusinessPreferences['dateFormat'])
-          }
-        />
-        <DSelect
-          label={copy('Time format')}
-          value={timeFormat}
-          clearable={false}
-          options={[
-            { value: 'HH:mm', label: '24-hour (HH:mm)' },
-            { value: 'hh:mm a', label: '12-hour (hh:mm a)' },
-          ]}
-          onValueChange={(value) =>
-            setTimeFormat(value as BusinessPreferences['timeFormat'])
-          }
-        />
-      </div>
     </DDialog>
   );
 }
