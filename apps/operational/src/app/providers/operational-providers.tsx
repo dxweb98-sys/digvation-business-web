@@ -11,9 +11,14 @@ import {
   loadAuthenticatedRuntimeAvailability,
   RuntimeProvider,
   useRuntime,
+  type RuntimeAvailabilityConfig,
   type RuntimeConfig,
 } from '@digvation/business-runtime';
-import { DToastProvider as ToastProvider, useToast } from '@digvation/ui';
+import {
+  DLocalizationProvider,
+  DToastProvider as ToastProvider,
+  useToast,
+} from '@digvation/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { RouterProviderProps } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
@@ -30,22 +35,36 @@ import {
 import { OperationalLoginPage } from '../../modules/operational/operational-login-page';
 import { OperationalSessionProvider } from '../../modules/operational/operational-session-provider';
 import { PosOperationalSessionProvider } from '../../modules/pos/pos-operational-session-provider';
+import { OperationalAvailabilityProvider } from './operational-availability-context';
 
 const SESSION_END_TRANSITION_MS = 5_000;
 const IDLE_SESSION_ENDED_MESSAGE =
   'Sesi Anda telah berakhir karena tidak ada aktivitas. Silakan masuk kembali.';
 const INVALID_SESSION_ENDED_MESSAGE = 'Sesi Anda telah berakhir. Silakan masuk kembali.';
 
+function hasImplementedOperationalSurface(availability: RuntimeAvailabilityConfig): boolean {
+  const permissions = availability.effectivePermissions;
+  const hasPos =
+    availability.effectiveEntitlements.products.includes('POS') &&
+    permissions.some((permission) => permission.startsWith('sales:'));
+  const hasExpenses =
+    availability.effectiveEntitlements.capabilities.includes('FINANCE_OPERATIONS') &&
+    permissions.some((permission) => permission.startsWith('expenses:'));
+  return hasPos || hasExpenses;
+}
+
 function AuthenticatedOperationalRuntime({ children }: { children: ReactNode }) {
   const { session, authPort } = useAuth();
   const bootstrapRuntime = useRuntime();
   const [state, setState] = useState<'loading' | 'allowed' | 'denied' | 'unavailable'>('loading');
   const [effectiveRuntime, setEffectiveRuntime] = useState<RuntimeConfig | null>(null);
+  const [availability, setAvailability] = useState<RuntimeAvailabilityConfig | null>(null);
 
   useEffect(() => {
     let active = true;
     setState('loading');
     setEffectiveRuntime(null);
+    setAvailability(null);
     void (async () => {
       const token = await authPort.getAccessToken?.();
       if (!token) {
@@ -53,19 +72,23 @@ function AuthenticatedOperationalRuntime({ children }: { children: ReactNode }) 
         return;
       }
       try {
-        const availability = await loadAuthenticatedRuntimeAvailability(
+        const nextAvailability = await loadAuthenticatedRuntimeAvailability(
           bootstrapRuntime.apiBaseUrl,
           token,
         );
         if (!active) return;
-        if (!availability.effectiveEntitlements.products.includes('POS')) {
+        if (
+          !nextAvailability.effectiveFoundations.includes('OPERATIONAL_ACCESS') ||
+          !hasImplementedOperationalSurface(nextAvailability)
+        ) {
           setState('denied');
           return;
         }
+        setAvailability(nextAvailability);
         setEffectiveRuntime(
           applyEffectiveBusinessConfiguration(
             bootstrapRuntime,
-            availability.businessConfiguration,
+            nextAvailability.businessConfiguration,
           ),
         );
         setState('allowed');
@@ -78,8 +101,16 @@ function AuthenticatedOperationalRuntime({ children }: { children: ReactNode }) 
     };
   }, [authPort, bootstrapRuntime, session.identity.userId]);
 
-  if (state === 'allowed' && effectiveRuntime)
-    return <RuntimeProvider config={effectiveRuntime}>{children}</RuntimeProvider>;
+  if (state === 'allowed' && effectiveRuntime && availability)
+    return (
+      <RuntimeProvider config={effectiveRuntime}>
+        <OperationalAvailabilityProvider availability={availability}>
+          <DLocalizationProvider locale={effectiveRuntime.locale}>
+            {children}
+          </DLocalizationProvider>
+        </OperationalAvailabilityProvider>
+      </RuntimeProvider>
+    );
 
   return (
     <main className="grid min-h-screen place-items-center bg-[var(--color-background)] p-6 text-center">
@@ -88,7 +119,7 @@ function AuthenticatedOperationalRuntime({ children }: { children: ReactNode }) 
           {state === 'loading'
             ? 'Memverifikasi akses operasional'
             : state === 'denied'
-              ? 'Akses POS tidak tersedia'
+              ? 'Akses operasional tidak tersedia'
               : 'Konteks operasional belum tersedia'}
         </h1>
         <p className="mt-2 text-sm text-[var(--color-text-muted)]">
