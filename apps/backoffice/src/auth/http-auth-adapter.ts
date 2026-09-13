@@ -74,8 +74,12 @@ export class HttpAuthAdapter {
     return this.sessionClient.logout();
   }
 
-  public async getAccessToken(): Promise<string | null> {
-    return this.sessionClient.getAccessToken();
+  public async getAccessToken(forceRefresh = false): Promise<string | null> {
+    if (!forceRefresh) return this.sessionClient.getAccessToken();
+    const refreshed = await this.sessionClient.refreshAccessToken();
+    if (refreshed.kind === 'refreshed') return refreshed.accessToken;
+    if (refreshed.kind === 'deferred') return this.sessionClient.getAccessToken();
+    return null;
   }
 
   public refreshAccessToken(): Promise<AuthRefreshResult> {
