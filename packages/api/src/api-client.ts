@@ -9,7 +9,7 @@ export type AccessTokenRefreshResult =
 
 export interface ApiClientOptions {
   baseUrl: string;
-  getAccessToken?: () => Promise<string | null>;
+  getAccessToken?: (forceRefresh?: boolean) => Promise<string | null>;
   refreshAccessToken?: () => Promise<AccessTokenRefreshResult>;
   onSessionEnded?: (reason: SessionEndReason) => void;
   onUnauthorized?: () => void;
@@ -100,12 +100,19 @@ export class ApiClient {
     const payload = (await response.json()) as ApiEnvelope<T> | ApiFailureEnvelope;
 
     if (!response.ok || !payload.success) {
-      if (response.status === 401 && mayRefresh && this.options.refreshAccessToken) {
-        const refreshed = await this.options.refreshAccessToken();
-        if (refreshed.kind === 'refreshed') return this.request<T>(path, init, false);
-        if (refreshed.kind === 'ended') this.options.onSessionEnded?.(refreshed.reason);
-      } else if (response.status === 401 && !this.options.refreshAccessToken) {
-        this.options.onUnauthorized?.();
+      if (response.status === 401 && mayRefresh) {
+        if (this.options.refreshAccessToken) {
+          const refreshed = await this.options.refreshAccessToken();
+          if (refreshed.kind === 'refreshed') return this.request<T>(path, init, false);
+          if (refreshed.kind === 'ended') this.options.onSessionEnded?.(refreshed.reason);
+        } else if (this.options.getAccessToken) {
+          const refreshedToken = await this.options.getAccessToken(true);
+          if (refreshedToken && refreshedToken !== token)
+            return this.request<T>(path, init, false);
+          this.options.onUnauthorized?.();
+        } else {
+          this.options.onUnauthorized?.();
+        }
       }
 
       if (!payload.success) {
