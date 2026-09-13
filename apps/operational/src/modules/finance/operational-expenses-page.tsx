@@ -73,13 +73,9 @@ export function OperationalExpensesPage() {
   const accounts = useQuery({
     queryKey: ['operational-expense-accounts', selectedLocationId],
     enabled: Boolean(selectedLocationId && canCreate && isCreateOpen),
-    queryFn: () => api.listFinancialAccounts(),
+    queryFn: () => api.listEligibleAccounts(selectedLocationId!),
   });
-  const eligibleAccounts = (accounts.data?.items ?? []).filter(
-    (account) =>
-      account.status === 'ACTIVE' &&
-      (!account.operatingLocationId || account.operatingLocationId === selectedLocationId),
-  );
+  const eligibleAccounts = accounts.data?.items ?? [];
   const createExpense = useMutation({
     mutationFn: () =>
       api.create({
