@@ -71,8 +71,12 @@ export class HttpAuthAdapter implements AuthPort {
     throw new Error('PASSWORD_CHANGE_NOT_SUPPORTED');
   }
 
-  public async getAccessToken(): Promise<string | null> {
-    return this.sessionClient.getAccessToken();
+  public async getAccessToken(forceRefresh = false): Promise<string | null> {
+    if (!forceRefresh) return this.sessionClient.getAccessToken();
+    const refreshed = await this.sessionClient.refreshAccessToken();
+    if (refreshed.kind === 'refreshed') return refreshed.accessToken;
+    if (refreshed.kind === 'deferred') return this.sessionClient.getAccessToken();
+    return null;
   }
 
   public refreshAccessToken(): Promise<AuthRefreshResult> {
