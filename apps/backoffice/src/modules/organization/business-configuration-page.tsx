@@ -27,22 +27,14 @@ import {
 } from '../../app/layout/backoffice-page';
 import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
 import { canPerformBackofficeAction } from '../../auth/backoffice-access';
-import type { BackofficeSession } from '../../auth/auth-session';
 import {
   isSessionExpiredError,
   useBackofficeAuth,
 } from '../../auth/backoffice-auth-context';
 import {
-  isReportAvailable,
-  type ReportType,
-} from '../reporting/report-availability';
-import {
   BusinessSettingsApi,
-  type BusinessExperiencePreferences,
   type BusinessPreferences,
   type BusinessProfile,
-  type ConfigurableReport,
-  type DashboardWidget,
   type NumberingPreference,
   type SellingLocation,
 } from './business-settings-api';
@@ -51,41 +43,7 @@ const keys = {
   configuration: ['business-settings', 'configuration'] as const,
   locations: ['business-settings', 'locations'] as const,
   numbering: ['business-settings', 'numbering'] as const,
-  experience: ['business-settings', 'experience'] as const,
 };
-
-const dashboardOptions: Array<{
-  key: DashboardWidget;
-  label: string;
-  report: ReportType;
-}> = [
-  { key: 'TOP_ITEMS', label: 'Top catalog items', report: 'catalog-performance' },
-  { key: 'PAYMENT_MIX', label: 'Payment mix', report: 'payments' },
-  { key: 'RECENT_TRANSACTIONS', label: 'Recent transactions', report: 'transactions' },
-  { key: 'TOP_EMPLOYEES', label: 'Top employees', report: 'employee-performance' },
-  { key: 'BUSINESS_INSIGHT', label: 'Business insight', report: 'business-performance' },
-];
-
-const reportOptions: Array<{ key: ConfigurableReport; label: string }> = [
-  { key: 'business-performance', label: 'Business Performance Summary' },
-  { key: 'transactions', label: 'Transaction Report' },
-  { key: 'catalog-performance', label: 'Catalog Performance' },
-  { key: 'employee-performance', label: 'Employee Performance' },
-  { key: 'attendance', label: 'Attendance Report' },
-  { key: 'payments', label: 'Payment Report' },
-  { key: 'expenses', label: 'Expense Report' },
-  { key: 'cash', label: 'Cash Report' },
-  { key: 'settlements', label: 'Settlement Report' },
-  { key: 'reconciliations', label: 'Reconciliation Report' },
-  { key: 'tax', label: 'Tax Report' },
-  { key: 'locations', label: 'Selling Location Performance' },
-];
-
-function toggleValue<T extends string>(values: T[], value: T): T[] {
-  return values.includes(value)
-    ? values.filter((item) => item !== value)
-    : [...values, value];
-}
 
 export function BusinessConfigurationPage() {
   const { session, createApiClient } = useBackofficeAuth();
@@ -128,11 +86,6 @@ export function BusinessConfigurationPage() {
     queryFn: () => api.getNumbering(),
     enabled: canViewProfile,
   });
-  const experience = useQuery({
-    queryKey: keys.experience,
-    queryFn: () => api.getExperience(),
-    enabled: canViewProfile,
-  });
 
   if (!session) return null;
 
@@ -146,7 +99,7 @@ export function BusinessConfigurationPage() {
         eyebrow={copy('Configuration')}
         title={copy('Business')}
         description={copy(
-          'Manage business identity, locations, localization, numbering, and visible business experiences from one authoritative configuration.',
+          'Manage business identity, locations, localization, and numbering from one authoritative configuration.',
         )}
       />
 
@@ -165,11 +118,6 @@ export function BusinessConfigurationPage() {
           ) : null}
           {canViewProfile ? (
             <DTabsTrigger value="numbering">{copy('Numbering')}</DTabsTrigger>
-          ) : null}
-          {canViewProfile ? (
-            <DTabsTrigger value="dashboard-reports">
-              {copy('Dashboard & Reports')}
-            </DTabsTrigger>
           ) : null}
         </DTabsList>
 
@@ -212,17 +160,6 @@ export function BusinessConfigurationPage() {
             invoiceApplicable={session.effectiveEntitlements.products.includes('POS')}
             api={api}
             onChanged={() => invalidate(keys.numbering)}
-          />
-        </DTabsContent>
-
-        <DTabsContent value="dashboard-reports" className="mt-5">
-          <ExperienceSection
-            preferences={experience.data}
-            loading={experience.isLoading}
-            canUpdate={canUpdateProfile}
-            session={session}
-            api={api}
-            onChanged={() => invalidate(keys.experience)}
           />
         </DTabsContent>
       </DTabs>
@@ -731,8 +668,13 @@ function NumberingSection({
     (item) => item.namespace !== 'INVOICE' || invoiceApplicable,
   );
   const labels: Record<NumberingPreference['namespace'], string> = {
-    SALE: copy('Sale / Transaction'),
+    PRODUCT: copy('Product'),
+    SERVICE: copy('Service'),
+    CATEGORY: copy('Category'),
+    VARIANT: copy('Variant'),
     EMPLOYEE: copy('Employee'),
+    EMPLOYEE_POSITION: copy('Employee Position'),
+    SALE: copy('Sale / Transaction'),
     INVOICE: copy('Invoice'),
   };
 
@@ -747,7 +689,7 @@ function NumberingSection({
       {loading ? (
         <DSkeleton className="mt-5 h-32" />
       ) : (
-        <div className="mt-5 grid gap-3 lg:grid-cols-3">
+        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {visible.map((item) => (
             <div
               key={item.namespace}
@@ -870,168 +812,5 @@ function NumberingDialog({
         {copy('Current sequence')}: {preference?.currentSequence ?? 0}
       </p>
     </DDialog>
-  );
-}
-
-function ExperienceSection({
-  preferences,
-  loading,
-  canUpdate,
-  session,
-  api,
-  onChanged,
-}: {
-  preferences?: BusinessExperiencePreferences;
-  loading: boolean;
-  canUpdate: boolean;
-  session: BackofficeSession;
-  api: BusinessSettingsApi;
-  onChanged: () => void;
-}) {
-  const { copy } = useBackofficeLocalization();
-  const { showToast } = useToast();
-  const [hiddenWidgets, setHiddenWidgets] = useState<DashboardWidget[]>([]);
-  const [hiddenReports, setHiddenReports] = useState<ConfigurableReport[]>([]);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!preferences) return;
-    setHiddenWidgets([...preferences.hiddenDashboardWidgets]);
-    setHiddenReports([...preferences.hiddenReports]);
-  }, [preferences]);
-
-  const availableWidgets = dashboardOptions.filter((item) =>
-    isReportAvailable(session, item.report),
-  );
-  const availableReports = reportOptions.filter((item) =>
-    isReportAvailable(session, item.key),
-  );
-
-  const save = async () => {
-    if (!preferences || saving) return;
-    setSaving(true);
-    try {
-      await api.updateExperience({
-        ...preferences,
-        hiddenDashboardWidgets: hiddenWidgets,
-        hiddenReports,
-      });
-      onChanged();
-      showToast({
-        variant: 'success',
-        title: copy('Dashboard and report visibility updated.'),
-      });
-    } catch (error) {
-      if (!isSessionExpiredError(error))
-        showToast({
-          variant: 'danger',
-          title: normalizeBackofficeApiError(
-            error,
-            copy('Could not update visibility preferences.'),
-          ).safeMessage,
-        });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (loading)
-    return (
-      <Card>
-        <DSkeleton className="h-40" />
-      </Card>
-    );
-
-  return (
-    <Card>
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h2 className="font-semibold">{copy('Dashboard & Reports')}</h2>
-          <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-            {copy(
-              'These preferences can hide available experiences. They never grant entitlement, permission, or location access.',
-            )}
-          </p>
-        </div>
-        {canUpdate && preferences ? (
-          <DButton onClick={() => void save()} disabled={saving}>
-            {copy('Save visibility')}
-          </DButton>
-        ) : null}
-      </div>
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        <VisibilityGroup
-          title={copy('Dashboard')}
-          items={availableWidgets.map((item) => ({
-            key: item.key,
-            label: copy(item.label),
-            hidden: hiddenWidgets.includes(item.key),
-          }))}
-          disabled={!canUpdate}
-          onToggle={(key) =>
-            setHiddenWidgets((values) =>
-              toggleValue(values, key as DashboardWidget),
-            )
-          }
-        />
-        <VisibilityGroup
-          title={copy('Reports')}
-          items={availableReports.map((item) => ({
-            key: item.key,
-            label: copy(item.label),
-            hidden: hiddenReports.includes(item.key),
-          }))}
-          disabled={!canUpdate}
-          onToggle={(key) =>
-            setHiddenReports((values) =>
-              toggleValue(values, key as ConfigurableReport),
-            )
-          }
-        />
-      </div>
-    </Card>
-  );
-}
-
-function VisibilityGroup({
-  title,
-  items,
-  disabled,
-  onToggle,
-}: {
-  title: string;
-  items: Array<{ key: string; label: string; hidden: boolean }>;
-  disabled: boolean;
-  onToggle: (key: string) => void;
-}) {
-  const { copy } = useBackofficeLocalization();
-  return (
-    <div>
-      <h3 className="font-semibold">{title}</h3>
-      <div className="mt-3 space-y-2">
-        {items.length ? (
-          items.map((item) => (
-            <label
-              key={item.key}
-              className="flex items-center justify-between gap-4 rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm"
-            >
-              <span>{item.label}</span>
-              <span className="flex items-center gap-2 text-[var(--color-text-muted)]">
-                <DCheckbox
-                  checked={!item.hidden}
-                  onChange={() => onToggle(item.key)}
-                  disabled={disabled}
-                />
-                {copy(item.hidden ? 'Hidden' : 'Visible')}
-              </span>
-            </label>
-          ))
-        ) : (
-          <p className="text-sm text-[var(--color-text-muted)]">
-            {copy('No available items for the current tenant and role.')}
-          </p>
-        )}
-      </div>
-    </div>
   );
 }
