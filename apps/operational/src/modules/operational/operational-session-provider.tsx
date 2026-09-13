@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { useAuth } from '@digvation/business-auth';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 
 interface OperationalSessionContextValue {
   selectedLocationId: string | null;
@@ -10,13 +18,38 @@ interface OperationalSessionContextValue {
 
 const OperationalSessionContext = createContext<OperationalSessionContextValue | null>(null);
 
+function storageKey(userId: string) {
+  return `digvation.operational.location.v1:${userId}`;
+}
+
+function readStoredLocation(userId: string): string | null {
+  try {
+    return window.sessionStorage.getItem(storageKey(userId));
+  } catch {
+    return null;
+  }
+}
+
 export function OperationalSessionProvider({ children }: { children: ReactNode }) {
-  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
+  const { session } = useAuth();
+  const userId = session.identity.userId;
+  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(() =>
+    readStoredLocation(userId),
+  );
   const [isBranchPickerOpen, setBranchPickerOpen] = useState(false);
 
-  const selectLocation = useCallback((locationId: string | null) => {
-    setSelectedLocationId(locationId);
-  }, []);
+  const selectLocation = useCallback(
+    (locationId: string | null) => {
+      setSelectedLocationId(locationId);
+      try {
+        if (locationId) window.sessionStorage.setItem(storageKey(userId), locationId);
+        else window.sessionStorage.removeItem(storageKey(userId));
+      } catch {
+        // Selection persistence is convenience state only. Runtime authorization remains authoritative.
+      }
+    },
+    [userId],
+  );
 
   const openBranchPicker = useCallback(() => {
     setBranchPickerOpen(true);
