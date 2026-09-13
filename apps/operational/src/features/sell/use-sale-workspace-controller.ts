@@ -308,6 +308,7 @@ export function useSaleWorkspaceController({
     cart: {
       lines: cartLines,
       grossAmount: saleQuery.data?.grossAmount ?? cartTotal,
+      taxAmount: saleQuery.data?.taxAmount ?? '0.0000',
       totalAmount: cartTotal,
       discountAmount: saleQuery.data?.discountAmount ?? '0.0000',
       isLocalDraft: !saleQuery.data && draftLines.length > 0,

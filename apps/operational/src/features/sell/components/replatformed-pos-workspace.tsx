@@ -19,6 +19,7 @@ import {
   DSkeleton as Skeleton,
   useToast,
 } from '@digvation-labs/ui';
+import { DTabs, DTabsContent, DTabsList, DTabsTrigger } from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
 import {
   AlertCircle,
@@ -47,6 +48,7 @@ import {
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
+import { useOperationalLocalization } from '../../../app/localization/operational-localization';
 import { cashierTransactionKeys } from '../cashier-transaction-keys';
 import type { CartDisplayLine } from '../cart-draft';
 import {
@@ -517,6 +519,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const runtime = useRuntime();
   const { session, authPort } = useAuth();
   const { showToast } = useToast();
+  const { copy } = useOperationalLocalization();
   const isLocalDemo = isLocalCashierDemoEnabled();
   const adapter = useMemo(
     () => createCashierTransactionAdapter(runtime, authPort.getAccessToken.bind(authPort)),
@@ -1117,6 +1120,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         lines={lines}
         total={total}
         gross={workspace.cart.grossAmount}
+        taxAmount={workspace.cart.taxAmount}
+        taxLabel={copy('Tax')}
         isEstimate={workspace.cart.isLocalDraft}
         locale={workspace.locale}
         customer={cartCustomer}
@@ -1162,6 +1167,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         total={total}
         gross={workspace.cart.grossAmount}
         discountAmount={workspace.cart.discountAmount}
+        taxAmount={workspace.cart.taxAmount}
+        taxLabel={copy('Tax')}
         locale={workspace.locale}
         customer={cartCustomer}
         method={paymentMethod}
@@ -1481,8 +1488,6 @@ function ReferenceQueueBoard({
 }) {
   const statuses = Object.keys(statusMeta) as QueueStatus[];
   const count = groups.QUEUED.length + groups.PROGRESS.length;
-  const list = groups[active];
-  const contentKey = `${active}:${list.map((sale) => `${sale.id}:${sale.version}`).join('|')}`;
   return (
     <div className="mb-4 shrink-0">
       <div className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm">
@@ -1536,67 +1541,62 @@ function ReferenceQueueBoard({
           className={`grid transition-all duration-300 ease-out ${open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
         >
           <div className="overflow-hidden">
-            <div
-              key={contentKey}
-              className="pos-queue-content-enter space-y-3 border-t border-[var(--color-border)] p-3"
+            <DTabs
+              value={active}
+              defaultValue={active}
+              onValueChange={(value) => onChangeTab(value as QueueStatus)}
+              className="border-t border-[var(--color-border)] p-3"
             >
-              <div className="no-scrollbar flex items-center gap-2 overflow-x-auto">
-                {statuses.map((status) => {
-                  const meta = statusMeta[status];
-                  const selected = status === active;
-                  return (
-                    <button
-                      key={status}
-                      type="button"
-                      onClick={() => onChangeTab(status)}
-                      className={`inline-flex shrink-0 items-center gap-2 rounded-2xl border px-4 py-2.5 text-xs font-bold transition-all active:scale-[.98] ${selected ? 'bg-[var(--color-background)] text-[var(--color-text)] shadow-sm ring-1 ring-[var(--color-border)]' : 'border-transparent bg-[var(--color-surface-muted)]/45 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]'}`}
-                    >
-                      <span
-                        className={`inline-flex size-6 items-center justify-center rounded-full ${selected ? meta.tone : 'bg-[var(--color-background)] text-[var(--color-text-muted)]'}`}
-                      >
-                        {meta.icon}
-                      </span>
-                      <span>{meta.label}</span>
-                      <span
-                        className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-black ${selected ? meta.tone : 'bg-[var(--color-background)] text-[var(--color-text-muted)]'}`}
-                      >
-                        {groups[status].length}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-              {list.length ? (
-                <div className="no-scrollbar cursor-grab overflow-x-auto overflow-y-hidden pb-3 select-none">
-                  <div className="flex w-max gap-4 px-0.5">
-                    {list.map((sale) => (
-                      <ReferenceQueueCard
-                        key={sale.id}
-                        sale={sale}
-                        status={active}
-                        locale={locale}
-                        issues={issues[sale.id] ?? []}
-                        onStartWork={onStartWork}
-                        onAdjust={onAdjust}
-                        onPay={onPay}
-                        onCancel={onCancel}
-                        onView={onView}
-                        onViewReceipt={onViewReceipt}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)]/20 py-7 text-center">
-                  <p className="text-sm font-semibold">
-                    Tidak ada transaksi {statusMeta[active].label.toLowerCase()}
-                  </p>
-                  <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                    Transaksi akan muncul di sini ketika sudah dibuat.
-                  </p>
-                </div>
-              )}
-            </div>
+              <DTabsList className="max-w-full overflow-x-auto">
+                {statuses.map((status) => (
+                  <DTabsTrigger key={status} value={status}>
+                    {statusMeta[status].label} ({groups[status].length})
+                  </DTabsTrigger>
+                ))}
+              </DTabsList>
+              {statuses.map((status) => {
+                const list = groups[status];
+                const contentKey = `${status}:${list
+                  .map((sale) => `${sale.id}:${sale.version}`)
+                  .join('|')}`;
+                return (
+                  <DTabsContent key={status} value={status} className="mt-3">
+                    <div key={contentKey} className="pos-queue-content-enter space-y-3">
+                      {list.length ? (
+                        <div className="no-scrollbar cursor-grab overflow-x-auto overflow-y-hidden pb-3 select-none">
+                          <div className="flex w-max gap-4 px-0.5">
+                            {list.map((sale) => (
+                              <ReferenceQueueCard
+                                key={sale.id}
+                                sale={sale}
+                                status={status}
+                                locale={locale}
+                                issues={issues[sale.id] ?? []}
+                                onStartWork={onStartWork}
+                                onAdjust={onAdjust}
+                                onPay={onPay}
+                                onCancel={onCancel}
+                                onView={onView}
+                                onViewReceipt={onViewReceipt}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)]/20 py-7 text-center">
+                          <p className="text-sm font-semibold">
+                            Tidak ada transaksi {statusMeta[status].label.toLowerCase()}
+                          </p>
+                          <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                            Transaksi akan muncul di sini ketika sudah dibuat.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </DTabsContent>
+                );
+              })}
+            </DTabs>
           </div>
         </div>
       </div>
@@ -1775,6 +1775,8 @@ function ReferenceFloatingCart({
   lines,
   total,
   gross,
+  taxAmount,
+  taxLabel,
   isEstimate,
   locale,
   customer,
@@ -1788,6 +1790,8 @@ function ReferenceFloatingCart({
   lines: readonly CartDisplayLine[];
   total: string;
   gross: string;
+  taxAmount: string;
+  taxLabel: string;
   isEstimate: boolean;
   locale: string;
   customer: PosCustomer | null;
@@ -1801,6 +1805,8 @@ function ReferenceFloatingCart({
       lines={lines}
       total={total}
       gross={gross}
+      taxAmount={taxAmount}
+      taxLabel={taxLabel}
       isEstimate={isEstimate}
       locale={locale}
       customer={customer}
@@ -1899,6 +1905,8 @@ function ReferenceCartPanel({
   lines,
   total,
   gross,
+  taxAmount,
+  taxLabel,
   isEstimate,
   locale,
   customer,
@@ -1910,6 +1918,8 @@ function ReferenceCartPanel({
   lines: readonly CartDisplayLine[];
   total: string;
   gross: string;
+  taxAmount: string;
+  taxLabel: string;
   isEstimate: boolean;
   locale: string;
   customer: PosCustomer | null;
@@ -1919,6 +1929,7 @@ function ReferenceCartPanel({
   onCheckout: () => void;
 }) {
   const status = customerStatus(customer);
+  const hasTax = !createDecimal(taxAmount).equals(createDecimal('0'));
   const increment = (line: CartDisplayLine, direction: 'up' | 'down') => {
     const next =
       direction === 'up'
@@ -2038,6 +2049,12 @@ function ReferenceCartPanel({
             </span>
             <span className="font-medium">{money(gross, locale)}</span>
           </div>
+          {hasTax ? (
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-[var(--color-text-muted)]">{taxLabel}</span>
+              <span className="font-medium">{money(taxAmount, locale)}</span>
+            </div>
+          ) : null}
           <div className="flex items-center justify-between border-t border-[var(--color-border)] pt-2">
             <span className="text-sm font-bold">{isEstimate ? 'Estimasi total' : 'Total'}</span>
             <span className="text-lg font-bold text-[var(--color-brand)]">
@@ -2227,6 +2244,8 @@ function ReferencePaymentDialog({
   total,
   gross,
   discountAmount,
+  taxAmount,
+  taxLabel,
   locale,
   customer,
   method,
@@ -2250,6 +2269,8 @@ function ReferencePaymentDialog({
   total: string;
   gross: string;
   discountAmount: string;
+  taxAmount: string;
+  taxLabel: string;
   locale: string;
   customer: PosCustomer | null;
   method: PaymentMethod;
@@ -2269,6 +2290,7 @@ function ReferencePaymentDialog({
 }) {
   const isCash = method === 'CASH';
   const needsProvider = method === 'BANK_TRANSFER' || method === 'WALLET';
+  const hasTax = !createDecimal(taxAmount).equals(createDecimal('0'));
   const canPay =
     lines.length > 0 && !isCashShort && (!needsProvider || Boolean(provider)) && !isSubmitting;
   const canConfirm = payNow ? canPay : lines.length > 0 && !isSubmitting;
@@ -2348,6 +2370,12 @@ function ReferencePaymentDialog({
               <span className="text-[var(--color-text-muted)]">Diskon transaksi</span>
               <span className="font-semibold">{money(discountAmount, locale)}</span>
             </div>
+            {hasTax ? (
+              <div className="mt-1 flex justify-between">
+                <span className="text-[var(--color-text-muted)]">{taxLabel}</span>
+                <span className="font-semibold">{money(taxAmount, locale)}</span>
+              </div>
+            ) : null}
             <div className="mt-2 flex justify-between border-t border-[var(--color-border)] pt-2 text-sm">
               <span className="font-bold">Grand total</span>
               <span className="font-bold text-[var(--color-brand)]">{money(total, locale)}</span>

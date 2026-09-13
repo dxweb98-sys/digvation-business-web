@@ -2,9 +2,9 @@ import { useRuntime } from '@digvation/business-runtime';
 import {
   DBadge,
   DButton,
-  DCheckbox,
   DConfirmDialog,
   DDataTable,
+  DDatePicker,
   DDialog,
   DInput,
   DSelect,
@@ -13,6 +13,7 @@ import {
   DTabsContent,
   DTabsList,
   DTabsTrigger,
+  DToggle,
   useToast,
   type TableColumn,
 } from '@digvation/ui';
@@ -25,13 +26,13 @@ import {
   BackofficePage,
   BackofficePageHeader,
 } from '../../app/layout/backoffice-page';
-import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
 import { canPerformBackofficeAction } from '../../auth/backoffice-access';
 import {
   isSessionExpiredError,
   useBackofficeAuth,
 } from '../../auth/backoffice-auth-context';
 import { TaxApi, type TaxCategory, type TaxProfile, type TaxRule } from './tax-api';
+import { useTaxLocalization, type TaxMessageKey } from './tax-localization';
 
 const keys = {
   profile: ['tax', 'profile'] as const,
@@ -43,7 +44,7 @@ export function TaxPage() {
   const { session, createApiClient } = useBackofficeAuth();
   const runtime = useRuntime();
   const queryClient = useQueryClient();
-  const { copy } = useBackofficeLocalization();
+  const { copy, tax } = useTaxLocalization();
   const api = useMemo(
     () => new TaxApi(createApiClient(runtime.apiBaseUrl)),
     [createApiClient, runtime.apiBaseUrl],
@@ -80,16 +81,14 @@ export function TaxPage() {
       <BackofficePageHeader
         eyebrow={copy('Configuration')}
         title={copy('Tax')}
-        description={copy(
-          'Configure the existing Runtime tax profile, categories, and effective rules. Historical Sale tax facts remain unchanged.',
-        )}
+        description={tax('pageDescription')}
       />
 
       <DTabs defaultValue="profile" className="mt-6">
         <DTabsList>
-          <DTabsTrigger value="profile">{copy('Profile')}</DTabsTrigger>
-          <DTabsTrigger value="categories">{copy('Categories')}</DTabsTrigger>
-          <DTabsTrigger value="rules">{copy('Effective rules')}</DTabsTrigger>
+          <DTabsTrigger value="profile">{tax('profile')}</DTabsTrigger>
+          <DTabsTrigger value="categories">{tax('categories')}</DTabsTrigger>
+          <DTabsTrigger value="rules">{tax('rules')}</DTabsTrigger>
         </DTabsList>
         <DTabsContent value="profile" className="mt-5">
           <TaxProfileSection
@@ -126,14 +125,6 @@ export function TaxPage() {
   );
 }
 
-function Panel({ children }: { children: React.ReactNode }) {
-  return (
-    <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 sm:p-6">
-      {children}
-    </section>
-  );
-}
-
 function TaxProfileSection({
   profile,
   loading,
@@ -141,13 +132,13 @@ function TaxProfileSection({
   api,
   onChanged,
 }: {
-  profile?: TaxProfile;
+  profile: TaxProfile | undefined;
   loading: boolean;
   canUpdate: boolean;
   api: TaxApi;
   onChanged: () => void;
 }) {
-  const { copy } = useBackofficeLocalization();
+  const { tax } = useTaxLocalization();
   const { showToast } = useToast();
   const [itemTaxEnabled, setItemTaxEnabled] = useState(false);
   const [transactionTaxEnabled, setTransactionTaxEnabled] = useState(false);
@@ -159,18 +150,24 @@ function TaxProfileSection({
     setTransactionTaxEnabled(profile.transactionTaxEnabled);
   }, [profile]);
 
+  const changed = Boolean(
+    profile &&
+      (itemTaxEnabled !== profile.itemTaxEnabled ||
+        transactionTaxEnabled !== profile.transactionTaxEnabled),
+  );
+
   const save = async () => {
-    if (!profile || saving) return;
+    if (!profile || saving || !changed) return;
     setSaving(true);
     try {
       await api.updateProfile(profile, { itemTaxEnabled, transactionTaxEnabled });
       onChanged();
-      showToast({ variant: 'success', title: copy('Tax profile updated.') });
+      showToast({ variant: 'success', title: tax('profileSaved') });
     } catch (error) {
       if (!isSessionExpiredError(error))
         showToast({
           variant: 'danger',
-          title: normalizeBackofficeApiError(error, copy('Could not update tax profile.')).safeMessage,
+          title: taxApiMessage(error, tax, 'profileSaveFailed'),
         });
     } finally {
       setSaving(false);
@@ -179,55 +176,55 @@ function TaxProfileSection({
 
   if (loading)
     return (
-      <Panel>
-        <DSkeleton className="h-28" />
-      </Panel>
+      <div className="max-w-3xl space-y-3">
+        <DSkeleton className="h-14" />
+        <DSkeleton className="h-14" />
+      </div>
     );
 
   return (
-    <Panel>
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h2 className="font-semibold">{copy('Tax profile')}</h2>
-          <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-            {copy('Enable only the tax scopes this business actually uses.')}
-          </p>
+    <section className="max-w-3xl rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 sm:p-6">
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          void save();
+        }}
+      >
+        <div className="divide-y divide-[var(--color-border)]">
+          <div className="flex items-center justify-between gap-5 py-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-[var(--color-text)]">{tax('itemTax')}</p>
+              <p className="mt-1 text-sm text-[var(--color-text-muted)]">{tax('itemTaxHint')}</p>
+            </div>
+            <DToggle
+              checked={itemTaxEnabled}
+              onChange={setItemTaxEnabled}
+              disabled={!canUpdate}
+              ariaLabel={tax('itemTax')}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-5 py-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-[var(--color-text)]">{tax('transactionTax')}</p>
+              <p className="mt-1 text-sm text-[var(--color-text-muted)]">{tax('transactionTaxHint')}</p>
+            </div>
+            <DToggle
+              checked={transactionTaxEnabled}
+              onChange={setTransactionTaxEnabled}
+              disabled={!canUpdate}
+              ariaLabel={tax('transactionTax')}
+            />
+          </div>
         </div>
         {canUpdate && profile ? (
-          <DButton onClick={() => void save()} disabled={saving}>
-            {copy('Save profile')}
-          </DButton>
+          <div className="mt-5 flex justify-end border-t border-[var(--color-border)] pt-4">
+            <DButton type="submit" loading={saving} disabled={!changed}>
+              {tax('saveProfile')}
+            </DButton>
+          </div>
         ) : null}
-      </div>
-      <div className="mt-5 grid gap-3 md:grid-cols-2">
-        <label className="flex items-start gap-3 rounded-lg border border-[var(--color-border)] p-4">
-          <DCheckbox
-            checked={itemTaxEnabled}
-            onChange={() => setItemTaxEnabled((value) => !value)}
-            disabled={!canUpdate}
-          />
-          <span>
-            <span className="block font-medium">{copy('Item tax')}</span>
-            <span className="mt-1 block text-sm text-[var(--color-text-muted)]">
-              {copy('Allows item-category tax rules to be resolved for catalog lines.')}
-            </span>
-          </span>
-        </label>
-        <label className="flex items-start gap-3 rounded-lg border border-[var(--color-border)] p-4">
-          <DCheckbox
-            checked={transactionTaxEnabled}
-            onChange={() => setTransactionTaxEnabled((value) => !value)}
-            disabled={!canUpdate}
-          />
-          <span>
-            <span className="block font-medium">{copy('Transaction tax')}</span>
-            <span className="mt-1 block text-sm text-[var(--color-text-muted)]">
-              {copy('Allows the active transaction-level tax rule to be resolved.')}
-            </span>
-          </span>
-        </label>
-      </div>
-    </Panel>
+      </form>
+    </section>
   );
 }
 
@@ -246,17 +243,17 @@ function TaxCategoriesSection({
   api: TaxApi;
   onChanged: () => void;
 }) {
-  const { copy } = useBackofficeLocalization();
+  const { tax } = useTaxLocalization();
   const [editing, setEditing] = useState<TaxCategory | null | undefined>();
   const columns: TableColumn<TaxCategory>[] = [
-    { key: 'code', label: copy('Code') },
-    { key: 'name', label: copy('Name') },
+    { key: 'code', label: tax('code') },
+    { key: 'name', label: tax('name') },
     {
       key: 'status',
-      label: copy('Status'),
+      label: tax('status'),
       render: (row) => (
         <DBadge variant={row.status === 'ACTIVE' ? 'outline' : 'secondary'}>
-          {copy(row.status === 'ACTIVE' ? 'Active' : 'Inactive')}
+          {tax(row.status === 'ACTIVE' ? 'active' : 'inactive')}
         </DBadge>
       ),
     },
@@ -269,11 +266,11 @@ function TaxCategoriesSection({
         data={categories}
         loading={loading}
         rowKey="id"
-        emptyMessage={copy('No tax categories have been configured yet.')}
+        emptyMessage={tax('categoryEmpty')}
         headerActions={
           canCreate ? (
             <DButton leftIcon={<Plus className="size-4" />} onClick={() => setEditing(null)}>
-              {copy('Add category')}
+              {tax('addCategory')}
             </DButton>
           ) : null
         }
@@ -281,7 +278,7 @@ function TaxCategoriesSection({
           canUpdate
             ? [
                 {
-                  label: copy('Edit category'),
+                  label: tax('editCategory'),
                   icon: <Pencil className="size-4" />,
                   onClick: (row) => setEditing(row),
                 },
@@ -310,7 +307,7 @@ function TaxCategoryDialog({
   onClose: () => void;
   onChanged: () => void;
 }) {
-  const { copy } = useBackofficeLocalization();
+  const { tax } = useTaxLocalization();
   const { showToast } = useToast();
   const isNew = category === null;
   const [code, setCode] = useState('');
@@ -335,12 +332,12 @@ function TaxCategoryDialog({
         await api.updateCategory(category, { name: name.trim(), status });
       onChanged();
       onClose();
-      showToast({ variant: 'success', title: copy('Tax category saved.') });
+      showToast({ variant: 'success', title: tax('categorySaved') });
     } catch (error) {
       if (!isSessionExpiredError(error))
         showToast({
           variant: 'danger',
-          title: normalizeBackofficeApiError(error, copy('Could not save tax category.')).safeMessage,
+          title: taxApiMessage(error, tax, 'categorySaveFailed'),
         });
     }
   };
@@ -349,31 +346,31 @@ function TaxCategoryDialog({
     <DDialog
       open={category !== undefined}
       onClose={onClose}
-      title={copy(isNew ? 'Add tax category' : 'Edit tax category')}
+      title={tax(isNew ? 'addCategory' : 'editCategory')}
       footer={
         <div className="flex justify-end gap-2">
-          <DButton variant="secondary" onClick={onClose}>{copy('Cancel')}</DButton>
+          <DButton variant="secondary" onClick={onClose}>{tax('cancel')}</DButton>
           <DButton onClick={() => void save()} disabled={!name.trim() || (isNew && !code.trim())}>
-            {copy('Save')}
+            {tax('save')}
           </DButton>
         </div>
       }
     >
       <div className="grid gap-4 sm:grid-cols-2">
         {isNew ? (
-          <DInput label={copy('Code')} value={code} onChange={(value) => setCode(value.toUpperCase())} />
+          <DInput label={tax('code')} value={code} onChange={(value) => setCode(value.toUpperCase())} />
         ) : (
-          <DInput label={copy('Code')} value={category?.code ?? ''} onChange={() => undefined} disabled />
+          <DInput label={tax('code')} value={category?.code ?? ''} onChange={() => undefined} disabled />
         )}
-        <DInput label={copy('Name')} value={name} onChange={setName} />
+        <DInput label={tax('name')} value={name} onChange={setName} />
         {!isNew ? (
           <DSelect
-            label={copy('Status')}
+            label={tax('status')}
             value={status}
             clearable={false}
             options={[
-              { value: 'ACTIVE', label: copy('Active') },
-              { value: 'INACTIVE', label: copy('Inactive') },
+              { value: 'ACTIVE', label: tax('active') },
+              { value: 'INACTIVE', label: tax('inactive') },
             ]}
             onValueChange={(value) => setStatus(value as TaxCategory['status'])}
           />
@@ -400,42 +397,46 @@ function TaxRulesSection({
   api: TaxApi;
   onChanged: () => void;
 }) {
-  const { copy } = useBackofficeLocalization();
+  const { tax, formatDate } = useTaxLocalization();
   const { showToast } = useToast();
   const [creating, setCreating] = useState(false);
   const [cancelling, setCancelling] = useState<TaxRule | null>(null);
   const categoryName = (id: string | null) =>
-    id ? categories.find((category) => category.id === id)?.name ?? '—' : '—';
+    id ? categories.find((category) => category.id === id)?.name ?? tax('noCategory') : tax('noCategory');
   const columns: TableColumn<TaxRule>[] = [
-    { key: 'code', label: copy('Code') },
-    { key: 'name', label: copy('Name') },
-    { key: 'scope', label: copy('Scope') },
+    { key: 'code', label: tax('code') },
+    { key: 'name', label: tax('name') },
+    {
+      key: 'scope',
+      label: tax('scope'),
+      render: (row) => tax(row.scope === 'ITEM' ? 'item' : 'transaction'),
+    },
     {
       key: 'taxCategoryId',
-      label: copy('Category'),
+      label: tax('category'),
       render: (row) => categoryName(row.taxCategoryId),
     },
     {
       key: 'rate',
-      label: copy('Rate'),
+      label: tax('rate'),
       render: (row) => `${(Number(row.rate) * 100).toLocaleString()}%`,
     },
     {
       key: 'priceTreatment',
-      label: copy('Price treatment'),
-      render: (row) => copy(row.priceTreatment === 'INCLUDED' ? 'Inclusive' : 'Exclusive'),
+      label: tax('treatment'),
+      render: (row) => tax(row.priceTreatment === 'INCLUDED' ? 'included' : 'excluded'),
     },
     {
       key: 'effectiveFrom',
-      label: copy('Effective from'),
-      render: (row) => new Date(row.effectiveFrom).toLocaleString(),
+      label: tax('effectivity'),
+      render: (row) => formatEffectivity(row, tax, formatDate),
     },
     {
       key: 'cancelledAt',
-      label: copy('Status'),
+      label: tax('status'),
       render: (row) => (
         <DBadge variant={row.cancelledAt ? 'secondary' : 'outline'}>
-          {copy(row.cancelledAt ? 'Cancelled' : 'Active')}
+          {tax(row.cancelledAt ? 'cancelled' : 'active')}
         </DBadge>
       ),
     },
@@ -447,12 +448,12 @@ function TaxRulesSection({
       await api.cancelRule(cancelling.id);
       onChanged();
       setCancelling(null);
-      showToast({ variant: 'success', title: copy('Tax rule cancelled.') });
+      showToast({ variant: 'success', title: tax('ruleCancelled') });
     } catch (error) {
       if (!isSessionExpiredError(error))
         showToast({
           variant: 'danger',
-          title: normalizeBackofficeApiError(error, copy('Could not cancel tax rule.')).safeMessage,
+          title: taxApiMessage(error, tax, 'ruleCancelFailed'),
         });
     }
   };
@@ -464,11 +465,11 @@ function TaxRulesSection({
         data={rules}
         loading={loading}
         rowKey="id"
-        emptyMessage={copy('No effective tax rules have been configured yet.')}
+        emptyMessage={tax('ruleEmpty')}
         headerActions={
           canCreate ? (
             <DButton leftIcon={<Plus className="size-4" />} onClick={() => setCreating(true)}>
-              {copy('Add rule')}
+              {tax('addRule')}
             </DButton>
           ) : null
         }
@@ -476,7 +477,7 @@ function TaxRulesSection({
           canCancel
             ? [
                 {
-                  label: copy('Cancel rule'),
+                  label: tax('cancelRule'),
                   icon: <Ban className="size-4" />,
                   variant: 'danger',
                   onClick: (row) => setCancelling(row),
@@ -497,9 +498,9 @@ function TaxRulesSection({
         open={Boolean(cancelling)}
         onClose={() => setCancelling(null)}
         onConfirm={() => void cancel()}
-        title={copy('Cancel tax rule?')}
-        message={copy('Historical Sale tax facts remain unchanged. The rule will no longer resolve for future effective calculations.')}
-        confirmLabel={copy('Cancel rule')}
+        title={tax('cancelRuleTitle')}
+        message={tax('cancelRuleMessage')}
+        confirmLabel={tax('cancelRule')}
         variant="danger"
       />
     </>
@@ -519,7 +520,7 @@ function TaxRuleDialog({
   onClose: () => void;
   onChanged: () => void;
 }) {
-  const { copy } = useBackofficeLocalization();
+  const { tax } = useTaxLocalization();
   const { showToast } = useToast();
   const [scope, setScope] = useState<TaxRule['scope']>('TRANSACTION');
   const [categoryId, setCategoryId] = useState('');
@@ -533,54 +534,54 @@ function TaxRuleDialog({
 
   useEffect(() => {
     if (!open) return;
-    const now = new Date();
-    now.setSeconds(0, 0);
-    const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000)
-      .toISOString()
-      .slice(0, 16);
     setScope('TRANSACTION');
     setCategoryId('');
     setCode('');
     setName('');
     setRatePercent('11');
     setPriceTreatment('EXCLUDED');
-    setEffectiveFrom(local);
+    setEffectiveFrom('');
     setEffectiveUntil('');
   }, [open]);
 
   const percent = Number(ratePercent);
+  const periodInvalid = Boolean(
+    effectiveFrom &&
+      effectiveUntil &&
+      new Date(effectiveUntil).getTime() <= new Date(effectiveFrom).getTime(),
+  );
   const valid =
     code.trim().length > 0 &&
     name.trim().length > 0 &&
+    ratePercent.trim().length > 0 &&
     Number.isFinite(percent) &&
     percent >= 0 &&
     percent <= 100 &&
-    Boolean(effectiveFrom) &&
+    !periodInvalid &&
     (scope === 'TRANSACTION' || Boolean(categoryId));
 
   const save = async () => {
     if (!valid || saving) return;
     setSaving(true);
     try {
-      const fraction = String(percent / 100);
       await api.createRule({
         scope,
         taxCategoryId: scope === 'ITEM' ? categoryId : null,
         code: code.trim().toUpperCase(),
         name: name.trim(),
-        rate: fraction,
+        rate: String(percent / 100),
         priceTreatment,
-        effectiveFrom: new Date(effectiveFrom).toISOString(),
+        effectiveFrom: effectiveFrom ? new Date(effectiveFrom).toISOString() : null,
         effectiveUntil: effectiveUntil ? new Date(effectiveUntil).toISOString() : null,
       });
       onChanged();
       onClose();
-      showToast({ variant: 'success', title: copy('Tax rule added.') });
+      showToast({ variant: 'success', title: tax('ruleAdded') });
     } catch (error) {
       if (!isSessionExpiredError(error))
         showToast({
           variant: 'danger',
-          title: normalizeBackofficeApiError(error, copy('Could not add tax rule.')).safeMessage,
+          title: taxApiMessage(error, tax, 'ruleAddFailed'),
         });
     } finally {
       setSaving(false);
@@ -591,52 +592,101 @@ function TaxRuleDialog({
     <DDialog
       open={open}
       onClose={onClose}
-      title={copy('Add tax rule')}
-      description={copy('Rules are append-only effective history. Existing rules are cancelled, not edited in place.')}
+      title={tax('addRule')}
       size="lg"
       footer={
         <div className="flex justify-end gap-2">
-          <DButton variant="secondary" onClick={onClose}>{copy('Cancel')}</DButton>
-          <DButton onClick={() => void save()} disabled={!valid || saving}>{copy('Add rule')}</DButton>
+          <DButton variant="secondary" onClick={onClose}>{tax('cancel')}</DButton>
+          <DButton onClick={() => void save()} disabled={!valid || saving}>{tax('addRule')}</DButton>
         </div>
       }
     >
       <div className="grid gap-4 sm:grid-cols-2">
         <DSelect
-          label={copy('Scope')}
+          label={tax('scope')}
           value={scope}
           clearable={false}
           options={[
-            { value: 'TRANSACTION', label: copy('Transaction') },
-            { value: 'ITEM', label: copy('Item') },
+            { value: 'TRANSACTION', label: tax('transaction') },
+            { value: 'ITEM', label: tax('item') },
           ]}
-          onValueChange={(value) => setScope(value as TaxRule['scope'])}
+          onValueChange={(value) => {
+            setScope(value as TaxRule['scope']);
+            if (value === 'TRANSACTION') setCategoryId('');
+          }}
         />
         {scope === 'ITEM' ? (
           <DSelect
-            label={copy('Category')}
+            label={tax('category')}
             value={categoryId}
             clearable={false}
-            options={categories.map((category) => ({ value: category.id, label: `${category.code} — ${category.name}` }))}
-            onValueChange={setCategoryId}
+            options={categories.map((category) => ({
+              value: category.id,
+              label: `${category.code} — ${category.name}`,
+            }))}
+            onValueChange={(value) => setCategoryId(value == null ? '' : String(value))}
           />
         ) : null}
-        <DInput label={copy('Code')} value={code} onChange={(value) => setCode(value.toUpperCase())} />
-        <DInput label={copy('Name')} value={name} onChange={setName} />
-        <DInput label={copy('Rate (%)')} value={ratePercent} onChange={setRatePercent} />
+        <DInput label={tax('code')} value={code} onChange={(value) => setCode(value.toUpperCase())} />
+        <DInput label={tax('name')} value={name} onChange={setName} />
+        <DInput label={tax('rate')} inputMode="decimal" value={ratePercent} onChange={setRatePercent} />
         <DSelect
-          label={copy('Price treatment')}
+          label={tax('treatment')}
           value={priceTreatment}
           clearable={false}
           options={[
-            { value: 'INCLUDED', label: copy('Inclusive') },
-            { value: 'EXCLUDED', label: copy('Exclusive') },
+            { value: 'INCLUDED', label: tax('included') },
+            { value: 'EXCLUDED', label: tax('excluded') },
           ]}
           onValueChange={(value) => setPriceTreatment(value as TaxRule['priceTreatment'])}
         />
-        <DInput label={copy('Effective from')} type="datetime-local" value={effectiveFrom} onChange={setEffectiveFrom} />
-        <DInput label={copy('Effective until (optional)')} type="datetime-local" value={effectiveUntil} onChange={setEffectiveUntil} />
+        <DDatePicker
+          label={`${tax('effectiveFrom')} (${tax('optional')})`}
+          variant="date-time"
+          value={effectiveFrom}
+          onChange={(value) => setEffectiveFrom(value == null ? '' : String(value))}
+          onClear={() => setEffectiveFrom('')}
+          clearable
+        />
+        <DDatePicker
+          label={`${tax('effectiveUntil')} (${tax('optional')})`}
+          variant="date-time"
+          value={effectiveUntil}
+          onChange={(value) => setEffectiveUntil(value == null ? '' : String(value))}
+          onClear={() => setEffectiveUntil('')}
+          clearable
+          error={periodInvalid ? tax('invalidPeriod') : undefined}
+        />
       </div>
     </DDialog>
   );
+}
+
+function formatEffectivity(
+  rule: TaxRule,
+  tax: (key: TaxMessageKey) => string,
+  formatDate: (value: Date, options?: Intl.DateTimeFormatOptions) => string,
+) {
+  const from = rule.effectiveFrom
+    ? formatDate(new Date(rule.effectiveFrom), { dateStyle: 'medium', timeStyle: 'short' })
+    : tax('immediate');
+  const until = rule.effectiveUntil
+    ? formatDate(new Date(rule.effectiveUntil), { dateStyle: 'medium', timeStyle: 'short' })
+    : tax('noEnd');
+  return `${from} → ${until}`;
+}
+
+function taxApiMessage(
+  error: unknown,
+  tax: (key: TaxMessageKey) => string,
+  fallback: TaxMessageKey,
+) {
+  const normalized = normalizeBackofficeApiError(error);
+  if (normalized.code === 'EFFECTIVE_PERIOD_OVERLAP') return tax('conflict');
+  if (normalized.code === 'INACTIVE_REFERENCE') return tax('inactiveReference');
+  if (normalized.code === 'DOMAIN_VALIDATION_ERROR' || normalized.code === 'BAD_REQUEST')
+    return tax('invalidInput');
+  if (normalized.code === 'FORBIDDEN' || normalized.status === 403) return tax('forbidden');
+  if (normalized.status !== null && normalized.status >= 500) return tax('serverError');
+  return normalized.safeMessage || tax(fallback);
 }

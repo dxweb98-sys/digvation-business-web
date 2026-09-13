@@ -26,7 +26,7 @@ export interface TaxRule {
   name: string;
   rate: string;
   priceTreatment: 'INCLUDED' | 'EXCLUDED';
-  effectiveFrom: string;
+  effectiveFrom: string | null;
   effectiveUntil: string | null;
   cancelledAt: string | null;
   createdAt: string;
@@ -82,7 +82,7 @@ export class TaxApi {
     name: string;
     rate: string;
     priceTreatment: TaxRule['priceTreatment'];
-    effectiveFrom: string;
+    effectiveFrom?: string | null;
     effectiveUntil?: string | null;
   }) {
     return this.client.post<TaxRule>('/api/v1/tax/rules', input);
