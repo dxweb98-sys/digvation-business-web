@@ -19,7 +19,8 @@ import {
   WalletCards,
   type LucideIcon,
 } from 'lucide-react';
-import { NavLink, Outlet } from 'react-router';
+import { NavLink, Outlet, useLocation } from 'react-router';
+import { useEffect, useState } from 'react';
 
 import { canAccessBackoffice, type BackofficeCapability } from '../../auth/backoffice-access';
 import { useBackofficeAuth } from '../../auth/backoffice-auth-context';
@@ -102,6 +103,17 @@ export function BackofficeShell() {
   const runtime = useRuntime();
   const { t, formatDate } = useBackofficeLocalization();
   const { session, logout } = useBackofficeAuth();
+  const location = useLocation();
+  const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [activeBranchSelectorOpen, setActiveBranchSelectorOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileNavigationOpen(false);
+    setAccountMenuOpen(false);
+    setActiveBranchSelectorOpen(false);
+  }, [location.key]);
+
   if (!session) return null;
 
   const brandSubtitle =
@@ -182,6 +194,8 @@ export function BackofficeShell() {
           <div className="flex min-w-0 items-center gap-2">
             <div className="backoffice-shell__mobile-navigation md:hidden">
               <DDropdown
+                open={mobileNavigationOpen}
+                onOpenChange={setMobileNavigationOpen}
                 placement="bottom-start"
                 contentPadding={false}
                 closeOnItemClick
@@ -198,7 +212,10 @@ export function BackofficeShell() {
                 </nav>
               </DDropdown>
             </div>
-            <ActiveBranchHeaderSelector />
+            <ActiveBranchHeaderSelector
+              open={activeBranchSelectorOpen}
+              onOpenChange={setActiveBranchSelectorOpen}
+            />
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
             <p className="backoffice-shell__header-date hidden text-xs text-[var(--color-text-muted)] md:block">
@@ -225,6 +242,8 @@ export function BackofficeShell() {
               <Bell className="size-[18px]" />
             </DButton>
             <DDropdown
+              open={accountMenuOpen}
+              onOpenChange={setAccountMenuOpen}
               placement="bottom-end"
               contentPadding={false}
               minWidth={240}
