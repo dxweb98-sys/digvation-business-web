@@ -101,6 +101,9 @@ export class ApiClient {
 
     if (!response.ok || !payload.success) {
       if (response.status === 401 && mayRefresh) {
+        const latestToken = await this.options.getAccessToken?.();
+        if (latestToken && latestToken !== token) return this.request<T>(path, init, false);
+
         if (this.options.refreshAccessToken) {
           const refreshed = await this.options.refreshAccessToken();
           if (refreshed.kind === 'refreshed') return this.request<T>(path, init, false);
