@@ -1,7 +1,8 @@
 import { AuthProvider, useAuth, type AuthPort, type AuthSession } from '@digvation/business-auth';
 import {
+  applyEffectiveBusinessConfiguration,
   ConnectivityProvider,
-  loadAuthenticatedEntitlements,
+  loadAuthenticatedRuntimeAvailability,
   RuntimeProvider,
   useRuntime,
   type RuntimeConfig,
@@ -19,10 +20,14 @@ import { PosOperationalSessionProvider } from '../../modules/pos/pos-operational
 
 function AuthenticatedOperationalRuntime({ children }: { children: ReactNode }) {
   const { session, authPort } = useAuth();
-  const runtime = useRuntime();
+  const bootstrapRuntime = useRuntime();
   const [state, setState] = useState<'loading' | 'allowed' | 'denied' | 'unavailable'>('loading');
+  const [effectiveRuntime, setEffectiveRuntime] = useState<RuntimeConfig | null>(null);
+
   useEffect(() => {
     let active = true;
+    setState('loading');
+    setEffectiveRuntime(null);
     void (async () => {
       const token = await authPort.getAccessToken?.();
       if (!token) {
@@ -30,8 +35,22 @@ function AuthenticatedOperationalRuntime({ children }: { children: ReactNode }) 
         return;
       }
       try {
-        const entitlements = await loadAuthenticatedEntitlements(runtime.apiBaseUrl, token);
-        if (active) setState(entitlements.products.includes('POS') ? 'allowed' : 'denied');
+        const availability = await loadAuthenticatedRuntimeAvailability(
+          bootstrapRuntime.apiBaseUrl,
+          token,
+        );
+        if (!active) return;
+        if (!availability.effectiveEntitlements.products.includes('POS')) {
+          setState('denied');
+          return;
+        }
+        setEffectiveRuntime(
+          applyEffectiveBusinessConfiguration(
+            bootstrapRuntime,
+            availability.businessConfiguration,
+          ),
+        );
+        setState('allowed');
       } catch {
         if (active) setState('unavailable');
       }
@@ -39,8 +58,11 @@ function AuthenticatedOperationalRuntime({ children }: { children: ReactNode }) 
     return () => {
       active = false;
     };
-  }, [authPort, session.identity.userId]);
-  if (state === 'allowed') return <>{children}</>;
+  }, [authPort, bootstrapRuntime, session.identity.userId]);
+
+  if (state === 'allowed' && effectiveRuntime)
+    return <RuntimeProvider config={effectiveRuntime}>{children}</RuntimeProvider>;
+
   return (
     <main className="grid min-h-screen place-items-center bg-[var(--color-background)] p-6 text-center">
       <section className="max-w-md rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">

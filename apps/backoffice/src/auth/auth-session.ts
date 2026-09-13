@@ -1,5 +1,6 @@
 import type {
   BusinessFoundation,
+  EffectiveBusinessConfiguration,
   EffectiveEntitlementConfig,
 } from '@digvation/business-runtime';
 
@@ -22,6 +23,7 @@ export interface BackofficeSession {
   identity: BackofficeIdentity;
   effectiveEntitlements: EffectiveEntitlementConfig;
   effectiveFoundations: readonly BusinessFoundation[];
+  businessConfiguration?: EffectiveBusinessConfiguration | undefined;
 }
 
 export interface LoginCredentials {

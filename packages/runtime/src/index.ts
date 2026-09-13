@@ -4,7 +4,7 @@ export {
   loadAuthenticatedRuntimeAvailability,
 } from './authenticated-runtime-context';
 export { ConnectivityProvider, useConnectivity } from './connectivity-context';
-export type { ConnectivityState } from './connectivity-context';
+export { applyEffectiveBusinessConfiguration } from './effective-business-configuration';
 export { RuntimeProvider, useRuntime } from './runtime-context';
 export { HttpRuntimeConfigAdapter } from './runtime-config.adapter';
 export { runtimeConfigSchema } from './runtime-config.schema';
@@ -14,10 +14,16 @@ export type {
   BrandingConfig,
   BrandingMode,
   BusinessCapability,
+  BusinessDateFormat,
   BusinessFoundation,
+  BusinessLocale,
   BusinessProduct,
+  BusinessTimeFormat,
   CapabilityConfig,
   DeploymentProfile,
+  EffectiveBusinessConfiguration,
+  EffectiveBusinessPreferences,
+  EffectiveBusinessProfileConfiguration,
   EffectiveEntitlementConfig,
   RuntimeAvailabilityConfig,
   RuntimeConfig,

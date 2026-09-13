@@ -14,6 +14,13 @@ export type ReportType =
   | 'tax'
   | 'locations';
 
+export type DashboardWidget =
+  | 'TOP_ITEMS'
+  | 'PAYMENT_MIX'
+  | 'RECENT_TRANSACTIONS'
+  | 'TOP_EMPLOYEES'
+  | 'BUSINESS_INSIGHT';
+
 const REPORT_PERMISSION: Record<ReportType, string> = {
   'business-performance': 'sales:read',
   transactions: 'sales:read',
@@ -39,15 +46,52 @@ const POS_REPORTS = new Set<ReportType>([
   'locations',
 ]);
 
+const DASHBOARD_REPORT: Record<DashboardWidget, ReportType> = {
+  TOP_ITEMS: 'catalog-performance',
+  PAYMENT_MIX: 'payments',
+  RECENT_TRANSACTIONS: 'transactions',
+  TOP_EMPLOYEES: 'employee-performance',
+  BUSINESS_INSIGHT: 'business-performance',
+};
+
 /**
- * UI composition only. Runtime effective permissions have already intersected
- * RBAC grants with capability/foundation availability. Reports that project POS
- * facts additionally require the POS product itself. Backend report guards remain
- * the final authority.
+ * Report visibility is derived from the effective runtime composition only.
+ * Effective permissions have already been intersected with product,
+ * capability, foundation and RBAC availability by Business Runtime.
  */
-export function canAccessReport(session: BackofficeSession | null, type: ReportType): boolean {
+export function isReportAvailable(
+  session: BackofficeSession | null,
+  type: ReportType,
+): boolean {
   if (!session) return false;
   if (!session.identity.permissions.includes(REPORT_PERMISSION[type])) return false;
-  if (POS_REPORTS.has(type) && !session.effectiveEntitlements.products.includes('POS')) return false;
+  if (
+    POS_REPORTS.has(type) &&
+    !session.effectiveEntitlements.products.includes('POS')
+  )
+    return false;
   return true;
+}
+
+/** Compatibility name used by report routes and selectors. */
+export function canAccessReport(
+  session: BackofficeSession | null,
+  type: ReportType,
+): boolean {
+  return isReportAvailable(session, type);
+}
+
+export function isDashboardWidgetAvailable(
+  session: BackofficeSession | null,
+  widget: DashboardWidget,
+): boolean {
+  return isReportAvailable(session, DASHBOARD_REPORT[widget]);
+}
+
+/** All dashboard contributions for enabled features are shown. */
+export function canShowDashboardWidget(
+  session: BackofficeSession | null,
+  widget: DashboardWidget,
+): boolean {
+  return isDashboardWidgetAvailable(session, widget);
 }

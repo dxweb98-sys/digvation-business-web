@@ -7,7 +7,6 @@ import {
   Building2,
   ChartNoAxesCombined,
   CircleUserRound,
-  Globe2,
   KeyRound,
   LayoutDashboard,
   LogOut,
@@ -96,7 +95,7 @@ const navigationSections: ReadonlyArray<{
 
 export function BackofficeShell() {
   const runtime = useRuntime();
-  const { locale, setLocale, t, formatDate } = useBackofficeLocalization();
+  const { t, formatDate } = useBackofficeLocalization();
   const { session, logout } = useBackofficeAuth();
   if (!session) return null;
 
@@ -270,23 +269,6 @@ export function BackofficeShell() {
                   <KeyRound className="size-4" />
                   {t('changePassword')}
                 </button>
-                <div className="my-1 border-t border-[var(--color-border)]" />
-                <div className="px-2.5 py-1.5 text-xs font-semibold text-[var(--color-text-muted)]">
-                  {t('language')}
-                </div>
-                {(['id', 'en'] as const).map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    role="menuitemradio"
-                    aria-checked={locale === option}
-                    onClick={() => setLocale(option)}
-                    className="flex h-9 w-full items-center gap-2 rounded-[var(--radius-control)] px-2.5 text-left text-sm text-[var(--color-text)] hover:bg-[var(--color-surface-muted)]"
-                  >
-                    <Globe2 className="size-4" />
-                    {option === 'id' ? t('indonesian') : t('english')}
-                  </button>
-                ))}
                 <div className="my-1 border-t border-[var(--color-border)]" />
                 <button
                   type="button"
