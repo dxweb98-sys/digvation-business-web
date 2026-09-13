@@ -1090,6 +1090,7 @@ const copy: Record<string, { id: string; en: string }> = {
     id: 'Belum ada pemenuhan terlacak yang dicatat.',
     en: 'No tracked fulfillment is recorded.',
   },
+  Quantity: { id: 'Kuantitas', en: 'Quantity' },
   OPEN: { id: 'Terbuka', en: 'Open' },
   FINALIZED: { id: 'Difinalisasi', en: 'Finalized' },
   VOIDED: { id: 'Dibatalkan', en: 'Voided' },

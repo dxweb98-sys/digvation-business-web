@@ -284,6 +284,7 @@ function TransactionDetail({
     <DDialog
       open={open}
       onClose={onClose}
+      size="xl"
       title={copy('Transaction details')}
       footer={
         <div className="flex justify-end">
@@ -305,22 +306,48 @@ function TransactionDetail({
         />
       ) : (
         <div className="space-y-6">
-          <section>
-            <h3 className="text-sm font-semibold">{copy('Sale information')}</h3>
-            <dl className="mt-3 grid gap-3 sm:grid-cols-2">
-              <Fact label={copy('Sale')} value={item.id} mono />
+          <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4 sm:p-5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <p className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+                  {copy('Transaction number')}
+                </p>
+                <h3 className="mt-1 break-words font-mono text-xl font-semibold tracking-tight">
+                  {item.saleNumber}
+                </h3>
+                {item.invoiceNumber ? (
+                  <p className="mt-1 break-words font-mono text-sm text-[var(--color-text-muted)]">
+                    {copy('Invoice number')}: {item.invoiceNumber}
+                  </p>
+                ) : null}
+              </div>
+              <div className="flex flex-col items-start gap-2 sm:items-end">
+                <StatusBadge status={item.status} />
+                <p className="text-xl font-semibold text-[var(--color-text)]">
+                  {formatMoney(item.totalAmount, item.currency)}
+                </p>
+                <p className="text-sm text-[var(--color-text-muted)]">
+                  {formatDate(new Date(item.createdAt), {
+                    dateStyle: 'medium',
+                    timeStyle: 'short',
+                  })}
+                </p>
+              </div>
+            </div>
+            <h3 className="mt-5 border-t border-[var(--color-border)] pt-4 text-sm font-semibold">
+              {copy('Sale information')}
+            </h3>
+            <dl className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <Fact
-                label={copy('Date')}
-                value={formatDate(new Date(item.createdAt), {
-                  dateStyle: 'medium',
-                  timeStyle: 'short',
-                })}
+                label={copy('Discount')}
+                value={formatMoney(item.discountAmount, item.currency)}
               />
+              <Fact label={copy('Tax')} value={formatMoney(item.taxAmount, item.currency)} />
               <Fact label={copy('Total')} value={formatMoney(item.totalAmount, item.currency)} />
-              <Fact label={copy('Sale status')} value={<StatusBadge status={item.status} />} />
+              <Fact label={copy('Currency')} value={item.currency} />
             </dl>
           </section>
-          <section>
+          <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] p-4 sm:p-5">
             <h3 className="text-sm font-semibold">{copy('Payment information')}</h3>
             <div className="mt-3 space-y-2">
               {item.payments.length ? (
@@ -336,6 +363,18 @@ function TransactionDetail({
                     <p className="mt-1 font-semibold">
                       {formatMoney(payment.appliedAmount, payment.currency)}
                     </p>
+                    {payment.tenderedAmount ? (
+                      <p className="mt-2 text-xs text-[var(--color-text-muted)]">
+                        {copy('Tendered Amount')}:{' '}
+                        {formatMoney(payment.tenderedAmount, payment.currency)}
+                      </p>
+                    ) : null}
+                    {payment.changeAmount ? (
+                      <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                        {copy('Change Amount')}:{' '}
+                        {formatMoney(payment.changeAmount, payment.currency)}
+                      </p>
+                    ) : null}
                     {payment.providerReference ? (
                       <p className="mt-1 text-xs text-[var(--color-text-muted)]">
                         {payment.providerReference}
@@ -350,7 +389,7 @@ function TransactionDetail({
               )}
             </div>
           </section>
-          <section>
+          <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] p-4 sm:p-5">
             <h3 className="text-sm font-semibold">{copy('Fulfillment information')}</h3>
             <div className="mt-3 space-y-2">
               {item.lines.filter((line) => line.fulfillment).length ? (
@@ -361,10 +400,17 @@ function TransactionDetail({
                       key={line.id}
                       className="flex items-center justify-between gap-3 rounded-[var(--radius-control)] border border-[var(--color-border)] p-3 text-sm"
                     >
-                      <span>
-                        {line.itemNameSnapshot}
-                        {line.variantNameSnapshot ? ` · ${line.variantNameSnapshot}` : ''}
-                      </span>
+                      <div>
+                        <p className="font-medium">{line.itemNameSnapshot}</p>
+                        {line.variantNameSnapshot ? (
+                          <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
+                            {line.variantNameSnapshot}
+                          </p>
+                        ) : null}
+                        <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                          {copy('Quantity')}: {line.quantity}
+                        </p>
+                      </div>
                       <StatusBadge status={line.fulfillment!.status} />
                     </div>
                   ))
@@ -380,11 +426,11 @@ function TransactionDetail({
     </DDialog>
   );
 }
-function Fact({ label, value, mono = false }: { label: string; value: ReactNode; mono?: boolean }) {
+function Fact({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div>
       <dt className="text-xs font-medium text-[var(--color-text-muted)]">{label}</dt>
-      <dd className={`mt-1 text-sm ${mono ? 'break-all font-mono text-xs' : ''}`}>{value}</dd>
+      <dd className="mt-1 text-sm">{value}</dd>
     </div>
   );
 }
