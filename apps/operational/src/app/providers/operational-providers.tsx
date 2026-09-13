@@ -47,27 +47,16 @@ function AuthenticatedOperationalRuntime({ children }: { children: ReactNode }) 
     setState('loading');
     setEffectiveRuntime(null);
     void (async () => {
-      let token = await authPort.getAccessToken?.();
+      const token = await authPort.getAccessToken?.();
       if (!token) {
         if (active) setState('denied');
         return;
       }
       try {
-        let availability;
-        try {
-          availability = await loadAuthenticatedRuntimeAvailability(
-            bootstrapRuntime.apiBaseUrl,
-            token,
-          );
-        } catch (error) {
-          const refreshed = await authPort.refreshAccessToken?.();
-          if (!refreshed || refreshed.kind !== 'refreshed') throw error;
-          token = refreshed.accessToken;
-          availability = await loadAuthenticatedRuntimeAvailability(
-            bootstrapRuntime.apiBaseUrl,
-            token,
-          );
-        }
+        const availability = await loadAuthenticatedRuntimeAvailability(
+          bootstrapRuntime.apiBaseUrl,
+          token,
+        );
         if (!active) return;
         if (!availability.effectiveEntitlements.products.includes('POS')) {
           setState('denied');
@@ -132,7 +121,7 @@ interface OperationalProvidersProps {
   router: RouterProviderProps['router'];
 }
 
-interface OperationalAuthBoundaryProps extends OperationalProvidersProps {}
+type OperationalAuthBoundaryProps = OperationalProvidersProps;
 
 function OperationalAuthBoundary({
   runtime,
