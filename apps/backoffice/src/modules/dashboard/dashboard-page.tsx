@@ -13,7 +13,11 @@ import { BackofficePage } from '../../app/layout/backoffice-page';
 import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
 import { useBusinessLocation } from '../../app/providers/business-location-context';
 import { useBackofficeAuth } from '../../auth/backoffice-auth-context';
-import { canAccessReport } from '../reporting/report-availability';
+import {
+  canAccessReport,
+  canShowDashboardWidget,
+  isReportAvailable,
+} from '../reporting/report-availability';
 import { BusinessInsightWidget } from './components/business-insight-widget';
 import { BusinessPerformanceCard } from './components/business-performance-card';
 import { DashboardKpiCard } from './components/dashboard-kpi-card';
@@ -144,10 +148,21 @@ export function DashboardPage() {
     () => new DashboardApi(createApiClient(runtime.apiBaseUrl)),
     [createApiClient, runtime.apiBaseUrl],
   );
-  const canReadSales = canAccessReport(session, 'business-performance');
-  const canReadCatalog = canAccessReport(session, 'catalog-performance');
-  const canReadEmployees = canAccessReport(session, 'employee-performance');
-  const canReadPayments = canAccessReport(session, 'payments');
+
+  // Core dashboard availability is independent from report hide preferences.
+  const canReadSales = isReportAvailable(session, 'business-performance');
+  const canReadCatalog = isReportAvailable(session, 'catalog-performance');
+  const canReadEmployees = isReportAvailable(session, 'employee-performance');
+  const canReadPayments = isReportAvailable(session, 'payments');
+
+  const showTopItems = canShowDashboardWidget(session, 'TOP_ITEMS');
+  const showPaymentMix = canShowDashboardWidget(session, 'PAYMENT_MIX');
+  const showRecentTransactions = canShowDashboardWidget(
+    session,
+    'RECENT_TRANSACTIONS',
+  );
+  const showTopEmployees = canShowDashboardWidget(session, 'TOP_EMPLOYEES');
+  const showBusinessInsight = canShowDashboardWidget(session, 'BUSINESS_INSIGHT');
 
   const today = periodRange('today');
   const yesterday = previousRange(today.from, today.to);
@@ -190,34 +205,46 @@ export function DashboardPage() {
     enabled: reportEnabled,
   });
   const previousActivityPerformance = useQuery({
-    queryKey: ['dashboard', 'business-performance', 'previous-activity', previousActivityFilters],
+    queryKey: [
+      'dashboard',
+      'business-performance',
+      'previous-activity',
+      previousActivityFilters,
+    ],
     queryFn: () => api.report('business-performance', previousActivityFilters),
     enabled: reportEnabled,
   });
   const lastTransactions = useQuery({
     queryKey: ['dashboard', 'last-transactions', recentFilters],
     queryFn: () => api.report('transactions', recentFilters, 6),
-    enabled: reportEnabled,
+    enabled: Boolean(reportEnabled && showRecentTransactions),
   });
   const monthPerformance = useQuery({
     queryKey: ['dashboard', 'business-performance', monthFilters],
     queryFn: () => api.report('business-performance', monthFilters),
-    enabled: reportEnabled,
+    enabled: Boolean(reportEnabled && (showPaymentMix || showBusinessInsight)),
   });
   const previousMonthPerformance = useQuery({
-    queryKey: ['dashboard', 'business-performance', 'previous-month', previousMonthFilters],
+    queryKey: [
+      'dashboard',
+      'business-performance',
+      'previous-month',
+      previousMonthFilters,
+    ],
     queryFn: () => api.report('business-performance', previousMonthFilters),
-    enabled: reportEnabled,
+    enabled: Boolean(reportEnabled && showBusinessInsight),
   });
   const catalogPerformance = useQuery({
     queryKey: ['dashboard', 'catalog-performance', monthFilters],
     queryFn: () => api.report('catalog-performance', monthFilters, 5),
-    enabled: Boolean(session && canReadCatalog && locationReady),
+    enabled: Boolean(session && canReadCatalog && locationReady && showTopItems),
   });
   const employeePerformance = useQuery({
     queryKey: ['dashboard', 'employee-performance', monthFilters],
     queryFn: () => api.report('employee-performance', monthFilters, 5),
-    enabled: Boolean(session && canReadEmployees && locationReady),
+    enabled: Boolean(
+      session && canReadEmployees && locationReady && showTopEmployees,
+    ),
   });
 
   if (!session) return null;
@@ -256,10 +283,16 @@ export function DashboardPage() {
   const quantityToday = numberValue(todayData?.summary.quantitySold);
   const quantityYesterday = numberValue(yesterdayData?.summary.quantitySold);
   const activityRevenue = numberValue(activityData?.summary.finalRevenue);
-  const previousActivityRevenue = numberValue(previousActivityData?.summary.finalRevenue);
+  const previousActivityRevenue = numberValue(
+    previousActivityData?.summary.finalRevenue,
+  );
   const activityTransactions = numberValue(activityData?.summary.transactionCount);
-  const previousActivityTransactions = numberValue(previousActivityData?.summary.transactionCount);
-  const transactionTotalToday = numberValue(todayTransactionData?.summary.transactionCount);
+  const previousActivityTransactions = numberValue(
+    previousActivityData?.summary.transactionCount,
+  );
+  const transactionTotalToday = numberValue(
+    todayTransactionData?.summary.transactionCount,
+  );
   const finalizedToday = numberValue(todayTransactionData?.summary.finalizedCount);
   const voidedToday = numberValue(todayTransactionData?.summary.voidedCount);
 
@@ -273,21 +306,34 @@ export function DashboardPage() {
     secondary: `${formatInteger(numberValue(row.quantitySold))} ${text('sold')} · ${formatInteger(numberValue(row.transactionCount))} ${text('txShort')}`,
     value: money(row.finalRevenue),
   }));
-  const topEmployees = (employeePerformance.data?.items ?? []).slice(0, 5).map((row) => ({
-    label: String(row.employeeName ?? '—'),
-    secondary: `${formatInteger(numberValue(row.contributedTransactions))} ${text('txShort')} · ${String(row.topCatalogItem ?? '—')}`,
-    value: money(row.contributionRevenue),
-  }));
+  const topEmployees = (employeePerformance.data?.items ?? [])
+    .slice(0, 5)
+    .map((row) => ({
+      label: String(row.employeeName ?? '—'),
+      secondary: `${formatInteger(numberValue(row.contributedTransactions))} ${text('txShort')} · ${String(row.topCatalogItem ?? '—')}`,
+      value: money(row.contributionRevenue),
+    }));
 
-  const firstName = session.identity.displayName.trim().split(/\s+/)[0] || (locale === 'id' ? 'Pengguna' : 'there');
+  const firstName =
+    session.identity.displayName.trim().split(/\s+/)[0] ||
+    (locale === 'id' ? 'Pengguna' : 'there');
   const welcome = welcomeCopy(locale, firstName, new Date().getHours());
-  const transactionReportHref = reportHref('transactions', locationId, recent);
-  const catalogReportHref = reportHref('catalog-performance', locationId, month);
-  const employeeReportHref = reportHref('employee-performance', locationId, month);
-  const paymentReportHref = canReadPayments
+
+  const transactionReportHref = canAccessReport(session, 'transactions')
+    ? reportHref('transactions', locationId, recent)
+    : undefined;
+  const catalogReportHref = canAccessReport(session, 'catalog-performance')
+    ? reportHref('catalog-performance', locationId, month)
+    : undefined;
+  const employeeReportHref = canAccessReport(session, 'employee-performance')
+    ? reportHref('employee-performance', locationId, month)
+    : undefined;
+  const paymentReportHref = canAccessReport(session, 'payments')
     ? reportHref('payments', locationId, month)
     : undefined;
-  const performanceReportHref = reportHref('business-performance', locationId, month);
+  const performanceReportHref = canAccessReport(session, 'business-performance')
+    ? reportHref('business-performance', locationId, month)
+    : undefined;
 
   return (
     <BackofficePage>
@@ -384,7 +430,9 @@ export function DashboardPage() {
                 { value: 'month', label: text('thisMonth') },
                 { value: 'year', label: text('thisYear') },
               ]}
-              onPeriodChange={(value) => setActivityPeriod(value as ActivityPeriod)}
+              onPeriodChange={(value) =>
+                setActivityPeriod(value as ActivityPeriod)
+              }
               revenue={activityRevenue}
               transactions={activityTransactions}
               previousRevenue={previousActivityRevenue}
@@ -392,7 +440,6 @@ export function DashboardPage() {
               trend={activityData?.analytics.trend ?? []}
               formatMoney={moneyNumber}
             />
-
             <TransactionCompletionCard
               finalized={finalizedToday}
               total={transactionTotalToday}
@@ -400,58 +447,65 @@ export function DashboardPage() {
             />
           </section>
 
-          <section className="mt-4 grid items-stretch gap-4 lg:grid-cols-2 xl:grid-cols-3">
-            {canReadCatalog ? (
-              <RankingCard
-                title={text('topItems')}
-                subtitle={text('thisMonth')}
-                items={topItems}
-                emptyMessage={text('noSummary')}
-                kind="items"
-                seeAllHref={catalogReportHref}
-              />
-            ) : null}
+          {showTopItems || showPaymentMix || showRecentTransactions ? (
+            <section className="mt-4 grid items-stretch gap-4 lg:grid-cols-2 xl:grid-cols-3">
+              {showTopItems ? (
+                <RankingCard
+                  title={text('topItems')}
+                  subtitle={text('thisMonth')}
+                  items={topItems}
+                  emptyMessage={text('noSummary')}
+                  kind="items"
+                  seeAllHref={catalogReportHref}
+                />
+              ) : null}
+              {showPaymentMix ? (
+                <PaymentMixCard
+                  title={`${text('paymentMix')} · ${text('thisMonth')}`}
+                  points={paymentMix}
+                  emptyMessage={text('noSummary')}
+                  formatValue={moneyNumber}
+                  seeAllHref={paymentReportHref}
+                />
+              ) : null}
+              {showRecentTransactions ? (
+                <TransactionsCard
+                  title={text('lastTransactions')}
+                  periodLabel={text('latest')}
+                  total={lastTransactions.data?.total ?? 0}
+                  transactions={recentTransactions}
+                  emptyMessage={text('noRecentTransactions')}
+                  formatDateTime={formatDateTime}
+                  formatMoney={money}
+                  seeAllHref={transactionReportHref}
+                />
+              ) : null}
+            </section>
+          ) : null}
 
-            <PaymentMixCard
-              title={`${text('paymentMix')} · ${text('thisMonth')}`}
-              points={paymentMix}
-              emptyMessage={text('noSummary')}
-              formatValue={moneyNumber}
-              seeAllHref={paymentReportHref}
-            />
-
-            <TransactionsCard
-              title={text('lastTransactions')}
-              periodLabel={text('latest')}
-              total={lastTransactions.data?.total ?? 0}
-              transactions={recentTransactions}
-              emptyMessage={text('noRecentTransactions')}
-              formatDateTime={formatDateTime}
-              formatMoney={money}
-              seeAllHref={transactionReportHref}
-            />
-          </section>
-
-          <section className="mt-4 grid items-stretch gap-4 lg:grid-cols-2">
-            {canReadEmployees ? (
-              <RankingCard
-                title={text('topEmployees')}
-                subtitle={text('thisMonth')}
-                items={topEmployees}
-                emptyMessage={text('noSummary')}
-                kind="employees"
-                seeAllHref={employeeReportHref}
-              />
-            ) : null}
-
-            <BusinessInsightWidget
-              current={monthData}
-              previous={previousMonthData}
-              currency={runtime.currency}
-              formatMoney={formatMoney}
-              seeAllHref={performanceReportHref}
-            />
-          </section>
+          {showTopEmployees || showBusinessInsight ? (
+            <section className="mt-4 grid items-stretch gap-4 lg:grid-cols-2">
+              {showTopEmployees ? (
+                <RankingCard
+                  title={text('topEmployees')}
+                  subtitle={text('thisMonth')}
+                  items={topEmployees}
+                  emptyMessage={text('noSummary')}
+                  kind="employees"
+                  seeAllHref={employeeReportHref}
+                />
+              ) : null}
+              {showBusinessInsight ? (
+                <BusinessInsightWidget
+                  current={monthData}
+                  previous={previousMonthData}
+                  currency={runtime.currency}
+                  formatMoney={formatMoney}
+                  seeAllHref={performanceReportHref}
+                />
+              ) : null}
+            </section>
+          ) : null}
         </>
       ) : null}
     </BackofficePage>
