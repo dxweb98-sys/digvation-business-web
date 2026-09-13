@@ -28,8 +28,8 @@ export interface FinancialAccountOption {
 interface Page<T> {
   items: T[];
   total: number;
-  limit: number;
-  offset: number;
+  limit?: number;
+  offset?: number;
 }
 
 type Query = Record<string, string | number | undefined>;
@@ -61,9 +61,9 @@ export class OperationalExpenseApi {
     return this.client.post<OperationalExpense>('/api/v1/operational/expenses', input);
   }
 
-  listFinancialAccounts() {
+  listEligibleAccounts(sellingLocationId: string) {
     return this.client.get<Page<FinancialAccountOption>>(
-      '/api/v1/financial-accounts?status=ACTIVE&limit=100&offset=0',
+      `/api/v1/operational/expenses/eligible-accounts?sellingLocationId=${encodeURIComponent(sellingLocationId)}`,
     );
   }
 }
