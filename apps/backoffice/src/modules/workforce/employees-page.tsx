@@ -327,6 +327,7 @@ export function EmployeesPage() {
       />
 
       <EmployeeDetailDialog
+        key={detailId ?? 'employee-detail'}
         open={detailId !== null}
         employee={detailId ? detail.data : undefined}
         isLoading={Boolean(detailId && detail.isLoading)}

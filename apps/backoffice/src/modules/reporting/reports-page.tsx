@@ -2,20 +2,14 @@ import { useRuntime } from '@digvation/business-runtime';
 import {
   DButton,
   DDataTable,
-  DDateRangeFilter,
   DDropdown,
   DInput,
+  DRangeDatePicker,
   DSelect,
   type TableColumn,
 } from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
-import {
-  ChartNoAxesColumnIncreasing,
-  CircleDollarSign,
-  Filter,
-  Hash,
-  PackageCheck,
-} from 'lucide-react';
+import { ChartNoAxesColumnIncreasing, CircleDollarSign, Hash, PackageCheck } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
 import {
@@ -226,7 +220,7 @@ const metrics: Record<Type, string[]> = {
   tax: ['taxAmount', 'taxableBase', 'includedTax', 'excludedTax'],
   locations: ['finalRevenue', 'transactionCount', 'averageTransactionValue', 'quantitySold'],
 };
-const visuals: Record<Type, { trend: string; insights: [string, string][]; ranking?: string }> = {
+const visuals: Record<Type, { trend?: string; insights: [string, string][]; ranking?: string }> = {
   'business-performance': {
     trend: 'Revenue activity',
     insights: [['paymentMethod', 'Payment mix']],
@@ -256,12 +250,9 @@ const visuals: Record<Type, { trend: string; insights: [string, string][]; ranki
   payments: { trend: 'Payment activity', insights: [['primary', 'Payment status insight']] },
   expenses: { trend: 'Expense activity', insights: [['primary', 'Expense status']] },
   cash: { trend: 'Cash movement activity', insights: [['primary', 'Cash movement mix']] },
-  settlements: { trend: 'Settlement activity', insights: [['primary', 'Settlement status']] },
-  reconciliations: {
-    trend: 'Reconciliation activity',
-    insights: [['primary', 'Reconciliation status']],
-  },
-  tax: { trend: 'Tax activity', insights: [['primary', 'Tax contribution']] },
+  settlements: { insights: [] },
+  reconciliations: { insights: [] },
+  tax: { insights: [] },
   locations: {
     trend: 'Location revenue comparison',
     insights: [['primary', 'Revenue share']],
@@ -389,7 +380,7 @@ export function ReportsPage() {
   });
   const requestedLocationIsAvailable = Boolean(
     selectedLocationId &&
-      locations.data?.locations.some((location) => location.id === selectedLocationId),
+    locations.data?.locations.some((location) => location.id === selectedLocationId),
   );
   const locationId =
     (requestedLocationIsAvailable ? selectedLocationId : '') ||
@@ -430,9 +421,7 @@ export function ReportsPage() {
     enabled: Boolean(session?.identity.permissions.includes('financial-accounts:read')),
   });
   const locationSelectionReady =
-    !locationScoped ||
-    locations.data?.resolution !== 'SELECTION_REQUIRED' ||
-    Boolean(locationId);
+    !locationScoped || locations.data?.resolution !== 'SELECTION_REQUIRED' || Boolean(locationId);
   const params = new URLSearchParams({
     dateFrom: from,
     dateTo: to,
@@ -484,7 +473,13 @@ export function ReportsPage() {
     });
     setPage(1);
   };
-  const activeCount = Object.keys(filters).length;
+  const resetFilters = () => {
+    setFilters({});
+    setLocationId('');
+    setFrom(initial.from);
+    setTo(initial.to);
+    setPage(1);
+  };
   const option = (r: Option) => r.name ?? r.displayName ?? r.code;
   const choices = (fields: [string, string, string[]][]) =>
     fields.map(
@@ -627,7 +622,7 @@ export function ReportsPage() {
       ],
     ],
   };
-  const download = async (kind: 'xlsx' | 'pdf' | 'csv') => {
+  const download = async (kind: 'xlsx' | 'csv') => {
     const token = await getAccessToken();
     const p = new URLSearchParams({
       dateFrom: from,
@@ -661,36 +656,30 @@ export function ReportsPage() {
     key: k,
     label: `${copy(title(k))}: ${copy(attendanceLabels[v] ?? v)}`,
   }));
-  const exportMenu = (
-    <DDropdown
-      placement="bottom-end"
-      contentRole="menu"
-      closeOnItemClick
-      trigger={() => <DButton>{copy('Export')}</DButton>}
-    >
-      <button
-        className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--color-surface-muted)]"
-        onClick={() => void download('xlsx')}
+  const exportAction =
+    type === 'attendance' ? (
+      <DDropdown
+        placement="bottom-end"
+        contentRole="menu"
+        closeOnItemClick
+        trigger={() => <DButton>{copy('Export')}</DButton>}
       >
-        {copy('Export Excel')}
-      </button>
-      {type === 'attendance' ? (
+        <button
+          className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--color-surface-muted)]"
+          onClick={() => void download('xlsx')}
+        >
+          {copy('Export Excel')}
+        </button>
         <button
           className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--color-surface-muted)]"
           onClick={() => void download('csv')}
         >
           {copy('Export CSV')}
         </button>
-      ) : (
-        <button
-          className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--color-surface-muted)]"
-          onClick={() => void download('pdf')}
-        >
-          {copy('Export PDF')}
-        </button>
-      )}
-    </DDropdown>
-  );
+      </DDropdown>
+    ) : (
+      <DButton onClick={() => void download('xlsx')}>{copy('Export Excel')}</DButton>
+    );
   return (
     <BackofficePage>
       <div className="pt-2">
@@ -700,152 +689,147 @@ export function ReportsPage() {
           description={copy(
             'Reports compose authoritative projections from the available business domains.',
           )}
-          actions={exportMenu}
         />
       </div>
-      <div
-        className={`mt-4 grid grid-cols-1 items-end gap-3 md:gap-3 ${
-          locationScoped
-            ? 'md:grid-cols-[300px_360px_240px_auto]'
-            : 'md:grid-cols-[300px_360px_auto]'
-        }`}
-      >
-        <div className="min-w-0">
-          <DSelect
-            label={copy('Report type')}
-            value={type}
-            options={availableTypes.map(([value, label]) => ({
-              value,
-              label: copy(label),
-            }))}
-            onChange={(v) => {
-              setType(v as Type);
-              setFilters({});
-              setPage(1);
-            }}
-          />
+      <section className="mt-4 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:p-5">
+        <div className="flex flex-col gap-3 border-b border-[var(--color-border)] pb-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-[var(--color-text)]">
+              {copy('Report filters')}
+            </h2>
+            <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+              {copy('Choose a report and period to refresh the authoritative detail below.')}
+            </p>
+          </div>
+          {exportAction}
         </div>
-        <div className="min-w-0">
-          <DDateRangeFilter
-            from={from}
-            to={to}
-            onFromChange={(v) => {
-              setFrom(v);
-              setPage(1);
-            }}
-            onToChange={(v) => {
-              setTo(v);
-              setPage(1);
-            }}
-          />
-        </div>
-        {locationScoped ? (
+        <div
+          className={`mt-4 grid grid-cols-1 items-end gap-3 md:grid-cols-2 xl:grid-cols-4 ${
+            locationScoped ? '' : 'xl:grid-cols-3'
+          }`}
+        >
           <div className="min-w-0">
             <DSelect
-              label={copy('Location')}
-              value={locationId}
-              options={[
-                {
-                  value: '',
-                  label: copy(locations.data?.organizationWide ? 'All locations' : 'Select location'),
-                },
-                ...(locations.data?.locations ?? []).map((i) => ({
-                  value: i.id,
-                  label: option(i),
-                })),
-              ]}
+              label={copy('Report type')}
+              value={type}
+              options={availableTypes.map(([value, label]) => ({
+                value,
+                label: copy(label),
+              }))}
               onChange={(v) => {
-                setLocationId(String(v ?? ''));
+                setType(v as Type);
+                setFilters({});
                 setPage(1);
               }}
             />
           </div>
-        ) : null}
-        <div className="min-w-0">
-          <DDropdown
-            placement="bottom-start"
-            contentRole="dialog"
-            trigger={() => (
-              <DButton variant="secondary">
-                <Filter aria-hidden="true" className="mr-2 size-4" />
-                {copy('Filters')}
-                {activeCount ? ` (${activeCount})` : ''}
-              </DButton>
-            )}
-          >
-            <div className="w-[320px] space-y-3 p-3">
-              {type === 'transactions' ? (
-                <DInput
-                  label={copy('Search transaction or invoice number')}
-                  value={filters.search ?? ''}
-                  onChange={(v) => update('search', v)}
-                />
-              ) : null}
-              {type === 'attendance' ? (
-                <DInput
-                  label={copy('Search employee code or name')}
-                  value={filters.search ?? ''}
-                  onChange={(v) => update('search', v)}
-                />
-              ) : null}
-              {type === 'tax' ? (
-                <DInput
-                  label={copy('Tax code')}
-                  value={filters.taxCode ?? ''}
-                  onChange={(v) => update('taxCode', v)}
-                />
-              ) : null}
-              {optionFilters[type].map(([k, l, o]) => (
-                <DSelect
-                  key={k}
-                  label={copy(l)}
-                  value={filters[k] ?? ''}
-                  options={o}
-                  onChange={(v) => update(k, String(v ?? ''))}
-                />
-              ))}
-              {activeCount ? (
-                <DButton
-                  variant="secondary"
-                  onClick={() => {
-                    setFilters({});
-                    setPage(1);
-                  }}
-                >
-                  {copy('Clear filters')}
-                </DButton>
-              ) : null}
+          <div className="min-w-0">
+            <DRangeDatePicker
+              label={copy('Period')}
+              value={{ start: from, end: to }}
+              onChange={(range) => {
+                setFrom(range.start ?? initial.from);
+                setTo(range.end ?? initial.to);
+                setPage(1);
+              }}
+            />
+          </div>
+          {locationScoped ? (
+            <div className="min-w-0">
+              <DSelect
+                label={copy('Location')}
+                value={locationId}
+                options={[
+                  {
+                    value: '',
+                    label: copy(
+                      locations.data?.organizationWide ? 'All locations' : 'Select location',
+                    ),
+                  },
+                  ...(locations.data?.locations ?? []).map((i) => ({
+                    value: i.id,
+                    label: option(i),
+                  })),
+                ]}
+                onChange={(v) => {
+                  setLocationId(String(v ?? ''));
+                  setPage(1);
+                }}
+              />
             </div>
-          </DDropdown>
-        </div>
-      </div>
-      {activeFilters.length ? (
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          {activeFilters.map(({ key, label }) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => update(key, '')}
-              className="inline-flex h-7 items-center gap-1 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-2.5 text-xs text-[var(--color-text-muted)] transition-colors hover:border-[var(--color-brand)] hover:text-[var(--color-brand)]"
-            >
-              <span>{label}</span>
-              <span aria-hidden="true" className="text-sm leading-none">
-                ×
-              </span>
-            </button>
+          ) : null}
+          {type === 'transactions' ? (
+            <DInput
+              label={copy('Search transaction or invoice number')}
+              value={filters.search ?? ''}
+              onChange={(v) => update('search', v)}
+            />
+          ) : null}
+          {type === 'attendance' ? (
+            <DInput
+              label={copy('Search employee code or name')}
+              value={filters.search ?? ''}
+              onChange={(v) => update('search', v)}
+            />
+          ) : null}
+          {type === 'tax' ? (
+            <DInput
+              label={copy('Tax code')}
+              value={filters.taxCode ?? ''}
+              onChange={(v) => update('taxCode', v)}
+            />
+          ) : null}
+          {optionFilters[type].map(([k, l, o]) => (
+            <DSelect
+              key={k}
+              label={copy(l)}
+              value={filters[k] ?? ''}
+              options={o}
+              onChange={(v) => update(k, String(v ?? ''))}
+            />
           ))}
-          <button
-            type="button"
-            onClick={() => {
-              setFilters({});
-              setPage(1);
-            }}
-            className="h-7 px-1 text-xs font-medium text-[var(--color-brand)]"
-          >
-            {copy('Clear filters')}
-          </button>
         </div>
-      ) : null}
+        <div className="mt-4 flex flex-col gap-3 border-t border-[var(--color-border)] pt-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-muted)]">
+            <span>
+              {from} - {to}
+            </span>
+            <span aria-hidden="true">|</span>
+            <span>
+              {locationScoped
+                ? locationId
+                  ? option(
+                      locations.data?.locations.find((location) => location.id === locationId) ?? {
+                        id: locationId,
+                        code: locationId,
+                      },
+                    )
+                  : copy(locations.data?.organizationWide ? 'All locations' : 'Select location')
+                : copy('Attendance')}
+            </span>
+            <span aria-hidden="true">|</span>
+            <span>
+              {data?.total ?? 0} {copy('records')}
+            </span>
+            {activeFilters.map(({ key, label }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => update(key, '')}
+                className="inline-flex h-7 items-center gap-1 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-2.5 text-xs text-[var(--color-text-muted)] transition-colors hover:border-[var(--color-brand)] hover:text-[var(--color-brand)]"
+              >
+                <span>{label}</span>
+                <span aria-hidden="true" className="text-sm leading-none">
+                  ×
+                </span>
+              </button>
+            ))}
+          </div>
+          <DButton variant="secondary" size="sm" onClick={resetFilters}>
+            {copy('Reset filters')}
+          </DButton>
+        </div>
+      </section>
       <section
         className={`mt-5 grid gap-3 md:grid-cols-2 ${
           type === 'attendance' ? 'xl:grid-cols-5' : 'lg:grid-cols-4'
@@ -862,35 +846,39 @@ export function ReportsPage() {
             />
           ))}
       </section>
-      <section className="mt-5 grid gap-4 lg:grid-cols-3">
-        <AnalyticsLineChart
-          title={copy(visual.trend)}
-          subtitle={`${copy('Selected period')}: ${from} — ${to}`}
-          data={data?.analytics.trend ?? []}
-          formatValue={(v) =>
-            type === 'attendance' ? integer(Number(v)) : formatMoney(v, 'IDR')
-          }
-          emptyMessage={empty}
-          pointsLabel={copy('data points')}
-        />
-        {visual.insights.length ? (
-          <div className="grid content-start gap-4">
-            {visual.insights.map(([k, l]) => {
-              const points = localized(k);
-              return points.length ? (
-                <AnalyticsDonutChart
-                  key={k}
-                  title={copy(l)}
-                  data={points}
-                  emptyMessage={empty}
-                  totalLabel={copy('Total')}
-                  formatValue={integer}
-                />
-              ) : null;
-            })}
-          </div>
-        ) : null}
-      </section>
+      {visual.trend || visual.insights.length ? (
+        <section className="mt-5 grid gap-4 lg:grid-cols-3">
+          {visual.trend ? (
+            <AnalyticsLineChart
+              title={copy(visual.trend)}
+              subtitle={`${copy('Selected period')}: ${from} — ${to}`}
+              data={data?.analytics.trend ?? []}
+              formatValue={(v) =>
+                type === 'attendance' ? integer(Number(v)) : formatMoney(v, 'IDR')
+              }
+              emptyMessage={empty}
+              pointsLabel={copy('data points')}
+            />
+          ) : null}
+          {visual.insights.length ? (
+            <div className="grid content-start gap-4">
+              {visual.insights.map(([k, l]) => {
+                const points = localized(k);
+                return points.length ? (
+                  <AnalyticsDonutChart
+                    key={k}
+                    title={copy(l)}
+                    data={points}
+                    emptyMessage={empty}
+                    totalLabel={copy('Total')}
+                    formatValue={integer}
+                  />
+                ) : null;
+              })}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
       {visual.ranking && data?.analytics.ranking.length ? (
         <section className="mt-4 grid gap-4 lg:grid-cols-3">
           <AnalyticsHorizontalBarChart

@@ -57,13 +57,17 @@ const workforceCopy: Record<string, { id: string; en: string }> = {
   },
   'Position added.': { id: 'Jabatan ditambahkan.', en: 'Position added.' },
   'Position updated.': { id: 'Jabatan diperbarui.', en: 'Position updated.' },
-  'Could not save position.': { id: 'Jabatan tidak dapat disimpan.', en: 'Could not save position.' },
+  'Could not save position.': {
+    id: 'Jabatan tidak dapat disimpan.',
+    en: 'Could not save position.',
+  },
   'Deactivate position': { id: 'Nonaktifkan jabatan', en: 'Deactivate position' },
   'Reactivate position': { id: 'Aktifkan kembali jabatan', en: 'Reactivate position' },
-  'Existing historical assignments remain unchanged. New service assignments require an active eligible position.': {
-    id: 'Penugasan historis tetap tidak berubah. Penugasan jasa baru memerlukan jabatan aktif yang diizinkan.',
-    en: 'Existing historical assignments remain unchanged. New service assignments require an active eligible position.',
-  },
+  'Existing historical assignments remain unchanged. New service assignments require an active eligible position.':
+    {
+      id: 'Penugasan historis tetap tidak berubah. Penugasan jasa baru memerlukan jabatan aktif yang diizinkan.',
+      en: 'Existing historical assignments remain unchanged. New service assignments require an active eligible position.',
+    },
   'Select position': { id: 'Pilih jabatan', en: 'Select position' },
   'All positions': { id: 'Semua jabatan', en: 'All positions' },
   'Attendance date': { id: 'Tanggal absensi', en: 'Attendance date' },
@@ -111,14 +115,16 @@ const workforceCopy: Record<string, { id: string; en: string }> = {
     id: 'Belum ada absensi untuk tanggal ini.',
     en: 'No attendance has been recorded for this date.',
   },
-  'Attendance is recorded by authorized supervisors or managers. HRIS-sourced records remain read-only locally.': {
-    id: 'Absensi dicatat oleh atasan yang berwenang. Data yang bersumber dari HRIS tetap hanya-baca secara lokal.',
-    en: 'Attendance is recorded by authorized supervisors or managers. HRIS-sourced records remain read-only locally.',
-  },
-  'Review the daily roster, find an employee quickly, and record attendance without leaving this view.': {
-    id: 'Tinjau daftar karyawan harian, temukan karyawan dengan cepat, dan catat absensi tanpa meninggalkan halaman ini.',
-    en: 'Review the daily roster, find an employee quickly, and record attendance without leaving this view.',
-  },
+  'Attendance is recorded by authorized supervisors or managers. HRIS-sourced records remain read-only locally.':
+    {
+      id: 'Absensi dicatat oleh atasan yang berwenang. Data yang bersumber dari HRIS tetap hanya-baca secara lokal.',
+      en: 'Attendance is recorded by authorized supervisors or managers. HRIS-sourced records remain read-only locally.',
+    },
+  'Review the daily roster, find an employee quickly, and record attendance without leaving this view.':
+    {
+      id: 'Tinjau daftar karyawan harian, temukan karyawan dengan cepat, dan catat absensi tanpa meninggalkan halaman ini.',
+      en: 'Review the daily roster, find an employee quickly, and record attendance without leaving this view.',
+    },
   'Review attendance history by day, month, or a custom date range.': {
     id: 'Tinjau riwayat absensi berdasarkan hari, bulan, atau rentang tanggal tertentu.',
     en: 'Review attendance history by day, month, or a custom date range.',
@@ -143,10 +149,15 @@ const workforceCopy: Record<string, { id: string; en: string }> = {
     id: 'Belum ada riwayat absensi.',
     en: 'No attendance history is available.',
   },
-  'Service eligibility is controlled by the employee position. Catalog service assignment mode still decides whether assignment is optional or required.': {
-    id: 'Kelayakan mengerjakan jasa dikontrol oleh jabatan karyawan. Mode penugasan pada katalog jasa tetap menentukan apakah penugasan opsional atau wajib.',
-    en: 'Service eligibility is controlled by the employee position. Catalog service assignment mode still decides whether assignment is optional or required.',
+  'Could not load attendance history.': {
+    id: 'Riwayat absensi tidak dapat dimuat.',
+    en: 'Could not load attendance history.',
   },
+  'Service eligibility is controlled by the employee position. Catalog service assignment mode still decides whether assignment is optional or required.':
+    {
+      id: 'Kelayakan mengerjakan jasa dikontrol oleh jabatan karyawan. Mode penugasan pada katalog jasa tetap menentukan apakah penugasan opsional atau wajib.',
+      en: 'Service eligibility is controlled by the employee position. Catalog service assignment mode still decides whether assignment is optional or required.',
+    },
 };
 
 export function useWorkforceLocalization() {

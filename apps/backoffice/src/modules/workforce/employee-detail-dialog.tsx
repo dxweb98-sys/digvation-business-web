@@ -2,23 +2,31 @@ import {
   DBadge,
   DButton,
   DDataTable,
+  DDatePicker,
   DDialog,
+  DSelect,
   DSkeleton,
   type TableColumn,
 } from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
 import { UserRound } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 
-import {
-  type AttendanceStatus,
-  type Employee,
-  type EmployeeDetail,
-  type EmployeeStatusHistoryEntry,
+import type {
   EmployeesApi,
+  AttendanceStatus,
+  Employee,
+  EmployeeAttendance,
+  EmployeeDetail,
+  EmployeeStatusHistoryEntry,
 } from './employees-api';
 import { AttendanceBadge } from './attendance-panel';
 import { useWorkforceLocalization } from './workforce-localization';
+
+type AttendancePeriodMode = 'DAY' | 'MONTH' | 'RANGE';
+type AttendanceStatusFilter = 'ALL' | AttendanceStatus;
+
+const attendanceStatuses: AttendanceStatus[] = ['PRESENT', 'ABSENT', 'LEAVE', 'SICK'];
 
 export function EmployeeDetailDialog({
   open,
@@ -37,28 +45,95 @@ export function EmployeeDetailDialog({
   attendanceEnabled: boolean;
   onClose: () => void;
 }) {
-  const { copy, formatDate } = useWorkforceLocalization();
-  const month = currentMonthRange();
+  const { copy, formatDate, locale } = useWorkforceLocalization();
+  const today = dateKey(new Date());
+  const [attendanceMode, setAttendanceMode] = useState<AttendancePeriodMode>('MONTH');
+  const [attendanceDay, setAttendanceDay] = useState(today);
+  const [attendanceMonth, setAttendanceMonth] = useState(today.slice(0, 7));
+  const [attendanceFrom, setAttendanceFrom] = useState(startOfMonth(today));
+  const [attendanceTo, setAttendanceTo] = useState(today);
+  const [attendanceStatus, setAttendanceStatus] = useState<AttendanceStatusFilter>('ALL');
+  const [attendanceOffset, setAttendanceOffset] = useState(0);
+  const [attendancePageSize, setAttendancePageSize] = useState(20);
+  const attendanceRange = useMemo(
+    () =>
+      resolveAttendanceRange({
+        mode: attendanceMode,
+        day: attendanceDay,
+        month: attendanceMonth,
+        from: attendanceFrom,
+        to: attendanceTo,
+      }),
+    [attendanceDay, attendanceFrom, attendanceMode, attendanceMonth, attendanceTo],
+  );
+  const monthOptions = useMemo(
+    () => createMonthOptions(locale === 'id' ? 'id-ID' : 'en-US'),
+    [locale],
+  );
+
   const attendance = useQuery({
-    queryKey: ['employees', 'detail-attendance', employee?.id, month.from, month.to],
+    queryKey: [
+      'employees',
+      'detail-attendance',
+      employee?.id,
+      attendanceRange.from,
+      attendanceRange.to,
+      attendanceStatus,
+      attendanceOffset,
+      attendancePageSize,
+    ],
     queryFn: () =>
       api.listAttendance({
         employeeId: employee!.id,
-        from: month.from,
-        to: month.to,
-        limit: 100,
-        offset: 0,
+        from: attendanceRange.from,
+        to: attendanceRange.to,
+        ...(attendanceStatus !== 'ALL' ? { status: attendanceStatus } : {}),
+        limit: attendancePageSize,
+        offset: attendanceOffset,
       }),
     enabled: Boolean(open && employee && attendanceEnabled),
   });
 
-  const counts: Record<AttendanceStatus, number> = {
+  const attendanceCounts = useQuery({
+    queryKey: [
+      'employees',
+      'detail-attendance',
+      'counts',
+      employee?.id,
+      attendanceRange.from,
+      attendanceRange.to,
+    ],
+    queryFn: async () => {
+      const pages = await Promise.all(
+        attendanceStatuses.map((status) =>
+          api.listAttendance({
+            employeeId: employee!.id,
+            from: attendanceRange.from,
+            to: attendanceRange.to,
+            status,
+            limit: 1,
+            offset: 0,
+          }),
+        ),
+      );
+      return attendanceStatuses.reduce<Record<AttendanceStatus, number>>(
+        (result, status, index) => {
+          result[status] = pages[index]?.total ?? 0;
+          return result;
+        },
+        { PRESENT: 0, ABSENT: 0, LEAVE: 0, SICK: 0 },
+      );
+    },
+    enabled: Boolean(open && employee && attendanceEnabled),
+  });
+
+  const counts = attendanceCounts.data ?? {
     PRESENT: 0,
     ABSENT: 0,
     LEAVE: 0,
     SICK: 0,
   };
-  for (const record of attendance.data?.items ?? []) counts[record.status] += 1;
+  const totalRecords = counts.PRESENT + counts.ABSENT + counts.LEAVE + counts.SICK;
 
   return (
     <DDialog
@@ -95,7 +170,10 @@ export function EmployeeDetailDialog({
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex min-w-0 items-start gap-3">
                   <div className="grid size-12 shrink-0 place-items-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
-                    <UserRound aria-hidden="true" className="size-5 text-[var(--color-text-muted)]" />
+                    <UserRound
+                      aria-hidden="true"
+                      className="size-5 text-[var(--color-text-muted)]"
+                    />
                   </div>
                   <div className="min-w-0">
                     <p className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
@@ -132,7 +210,10 @@ export function EmployeeDetailDialog({
               <DetailGrid>
                 <Field label={copy('Employee code')} value={employee.code} />
                 <Field label={copy('Display name')} value={employee.displayName} />
-                <Field label={copy('Position')} value={employee.position?.name ?? copy('Not set')} />
+                <Field
+                  label={copy('Position')}
+                  value={employee.position?.name ?? copy('Not set')}
+                />
                 <Field
                   label={copy('Service assignment')}
                   value={
@@ -170,22 +251,142 @@ export function EmployeeDetailDialog({
 
             {attendanceEnabled ? (
               <DetailCard
-                title={copy('Attendance summary')}
-                description={copy('This month')}
+                title={copy('Attendance history')}
+                description={copy(
+                  'Review attendance history by day, month, or a custom date range.',
+                )}
               >
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  <SummaryFact label={copy('Present')} value={String(counts.PRESENT)} />
-                  <SummaryFact label={copy('Absent')} value={String(counts.ABSENT)} />
-                  <SummaryFact label={copy('Leave')} value={String(counts.LEAVE)} />
-                  <SummaryFact label={copy('Sick')} value={String(counts.SICK)} />
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <DSelect
+                    label={copy('Period')}
+                    value={attendanceMode}
+                    clearable={false}
+                    options={[
+                      { value: 'DAY', label: copy('Daily') },
+                      { value: 'MONTH', label: copy('Monthly') },
+                      { value: 'RANGE', label: copy('Date range') },
+                    ]}
+                    onValueChange={(value) => {
+                      setAttendanceMode(value as AttendancePeriodMode);
+                      setAttendanceOffset(0);
+                    }}
+                  />
+
+                  {attendanceMode === 'DAY' ? (
+                    <DDatePicker
+                      label={copy('Attendance date')}
+                      value={attendanceDay}
+                      onChange={(value) => {
+                        if (!value) return;
+                        setAttendanceDay(value);
+                        setAttendanceOffset(0);
+                      }}
+                      variant="date"
+                    />
+                  ) : null}
+
+                  {attendanceMode === 'MONTH' ? (
+                    <DSelect
+                      label={copy('Month')}
+                      value={attendanceMonth}
+                      clearable={false}
+                      options={monthOptions}
+                      onValueChange={(value) => {
+                        if (typeof value !== 'string') return;
+                        setAttendanceMonth(value);
+                        setAttendanceOffset(0);
+                      }}
+                    />
+                  ) : null}
+
+                  {attendanceMode === 'RANGE' ? (
+                    <>
+                      <DDatePicker
+                        label={copy('From date')}
+                        value={attendanceFrom}
+                        onChange={(value) => {
+                          if (!value) return;
+                          setAttendanceFrom(value);
+                          if (value > attendanceTo) setAttendanceTo(value);
+                          setAttendanceOffset(0);
+                        }}
+                        variant="date"
+                      />
+                      <DDatePicker
+                        label={copy('To date')}
+                        value={attendanceTo}
+                        onChange={(value) => {
+                          if (!value) return;
+                          setAttendanceTo(value);
+                          if (value < attendanceFrom) setAttendanceFrom(value);
+                          setAttendanceOffset(0);
+                        }}
+                        variant="date"
+                      />
+                    </>
+                  ) : null}
+
+                  <DSelect
+                    label={copy('Attendance status')}
+                    value={attendanceStatus}
+                    clearable={false}
+                    options={[
+                      { value: 'ALL', label: copy('All statuses') },
+                      { value: 'PRESENT', label: copy('Present') },
+                      { value: 'ABSENT', label: copy('Absent') },
+                      { value: 'LEAVE', label: copy('Leave') },
+                      { value: 'SICK', label: copy('Sick') },
+                    ]}
+                    onValueChange={(value) => {
+                      setAttendanceStatus(value as AttendanceStatusFilter);
+                      setAttendanceOffset(0);
+                    }}
+                  />
+                </div>
+
+                <p className="mt-4 text-sm font-medium text-[var(--color-text)]">
+                  {attendanceCounts.isLoading ? '—' : totalRecords} {copy('attendance records')}
+                </p>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <SummaryFact
+                    label={copy('Present')}
+                    value={attendanceCounts.isLoading ? '—' : String(counts.PRESENT)}
+                  />
+                  <SummaryFact
+                    label={copy('Absent')}
+                    value={attendanceCounts.isLoading ? '—' : String(counts.ABSENT)}
+                  />
+                  <SummaryFact
+                    label={copy('Leave')}
+                    value={attendanceCounts.isLoading ? '—' : String(counts.LEAVE)}
+                  />
+                  <SummaryFact
+                    label={copy('Sick')}
+                    value={attendanceCounts.isLoading ? '—' : String(counts.SICK)}
+                  />
                 </div>
                 <div className="mt-4">
+                  {attendance.isError || attendanceCounts.isError ? (
+                    <p className="mb-3 text-sm text-[var(--color-text-muted)]">
+                      {copy('Could not load attendance history.')}
+                    </p>
+                  ) : null}
                   <DDataTable
                     columns={attendanceColumns(copy, formatDate)}
                     data={attendance.data?.items ?? []}
                     loading={attendance.isLoading}
                     rowKey="id"
                     emptyMessage={copy('No attendance history is available.')}
+                    pagination={{
+                      page: Math.floor(attendanceOffset / attendancePageSize) + 1,
+                      pageSize: attendancePageSize,
+                      total: attendance.data?.total ?? 0,
+                    }}
+                    onPageChange={(page) => setAttendanceOffset((page - 1) * attendancePageSize)}
+                    onPageSizeChange={(nextPageSize) => {
+                      setAttendancePageSize(nextPageSize);
+                      setAttendanceOffset(0);
+                    }}
                   />
                 </div>
               </DetailCard>
@@ -229,7 +430,7 @@ export function EmployeeDetailDialog({
 function attendanceColumns(
   copy: (value: string) => string,
   formatDate: (value: Date, options?: Intl.DateTimeFormatOptions) => string,
-): TableColumn<import('./employees-api').EmployeeAttendance>[] {
+): TableColumn<EmployeeAttendance>[] {
   return [
     {
       key: 'attendanceDate',
@@ -461,11 +662,45 @@ function addCalendarMonths(date: Date, months: number) {
   );
 }
 
-function currentMonthRange() {
+function resolveAttendanceRange(input: {
+  mode: AttendancePeriodMode;
+  day: string;
+  month: string;
+  from: string;
+  to: string;
+}) {
+  if (input.mode === 'DAY') return { from: input.day, to: input.day };
+  if (input.mode === 'MONTH') return monthRange(input.month);
+  return input.from <= input.to
+    ? { from: input.from, to: input.to }
+    : { from: input.to, to: input.from };
+}
+
+function monthRange(month: string) {
+  const year = Number(month.slice(0, 4));
+  const monthNumber = Number(month.slice(5, 7));
+  const lastDay = new Date(year, monthNumber, 0).getDate();
+  return {
+    from: `${month}-01`,
+    to: `${month}-${String(lastDay).padStart(2, '0')}`,
+  };
+}
+
+function createMonthOptions(locale: string) {
+  const formatter = new Intl.DateTimeFormat(locale, {
+    month: 'long',
+    year: 'numeric',
+  });
   const now = new Date();
-  const from = new Date(now.getFullYear(), now.getMonth(), 1);
-  const to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  return { from: dateKey(from), to: dateKey(to) };
+  return Array.from({ length: 24 }, (unused, index) => {
+    const date = new Date(now.getFullYear(), now.getMonth() - index, 1);
+    const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    return { value, label: formatter.format(date) };
+  });
+}
+
+function startOfMonth(date: string) {
+  return `${date.slice(0, 7)}-01`;
 }
 
 function dateKey(date: Date) {
