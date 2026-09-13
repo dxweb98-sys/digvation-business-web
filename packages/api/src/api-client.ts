@@ -1,9 +1,17 @@
 import { ApiError } from './api-error';
 import type { ApiEnvelope, ApiFailureEnvelope } from './api.types';
 
+export type SessionEndReason = 'idle' | 'invalid';
+export type AccessTokenRefreshResult =
+  | { kind: 'refreshed'; accessToken: string }
+  | { kind: 'deferred' }
+  | { kind: 'ended'; reason: SessionEndReason };
+
 export interface ApiClientOptions {
   baseUrl: string;
-  getAccessToken?: () => Promise<string | null>;
+  getAccessToken?: (forceRefresh?: boolean) => Promise<string | null>;
+  refreshAccessToken?: () => Promise<AccessTokenRefreshResult>;
+  onSessionEnded?: (reason: SessionEndReason) => void;
   onUnauthorized?: () => void;
 }
 
@@ -76,22 +84,40 @@ export class ApiClient {
     });
   }
 
-  private async request<T>(path: string, init: RequestInit): Promise<T> {
+  private async request<T>(path: string, init: RequestInit, mayRefresh = true): Promise<T> {
     const token = await this.options.getAccessToken?.();
     const headers = new Headers(init.headers);
 
     if (token) headers.set('authorization', `Bearer ${token}`);
+    else headers.delete('authorization');
 
     const response = await fetch(`${this.options.baseUrl}${path}`, {
       ...init,
-      credentials: 'omit',
+      credentials: 'include',
       headers,
     });
 
     const payload = (await response.json()) as ApiEnvelope<T> | ApiFailureEnvelope;
 
     if (!response.ok || !payload.success) {
-      if (response.status === 401) this.options.onUnauthorized?.();
+      if (response.status === 401 && mayRefresh) {
+        const latestToken = await this.options.getAccessToken?.();
+        if (latestToken && latestToken !== token) return this.request<T>(path, init, false);
+
+        if (this.options.refreshAccessToken) {
+          const refreshed = await this.options.refreshAccessToken();
+          if (refreshed.kind === 'refreshed') return this.request<T>(path, init, false);
+          if (refreshed.kind === 'ended') this.options.onSessionEnded?.(refreshed.reason);
+        } else if (this.options.getAccessToken) {
+          const refreshedToken = await this.options.getAccessToken(true);
+          if (refreshedToken && refreshedToken !== token)
+            return this.request<T>(path, init, false);
+          this.options.onUnauthorized?.();
+        } else {
+          this.options.onUnauthorized?.();
+        }
+      }
+
       if (!payload.success) {
         throw new ApiError(
           response.status,
