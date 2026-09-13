@@ -13,7 +13,8 @@ export type BackofficeCapability =
   | 'transactions'
   | 'configuration'
   | 'tax'
-  | 'accessControl';
+  | 'accessControl'
+  | 'activity';
 
 export type BackofficeAction =
   | 'createRole'
@@ -92,6 +93,7 @@ const capabilityPermissions: Record<BackofficeCapability, PermissionRequirement>
   configuration: { anyOf: ['business-profile:read', 'locations:read'] },
   tax: { allOf: ['tax:read'] },
   accessControl: { allOf: ['roles:read'] },
+  activity: { allOf: ['activity:read'] },
 };
 
 const actionPermissions: Record<BackofficeAction, readonly string[]> = {

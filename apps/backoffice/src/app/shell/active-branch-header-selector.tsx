@@ -4,7 +4,13 @@ import { Building2, Check, ChevronDown } from 'lucide-react';
 import { useBusinessLocation } from '../providers/business-location-context';
 import { useDashboardI18n } from '../../modules/dashboard/dashboard-i18n';
 
-export function ActiveBranchHeaderSelector() {
+export function ActiveBranchHeaderSelector({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const { locations, selectedLocationId, mainLocationId, isReady, selectLocation } =
     useBusinessLocation();
   const { text } = useDashboardI18n();
@@ -19,6 +25,8 @@ export function ActiveBranchHeaderSelector() {
 
   return (
     <DDropdown
+      open={open}
+      onOpenChange={onOpenChange}
       placement="bottom-start"
       contentPadding={false}
       closeOnItemClick
