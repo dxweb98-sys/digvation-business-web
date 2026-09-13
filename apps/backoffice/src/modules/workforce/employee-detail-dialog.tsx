@@ -4,6 +4,7 @@ import {
   DDataTable,
   DDatePicker,
   DDialog,
+  DRangeDatePicker,
   DSelect,
   DSkeleton,
   type TableColumn,
@@ -300,30 +301,17 @@ export function EmployeeDetailDialog({
                   ) : null}
 
                   {attendanceMode === 'RANGE' ? (
-                    <>
-                      <DDatePicker
-                        label={copy('From date')}
-                        value={attendanceFrom}
-                        onChange={(value) => {
-                          if (!value) return;
-                          setAttendanceFrom(value);
-                          if (value > attendanceTo) setAttendanceTo(value);
-                          setAttendanceOffset(0);
-                        }}
-                        variant="date"
-                      />
-                      <DDatePicker
-                        label={copy('To date')}
-                        value={attendanceTo}
-                        onChange={(value) => {
-                          if (!value) return;
-                          setAttendanceTo(value);
-                          if (value < attendanceFrom) setAttendanceFrom(value);
-                          setAttendanceOffset(0);
-                        }}
-                        variant="date"
-                      />
-                    </>
+                    <DRangeDatePicker
+                      label={copy('Date range')}
+                      value={{ start: attendanceFrom, end: attendanceTo }}
+                      clearable={false}
+                      onChange={(value) => {
+                        if (!value.start || !value.end) return;
+                        setAttendanceFrom(value.start);
+                        setAttendanceTo(value.end);
+                        setAttendanceOffset(0);
+                      }}
+                    />
                   ) : null}
 
                   <DSelect
