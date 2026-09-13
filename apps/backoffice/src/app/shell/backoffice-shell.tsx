@@ -1,7 +1,6 @@
 import { useRuntime } from '@digvation/business-runtime';
 import { DAvatar, DBadge, DButton, DDropdown } from '@digvation/ui';
 import {
-  Bell,
   BadgePercent,
   BookOpen,
   Building2,
@@ -25,6 +24,7 @@ import { useEffect, useState } from 'react';
 import { canAccessBackoffice, type BackofficeCapability } from '../../auth/backoffice-access';
 import { useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import type { BackofficeSession } from '../../auth/auth-session';
+import { NotificationBell } from '../../modules/notifications';
 import {
   type BackofficeMessageKey,
   useBackofficeLocalization,
@@ -46,7 +46,10 @@ const dashboardItem: NavigationItem = {
 };
 
 const activityItem: NavigationItem = {
-  label: 'activity', to: '/activity', icon: ClipboardList, capability: 'activity',
+  label: 'activity',
+  to: '/activity',
+  icon: ClipboardList,
+  capability: 'activity',
 };
 
 const navigationSections: ReadonlyArray<{
@@ -238,9 +241,7 @@ export function BackofficeShell() {
               />
               {t('online')}
             </span>
-            <DButton variant="ghost" size="icon" aria-label={t('notifications')}>
-              <Bell className="size-[18px]" />
-            </DButton>
+            <NotificationBell />
             <DDropdown
               open={accountMenuOpen}
               onOpenChange={setAccountMenuOpen}
@@ -323,9 +324,7 @@ function NavigationGroups({ session }: { session: BackofficeSession }) {
         <NavigationLink item={dashboardItem} />
       </div>
       {navigationSections.map((section) => {
-        const items = section.items.filter((item) =>
-          canAccessBackoffice(session, item.capability),
-        );
+        const items = section.items.filter((item) => canAccessBackoffice(session, item.capability));
         if (!items.length) return null;
         return (
           <div key={section.label} className="mt-3">

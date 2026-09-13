@@ -11,13 +11,11 @@ import { BusinessSettingsPage } from '../../modules/organization';
 import { CatalogPage } from '../../modules/catalog';
 import { TaxPage } from '../../modules/tax';
 import { EmployeesPage } from '../../modules/workforce';
-import {
-  ExpensesPage,
-  FinancialAccountsPage,
-} from '../../modules/finance';
+import { ExpensesPage, FinancialAccountsPage } from '../../modules/finance';
 import { TransactionHistoryPage } from '../../modules/pos';
 import { ReportsPage } from '../../modules/reporting';
 import { ActivityPage } from '../../modules/activity';
+import { NotificationsPage } from '../../modules/notifications';
 
 export const backofficeRouter = createBrowserRouter([
   { path: '/login', element: <BackofficeLoginPage /> },
@@ -76,6 +74,7 @@ export const backofficeRouter = createBrowserRouter([
             element: <AuthorizedRoute capability="accessControl" />,
             children: [{ path: '/access-control', element: <AccessControlPage /> }],
           },
+          { path: '/notifications', element: <NotificationsPage /> },
           { path: '/unauthorized', element: <UnauthorizedPage /> },
         ],
       },
