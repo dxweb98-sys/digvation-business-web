@@ -107,7 +107,7 @@ export function OperationalExpensesPage() {
       <div className="p-5 md:p-6 lg:p-8">
         <DConnectionError
           title={copy('Could not load expenses.')}
-          message={copy('Try loading transaction history again.')}
+          message={copy('Try loading expenses again.')}
           onRetry={() => void expenses.refetch()}
         />
       </div>
@@ -231,7 +231,7 @@ export function OperationalExpensesPage() {
             value={categoryCode}
             onChange={setCategoryCode}
           />
-          <DInput label={copy('Amount')} value={amount} onChange={setAmount} inputMode="decimal" />
+          <DInput label={copy('Amount')} value={amount} onChange={setAmount} />
           <DInput label={copy('Note')} value={note} onChange={setNote} />
         </div>
       </DDialog>
