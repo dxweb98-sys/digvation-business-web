@@ -20,6 +20,7 @@ export type BackofficeAction =
   | 'updateRole'
   | 'manageRolePermissions'
   | 'viewUsers'
+  | 'inviteUsers'
   | 'manageUserRoles'
   | 'viewOperationalAccess'
   | 'manageOperationalAccess'
@@ -98,6 +99,7 @@ const actionPermissions: Record<BackofficeAction, readonly string[]> = {
   updateRole: ['roles:update'],
   manageRolePermissions: ['roles:permissions'],
   viewUsers: ['users:read'],
+  inviteUsers: ['users:invite'],
   manageUserRoles: ['users:roles'],
   viewOperationalAccess: ['operational-access:read'],
   manageOperationalAccess: ['operational-access:update'],
