@@ -188,7 +188,7 @@ function TaxProfileSection({
             checked={itemTaxEnabled}
             onChange={setItemTaxEnabled}
             disabled={!canUpdate}
-            aria-label={tax('itemTax')}
+            ariaLabel={tax('itemTax')}
           />
         </div>
         <div className="flex items-center justify-between gap-5 py-4">
@@ -200,7 +200,7 @@ function TaxProfileSection({
             checked={transactionTaxEnabled}
             onChange={setTransactionTaxEnabled}
             disabled={!canUpdate}
-            aria-label={tax('transactionTax')}
+            ariaLabel={tax('transactionTax')}
           />
         </div>
       </div>
@@ -674,7 +674,6 @@ function taxApiMessage(
   if (normalized.code === 'DOMAIN_VALIDATION_ERROR' || normalized.code === 'BAD_REQUEST')
     return tax('invalidInput');
   if (normalized.code === 'FORBIDDEN' || normalized.status === 403) return tax('forbidden');
-  if (normalized.code === 'SERVICE_UNAVAILABLE' || normalized.status === 503)
-    return tax('serverError');
+  if (normalized.status >= 500) return tax('serverError');
   return normalized.safeMessage || tax(fallback);
 }
