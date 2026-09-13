@@ -1,1 +1,1 @@
-export { BusinessSettingsPage } from './business-settings-page';
+export { BusinessConfigurationPage as BusinessSettingsPage } from './business-configuration-page';
