@@ -55,16 +55,13 @@ const eventLabels: Record<string, string> = {
   ATTENDANCE_UPDATED: 'Attendance updated',
   EMPLOYEE_CREATED: 'Employee created',
   EMPLOYEE_UPDATED: 'Employee updated',
-  FINANCIAL_ACCOUNT_CREATED: 'Financial account created',
-  FINANCIAL_ACCOUNT_UPDATED: 'Financial account updated',
-  PAYMENT_ROUTE_CREATED: 'Payment route created',
-  PAYMENT_ROUTE_UPDATED: 'Payment route updated',
-  CASH_MOVEMENT_CREATED: 'Cash movement created',
-  SETTLEMENT_CREATED: 'Settlement created',
-  SETTLEMENT_COMPLETED: 'Settlement completed',
-  SETTLEMENT_CANCELLED: 'Settlement cancelled',
-  RECONCILIATION_CREATED: 'Reconciliation created',
-  RECONCILIATION_UPDATED: 'Reconciliation updated',
+  FINANCIAL_ACCOUNT_CREATED: 'Financial account added.',
+  FINANCIAL_ACCOUNT_UPDATED: 'Financial account updated.',
+  PAYMENT_ROUTE_CREATED: 'Payment route added.',
+  PAYMENT_ROUTE_UPDATED: 'Payment route updated.',
+  CASH_MOVEMENT_CREATED: 'Cash movement recorded.',
+  SETTLEMENT_CREATED: 'Settlement created.',
+  RECONCILIATION_CREATED: 'Reconciliation recorded.',
   OWNER_PROVISIONED: 'Owner provisioned',
   OWNER_GRANTED: 'Owner role granted',
   OWNER_REVOKED: 'Owner role revoked',
@@ -84,6 +81,11 @@ const eventLabels: Record<string, string> = {
   LOCATION_ACCESS_GRANTED: 'Location access granted',
   LOCATION_ACCESS_REVOKED: 'Location access revoked',
 };
+const compositeEventLabels: Record<string, readonly string[]> = {
+  SETTLEMENT_COMPLETED: ['Settlement', 'COMPLETED'],
+  SETTLEMENT_CANCELLED: ['Settlement', 'CANCELLED'],
+  RECONCILIATION_UPDATED: ['Reconciliation', 'Updated'],
+};
 const targetTypeLabels: Record<string, string> = {
   EXPENSE: 'Expense',
   INVITATION: 'User invitation',
@@ -98,9 +100,9 @@ const targetTypeLabels: Record<string, string> = {
   CATALOG_PRICE: 'Price',
   EMPLOYEE: 'Employee',
   EMPLOYEE_POSITION: 'Employee position',
-  FINANCIAL_ACCOUNT: 'Financial account',
-  PAYMENT_ROUTE: 'Payment route',
-  CASH_MOVEMENT: 'Cash movement',
+  FINANCIAL_ACCOUNT: 'Financial Account',
+  PAYMENT_ROUTE: 'Payment routing',
+  CASH_MOVEMENT: 'Cash movements',
   SETTLEMENT: 'Settlement',
   RECONCILIATION: 'Reconciliation',
 };
@@ -265,5 +267,7 @@ function options(items: readonly ActivityEvent[], id: (item: ActivityEvent) => s
 }
 
 function eventLabel(value: string, copy: (value: string) => string) {
+  const composite = compositeEventLabels[value];
+  if (composite) return composite.map(copy).join(' · ');
   return copy(eventLabels[value] ?? value.split('_').map((part) => part[0] + part.slice(1).toLowerCase()).join(' '));
 }
