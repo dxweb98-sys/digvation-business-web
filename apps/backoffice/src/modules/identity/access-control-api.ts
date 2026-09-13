@@ -19,6 +19,19 @@ export interface AccessUser {
   roles: AccessRole[];
 }
 
+export interface UserInvitation {
+  id: string;
+  phoneE164: string;
+  username: string | null;
+  displayName: string;
+  expiresAt: string;
+  resendAvailableAt: string;
+  acceptedAt: string | null;
+  revokedAt: string | null;
+  createdAt: string;
+  roles: AccessRole[];
+}
+
 export interface Page<T> {
   items: T[];
   total?: number;
@@ -46,6 +59,25 @@ export class AccessControlApi {
     return this.client.get<Page<AccessUser>>(
       `/api/v1/users?limit=${page.limit}&offset=${page.offset}`,
     );
+  }
+  listInvitations(page: PageRequest) {
+    return this.client.get<Page<UserInvitation>>(
+      `/api/v1/user-invitations?limit=${page.limit}&offset=${page.offset}`,
+    );
+  }
+  createInvitation(input: {
+    phoneE164: string;
+    username?: string;
+    displayName: string;
+    roleIds: string[];
+  }) {
+    return this.client.post<UserInvitation>('/api/v1/user-invitations', input);
+  }
+  resendInvitation(id: string) {
+    return this.client.post<UserInvitation>(`/api/v1/user-invitations/${id}/resend`, {});
+  }
+  revokeInvitation(id: string) {
+    return this.client.post<UserInvitation>(`/api/v1/user-invitations/${id}/revoke`, {});
   }
   createRole(input: { code: string; name: string; permissions: string[] }) {
     return this.client.post<AccessRole>('/api/v1/roles', input);
