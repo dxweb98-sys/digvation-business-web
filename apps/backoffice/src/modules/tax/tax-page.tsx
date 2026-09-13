@@ -132,7 +132,7 @@ function TaxProfileSection({
   api,
   onChanged,
 }: {
-  profile?: TaxProfile;
+  profile: TaxProfile | undefined;
   loading: boolean;
   canUpdate: boolean;
   api: TaxApi;
@@ -150,8 +150,14 @@ function TaxProfileSection({
     setTransactionTaxEnabled(profile.transactionTaxEnabled);
   }, [profile]);
 
+  const changed = Boolean(
+    profile &&
+      (itemTaxEnabled !== profile.itemTaxEnabled ||
+        transactionTaxEnabled !== profile.transactionTaxEnabled),
+  );
+
   const save = async () => {
-    if (!profile || saving) return;
+    if (!profile || saving || !changed) return;
     setSaving(true);
     try {
       await api.updateProfile(profile, { itemTaxEnabled, transactionTaxEnabled });
@@ -177,41 +183,48 @@ function TaxProfileSection({
     );
 
   return (
-    <div className="max-w-3xl">
-      <div className="divide-y divide-[var(--color-border)] border-y border-[var(--color-border)]">
-        <div className="flex items-center justify-between gap-5 py-4">
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-[var(--color-text)]">{tax('itemTax')}</p>
-            <p className="mt-1 text-sm text-[var(--color-text-muted)]">{tax('itemTaxHint')}</p>
+    <section className="max-w-3xl rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 sm:p-6">
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          void save();
+        }}
+      >
+        <div className="divide-y divide-[var(--color-border)]">
+          <div className="flex items-center justify-between gap-5 py-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-[var(--color-text)]">{tax('itemTax')}</p>
+              <p className="mt-1 text-sm text-[var(--color-text-muted)]">{tax('itemTaxHint')}</p>
+            </div>
+            <DToggle
+              checked={itemTaxEnabled}
+              onChange={setItemTaxEnabled}
+              disabled={!canUpdate}
+              ariaLabel={tax('itemTax')}
+            />
           </div>
-          <DToggle
-            checked={itemTaxEnabled}
-            onChange={setItemTaxEnabled}
-            disabled={!canUpdate}
-            ariaLabel={tax('itemTax')}
-          />
-        </div>
-        <div className="flex items-center justify-between gap-5 py-4">
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-[var(--color-text)]">{tax('transactionTax')}</p>
-            <p className="mt-1 text-sm text-[var(--color-text-muted)]">{tax('transactionTaxHint')}</p>
+          <div className="flex items-center justify-between gap-5 py-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-[var(--color-text)]">{tax('transactionTax')}</p>
+              <p className="mt-1 text-sm text-[var(--color-text-muted)]">{tax('transactionTaxHint')}</p>
+            </div>
+            <DToggle
+              checked={transactionTaxEnabled}
+              onChange={setTransactionTaxEnabled}
+              disabled={!canUpdate}
+              ariaLabel={tax('transactionTax')}
+            />
           </div>
-          <DToggle
-            checked={transactionTaxEnabled}
-            onChange={setTransactionTaxEnabled}
-            disabled={!canUpdate}
-            ariaLabel={tax('transactionTax')}
-          />
         </div>
-      </div>
-      {canUpdate && profile ? (
-        <div className="mt-4 flex justify-end">
-          <DButton onClick={() => void save()} disabled={saving}>
-            {tax('saveProfile')}
-          </DButton>
-        </div>
-      ) : null}
-    </div>
+        {canUpdate && profile ? (
+          <div className="mt-5 flex justify-end border-t border-[var(--color-border)] pt-4">
+            <DButton type="submit" loading={saving} disabled={!changed}>
+              {tax('saveProfile')}
+            </DButton>
+          </div>
+        ) : null}
+      </form>
+    </section>
   );
 }
 
@@ -611,7 +624,7 @@ function TaxRuleDialog({
               value: category.id,
               label: `${category.code} — ${category.name}`,
             }))}
-            onValueChange={setCategoryId}
+            onValueChange={(value) => setCategoryId(value == null ? '' : String(value))}
           />
         ) : null}
         <DInput label={tax('code')} value={code} onChange={(value) => setCode(value.toUpperCase())} />
@@ -631,7 +644,7 @@ function TaxRuleDialog({
           label={`${tax('effectiveFrom')} (${tax('optional')})`}
           variant="date-time"
           value={effectiveFrom}
-          onChange={setEffectiveFrom}
+          onChange={(value) => setEffectiveFrom(value == null ? '' : String(value))}
           onClear={() => setEffectiveFrom('')}
           clearable
         />
@@ -639,7 +652,7 @@ function TaxRuleDialog({
           label={`${tax('effectiveUntil')} (${tax('optional')})`}
           variant="date-time"
           value={effectiveUntil}
-          onChange={setEffectiveUntil}
+          onChange={(value) => setEffectiveUntil(value == null ? '' : String(value))}
           onClear={() => setEffectiveUntil('')}
           clearable
           error={periodInvalid ? tax('invalidPeriod') : undefined}
@@ -674,6 +687,6 @@ function taxApiMessage(
   if (normalized.code === 'DOMAIN_VALIDATION_ERROR' || normalized.code === 'BAD_REQUEST')
     return tax('invalidInput');
   if (normalized.code === 'FORBIDDEN' || normalized.status === 403) return tax('forbidden');
-  if (normalized.status >= 500) return tax('serverError');
+  if (normalized.status !== null && normalized.status >= 500) return tax('serverError');
   return normalized.safeMessage || tax(fallback);
 }
