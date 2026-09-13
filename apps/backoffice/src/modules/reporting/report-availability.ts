@@ -54,7 +54,11 @@ const DASHBOARD_REPORT: Record<DashboardWidget, ReportType> = {
   BUSINESS_INSIGHT: 'business-performance',
 };
 
-/** Availability is entitlement/permission composition only, without tenant hide preferences. */
+/**
+ * Report visibility is derived from the effective runtime composition only.
+ * Effective permissions have already been intersected with product,
+ * capability, foundation and RBAC availability by Business Runtime.
+ */
 export function isReportAvailable(
   session: BackofficeSession | null,
   type: ReportType,
@@ -69,17 +73,12 @@ export function isReportAvailable(
   return true;
 }
 
-/**
- * UI composition only. Business preferences may hide an otherwise available
- * report, but never grant an unavailable report. Backend report guards remain
- * the final authority.
- */
+/** Compatibility name used by report routes and selectors. */
 export function canAccessReport(
   session: BackofficeSession | null,
   type: ReportType,
 ): boolean {
-  if (!isReportAvailable(session, type)) return false;
-  return !session!.businessConfiguration?.experience.hiddenReports.includes(type);
+  return isReportAvailable(session, type);
 }
 
 export function isDashboardWidgetAvailable(
@@ -89,12 +88,10 @@ export function isDashboardWidgetAvailable(
   return isReportAvailable(session, DASHBOARD_REPORT[widget]);
 }
 
+/** All dashboard contributions for enabled features are shown. */
 export function canShowDashboardWidget(
   session: BackofficeSession | null,
   widget: DashboardWidget,
 ): boolean {
-  if (!isDashboardWidgetAvailable(session, widget)) return false;
-  return !session!.businessConfiguration?.experience.hiddenDashboardWidgets.includes(
-    widget,
-  );
+  return isDashboardWidgetAvailable(session, widget);
 }
