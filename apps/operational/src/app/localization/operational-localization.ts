@@ -53,6 +53,10 @@ const copy: Record<string, { 'id-ID': string; 'en-US': string }> = {
     'id-ID': 'Pengeluaran tidak dapat dimuat.',
     'en-US': 'Could not load expenses.',
   },
+  'Try loading expenses again.': {
+    'id-ID': 'Coba muat ulang pengeluaran.',
+    'en-US': 'Try loading expenses again.',
+  },
   'Expense submitted.': { 'id-ID': 'Pengeluaran diajukan.', 'en-US': 'Expense submitted.' },
   'Could not submit expense.': {
     'id-ID': 'Pengeluaran tidak dapat diajukan.',
@@ -73,7 +77,6 @@ const copy: Record<string, { 'id-ID': string; 'en-US': string }> = {
   },
   Close: { 'id-ID': 'Tutup', 'en-US': 'Close' },
   Logout: { 'id-ID': 'Keluar', 'en-US': 'Logout' },
-  Account: { 'id-ID': 'Akun', 'en-US': 'Account' },
 };
 
 export function useOperationalLocalization() {
