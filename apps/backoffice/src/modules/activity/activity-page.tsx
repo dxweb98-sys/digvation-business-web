@@ -93,8 +93,10 @@ const eventLabels: Record<string, string> = {
   OWNER_GRANTED: 'Owner role granted',
   OWNER_REVOKED: 'Owner role revoked',
   INVITATION_CREATED: 'User invitation created',
+  INVITATION_RESENT: 'User invitation resent',
   INVITATION_REVOKED: 'User invitation revoked',
   INVITATION_ACCEPTED: 'User invitation accepted',
+  USER_UPDATED: 'User updated',
   USER_ENABLED: 'User enabled',
   USER_DISABLED: 'User disabled',
   USER_ROLES_CHANGED: 'User roles changed',
@@ -160,6 +162,14 @@ const localizedActivityCopy: Record<string, { id: string; en: string }> = {
   'Localization and time settings': {
     id: 'Pengaturan bahasa, tanggal & waktu',
     en: 'Localization and time settings',
+  },
+  'User invitation resent': {
+    id: 'Undangan pengguna dikirim ulang',
+    en: 'User invitation resent',
+  },
+  'User updated': {
+    id: 'Pengguna diperbarui',
+    en: 'User updated',
   },
   'Transaction item': { id: 'Item transaksi', en: 'Transaction item' },
   'Transaction created': { id: 'Transaksi dibuat', en: 'Transaction created' },
