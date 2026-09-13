@@ -74,10 +74,16 @@ export class AccessControlApi {
     return this.client.post<UserInvitation>('/api/v1/user-invitations', input);
   }
   resendInvitation(id: string) {
-    return this.client.post<UserInvitation>(`/api/v1/user-invitations/${id}/resend`, {});
+    return this.client.post<{ completed: true }>(
+      `/api/v1/user-invitations/${id}/resend`,
+      {},
+    );
   }
   revokeInvitation(id: string) {
-    return this.client.post<UserInvitation>(`/api/v1/user-invitations/${id}/revoke`, {});
+    return this.client.post<UserInvitation>(
+      `/api/v1/user-invitations/${id}/revoke`,
+      {},
+    );
   }
   createRole(input: { code: string; name: string; permissions: string[] }) {
     return this.client.post<AccessRole>('/api/v1/roles', input);
