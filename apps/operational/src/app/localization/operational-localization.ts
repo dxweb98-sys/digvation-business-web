@@ -10,6 +10,7 @@ const copy: Record<string, { 'id-ID': string; 'en-US': string }> = {
   From: { 'id-ID': 'Dari', 'en-US': 'From' },
   To: { 'id-ID': 'Sampai', 'en-US': 'To' },
   Period: { 'id-ID': 'Periode', 'en-US': 'Period' },
+  Tax: { 'id-ID': 'Pajak', 'en-US': 'Tax' },
   Total: { 'id-ID': 'Total', 'en-US': 'Total' },
   Status: { 'id-ID': 'Status', 'en-US': 'Status' },
   Location: { 'id-ID': 'Lokasi', 'en-US': 'Location' },
