@@ -7,12 +7,16 @@ import {
   DDataTable,
   DDialog,
   DInput,
+  DTabs,
+  DTabsContent,
+  DTabsList,
+  DTabsTrigger,
   useToast,
   type TableColumn,
 } from '@digvation/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ban, Pencil, Plus, RefreshCw, UserCog, UserPlus } from 'lucide-react';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState } from 'react';
 
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
 import {
@@ -140,27 +144,20 @@ export function AccessControlPage() {
         actions={actions}
       />
 
-      <div className="mt-7 flex gap-1 border-b border-[var(--color-border)]">
-        <SectionButton active={section === 'roles'} onClick={() => setSection('roles')}>
-          {copy('Roles')}
-        </SectionButton>
-        {canViewUsers ? (
-          <SectionButton active={section === 'users'} onClick={() => setSection('users')}>
-            {copy('Users')}
-          </SectionButton>
-        ) : null}
-        {canViewUsers ? (
-          <SectionButton
-            active={section === 'invitations'}
-            onClick={() => setSection('invitations')}
-          >
-            {copy('Invitations')}
-          </SectionButton>
-        ) : null}
-      </div>
+      <DTabs
+        value={section}
+        onValueChange={(value) => setSection(value as Section)}
+        className="mt-6"
+      >
+        <DTabsList className="max-w-full overflow-x-auto">
+          <DTabsTrigger value="roles">{copy('Roles')}</DTabsTrigger>
+          {canViewUsers ? <DTabsTrigger value="users">{copy('Users')}</DTabsTrigger> : null}
+          {canViewUsers ? (
+            <DTabsTrigger value="invitations">{copy('Invitations')}</DTabsTrigger>
+          ) : null}
+        </DTabsList>
 
-      <div className="mt-5">
-        {section === 'roles' ? (
+        <DTabsContent value="roles" className="mt-4">
           <RolesTable
             roles={roles.data?.items ?? []}
             loading={roles.isLoading}
@@ -169,26 +166,30 @@ export function AccessControlPage() {
             onEdit={setEditingRole}
             onDeactivate={setDeactivatingRole}
           />
+        </DTabsContent>
+        {canViewUsers ? (
+          <DTabsContent value="users" className="mt-4">
+            <UsersTable
+              users={users.data?.items ?? []}
+              loading={users.isLoading}
+              canEdit={canManageUsers || canManageLocations}
+              onEdit={setEditingUser}
+            />
+          </DTabsContent>
         ) : null}
-        {section === 'users' && canViewUsers ? (
-          <UsersTable
-            users={users.data?.items ?? []}
-            loading={users.isLoading}
-            canEdit={canManageUsers || canManageLocations}
-            onEdit={setEditingUser}
-          />
+        {canViewUsers ? (
+          <DTabsContent value="invitations" className="mt-4">
+            <InvitationsTable
+              invitations={invitations.data?.items ?? []}
+              loading={invitations.isLoading}
+              canManage={canInviteUsers}
+              api={api}
+              onChanged={() => invalidate(keys.invitations)}
+              onRevoke={setRevokingInvitation}
+            />
+          </DTabsContent>
         ) : null}
-        {section === 'invitations' && canViewUsers ? (
-          <InvitationsTable
-            invitations={invitations.data?.items ?? []}
-            loading={invitations.isLoading}
-            canManage={canInviteUsers}
-            api={api}
-            onChanged={() => invalidate(keys.invitations)}
-            onRevoke={setRevokingInvitation}
-          />
-        ) : null}
-      </div>
+      </DTabs>
 
       {editingRole !== undefined ? (
         <RoleEditor
@@ -263,30 +264,6 @@ export function AccessControlPage() {
   );
 }
 
-function SectionButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
-        active
-          ? 'border-[var(--color-brand)] text-[var(--color-text)]'
-          : 'border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
 function RolesTable({
   roles,
   loading,
@@ -318,7 +295,7 @@ function RolesTable({
       key: 'status',
       label: copy('Status'),
       render: (role) => (
-        <DBadge variant={role.status === 'ACTIVE' ? 'outline' : 'secondary'}>
+        <DBadge variant={role.status === 'ACTIVE' ? 'success' : 'secondary'}>
           {copy(role.status === 'ACTIVE' ? 'Active' : 'Inactive')}
         </DBadge>
       ),
@@ -388,7 +365,11 @@ function UsersTable({
     {
       key: 'status',
       label: copy('Status'),
-      render: (user) => <DBadge variant="outline">{copy(user.status)}</DBadge>,
+      render: (user) => (
+        <DBadge variant={user.status === 'ACTIVE' ? 'success' : 'secondary'}>
+          {copy(user.status === 'ACTIVE' ? 'Active' : 'Inactive')}
+        </DBadge>
+      ),
     },
   ];
   return (
@@ -455,7 +436,9 @@ function InvitationsTable({
       key: 'acceptedAt',
       label: copy('Status'),
       render: (invitation) => (
-        <DBadge variant={invitation.acceptedAt ? 'outline' : 'secondary'}>
+        <DBadge
+          variant={invitation.acceptedAt ? 'success' : invitation.revokedAt ? 'secondary' : 'warning'}
+        >
           {copy(
             invitation.acceptedAt
               ? 'Accepted'
@@ -586,9 +569,20 @@ function RoleEditor({
         {!role?.systemKey ? (
           <div className="grid gap-4 sm:grid-cols-2">
             {isNew ? (
-              <DInput label={copy('Role code')} value={code} onChange={(value) => setCode(value.toUpperCase())} />
+              <DInput
+                label={copy('Role code')}
+                value={code}
+                onChange={(value) => setCode(value.toUpperCase())}
+                placeholder={copy('For example, MANAGER')}
+              />
             ) : null}
-            <DInput label={copy('Role name')} value={name} onChange={setName} disabled={!isNew && !canUpdate} />
+            <DInput
+              label={copy('Role name')}
+              value={name}
+              onChange={setName}
+              disabled={!isNew && !canUpdate}
+              placeholder={copy('For example, Store Manager')}
+            />
           </div>
         ) : (
           <p className="text-sm text-[var(--color-text-muted)]">
@@ -787,8 +781,18 @@ function InvitationDialog({
     >
       <div className="grid gap-4 sm:grid-cols-2">
         <DInput label={copy('Phone (E.164)')} value={phone} onChange={setPhone} placeholder="+628111111111" />
-        <DInput label={copy('Username (optional)')} value={username} onChange={setUsername} />
-        <DInput label={copy('Display name')} value={displayName} onChange={setDisplayName} />
+        <DInput
+          label={copy('Username (optional)')}
+          value={username}
+          onChange={setUsername}
+          placeholder={copy('For example, cashier.main')}
+        />
+        <DInput
+          label={copy('Display name')}
+          value={displayName}
+          onChange={setDisplayName}
+          placeholder={copy('For example, Siti Rahma')}
+        />
       </div>
       <div className="mt-5">
         <p className="text-sm font-semibold">{copy('Roles')}</p>
