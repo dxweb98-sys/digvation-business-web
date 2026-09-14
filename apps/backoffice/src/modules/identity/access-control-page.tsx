@@ -19,6 +19,11 @@ import {
   BackofficePage,
   BackofficePageHeader,
 } from '../../app/layout/backoffice-page';
+import {
+  groupPermissionKeys,
+  humanReadableLabel,
+  permissionLabel,
+} from '../../app/localization/human-readable-labels';
 import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
 import { canPerformBackofficeAction } from '../../auth/backoffice-access';
 import {
@@ -302,7 +307,7 @@ function RolesTable({
   onEdit: (role: AccessRole) => void;
   onDeactivate: (role: AccessRole) => void;
 }) {
-  const { copy } = useBackofficeLocalization();
+  const { copy, locale } = useBackofficeLocalization();
   const columns: TableColumn<AccessRole>[] = [
     {
       key: 'name',
@@ -319,7 +324,7 @@ function RolesTable({
       label: copy('Status'),
       render: (role) => (
         <DBadge variant={role.status === 'ACTIVE' ? 'outline' : 'secondary'}>
-          {copy(role.status === 'ACTIVE' ? 'Active' : 'Inactive')}
+          {humanReadableLabel(role.status, locale)}
         </DBadge>
       ),
     },
@@ -366,7 +371,7 @@ function UsersTable({
   canEdit: boolean;
   onEdit: (user: AccessUser) => void;
 }) {
-  const { copy } = useBackofficeLocalization();
+  const { copy, locale } = useBackofficeLocalization();
   const columns: TableColumn<AccessUser>[] = [
     {
       key: 'displayName',
@@ -388,7 +393,9 @@ function UsersTable({
     {
       key: 'status',
       label: copy('Status'),
-      render: (user) => <DBadge variant="outline">{copy(user.status)}</DBadge>,
+      render: (user) => (
+        <DBadge variant="outline">{humanReadableLabel(user.status, locale)}</DBadge>
+      ),
     },
   ];
   return (
@@ -530,12 +537,16 @@ function RoleEditor({
   onClose: () => void;
   onChanged: () => void;
 }) {
-  const { copy } = useBackofficeLocalization();
+  const { copy, locale } = useBackofficeLocalization();
   const { showToast } = useToast();
   const isNew = role === null;
   const [code, setCode] = useState('');
   const [name, setName] = useState(role?.name ?? '');
   const [selected, setSelected] = useState<string[]>(role?.permissions ?? []);
+  const permissionGroups = useMemo(
+    () => groupPermissionKeys(permissions, locale),
+    [permissions, locale],
+  );
 
   const save = async () => {
     if (!name.trim() || (isNew && !code.trim())) return;
@@ -592,21 +603,41 @@ function RoleEditor({
           </div>
         ) : (
           <p className="text-sm text-[var(--color-text-muted)]">
-            {copy('System roles are protected by the Business Runtime authorization policy.')}
+            {locale === 'id'
+              ? 'Peran sistem memiliki izin bawaan dan tidak dapat diubah.'
+              : 'System roles have built-in permissions and cannot be changed.'}
           </p>
         )}
         <div>
           <p className="text-sm font-semibold">{copy('Permissions')}</p>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            {permissions.map((permission) => (
-              <label key={permission} className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm">
-                <DCheckbox
-                  checked={selected.includes(permission)}
-                  onChange={() => setSelected((values) => values.includes(permission) ? values.filter((item) => item !== permission) : [...values, permission])}
-                  disabled={Boolean(role?.systemKey) || (!isNew && !canManagePermissions)}
-                />
-                {permission}
-              </label>
+          <div className="mt-3 space-y-5">
+            {permissionGroups.map((group) => (
+              <section key={group.key}>
+                <p className="mb-2 text-xs font-bold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+                  {group.label}
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {group.permissions.map((permission) => (
+                    <label
+                      key={permission}
+                      className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm"
+                    >
+                      <DCheckbox
+                        checked={selected.includes(permission)}
+                        onChange={() =>
+                          setSelected((values) =>
+                            values.includes(permission)
+                              ? values.filter((item) => item !== permission)
+                              : [...values, permission],
+                          )
+                        }
+                        disabled={Boolean(role?.systemKey) || (!isNew && !canManagePermissions)}
+                      />
+                      {permissionLabel(permission, locale)}
+                    </label>
+                  ))}
+                </div>
+              </section>
             ))}
           </div>
         </div>
@@ -738,7 +769,7 @@ function InvitationDialog({
   onClose: () => void;
   onChanged: () => void;
 }) {
-  const { copy } = useBackofficeLocalization();
+  const { copy, locale } = useBackofficeLocalization();
   const { showToast } = useToast();
   const [phone, setPhone] = useState('');
   const [username, setUsername] = useState('');
@@ -776,7 +807,11 @@ function InvitationDialog({
       open
       onClose={onClose}
       title={copy('Invite user')}
-      description={copy('Use the existing Runtime invitation contract. The user activates the account through the invitation flow.')}
+      description={
+        locale === 'id'
+          ? 'Undang pengguna untuk mengaktifkan akun dan menerima akses sesuai peran yang dipilih.'
+          : 'Invite a user to activate an account and receive access from the selected roles.'
+      }
       size="lg"
       footer={
         <div className="flex justify-end gap-2">
