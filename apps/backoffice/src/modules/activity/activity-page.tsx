@@ -70,7 +70,7 @@ export function ActivityPage() {
   }));
   const locationOptions = (facets.data?.locations ?? []).map((location) => ({
     value: location.id,
-    label: `${location.name} · ${location.code}`,
+    label: `${location.name} (${location.code})`,
   }));
   const columns: TableColumn<ActivityEvent>[] = [
     {
@@ -92,7 +92,7 @@ export function ActivityPage() {
     {
       key: 'target',
       label: copy('Target / reference'),
-      render: (item) => targetSummary(item, locale) ?? '—',
+      render: (item) => targetSummary(item, locale) ?? '-',
     },
     {
       key: 'category',
@@ -104,7 +104,7 @@ export function ActivityPage() {
     {
       key: 'location',
       label: copy('Location'),
-      render: (item) => item.locationName ?? '—',
+      render: (item) => item.locationName ?? '-',
     },
   ];
   if (list.isError) {
@@ -120,11 +120,7 @@ export function ActivityPage() {
   const filtered = Boolean(from || to || actorUserId || category || locationId);
   return (
     <BackofficePage>
-      <BackofficePageHeader
-        eyebrow={copy('Audit')}
-        title={t('activity')}
-        description={copy('Review important business and access actions safely.')}
-      />
+      <BackofficePageHeader eyebrow={copy('Audit')} title={t('activity')} />
       <section className="mt-6">
         <DDataTable
           columns={columns}
@@ -304,7 +300,8 @@ function targetSummary(item: ActivityEvent, locale: HumanLabelLocale): string | 
     ? activityNamespaceLabel(item.target.reference, locale)
     : undefined;
   const fallback = activityTargetLabel(item.target.type, locale);
-  return [display ?? fallback, reference].filter(Boolean).join(' · ');
+  const target = display ?? fallback;
+  return reference ? `${target} (${reference})` : target;
 }
 
 function hasBusinessTarget(item: ActivityEvent) {
@@ -312,7 +309,7 @@ function hasBusinessTarget(item: ActivityEvent) {
 }
 
 function sourceLabel(value: ActivityEvent['source'], locale: HumanLabelLocale) {
-  if (value === 'OPERATIONAL') return locale === 'id' ? 'Operasional' : 'Operational';
+  if (value === 'OPERATIONAL') return 'Operational';
   if (value === 'SYSTEM') return locale === 'id' ? 'Sistem' : 'System';
   return 'Backoffice';
 }
