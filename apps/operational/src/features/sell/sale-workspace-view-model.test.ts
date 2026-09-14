@@ -80,6 +80,7 @@ function createSale(overrides: Partial<Sale> = {}): Sale {
     sellingLocationId: '11111111-1111-4111-8111-111111111111',
     currency: 'IDR',
     status: 'OPEN',
+    operationalState: 'UNSUBMITTED',
     version: 2,
     grossAmount: '125000.0000',
     discountAmount: '0.0000',

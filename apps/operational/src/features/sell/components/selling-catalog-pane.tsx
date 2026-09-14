@@ -126,13 +126,15 @@ export function SellingCatalogPane({
                   className="group flex h-auto min-h-0 w-full aspect-[.88] min-w-0 flex-col items-stretch justify-start rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-left shadow-[var(--shadow-panel)] transition-[transform,box-shadow,border-color] duration-150 hover:border-[var(--color-brand)]/40 hover:shadow-md active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <div
-                    className={`grid aspect-square w-full place-items-center rounded-xl ${
+                    className={`grid aspect-square w-full place-items-center overflow-hidden rounded-xl ${
                       item.type === 'SERVICE'
                         ? 'bg-[var(--color-accent-lavender)]/45 text-[var(--color-brand)]'
                         : 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]'
                     }`}
                   >
-                    {item.type === 'SERVICE' ? (
+                    {item.image?.url ? (
+                      <img src={item.image.url} alt="" className="size-full object-cover" />
+                    ) : item.type === 'SERVICE' ? (
                       <Wrench className="size-7" />
                     ) : (
                       <ShoppingBag className="size-7" />

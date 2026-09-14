@@ -1,4 +1,4 @@
-import { ApiClient } from '@digvation/business-api';
+import type { ApiClient } from '@digvation/business-api';
 
 export interface OperationalLocation {
   id: string;
@@ -10,6 +10,8 @@ export interface OperationalAccessContext {
   organizationWide: boolean;
   resolution: 'DENIED' | 'AUTO_RESOLVED' | 'SELECTION_REQUIRED';
   selectedLocationId: string | null;
+  /** Canonical tenant Main Branch, exposed only when it is permitted to this user. */
+  mainLocationId: string | null;
   locations: OperationalLocation[];
 }
 

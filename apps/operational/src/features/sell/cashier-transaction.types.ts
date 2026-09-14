@@ -1,7 +1,21 @@
 export type RecordStatus = 'ACTIVE' | 'INACTIVE';
 export type CatalogLifecycle = 'DRAFT' | 'ACTIVE' | 'INACTIVE' | 'ARCHIVED';
 export type SaleStatus = 'OPEN' | 'FINALIZED' | 'VOIDED';
+export type SaleOperationalState = 'UNSUBMITTED' | 'QUEUED' | 'IN_PROGRESS';
 export type PaymentMethod = 'CASH' | 'BANK_TRANSFER' | 'WALLET' | 'QRIS';
+export interface PaymentRoute {
+  id: string;
+  sellingLocationId: string;
+  paymentMethod: PaymentMethod;
+  currency: string;
+  financialAccountId: string;
+  financialAccountCode: string | null;
+  financialAccountName: string;
+  status: RecordStatus;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
 export type PaymentStatus = 'PENDING' | 'SUCCEEDED' | 'FAILED' | 'CANCELLED' | 'EXPIRED';
 export type FulfillmentStatus = 'WAITING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELED';
 export type EmployeeAssignmentMode = 'NONE' | 'OPTIONAL' | 'REQUIRED';
@@ -61,6 +75,14 @@ export interface CatalogDisplayPrice {
   kind: 'EXACT' | 'FROM';
 }
 
+export interface CatalogItemImage {
+  catalogItemId: string;
+  contentType: 'image/jpeg' | 'image/png' | 'image/webp';
+  sizeBytes: number;
+  updatedAt: string;
+  url: string;
+}
+
 export interface CatalogItem {
   id: string;
   code: string;
@@ -76,6 +98,7 @@ export interface CatalogItem {
   updatedAt: string;
   serviceDefinition: ServiceDefinition | null;
   displayPrice?: CatalogDisplayPrice | null;
+  image?: CatalogItemImage | null;
 }
 
 export interface CatalogVariant extends NamedRecord {
@@ -205,6 +228,7 @@ export interface Sale {
   sellingLocationId: string;
   currency: string;
   status: SaleStatus;
+  operationalState: SaleOperationalState;
   version: number;
   grossAmount: string;
   discountAmount: string;

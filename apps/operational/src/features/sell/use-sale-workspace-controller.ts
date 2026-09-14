@@ -22,9 +22,11 @@ import type {
   CatalogItem,
   CatalogVariant,
   ResolvedPrice,
+  Sale,
   SaleLine,
 } from './cashier-transaction.types';
 import { createSaleWorkspaceViewModel } from './sale-workspace-view-model';
+import { createDraftCommitGate } from './draft-commit-gate';
 import type { SaleCommandCoordinator } from './use-sale-command-coordinator';
 
 const QUANTITY_PATTERN = /^(0|[1-9]\d{0,14})(\.\d{1,4})?$/;
@@ -113,6 +115,7 @@ export function useSaleWorkspaceController({
   const [draft, setDraft] = useState<CartDraft | null>(null);
   const [retryCommitIntent, setRetryCommitIntent] = useState<CommitDraftIntent | null>(null);
   const previousLocationIdRef = useRef(selectedLocationId);
+  const draftCommitGateRef = useRef(createDraftCommitGate<Sale>());
 
   const saleQuery = useQuery({
     queryKey: cashierTransactionKeys.sale(routeSaleId ?? 'idle'),
@@ -293,7 +296,7 @@ export function useSaleWorkspaceController({
         ? retryCommitIntent
         : { draft, idempotencyKey: createIdempotencyKey('start-sale') };
     setRetryCommitIntent(intent);
-    return commitDraftMutation.mutateAsync(intent);
+    return draftCommitGateRef.current.run(() => commitDraftMutation.mutateAsync(intent));
   };
 
   const activeSaleLines = viewModel.activeLines;

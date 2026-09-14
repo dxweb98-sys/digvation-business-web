@@ -10,6 +10,7 @@ import type {
   Employee,
   FulfillmentStatus,
   PaymentMethod,
+  PaymentRoute,
   PaymentStatus,
   ResolvedPrice,
   Sale,
@@ -117,6 +118,9 @@ export interface SellingCatalogQuery {
 export interface EmployeeQuery {
   listEmployees(signal?: AbortSignal): Promise<ApiPage<Employee>>;
 }
+export interface PaymentRouteQuery {
+  listPaymentRoutes(input: { sellingLocationId: string; currency: string }, signal?: AbortSignal): Promise<ApiPage<PaymentRoute>>;
+}
 
 export interface OpenSalesQuery {
   listSales(signal?: AbortSignal): Promise<ApiPage<Sale>>;
@@ -163,6 +167,8 @@ export interface SaleTransactionClient {
     saleLineId: string,
     input: FulfillmentInput,
   ): Promise<Sale>;
+  queueSale(saleId: string, expectedVersion: number, idempotencyKey: string): Promise<Sale>;
+  startSaleWork(saleId: string, expectedVersion: number, idempotencyKey: string): Promise<Sale>;
   createSalePayment(
     saleId: string,
     input: CreatePaymentInput,
@@ -178,14 +184,14 @@ export interface SaleTransactionClient {
 }
 
 export interface SaleTransactionPort
-  extends SellingCatalogQuery, EmployeeQuery, OpenSalesQuery, SaleTransactionClient {}
+  extends SellingCatalogQuery, EmployeeQuery, PaymentRouteQuery, OpenSalesQuery, SaleTransactionClient {}
 
 function pagePath(path: string): string {
   return `${path}?limit=${PAGE_SIZE}&offset=0`;
 }
 
 export class HttpCashierTransactionAdapter
-  implements SellingCatalogQuery, EmployeeQuery, OpenSalesQuery, SaleTransactionClient
+  implements SellingCatalogQuery, EmployeeQuery, PaymentRouteQuery, OpenSalesQuery, SaleTransactionClient
 {
   public constructor(private readonly client: ApiClient) {}
 
@@ -200,9 +206,15 @@ export class HttpCashierTransactionAdapter
       signal,
     });
   }
+  public listPaymentRoutes(input: { sellingLocationId: string; currency: string }, signal?: AbortSignal): Promise<ApiPage<PaymentRoute>> {
+    const query = new URLSearchParams({ sellingLocationId: input.sellingLocationId, currency: input.currency, status: 'ACTIVE', limit: String(PAGE_SIZE), offset: '0' });
+    return this.client.get<ApiPage<PaymentRoute>>(`${API_PREFIX}/payment-routing?${query}`, { signal });
+  }
 
   public listCatalogItems(signal?: AbortSignal): Promise<ApiPage<CatalogItem>> {
-    return this.client.get<ApiPage<CatalogItem>>(pagePath(`${API_PREFIX}/catalog/items`), { signal });
+    return this.client.get<ApiPage<CatalogItem>>(pagePath(`${API_PREFIX}/catalog/items`), {
+      signal,
+    });
   }
 
   public listSellingCatalogItems(
@@ -403,6 +415,24 @@ export class HttpCashierTransactionAdapter
     return this.client.post<Sale>(
       `${API_PREFIX}/sales/${saleId}/lines/${saleLineId}/fulfillment`,
       input,
+    );
+  }
+  public queueSale(saleId: string, expectedVersion: number, idempotencyKey: string): Promise<Sale> {
+    return this.client.post<Sale>(
+      `${API_PREFIX}/sales/${saleId}/queue`,
+      { expectedVersion },
+      { headers: { 'Idempotency-Key': idempotencyKey } },
+    );
+  }
+  public startSaleWork(
+    saleId: string,
+    expectedVersion: number,
+    idempotencyKey: string,
+  ): Promise<Sale> {
+    return this.client.post<Sale>(
+      `${API_PREFIX}/sales/${saleId}/start-work`,
+      { expectedVersion },
+      { headers: { 'Idempotency-Key': idempotencyKey } },
     );
   }
 

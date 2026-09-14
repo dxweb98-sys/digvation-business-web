@@ -274,7 +274,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
   const startQueuedFulfillment = async (sale: Sale, preferredLine: SaleLine) => {
     command.clearNotice();
     try {
-      let current = sale;
+      let current = (await command.refetchSale(sale.id)) ?? sale;
       const waitingLineIds = current.lines
         .filter(
           (line) =>
@@ -305,6 +305,18 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
       throw error;
     }
   };
+  const queueSale = async (sale: Sale) =>
+    command.runMutation(() =>
+      transactionAdapter.queueSale(sale.id, sale.version, `cashier-queue-${crypto.randomUUID()}`),
+    );
+  const startSaleWork = async (sale: Sale) =>
+    command.runMutation(() =>
+      transactionAdapter.startSaleWork(
+        sale.id,
+        sale.version,
+        `cashier-start-work-${crypto.randomUUID()}`,
+      ),
+    );
 
   const setQueuedAssignments = async (
     sale: Sale,
@@ -347,11 +359,11 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
         throw new Error('Mulai semua pekerjaan sebelum menyelesaikan transaksi.');
       }
       if (
-        trackedLines.some(
-          (line) => !line.fulfillment || line.fulfillment.status === 'CANCELED',
-        )
+        trackedLines.some((line) => !line.fulfillment || line.fulfillment.status === 'CANCELED')
       ) {
-        throw new Error('Pekerjaan yang dibatalkan tidak dapat diselesaikan sebagai transaksi aktif.');
+        throw new Error(
+          'Pekerjaan yang dibatalkan tidak dapat diselesaikan sebagai transaksi aktif.',
+        );
       }
       for (const trackedLine of trackedLines) {
         const liveLine = current.lines.find((line) => line.id === trackedLine.id);
@@ -387,11 +399,16 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
   ) => {
     command.clearNotice();
     try {
+      const authoritative = await transactionAdapter.getSale(targetSale.id);
+      if (authoritative.payments.some((payment) => payment.status === 'PENDING'))
+        throw new Error(
+          'A payment attempt is still pending. Wait for its settlement before trying again.',
+        );
       const updated = await command.runMutation(() =>
         transactionAdapter.createSalePayment(
-          targetSale.id,
+          authoritative.id,
           {
-            expectedVersion: targetSale.version,
+            expectedVersion: authoritative.version,
             method,
             appliedAmount,
             ...(tenderedAmount ? { tenderedAmount } : {}),
@@ -479,6 +496,8 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     setContributions: core.setContributions,
     transitionFulfillment: core.transitionFulfillment,
     startQueuedFulfillment,
+    queueSale,
+    startSaleWork,
     transitionQueuedFulfillment,
     setQueuedAssignments,
     finalizeQueuedSale,

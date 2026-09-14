@@ -151,6 +151,7 @@ export class LocalCashierTransactionAdapter implements SaleTransactionPort {
       sellingLocationId: input.sellingLocationId,
       currency: input.currency,
       status: 'OPEN',
+      operationalState: 'UNSUBMITTED',
       version: 1,
       grossAmount: '0.0000',
       discountAmount: '0.0000',
@@ -474,6 +475,20 @@ export class LocalCashierTransactionAdapter implements SaleTransactionPort {
         };
       }),
     });
+  }
+
+  public async queueSale(saleId: string, expectedVersion: number, idempotencyKey: string) {
+    void idempotencyKey;
+    const sale = this.openSale(saleId, expectedVersion);
+    if (sale.operationalState !== 'UNSUBMITTED') throw new Error('Sale is already submitted.');
+    return this.save(sale, { operationalState: 'QUEUED' });
+  }
+
+  public async startSaleWork(saleId: string, expectedVersion: number, idempotencyKey: string) {
+    void idempotencyKey;
+    const sale = this.openSale(saleId, expectedVersion);
+    if (sale.operationalState === 'IN_PROGRESS') throw new Error('Sale work is already started.');
+    return this.save(sale, { operationalState: 'IN_PROGRESS' });
   }
 
   public async createSalePayment(
