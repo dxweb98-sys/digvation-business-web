@@ -20,6 +20,7 @@ import { useRuntime } from '@digvation/business-runtime';
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
 import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
 import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
+import { humanReadableLabel } from '../../app/localization/human-readable-labels';
 import { canPerformBackofficeAction } from '../../auth/backoffice-access';
 import { useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import type { PaymentMethod } from './financial-accounts-api';
@@ -82,9 +83,10 @@ export function FinancialOperationsPage() {
     </BackofficePage>
   );
 }
+
 function CashPanel({ api }: { api: FinancialOperationsApi }) {
   const { session } = useBackofficeAuth();
-  const { copy } = useBackofficeLocalization();
+  const { copy, locale } = useBackofficeLocalization();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [positionOffset, setPositionOffset] = useState(0);
@@ -167,7 +169,11 @@ function CashPanel({ api }: { api: FinancialOperationsApi }) {
         <h2 className="mb-3 text-base font-bold">{copy('Cash movements')}</h2>
         <DDataTable
           columns={[
-            { key: 'type', label: copy('Movement type') },
+            {
+              key: 'type',
+              label: copy('Movement type'),
+              render: (row) => humanReadableLabel(row.type, locale),
+            },
             {
               key: 'amount',
               label: copy('Amount'),
@@ -200,6 +206,7 @@ function CashPanel({ api }: { api: FinancialOperationsApi }) {
     </section>
   );
 }
+
 function SettlementPanel({ api }: { api: FinancialOperationsApi }) {
   const { session } = useBackofficeAuth();
   const { copy } = useBackofficeLocalization();
@@ -291,6 +298,7 @@ function SettlementPanel({ api }: { api: FinancialOperationsApi }) {
     </section>
   );
 }
+
 function ReconciliationPanel({ api }: { api: FinancialOperationsApi }) {
   const { session } = useBackofficeAuth();
   const { copy } = useBackofficeLocalization();
@@ -399,6 +407,7 @@ function ReconciliationPanel({ api }: { api: FinancialOperationsApi }) {
     </section>
   );
 }
+
 function MovementDialog({
   open,
   onClose,
@@ -499,6 +508,7 @@ function MovementDialog({
     </DDialog>
   );
 }
+
 function SettlementDialog({
   open,
   onClose,
@@ -586,6 +596,7 @@ function SettlementDialog({
     </DDialog>
   );
 }
+
 function SettlementDetail({
   item,
   onClose,
@@ -669,6 +680,7 @@ function SettlementDetail({
     </DDialog>
   );
 }
+
 function ReconciliationDialog({
   open,
   onClose,
@@ -737,15 +749,16 @@ function ReconciliationDialog({
     </DDialog>
   );
 }
+
 function SettlementBadge({ status }: { status: Settlement['status'] }) {
-  const { copy } = useBackofficeLocalization();
+  const { locale } = useBackofficeLocalization();
   return (
     <DBadge
       variant={
         status === 'COMPLETED' ? 'success' : status === 'CANCELLED' ? 'secondary' : 'outline'
       }
     >
-      {copy(status === 'COMPLETED' ? 'Completed' : status === 'CANCELLED' ? 'Cancelled' : 'Draft')}
+      {humanReadableLabel(status, locale)}
     </DBadge>
   );
 }
