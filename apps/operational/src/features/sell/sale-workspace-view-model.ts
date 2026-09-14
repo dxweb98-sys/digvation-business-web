@@ -99,18 +99,18 @@ function domainReadiness(sale: Sale | null, activeLines: SaleLine[]) {
   if (!sale) return { ready: false, blockers };
 
   if (activeLines.length === 0) {
-    blockers.push({ code: 'NO_LINES', message: 'Add at least one active line.' });
+    blockers.push({ code: 'NO_LINES', message: 'Tambahkan setidaknya satu item.' });
   }
 
   if (sale.payments.some((payment) => payment.status === 'PENDING')) {
-    blockers.push({ code: 'PAYMENT_PENDING', message: 'Resolve pending payments.' });
+    blockers.push({ code: 'PAYMENT_PENDING', message: 'Selesaikan pembayaran yang masih menunggu.' });
   }
 
   const succeeded = createDecimal(sumPayments(sale, 'SUCCEEDED'));
   if (!succeeded.equals(createDecimal(sale.totalAmount))) {
     blockers.push({
       code: 'NOT_SETTLED',
-      message: 'Successful payments must exactly match the Sale total.',
+      message: 'Jumlah pembayaran harus sama dengan total transaksi.',
     });
   }
 
@@ -122,7 +122,7 @@ function domainReadiness(sale: Sale | null, activeLines: SaleLine[]) {
       blockers.push({
         code: 'FULFILLMENT_INCOMPLETE',
         saleLineId: line.id,
-        message: `${line.itemNameSnapshot}: tracked work is not completed.`,
+        message: `${line.itemNameSnapshot}: pengerjaan belum selesai.`,
       });
     }
 
@@ -133,7 +133,7 @@ function domainReadiness(sale: Sale | null, activeLines: SaleLine[]) {
       blockers.push({
         code: 'ASSIGNMENT_REQUIRED',
         saleLineId: line.id,
-        message: `${line.itemNameSnapshot}: employee assignment is required.`,
+        message: `${line.itemNameSnapshot}: pilih karyawan.`,
       });
     }
 
@@ -141,7 +141,7 @@ function domainReadiness(sale: Sale | null, activeLines: SaleLine[]) {
       blockers.push({
         code: 'CONTRIBUTION_REQUIRED',
         saleLineId: line.id,
-        message: `${line.itemNameSnapshot}: contribution allocation must reconcile to 100%.`,
+        message: `${line.itemNameSnapshot}: total kontribusi karyawan harus 100%.`,
       });
     }
   }
@@ -237,20 +237,20 @@ export function createSaleWorkspaceViewModel(
 export function actionBlockMessage(reason: ActionBlockReason): string {
   switch (reason) {
     case 'SALE_TERMINAL':
-      return 'This Sale is already terminal.';
+      return 'Transaksi ini sudah ditutup.';
     case 'PAYMENT_PENDING':
-      return 'A pending payment blocks monetary changes.';
+      return 'Selesaikan pembayaran yang masih menunggu.';
     case 'OFFLINE':
-      return 'Reconnect before changing this Sale.';
+      return 'Sambungkan kembali perangkat sebelum mengubah transaksi.';
     case 'CONFLICT_REVIEW':
-      return 'Review the latest server state before continuing.';
+      return 'Periksa perubahan terbaru sebelum melanjutkan.';
     case 'MUTATION_IN_PROGRESS':
-      return 'Wait for the current change to finish.';
+      return 'Tunggu perubahan saat ini selesai.';
     case 'DOMAIN_NOT_READY':
-      return 'Resolve the Sale readiness blockers first.';
+      return 'Lengkapi transaksi sebelum melanjutkan.';
     case 'NOTHING_TO_PAY':
-      return 'There is no available amount to pay.';
+      return 'Tidak ada sisa pembayaran.';
     case 'NOT_VOIDABLE':
-      return 'A Sale with pending or successful payment cannot be voided.';
+      return 'Transaksi dengan pembayaran tidak dapat dibatalkan.';
   }
 }
