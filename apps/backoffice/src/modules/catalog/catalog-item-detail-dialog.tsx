@@ -1,6 +1,4 @@
 import {
-  DAccordion,
-  DAccordionItem,
   DBadge,
   DButton,
   DConfirmDialog,
@@ -23,7 +21,6 @@ import type {
   Variant,
 } from './catalog-api';
 import { CatalogItemThumbnail } from './catalog-item-thumbnail';
-import { useCatalogLocalization } from './catalog-localization';
 import { PriceChangeDialog, PriceHistoryTable, VariantPriceLabel } from './catalog-pricing';
 import { CatalogNamedRecordDialog } from './catalog-record-dialog';
 import { DetailField, PriceLabel, Status, humanize } from './catalog-shared';
@@ -75,12 +72,12 @@ export function CatalogItemDetailDialog({
   onEdit: (item: CatalogManagementItem) => void;
 }) {
   const client = useQueryClient();
-  const { copy } = useCatalogLocalization();
   const { showToast } = useToast();
   const [editingVariant, setEditingVariant] = useState<Variant | null | undefined>();
   const [pricingTarget, setPricingTarget] = useState<'default' | Variant | null>(null);
   const [statusTarget, setStatusTarget] = useState<Variant | null>(null);
   const [changingStatus, setChangingStatus] = useState(false);
+
   const variants = useQuery({
     queryKey: keys.variants(item?.id ?? ''),
     queryFn: () => api.listVariants(item!.id),
@@ -104,14 +101,15 @@ export function CatalogItemDetailDialog({
       enabled: Boolean(item && canViewPricing),
     })),
   });
+
   if (!item) return null;
 
   const categoryName = item.categoryId
-    ? (categories.find((candidate) => candidate.id === item.categoryId)?.name ?? item.categoryId)
-    : copy('Not assigned');
+    ? categories.find((candidate) => candidate.id === item.categoryId)?.name ?? item.categoryId
+    : 'Belum ditentukan';
   const taxCategoryName = item.taxCategoryId
-    ? (taxCategories.find((candidate) => candidate.id === item.taxCategoryId)?.name ?? item.taxCategoryId)
-    : copy('No item-specific tax');
+    ? taxCategories.find((candidate) => candidate.id === item.taxCategoryId)?.name ?? item.taxCategoryId
+    : 'Tidak ada pajak khusus item';
   const serviceDefinition = item.serviceDefinition;
   const defaultHistory = (priceHistory.data?.items ?? []).filter(
     (price) => price.catalogVariantId === null && price.locationId === null,
@@ -119,20 +117,23 @@ export function CatalogItemDetailDialog({
   const variantPriceById = new Map(
     (variants.data?.items ?? []).map((variant, index) => [variant.id, resolvedVariantPrices[index]]),
   );
+  const variantCount = variants.data?.items.length ?? item.variantCount;
+
   const refreshVariants = () =>
     void client.invalidateQueries({ queryKey: keys.variants(item.id) });
   const refreshVariantsAndCount = () => {
     refreshVariants();
     onVariantsChanged();
   };
+
   const variantColumns: TableColumn<Variant>[] = [
-    { key: 'code', label: copy('Code') },
-    { key: 'name', label: copy('Name') },
+    { key: 'code', label: 'Kode' },
+    { key: 'name', label: 'Nama Varian' },
     ...(canViewPricing
       ? [
           {
             key: 'price',
-            label: copy('Price'),
+            label: 'Harga',
             render: (variant: Variant) => (
               <VariantPriceLabel
                 query={variantPriceById.get(variant.id)}
@@ -145,7 +146,7 @@ export function CatalogItemDetailDialog({
       : []),
     {
       key: 'status',
-      label: copy('Status'),
+      label: 'Status',
       render: (variant) => <Status value={variant.status} />,
     },
   ];
@@ -160,12 +161,12 @@ export function CatalogItemDetailDialog({
       setStatusTarget(null);
       refreshVariantsAndCount();
       void client.invalidateQueries({ queryKey: ['catalog', 'default-prices'] });
-      showToast({ variant: 'success', title: copy('Variant updated.') });
+      showToast({ variant: 'success', title: 'Varian berhasil diperbarui.' });
     } catch (error) {
       if (!isSessionExpiredError(error)) {
         showToast({
           variant: 'danger',
-          title: normalizeBackofficeApiError(error, copy('Could not save variant.')).safeMessage,
+          title: normalizeBackofficeApiError(error, 'Varian tidak dapat diperbarui.').safeMessage,
         });
       }
     } finally {
@@ -179,217 +180,127 @@ export function CatalogItemDetailDialog({
       onClose={onClose}
       size="xl"
       title={item.name}
-      description={`${item.code} · ${copy(humanize(item.type))}`}
+      description={`${item.code} · ${item.type === 'SERVICE' ? 'Layanan' : 'Produk'}`}
       footer={
         <div className="flex justify-end gap-2">
-          <DButton variant="secondary" onClick={onClose}>
-            {copy('Close')}
-          </DButton>
+          <DButton variant="secondary" onClick={onClose}>Tutup</DButton>
           {canUpdate ? (
             <DButton leftIcon={<Pencil className="size-4" />} onClick={() => onEdit(item)}>
-              {copy('Edit item')}
+              Edit Item
             </DButton>
           ) : null}
         </div>
       }
     >
-      <div className="space-y-4">
-        <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4">
+      <div className="space-y-5">
+        <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] p-4">
           <div className="grid gap-5 md:grid-cols-[auto_minmax(0,1fr)]">
             <CatalogItemThumbnail api={api} itemId={item.id} itemName={item.name} size="detail" />
             <div className="min-w-0">
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
-                    {copy('Item overview')}
-                  </p>
-                  <h2 className="mt-1 break-words text-xl font-semibold tracking-tight">{item.name}</h2>
-                  <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">{item.code}</p>
+                <div>
+                  <h2 className="text-xl font-semibold tracking-tight">{item.name}</h2>
+                  <p className="mt-1 text-sm text-[var(--color-text-muted)]">{item.code}</p>
                 </div>
                 <Status value={item.lifecycle} />
               </div>
-              <dl className="mt-4 grid gap-x-5 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
-                <DetailField
-                  label={copy('Default Price')}
-                  value={
-                    <PriceLabel
-                      price={defaultPrice}
-                      loading={defaultPriceLoading}
-                      available={canViewPricing}
-                      emptyLabel={copy('Not set')}
-                    />
-                  }
-                  emphasized
-                />
-                <DetailField label={copy('Tax')} value={canViewTax ? taxCategoryName : '—'} />
-                <DetailField label={copy('Category')} value={categoryName} />
-                <DetailField label={copy('Variants')} value={item.variantCount} />
+              <dl className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <DetailField label="Tipe" value={item.type === 'SERVICE' ? 'Layanan' : 'Produk'} />
+                <DetailField label="Kategori" value={categoryName} />
+                <DetailField label="Status" value={<Status value={item.lifecycle} />} />
+                <DetailField label="Varian" value={`${variantCount}`} />
               </dl>
+              {item.description?.trim() ? (
+                <p className="mt-4 border-t border-[var(--color-border)] pt-4 text-sm text-[var(--color-text-muted)]">
+                  {item.description}
+                </p>
+              ) : null}
             </div>
           </div>
-
-          <dl className="mt-5 grid gap-4 border-t border-[var(--color-border)] pt-4 sm:grid-cols-2 lg:grid-cols-4">
-            <DetailField label={copy('Type')} value={copy(humanize(item.type))} />
-            <DetailField
-              label={copy('Fulfillment')}
-              value={copy(humanize(item.fulfillmentBehavior))}
-            />
-            <div className="sm:col-span-2">
-              <DetailField
-                label={copy('Description')}
-                value={item.description?.trim() || copy('No description')}
-              />
-            </div>
-          </dl>
-          {canViewTax ? (
-            <p className="mt-4 border-t border-[var(--color-border)] pt-3 text-xs leading-5 text-[var(--color-text-muted)]">
-              {item.taxCategoryId
-                ? copy(
-                    'This item uses its assigned item tax category. Transaction tax may also apply when enabled.',
-                  )
-                : copy(
-                    'No item-specific tax is assigned. Transaction tax may still apply when enabled.',
-                  )}
-            </p>
-          ) : null}
         </section>
 
-        {item.type === 'SERVICE' ? (
+        {canViewPricing ? (
           <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] p-4">
-            <h2 className="text-sm font-semibold">{copy('Service configuration')}</h2>
-            <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-              {copy('Operational defaults used when this service is sold and fulfilled.')}
-            </p>
-            <dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <DetailField
-                label={copy('Default duration')}
-                value={
-                  serviceDefinition?.defaultDurationMinutes != null
-                    ? `${serviceDefinition.defaultDurationMinutes} ${copy('minutes')}`
-                    : copy('Not configured')
-                }
-              />
-              <DetailField
-                label={copy('Employee assignment')}
-                value={
-                  serviceDefinition
-                    ? copy(humanize(serviceDefinition.employeeAssignmentMode))
-                    : copy('Not configured')
-                }
-              />
-              <DetailField
-                label={copy('Employee contribution')}
-                value={
-                  serviceDefinition?.allowEmployeeContribution
-                    ? copy('Allowed')
-                    : copy('Not allowed')
-                }
-              />
-              <DetailField
-                label={copy('Fulfillment')}
-                value={copy(humanize(item.fulfillmentBehavior))}
-              />
-            </dl>
-          </section>
-        ) : null}
-
-        <DAccordion type="multiple" variant="separated">
-          <DAccordionItem
-            value="variants"
-            title={
-              <span className="flex min-w-0 flex-col gap-0.5">
-                <span className="flex items-center gap-2">
-                  <span className="font-semibold">{copy('Variants')}</span>
-                  <DBadge variant="secondary">
-                    {variants.data?.items.length ?? item.variantCount}
-                  </DBadge>
-                </span>
-                <span className="text-xs font-normal text-[var(--color-text-muted)]">
-                  {copy(
-                    'Open only when you need to review or maintain variant-specific configuration.',
-                  )}
-                </span>
-              </span>
-            }
-          >
-            <div className="mb-3 flex justify-end">
-              {canCreate ? (
-                <DButton leftIcon={<Plus className="size-4" />} onClick={() => setEditingVariant(null)}>
-                  {copy('Add variant')}
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">Harga Saat Ini</p>
+                <div className="mt-1 text-2xl font-semibold">
+                  <PriceLabel
+                    price={defaultPrice}
+                    loading={defaultPriceLoading}
+                    available
+                    emptyLabel="Belum diatur"
+                  />
+                </div>
+              </div>
+              {canCreatePricing ? (
+                <DButton leftIcon={<BadgeDollarSign className="size-4" />} onClick={() => setPricingTarget('default')}>
+                  {defaultPrice ? 'Ubah Harga' : 'Atur Harga'}
                 </DButton>
               ) : null}
             </div>
+          </section>
+        ) : null}
+
+        <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-semibold">Varian</h2>
+              <DBadge variant="secondary">{variantCount}</DBadge>
+            </div>
+            {canCreate ? (
+              <DButton leftIcon={<Plus className="size-4" />} onClick={() => setEditingVariant(null)}>
+                Tambah Varian
+              </DButton>
+            ) : null}
+          </div>
+          <div className="mt-4">
             <DDataTable
               columns={variantColumns}
               data={variants.data?.items ?? []}
               loading={variants.isLoading}
               rowKey="id"
-              emptyMessage={copy('No variants.')}
+              emptyMessage="Item ini belum memiliki varian."
               actions={[
                 {
-                  label: copy('Edit variant'),
+                  label: 'Edit varian',
                   icon: <Pencil className="size-4" />,
                   onClick: setEditingVariant,
                   show: () => canUpdate,
                 },
                 {
-                  label: copy('Manage variant price'),
+                  label: 'Ubah harga varian',
                   icon: <BadgeDollarSign className="size-4" />,
                   onClick: setPricingTarget,
                   show: () => canViewPricing,
                 },
                 {
-                  label: copy('Deactivate variant'),
+                  label: 'Nonaktifkan varian',
                   icon: <Power className="size-4" />,
                   onClick: setStatusTarget,
                   show: (variant) => canUpdate && variant.status === 'ACTIVE',
                 },
                 {
-                  label: copy('Reactivate variant'),
+                  label: 'Aktifkan varian',
                   icon: <RotateCcw className="size-4" />,
                   onClick: setStatusTarget,
                   show: (variant) => canUpdate && variant.status === 'INACTIVE',
                 },
               ]}
             />
-          </DAccordionItem>
+          </div>
+        </section>
 
-          {canViewPricing ? (
-            <DAccordionItem
-              value="price-history"
-              title={
-                <span className="flex min-w-0 flex-col gap-0.5">
-                  <span className="flex items-center gap-2">
-                    <span className="font-semibold">{copy('Price history')}</span>
-                    <DBadge variant="secondary">{defaultHistory.length}</DBadge>
-                  </span>
-                  <span className="text-xs font-normal text-[var(--color-text-muted)]">
-                    {copy(
-                      'Historical default prices stay immutable so past sales remain auditable.',
-                    )}
-                  </span>
-                </span>
-              }
-            >
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[var(--color-surface-muted)] p-3">
-                <div>
-                  <p className="text-xs text-[var(--color-text-muted)]">
-                    {copy('Current default price')}
-                  </p>
-                  <p className="mt-1 text-lg font-semibold">
-                    <PriceLabel
-                      price={defaultPrice}
-                      loading={defaultPriceLoading}
-                      emptyLabel={copy('Not set')}
-                    />
-                  </p>
-                </div>
-                {canCreatePricing ? (
-                  <DButton onClick={() => setPricingTarget('default')}>
-                    {defaultPrice ? copy('Change price') : copy('Set price')}
-                  </DButton>
-                ) : null}
-              </div>
+        {canViewPricing ? (
+          <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] p-4">
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-semibold">Riwayat Harga</h2>
+              <DBadge variant="secondary">{defaultHistory.length}</DBadge>
+            </div>
+            <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+              Setiap perubahan harga disimpan agar harga sebelumnya tetap dapat ditelusuri.
+            </p>
+            <div className="mt-4">
               <PriceHistoryTable
                 prices={defaultHistory}
                 currency={currency}
@@ -399,11 +310,46 @@ export function CatalogItemDetailDialog({
                   await api.cancelPrice(price.id);
                   onPricingChanged();
                 }}
-                emptyMessage={copy('No default price history.')}
+                emptyMessage="Belum ada riwayat harga."
               />
-            </DAccordionItem>
-          ) : null}
-        </DAccordion>
+            </div>
+          </section>
+        ) : null}
+
+        {item.type === 'SERVICE' ? (
+          <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] p-4">
+            <h2 className="text-base font-semibold">Pengaturan Layanan</h2>
+            <dl className="mt-4 grid gap-4 sm:grid-cols-3">
+              <DetailField
+                label="Durasi Default"
+                value={
+                  serviceDefinition?.defaultDurationMinutes != null
+                    ? `${serviceDefinition.defaultDurationMinutes} menit`
+                    : 'Belum diatur'
+                }
+              />
+              <DetailField
+                label="Penugasan Karyawan"
+                value={
+                  serviceDefinition
+                    ? humanize(serviceDefinition.employeeAssignmentMode)
+                    : 'Belum diatur'
+                }
+              />
+              <DetailField
+                label="Kontribusi Karyawan"
+                value={serviceDefinition?.allowEmployeeContribution ? 'Diizinkan' : 'Tidak diizinkan'}
+              />
+            </dl>
+          </section>
+        ) : null}
+
+        {canViewTax ? (
+          <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] p-4">
+            <h2 className="text-base font-semibold">Pajak</h2>
+            <div className="mt-4"><DetailField label="Kategori Pajak Item" value={taxCategoryName} /></div>
+          </section>
+        ) : null}
       </div>
 
       <CatalogNamedRecordDialog
@@ -418,49 +364,41 @@ export function CatalogItemDetailDialog({
         }
         onSaved={refreshVariantsAndCount}
       />
+
       <PriceChangeDialog
-        key={pricingTarget === 'default' ? 'default-price' : (pricingTarget?.id ?? 'closed')}
         target={pricingTarget}
         item={item}
         currency={currency}
-        prices={
+        prices={(priceHistory.data?.items ?? []).filter((price) =>
           pricingTarget === 'default'
-            ? defaultHistory
+            ? price.catalogVariantId === null && price.locationId === null
             : pricingTarget
-              ? (priceHistory.data?.items ?? []).filter(
-                  (price) =>
-                    price.catalogVariantId === pricingTarget.id && price.locationId === null,
-                )
-              : []
-        }
+              ? price.catalogVariantId === pricingTarget.id && price.locationId === null
+              : false,
+        )}
         historyLoading={priceHistory.isLoading}
         canCreate={canCreatePricing}
         canCancel={canCancelPricing}
         api={api}
         onClose={() => setPricingTarget(null)}
-        onSaved={onPricingChanged}
+        onSaved={() => {
+          onPricingChanged();
+          void client.invalidateQueries({ queryKey: ['catalog', 'variant-price'] });
+        }}
       />
+
       <DConfirmDialog
         open={Boolean(statusTarget)}
         onClose={() => setStatusTarget(null)}
         onConfirm={() => void confirmVariantStatus()}
-        loading={changingStatus}
-        variant={statusTarget?.status === 'ACTIVE' ? 'danger' : 'primary'}
-        title={
-          statusTarget?.status === 'ACTIVE'
-            ? copy('Deactivate variant?')
-            : copy('Reactivate variant?')
-        }
+        title={statusTarget?.status === 'ACTIVE' ? 'Nonaktifkan varian?' : 'Aktifkan varian?'}
         message={
           statusTarget?.status === 'ACTIVE'
-            ? copy('This variant will stop appearing in active selling choices. Existing transaction and price history will be preserved.')
-            : copy('This variant will become available for active selling choices again.')
+            ? 'Varian tidak akan tersedia untuk penggunaan baru sampai diaktifkan kembali.'
+            : 'Varian akan tersedia kembali untuk penggunaan baru.'
         }
-        confirmLabel={
-          statusTarget?.status === 'ACTIVE'
-            ? copy('Deactivate variant')
-            : copy('Reactivate variant')
-        }
+        confirmLabel={statusTarget?.status === 'ACTIVE' ? 'Nonaktifkan' : 'Aktifkan'}
+        variant={statusTarget?.status === 'ACTIVE' ? 'danger' : 'default'}
       />
     </DDialog>
   );
