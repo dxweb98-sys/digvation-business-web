@@ -159,7 +159,7 @@ export interface SaleTransactionClient {
   clearSaleLineDiscount(saleId: string, saleLineId: string, expectedVersion: number): Promise<Sale>;
   setSaleDiscount(saleId: string, input: DiscountInput): Promise<Sale>;
   clearSaleDiscount(saleId: string, expectedVersion: number): Promise<Sale>;
-  setSaleLinePerformers(
+  setSaleLinePerformers?(
     saleId: string,
     saleLineId: string,
     input: ServicePerformersInput,
