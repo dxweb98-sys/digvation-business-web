@@ -80,7 +80,7 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
   );
   const selectedLocation = locations.find((location) => location.id === selectedLocationId) ?? null;
   const brandSubtitle =
-    runtime.branding.businessName ?? runtime.branding.companyName ?? runtime.workspace;
+    runtime.branding.businessName ?? runtime.branding.companyName ?? 'Operational';
   const userInitials = identityInitials(session.identity.displayName, session.identity.initials);
 
   useEffect(() => {
@@ -134,8 +134,8 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
     } catch {
       setLoggingOut(false);
       showToast({
-        title: 'Keluar gagal',
-        description: 'Sesi belum dapat diakhiri. Silakan coba lagi.',
+        title: 'Gagal keluar',
+        description: 'Coba lagi.',
         variant: 'danger',
       });
     }
@@ -147,7 +147,7 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
     if (!email) {
       showToast({
         title: 'Email tidak tersedia',
-        description: 'Hubungi administrator untuk meminta perubahan kata sandi.',
+        description: 'Hubungi administrator untuk mengubah kata sandi.',
         variant: 'warning',
       });
       return;
@@ -158,13 +158,13 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
       await authPort.requestPasswordChange({ email });
       showToast({
         title: 'Permintaan diterima',
-        description: 'Instruksi perubahan kata sandi akan dikirim ke email akun Anda.',
+        description: 'Instruksi akan dikirim ke email akun.',
         variant: 'success',
       });
     } catch {
       showToast({
-        title: 'Permintaan belum dapat diproses',
-        description: 'Silakan coba lagi atau hubungi administrator.',
+        title: 'Gagal meminta perubahan kata sandi',
+        description: 'Coba lagi atau hubungi administrator.',
         variant: 'danger',
       });
     } finally {
@@ -231,7 +231,7 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
                   {session.identity.displayName}
                 </span>
                 <span className="block truncate text-xs leading-4 text-[var(--color-text-muted)]">
-                  v{version.version} · {version.revision}
+                  {copy('Version')} {version.version}
                 </span>
               </span>
             </div>
