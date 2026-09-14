@@ -116,6 +116,7 @@ const technicalLabels: Record<string, LocalizedLabel> = {
   SUCCEEDED: { 'id-ID': 'Berhasil', 'en-US': 'Succeeded' },
   FAILED: { 'id-ID': 'Gagal', 'en-US': 'Failed' },
   REJECTED: { 'id-ID': 'Ditolak', 'en-US': 'Rejected' },
+  APPROVED: { 'id-ID': 'Disetujui', 'en-US': 'Approved' },
   EXPIRED: { 'id-ID': 'Kedaluwarsa', 'en-US': 'Expired' },
   PRODUCT: { 'id-ID': 'Produk', 'en-US': 'Product' },
   SERVICE: { 'id-ID': 'Layanan', 'en-US': 'Service' },
@@ -130,6 +131,10 @@ const technicalLabels: Record<string, LocalizedLabel> = {
   BANK_TRANSFER: { 'id-ID': 'Transfer bank', 'en-US': 'Bank transfer' },
   WALLET: { 'id-ID': 'Dompet digital', 'en-US': 'E-wallet' },
   QRIS: { 'id-ID': 'QRIS', 'en-US': 'QRIS' },
+  OPERATIONS: { 'id-ID': 'Operasional', 'en-US': 'Operations' },
+  TRANSPORT: { 'id-ID': 'Transportasi', 'en-US': 'Transport' },
+  SUPPLIES: { 'id-ID': 'Perlengkapan', 'en-US': 'Supplies' },
+  OTHER: { 'id-ID': 'Lainnya', 'en-US': 'Other' },
 };
 
 function humanizeTechnicalValue(value: string): string {
