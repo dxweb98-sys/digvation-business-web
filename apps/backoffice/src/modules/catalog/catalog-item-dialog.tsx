@@ -146,8 +146,6 @@ export function CatalogItemDialog({
         type === 'SERVICE'
           ? {
               defaultDurationMinutes: parsedDefaultDuration,
-              employeeAssignmentMode: 'REQUIRED' as const,
-              allowEmployeeContribution: false,
             }
           : undefined;
       const baseInput = {
