@@ -6,6 +6,7 @@ import {
   DDatePicker,
   DDialog,
   DInput,
+  DRangeDatePicker,
   DSelect,
   DTextarea,
   DTimePicker,
@@ -262,6 +263,7 @@ export function AttendancePanel({ api, canManage }: { api: EmployeesApi; canMana
                 }
               }}
               variant="date"
+              placeholder={copy('Select attendance date')}
             />
           ) : null}
 
@@ -279,30 +281,17 @@ export function AttendancePanel({ api, canManage }: { api: EmployeesApi; canMana
           ) : null}
 
           {historyMode === 'RANGE' ? (
-            <>
-              <DDatePicker
-                label={copy('From date')}
-                value={historyFrom}
-                onChange={(value) => {
-                  if (!value) return;
-                  setHistoryFrom(value);
-                  if (value > historyTo) setHistoryTo(value);
-                  setHistoryOffset(0);
-                }}
-                variant="date"
-              />
-              <DDatePicker
-                label={copy('To date')}
-                value={historyTo}
-                onChange={(value) => {
-                  if (!value) return;
-                  setHistoryTo(value);
-                  if (value < historyFrom) setHistoryFrom(value);
-                  setHistoryOffset(0);
-                }}
-                variant="date"
-              />
-            </>
+            <DRangeDatePicker
+              label={copy('Date range')}
+              value={{ start: historyFrom, end: historyTo }}
+              onChange={(range) => {
+                const nextFrom = range.start ?? historyFrom;
+                const nextTo = range.end ?? historyTo;
+                setHistoryFrom(nextFrom <= nextTo ? nextFrom : nextTo);
+                setHistoryTo(nextFrom <= nextTo ? nextTo : nextFrom);
+                setHistoryOffset(0);
+              }}
+            />
           ) : null}
 
           <DSelect
@@ -558,6 +547,7 @@ function AttendanceAdjustmentDialog({
               setSelectedIds(new Set());
             }}
             variant="date"
+            placeholder={copy('Select attendance date')}
           />
           <DSelect
             label={copy('Position')}
@@ -691,7 +681,7 @@ function AttendanceAdjustmentDialog({
               label={copy('Note')}
               value={note}
               onChange={setNote}
-              placeholder={copy('Not set')}
+              placeholder={copy('Optional reason or attendance note')}
             />
           </div>
         </div>
