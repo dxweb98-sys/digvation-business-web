@@ -4,7 +4,7 @@ const workforceCopy: Record<string, { id: string; en: string }> = {
   Position: { id: 'Jabatan', en: 'Position' },
   Positions: { id: 'Jabatan', en: 'Positions' },
   Attendance: { id: 'Absensi', en: 'Attendance' },
-  'Attendance Report': { id: 'Laporan Absensi', en: 'Attendance Report' },
+  'Attendance Report': { id: 'Laporan absensi', en: 'Attendance Report' },
   'Attendance activity': { id: 'Aktivitas absensi', en: 'Attendance activity' },
   'Export CSV': { id: 'Ekspor CSV', en: 'Export CSV' },
   'Total Records': { id: 'Total catatan', en: 'Total Records' },
@@ -29,17 +29,17 @@ const workforceCopy: Record<string, { id: string; en: string }> = {
   'Attendance summary': { id: 'Ringkasan absensi', en: 'Attendance summary' },
   'Attendance history': { id: 'Riwayat absensi', en: 'Attendance history' },
   'Status changes remain auditable and do not remove historical employee references.': {
-    id: 'Perubahan status tetap dapat diaudit dan tidak menghapus referensi historis karyawan.',
-    en: 'Status changes remain auditable and do not remove historical employee references.',
+    id: 'Riwayat karyawan tetap tersimpan setelah status diubah.',
+    en: 'Employee history remains available after a status change.',
   },
   'System information': { id: 'Informasi sistem', en: 'System information' },
   'Record version': { id: 'Versi data', en: 'Record version' },
   'Position not set': { id: 'Jabatan belum diatur', en: 'Position not set' },
-  'Service assignment': { id: 'Penugasan jasa', en: 'Service assignment' },
-  'Can perform services': { id: 'Bisa mengerjakan jasa', en: 'Can perform services' },
-  'Cannot perform services': { id: 'Tidak bisa mengerjakan jasa', en: 'Cannot perform services' },
+  'Service assignment': { id: 'Penugasan layanan', en: 'Service assignment' },
+  'Can perform services': { id: 'Bisa mengerjakan layanan', en: 'Can perform services' },
+  'Cannot perform services': { id: 'Tidak bisa mengerjakan layanan', en: 'Cannot perform services' },
   'Allow employees in this position to be assigned to service work.': {
-    id: 'Izinkan karyawan dengan jabatan ini ditugaskan untuk mengerjakan jasa.',
+    id: 'Izinkan karyawan dengan jabatan ini mengerjakan layanan.',
     en: 'Allow employees in this position to be assigned to service work.',
   },
   'Add position': { id: 'Tambah jabatan', en: 'Add position' },
@@ -55,17 +55,17 @@ const workforceCopy: Record<string, { id: string; en: string }> = {
     id: 'Tidak ada jabatan yang sesuai.',
     en: 'No matching positions found.',
   },
-  'Position added.': { id: 'Jabatan ditambahkan.', en: 'Position added.' },
-  'Position updated.': { id: 'Jabatan diperbarui.', en: 'Position updated.' },
+  'Position added.': { id: 'Jabatan berhasil ditambahkan.', en: 'Position added.' },
+  'Position updated.': { id: 'Jabatan berhasil diperbarui.', en: 'Position updated.' },
   'Could not save position.': {
-    id: 'Jabatan tidak dapat disimpan.',
+    id: 'Gagal menyimpan jabatan.',
     en: 'Could not save position.',
   },
   'Deactivate position': { id: 'Nonaktifkan jabatan', en: 'Deactivate position' },
   'Reactivate position': { id: 'Aktifkan kembali jabatan', en: 'Reactivate position' },
   'Existing historical assignments remain unchanged. New service assignments require an active eligible position.':
     {
-      id: 'Penugasan historis tetap tidak berubah. Penugasan jasa baru memerlukan jabatan aktif yang diizinkan.',
+      id: 'Penugasan lama tetap tersimpan. Penugasan layanan baru memerlukan jabatan aktif yang memenuhi syarat.',
       en: 'Existing historical assignments remain unchanged. New service assignments require an active eligible position.',
     },
   'Select position': { id: 'Pilih jabatan', en: 'Select position' },
@@ -79,15 +79,15 @@ const workforceCopy: Record<string, { id: string; en: string }> = {
   'Edit attendance': { id: 'Ubah absensi', en: 'Edit attendance' },
   'Adjust attendance': { id: 'Penyesuaian absensi', en: 'Adjust attendance' },
   'Select one or more employees, then apply the same attendance adjustment.': {
-    id: 'Pilih satu atau beberapa karyawan, lalu terapkan penyesuaian absensi yang sama.',
-    en: 'Select one or more employees, then apply the same attendance adjustment.',
+    id: 'Pilih karyawan lalu isi penyesuaian absensi.',
+    en: 'Select employees, then enter the attendance adjustment.',
   },
   'Select visible': { id: 'Pilih yang tampil', en: 'Select visible' },
   'Clear selection': { id: 'Hapus pilihan', en: 'Clear selection' },
   'employees selected': { id: 'karyawan dipilih', en: 'employees selected' },
   'employees updated': { id: 'karyawan diperbarui', en: 'employees updated' },
   'Attendance adjustment saved.': {
-    id: 'Penyesuaian absensi disimpan.',
+    id: 'Penyesuaian absensi berhasil disimpan.',
     en: 'Attendance adjustment saved.',
   },
   'attendance records': { id: 'catatan absensi', en: 'attendance records' },
@@ -98,17 +98,17 @@ const workforceCopy: Record<string, { id: string; en: string }> = {
   'Check in (optional)': { id: 'Jam masuk (opsional)', en: 'Check in (optional)' },
   'Check out (optional)': { id: 'Jam pulang (opsional)', en: 'Check out (optional)' },
   'Check-in and check-out times are optional for now.': {
-    id: 'Jam masuk dan jam pulang bersifat opsional untuk saat ini.',
-    en: 'Check-in and check-out times are optional for now.',
+    id: 'Jam masuk dan jam pulang bersifat opsional.',
+    en: 'Check-in and check-out times are optional.',
   },
   Note: { id: 'Catatan', en: 'Note' },
   Source: { id: 'Sumber', en: 'Source' },
   Local: { id: 'Lokal', en: 'Local' },
   HRIS: { id: 'HRIS', en: 'HRIS' },
   'Recorded by': { id: 'Dicatat oleh', en: 'Recorded by' },
-  'Attendance saved.': { id: 'Absensi disimpan.', en: 'Attendance saved.' },
+  'Attendance saved.': { id: 'Absensi berhasil disimpan.', en: 'Attendance saved.' },
   'Could not save attendance.': {
-    id: 'Absensi tidak dapat disimpan.',
+    id: 'Gagal menyimpan absensi.',
     en: 'Could not save attendance.',
   },
   'No attendance has been recorded for this date.': {
@@ -117,21 +117,21 @@ const workforceCopy: Record<string, { id: string; en: string }> = {
   },
   'Attendance is recorded by authorized supervisors or managers. HRIS-sourced records remain read-only locally.':
     {
-      id: 'Absensi dicatat oleh atasan yang berwenang. Data yang bersumber dari HRIS tetap hanya-baca secara lokal.',
-      en: 'Attendance is recorded by authorized supervisors or managers. HRIS-sourced records remain read-only locally.',
+      id: 'Absensi dapat dicatat oleh atasan yang berwenang. Data dari HRIS tidak dapat diubah di sini.',
+      en: 'Authorized supervisors or managers can record attendance. HRIS records cannot be changed here.',
     },
   'Review the daily roster, find an employee quickly, and record attendance without leaving this view.':
     {
-      id: 'Tinjau daftar karyawan harian, temukan karyawan dengan cepat, dan catat absensi tanpa meninggalkan halaman ini.',
-      en: 'Review the daily roster, find an employee quickly, and record attendance without leaving this view.',
+      id: 'Lihat daftar karyawan dan catat absensi hari ini.',
+      en: 'Review employees and record attendance for today.',
     },
   'Review attendance history by day, month, or a custom date range.': {
-    id: 'Tinjau riwayat absensi berdasarkan hari, bulan, atau rentang tanggal tertentu.',
-    en: 'Review attendance history by day, month, or a custom date range.',
+    id: 'Lihat riwayat absensi berdasarkan periode.',
+    en: 'Review attendance history by period.',
   },
   'Showing attendance records for the selected period and filters.': {
-    id: 'Menampilkan catatan absensi sesuai periode dan filter yang dipilih.',
-    en: 'Showing attendance records for the selected period and filters.',
+    id: 'Catatan absensi sesuai periode dan filter.',
+    en: 'Attendance records for the selected period and filters.',
   },
   Period: { id: 'Periode', en: 'Period' },
   Daily: { id: 'Harian', en: 'Daily' },
@@ -150,13 +150,13 @@ const workforceCopy: Record<string, { id: string; en: string }> = {
     en: 'No attendance history is available.',
   },
   'Could not load attendance history.': {
-    id: 'Riwayat absensi tidak dapat dimuat.',
+    id: 'Gagal memuat riwayat absensi.',
     en: 'Could not load attendance history.',
   },
   'Service eligibility is controlled by the employee position. Catalog service assignment mode still decides whether assignment is optional or required.':
     {
-      id: 'Kelayakan mengerjakan jasa dikontrol oleh jabatan karyawan. Mode penugasan pada katalog jasa tetap menentukan apakah penugasan opsional atau wajib.',
-      en: 'Service eligibility is controlled by the employee position. Catalog service assignment mode still decides whether assignment is optional or required.',
+      id: 'Jabatan menentukan layanan yang dapat dikerjakan. Pengaturan layanan menentukan apakah penugasan karyawan opsional atau wajib.',
+      en: 'Position determines which services an employee can perform. Service settings determine whether assignment is optional or required.',
     },
 };
 
