@@ -35,7 +35,7 @@ export class HttpAuthAdapter {
   }
 
   public async restore(): Promise<BackofficeSession | null> {
-    const accessToken = this.sessionClient.getAccessToken();
+    const accessToken = await this.sessionClient.restoreAccessToken();
     if (!accessToken) return null;
 
     try {
@@ -75,7 +75,7 @@ export class HttpAuthAdapter {
   }
 
   public async getAccessToken(forceRefresh = false): Promise<string | null> {
-    if (!forceRefresh) return this.sessionClient.getAccessToken();
+    if (!forceRefresh) return this.sessionClient.getUsableAccessToken();
     const refreshed = await this.sessionClient.refreshAccessToken();
     if (refreshed.kind === 'refreshed') return refreshed.accessToken;
     if (refreshed.kind === 'deferred') return this.sessionClient.getAccessToken();
