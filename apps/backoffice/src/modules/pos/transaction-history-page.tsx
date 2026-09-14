@@ -15,6 +15,7 @@ import { useRuntime } from '@digvation/business-runtime';
 import { useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
 import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
+import { humanReadableLabel } from '../../app/localization/human-readable-labels';
 import {
   TransactionHistoryApi,
   type FulfillmentStatus,
@@ -28,7 +29,7 @@ const defaultPageSize = 20;
 export function TransactionHistoryPage() {
   const { createApiClient } = useBackofficeAuth();
   const runtime = useRuntime();
-  const { copy, formatDate, formatMoney } = useBackofficeLocalization();
+  const { copy, formatDate, formatMoney, locale } = useBackofficeLocalization();
   const api = useMemo(
     () => new TransactionHistoryApi(createApiClient(runtime.apiBaseUrl)),
     [createApiClient, runtime.apiBaseUrl],
@@ -126,7 +127,7 @@ export function TransactionHistoryPage() {
     },
     {
       key: 'fulfillment',
-      label: copy('Fulfillment'),
+      label: locale === 'id' ? 'Pengerjaan' : 'Work',
       render: (row) => <FulfillmentSummary lines={row.lines} />,
     },
   ];
@@ -136,9 +137,11 @@ export function TransactionHistoryPage() {
       <BackofficePageHeader
         eyebrow={copy('Reporting')}
         title={copy('Transaction history')}
-        description={copy(
-          'Review sale, payment, and fulfillment facts without changing their lifecycle.',
-        )}
+        description={
+          locale === 'id'
+            ? 'Tinjau status transaksi, pembayaran, dan pengerjaan tanpa mengubah data transaksi.'
+            : 'Review transaction, payment, and work status without changing transaction data.'
+        }
       />
       <section className="mt-6">
         <DDataTable
@@ -163,7 +166,10 @@ export function TransactionHistoryPage() {
                   setSaleStatus(String(value ?? ''));
                   resetPage();
                 }}
-                options={saleStatuses.map((value) => ({ value, label: copy(value) }))}
+                options={saleStatuses.map((value) => ({
+                  value,
+                  label: humanReadableLabel(value, locale),
+                }))}
               />
               <DSelectFilter
                 label={copy('Payment status')}
@@ -173,17 +179,23 @@ export function TransactionHistoryPage() {
                   setPaymentStatus(String(value ?? ''));
                   resetPage();
                 }}
-                options={paymentStatuses.map((value) => ({ value, label: copy(value) }))}
+                options={paymentStatuses.map((value) => ({
+                  value,
+                  label: humanReadableLabel(value, locale),
+                }))}
               />
               <DSelectFilter
-                label={copy('Fulfillment status')}
+                label={locale === 'id' ? 'Status pengerjaan' : 'Work status'}
                 value={fulfillmentStatus || null}
                 clearable
                 onChange={(value) => {
                   setFulfillmentStatus(String(value ?? ''));
                   resetPage();
                 }}
-                options={fulfillmentStatuses.map((value) => ({ value, label: copy(value) }))}
+                options={fulfillmentStatuses.map((value) => ({
+                  value,
+                  label: humanReadableLabel(value, locale),
+                }))}
               />
               <DDatePicker
                 label={copy('From')}
@@ -244,7 +256,7 @@ const fulfillmentStatuses: FulfillmentStatus[] = [
 ];
 
 function StatusBadge({ status }: { status: SaleStatus | PaymentStatus | FulfillmentStatus }) {
-  const { copy } = useBackofficeLocalization();
+  const { locale } = useBackofficeLocalization();
   const variant = ['FINALIZED', 'SUCCEEDED', 'COMPLETED'].includes(status)
     ? 'success'
     : ['VOIDED', 'FAILED', 'CANCELLED', 'EXPIRED', 'CANCELED'].includes(status)
@@ -252,7 +264,7 @@ function StatusBadge({ status }: { status: SaleStatus | PaymentStatus | Fulfillm
       : status === 'PENDING' || status === 'IN_PROGRESS'
         ? 'warning'
         : 'outline';
-  return <DBadge variant={variant}>{copy(status)}</DBadge>;
+  return <DBadge variant={variant}>{humanReadableLabel(status, locale)}</DBadge>;
 }
 function FulfillmentSummary({ lines }: { lines: Sale['lines'] }) {
   const tracked = lines.filter((line) => line.fulfillment);
@@ -279,7 +291,7 @@ function TransactionDetail({
   error: boolean;
   onClose: () => void;
 }) {
-  const { copy, formatDate, formatMoney } = useBackofficeLocalization();
+  const { copy, formatDate, formatMoney, locale } = useBackofficeLocalization();
   return (
     <DDialog
       open={open}
@@ -357,7 +369,7 @@ function TransactionDetail({
                     className="rounded-[var(--radius-control)] border border-[var(--color-border)] p-3 text-sm"
                   >
                     <div className="flex items-center justify-between gap-3">
-                      <span>{copy(payment.method)}</span>
+                      <span>{humanReadableLabel(payment.method, locale)}</span>
                       <StatusBadge status={payment.status} />
                     </div>
                     <p className="mt-1 font-semibold">
@@ -390,7 +402,9 @@ function TransactionDetail({
             </div>
           </section>
           <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] p-4 sm:p-5">
-            <h3 className="text-sm font-semibold">{copy('Fulfillment information')}</h3>
+            <h3 className="text-sm font-semibold">
+              {locale === 'id' ? 'Informasi pengerjaan' : 'Work information'}
+            </h3>
             <div className="mt-3 space-y-2">
               {item.lines.filter((line) => line.fulfillment).length ? (
                 item.lines
@@ -416,7 +430,9 @@ function TransactionDetail({
                   ))
               ) : (
                 <p className="text-sm text-[var(--color-text-muted)]">
-                  {copy('No tracked fulfillment is recorded.')}
+                  {locale === 'id'
+                    ? 'Tidak ada pengerjaan yang dicatat untuk transaksi ini.'
+                    : 'No work is recorded for this transaction.'}
                 </p>
               )}
             </div>
