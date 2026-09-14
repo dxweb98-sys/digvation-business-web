@@ -70,6 +70,19 @@ function fulfillmentActions(status: FulfillmentStatus | null) {
   return [] as const;
 }
 
+function fulfillmentLabel(status: FulfillmentStatus) {
+  if (status === 'WAITING') return 'Menunggu';
+  if (status === 'IN_PROGRESS') return 'Dikerjakan';
+  if (status === 'COMPLETED') return 'Selesai';
+  return 'Dibatalkan';
+}
+
+function assignmentModeLabel(mode: SaleLine['employeeAssignmentModeSnapshot']) {
+  if (mode === 'REQUIRED') return 'Wajib';
+  if (mode === 'OPTIONAL') return 'Opsional';
+  return 'Tidak diperlukan';
+}
+
 export function SaleLineTaskDialog({
   line,
   employees,
@@ -157,7 +170,7 @@ export function SaleLineTaskDialog({
       }
       const shareRate = percentToRate(trimmed);
       if (!shareRate) {
-        setFormError('Contribution share must be greater than 0 and at most 100%.');
+        setFormError('Porsi kontribusi harus lebih dari 0 dan maksimal 100%.');
         return;
       }
       contributors.push({ employeeId, shareRate });
@@ -169,7 +182,7 @@ export function SaleLineTaskDialog({
     setFormError(null);
     const value = discountValueForApi(discountType, discountValue);
     if (!value || discountReason.trim() === '') {
-      setFormError('Discount value and reason are required. Percentage uses 0â€“100%.');
+      setFormError('Isi nilai dan alasan diskon. Persentase harus antara 0 sampai 100%.');
       return;
     }
     onSetLineDiscount(line, { type: discountType, value, reason: discountReason.trim() });
@@ -178,7 +191,7 @@ export function SaleLineTaskDialog({
   const saveOverride = () => {
     setFormError(null);
     if (!/^\d+(?:\.\d{1,4})?$/.test(overrideAmount.trim()) || overrideReason.trim() === '') {
-      setFormError('Override amount and reason are required. Amount supports up to four decimals.');
+      setFormError('Isi harga dan alasan. Harga dapat menggunakan maksimal empat angka desimal.');
       return;
     }
     onSetPriceOverride(line, overrideAmount.trim(), overrideReason.trim());
@@ -190,20 +203,17 @@ export function SaleLineTaskDialog({
     <DDialog
       open
       onClose={onClose}
-      ariaLabel={`Manage ${line.itemNameSnapshot}`}
+      ariaLabel={`Atur ${line.itemNameSnapshot}`}
       className="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-t-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl sm:rounded-[var(--radius-card)]"
     >
       <header className="flex items-start justify-between gap-4 border-b border-[var(--color-border)] p-4 sm:p-5">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-brand)]">
-            Line task
+            Pengaturan item
           </p>
           <h2 className="mt-2 text-xl font-bold">{line.itemNameSnapshot}</h2>
-          <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-            Assignment, contribution, fulfillment and monetary adjustments remain separate commands.
-          </p>
         </div>
-        <DButton variant="ghost" aria-label="Close line task" onClick={onClose} className="px-3">
+        <DButton variant="ghost" aria-label="Tutup" onClick={onClose} className="px-3">
           <X className="size-5" />
         </DButton>
       </header>
@@ -220,11 +230,10 @@ export function SaleLineTaskDialog({
             <article className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm">
               <div className="flex items-center gap-2">
                 <UserRound className="size-4" />
-                <h3 className="font-bold">Employee assignment</h3>
+                <h3 className="font-bold">Penugasan karyawan</h3>
               </div>
               <p className="mt-2 text-xs leading-5 text-[var(--color-text-muted)]">
-                Mode: {line.employeeAssignmentModeSnapshot}. Assignment is operational and does not
-                define contribution share.
+                Penugasan {assignmentModeLabel(line.employeeAssignmentModeSnapshot).toLowerCase()}.
               </p>
               <div className="mt-4 space-y-2">
                 {employees.map((employee) => (
@@ -244,9 +253,7 @@ export function SaleLineTaskDialog({
                   </label>
                 ))}
                 {employees.length === 0 ? (
-                  <p className="text-sm text-[var(--color-text-muted)]">
-                    No ACTIVE employees available.
-                  </p>
+                  <p className="text-sm text-[var(--color-text-muted)]">Belum ada karyawan aktif.</p>
                 ) : null}
               </div>
               {operationalMessage ? (
@@ -258,7 +265,7 @@ export function SaleLineTaskDialog({
                 disabled={operationalDisabled}
                 onClick={() => onSetAssignments(line, assignedIds)}
               >
-                Save assignment
+                Simpan penugasan
               </DButton>
             </article>
           ) : null}
@@ -267,11 +274,10 @@ export function SaleLineTaskDialog({
             <article className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm">
               <div className="flex items-center gap-2">
                 <Percent className="size-4" />
-                <h3 className="font-bold">Employee contribution</h3>
+                <h3 className="font-bold">Kontribusi karyawan</h3>
               </div>
               <p className="mt-2 text-xs leading-5 text-[var(--color-text-muted)]">
-                Leave all shares blank for equal split. Partial shares are allowed; the backend
-                distributes the remaining share deterministically.
+                Kosongkan porsi untuk membagi kontribusi secara merata.
               </p>
               <div className="mt-4 space-y-2">
                 {employees.map((employee) => {
@@ -291,9 +297,9 @@ export function SaleLineTaskDialog({
                       </label>
                       {selected ? (
                         <label className="mt-2 flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
-                          Share %
+                          Porsi %
                           <DInput
-                            aria-label={`${employee.displayName} contribution share`}
+                            aria-label={`Porsi kontribusi ${employee.displayName}`}
                             value={contributionShares[employee.id] ?? ''}
                             disabled={operationalDisabled}
                             onChange={(value) =>
@@ -302,7 +308,7 @@ export function SaleLineTaskDialog({
                                 [employee.id]: value,
                               }))
                             }
-                            placeholder="auto"
+                            placeholder="Otomatis"
                             inputMode="decimal"
                             className="ml-auto w-28 text-right"
                           />
@@ -318,16 +324,16 @@ export function SaleLineTaskDialog({
                 disabled={operationalDisabled}
                 onClick={saveContributions}
               >
-                Save contribution
+                Simpan kontribusi
               </DButton>
 
               {contributionPreview ? (
                 <div className="mt-4 rounded-[var(--radius-control)] border border-[var(--color-border)] p-3">
                   <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">
-                    Backend preview
+                    Pratinjau kontribusi
                   </p>
                   <p className="mt-2 text-sm font-semibold">
-                    Base{' '}
+                    Dasar perhitungan{' '}
                     {formatMoney(contributionPreview.contributionBaseAmount, line.currency, locale)}
                   </p>
                   <div className="mt-2 space-y-1 text-xs">
@@ -352,10 +358,10 @@ export function SaleLineTaskDialog({
             <article className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm">
               <div className="flex items-center gap-2">
                 <CircleDot className="size-4" />
-                <h3 className="font-bold">Tracked fulfillment</h3>
+                <h3 className="font-bold">Pengerjaan layanan</h3>
               </div>
               <p className="mt-2 text-sm">
-                Current status: <strong>{line.fulfillment.status}</strong>
+                Status: <strong>{fulfillmentLabel(line.fulfillment.status)}</strong>
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 {actions.map((status) => (
@@ -368,12 +374,16 @@ export function SaleLineTaskDialog({
                     {status === 'IN_PROGRESS' ? <Play className="mr-2 size-4" /> : null}
                     {status === 'COMPLETED' ? <CheckCircle2 className="mr-2 size-4" /> : null}
                     {status === 'CANCELED' ? <Square className="mr-2 size-4" /> : null}
-                    {status.replace('_', ' ')}
+                    {status === 'IN_PROGRESS'
+                      ? 'Mulai pengerjaan'
+                      : status === 'COMPLETED'
+                        ? 'Tandai selesai'
+                        : 'Batalkan pengerjaan'}
                   </DButton>
                 ))}
                 {actions.length === 0 ? (
                   <p className="text-xs text-[var(--color-text-muted)]">
-                    No further CP2 transition is available.
+                    Tidak ada tindakan lanjutan.
                   </p>
                 ) : null}
               </div>
@@ -381,14 +391,11 @@ export function SaleLineTaskDialog({
           ) : null}
 
           <article className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm">
-            <h3 className="font-bold">Price override</h3>
-            <p className="mt-2 text-xs leading-5 text-[var(--color-text-muted)]">
-              Resolved price stays captured. Override stores a separate final unit price and reason.
-            </p>
+            <h3 className="font-bold">Harga khusus</h3>
             <label className="mt-4 block text-xs font-semibold text-[var(--color-text-muted)]">
-              Unit amount
+              Harga
               <DInput
-                aria-label="Price override amount"
+                aria-label="Harga khusus"
                 value={overrideAmount}
                 disabled={monetaryDisabled}
                 onChange={setOverrideAmount}
@@ -397,9 +404,9 @@ export function SaleLineTaskDialog({
               />
             </label>
             <label className="mt-3 block text-xs font-semibold text-[var(--color-text-muted)]">
-              Reason
+              Alasan
               <DInput
-                aria-label="Price override reason"
+                aria-label="Alasan harga khusus"
                 value={overrideReason}
                 disabled={monetaryDisabled}
                 onChange={setOverrideReason}
@@ -408,7 +415,7 @@ export function SaleLineTaskDialog({
             </label>
             <div className="mt-4 flex gap-2">
               <DButton variant="secondary" disabled={monetaryDisabled} onClick={saveOverride}>
-                Apply override
+                Terapkan harga
               </DButton>
               {line.overrideAmount ? (
                 <DButton
@@ -416,7 +423,7 @@ export function SaleLineTaskDialog({
                   disabled={monetaryDisabled}
                   onClick={() => onClearPriceOverride(line)}
                 >
-                  Remove
+                  Hapus
                 </DButton>
               ) : null}
             </div>
@@ -426,10 +433,10 @@ export function SaleLineTaskDialog({
           </article>
 
           <article className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm">
-            <h3 className="font-bold">Line discount</h3>
+            <h3 className="font-bold">Diskon item</h3>
             <div className="mt-4 grid grid-cols-[140px_minmax(0,1fr)] gap-2">
               <DSelect
-                aria-label="Line discount type"
+                aria-label="Jenis diskon item"
                 value={discountType}
                 disabled={monetaryDisabled}
                 clearable={false}
@@ -440,11 +447,11 @@ export function SaleLineTaskDialog({
                   setDiscountValue('');
                 }}
               >
-                <option value="PERCENTAGE">Percentage</option>
-                <option value="FIXED_AMOUNT">Fixed amount</option>
+                <option value="PERCENTAGE">Persentase</option>
+                <option value="FIXED_AMOUNT">Nominal</option>
               </DSelect>
               <DDecimalInput
-                aria-label="Line discount value"
+                aria-label="Nilai diskon item"
                 value={discountValue}
                 disabled={monetaryDisabled}
                 onValueChange={setDiscountValue}
@@ -452,16 +459,16 @@ export function SaleLineTaskDialog({
               />
             </div>
             <DInput
-              aria-label="Line discount reason"
+              aria-label="Alasan diskon item"
               value={discountReason}
               disabled={monetaryDisabled}
               onChange={setDiscountReason}
-              placeholder="Reason"
+              placeholder="Alasan"
               className="mt-2"
             />
             <div className="mt-4 flex gap-2">
               <DButton variant="secondary" disabled={monetaryDisabled} onClick={saveDiscount}>
-                Apply discount
+                Terapkan diskon
               </DButton>
               {line.discountType ? (
                 <DButton
@@ -469,7 +476,7 @@ export function SaleLineTaskDialog({
                   disabled={monetaryDisabled}
                   onClick={() => onClearLineDiscount(line)}
                 >
-                  Remove
+                  Hapus
                 </DButton>
               ) : null}
             </div>
