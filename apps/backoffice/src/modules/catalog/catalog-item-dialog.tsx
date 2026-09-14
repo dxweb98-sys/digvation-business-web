@@ -1,4 +1,6 @@
 import {
+  DAccordion,
+  DAccordionItem,
   DButton,
   DCheckbox,
   DCurrencyInput,
@@ -260,82 +262,7 @@ export function CatalogItemDialog({
       }
       footer={<DialogFooter onClose={onClose} onSave={() => void save()} disabled={disabled} />}
     >
-      <div className="space-y-5">
-        <section className="rounded-(--radius-card) border border-(--color-border) p-4">
-          <h2 className="text-sm font-semibold">{copy('Basic information')}</h2>
-          <p className="mt-1 text-xs leading-5 text-(--color-text-muted)">
-            {copy('Identity and selling behavior for this catalog item.')}
-          </p>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <DInput
-              label={copy('Item code')}
-              hint={
-                fresh
-                  ? copy('Leave blank to generate a code automatically.')
-                  : copy('Code cannot be changed after creation.')
-              }
-              value={code}
-              onChange={setCode}
-              disabled={!fresh}
-              placeholder="COFFEE_LATTE"
-            />
-            <DInput
-              label={copy('Item name')}
-              value={name}
-              onChange={setName}
-              placeholder={copy('For example, Coffee Latte')}
-            />
-            <DSelect
-              label={copy('Type')}
-              value={type}
-              onChange={(value) => setType(value as Item['type'])}
-              disabled={!fresh}
-              options={[
-                { label: copy('Product'), value: 'PRODUCT' },
-                { label: copy('Service'), value: 'SERVICE' },
-              ]}
-            />
-            <DSelect
-              label={copy('Status')}
-              value={lifecycle}
-              onChange={(value) => setLifecycle(value as Item['lifecycle'])}
-              options={[
-                { label: copy('Draft'), value: 'DRAFT' },
-                { label: copy('Active'), value: 'ACTIVE' },
-                { label: copy('Inactive'), value: 'INACTIVE' },
-              ]}
-            />
-            <DSelect
-              label={copy('Category')}
-              value={categoryId}
-              onChange={(value) => setCategoryId(value as string | null)}
-              clearable
-              options={activeCategories.map((category) => ({
-                label: category.name,
-                value: category.id,
-              }))}
-            />
-            <DSelect
-              label={copy('Fulfillment')}
-              value={fulfillmentBehavior}
-              onChange={(value) => setFulfillmentBehavior(value as Item['fulfillmentBehavior'])}
-              options={[
-                { label: copy('Instant'), value: 'INSTANT' },
-                { label: copy('Tracked'), value: 'TRACKED' },
-              ]}
-            />
-          </div>
-          <div className="mt-4">
-            <DTextarea
-              label={copy('Description')}
-              value={description}
-              onChange={setDescription}
-              placeholder={copy('Add an optional description for this item')}
-              className="min-h-24"
-            />
-          </div>
-        </section>
-
+      <div className="space-y-3">
         {canManageImage ? (
           <CatalogItemImageField
             itemName={name}
@@ -351,109 +278,212 @@ export function CatalogItemDialog({
           />
         ) : null}
 
-        {canViewTax || (fresh && canCreatePricing) ? (
-          <section className="rounded-(--radius-card) border border-(--color-border) p-4">
-            <h2 className="text-sm font-semibold">{copy('Pricing & tax')}</h2>
-            <p className="mt-1 text-xs leading-5 text-(--color-text-muted)">
-              {copy(
-                'Set the starting price and item-specific tax behavior without leaving item creation.',
-              )}
-            </p>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              {fresh && canCreatePricing ? (
-                <div>
-                  <DCurrencyInput
-                    label={`${copy('Default Price')} (${currency})`}
-                    value={defaultPrice}
-                    onValueChange={setDefaultPrice}
-                    placeholder={copy('For example, 100000')}
-                  />
-                  <p className="mt-1 text-xs leading-5 text-(--color-text-muted)">
-                    {copy(
-                      'Optional. Variant prices inherit this price unless an override is provided.',
-                    )}
-                  </p>
-                </div>
-              ) : null}
-              {canViewTax ? (
-                <div>
-                  <DSelect
-                    label={copy('Item tax category')}
-                    value={taxCategoryId}
-                    onChange={(value) => setTaxCategoryId(value as string | null)}
-                    clearable
-                    options={availableTaxCategories.map((category) => ({
-                      label:
-                        category.status === 'ACTIVE'
-                          ? category.name
-                          : `${category.name} · ${copy('Inactive')}`,
-                      value: category.id,
-                    }))}
-                  />
-                  <p className="mt-1 text-xs leading-5 text-(--color-text-muted)">
-                    {taxProfile?.itemTaxEnabled
-                      ? copy(
-                          'Leave empty when this item has no item-specific tax. Transaction tax may still apply.',
-                        )
-                      : copy(
-                          'Item tax is currently disabled in Tax settings. The category can still be prepared here.',
-                        )}
-                  </p>
-                </div>
-              ) : null}
-            </div>
-            {!validPrice ? (
-              <p className="mt-2 text-sm text-(--color-danger)">
-                {copy('Price must be greater than zero with up to four decimal places.')}
-              </p>
-            ) : null}
-          </section>
-        ) : null}
-
-        {type === 'SERVICE' ? (
-          <section className="rounded-(--radius-card) border border-(--color-border) p-4">
-            <h2 className="text-sm font-semibold">{copy('Service configuration')}</h2>
-            <p className="mt-1 text-xs leading-5 text-(--color-text-muted)">
-              {copy('Define how this service is staffed and fulfilled.')}
-            </p>
+        <DAccordion type="multiple" variant="card">
+          <DAccordionItem
+            value="copy('Basic information')"
+            title={
+              <section className="">
+                <h2 className="text-sm font-semibold">{copy('Basic information')}</h2>
+                <p className="mt-1 text-xs leading-5 text-(--color-text-muted)">
+                  {copy('Identity and selling behavior for this catalog item.')}
+                </p>
+              </section>
+            }
+          >
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <DInput
-                label={copy('Default duration')}
-                hint={copy('Optional, in minutes.')}
-                value={defaultDurationMinutes}
-                onChange={setDefaultDurationMinutes}
-                type="number"
-                min={1}
-                placeholder="30"
+                label={copy('Item code')}
+                hint={
+                  fresh
+                    ? copy('Leave blank to generate a code automatically.')
+                    : copy('Code cannot be changed after creation.')
+                }
+                value={code}
+                onChange={setCode}
+                disabled={!fresh}
+                placeholder="COFFEE_LATTE"
+              />
+              <DInput
+                label={copy('Item name')}
+                value={name}
+                onChange={setName}
+                placeholder={copy('For example, Coffee Latte')}
               />
               <DSelect
-                label={copy('Employee assignment')}
-                value={employeeAssignmentMode}
-                onChange={(value) =>
-                  setEmployeeAssignmentMode(
-                    value as NonNullable<Item['serviceDefinition']>['employeeAssignmentMode'],
-                  )
-                }
+                label={copy('Type')}
+                value={type}
+                onChange={(value) => setType(value as Item['type'])}
+                disabled={!fresh}
                 options={[
-                  { label: copy('None'), value: 'NONE' },
-                  { label: copy('Optional'), value: 'OPTIONAL' },
-                  { label: copy('Required'), value: 'REQUIRED' },
+                  { label: copy('Product'), value: 'PRODUCT' },
+                  { label: copy('Service'), value: 'SERVICE' },
+                ]}
+              />
+              <DSelect
+                label={copy('Status')}
+                value={lifecycle}
+                onChange={(value) => setLifecycle(value as Item['lifecycle'])}
+                options={[
+                  { label: copy('Draft'), value: 'DRAFT' },
+                  { label: copy('Active'), value: 'ACTIVE' },
+                  { label: copy('Inactive'), value: 'INACTIVE' },
+                ]}
+              />
+              <DSelect
+                label={copy('Category')}
+                value={categoryId}
+                onChange={(value) => setCategoryId(value as string | null)}
+                clearable
+                options={activeCategories.map((category) => ({
+                  label: category.name,
+                  value: category.id,
+                }))}
+              />
+              <DSelect
+                label={copy('Fulfillment')}
+                value={fulfillmentBehavior}
+                onChange={(value) => setFulfillmentBehavior(value as Item['fulfillmentBehavior'])}
+                options={[
+                  { label: copy('Instant'), value: 'INSTANT' },
+                  { label: copy('Tracked'), value: 'TRACKED' },
                 ]}
               />
             </div>
-            {!validDefaultDuration ? (
-              <p className="mt-2 text-sm text-(--color-danger)">
-                {copy('Default duration must be a positive whole number.')}
-              </p>
-            ) : null}
-            <label className="mt-4 flex items-center gap-2 text-sm">
-              <DCheckbox
-                checked={allowEmployeeContribution}
-                onChange={(event) => setAllowEmployeeContribution(event.target.checked)}
+            <div className="mt-4">
+              <DTextarea
+                label={copy('Description')}
+                value={description}
+                onChange={setDescription}
+                placeholder={copy('Add an optional description for this item')}
+                className="min-h-24"
               />
-              {copy('Allow employee contribution')}
-            </label>
-          </section>
+            </div>
+          </DAccordionItem>
+        </DAccordion>
+
+        {canViewTax || (fresh && canCreatePricing) ? (
+          <DAccordion type="multiple" variant="card">
+            <DAccordionItem
+              value="copy('Basic information')"
+              title={
+                <section className="">
+                  <h2 className="text-sm font-semibold">{copy('Pricing & tax')}</h2>
+                  <p className="mt-1 text-xs leading-5 text-(--color-text-muted)">
+                    {copy(
+                      'Set the starting price and item-specific tax behavior without leaving item creation.',
+                    )}
+                  </p>
+                </section>
+              }
+            >
+              <section>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  {fresh && canCreatePricing ? (
+                    <div>
+                      <DCurrencyInput
+                        label={`${copy('Default Price')} (${currency})`}
+                        value={defaultPrice}
+                        onValueChange={setDefaultPrice}
+                        placeholder={copy('For example, 100000')}
+                      />
+                      <p className="mt-1 text-xs leading-5 text-(--color-text-muted)">
+                        {copy(
+                          'Optional. Variant prices inherit this price unless an override is provided.',
+                        )}
+                      </p>
+                    </div>
+                  ) : null}
+                  {canViewTax ? (
+                    <div>
+                      <DSelect
+                        label={copy('Item tax category')}
+                        value={taxCategoryId}
+                        onChange={(value) => setTaxCategoryId(value as string | null)}
+                        clearable
+                        options={availableTaxCategories.map((category) => ({
+                          label:
+                            category.status === 'ACTIVE'
+                              ? category.name
+                              : `${category.name} · ${copy('Inactive')}`,
+                          value: category.id,
+                        }))}
+                      />
+                      <p className="mt-1 text-xs leading-5 text-(--color-text-muted)">
+                        {taxProfile?.itemTaxEnabled
+                          ? copy(
+                              'Leave empty when this item has no item-specific tax. Transaction tax may still apply.',
+                            )
+                          : copy(
+                              'Item tax is currently disabled in Tax settings. The category can still be prepared here.',
+                            )}
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
+                {!validPrice ? (
+                  <p className="mt-2 text-sm text-(--color-danger)">
+                    {copy('Price must be greater than zero with up to four decimal places.')}
+                  </p>
+                ) : null}
+              </section>
+            </DAccordionItem>
+          </DAccordion>
+        ) : null}
+
+        {type === 'SERVICE' ? (
+          <DAccordion type="multiple" variant="card">
+            <DAccordionItem
+              value="copy('Basic information')"
+              title={
+                <section className="">
+                  <h2 className="text-sm font-semibold">{copy('Service configuration')}</h2>
+                  <p className="mt-1 text-xs leading-5 text-(--color-text-muted)">
+                    {copy('Define how this service is staffed and fulfilled.')}
+                  </p>
+                </section>
+              }
+            >
+              <section>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <DInput
+                    label={copy('Default duration')}
+                    hint={copy('Optional, in minutes.')}
+                    value={defaultDurationMinutes}
+                    onChange={setDefaultDurationMinutes}
+                    type="number"
+                    min={1}
+                    placeholder="30"
+                  />
+                  <DSelect
+                    label={copy('Employee assignment')}
+                    value={employeeAssignmentMode}
+                    onChange={(value) =>
+                      setEmployeeAssignmentMode(
+                        value as NonNullable<Item['serviceDefinition']>['employeeAssignmentMode'],
+                      )
+                    }
+                    options={[
+                      { label: copy('None'), value: 'NONE' },
+                      { label: copy('Optional'), value: 'OPTIONAL' },
+                      { label: copy('Required'), value: 'REQUIRED' },
+                    ]}
+                  />
+                </div>
+                {!validDefaultDuration ? (
+                  <p className="mt-2 text-sm text-(--color-danger)">
+                    {copy('Default duration must be a positive whole number.')}
+                  </p>
+                ) : null}
+                <label className="mt-4 flex items-center gap-2 text-sm">
+                  <DCheckbox
+                    checked={allowEmployeeContribution}
+                    onChange={(event) => setAllowEmployeeContribution(event.target.checked)}
+                  />
+                  {copy('Allow employee contribution')}
+                </label>
+              </section>
+            </DAccordionItem>
+          </DAccordion>
         ) : null}
 
         {fresh && canCreateVariants ? (

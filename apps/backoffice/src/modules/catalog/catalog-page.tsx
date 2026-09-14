@@ -1,5 +1,14 @@
 import { useRuntime } from '@digvation/business-runtime';
-import { DButton, DDataTable, DSelectFilter, type TableColumn } from '@digvation/ui';
+import {
+  DButton,
+  DDataTable,
+  DSelectFilter,
+  DTabs,
+  DTabsContent,
+  DTabsList,
+  DTabsTrigger,
+  type TableColumn,
+} from '@digvation/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Eye, Pencil, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -7,12 +16,7 @@ import { useMemo, useState } from 'react';
 import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
 import { canPerformBackofficeAction, type BackofficeAction } from '../../auth/backoffice-access';
 import { useBackofficeAuth } from '../../auth/backoffice-auth-context';
-import {
-  CatalogApi,
-  type CatalogManagementItem,
-  type Category,
-  type Item,
-} from './catalog-api';
+import { CatalogApi, type CatalogManagementItem, type Category, type Item } from './catalog-api';
 import { CatalogItemDetailDialog } from './catalog-item-detail-dialog';
 import { CatalogItemDialog } from './catalog-item-dialog';
 import { CatalogItemThumbnail } from './catalog-item-thumbnail';
@@ -20,7 +24,6 @@ import { useCatalogLocalization } from './catalog-localization';
 import { CatalogNamedRecordDialog } from './catalog-record-dialog';
 import { PriceLabel, Status, humanize } from './catalog-shared';
 
-type Section = 'items' | 'categories';
 type ItemFilterState = {
   q: string;
   type: '' | Item['type'];
@@ -48,7 +51,6 @@ export function CatalogPage() {
     [apiBaseUrl, createApiClient],
   );
   const client = useQueryClient();
-  const [section, setSection] = useState<Section>('items');
   const [item, setItem] = useState<Item | null | undefined>();
   const [detailItem, setDetailItem] = useState<CatalogManagementItem | null>(null);
   const [category, setCategory] = useState<Category | null | undefined>();
@@ -144,10 +146,10 @@ export function CatalogPage() {
         <div className="flex min-w-0 items-center gap-3">
           <CatalogItemThumbnail api={api} itemId={candidate.id} itemName={candidate.name} />
           <div className="min-w-0">
-            <p className="line-clamp-2 font-medium text-[var(--color-text)]" title={candidate.name}>
+            <p className="line-clamp-2 font-medium text-(--color-text)" title={candidate.name}>
               {candidate.name}
             </p>
-            <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">{candidate.code}</p>
+            <p className="mt-0.5 text-xs text-(--color-text-muted)">{candidate.code}</p>
           </div>
         </div>
       ),
@@ -202,25 +204,13 @@ export function CatalogPage() {
         )}
       />
 
-      <div className="mt-6 flex gap-1 border-b border-[var(--color-border)]">
-        {(['items', 'categories'] as Section[]).map((candidate) => (
-          <button
-            key={candidate}
-            type="button"
-            onClick={() => setSection(candidate)}
-            className={`border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
-              section === candidate
-                ? 'border-[var(--color-brand)] text-[var(--color-brand)]'
-                : 'border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
-            }`}
-          >
-            {candidate === 'items' ? copy('Items') : copy('Categories')}
-          </button>
-        ))}
-      </div>
+      <DTabs defaultValue="items" className="mt-6">
+        <DTabsList className="max-w-full overflow-x-auto">
+          <DTabsTrigger value="items">{copy('Items')}</DTabsTrigger>
+          <DTabsTrigger value="categories">{copy('Categories')}</DTabsTrigger>
+        </DTabsList>
 
-      {section === 'items' ? (
-        <section className="mt-6">
+        <DTabsContent value="items" className="mt-4">
           <DDataTable
             columns={itemColumns}
             data={itemRows}
@@ -235,9 +225,7 @@ export function CatalogPage() {
                 <DSelectFilter
                   label={copy('Type')}
                   value={itemQuery.type || null}
-                  onChange={(type) =>
-                    changeItemFilter({ type: (type ?? '') as '' | Item['type'] })
-                  }
+                  onChange={(type) => changeItemFilter({ type: (type ?? '') as '' | Item['type'] })}
                   clearable
                   options={[
                     { label: copy('Product'), value: 'PRODUCT' },
@@ -309,9 +297,9 @@ export function CatalogPage() {
               },
             ]}
           />
-        </section>
-      ) : (
-        <section className="mt-6">
+        </DTabsContent>
+
+        <DTabsContent value="categories" className="mt-4">
           <DDataTable
             columns={categoryColumns}
             data={categories.data?.items ?? []}
@@ -368,8 +356,8 @@ export function CatalogPage() {
               },
             ]}
           />
-        </section>
-      )}
+        </DTabsContent>
+      </DTabs>
 
       <CatalogItemDialog
         key={item?.id ?? (item === null ? 'new' : 'closed')}
@@ -420,9 +408,7 @@ export function CatalogPage() {
         item={category}
         onClose={() => setCategory(undefined)}
         onSave={(existing, input) =>
-          existing
-            ? api.updateCategory(existing as Category, input)
-            : api.createCategory(input)
+          existing ? api.updateCategory(existing as Category, input) : api.createCategory(input)
         }
         onSaved={refreshCategories}
       />
