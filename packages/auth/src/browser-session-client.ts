@@ -14,6 +14,7 @@ interface ApiResponse<T> {
 
 const IDLE_TIMEOUT_MS = 60 * 60 * 1000;
 const ACTIVITY_THROTTLE_MS = 15_000;
+const ACCESS_REFRESH_LEEWAY_MS = 30_000;
 const SESSION_CHANNEL_HEADER = 'X-Digvation-Session-Channel';
 
 export class BrowserSessionClient {
@@ -43,11 +44,60 @@ export class BrowserSessionClient {
   }
 
   public getAccessToken(): string | null {
+    const accessToken = window.sessionStorage.getItem(this.accessTokenKey);
+    if (!accessToken) return null;
     if (this.hasIdleExpired()) {
       this.endSession('idle');
       return null;
     }
-    return window.sessionStorage.getItem(this.accessTokenKey);
+    return accessToken;
+  }
+
+  /**
+   * Returns an access token suitable for an active request. A token that is
+   * already expired (or close to expiry) is refreshed once for all concurrent
+   * callers. Refreshing never counts as user activity.
+   */
+  public async getUsableAccessToken(): Promise<string | null> {
+    const accessToken = this.getAccessToken();
+    if (!accessToken) return null;
+    if (!this.shouldRefreshAccessToken()) return accessToken;
+
+    try {
+      const refreshed = await this.refreshAccessToken();
+      if (refreshed.kind === 'refreshed') return refreshed.accessToken;
+      if (refreshed.kind === 'deferred') return accessToken;
+      return null;
+    } catch (error) {
+      // A temporary refresh-network failure must not discard an access token
+      // that is still accepted by the server.
+      if (!this.isAccessTokenExpired()) return accessToken;
+      throw error;
+    }
+  }
+
+  /**
+   * Restores a browser session from the HttpOnly refresh cookie when there was
+   * meaningful activity within the one-hour idle boundary. Access tokens stay
+   * tab-scoped in sessionStorage; only the non-sensitive activity timestamp is
+   * shared so reload/new-tab recovery can respect the same idle policy.
+   */
+  public async restoreAccessToken(): Promise<string | null> {
+    const accessToken = window.sessionStorage.getItem(this.accessTokenKey);
+    const lastActivity = this.readLastActivity();
+    if (!accessToken && lastActivity === null) return null;
+
+    if (this.hasIdleExpired()) {
+      this.endSession('idle');
+      await this.revokeBrowserSessionSilently();
+      return null;
+    }
+
+    if (accessToken) return this.getUsableAccessToken();
+    if (document.visibilityState === 'hidden') return null;
+
+    const refreshed = await this.refreshAccessToken();
+    return refreshed.kind === 'refreshed' ? refreshed.accessToken : null;
   }
 
   public async login(
@@ -91,6 +141,7 @@ export class BrowserSessionClient {
     window.sessionStorage.removeItem(this.accessTokenKey);
     window.sessionStorage.removeItem(this.accessExpiryKey);
     window.sessionStorage.removeItem(this.lastActivityKey);
+    window.localStorage.removeItem(this.lastActivityKey);
     this.clearIdleTimer();
   }
 
@@ -105,7 +156,7 @@ export class BrowserSessionClient {
     const now = Date.now();
     if (now - this.lastRecordedActivity < ACTIVITY_THROTTLE_MS) return;
     this.lastRecordedActivity = now;
-    window.sessionStorage.setItem(this.lastActivityKey, String(now));
+    window.localStorage.setItem(this.lastActivityKey, String(now));
     this.scheduleIdleCheck();
   }
 
@@ -129,28 +180,58 @@ export class BrowserSessionClient {
     this.ended = false;
     window.sessionStorage.setItem(this.accessTokenKey, session.accessToken);
     window.sessionStorage.setItem(this.accessExpiryKey, session.accessExpiresAt);
-    if (resetActivity || !window.sessionStorage.getItem(this.lastActivityKey)) {
+    if (resetActivity || this.readLastActivity() === null) {
       const now = Date.now();
       this.lastRecordedActivity = now;
-      window.sessionStorage.setItem(this.lastActivityKey, String(now));
+      window.localStorage.setItem(this.lastActivityKey, String(now));
     }
+    window.sessionStorage.removeItem(this.lastActivityKey);
     this.scheduleIdleCheck();
   }
 
-  private hasIdleExpired(now = Date.now()): boolean {
-    const token = window.sessionStorage.getItem(this.accessTokenKey);
-    if (!token) return false;
-    const raw = window.sessionStorage.getItem(this.lastActivityKey);
-    const lastActivity = raw ? Number(raw) : 0;
-    return !Number.isFinite(lastActivity) || lastActivity <= 0 || now - lastActivity >= IDLE_TIMEOUT_MS;
+  private readLastActivity(): number | null {
+    const shared = window.localStorage.getItem(this.lastActivityKey);
+    if (shared !== null) {
+      const value = Number(shared);
+      return Number.isFinite(value) && value > 0 ? value : null;
+    }
+
+    // Migrate sessions created before activity timestamps became shared.
+    const legacy = window.sessionStorage.getItem(this.lastActivityKey);
+    if (legacy === null) return null;
+    const value = Number(legacy);
+    if (!Number.isFinite(value) || value <= 0) return null;
+    window.localStorage.setItem(this.lastActivityKey, String(value));
+    window.sessionStorage.removeItem(this.lastActivityKey);
+    return value;
   }
 
-  private endSession(reason: SessionEndReason): void {
+  private hasIdleExpired(now = Date.now()): boolean {
+    const lastActivity = this.readLastActivity();
+    return lastActivity !== null && now - lastActivity >= IDLE_TIMEOUT_MS;
+  }
+
+  private shouldRefreshAccessToken(now = Date.now()): boolean {
+    const raw = window.sessionStorage.getItem(this.accessExpiryKey);
+    if (!raw) return true;
+    const expiresAt = Date.parse(raw);
+    return !Number.isFinite(expiresAt) || expiresAt - now <= ACCESS_REFRESH_LEEWAY_MS;
+  }
+
+  private isAccessTokenExpired(now = Date.now()): boolean {
+    const raw = window.sessionStorage.getItem(this.accessExpiryKey);
+    if (!raw) return true;
+    const expiresAt = Date.parse(raw);
+    return !Number.isFinite(expiresAt) || expiresAt <= now;
+  }
+
+  private endSession(reason: SessionEndReason, clearSharedActivity = true): void {
     if (this.ended) return;
     this.ended = true;
     window.sessionStorage.removeItem(this.accessTokenKey);
     window.sessionStorage.removeItem(this.accessExpiryKey);
     window.sessionStorage.removeItem(this.lastActivityKey);
+    if (clearSharedActivity) window.localStorage.removeItem(this.lastActivityKey);
     this.clearIdleTimer();
     for (const listener of this.listeners) listener(reason);
   }
@@ -163,6 +244,14 @@ export class BrowserSessionClient {
     window.addEventListener('touchstart', record, { passive: true });
     window.addEventListener('popstate', record);
     window.addEventListener('hashchange', record);
+    window.addEventListener('storage', (event) => {
+      if (event.key !== this.lastActivityKey || event.storageArea !== window.localStorage) return;
+      if (event.newValue === null) {
+        if (window.sessionStorage.getItem(this.accessTokenKey)) this.endSession('invalid', false);
+        return;
+      }
+      this.scheduleIdleCheck();
+    });
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') {
         this.clearIdleTimer();
@@ -181,7 +270,8 @@ export class BrowserSessionClient {
     this.clearIdleTimer();
     if (document.visibilityState === 'hidden') return;
     if (!window.sessionStorage.getItem(this.accessTokenKey)) return;
-    const lastActivity = Number(window.sessionStorage.getItem(this.lastActivityKey) ?? '0');
+    const lastActivity = this.readLastActivity();
+    if (lastActivity === null) return;
     const remaining = Math.max(0, IDLE_TIMEOUT_MS - (Date.now() - lastActivity));
     this.idleTimer = window.setTimeout(() => {
       if (this.hasIdleExpired()) this.endSession('idle');
@@ -193,6 +283,14 @@ export class BrowserSessionClient {
     if (this.idleTimer === null) return;
     window.clearTimeout(this.idleTimer);
     this.idleTimer = null;
+  }
+
+  private async revokeBrowserSessionSilently(): Promise<void> {
+    try {
+      await this.request('/api/v1/auth/browser/logout', { method: 'POST' });
+    } catch {
+      // The local one-hour idle boundary is authoritative even while offline.
+    }
   }
 
   private async request<T>(
