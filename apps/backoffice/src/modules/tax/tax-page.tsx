@@ -249,7 +249,7 @@ function TaxCategoriesSection({
       key: 'status',
       label: tax('status'),
       render: (row) => (
-        <DBadge variant={row.status === 'ACTIVE' ? 'outline' : 'secondary'}>
+        <DBadge variant={row.status === 'ACTIVE' ? 'success' : 'secondary'}>
           {tax(row.status === 'ACTIVE' ? 'active' : 'inactive')}
         </DBadge>
       ),
@@ -352,11 +352,16 @@ function TaxCategoryDialog({
     >
       <div className="grid gap-4 sm:grid-cols-2">
         {isNew ? (
-          <DInput label={tax('code')} value={code} onChange={(value) => setCode(value.toUpperCase())} />
+          <DInput
+            label={tax('code')}
+            value={code}
+            onChange={(value) => setCode(value.toUpperCase())}
+            placeholder="PPN"
+          />
         ) : (
           <DInput label={tax('code')} value={category?.code ?? ''} onChange={() => undefined} disabled />
         )}
-        <DInput label={tax('name')} value={name} onChange={setName} />
+        <DInput label={tax('name')} value={name} onChange={setName} placeholder="PPN" />
         {!isNew ? (
           <DSelect
             label={tax('status')}
@@ -429,7 +434,7 @@ function TaxRulesSection({
       key: 'cancelledAt',
       label: tax('status'),
       render: (row) => (
-        <DBadge variant={row.cancelledAt ? 'secondary' : 'outline'}>
+        <DBadge variant={row.cancelledAt ? 'secondary' : 'success'}>
           {tax(row.cancelledAt ? 'cancelled' : 'active')}
         </DBadge>
       ),
@@ -601,6 +606,7 @@ function TaxRuleDialog({
             label={tax('category')}
             value={categoryId}
             clearable={false}
+            placeholder={tax('category')}
             options={categories.map((category) => ({
               value: category.id,
               label: `${category.code} — ${category.name}`,
@@ -608,9 +614,20 @@ function TaxRuleDialog({
             onValueChange={(value) => setCategoryId(value == null ? '' : String(value))}
           />
         ) : null}
-        <DInput label={tax('code')} value={code} onChange={(value) => setCode(value.toUpperCase())} />
-        <DInput label={tax('name')} value={name} onChange={setName} />
-        <DInput label={tax('rate')} inputMode="decimal" value={ratePercent} onChange={setRatePercent} />
+        <DInput
+          label={tax('code')}
+          value={code}
+          onChange={(value) => setCode(value.toUpperCase())}
+          placeholder="PPN-11"
+        />
+        <DInput label={tax('name')} value={name} onChange={setName} placeholder="PPN 11%" />
+        <DInput
+          label={tax('rate')}
+          inputMode="decimal"
+          value={ratePercent}
+          onChange={setRatePercent}
+          placeholder="11"
+        />
         <DSelect
           label={tax('treatment')}
           value={priceTreatment}
