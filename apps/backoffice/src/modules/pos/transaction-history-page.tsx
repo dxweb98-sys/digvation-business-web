@@ -3,7 +3,7 @@ import {
   DButton,
   DConnectionError,
   DDataTable,
-  DDatePicker,
+  DDateRangeFilter,
   DDialog,
   DSelectFilter,
   type TableColumn,
@@ -185,19 +185,20 @@ export function TransactionHistoryPage() {
                 }}
                 options={fulfillmentStatuses.map((value) => ({ value, label: copy(value) }))}
               />
-              <DDatePicker
-                label={copy('From')}
-                value={createdFrom}
-                onChange={(value) => {
+              <DDateRangeFilter
+                from={createdFrom}
+                to={createdTo}
+                onFromChange={(value) => {
                   setCreatedFrom(value);
                   resetPage();
                 }}
-              />
-              <DDatePicker
-                label={copy('To')}
-                value={createdTo}
-                onChange={(value) => {
+                onToChange={(value) => {
                   setCreatedTo(value);
+                  resetPage();
+                }}
+                onClear={() => {
+                  setCreatedFrom('');
+                  setCreatedTo('');
                   resetPage();
                 }}
               />
