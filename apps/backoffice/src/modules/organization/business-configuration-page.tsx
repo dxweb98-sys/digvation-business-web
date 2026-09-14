@@ -294,7 +294,7 @@ function LocalizationSection({
   const [draftTimeFormat, setDraftTimeFormat] =
     useState<BusinessPreferences['timeFormat'] | null>(null);
   const locale = draftLocale ?? preferences?.defaultLocale ?? 'id-ID';
-  const timezone = draftTimezone ?? preferences?.timezone ?? 'Asia/Jakarta';
+  const timezone = draftTimezone ?? preferences?.timezone ?? '';
   const dateFormat = draftDateFormat ?? preferences?.dateFormat ?? 'DD/MM/YYYY';
   const timeFormat = draftTimeFormat ?? preferences?.timeFormat ?? 'HH:mm';
   const close = () => {
@@ -386,7 +386,7 @@ function LocalizationSection({
             label={copy('Timezone')}
             value={timezone}
             onChange={setDraftTimezone}
-            placeholder="Asia/Jakarta"
+            placeholder="Region/City"
           />
           <DSelect
             label={copy('Date format')}
