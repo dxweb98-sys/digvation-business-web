@@ -14,7 +14,12 @@ import { useRuntime } from '@digvation/business-runtime';
 import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
 import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
 import { useBackofficeAuth } from '../../auth/backoffice-auth-context';
-import { ActivityApi, type ActivityActor, type ActivityEvent } from './activity-api';
+import {
+  ActivityApi,
+  type ActivityActor,
+  type ActivityEvent,
+  type ActivitySource,
+} from './activity-api';
 
 const defaultPageSize = 30;
 
@@ -34,8 +39,8 @@ const categoryLabels: Record<string, LocalizedLabel> = {
 };
 
 const eventLabels: Record<string, LocalizedLabel> = {
-  LOGIN_SUCCEEDED: { id: 'Login berhasil', en: 'Login succeeded' },
-  LOGOUT: { id: 'Logout', en: 'Logout' },
+  LOGIN_SUCCEEDED: { id: 'Masuk ke aplikasi', en: 'Signed in to application' },
+  LOGOUT: { id: 'Keluar dari aplikasi', en: 'Signed out of application' },
   BUSINESS_NUMBERING_UPDATED: { id: 'Pengaturan penomoran diperbarui', en: 'Numbering settings updated' },
   EXPENSE_APPROVED: { id: 'Pengeluaran disetujui', en: 'Expense approved' },
   EXPENSE_REJECTED: { id: 'Pengeluaran ditolak', en: 'Expense rejected' },
@@ -164,10 +169,31 @@ export function ActivityPage() {
   const [actorUserId, setActorUserId] = useState('');
   const [category, setCategory] = useState('');
   const [locationId, setLocationId] = useState('');
+  const [source, setSource] = useState<ActivitySource | ''>('');
   const [detail, setDetail] = useState<ActivityEvent | null>(null);
   const list = useQuery({
-    queryKey: ['activity', offset, pageSize, from, to, actorUserId, category, locationId],
-    queryFn: () => api.list({ offset, limit: pageSize, from, to, actorUserId, category, locationId }),
+    queryKey: [
+      'activity',
+      offset,
+      pageSize,
+      from,
+      to,
+      actorUserId,
+      category,
+      locationId,
+      source,
+    ],
+    queryFn: () =>
+      api.list({
+        offset,
+        limit: pageSize,
+        from,
+        to,
+        actorUserId,
+        category,
+        locationId,
+        source: source || undefined,
+      }),
   });
   const facets = useQuery({
     queryKey: ['activity-facets'],
@@ -194,7 +220,14 @@ export function ActivityPage() {
     {
       key: 'actor',
       label: copy('Actor'),
-      render: (item) => <ActorIdentity actor={item.actor} systemLabel={copy('System')} />,
+      render: (item) => (
+        <ActorIdentity
+          actor={item.actor}
+          source={item.source}
+          systemLabel={locale === 'id' ? 'Sistem' : 'System'}
+          unknownLabel={locale === 'id' ? 'Tidak diketahui' : 'Unknown'}
+        />
+      ),
     },
     {
       key: 'eventType',
@@ -217,13 +250,13 @@ export function ActivityPage() {
     },
     {
       key: 'location',
-      label: copy('Location'),
+      label: `${locale === 'id' ? 'Aplikasi' : 'Application'} / ${copy('Location')}`,
       render: (item) => (
-        <div>
-          <div>{item.locationName ?? '—'}</div>
-          <div className="text-xs text-[var(--color-text-muted)]">
-            {sourceLabel(item.source, locale)}
-          </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <DBadge variant="outline">{sourceLabel(item.source, locale)}</DBadge>
+          {item.locationName ? (
+            <span className="text-xs text-[var(--color-text-muted)]">· {item.locationName}</span>
+          ) : null}
         </div>
       ),
     },
@@ -243,7 +276,7 @@ export function ActivityPage() {
       />
     );
   }
-  const filtered = Boolean(from || to || actorUserId || category || locationId);
+  const filtered = Boolean(from || to || actorUserId || category || locationId || source);
   return (
     <BackofficePage>
       <BackofficePageHeader
@@ -263,9 +296,19 @@ export function ActivityPage() {
               <DDateRangeFilter
                 from={from}
                 to={to}
-                onFromChange={(value) => { setFrom(value); resetPage(); }}
-                onToChange={(value) => { setTo(value); resetPage(); }}
-                onClear={() => { setFrom(''); setTo(''); resetPage(); }}
+                onFromChange={(value) => {
+                  setFrom(value);
+                  resetPage();
+                }}
+                onToChange={(value) => {
+                  setTo(value);
+                  resetPage();
+                }}
+                onClear={() => {
+                  setFrom('');
+                  setTo('');
+                  resetPage();
+                }}
               />
               <DSelectFilter
                 label={copy('User')}
@@ -273,7 +316,25 @@ export function ActivityPage() {
                 value={actorUserId || null}
                 clearable
                 options={actorOptions}
-                onChange={(value) => { setActorUserId(String(value ?? '')); resetPage(); }}
+                onChange={(value) => {
+                  setActorUserId(String(value ?? ''));
+                  resetPage();
+                }}
+              />
+              <DSelectFilter
+                label={locale === 'id' ? 'Aplikasi' : 'Application'}
+                placeholder={locale === 'id' ? 'Semua aplikasi' : 'All applications'}
+                value={source || null}
+                clearable
+                options={([
+                  ['BACKOFFICE', 'Backoffice'],
+                  ['OPERATIONAL', 'Operational'],
+                  ['SYSTEM', locale === 'id' ? 'Sistem' : 'System'],
+                ] as const).map(([value, label]) => ({ value, label }))}
+                onChange={(value) => {
+                  setSource((value ?? '') as ActivitySource | '');
+                  resetPage();
+                }}
               />
               <DSelectFilter
                 label={copy('Category')}
@@ -283,7 +344,10 @@ export function ActivityPage() {
                   value,
                   label: label[locale],
                 }))}
-                onChange={(value) => { setCategory(String(value ?? '')); resetPage(); }}
+                onChange={(value) => {
+                  setCategory(String(value ?? ''));
+                  resetPage();
+                }}
               />
               <DSelectFilter
                 label={copy('Location')}
@@ -291,7 +355,10 @@ export function ActivityPage() {
                 value={locationId || null}
                 clearable
                 options={locationOptions}
-                onChange={(value) => { setLocationId(String(value ?? '')); resetPage(); }}
+                onChange={(value) => {
+                  setLocationId(String(value ?? ''));
+                  resetPage();
+                }}
               />
             </div>
           }
@@ -301,7 +368,10 @@ export function ActivityPage() {
             total: list.data?.total ?? 0,
           }}
           onPageChange={(page) => setOffset((page - 1) * pageSize)}
-          onPageSizeChange={(size) => { setPageSize(size); resetPage(); }}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            resetPage();
+          }}
           emptyMessage={copy(
             filtered
               ? 'No activity matches the current filters.'
@@ -325,7 +395,9 @@ function ActivityDetail({ item, onClose }: { item: ActivityEvent | null; onClose
       description={item ? formatDateTime(item.occurredAt) : undefined}
       footer={
         <div className="flex justify-end">
-          <DButton variant="secondary" onClick={onClose}>{copy('Close')}</DButton>
+          <DButton variant="secondary" onClick={onClose}>
+            {copy('Close')}
+          </DButton>
         </div>
       }
     >
@@ -335,13 +407,29 @@ function ActivityDetail({ item, onClose }: { item: ActivityEvent | null; onClose
             <DBadge variant="outline">
               {categoryLabels[item.category]?.[locale] ?? humanize(item.category)}
             </DBadge>
+            <DBadge variant="outline">{sourceLabel(item.source, locale)}</DBadge>
             <DBadge variant="outline">{outcomeLabel(item.outcome, locale)}</DBadge>
           </div>
           <dl className="grid gap-4 text-sm sm:grid-cols-2">
-            <Fact label={copy('Actor')} value={actorCompactLabel(item.actor) || copy('System')} />
+            <Fact
+              label={copy('Actor')}
+              value={
+                actorCompactLabel(item.actor) ||
+                (item.source === 'SYSTEM'
+                  ? locale === 'id'
+                    ? 'Sistem'
+                    : 'System'
+                  : locale === 'id'
+                    ? 'Tidak diketahui'
+                    : 'Unknown')
+              }
+            />
             {target ? <Fact label={copy('Affected item')} value={target} /> : null}
             {item.locationName ? <Fact label={copy('Location')} value={item.locationName} /> : null}
-            <Fact label={copy('Source')} value={sourceLabel(item.source, locale)} />
+            <Fact
+              label={locale === 'id' ? 'Aplikasi' : 'Application'}
+              value={sourceLabel(item.source, locale)}
+            />
           </dl>
           {item.correlationId ? (
             <section className="border-t border-[var(--color-border)] pt-4">
@@ -357,8 +445,18 @@ function ActivityDetail({ item, onClose }: { item: ActivityEvent | null; onClose
   );
 }
 
-function ActorIdentity({ actor, systemLabel }: { actor: ActivityActor | null; systemLabel: string }) {
-  if (!actor) return <span>{systemLabel}</span>;
+function ActorIdentity({
+  actor,
+  source,
+  systemLabel,
+  unknownLabel,
+}: {
+  actor: ActivityActor | null;
+  source: ActivityEvent['source'];
+  systemLabel: string;
+  unknownLabel: string;
+}) {
+  if (!actor) return <span>{source === 'SYSTEM' ? systemLabel : unknownLabel}</span>;
   const context = actorContext(actor);
   return (
     <div>
@@ -376,18 +474,30 @@ function actorContext(actor: Pick<ActivityActor, 'username' | 'roleNames'>): str
     .join(' · ');
 }
 
-function actorCompactLabel(actor: Pick<ActivityActor, 'displayName' | 'username' | 'roleNames'> | null): string {
+function actorCompactLabel(
+  actor: Pick<ActivityActor, 'displayName' | 'username' | 'roleNames'> | null,
+): string {
   if (!actor) return '';
   const username = actor.username ? `(@${actor.username})` : '';
   const roles = actor.roleNames.length ? ` · ${actor.roleNames.join(', ')}` : '';
   return `${actor.displayName}${username ? ` ${username}` : ''}${roles}`;
 }
 
-function Fact({ label, value, technical = false }: { label: string; value: string; technical?: boolean }) {
+function Fact({
+  label,
+  value,
+  technical = false,
+}: {
+  label: string;
+  value: string;
+  technical?: boolean;
+}) {
   return (
     <div>
       <dt className="text-xs font-medium text-[var(--color-text-muted)]">{label}</dt>
-      <dd className={`mt-1 break-words text-[var(--color-text)]${technical ? ' font-mono text-xs' : ''}`}>
+      <dd
+        className={`mt-1 break-words text-[var(--color-text)]${technical ? ' font-mono text-xs' : ''}`}
+      >
         {value}
       </dd>
     </div>
@@ -413,9 +523,10 @@ function outcomeLabel(value: string, locale: 'id' | 'en') {
 }
 
 function sourceLabel(value: ActivityEvent['source'], locale: 'id' | 'en') {
-  const labels: Record<ActivityEvent['source'], LocalizedLabel> = {
+  if (!value) return locale === 'id' ? 'Tidak diketahui' : 'Unknown';
+  const labels: Record<ActivitySource, LocalizedLabel> = {
     BACKOFFICE: { id: 'Backoffice', en: 'Backoffice' },
-    OPERATIONAL: { id: 'Operasional', en: 'Operational' },
+    OPERATIONAL: { id: 'Operational', en: 'Operational' },
     SYSTEM: { id: 'Sistem', en: 'System' },
   };
   return labels[value][locale];
