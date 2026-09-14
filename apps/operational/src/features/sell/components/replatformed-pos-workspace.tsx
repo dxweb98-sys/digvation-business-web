@@ -1178,7 +1178,6 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         quickTender={quickTender}
         isSubmitting={workspace.isCoreMutating}
         onQueue={() => void completeCheckout('QUEUE')}
-        onStartProcess={() => void completeCheckout('START_PROCESS')}
       />
       <ReferenceTransactionDetail
         sale={displayedQueueDetail}
@@ -2269,7 +2268,6 @@ function ReferencePaymentDialog({
   quickTender,
   isSubmitting,
   onQueue,
-  onStartProcess,
 }: {
   open: boolean;
   onClose: () => void;
@@ -2294,7 +2292,6 @@ function ReferencePaymentDialog({
   quickTender: readonly string[];
   isSubmitting: boolean;
   onQueue: () => void;
-  onStartProcess: () => void;
 }) {
   const isCash = method === 'CASH';
   const needsProvider = method === 'BANK_TRANSFER' || method === 'WALLET';
@@ -2327,21 +2324,8 @@ function ReferencePaymentDialog({
           <DButton variant="ghost" onClick={onClose}>
             Batal
           </DButton>
-          <DButton
-            variant="outline"
-            disabled={!canConfirm}
-            loading={isSubmitting}
-            onClick={onQueue}
-          >
+          <DButton disabled={!canConfirm} loading={isSubmitting} onClick={onQueue}>
             Masuk Antrian
-          </DButton>
-          <DButton
-            disabled={!canConfirm}
-            loading={isSubmitting}
-            onClick={onStartProcess}
-            leftIcon={<CheckCircle2 className="size-3.5" />}
-          >
-            Lanjut Proses
           </DButton>
         </div>
       }
