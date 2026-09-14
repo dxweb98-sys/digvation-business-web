@@ -61,6 +61,7 @@ import {
   type MemberCustomerLookupResult,
   type TransactionCustomer,
 } from '../customer-member-lookup';
+import { hasStartableQueuedWork } from '../queued-sale-work';
 import type {
   CatalogItem,
   Employee,
@@ -1622,6 +1623,7 @@ function ReferenceQueueCard({
   const hasPayment = hasSuccessfulPayment(sale);
   const paid = hasSuccessfulCheckout(sale);
   const customer = saleCustomer(sale.id);
+  const canStartWork = hasStartableQueuedWork(sale);
   const actionItems = [
     { label: 'Preview / Detail', icon: <Eye className="size-3.5" />, onSelect: () => onView(sale) },
     ...(hasPayment
@@ -1635,11 +1637,15 @@ function ReferenceQueueCard({
       : []),
     ...(status === 'QUEUED'
       ? [
-          {
-            label: 'Mulai Pekerjaan',
-            icon: <PlayCircle className="size-3.5" />,
-            onSelect: () => onStartWork(sale),
-          },
+          ...(canStartWork
+            ? [
+                {
+                  label: 'Mulai Dikerjakan',
+                  icon: <PlayCircle className="size-3.5" />,
+                  onSelect: () => onStartWork(sale),
+                },
+              ]
+            : []),
           {
             label: 'Sesuaikan Pesanan',
             icon: <ShoppingBag className="size-3.5" />,
@@ -1719,35 +1725,47 @@ function ReferenceQueueCard({
             {money(sale.totalAmount, locale)}
           </p>
         </div>
-        <Dropdown
-          placement="bottom-end"
-          contentRole="menu"
-          closeOnItemClick
-          contentClassName="min-w-[172px] overflow-hidden p-1"
-          trigger={({ open }) => (
-            <button
-              type="button"
-              aria-label={`Actions for ${transactionNumber(sale.id)}`}
-              aria-expanded={open}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 text-[11px] font-semibold text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand)]/20"
+        <div className="flex items-center gap-2">
+          {canStartWork ? (
+            <DButton
+              size="sm"
+              className="h-8 px-3 text-[11px]"
+              leftIcon={<PlayCircle className="size-3.5" />}
+              onClick={() => onStartWork(sale)}
             >
-              <MoreHorizontal className="size-4" />
-            </button>
-          )}
-        >
-          {actionItems.map((item) => (
-            <button
-              key={item.label}
-              type="button"
-              role="menuitem"
-              onClick={item.onSelect}
-              className={`flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs font-medium transition-colors ${item.destructive ? 'text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10' : 'text-[var(--color-text)] hover:bg-[var(--color-surface-muted)]'}`}
-            >
-              {item.icon ? <span className="shrink-0">{item.icon}</span> : null}
-              {item.label}
-            </button>
-          ))}
-        </Dropdown>
+              Mulai Dikerjakan
+            </DButton>
+          ) : null}
+          <Dropdown
+            placement="bottom-end"
+            contentRole="menu"
+            closeOnItemClick
+            contentClassName="min-w-[172px] overflow-hidden p-1"
+            trigger={({ open }) => (
+              <button
+                type="button"
+                aria-label={`Actions for ${transactionNumber(sale.id)}`}
+                aria-expanded={open}
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 text-[11px] font-semibold text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand)]/20"
+              >
+                <MoreHorizontal className="size-4" />
+              </button>
+            )}
+          >
+            {actionItems.map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                role="menuitem"
+                onClick={item.onSelect}
+                className={`flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs font-medium transition-colors ${item.destructive ? 'text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10' : 'text-[var(--color-text)] hover:bg-[var(--color-surface-muted)]'}`}
+              >
+                {item.icon ? <span className="shrink-0">{item.icon}</span> : null}
+                {item.label}
+              </button>
+            ))}
+          </Dropdown>
+        </div>
       </div>
       {issues.length ? (
         <div className="mt-3 rounded-xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 px-3 py-2 text-xs">
