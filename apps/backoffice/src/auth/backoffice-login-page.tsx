@@ -100,7 +100,7 @@ export function BackofficeLoginPage() {
   const isIndonesian = locale === 'id';
 
   return (
-    <main className="min-h-[100svh] overflow-y-auto bg-[var(--color-surface)] text-[var(--color-text)] lg:grid lg:grid-cols-[minmax(0,0.92fr)_minmax(520px,1.08fr)]">
+    <main className="h-[100svh] overflow-y-auto bg-[var(--color-surface)] text-[var(--color-text)] lg:grid lg:grid-cols-[minmax(0,0.92fr)_minmax(520px,1.08fr)]">
       <aside className="relative hidden min-h-[100svh] overflow-hidden bg-[var(--color-brand)] px-10 py-9 text-white lg:flex lg:flex-col xl:px-14 xl:py-12">
         <div
           className="pointer-events-none absolute inset-0 opacity-[0.12]"

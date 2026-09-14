@@ -1,7 +1,11 @@
 import { DButton, DInput, useToast } from '@digvation/ui';
 import { useState, type FormEvent } from 'react';
 
-import type { AuthPort, AuthSession } from '@digvation/business-auth';
+import {
+  BrowserSessionRequestError,
+  type AuthPort,
+  type AuthSession,
+} from '@digvation/business-auth';
 import { useRuntime } from '@digvation/business-runtime';
 import { useOperationalLocalization } from '../../app/localization/operational-localization';
 
@@ -33,7 +37,11 @@ function BrandMark({ logoUrl }: { logoUrl: string | undefined }) {
 
 function loginFailureMessage(error: unknown, locale: 'id-ID' | 'en-US') {
   const isIndonesian = locale === 'id-ID';
-  if (error instanceof Error && error.message === 'INVALID_CREDENTIALS') {
+  if (
+    (error instanceof BrowserSessionRequestError &&
+      (error.status === 401 || error.code === 'INVALID_CREDENTIALS')) ||
+    (error instanceof Error && error.message === 'INVALID_CREDENTIALS')
+  ) {
     return isIndonesian
       ? 'Username atau kata sandi salah.'
       : 'Username or password is incorrect.';
@@ -96,7 +104,7 @@ export function OperationalLoginPage({ authPort, onAuthenticated }: OperationalL
   };
 
   return (
-    <main className="relative flex min-h-[100svh] items-center justify-center overflow-y-auto overflow-x-hidden bg-[var(--color-background)] px-5 py-10 text-[var(--color-text)] sm:px-8">
+    <main className="relative flex h-[100svh] items-center justify-center overflow-y-auto overflow-x-hidden bg-[var(--color-background)] px-5 py-10 text-[var(--color-text)] sm:px-8">
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.055]"
         style={{
