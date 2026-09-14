@@ -105,10 +105,13 @@ export class BrowserSessionClient {
     identifier: string,
     password: string,
   ): Promise<string> {
-    const session = await this.request<BrowserSessionResponse>('/api/v1/auth/browser/login', {
-      method: 'POST',
-      body: { workspace, identifier, password },
-    });
+    const session = await this.request<BrowserSessionResponse>(
+      '/api/v1/auth/browser/login',
+      {
+        method: 'POST',
+        body: { workspace, identifier, password },
+      },
+    );
     this.acceptSession(session);
     return session.accessToken;
   }
@@ -145,7 +148,9 @@ export class BrowserSessionClient {
     this.clearIdleTimer();
   }
 
-  public subscribeSessionEnded(listener: (reason: SessionEndReason) => void): () => void {
+  public subscribeSessionEnded(
+    listener: (reason: SessionEndReason) => void,
+  ): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   }
@@ -162,13 +167,17 @@ export class BrowserSessionClient {
 
   private async rotateBrowserSession(): Promise<AuthRefreshResult> {
     try {
-      const session = await this.request<BrowserSessionResponse>('/api/v1/auth/browser/refresh', {
-        method: 'POST',
-      });
+      const session = await this.request<BrowserSessionResponse>(
+        '/api/v1/auth/browser/refresh',
+        { method: 'POST' },
+      );
       this.acceptSession(session, false);
       return { kind: 'refreshed', accessToken: session.accessToken };
     } catch (error) {
-      if (error instanceof BrowserSessionRequestError && error.status === 401) {
+      if (
+        error instanceof BrowserSessionRequestError &&
+        (error.status === 401 || error.status === 403)
+      ) {
         this.endSession('invalid');
         return { kind: 'ended', reason: 'invalid' };
       }
@@ -176,7 +185,10 @@ export class BrowserSessionClient {
     }
   }
 
-  private acceptSession(session: BrowserSessionResponse, resetActivity = true): void {
+  private acceptSession(
+    session: BrowserSessionResponse,
+    resetActivity = true,
+  ): void {
     this.ended = false;
     window.sessionStorage.setItem(this.accessTokenKey, session.accessToken);
     window.sessionStorage.setItem(this.accessExpiryKey, session.accessExpiresAt);
@@ -193,7 +205,8 @@ export class BrowserSessionClient {
     const shared = window.localStorage.getItem(this.lastActivityKey);
     if (shared !== null) {
       const value = Number(shared);
-      return Number.isFinite(value) && value > 0 ? value : null;
+      if (Number.isFinite(value) && value > 0) return value;
+      window.localStorage.removeItem(this.lastActivityKey);
     }
 
     // Migrate sessions created before activity timestamps became shared.
@@ -215,7 +228,10 @@ export class BrowserSessionClient {
     const raw = window.sessionStorage.getItem(this.accessExpiryKey);
     if (!raw) return true;
     const expiresAt = Date.parse(raw);
-    return !Number.isFinite(expiresAt) || expiresAt - now <= ACCESS_REFRESH_LEEWAY_MS;
+    return (
+      !Number.isFinite(expiresAt) ||
+      expiresAt - now <= ACCESS_REFRESH_LEEWAY_MS
+    );
   }
 
   private isAccessTokenExpired(now = Date.now()): boolean {
@@ -225,7 +241,10 @@ export class BrowserSessionClient {
     return !Number.isFinite(expiresAt) || expiresAt <= now;
   }
 
-  private endSession(reason: SessionEndReason, clearSharedActivity = true): void {
+  private endSession(
+    reason: SessionEndReason,
+    clearSharedActivity = true,
+  ): void {
     if (this.ended) return;
     this.ended = true;
     window.sessionStorage.removeItem(this.accessTokenKey);
@@ -245,9 +264,14 @@ export class BrowserSessionClient {
     window.addEventListener('popstate', record);
     window.addEventListener('hashchange', record);
     window.addEventListener('storage', (event) => {
-      if (event.key !== this.lastActivityKey || event.storageArea !== window.localStorage) return;
+      if (
+        event.key !== this.lastActivityKey ||
+        event.storageArea !== window.localStorage
+      )
+        return;
       if (event.newValue === null) {
-        if (window.sessionStorage.getItem(this.accessTokenKey)) this.endSession('invalid', false);
+        if (window.sessionStorage.getItem(this.accessTokenKey))
+          this.endSession('invalid', false);
         return;
       }
       this.scheduleIdleCheck();
@@ -272,7 +296,10 @@ export class BrowserSessionClient {
     if (!window.sessionStorage.getItem(this.accessTokenKey)) return;
     const lastActivity = this.readLastActivity();
     if (lastActivity === null) return;
-    const remaining = Math.max(0, IDLE_TIMEOUT_MS - (Date.now() - lastActivity));
+    const remaining = Math.max(
+      0,
+      IDLE_TIMEOUT_MS - (Date.now() - lastActivity),
+    );
     this.idleTimer = window.setTimeout(() => {
       if (this.hasIdleExpired()) this.endSession('idle');
       else this.scheduleIdleCheck();
@@ -299,12 +326,15 @@ export class BrowserSessionClient {
   ): Promise<T> {
     const headers = new Headers();
     headers.set(SESSION_CHANNEL_HEADER, this.sessionChannel);
-    if (options.body !== undefined) headers.set('content-type', 'application/json');
+    if (options.body !== undefined)
+      headers.set('content-type', 'application/json');
     const response = await fetch(`${this.apiBaseUrl}${path}`, {
       method: options.method,
       headers,
       credentials: 'include',
-      ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
+      ...(options.body === undefined
+        ? {}
+        : { body: JSON.stringify(options.body) }),
     });
     const payload = (await response.json()) as ApiResponse<T>;
     if (!response.ok || !payload.success || payload.data === undefined) {
