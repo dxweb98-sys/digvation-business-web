@@ -42,6 +42,14 @@ describe('createBusinessDateTimeFormatter', () => {
     const formatter = createBusinessDateTimeFormatter(runtime('Australia/Sydney'));
     expect(formatter.formatDateOnly('2026-09-15')).toBe('15/09/2026');
     expect(formatter.formatDate('2026-09-15')).toBe('15/09/2026');
+    expect(formatter.formatDateTime('2026-09-15')).toBe('15/09/2026');
+    expect(formatter.formatTime('2026-09-15')).toBe('—');
+    expect(
+      formatter.format('2026-09-15', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      }),
+    ).toBe('15/09/2026');
   });
 
   it('uses UTC rather than browser timezone when preferences are unavailable', () => {
