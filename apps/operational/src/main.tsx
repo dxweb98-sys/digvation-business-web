@@ -1,10 +1,11 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { ApplicationSplash } from '@digvation/business-runtime';
+import { Building2 } from 'lucide-react';
 
 import '@digvation/ui/styles.css';
 import './app/app.css';
 
-import { AppBootScreen } from './app/bootstrap/app-boot-screen';
 import { BootstrapTransition } from './app/bootstrap/bootstrap-transition';
 import { bootstrapOperational } from './app/bootstrap/bootstrap-operational';
 
@@ -30,7 +31,7 @@ const root = ReactDOM.createRoot(document.getElementById('root')!);
 
 root.render(
   <React.StrictMode>
-    <AppBootScreen />
+    <ApplicationSplash mark={<Building2 className="size-6" />} />
   </React.StrictMode>,
 );
 
