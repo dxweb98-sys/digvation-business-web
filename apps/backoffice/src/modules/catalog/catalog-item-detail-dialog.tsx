@@ -23,7 +23,7 @@ import type {
 import { CatalogItemThumbnail } from './catalog-item-thumbnail';
 import { PriceChangeDialog, PriceHistoryTable, VariantPriceLabel } from './catalog-pricing';
 import { CatalogNamedRecordDialog } from './catalog-record-dialog';
-import { DetailField, PriceLabel, Status, humanize } from './catalog-shared';
+import { DetailField, PriceLabel, Status } from './catalog-shared';
 
 const keys = {
   prices: (itemId: string) => ['catalog', 'prices', itemId] as const,
@@ -110,7 +110,6 @@ export function CatalogItemDetailDialog({
   const taxCategoryName = item.taxCategoryId
     ? taxCategories.find((candidate) => candidate.id === item.taxCategoryId)?.name ?? item.taxCategoryId
     : 'Tidak ada pajak khusus item';
-  const serviceDefinition = item.serviceDefinition;
   const defaultHistory = (priceHistory.data?.items ?? []).filter(
     (price) => price.catalogVariantId === null && price.locationId === null,
   );
@@ -179,11 +178,12 @@ export function CatalogItemDetailDialog({
       open
       onClose={onClose}
       size="xl"
-      title={item.name}
-      description={`${item.code} · ${item.type === 'SERVICE' ? 'Layanan' : 'Produk'}`}
+      title="Detail Item"
       footer={
         <div className="flex justify-end gap-2">
-          <DButton variant="secondary" onClick={onClose}>Tutup</DButton>
+          <DButton variant="secondary" onClick={onClose}>
+            Tutup
+          </DButton>
           {canUpdate ? (
             <DButton leftIcon={<Pencil className="size-4" />} onClick={() => onEdit(item)}>
               Edit Item
@@ -192,57 +192,55 @@ export function CatalogItemDetailDialog({
         </div>
       }
     >
-      <div className="space-y-5">
-        <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] p-4">
+      <div>
+        <section className="border-b border-[var(--color-border)] pb-5">
           <div className="grid gap-5 md:grid-cols-[auto_minmax(0,1fr)]">
             <CatalogItemThumbnail api={api} itemId={item.id} itemName={item.name} size="detail" />
             <div className="min-w-0">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-xl font-semibold tracking-tight">{item.name}</h2>
-                  <p className="mt-1 text-sm text-[var(--color-text-muted)]">{item.code}</p>
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <h2 className="break-words text-2xl font-semibold tracking-tight text-[var(--color-text)]">
+                    {item.name}
+                  </h2>
+                  <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+                    {item.code} · {item.type === 'SERVICE' ? 'Jasa' : 'Produk'} · {categoryName}
+                  </p>
                 </div>
                 <Status value={item.lifecycle} />
               </div>
-              <dl className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <DetailField label="Tipe" value={item.type === 'SERVICE' ? 'Layanan' : 'Produk'} />
-                <DetailField label="Kategori" value={categoryName} />
-                <DetailField label="Status" value={<Status value={item.lifecycle} />} />
-                <DetailField label="Varian" value={`${variantCount}`} />
-              </dl>
-              {item.description?.trim() ? (
-                <p className="mt-4 border-t border-[var(--color-border)] pt-4 text-sm text-[var(--color-text-muted)]">
-                  {item.description}
-                </p>
-              ) : null}
+
+              <div className="mt-5 flex flex-wrap items-end justify-between gap-4 border-t border-[var(--color-border)] pt-4">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+                    Harga Saat Ini
+                  </p>
+                  <div className="mt-1 text-3xl font-semibold tracking-tight text-[var(--color-text)]">
+                    {canViewPricing ? (
+                      <PriceLabel
+                        price={defaultPrice}
+                        loading={defaultPriceLoading}
+                        available
+                        emptyLabel="Belum diatur"
+                      />
+                    ) : (
+                      '—'
+                    )}
+                  </div>
+                </div>
+                {canCreatePricing ? (
+                  <DButton
+                    leftIcon={<BadgeDollarSign className="size-4" />}
+                    onClick={() => setPricingTarget('default')}
+                  >
+                    {defaultPrice ? 'Ubah Harga' : 'Atur Harga'}
+                  </DButton>
+                ) : null}
+              </div>
             </div>
           </div>
         </section>
 
-        {canViewPricing ? (
-          <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] p-4">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">Harga Saat Ini</p>
-                <div className="mt-1 text-2xl font-semibold">
-                  <PriceLabel
-                    price={defaultPrice}
-                    loading={defaultPriceLoading}
-                    available
-                    emptyLabel="Belum diatur"
-                  />
-                </div>
-              </div>
-              {canCreatePricing ? (
-                <DButton leftIcon={<BadgeDollarSign className="size-4" />} onClick={() => setPricingTarget('default')}>
-                  {defaultPrice ? 'Ubah Harga' : 'Atur Harga'}
-                </DButton>
-              ) : null}
-            </div>
-          </section>
-        ) : null}
-
-        <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] p-4">
+        <section className="border-b border-[var(--color-border)] py-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <h2 className="text-base font-semibold">Varian</h2>
@@ -292,14 +290,11 @@ export function CatalogItemDetailDialog({
         </section>
 
         {canViewPricing ? (
-          <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] p-4">
+          <section className="border-b border-[var(--color-border)] py-5">
             <div className="flex items-center gap-2">
               <h2 className="text-base font-semibold">Riwayat Harga</h2>
               <DBadge variant="secondary">{defaultHistory.length}</DBadge>
             </div>
-            <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-              Setiap perubahan harga disimpan agar harga sebelumnya tetap dapat ditelusuri.
-            </p>
             <div className="mt-4">
               <PriceHistoryTable
                 prices={defaultHistory}
@@ -316,40 +311,33 @@ export function CatalogItemDetailDialog({
           </section>
         ) : null}
 
-        {item.type === 'SERVICE' ? (
-          <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] p-4">
-            <h2 className="text-base font-semibold">Pengaturan Layanan</h2>
-            <dl className="mt-4 grid gap-4 sm:grid-cols-3">
+        <section className="pt-5">
+          <h2 className="text-base font-semibold">Informasi Item</h2>
+          <dl className="mt-4 grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
+            <DetailField label="Tipe" value={item.type === 'SERVICE' ? 'Jasa' : 'Produk'} />
+            <DetailField label="Kategori" value={categoryName} />
+            <DetailField label="Status" value={<Status value={item.lifecycle} />} />
+            {item.type === 'SERVICE' ? (
               <DetailField
-                label="Durasi Default"
+                label="Durasi Layanan"
                 value={
-                  serviceDefinition?.defaultDurationMinutes != null
-                    ? `${serviceDefinition.defaultDurationMinutes} menit`
+                  item.serviceDefinition?.defaultDurationMinutes != null
+                    ? `${item.serviceDefinition.defaultDurationMinutes} menit`
                     : 'Belum diatur'
                 }
               />
+            ) : null}
+            {canViewTax ? (
+              <DetailField label="Kategori Pajak" value={taxCategoryName} />
+            ) : null}
+            <div className="sm:col-span-2 lg:col-span-4">
               <DetailField
-                label="Penugasan Karyawan"
-                value={
-                  serviceDefinition
-                    ? humanize(serviceDefinition.employeeAssignmentMode)
-                    : 'Belum diatur'
-                }
+                label="Deskripsi"
+                value={item.description?.trim() || 'Tidak ada deskripsi'}
               />
-              <DetailField
-                label="Kontribusi Karyawan"
-                value={serviceDefinition?.allowEmployeeContribution ? 'Diizinkan' : 'Tidak diizinkan'}
-              />
-            </dl>
-          </section>
-        ) : null}
-
-        {canViewTax ? (
-          <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] p-4">
-            <h2 className="text-base font-semibold">Pajak</h2>
-            <div className="mt-4"><DetailField label="Kategori Pajak Item" value={taxCategoryName} /></div>
-          </section>
-        ) : null}
+            </div>
+          </dl>
+        </section>
       </div>
 
       <CatalogNamedRecordDialog
