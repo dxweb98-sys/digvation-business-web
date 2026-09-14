@@ -1,6 +1,5 @@
 import {
   DButton,
-  DCheckbox,
   DCurrencyInput,
   DDialog,
   DInput,
@@ -41,6 +40,7 @@ export function CatalogItemDialog({
   currency,
   api,
   canViewTax,
+  canViewPricing,
   canCreatePricing,
   canCreateVariants,
   canManageImage,
@@ -54,6 +54,7 @@ export function CatalogItemDialog({
   currency: string;
   api: CatalogApi;
   canViewTax: boolean;
+  canViewPricing: boolean;
   canCreatePricing: boolean;
   canCreateVariants: boolean;
   canManageImage: boolean;
@@ -71,18 +72,12 @@ export function CatalogItemDialog({
   const [description, setDescription] = useState(item?.description ?? '');
   const [lifecycle, setLifecycle] = useState<Item['lifecycle']>(item?.lifecycle ?? 'DRAFT');
   const [defaultPrice, setDefaultPrice] = useState('');
-  const initialPriceRef = useRef<string | null>(null);
+  const initialPriceRef = useRef<string | null | undefined>(undefined);
   const [variants, setVariants] = useState<DraftVariant[]>([]);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [removeImageRequested, setRemoveImageRequested] = useState(false);
   const [defaultDurationMinutes, setDefaultDurationMinutes] = useState(
     item?.serviceDefinition?.defaultDurationMinutes?.toString() ?? '',
-  );
-  const [employeeAssignmentMode, setEmployeeAssignmentMode] = useState<
-    NonNullable<Item['serviceDefinition']>['employeeAssignmentMode']
-  >(item?.serviceDefinition?.employeeAssignmentMode ?? 'NONE');
-  const [allowEmployeeContribution, setAllowEmployeeContribution] = useState(
-    item?.serviceDefinition?.allowEmployeeContribution ?? false,
   );
   const [saving, setSaving] = useState(false);
 
@@ -95,16 +90,15 @@ export function CatalogItemDialog({
   const currentPrice = useQuery({
     queryKey: ['catalog', 'edit-price', item?.id ?? 'new', currency],
     queryFn: () => api.listDefaultPrices([item!.id], currency, new Date().toISOString()),
-    enabled: Boolean(item && canCreatePricing),
+    enabled: Boolean(item && canViewPricing),
   });
 
   useEffect(() => {
-    if (fresh || initialPriceRef.current !== null) return;
-    const amount = currentPrice.data?.items[0]?.amount;
-    if (amount === undefined) return;
+    if (fresh || initialPriceRef.current !== undefined || currentPrice.isLoading) return;
+    const amount = currentPrice.data?.items[0]?.amount ?? null;
     initialPriceRef.current = amount;
-    setDefaultPrice(amount);
-  }, [currentPrice.data, fresh]);
+    setDefaultPrice(amount ?? '');
+  }, [currentPrice.data, currentPrice.isLoading, fresh]);
 
   const parsedDefaultDuration = defaultDurationMinutes.trim()
     ? Number(defaultDurationMinutes)
@@ -119,6 +113,8 @@ export function CatalogItemDialog({
   );
   const validPrice = validOptionalMoney(defaultPrice);
   const disabled = !name.trim() || !validDefaultDuration || !validPrice || invalidVariant || saving;
+  const showPrice = canViewPricing || (fresh && canCreatePricing);
+  const canEditPrice = fresh ? canCreatePricing : canViewPricing && canCreatePricing;
 
   const categoryOptions = useMemo(
     () =>
@@ -150,8 +146,8 @@ export function CatalogItemDialog({
         type === 'SERVICE'
           ? {
               defaultDurationMinutes: parsedDefaultDuration,
-              employeeAssignmentMode,
-              allowEmployeeContribution,
+              employeeAssignmentMode: 'REQUIRED' as const,
+              allowEmployeeContribution: false,
             }
           : undefined;
       const baseInput = {
@@ -215,8 +211,8 @@ export function CatalogItemDialog({
         });
 
         const nextPrice = defaultPrice.trim();
-        const initialPrice = initialPriceRef.current;
-        if (canCreatePricing && nextPrice && nextPrice !== initialPrice) {
+        const initialPrice = initialPriceRef.current ?? null;
+        if (canEditPrice && nextPrice && nextPrice !== initialPrice) {
           const effectiveFrom = new Date().toISOString();
           if (initialPrice) {
             await api.changePrice({
@@ -251,7 +247,10 @@ export function CatalogItemDialog({
       }
 
       onSaved();
-      showToast({ variant: 'success', title: fresh ? 'Item berhasil ditambahkan.' : 'Item berhasil diperbarui.' });
+      showToast({
+        variant: 'success',
+        title: fresh ? 'Item berhasil ditambahkan.' : 'Item berhasil diperbarui.',
+      });
       onClose();
     } catch (error) {
       if (persistedItem) {
@@ -280,7 +279,11 @@ export function CatalogItemDialog({
       onClose={onClose}
       size="xl"
       title={fresh ? 'Tambah Item' : 'Edit Item'}
-      description={fresh ? 'Lengkapi informasi utama, harga, dan pengaturan yang diperlukan.' : 'Ubah informasi item dan harga jual dalam satu langkah.'}
+      description={
+        fresh
+          ? 'Lengkapi informasi item, harga jual, dan pengaturan yang diperlukan.'
+          : 'Ubah informasi item dan harga jual dalam satu langkah.'
+      }
       footer={<DialogFooter onClose={onClose} onSave={() => void save()} disabled={disabled} />}
     >
       <div className="space-y-5">
@@ -299,35 +302,127 @@ export function CatalogItemDialog({
           />
         ) : null}
 
-        <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] p-4">
+        <section className="border-b border-[var(--color-border)] pb-5">
           <h2 className="text-sm font-semibold">Informasi Item</h2>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <DInput label="Kode Item" value={code} onChange={setCode} disabled={!fresh} hint={fresh ? 'Kosongkan untuk membuat kode otomatis.' : 'Kode tidak dapat diubah setelah dibuat.'} />
-            <DInput label="Nama Item" value={name} onChange={setName} placeholder="Contoh: Coffee Latte" />
-            <DSelect label="Tipe" value={type} onChange={(value) => setType(value as Item['type'])} disabled={!fresh} options={[{ label: 'Produk', value: 'PRODUCT' }, { label: 'Layanan', value: 'SERVICE' }]} />
-            <DSelect label="Status" value={lifecycle} onChange={(value) => setLifecycle(value as Item['lifecycle'])} options={[{ label: 'Draft', value: 'DRAFT' }, { label: 'Aktif', value: 'ACTIVE' }, { label: 'Nonaktif', value: 'INACTIVE' }]} />
-            <DSelect label="Kategori" value={categoryId} onChange={(value) => setCategoryId(value as string | null)} clearable options={categoryOptions.map((category) => ({ label: category.status === 'ACTIVE' ? category.name : `${category.name} · Nonaktif`, value: category.id }))} />
+            <DInput
+              label="Kode Item"
+              value={code}
+              onChange={setCode}
+              disabled={!fresh}
+              hint={
+                fresh
+                  ? 'Kosongkan untuk membuat kode otomatis.'
+                  : 'Kode tidak dapat diubah setelah dibuat.'
+              }
+            />
+            <DInput
+              label="Nama Item"
+              value={name}
+              onChange={setName}
+              placeholder="Contoh: Coffee Latte"
+            />
+            <DSelect
+              label="Tipe"
+              value={type}
+              onChange={(value) => setType(value as Item['type'])}
+              disabled={!fresh}
+              options={[
+                { label: 'Produk', value: 'PRODUCT' },
+                { label: 'Jasa', value: 'SERVICE' },
+              ]}
+            />
+            <DSelect
+              label="Status"
+              value={lifecycle}
+              onChange={(value) => setLifecycle(value as Item['lifecycle'])}
+              options={[
+                { label: 'Draft', value: 'DRAFT' },
+                { label: 'Aktif', value: 'ACTIVE' },
+                { label: 'Nonaktif', value: 'INACTIVE' },
+              ]}
+            />
+            <DSelect
+              label="Kategori"
+              value={categoryId}
+              onChange={(value) => setCategoryId(value as string | null)}
+              clearable
+              options={categoryOptions.map((category) => ({
+                label:
+                  category.status === 'ACTIVE' ? category.name : `${category.name} · Nonaktif`,
+                value: category.id,
+              }))}
+            />
           </div>
           <div className="mt-4">
-            <DTextarea label="Deskripsi" value={description} onChange={setDescription} placeholder="Deskripsi item (opsional)" className="min-h-24" />
+            <DTextarea
+              label="Deskripsi"
+              value={description}
+              onChange={setDescription}
+              placeholder="Deskripsi item (opsional)"
+              className="min-h-24"
+            />
           </div>
         </section>
 
-        {(canCreatePricing || canViewTax) ? (
-          <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] p-4">
+        {showPrice || canViewTax ? (
+          <section className="border-b border-[var(--color-border)] pb-5">
             <h2 className="text-sm font-semibold">Harga & Pajak</h2>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              {canCreatePricing ? (
+              {showPrice ? (
                 <div>
-                  <DCurrencyInput label={`Harga Jual (${currency})`} value={defaultPrice} onValueChange={setDefaultPrice} placeholder="Contoh: 100000" />
-                  {!fresh && currentPrice.isLoading ? <p className="mt-1 text-xs text-[var(--color-text-muted)]">Memuat harga saat ini...</p> : null}
-                  {!validPrice ? <p className="mt-1 text-sm text-[var(--color-danger)]">Harga harus lebih dari nol.</p> : null}
+                  {canEditPrice ? (
+                    <DCurrencyInput
+                      label={`Harga Jual (${currency})`}
+                      value={defaultPrice}
+                      onValueChange={setDefaultPrice}
+                      placeholder="Contoh: 100000"
+                    />
+                  ) : (
+                    <DInput
+                      label={`Harga Jual (${currency})`}
+                      value={defaultPrice}
+                      onChange={setDefaultPrice}
+                      disabled
+                    />
+                  )}
+                  {!fresh && currentPrice.isLoading ? (
+                    <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                      Memuat harga saat ini...
+                    </p>
+                  ) : null}
+                  {!validPrice ? (
+                    <p className="mt-1 text-sm text-[var(--color-danger)]">
+                      Harga harus lebih dari nol.
+                    </p>
+                  ) : null}
+                  {!canEditPrice && canViewPricing && !currentPrice.isLoading ? (
+                    <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                      Anda tidak memiliki akses untuk mengubah harga.
+                    </p>
+                  ) : null}
                 </div>
               ) : null}
               {canViewTax ? (
                 <div>
-                  <DSelect label="Kategori Pajak Item" value={taxCategoryId} onChange={(value) => setTaxCategoryId(value as string | null)} clearable options={availableTaxCategories.map((category) => ({ label: category.status === 'ACTIVE' ? category.name : `${category.name} · Nonaktif`, value: category.id }))} />
-                  <p className="mt-1 text-xs text-[var(--color-text-muted)]">{taxProfile?.itemTaxEnabled ? 'Kosongkan jika item tidak memiliki pajak khusus.' : 'Pajak item sedang dinonaktifkan di pengaturan pajak.'}</p>
+                  <DSelect
+                    label="Kategori Pajak Item"
+                    value={taxCategoryId}
+                    onChange={(value) => setTaxCategoryId(value as string | null)}
+                    clearable
+                    options={availableTaxCategories.map((category) => ({
+                      label:
+                        category.status === 'ACTIVE'
+                          ? category.name
+                          : `${category.name} · Nonaktif`,
+                      value: category.id,
+                    }))}
+                  />
+                  <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                    {taxProfile?.itemTaxEnabled
+                      ? 'Kosongkan jika item tidak memiliki pajak khusus.'
+                      : 'Pajak item sedang dinonaktifkan di pengaturan pajak.'}
+                  </p>
                 </div>
               ) : null}
             </div>
@@ -335,42 +430,94 @@ export function CatalogItemDialog({
         ) : null}
 
         {type === 'SERVICE' ? (
-          <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] p-4">
-            <h2 className="text-sm font-semibold">Pengaturan Layanan</h2>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <DInput label="Durasi Default" hint="Opsional, dalam menit." value={defaultDurationMinutes} onChange={setDefaultDurationMinutes} type="number" min={1} placeholder="30" />
-              <DSelect label="Penugasan Karyawan" value={employeeAssignmentMode} onChange={(value) => setEmployeeAssignmentMode(value as NonNullable<Item['serviceDefinition']>['employeeAssignmentMode'])} options={[{ label: 'Tidak ada', value: 'NONE' }, { label: 'Opsional', value: 'OPTIONAL' }, { label: 'Wajib', value: 'REQUIRED' }]} />
+          <section className="border-b border-[var(--color-border)] pb-5">
+            <h2 className="text-sm font-semibold">Jasa</h2>
+            <div className="mt-4 max-w-sm">
+              <DInput
+                label="Durasi Layanan (menit)"
+                hint="Opsional."
+                value={defaultDurationMinutes}
+                onChange={setDefaultDurationMinutes}
+                type="number"
+                min={1}
+                placeholder="30"
+              />
             </div>
-            {!validDefaultDuration ? <p className="mt-2 text-sm text-[var(--color-danger)]">Durasi harus berupa angka bulat positif.</p> : null}
-            <label className="mt-4 flex items-center gap-2 text-sm">
-              <DCheckbox checked={allowEmployeeContribution} onChange={(event) => setAllowEmployeeContribution(event.target.checked)} />
-              Izinkan kontribusi karyawan
-            </label>
+            {!validDefaultDuration ? (
+              <p className="mt-2 text-sm text-[var(--color-danger)]">
+                Durasi harus berupa angka bulat positif.
+              </p>
+            ) : null}
           </section>
         ) : null}
 
         {fresh && canCreateVariants ? (
-          <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] p-4">
+          <section>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-sm font-semibold">Varian</h2>
-                <p className="mt-1 text-xs text-[var(--color-text-muted)]">Tambahkan varian sekarang atau kelola nanti dari detail item.</p>
+                <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                  Tambahkan varian sekarang atau kelola nanti dari detail item.
+                </p>
               </div>
-              <DButton variant="secondary" leftIcon={<Plus className="size-4" />} onClick={() => setVariants((current) => [...current, draftVariant()])}>Tambah Varian</DButton>
+              <DButton
+                variant="secondary"
+                leftIcon={<Plus className="size-4" />}
+                onClick={() => setVariants((current) => [...current, draftVariant()])}
+              >
+                Tambah Varian
+              </DButton>
             </div>
             {variants.length ? (
               <div className="mt-4 space-y-3">
                 {variants.map((variant) => (
-                  <div key={variant.key} className="grid gap-3 rounded-xl bg-[var(--color-surface-muted)] p-3 md:grid-cols-[0.8fr_1.1fr_0.8fr_auto]">
-                    <DInput label="Kode" value={variant.code} onChange={(value) => updateVariant(variant.key, { code: value })} placeholder="Opsional" />
-                    <DInput label="Nama Varian" value={variant.name} onChange={(value) => updateVariant(variant.key, { name: value })} placeholder="Contoh: Large" />
-                    {canCreatePricing ? <DCurrencyInput label={`Harga (${currency})`} value={variant.price} onValueChange={(value) => updateVariant(variant.key, { price: value })} placeholder="Mengikuti harga item" /> : <div />}
-                    <div className="flex items-end"><DButton variant="secondary" onClick={() => setVariants((current) => current.filter((candidate) => candidate.key !== variant.key))}><Trash2 className="size-4" aria-hidden="true" /></DButton></div>
+                  <div
+                    key={variant.key}
+                    className="grid gap-3 rounded-xl bg-[var(--color-surface-muted)] p-3 md:grid-cols-[0.8fr_1.1fr_0.8fr_auto]"
+                  >
+                    <DInput
+                      label="Kode"
+                      value={variant.code}
+                      onChange={(value) => updateVariant(variant.key, { code: value })}
+                      placeholder="Opsional"
+                    />
+                    <DInput
+                      label="Nama Varian"
+                      value={variant.name}
+                      onChange={(value) => updateVariant(variant.key, { name: value })}
+                      placeholder="Contoh: Large"
+                    />
+                    {canCreatePricing ? (
+                      <DCurrencyInput
+                        label={`Harga (${currency})`}
+                        value={variant.price}
+                        onValueChange={(value) => updateVariant(variant.key, { price: value })}
+                        placeholder="Mengikuti harga item"
+                      />
+                    ) : (
+                      <div />
+                    )}
+                    <div className="flex items-end">
+                      <DButton
+                        variant="secondary"
+                        onClick={() =>
+                          setVariants((current) =>
+                            current.filter((candidate) => candidate.key !== variant.key),
+                          )
+                        }
+                      >
+                        <Trash2 className="size-4" aria-hidden="true" />
+                      </DButton>
+                    </div>
                   </div>
                 ))}
               </div>
             ) : null}
-            {invalidVariant ? <p className="mt-2 text-sm text-[var(--color-danger)]">Setiap varian yang diisi harus memiliki nama dan harga yang valid.</p> : null}
+            {invalidVariant ? (
+              <p className="mt-2 text-sm text-[var(--color-danger)]">
+                Setiap varian yang diisi harus memiliki nama dan harga yang valid.
+              </p>
+            ) : null}
           </section>
         ) : null}
       </div>
