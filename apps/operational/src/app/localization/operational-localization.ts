@@ -80,11 +80,26 @@ const copy: Record<string, LocalizedLabel> = {
     'id-ID': 'Tidak ada cabang aktif yang tersedia untuk bisnis ini.',
     'en-US': 'No active branches are available for this business.',
   },
+  'Changing branch leaves the current transaction open and starts a new transaction. Continue?': {
+    'id-ID': 'Mengganti cabang akan membiarkan transaksi saat ini tetap berjalan dan memulai transaksi baru. Lanjutkan?',
+    'en-US': 'Changing branch leaves the current transaction open and starts a new transaction. Continue?',
+  },
+  'Open navigation': { 'id-ID': 'Buka navigasi', 'en-US': 'Open navigation' },
+  'Open account information': { 'id-ID': 'Buka informasi akun', 'en-US': 'Open account information' },
+  'Account information': { 'id-ID': 'Informasi akun', 'en-US': 'Account information' },
+  'Operational account information for the active session.': {
+    'id-ID': 'Informasi akun operasional yang sedang aktif.',
+    'en-US': 'Operational account information for the active session.',
+  },
+  'Request password change': { 'id-ID': 'Ubah kata sandi', 'en-US': 'Request password change' },
+  Branch: { 'id-ID': 'Cabang', 'en-US': 'Branch' },
   Close: { 'id-ID': 'Tutup', 'en-US': 'Close' },
   Logout: { 'id-ID': 'Keluar', 'en-US': 'Logout' },
 };
 
 const technicalLabels: Record<string, LocalizedLabel> = {
+  ONLINE: { 'id-ID': 'Online', 'en-US': 'Online' },
+  OFFLINE: { 'id-ID': 'Offline', 'en-US': 'Offline' },
   ACTIVE: { 'id-ID': 'Aktif', 'en-US': 'Active' },
   INACTIVE: { 'id-ID': 'Nonaktif', 'en-US': 'Inactive' },
   DRAFT: { 'id-ID': 'Draf', 'en-US': 'Draft' },
