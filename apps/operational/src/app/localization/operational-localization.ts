@@ -1,6 +1,9 @@
 import { useRuntime } from '@digvation/business-runtime';
 
-const copy: Record<string, { 'id-ID': string; 'en-US': string }> = {
+type OperationalLocale = 'id-ID' | 'en-US';
+type LocalizedLabel = Record<OperationalLocale, string>;
+
+const copy: Record<string, LocalizedLabel> = {
   Sales: { 'id-ID': 'Penjualan', 'en-US': 'Sales' },
   Sell: { 'id-ID': 'Jual', 'en-US': 'Sell' },
   Operations: { 'id-ID': 'Operasional', 'en-US': 'Operations' },
@@ -29,16 +32,16 @@ const copy: Record<string, { 'id-ID': string; 'en-US': string }> = {
     'en-US': 'Try loading transaction history again.',
   },
   'Operational transaction history for the active authorized location.': {
-    'id-ID': 'Riwayat transaksi operasional untuk lokasi aktif yang diizinkan.',
-    'en-US': 'Operational transaction history for the active authorized location.',
+    'id-ID': 'Riwayat transaksi untuk cabang yang sedang aktif.',
+    'en-US': 'Transaction history for the active branch.',
   },
   'My operational expenses': {
     'id-ID': 'Pengeluaran operasional saya',
     'en-US': 'My operational expenses',
   },
   'Expenses submitted from Operational for the active authorized location.': {
-    'id-ID': 'Pengeluaran yang diajukan dari Operasional untuk lokasi aktif yang diizinkan.',
-    'en-US': 'Expenses submitted from Operational for the active authorized location.',
+    'id-ID': 'Pengeluaran yang diajukan untuk cabang yang sedang aktif.',
+    'en-US': 'Expenses submitted for the active branch.',
   },
   'New expense': { 'id-ID': 'Pengeluaran baru', 'en-US': 'New expense' },
   Amount: { 'id-ID': 'Jumlah', 'en-US': 'Amount' },
@@ -69,24 +72,67 @@ const copy: Record<string, { 'id-ID': string; 'en-US': string }> = {
   'Loading branch': { 'id-ID': 'Memuat cabang', 'en-US': 'Loading branch' },
   'Choose active branch': { 'id-ID': 'Pilih cabang aktif', 'en-US': 'Choose active branch' },
   'Select the location used for your active operation.': {
-    'id-ID': 'Pilih lokasi yang digunakan untuk operasi aktif Anda.',
-    'en-US': 'Select the location used for your active operation.',
+    'id-ID': 'Pilih cabang yang digunakan untuk operasional saat ini.',
+    'en-US': 'Select the branch used for current operations.',
   },
   'Loading branches...': { 'id-ID': 'Memuat cabang...', 'en-US': 'Loading branches...' },
   'No active branches are available for this workspace.': {
-    'id-ID': 'Tidak ada cabang aktif yang tersedia untuk ruang kerja ini.',
-    'en-US': 'No active branches are available for this workspace.',
+    'id-ID': 'Tidak ada cabang aktif yang tersedia untuk bisnis ini.',
+    'en-US': 'No active branches are available for this business.',
   },
   Close: { 'id-ID': 'Tutup', 'en-US': 'Close' },
   Logout: { 'id-ID': 'Keluar', 'en-US': 'Logout' },
 };
 
+const technicalLabels: Record<string, LocalizedLabel> = {
+  ACTIVE: { 'id-ID': 'Aktif', 'en-US': 'Active' },
+  INACTIVE: { 'id-ID': 'Nonaktif', 'en-US': 'Inactive' },
+  DRAFT: { 'id-ID': 'Draf', 'en-US': 'Draft' },
+  OPEN: { 'id-ID': 'Berjalan', 'en-US': 'Open' },
+  FINALIZED: { 'id-ID': 'Selesai', 'en-US': 'Completed' },
+  VOIDED: { 'id-ID': 'Dibatalkan', 'en-US': 'Voided' },
+  QUEUED: { 'id-ID': 'Antrian', 'en-US': 'Queued' },
+  IN_PROGRESS: { 'id-ID': 'Dikerjakan', 'en-US': 'In progress' },
+  COMPLETED: { 'id-ID': 'Selesai', 'en-US': 'Completed' },
+  CANCELED: { 'id-ID': 'Dibatalkan', 'en-US': 'Canceled' },
+  CANCELLED: { 'id-ID': 'Dibatalkan', 'en-US': 'Cancelled' },
+  PENDING: { 'id-ID': 'Menunggu', 'en-US': 'Pending' },
+  WAITING: { 'id-ID': 'Menunggu', 'en-US': 'Waiting' },
+  SUCCEEDED: { 'id-ID': 'Berhasil', 'en-US': 'Succeeded' },
+  FAILED: { 'id-ID': 'Gagal', 'en-US': 'Failed' },
+  REJECTED: { 'id-ID': 'Ditolak', 'en-US': 'Rejected' },
+  EXPIRED: { 'id-ID': 'Kedaluwarsa', 'en-US': 'Expired' },
+  PRODUCT: { 'id-ID': 'Produk', 'en-US': 'Product' },
+  SERVICE: { 'id-ID': 'Layanan', 'en-US': 'Service' },
+  REQUIRED: { 'id-ID': 'Wajib', 'en-US': 'Required' },
+  OPTIONAL: { 'id-ID': 'Opsional', 'en-US': 'Optional' },
+  NONE: { 'id-ID': 'Tidak diperlukan', 'en-US': 'Not required' },
+  EXACT: { 'id-ID': 'Harga tetap', 'en-US': 'Fixed price' },
+  FROM: { 'id-ID': 'Mulai dari', 'en-US': 'From' },
+  TRACKED: { 'id-ID': 'Perlu pengerjaan', 'en-US': 'Work tracked' },
+  INSTANT: { 'id-ID': 'Langsung selesai', 'en-US': 'Instant' },
+  CASH: { 'id-ID': 'Tunai', 'en-US': 'Cash' },
+  BANK_TRANSFER: { 'id-ID': 'Transfer bank', 'en-US': 'Bank transfer' },
+  WALLET: { 'id-ID': 'Dompet digital', 'en-US': 'E-wallet' },
+  QRIS: { 'id-ID': 'QRIS', 'en-US': 'QRIS' },
+};
+
+function humanizeTechnicalValue(value: string): string {
+  return value
+    .replace(/[:_]+/g, '-')
+    .split('-')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ');
+}
+
 export function useOperationalLocalization() {
   const runtime = useRuntime();
-  const locale = runtime.locale === 'en-US' ? 'en-US' : 'id-ID';
+  const locale: OperationalLocale = runtime.locale === 'en-US' ? 'en-US' : 'id-ID';
   return {
     locale,
     copy: (value: string) => copy[value]?.[locale] ?? value,
+    label: (value: string) => technicalLabels[value]?.[locale] ?? humanizeTechnicalValue(value),
     formatDate: (value: Date, options?: Intl.DateTimeFormatOptions) =>
       new Intl.DateTimeFormat(locale, options).format(value),
     formatMoney: (amount: string, currency: string) =>
