@@ -25,6 +25,7 @@ export function createCashierTransactionAdapter(
   return new HttpCashierTransactionAdapter(
     new ApiClient({
       baseUrl: runtime.apiBaseUrl,
+      applicationSurface: 'operational',
       ...(getAccessToken ? { getAccessToken } : {}),
     }),
   );
