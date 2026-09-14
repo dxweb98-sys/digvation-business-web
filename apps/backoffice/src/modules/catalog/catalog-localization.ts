@@ -4,6 +4,15 @@ const catalogCopy: Record<string, { id: string; en: string }> = {
   'Master Data': { id: 'Data Master', en: 'Master Data' },
   Items: { id: 'Item', en: 'Items' },
   Categories: { id: 'Kategori', en: 'Categories' },
+  Fulfillment: { id: 'Pengerjaan', en: 'Work' },
+  Instant: { id: 'Langsung selesai', en: 'Instant' },
+  Tracked: { id: 'Perlu pengerjaan', en: 'Work tracked' },
+  None: { id: 'Tidak diperlukan', en: 'Not required' },
+  Optional: { id: 'Opsional', en: 'Optional' },
+  Required: { id: 'Wajib', en: 'Required' },
+  'Service configuration': { id: 'Pengaturan layanan', en: 'Service configuration' },
+  'Employee assignment': { id: 'Penugasan karyawan', en: 'Employee assignment' },
+  'Employee contribution': { id: 'Kontribusi karyawan', en: 'Employee contribution' },
   'Manage items, categories, pricing, variants, and tax assignment from one catalog workspace.': {
     id: 'Kelola item, kategori, harga, varian, dan penetapan pajak dari satu ruang kerja katalog.',
     en: 'Manage items, categories, pricing, variants, and tax assignment from one catalog workspace.',
@@ -13,7 +22,7 @@ const catalogCopy: Record<string, { id: string; en: string }> = {
     en: 'Complete the essentials first. Pricing and variants can be prepared in the same flow.',
   },
   'Update item identity, tax assignment, and service behavior.': {
-    id: 'Perbarui identitas item, penetapan pajak, dan perilaku layanan.',
+    id: 'Perbarui identitas item, penetapan pajak, dan cara layanan dikerjakan.',
     en: 'Update item identity, tax assignment, and service behavior.',
   },
   'Identity and selling behavior for this catalog item.': {
@@ -43,8 +52,8 @@ const catalogCopy: Record<string, { id: string; en: string }> = {
     en: 'Price must be greater than zero with up to four decimal places.',
   },
   'Define how this service is staffed and fulfilled.': {
-    id: 'Tentukan bagaimana layanan ini ditugaskan dan dipenuhi.',
-    en: 'Define how this service is staffed and fulfilled.',
+    id: 'Tentukan bagaimana karyawan ditugaskan dan layanan dikerjakan.',
+    en: 'Define how employees are assigned and the service is worked on.',
   },
   'Initial variants': { id: 'Varian awal', en: 'Initial variants' },
   'Optional. Add the variants you already know now; more can be added from item details later.': {
@@ -98,8 +107,8 @@ const catalogCopy: Record<string, { id: string; en: string }> = {
     en: 'No item-specific tax is assigned. Transaction tax may still apply when enabled.',
   },
   'Operational defaults used when this service is sold and fulfilled.': {
-    id: 'Nilai default operasional yang digunakan saat layanan dijual dan dipenuhi.',
-    en: 'Operational defaults used when this service is sold and fulfilled.',
+    id: 'Pengaturan default yang digunakan saat layanan dijual dan dikerjakan.',
+    en: 'Default settings used when this service is sold and worked on.',
   },
   minutes: { id: 'menit', en: 'minutes' },
   'Open only when you need to review or maintain variant-specific configuration.': {
