@@ -171,7 +171,12 @@ export function ExpensesPage() {
         description={copy('This expense will not be realized. A rejection note is required.')}
         footer={<div className="flex justify-end gap-2"><DButton variant="secondary" onClick={() => { setRejecting(null); setRejectionNote(''); }}>{copy('Cancel')}</DButton><DButton variant="danger" disabled={!rejectionNote.trim()} onClick={() => { if (rejecting) void api.reject(rejecting, rejectionNote).then(refresh); setRejecting(null); setRejectionNote(''); }}>{copy('Reject')}</DButton></div>}
       >
-        <DTextarea label={copy('Rejection note')} value={rejectionNote} onChange={setRejectionNote} />
+        <DTextarea
+          label={copy('Rejection note')}
+          value={rejectionNote}
+          onChange={setRejectionNote}
+          placeholder={copy('For example, Supporting receipt is incomplete')}
+        />
       </DDialog>
     </BackofficePage>
   );
@@ -289,6 +294,7 @@ function ExpenseDialog({
         <DSelect
           label={copy('Selling location')}
           value={locationId}
+          placeholder={copy('Select selling location')}
           options={(locations.data?.items ?? [])
             .filter((x) => x.status === 'ACTIVE')
             .map((x) => ({ value: x.id, label: x.name }))}
@@ -297,6 +303,7 @@ function ExpenseDialog({
         <DSelect
           label={copy('Source financial account')}
           value={accountId}
+          placeholder={copy('Select source financial account')}
           options={(accounts.data?.items ?? [])
             .filter((x) => x.status === 'ACTIVE' && ['CASH', 'BANK', 'E_WALLET'].includes(x.type))
             .map((x) => ({ value: x.id, label: x.name }))}
@@ -305,6 +312,7 @@ function ExpenseDialog({
         <DSelect
           label={copy('Category')}
           value={categoryCode}
+          placeholder={copy('Select expense category')}
           options={[
             { value: 'OPERATIONS', label: copy('Operations') },
             { value: 'TRANSPORT', label: copy('Transport') },
@@ -313,12 +321,23 @@ function ExpenseDialog({
           ]}
           onChange={(x) => setCategoryCode(String(x))}
         />
-        <DCurrencyInput label={copy('Amount')} value={amount} onValueChange={setAmount} />
-        <DDatePicker label={copy('Date')} value={date} onChange={setDate} />
+        <DCurrencyInput
+          label={copy('Amount')}
+          value={amount}
+          onValueChange={setAmount}
+          placeholder={copy('For example, 150000')}
+        />
+        <DDatePicker
+          label={copy('Date')}
+          value={date}
+          onChange={setDate}
+          placeholder={copy('Select expense date')}
+        />
         <DTextarea
           label={copy('Description')}
           value={note}
           onChange={setNote}
+          placeholder={copy('For example, Operational supplies purchase')}
           containerClassName="sm:col-span-2"
         />
       </div>
