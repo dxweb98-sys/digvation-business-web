@@ -12,9 +12,9 @@ interface OperationalLoginPageProps {
 
 function loginFailureMessage(error: unknown) {
   if (error instanceof Error && error.message === 'INVALID_CREDENTIALS') {
-    return 'Periksa kembali ID pengguna dan kata sandi Anda.';
+    return 'ID pengguna atau kata sandi tidak valid.';
   }
-  return 'Login belum dapat diproses. Silakan coba lagi.';
+  return 'Gagal masuk. Silakan coba lagi.';
 }
 
 /** Operational-owned login composition using the canonical shared field, button, and toast primitives. */
@@ -41,8 +41,8 @@ export function OperationalLoginPage({ authPort, onAuthenticated }: OperationalL
 
     if (!identifier.trim() || !password) {
       showToast({
-        title: 'Data login belum lengkap',
-        description: 'Masukkan ID pengguna dan kata sandi untuk melanjutkan.',
+        title: 'Lengkapi data akun',
+        description: 'Isi ID pengguna dan kata sandi.',
         variant: 'danger',
       });
       return;
@@ -53,15 +53,14 @@ export function OperationalLoginPage({ authPort, onAuthenticated }: OperationalL
       const session = await authPort.login({ identifier: identifier.trim(), password });
       authenticatedSession.current = session;
       showToast({
-        title: 'Login berhasil',
-        description: `Selamat datang, ${session.identity.displayName}.`,
+        title: 'Berhasil masuk.',
         variant: 'success',
       });
       setLeaving(true);
     } catch (error) {
       setSubmitting(false);
       showToast({
-        title: 'Login gagal',
+        title: 'Gagal masuk',
         description: loginFailureMessage(error),
         variant: 'danger',
       });
@@ -87,16 +86,11 @@ export function OperationalLoginPage({ authPort, onAuthenticated }: OperationalL
           <h1 className="text-3xl font-bold tracking-[-0.04em] text-[var(--color-text)]">
             {runtime.branding.productName}
           </h1>
-          <p className="mt-2 text-sm text-[var(--color-text-muted)]">
-            Masuk untuk membuka ruang kerja bisnis Anda.
-          </p>
+          <p className="mt-2 text-sm text-[var(--color-text-muted)]">Operational</p>
         </header>
 
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-[var(--shadow-panel)]">
-          <h2 className="text-lg font-semibold text-[var(--color-text)]">Masuk</h2>
-          <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-            Gunakan akun Anda untuk melanjutkan ke ruang kerja yang tersedia.
-          </p>
+          <h2 className="text-lg font-semibold text-[var(--color-text)]">Masuk ke Operasional</h2>
 
           <form autoComplete="on" className="mt-6 space-y-4" onSubmit={submit}>
             <DInput
@@ -106,7 +100,7 @@ export function OperationalLoginPage({ authPort, onAuthenticated }: OperationalL
               value={identifier}
               disabled={isSubmitting}
               onChange={setIdentifier}
-              placeholder="Username atau email"
+              placeholder="Nama pengguna atau email"
               autoComplete="username"
               autoCapitalize="none"
               spellCheck={false}
@@ -119,11 +113,11 @@ export function OperationalLoginPage({ authPort, onAuthenticated }: OperationalL
               value={password}
               disabled={isSubmitting}
               onChange={setPassword}
-              placeholder="Masukkan kata sandi"
+              placeholder="Kata sandi"
               autoComplete="current-password"
             />
             <DButton type="submit" fullWidth loading={isSubmitting} className="mt-2">
-              {isLeaving ? 'Membuka ruang kerja...' : isSubmitting ? 'Memverifikasi...' : 'Masuk'}
+              {isLeaving ? 'Membuka Operasional...' : isSubmitting ? 'Masuk...' : 'Masuk'}
             </DButton>
           </form>
         </div>
