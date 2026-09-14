@@ -93,11 +93,19 @@ export class BrowserSessionClient {
       return null;
     }
 
-    if (accessToken) return this.getUsableAccessToken();
-    if (document.visibilityState === 'hidden') return null;
+    if (accessToken && !this.shouldRefreshAccessToken()) return accessToken;
 
-    const refreshed = await this.refreshAccessToken();
-    return refreshed.kind === 'refreshed' ? refreshed.accessToken : null;
+    try {
+      // A one-time bootstrap restore is allowed while hidden. Ongoing refresh
+      // calls still defer in hidden tabs, so this does not create a background loop.
+      const refreshed = await this.refreshAccessToken(true);
+      if (refreshed.kind === 'refreshed') return refreshed.accessToken;
+      if (refreshed.kind === 'deferred') return accessToken;
+      return null;
+    } catch (error) {
+      if (accessToken && !this.isAccessTokenExpired()) return accessToken;
+      throw error;
+    }
   }
 
   public async login(
@@ -116,12 +124,13 @@ export class BrowserSessionClient {
     return session.accessToken;
   }
 
-  public async refreshAccessToken(): Promise<AuthRefreshResult> {
+  public async refreshAccessToken(allowHidden = false): Promise<AuthRefreshResult> {
     if (this.hasIdleExpired()) {
       this.endSession('idle');
       return { kind: 'ended', reason: 'idle' };
     }
-    if (document.visibilityState === 'hidden') return { kind: 'deferred' };
+    if (!allowHidden && document.visibilityState === 'hidden')
+      return { kind: 'deferred' };
     if (this.refreshPromise) return this.refreshPromise;
 
     this.refreshPromise = this.rotateBrowserSession().finally(() => {
@@ -256,7 +265,9 @@ export class BrowserSessionClient {
   }
 
   private installActivityTracking(): void {
-    const record = () => this.markActivity();
+    const record = (event: Event) => {
+      if (event.isTrusted) this.markActivity();
+    };
     window.addEventListener('pointerdown', record, { passive: true });
     window.addEventListener('pointermove', record, { passive: true });
     window.addEventListener('keydown', record);
