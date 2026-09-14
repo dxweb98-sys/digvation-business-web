@@ -1,4 +1,7 @@
-import { useRuntime } from '@digvation/business-runtime';
+import {
+  createBusinessDateTimeFormatter,
+  useRuntime,
+} from '@digvation/business-runtime';
 
 const copy: Record<string, { 'id-ID': string; 'en-US': string }> = {
   Sales: { 'id-ID': 'Penjualan', 'en-US': 'Sales' },
@@ -83,12 +86,16 @@ const copy: Record<string, { 'id-ID': string; 'en-US': string }> = {
 
 export function useOperationalLocalization() {
   const runtime = useRuntime();
-  const locale = runtime.locale === 'en-US' ? 'en-US' : 'id-ID';
+  const dateTime = createBusinessDateTimeFormatter(runtime);
+  const locale = dateTime.locale === 'en-US' ? 'en-US' : 'id-ID';
   return {
     locale,
     copy: (value: string) => copy[value]?.[locale] ?? value,
-    formatDate: (value: Date, options?: Intl.DateTimeFormatOptions) =>
-      new Intl.DateTimeFormat(locale, options).format(value),
+    formatDate: dateTime.format,
+    formatTime: dateTime.formatTime,
+    formatDateTime: dateTime.formatDateTime,
+    formatDateOnly: dateTime.formatDateOnly,
+    businessTimezone: dateTime.timezone,
     formatMoney: (amount: string, currency: string) =>
       new Intl.NumberFormat(locale, {
         style: 'currency',
