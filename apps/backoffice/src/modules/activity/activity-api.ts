@@ -1,5 +1,7 @@
 import type { ApiClient } from '@digvation/business-api';
 
+export type ActivitySource = 'BACKOFFICE' | 'OPERATIONAL' | 'SYSTEM';
+
 export interface ActivityActor {
   id: string | null;
   displayName: string;
@@ -17,7 +19,7 @@ export interface ActivityEvent {
   correlationId: string | null;
   locationId: string | null;
   locationName: string | null;
-  source: 'BACKOFFICE' | 'OPERATIONAL' | 'SYSTEM';
+  source: ActivitySource | null;
   outcome: string;
   actor: ActivityActor | null;
   target: {
