@@ -17,8 +17,9 @@ interface AuthProviderProps extends Omit<AuthContextValue, 'logout'> {
 
 export function AuthProvider({ session, authPort, children, onLogout }: AuthProviderProps) {
   const logout = useCallback(async () => {
-    await authPort.logout();
+    const revocation = authPort.logout();
     onLogout?.();
+    await revocation;
   }, [authPort, onLogout]);
   const value = useMemo(() => ({ session, authPort, logout }), [authPort, logout, session]);
 
