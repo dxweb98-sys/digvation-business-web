@@ -50,6 +50,7 @@ import { createPortal } from 'react-dom';
 
 import { useOperationalLocalization } from '../../../app/localization/operational-localization';
 import { cashierTransactionKeys } from '../cashier-transaction-keys';
+import { cashierTransactionErrorMessage } from '../cashier-transaction-errors';
 import type { CartDisplayLine } from '../cart-draft';
 import {
   createCashierTransactionAdapter,
@@ -358,24 +359,8 @@ function employeeWorkSummary(line: SaleLine, employees: readonly Employee[]): st
 function queueStatus(sale: Sale, includeOpenSales = false): QueueStatus | null {
   if (sale.status === 'FINALIZED') return 'COMPLETED';
   if (sale.status === 'VOIDED') return 'CANCELED';
-  if (
-    sale.lines.some(
-      (line) =>
-        line.fulfillmentBehaviorSnapshot === 'TRACKED' &&
-        (line.fulfillment?.status === 'IN_PROGRESS' || line.fulfillment?.startedAt !== null),
-    )
-  ) {
-    return 'PROGRESS';
-  }
-  if (
-    includeOpenSales ||
-    sale.lines.some(
-      (line) =>
-        line.fulfillmentBehaviorSnapshot === 'TRACKED' && line.fulfillment?.status === 'WAITING',
-    )
-  ) {
-    return 'QUEUED';
-  }
+  if (sale.operationalState === 'IN_PROGRESS') return 'PROGRESS';
+  if (sale.operationalState === 'QUEUED') return 'QUEUED';
   return null;
 }
 
@@ -645,10 +630,10 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       try {
         const committed = await workspace.commitDraft();
         checkoutTotal = committed.totalAmount;
-      } catch {
+      } catch (error) {
         showToast({
           title: 'Cart belum dapat dibuat',
-          description: 'Tidak ada transaksi parsial yang disimpan. Periksa cart lalu coba lagi.',
+          description: `${cashierTransactionErrorMessage(error)} Cart tetap disimpan; perbaiki konfigurasi atau koneksi lalu coba lagi.`,
           variant: 'danger',
         });
         return;
@@ -715,15 +700,6 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       variant: 'success',
     });
   };
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const resume = (transaction: Sale) => {
-    workspace.resumeSale(transaction.id);
-    const customer = readStoredCustomer(saleCustomerKey(transaction.id));
-    setCartCustomer(customer);
-    writeStoredCustomer(CURRENT_CUSTOMER_KEY, customer);
-    setQueueIssues((current) => ({ ...current, [transaction.id]: [] }));
-    setCartOpen(true);
-  };
   const startQueuedWork = async (transaction: Sale) => {
     const line = transaction.lines.find(
       (candidate) =>
@@ -740,7 +716,11 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       return false;
     }
     try {
-      await workspace.startQueuedFulfillment(transaction, line);
+      const started =
+        transaction.operationalState === 'IN_PROGRESS'
+          ? transaction
+          : await workspace.startSaleWork(transaction);
+      await workspace.startQueuedFulfillment(started, line);
       setQueueTab('PROGRESS');
       showToast({
         title: 'Pekerjaan dimulai',
@@ -912,8 +892,17 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     if (!sale || !lines.length) return;
 
     if (!payNow) {
-      commitCheckoutToQueue(sale, false, destination);
-      if (destination === 'START_PROCESS') await startQueuedWork(sale);
+      try {
+        const submitted = await workspace.queueSale(sale);
+        commitCheckoutToQueue(submitted, false, destination);
+        if (destination === 'START_PROCESS') await startQueuedWork(submitted);
+      } catch (error) {
+        showToast({
+          title: 'Checkout gagal',
+          description: cashierTransactionErrorMessage(error),
+          variant: 'danger',
+        });
+      }
       return;
     }
 
@@ -936,12 +925,13 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         });
         return;
       }
-      commitCheckoutToQueue(completedSale, true, destination);
-      if (destination === 'START_PROCESS') await startQueuedWork(completedSale);
-    } catch {
+      const submitted = await workspace.queueSale(completedSale);
+      commitCheckoutToQueue(submitted, true, destination);
+      if (destination === 'START_PROCESS') await startQueuedWork(submitted);
+    } catch (error) {
       showToast({
         title: 'Checkout gagal',
-        description: 'Pembayaran belum berhasil diproses. Cart tidak diubah.',
+        description: `${cashierTransactionErrorMessage(error)} Cart tidak diubah.`,
         variant: 'danger',
       });
     }
@@ -973,10 +963,10 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         description: 'Status operasional transaksi tidak berubah.',
         variant: 'success',
       });
-    } catch {
+    } catch (error) {
       showToast({
         title: 'Pembayaran gagal',
-        description: 'Saldo transaksi tidak berubah dan antrian tetap dipertahankan.',
+        description: `${cashierTransactionErrorMessage(error)} Saldo transaksi tidak berubah dan antrian tetap dipertahankan.`,
         variant: 'danger',
       });
     }

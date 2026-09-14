@@ -439,6 +439,7 @@ export class LocalDemoCashierTransactionAdapter
       sellingLocationId: input.sellingLocationId,
       currency: input.currency,
       status: 'OPEN',
+      operationalState: 'UNSUBMITTED',
       version: 1,
       grossAmount: '0.0000',
       discountAmount: '0.0000',
@@ -765,6 +766,29 @@ export class LocalDemoCashierTransactionAdapter
       line.fulfillment.canceledAt = at;
       line.fulfillment.completedAt = null;
     }
+    touch(sale);
+    return clone(sale);
+  }
+
+  public async queueSale(saleId: string, expectedVersion: number, idempotencyKey: string) {
+    void idempotencyKey;
+    const sale = requireOpenSale(saleId);
+    if (sale.version !== expectedVersion) throw new Error('Sale changed; reload before retrying.');
+    if (sale.operationalState !== 'UNSUBMITTED') throw new Error('Sale is already submitted.');
+    sale.operationalState = 'QUEUED';
+    touch(sale);
+    return clone(sale);
+  }
+
+  public async startSaleWork(saleId: string, expectedVersion: number, idempotencyKey: string) {
+    void idempotencyKey;
+    const sale = requireOpenSale(saleId);
+    if (sale.version !== expectedVersion) throw new Error('Sale changed; reload before retrying.');
+    if (sale.operationalState === 'IN_PROGRESS') throw new Error('Sale work is already started.');
+    if (!sale.lines.some((line) => line.fulfillment?.status === 'WAITING')) {
+      throw new Error('Sale has no queued tracked work to start.');
+    }
+    sale.operationalState = 'IN_PROGRESS';
     touch(sale);
     return clone(sale);
   }

@@ -43,6 +43,10 @@ function clampNumericText(value: string, min: string, max: string | undefined, i
   return normalized;
 }
 
+export function normalizeCurrencyPresentationInput(value: string, fractionDigits = 0) {
+  return normalizeDecimalInput(value, { integer: fractionDigits === 0 });
+}
+
 /** Feature-owned numeric constraint handling composed from canonical DecimalInput. */
 export function PosNumericInput({
   value,
@@ -103,16 +107,20 @@ export function PosCurrencyInput({
   value,
   onChange,
   className = '',
+  fractionDigits = 0,
   ...props
 }: Omit<CurrencyInputProps, 'onValueChange' | 'value'> & {
   value: string;
   onChange: (value: string) => void;
+  fractionDigits?: number;
 }) {
   return (
     <DCurrencyInput
       {...props}
       value={value}
-      onValueChange={onChange}
+      onValueChange={(nextValue) =>
+        onChange(normalizeCurrencyPresentationInput(nextValue, fractionDigits))
+      }
       className={`${className} tabular-nums`}
     />
   );

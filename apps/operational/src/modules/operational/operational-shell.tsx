@@ -3,21 +3,14 @@ import { useAuth } from '@digvation/business-auth';
 import { useConnectivity, useRuntime } from '@digvation/business-runtime';
 import { DAvatar, DButton, DDialog, DDropdown, useToast } from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
-import {
-  Building2,
-  Check,
-  ChevronDown,
-  LogOut,
-  MapPin,
-  Menu,
-  UserRound,
-} from 'lucide-react';
+import { Building2, Check, ChevronDown, LogOut, MapPin, Menu, UserRound } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 
 import { getAppVersion } from '../../app/version/app-version';
 import { OperationalAccessApi, operationalAccessKeys } from './operational-access-api';
 import type { OperationalNavigationSection } from './operational-navigation';
+import { resolveOperationalLocationSelection } from './operational-location-selection';
 import { useOperationalSession } from './operational-session-provider';
 
 function formatCurrentDate(locale: string): string {
@@ -83,24 +76,19 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
     () => operationalAccessQuery.data?.locations ?? [],
     [operationalAccessQuery.data],
   );
-  const selectedLocation =
-    locations.find((location) => location.id === selectedLocationId) ?? null;
+  const selectedLocation = locations.find((location) => location.id === selectedLocationId) ?? null;
   const brandSubtitle =
     runtime.branding.businessName ?? runtime.branding.companyName ?? runtime.workspace;
-  const userInitials = identityInitials(
-    session.identity.displayName,
-    session.identity.initials,
-  );
+  const userInitials = identityInitials(session.identity.displayName, session.identity.initials);
 
   useEffect(() => {
-    if (locations.length === 1 && selectedLocationId !== locations[0]!.id)
-      selectLocation(locations[0]!.id);
-    else if (
-      selectedLocationId &&
-      !locations.some((location) => location.id === selectedLocationId)
-    )
-      selectLocation(null);
-  }, [locations, selectLocation, selectedLocationId]);
+    const resolved = resolveOperationalLocationSelection(
+      locations,
+      selectedLocationId,
+      operationalAccessQuery.data?.mainLocationId ?? null,
+    );
+    if (resolved !== selectedLocationId) selectLocation(resolved);
+  }, [locations, operationalAccessQuery.data?.mainLocationId, selectLocation, selectedLocationId]);
 
   if (operationalAccessQuery.isSuccess && locations.length === 0) {
     return (
@@ -323,9 +311,7 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
               {...(session.identity.avatarUrl ? { src: session.identity.avatarUrl } : {})}
               alt=""
               name={session.identity.displayName}
-              fallback={
-                userInitials ?? <UserRound className="size-4" aria-label="User account" />
-              }
+              fallback={userInitials ?? <UserRound className="size-4" aria-label="User account" />}
               size="sm"
               className="shrink-0 bg-[var(--color-brand)]/10 text-xs font-bold text-[var(--color-brand)]"
             />
@@ -382,7 +368,9 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
                     <span className="flex min-w-0 items-center gap-3">
                       <MapPin className="size-4 shrink-0" />
                       <span className="min-w-0">
-                        <span className="block truncate text-sm font-semibold">{location.name}</span>
+                        <span className="block truncate text-sm font-semibold">
+                          {location.name}
+                        </span>
                         <span className="mt-0.5 block truncate text-xs text-[var(--color-text-muted)]">
                           {location.code}
                         </span>
@@ -431,9 +419,7 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
               {...(session.identity.avatarUrl ? { src: session.identity.avatarUrl } : {})}
               alt=""
               name={session.identity.displayName}
-              fallback={
-                userInitials ?? <UserRound className="size-5" aria-label="User account" />
-              }
+              fallback={userInitials ?? <UserRound className="size-5" aria-label="User account" />}
               size="lg"
               className="shrink-0 bg-[var(--color-brand)]/10 text-sm font-bold text-[var(--color-brand)]"
             />

@@ -107,6 +107,12 @@ describe('LocalCashierTransactionAdapter', () => {
         .equals(1),
     ).toBe(true);
 
+    expect(sale.operationalState).toBe('UNSUBMITTED');
+    sale = await adapter.queueSale(sale.id, sale.version, 'queue');
+    expect(sale.operationalState).toBe('QUEUED');
+    sale = await adapter.startSaleWork(sale.id, sale.version, 'start-work');
+    expect(sale.operationalState).toBe('IN_PROGRESS');
+
     sale = await adapter.transitionSaleLineFulfillment(sale.id, serviceLine.id, {
       expectedVersion: sale.version,
       status: 'IN_PROGRESS',
