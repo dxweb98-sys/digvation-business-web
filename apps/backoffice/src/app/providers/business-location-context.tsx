@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query';
 import {
   createContext,
   useContext,
-  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -68,11 +67,9 @@ export function BusinessLocationProvider({ children }: { children: ReactNode }) 
   const preferenceKey = session
     ? `digvation.backoffice.dashboard.location.v1:${session.identity.workspace}:${session.identity.userId}`
     : 'digvation.backoffice.dashboard.location.v1:anonymous';
-  const [preferredLocationId, setPreferredLocationId] = useState<string | null>(null);
-
-  useEffect(() => {
-    setPreferredLocationId(readPreference(preferenceKey));
-  }, [preferenceKey]);
+  const [preferredLocationId, setPreferredLocationId] = useState<string | null>(
+    () => readPreference(preferenceKey),
+  );
 
   const query = useQuery({
     queryKey: ['operational-location-context'],

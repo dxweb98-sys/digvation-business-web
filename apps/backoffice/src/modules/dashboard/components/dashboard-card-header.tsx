@@ -20,17 +20,17 @@ export function DashboardCardHeader({
   tone = 'sky',
 }: {
   title: string;
-  subtitle?: string;
+  subtitle?: string | undefined;
   icon: ReactNode;
-  actionHref?: string;
-  actionLabel?: string;
+  actionHref?: string | undefined;
+  actionLabel?: string | undefined;
   tone?: keyof typeof tones;
 }) {
   const { text } = useDashboardI18n();
   const resolvedActionLabel = actionLabel ?? text('seeAll');
 
   return (
-    <div className="-mx-5 flex min-h-[58px] items-start gap-3 border-b border-[var(--color-border)] px-5 pb-4">
+    <div className="-mx-5 flex min-h-14.5 items-start gap-3 border-b border-(--color-border) px-5 pb-4">
       <span
         className={`flex size-9 shrink-0 items-center justify-center rounded-full ${tones[tone]}`}
       >
@@ -38,14 +38,14 @@ export function DashboardCardHeader({
       </span>
       <div className="min-w-0 flex-1 pt-0.5">
         <h2
-          className="line-clamp-2 text-sm font-semibold leading-5 tracking-tight text-[var(--color-text)]"
+          className="line-clamp-2 text-sm font-semibold leading-5 tracking-tight text-(--color-text)"
           title={title}
         >
           {title}
         </h2>
         {subtitle ? (
           <p
-            className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-[var(--color-text-muted)]"
+            className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-(--color-text-muted)"
             title={subtitle}
           >
             {subtitle}
@@ -55,7 +55,7 @@ export function DashboardCardHeader({
       {actionHref ? (
         <Link
           to={actionHref}
-          className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-semibold text-[var(--color-brand)] transition-colors hover:bg-[var(--color-accent-sky)]"
+          className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-semibold text-(--color-brand) transition-colors hover:bg-(--color-accent-sky)"
         >
           {resolvedActionLabel}
           <ArrowUpRight aria-hidden="true" className="size-3" />

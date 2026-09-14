@@ -1,7 +1,6 @@
-import { ApiClient } from '@digvation/business-api';
+import type { ApiClient } from '@digvation/business-api';
 
-export const BUSINESS_CONFIGURATION_CHANGED_EVENT =
-  'digvation:business-configuration-changed';
+export const BUSINESS_CONFIGURATION_CHANGED_EVENT = 'digvation:business-configuration-changed';
 
 export type NumberingNamespace =
   | 'PRODUCT'
@@ -81,9 +80,7 @@ export class BusinessSettingsApi {
   }
 
   getConfiguration() {
-    return this.client.get<EffectiveBusinessConfiguration>(
-      '/api/v1/business-configuration',
-    );
+    return this.client.get<EffectiveBusinessConfiguration>('/api/v1/business-configuration');
   }
 
   updateProfile(profile: BusinessProfile, name: string) {
@@ -108,9 +105,7 @@ export class BusinessSettingsApi {
   }
 
   getNumbering() {
-    return this.client.get<NumberingPreference[]>(
-      '/api/v1/business-configuration/numbering',
-    );
+    return this.client.get<NumberingPreference[]>('/api/v1/business-configuration/numbering');
   }
 
   updateNumbering(
@@ -135,11 +130,7 @@ export class BusinessSettingsApi {
     );
   }
 
-  createLocation(input: {
-    code: string;
-    name: string;
-    setAsMain?: boolean;
-  }) {
+  createLocation(input: { code: string; name: string; setAsMain?: boolean | undefined }) {
     return this.client.post<SellingLocation>('/api/v1/locations', input);
   }
 
@@ -148,12 +139,12 @@ export class BusinessSettingsApi {
     input: {
       name?: string;
       status?: SellingLocation['status'];
-      setAsMain?: boolean;
+      setAsMain?: boolean | undefined;
     },
   ) {
-    return this.client.patch<SellingLocation>(
-      `/api/v1/locations/${location.id}`,
-      { expectedVersion: location.version, ...input },
-    );
+    return this.client.patch<SellingLocation>(`/api/v1/locations/${location.id}`, {
+      expectedVersion: location.version,
+      ...input,
+    });
   }
 }

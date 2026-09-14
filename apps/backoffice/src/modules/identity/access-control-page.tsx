@@ -12,7 +12,7 @@ import {
 } from '@digvation/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ban, Pencil, Plus, RefreshCw, UserCog, UserPlus } from 'lucide-react';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
 import {
@@ -190,33 +190,40 @@ export function AccessControlPage() {
         ) : null}
       </div>
 
-      <RoleEditor
-        role={editingRole}
-        permissions={permissions.data?.items.map((item) => item.key) ?? []}
-        api={api}
-        canUpdate={canUpdateRole}
-        canManagePermissions={canManagePermissions}
-        onClose={() => setEditingRole(undefined)}
-        onChanged={() => invalidate(keys.roles)}
-      />
-      <UserEditor
-        user={editingUser}
-        roles={roles.data?.items ?? []}
-        api={api}
-        operationalAccess={operationalAccess}
-        canManageRoles={canManageUsers}
-        canViewLocations={canViewLocations || canManageLocations}
-        canManageLocations={canManageLocations}
-        onClose={() => setEditingUser(null)}
-        onChanged={() => invalidate(keys.users)}
-      />
-      <InvitationDialog
-        open={inviting}
-        roles={roles.data?.items.filter((role) => role.status === 'ACTIVE') ?? []}
-        api={api}
-        onClose={() => setInviting(false)}
-        onChanged={() => invalidate(keys.invitations)}
-      />
+      {editingRole !== undefined ? (
+        <RoleEditor
+          key={editingRole?.id ?? 'new'}
+          role={editingRole}
+          permissions={permissions.data?.items.map((item) => item.key) ?? []}
+          api={api}
+          canUpdate={canUpdateRole}
+          canManagePermissions={canManagePermissions}
+          onClose={() => setEditingRole(undefined)}
+          onChanged={() => invalidate(keys.roles)}
+        />
+      ) : null}
+      {editingUser ? (
+        <UserEditor
+          key={editingUser.id}
+          user={editingUser}
+          roles={roles.data?.items ?? []}
+          api={api}
+          operationalAccess={operationalAccess}
+          canManageRoles={canManageUsers}
+          canViewLocations={canViewLocations || canManageLocations}
+          canManageLocations={canManageLocations}
+          onClose={() => setEditingUser(null)}
+          onChanged={() => invalidate(keys.users)}
+        />
+      ) : null}
+      {inviting ? (
+        <InvitationDialog
+          roles={roles.data?.items.filter((role) => role.status === 'ACTIVE') ?? []}
+          api={api}
+          onClose={() => setInviting(false)}
+          onChanged={() => invalidate(keys.invitations)}
+        />
+      ) : null}
 
       <DConfirmDialog
         open={Boolean(deactivatingRole)}
@@ -527,14 +534,8 @@ function RoleEditor({
   const { showToast } = useToast();
   const isNew = role === null;
   const [code, setCode] = useState('');
-  const [name, setName] = useState('');
-  const [selected, setSelected] = useState<string[]>([]);
-
-  useEffect(() => {
-    setCode('');
-    setName(role?.name ?? '');
-    setSelected(role?.permissions ?? []);
-  }, [role]);
+  const [name, setName] = useState(role?.name ?? '');
+  const [selected, setSelected] = useState<string[]>(role?.permissions ?? []);
 
   const save = async () => {
     if (!name.trim() || (isNew && !code.trim())) return;
@@ -637,13 +638,10 @@ function UserEditor({
 }) {
   const { copy } = useBackofficeLocalization();
   const { showToast } = useToast();
-  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
-  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
-
-  useEffect(() => {
-    setSelectedRoles(user?.roles.map((role) => role.id) ?? []);
-    setSelectedLocations([]);
-  }, [user]);
+  const [selectedRoles, setSelectedRoles] = useState<string[]>(() =>
+    user?.roles.map((role) => role.id) ?? [],
+  );
+  const [selectedLocations, setSelectedLocations] = useState<string[] | null>(null);
 
   const locationAccess = useQuery({
     queryKey: ['access-control', 'locations', user?.id],
@@ -654,10 +652,8 @@ function UserEditor({
     enabled: Boolean(user && canViewLocations),
   });
 
-  useEffect(() => {
-    if (locationAccess.data)
-      setSelectedLocations(locationAccess.data.assigned.map((item) => item.id));
-  }, [locationAccess.data]);
+  const assignedLocationIds = locationAccess.data?.assigned.map((item) => item.id) ?? [];
+  const effectiveSelectedLocations = selectedLocations ?? assignedLocationIds;
 
   const save = async () => {
     if (!user) return;
@@ -665,7 +661,7 @@ function UserEditor({
       if (canManageRoles)
         await api.replaceUserRoles(user, selectedRoles);
       if (canManageLocations)
-        await operationalAccess.replaceUserLocations(user.id, selectedLocations);
+        await operationalAccess.replaceUserLocations(user.id, effectiveSelectedLocations);
       onChanged();
       onClose();
       showToast({ variant: 'success', title: copy('User access updated.') });
@@ -713,9 +709,16 @@ function UserEditor({
             <SelectionList
               title={copy('Location Access')}
               items={locations.map((location) => ({ id: location.id, label: `${location.code} — ${location.name}` }))}
-              selected={selectedLocations}
+              selected={effectiveSelectedLocations}
               disabled={!canManageLocations}
-              onToggle={(id) => setSelectedLocations((values) => values.includes(id) ? values.filter((item) => item !== id) : [...values, id])}
+              onToggle={(id) =>
+                setSelectedLocations((values) => {
+                  const current = values ?? assignedLocationIds;
+                  return current.includes(id)
+                    ? current.filter((item) => item !== id)
+                    : [...current, id];
+                })
+              }
             />
           ) : null}
         </div>
@@ -725,13 +728,11 @@ function UserEditor({
 }
 
 function InvitationDialog({
-  open,
   roles,
   api,
   onClose,
   onChanged,
 }: {
-  open: boolean;
   roles: AccessRole[];
   api: AccessControlApi;
   onClose: () => void;
@@ -744,14 +745,6 @@ function InvitationDialog({
   const [displayName, setDisplayName] = useState('');
   const [roleIds, setRoleIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    setPhone('');
-    setUsername('');
-    setDisplayName('');
-    setRoleIds([]);
-  }, [open]);
 
   const valid = /^\+[1-9]\d{7,14}$/.test(phone.trim()) && Boolean(displayName.trim());
   const save = async () => {
@@ -780,7 +773,7 @@ function InvitationDialog({
 
   return (
     <DDialog
-      open={open}
+      open
       onClose={onClose}
       title={copy('Invite user')}
       description={copy('Use the existing Runtime invitation contract. The user activates the account through the invitation flow.')}

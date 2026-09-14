@@ -24,13 +24,11 @@ export function PaymentMixCard({
   points: readonly DashboardAnalyticsPoint[];
   emptyMessage: string;
   formatValue(value: number): string;
-  seeAllHref?: string;
+  seeAllHref?: string | undefined;
 }) {
   const { copy } = useBackofficeLocalization();
   const { text } = useDashboardI18n();
-  const sorted = [...points]
-    .sort((a, b) => numeric(b.value) - numeric(a.value))
-    .slice(0, 4);
+  const sorted = [...points].sort((a, b) => numeric(b.value) - numeric(a.value)).slice(0, 4);
   const total = sorted.reduce((sum, point) => sum + numeric(point.value), 0);
 
   let cursor = 0;
@@ -38,6 +36,7 @@ export function PaymentMixCard({
     const value = numeric(point.value);
     const ratio = total > 0 ? (value / total) * 100 : 0;
     const from = cursor;
+    // eslint-disable-next-line react-hooks/immutability
     cursor += ratio;
     return `${SEGMENT_COLORS[index % SEGMENT_COLORS.length]} ${from.toFixed(2)}% ${cursor.toFixed(2)}%`;
   });
@@ -48,7 +47,7 @@ export function PaymentMixCard({
   return (
     <DCard
       variant="elevated"
-      className="h-full rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-[0_16px_40px_-34px_var(--color-text)]"
+      className="h-full rounded-(--radius-card) border border-(--color-border) bg-(--color-surface) p-5 shadow-[0_16px_40px_-34px_var(--color-text)]"
     >
       <DashboardCardHeader
         title={title}
@@ -60,13 +59,13 @@ export function PaymentMixCard({
 
       {sorted.length ? (
         <div className="mt-5 grid items-center gap-5 sm:grid-cols-[140px_minmax(0,1fr)]">
-          <div className="relative mx-auto size-[136px]">
+          <div className="relative mx-auto size-34">
             <div className="absolute inset-0 rounded-full" style={{ background: donut }} />
-            <div className="absolute inset-[23px] flex flex-col items-center justify-center rounded-full bg-[var(--color-surface)] text-center">
+            <div className="absolute inset-5.75 flex flex-col items-center justify-center rounded-full bg-(--color-surface) text-center">
               <p className="text-sm font-semibold tracking-tight tabular-nums">
                 {formatValue(total)}
               </p>
-              <p className="mt-1 text-[9px] uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+              <p className="mt-1 text-[9px] uppercase tracking-[0.08em] text-(--color-text-muted)">
                 {text('totalValue')}
               </p>
             </div>
@@ -85,17 +84,14 @@ export function PaymentMixCard({
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
-                      <p
-                        className="line-clamp-2 text-xs font-medium leading-4"
-                        title={label}
-                      >
+                      <p className="line-clamp-2 text-xs font-medium leading-4" title={label}>
                         {label}
                       </p>
                       <p className="shrink-0 text-xs font-semibold tabular-nums">
                         {ratio.toFixed(1)}%
                       </p>
                     </div>
-                    <p className="mt-0.5 text-[10px] text-[var(--color-text-muted)]">
+                    <p className="mt-0.5 text-[10px] text-(--color-text-muted)">
                       {formatValue(value)}
                     </p>
                   </div>
@@ -105,7 +101,7 @@ export function PaymentMixCard({
           </div>
         </div>
       ) : (
-        <div className="flex min-h-44 items-center justify-center text-center text-xs text-[var(--color-text-muted)]">
+        <div className="flex min-h-44 items-center justify-center text-center text-xs text-(--color-text-muted)">
           {emptyMessage}
         </div>
       )}

@@ -153,7 +153,6 @@ export function DashboardPage() {
   const canReadSales = isReportAvailable(session, 'business-performance');
   const canReadCatalog = isReportAvailable(session, 'catalog-performance');
   const canReadEmployees = isReportAvailable(session, 'employee-performance');
-  const canReadPayments = isReportAvailable(session, 'payments');
 
   const showTopItems = canShowDashboardWidget(session, 'TOP_ITEMS');
   const showPaymentMix = canShowDashboardWidget(session, 'PAYMENT_MIX');

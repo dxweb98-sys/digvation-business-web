@@ -31,8 +31,8 @@ export interface NamedRecord {
   status: 'ACTIVE' | 'INACTIVE';
   version: number;
 }
-export interface Category extends NamedRecord {}
-export interface TaxCategory extends NamedRecord {}
+export type Category = NamedRecord;
+export type TaxCategory = NamedRecord;
 export interface TaxProfile {
   itemTaxEnabled: boolean;
   transactionTaxEnabled: boolean;

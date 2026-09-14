@@ -18,7 +18,7 @@ import {
 } from '@digvation/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CircleOff, MapPinPlus, Pencil } from 'lucide-react';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
 import {
@@ -169,7 +169,7 @@ export function BusinessConfigurationPage() {
 
 function Card({ children }: { children: ReactNode }) {
   return (
-    <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 sm:p-6">
+    <section className="rounded-(--radius-card) border border-(--color-border) bg-(--color-surface) p-5 sm:p-6">
       {children}
     </section>
   );
@@ -182,7 +182,7 @@ function ProfileSection({
   api,
   onChanged,
 }: {
-  profile?: BusinessProfile & { configured?: boolean };
+  profile?: (BusinessProfile & { configured?: boolean }) | undefined;
   loading: boolean;
   canUpdate: boolean;
   api: BusinessSettingsApi;
@@ -191,16 +191,19 @@ function ProfileSection({
   const { copy } = useBackofficeLocalization();
   const { showToast } = useToast();
   const [open, setOpen] = useState(false);
-  const [name, setName] = useState('');
-
-  useEffect(() => setName(profile?.name ?? ''), [profile?.name]);
+  const [draftName, setDraftName] = useState<string | null>(null);
+  const name = draftName ?? profile?.name ?? '';
+  const close = () => {
+    setOpen(false);
+    setDraftName(null);
+  };
 
   const save = async () => {
     if (!profile || !name.trim()) return;
     try {
       await api.updateProfile(profile, name.trim());
       onChanged();
-      setOpen(false);
+      close();
       showToast({ variant: 'success', title: copy('Business profile updated.') });
     } catch (error) {
       if (!isSessionExpiredError(error))
@@ -219,7 +222,7 @@ function ProfileSection({
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="font-semibold">{copy('Business profile')}</h2>
-          <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+          <p className="mt-1 text-sm text-(--color-text-muted)">
             {copy(
               'This identity is the tenant business authority used by Backoffice and Operational.',
             )}
@@ -240,14 +243,14 @@ function ProfileSection({
       )}
       <DDialog
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={close}
         title={copy('Business profile')}
         description={copy(
           'Update the business identity consumed by authenticated applications.',
         )}
         footer={
           <div className="flex justify-end gap-2">
-            <DButton variant="secondary" onClick={() => setOpen(false)}>
+            <DButton variant="secondary" onClick={close}>
               {copy('Cancel')}
             </DButton>
             <DButton onClick={() => void save()} disabled={!name.trim()}>
@@ -259,7 +262,7 @@ function ProfileSection({
         <DInput
           label={copy('Business name')}
           value={name}
-          onChange={setName}
+          onChange={setDraftName}
           autoFocus
         />
       </DDialog>
@@ -274,7 +277,7 @@ function LocalizationSection({
   api,
   onChanged,
 }: {
-  preferences?: BusinessPreferences;
+  preferences?: BusinessPreferences | undefined;
   loading: boolean;
   canUpdate: boolean;
   api: BusinessSettingsApi;
@@ -283,21 +286,24 @@ function LocalizationSection({
   const { copy } = useBackofficeLocalization();
   const { showToast } = useToast();
   const [open, setOpen] = useState(false);
-  const [locale, setLocale] =
-    useState<BusinessPreferences['defaultLocale']>('id-ID');
-  const [timezone, setTimezone] = useState('Asia/Jakarta');
-  const [dateFormat, setDateFormat] =
-    useState<BusinessPreferences['dateFormat']>('DD/MM/YYYY');
-  const [timeFormat, setTimeFormat] =
-    useState<BusinessPreferences['timeFormat']>('HH:mm');
-
-  useEffect(() => {
-    if (!preferences) return;
-    setLocale(preferences.defaultLocale);
-    setTimezone(preferences.timezone);
-    setDateFormat(preferences.dateFormat);
-    setTimeFormat(preferences.timeFormat);
-  }, [preferences]);
+  const [draftLocale, setDraftLocale] =
+    useState<BusinessPreferences['defaultLocale'] | null>(null);
+  const [draftTimezone, setDraftTimezone] = useState<string | null>(null);
+  const [draftDateFormat, setDraftDateFormat] =
+    useState<BusinessPreferences['dateFormat'] | null>(null);
+  const [draftTimeFormat, setDraftTimeFormat] =
+    useState<BusinessPreferences['timeFormat'] | null>(null);
+  const locale = draftLocale ?? preferences?.defaultLocale ?? 'id-ID';
+  const timezone = draftTimezone ?? preferences?.timezone ?? 'Asia/Jakarta';
+  const dateFormat = draftDateFormat ?? preferences?.dateFormat ?? 'DD/MM/YYYY';
+  const timeFormat = draftTimeFormat ?? preferences?.timeFormat ?? 'HH:mm';
+  const close = () => {
+    setOpen(false);
+    setDraftLocale(null);
+    setDraftTimezone(null);
+    setDraftDateFormat(null);
+    setDraftTimeFormat(null);
+  };
 
   const save = async () => {
     if (!preferences || !timezone.trim()) return;
@@ -309,7 +315,7 @@ function LocalizationSection({
         timeFormat,
       });
       onChanged();
-      setOpen(false);
+      close();
       showToast({ variant: 'success', title: copy('Localization updated.') });
     } catch (error) {
       if (!isSessionExpiredError(error))
@@ -328,7 +334,7 @@ function LocalizationSection({
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="font-semibold">{copy('Localization')}</h2>
-          <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+          <p className="mt-1 text-sm text-(--color-text-muted)">
             {copy('Persisted values become the tenant default after save.')}
           </p>
         </div>
@@ -350,11 +356,11 @@ function LocalizationSection({
       ) : null}
       <DDialog
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={close}
         title={copy('Localization')}
         footer={
           <div className="flex justify-end gap-2">
-            <DButton variant="secondary" onClick={() => setOpen(false)}>
+            <DButton variant="secondary" onClick={close}>
               {copy('Cancel')}
             </DButton>
             <DButton onClick={() => void save()} disabled={!timezone.trim()}>
@@ -372,14 +378,14 @@ function LocalizationSection({
               { value: 'id-ID', label: copy('Indonesian') },
               { value: 'en-US', label: copy('English') },
             ]}
-            onValueChange={(value) =>
-              setLocale(value as BusinessPreferences['defaultLocale'])
-            }
+            onValueChange={(value) => {
+              if (value === 'id-ID' || value === 'en-US') setDraftLocale(value);
+            }}
           />
           <DInput
             label={copy('Timezone')}
             value={timezone}
-            onChange={setTimezone}
+            onChange={setDraftTimezone}
             placeholder="Asia/Jakarta"
           />
           <DSelect
@@ -390,9 +396,14 @@ function LocalizationSection({
               value,
               label: value,
             }))}
-            onValueChange={(value) =>
-              setDateFormat(value as BusinessPreferences['dateFormat'])
-            }
+            onValueChange={(value) => {
+              if (
+                value === 'DD/MM/YYYY' ||
+                value === 'MM/DD/YYYY' ||
+                value === 'YYYY-MM-DD'
+              )
+                setDraftDateFormat(value);
+            }}
           />
           <DSelect
             label={copy('Time format')}
@@ -402,9 +413,9 @@ function LocalizationSection({
               { value: 'HH:mm', label: '24-hour (HH:mm)' },
               { value: 'hh:mm a', label: '12-hour (hh:mm a)' },
             ]}
-            onValueChange={(value) =>
-              setTimeFormat(value as BusinessPreferences['timeFormat'])
-            }
+            onValueChange={(value) => {
+              if (value === 'HH:mm' || value === 'hh:mm a') setDraftTimeFormat(value);
+            }}
           />
         </div>
       </DDialog>
@@ -415,7 +426,7 @@ function LocalizationSection({
 function Fact({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-xs text-[var(--color-text-muted)]">{label}</dt>
+      <dt className="text-xs text-(--color-text-muted)">{label}</dt>
       <dd className="mt-1 font-medium">{value}</dd>
     </div>
   );
@@ -522,13 +533,16 @@ function LocationsSection({
             : []
         }
       />
-      <LocationDialog
-        location={editing}
-        items={items}
-        api={api}
-        onClose={() => setEditing(undefined)}
-        onChanged={onChanged}
-      />
+      {editing !== undefined ? (
+        <LocationDialog
+          key={editing?.id ?? 'new'}
+          location={editing}
+          items={items}
+          api={api}
+          onClose={() => setEditing(undefined)}
+          onChanged={onChanged}
+        />
+      ) : null}
       <DConfirmDialog
         open={Boolean(deactivating)}
         onClose={() => setDeactivating(null)}
@@ -561,14 +575,10 @@ function LocationDialog({
   const { showToast } = useToast();
   const isNew = location === null;
   const [code, setCode] = useState('');
-  const [name, setName] = useState('');
-  const [main, setMain] = useState(false);
-
-  useEffect(() => {
-    setName(location?.name ?? '');
-    setCode('');
-    setMain(Boolean(location?.isMain) || (location === null && items.length === 0));
-  }, [location, items.length]);
+  const [name, setName] = useState(location?.name ?? '');
+  const [main, setMain] = useState(
+    Boolean(location?.isMain) || (location === null && items.length === 0),
+  );
 
   const save = async () => {
     if (!name.trim() || (isNew && !code.trim())) return;
@@ -681,7 +691,7 @@ function NumberingSection({
   return (
     <Card>
       <h2 className="font-semibold">{copy('Numbering')}</h2>
-      <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+      <p className="mt-1 text-sm text-(--color-text-muted)">
         {copy(
           'Configure presentation only. Runtime remains the sequence authority and current sequence cannot be reset here.',
         )}
@@ -693,12 +703,12 @@ function NumberingSection({
           {visible.map((item) => (
             <div
               key={item.namespace}
-              className="rounded-lg border border-[var(--color-border)] p-4"
+              className="rounded-lg border border-(--color-border) p-4"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-semibold">{labels[item.namespace]}</p>
-                  <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+                  <p className="mt-1 text-sm text-(--color-text-muted)">
                     {item.prefix} · {copy('Padding')} {item.padding}
                   </p>
                 </div>
@@ -712,7 +722,7 @@ function NumberingSection({
                   </DButton>
                 ) : null}
               </div>
-              <p className="mt-4 text-xs text-[var(--color-text-muted)]">
+              <p className="mt-4 text-xs text-(--color-text-muted)">
                 {copy('Current sequence')}
               </p>
               <p className="mt-1 font-mono font-semibold">{item.currentSequence}</p>
@@ -720,15 +730,18 @@ function NumberingSection({
           ))}
         </div>
       )}
-      <NumberingDialog
-        preference={editing}
-        api={api}
-        onClose={() => setEditing(null)}
-        onChanged={() => {
-          onChanged();
-          showToast({ variant: 'success', title: copy('Numbering updated.') });
-        }}
-      />
+      {editing ? (
+        <NumberingDialog
+          key={editing.namespace}
+          preference={editing}
+          api={api}
+          onClose={() => setEditing(null)}
+          onChanged={() => {
+            onChanged();
+            showToast({ variant: 'success', title: copy('Numbering updated.') });
+          }}
+        />
+      ) : null}
     </Card>
   );
 }
@@ -739,20 +752,15 @@ function NumberingDialog({
   onClose,
   onChanged,
 }: {
-  preference: NumberingPreference | null;
+  preference: NumberingPreference;
   api: BusinessSettingsApi;
   onClose: () => void;
   onChanged: () => void;
 }) {
   const { copy } = useBackofficeLocalization();
   const { showToast } = useToast();
-  const [prefix, setPrefix] = useState('');
-  const [padding, setPadding] = useState('6');
-
-  useEffect(() => {
-    setPrefix(preference?.prefix ?? '');
-    setPadding(String(preference?.padding ?? 6));
-  }, [preference]);
+  const [prefix, setPrefix] = useState(preference.prefix);
+  const [padding, setPadding] = useState(String(preference.padding));
 
   const valid =
     /^[A-Z0-9][A-Z0-9_-]{0,15}$/.test(prefix) &&
@@ -761,7 +769,7 @@ function NumberingDialog({
     Number(padding) <= 12;
 
   const save = async () => {
-    if (!preference || !valid) return;
+    if (!valid) return;
     try {
       await api.updateNumbering(preference, {
         prefix,
@@ -783,7 +791,7 @@ function NumberingDialog({
 
   return (
     <DDialog
-      open={Boolean(preference)}
+      open
       onClose={onClose}
       title={copy('Edit numbering')}
       description={copy(
@@ -808,8 +816,8 @@ function NumberingDialog({
         />
         <DInput label={copy('Padding')} value={padding} onChange={setPadding} />
       </div>
-      <p className="mt-4 text-sm text-[var(--color-text-muted)]">
-        {copy('Current sequence')}: {preference?.currentSequence ?? 0}
+      <p className="mt-4 text-sm text-(--color-text-muted)">
+        {copy('Current sequence')}: {preference.currentSequence}
       </p>
     </DDialog>
   );

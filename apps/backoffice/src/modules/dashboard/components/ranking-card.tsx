@@ -19,18 +19,18 @@ export function RankingCard({
   seeAllHref,
 }: {
   title: string;
-  subtitle?: string;
+  subtitle?: string | undefined;
   items: readonly RankingCardItem[];
   emptyMessage: string;
   kind: 'items' | 'employees';
-  seeAllHref?: string;
+  seeAllHref?: string | undefined;
 }) {
   const Icon = kind === 'items' ? Package : Users;
 
   return (
     <DCard
       variant="elevated"
-      className="h-full rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-[0_16px_40px_-34px_var(--color-text)]"
+      className="h-full rounded-(--radius-card) border border-(--color-border) bg-(--color-surface) p-5 shadow-[0_16px_40px_-34px_var(--color-text)]"
     >
       <DashboardCardHeader
         title={title}
@@ -45,21 +45,21 @@ export function RankingCard({
           items.map((item, index) => (
             <div
               key={`${item.label}:${index}`}
-              className="flex items-start gap-3 border-b border-[var(--color-border)] py-3 last:border-b-0"
+              className="flex items-start gap-3 border-b border-(--color-border) py-3 last:border-b-0"
             >
-              <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--color-surface-muted)] text-[11px] font-semibold text-[var(--color-brand)]">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-(--color-surface-muted) text-[11px] font-semibold text-(--color-brand)">
                 {String(index + 1).padStart(2, '0')}
               </div>
               <div className="min-w-0 flex-1">
                 <p
-                  className="line-clamp-2 text-sm font-semibold leading-5 text-[var(--color-text)]"
+                  className="line-clamp-2 text-sm font-semibold leading-5 text-(--color-text)"
                   title={item.label}
                 >
                   {item.label}
                 </p>
                 {item.secondary ? (
                   <p
-                    className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-[var(--color-text-muted)]"
+                    className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-(--color-text-muted)"
                     title={item.secondary}
                   >
                     {item.secondary}
@@ -67,7 +67,7 @@ export function RankingCard({
                 ) : null}
               </div>
               <div className="shrink-0 text-right">
-                <p className="whitespace-nowrap text-sm font-semibold tabular-nums text-[var(--color-text)]">
+                <p className="whitespace-nowrap text-sm font-semibold tabular-nums text-(--color-text)">
                   {item.value}
                 </p>
                 {item.delta != null ? (
@@ -75,7 +75,7 @@ export function RankingCard({
                     className={[
                       'mt-0.5 inline-block text-[10px] font-semibold tabular-nums',
                       Math.abs(item.delta) < 0.05
-                        ? 'text-[var(--color-text-muted)]'
+                        ? 'text-(--color-text-muted)'
                         : item.delta > 0
                           ? 'text-emerald-600'
                           : 'text-red-600',
@@ -90,7 +90,7 @@ export function RankingCard({
             </div>
           ))
         ) : (
-          <div className="flex min-h-44 items-center justify-center text-center text-xs text-[var(--color-text-muted)]">
+          <div className="flex min-h-44 items-center justify-center text-center text-xs text-(--color-text-muted)">
             {emptyMessage}
           </div>
         )}

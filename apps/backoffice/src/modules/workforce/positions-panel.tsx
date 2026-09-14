@@ -7,18 +7,15 @@ import {
   DStatusFilter,
   DToggle,
   useToast,
-  type TableColumn,
 } from '@digvation/ui';
+import type { TableColumn } from '@digvation/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CircleCheck, CircleOff, Pencil, Plus } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
 import { isSessionExpiredError } from '../../auth/backoffice-auth-context';
-import {
-  type EmployeePosition,
-  EmployeesApi,
-} from './employees-api';
+import type { EmployeePosition, EmployeesApi } from './employees-api';
 import { useWorkforceLocalization } from './workforce-localization';
 
 const positionKey = ['employees', 'positions'] as const;
@@ -171,25 +168,25 @@ export function PositionsPanel({
         ]}
       />
 
-      <PositionEditor
-        open={editor !== null}
-        position={editor === 'create' ? null : editor}
-        api={api}
-        onClose={() => setEditor(null)}
-        onSaved={refresh}
-      />
+      {editor !== null ? (
+        <PositionEditor
+          key={editor === 'create' ? 'create' : editor.id}
+          position={editor === 'create' ? null : editor}
+          api={api}
+          onClose={() => setEditor(null)}
+          onSaved={refresh}
+        />
+      ) : null}
     </>
   );
 }
 
 function PositionEditor({
-  open,
   position,
   api,
   onClose,
   onSaved,
 }: {
-  open: boolean;
   position: EmployeePosition | null;
   api: EmployeesApi;
   onClose: () => void;
@@ -198,15 +195,11 @@ function PositionEditor({
   const { copy } = useWorkforceLocalization();
   const { showToast } = useToast();
   const fresh = position === null;
-  const [code, setCode] = useState('');
-  const [name, setName] = useState('');
-  const [serviceAssignmentEnabled, setServiceAssignmentEnabled] = useState(false);
-
-  useEffect(() => {
-    setCode(position?.code ?? '');
-    setName(position?.name ?? '');
-    setServiceAssignmentEnabled(position?.serviceAssignmentEnabled ?? false);
-  }, [position, open]);
+  const [code, setCode] = useState(position?.code ?? '');
+  const [name, setName] = useState(position?.name ?? '');
+  const [serviceAssignmentEnabled, setServiceAssignmentEnabled] = useState(
+    position?.serviceAssignmentEnabled ?? false,
+  );
 
   const save = async () => {
     if (!name.trim()) return;
@@ -241,7 +234,7 @@ function PositionEditor({
 
   return (
     <DDialog
-      open={open}
+      open
       onClose={onClose}
       title={copy(fresh ? 'Add position' : 'Edit position')}
       description={copy(

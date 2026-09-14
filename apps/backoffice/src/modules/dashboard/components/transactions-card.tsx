@@ -23,7 +23,7 @@ export function TransactionsCard({
   emptyMessage: string;
   formatDateTime(value: DashboardRow[string] | undefined): string;
   formatMoney(value: DashboardRow[string] | undefined): string;
-  seeAllHref?: string;
+  seeAllHref?: string | undefined;
 }) {
   const { copy } = useBackofficeLocalization();
   const { locale, text } = useDashboardI18n();
@@ -32,7 +32,7 @@ export function TransactionsCard({
   return (
     <DCard
       variant="elevated"
-      className="h-full rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-[0_16px_40px_-34px_var(--color-text)]"
+      className="h-full rounded-(--radius-card) border border-(--color-border) bg-(--color-surface) p-5 shadow-[0_16px_40px_-34px_var(--color-text)]"
     >
       <DashboardCardHeader
         title={title}
@@ -51,10 +51,8 @@ export function TransactionsCard({
             const occurredAt = formatDateTime(transaction.occurredAt);
             return (
               <div
-                key={String(
-                  transaction.saleNumber ?? transaction.invoiceNumber ?? index,
-                )}
-                className="flex items-center gap-3 border-b border-[var(--color-border)] py-3 last:border-b-0"
+                key={String(transaction.saleNumber ?? transaction.invoiceNumber ?? index)}
+                className="flex items-center gap-3 border-b border-(--color-border) py-3 last:border-b-0"
               >
                 <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600">
                   <ReceiptText aria-hidden="true" className="size-3.5" />
@@ -62,30 +60,27 @@ export function TransactionsCard({
                 <div className="min-w-0 flex-1">
                   <div className="flex min-w-0 items-center gap-2">
                     <p
-                      className="truncate text-sm font-semibold text-[var(--color-text)]"
+                      className="truncate text-sm font-semibold text-(--color-text)"
                       title={transactionNumber}
                     >
                       {transactionNumber}
                     </p>
-                    <span className="shrink-0 rounded-full bg-[var(--color-surface-muted)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+                    <span className="shrink-0 rounded-full bg-(--color-surface-muted) px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-(--color-text-muted)">
                       {copy(String(transaction.saleStatus ?? '—'))}
                     </span>
                   </div>
-                  <p
-                    className="mt-0.5 text-[10px] text-[var(--color-text-muted)]"
-                    title={occurredAt}
-                  >
+                  <p className="mt-0.5 text-[10px] text-(--color-text-muted)" title={occurredAt}>
                     {occurredAt}
                   </p>
                 </div>
-                <p className="shrink-0 whitespace-nowrap text-sm font-semibold tabular-nums text-[var(--color-text)]">
+                <p className="shrink-0 whitespace-nowrap text-sm font-semibold tabular-nums text-(--color-text)">
                   {formatMoney(transaction.total)}
                 </p>
               </div>
             );
           })
         ) : (
-          <div className="flex min-h-44 items-center justify-center text-center text-xs text-[var(--color-text-muted)]">
+          <div className="flex min-h-44 items-center justify-center text-center text-xs text-(--color-text-muted)">
             {emptyMessage}
           </div>
         )}

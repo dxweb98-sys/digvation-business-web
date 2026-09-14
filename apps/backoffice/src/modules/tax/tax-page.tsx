@@ -19,7 +19,7 @@ import {
 } from '@digvation/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ban, Pencil, Plus } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
 import {
@@ -92,6 +92,7 @@ export function TaxPage() {
         </DTabsList>
         <DTabsContent value="profile" className="mt-5">
           <TaxProfileSection
+            key={profile.data?.updatedAt ?? 'unavailable'}
             profile={profile.data}
             loading={profile.isLoading}
             canUpdate={canUpdate}
@@ -140,15 +141,11 @@ function TaxProfileSection({
 }) {
   const { tax } = useTaxLocalization();
   const { showToast } = useToast();
-  const [itemTaxEnabled, setItemTaxEnabled] = useState(false);
-  const [transactionTaxEnabled, setTransactionTaxEnabled] = useState(false);
+  const [itemTaxEnabled, setItemTaxEnabled] = useState(profile?.itemTaxEnabled ?? false);
+  const [transactionTaxEnabled, setTransactionTaxEnabled] = useState(
+    profile?.transactionTaxEnabled ?? false,
+  );
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!profile) return;
-    setItemTaxEnabled(profile.itemTaxEnabled);
-    setTransactionTaxEnabled(profile.transactionTaxEnabled);
-  }, [profile]);
 
   const changed = Boolean(
     profile &&
@@ -286,12 +283,15 @@ function TaxCategoriesSection({
             : []
         }
       />
-      <TaxCategoryDialog
-        category={editing}
-        api={api}
-        onClose={() => setEditing(undefined)}
-        onChanged={onChanged}
-      />
+      {editing !== undefined ? (
+        <TaxCategoryDialog
+          key={editing?.id ?? 'new'}
+          category={editing}
+          api={api}
+          onClose={() => setEditing(undefined)}
+          onChanged={onChanged}
+        />
+      ) : null}
     </>
   );
 }
@@ -311,14 +311,8 @@ function TaxCategoryDialog({
   const { showToast } = useToast();
   const isNew = category === null;
   const [code, setCode] = useState('');
-  const [name, setName] = useState('');
-  const [status, setStatus] = useState<TaxCategory['status']>('ACTIVE');
-
-  useEffect(() => {
-    setCode('');
-    setName(category?.name ?? '');
-    setStatus(category?.status ?? 'ACTIVE');
-  }, [category]);
+  const [name, setName] = useState(category?.name ?? '');
+  const [status, setStatus] = useState<TaxCategory['status']>(category?.status ?? 'ACTIVE');
 
   const save = async () => {
     if (!name.trim() || (isNew && !code.trim())) return;
@@ -487,13 +481,14 @@ function TaxRulesSection({
             : []
         }
       />
-      <TaxRuleDialog
-        open={creating}
-        categories={categories.filter((category) => category.status === 'ACTIVE')}
-        api={api}
-        onClose={() => setCreating(false)}
-        onChanged={onChanged}
-      />
+      {creating ? (
+        <TaxRuleDialog
+          categories={categories.filter((category) => category.status === 'ACTIVE')}
+          api={api}
+          onClose={() => setCreating(false)}
+          onChanged={onChanged}
+        />
+      ) : null}
       <DConfirmDialog
         open={Boolean(cancelling)}
         onClose={() => setCancelling(null)}
@@ -508,13 +503,11 @@ function TaxRulesSection({
 }
 
 function TaxRuleDialog({
-  open,
   categories,
   api,
   onClose,
   onChanged,
 }: {
-  open: boolean;
   categories: TaxCategory[];
   api: TaxApi;
   onClose: () => void;
@@ -531,18 +524,6 @@ function TaxRuleDialog({
   const [effectiveFrom, setEffectiveFrom] = useState('');
   const [effectiveUntil, setEffectiveUntil] = useState('');
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    setScope('TRANSACTION');
-    setCategoryId('');
-    setCode('');
-    setName('');
-    setRatePercent('11');
-    setPriceTreatment('EXCLUDED');
-    setEffectiveFrom('');
-    setEffectiveUntil('');
-  }, [open]);
 
   const percent = Number(ratePercent);
   const periodInvalid = Boolean(
@@ -590,7 +571,7 @@ function TaxRuleDialog({
 
   return (
     <DDialog
-      open={open}
+      open
       onClose={onClose}
       title={tax('addRule')}
       size="lg"

@@ -34,12 +34,17 @@ export function AnalyticsLineChart({ title, subtitle, data, formatValue, emptyMe
 
 export function AnalyticsDonutChart({ title, data, emptyMessage, totalLabel, formatValue }: { title: string; data: AnalyticsPoint[]; emptyMessage: string; totalLabel: string; formatValue: (value: number) => string }) {
   const total = data.reduce((sum, point) => sum + (point.count ?? numeric(point.value)), 0);
-  let offset = 0;
+  const segments = data.map((point, index) => {
+    const amount = point.count ?? numeric(point.value);
+    const percent = amount / total * 100;
+    const offset = data.slice(0, index).reduce((sum, previous) => sum + (previous.count ?? numeric(previous.value)) / total * 100, 0);
+    return { point, amount, percent, offset };
+  });
   const colors = ['var(--color-brand)', 'var(--color-accent-sky)', 'var(--color-accent-mint)', 'var(--color-accent-yellow)', 'var(--color-accent-lavender)'];
   return <DCard variant="elevated" className={surface}>
     <h2 className="text-sm font-semibold tracking-tight">{title}</h2>
     {total ? <div className="mt-5 grid grid-cols-[112px_1fr] items-center gap-4">
-      <div className="relative"><svg viewBox="0 0 42 42" className="h-28 w-28 -rotate-90" role="img" aria-label={title}><circle cx="21" cy="21" r="15.9" fill="none" stroke="var(--color-surface-muted)" strokeWidth="5.5" />{data.map((point, index) => { const amount = point.count ?? numeric(point.value); const percent = amount / total * 100; const node = <circle key={point.label} cx="21" cy="21" r="15.9" fill="none" stroke={colors[index % colors.length]} strokeWidth="5.5" strokeDasharray={`${percent} ${100 - percent}`} strokeDashoffset={-offset}><title>{point.label}: {formatValue(amount)}</title></circle>; offset += percent; return node; })}</svg><div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center"><strong className="text-base tabular-nums">{formatValue(total)}</strong><span className="text-[10px] text-[var(--color-text-muted)]">{totalLabel}</span></div></div>
+      <div className="relative"><svg viewBox="0 0 42 42" className="h-28 w-28 -rotate-90" role="img" aria-label={title}><circle cx="21" cy="21" r="15.9" fill="none" stroke="var(--color-surface-muted)" strokeWidth="5.5" />{segments.map(({ point, amount, percent, offset }, index) => <circle key={point.label} cx="21" cy="21" r="15.9" fill="none" stroke={colors[index % colors.length]} strokeWidth="5.5" strokeDasharray={`${percent} ${100 - percent}`} strokeDashoffset={-offset}><title>{point.label}: {formatValue(amount)}</title></circle>)}</svg><div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center"><strong className="text-base tabular-nums">{formatValue(total)}</strong><span className="text-[10px] text-[var(--color-text-muted)]">{totalLabel}</span></div></div>
       <div className="space-y-2.5">{data.map((point, index) => { const value = point.count ?? numeric(point.value); return <div key={point.label} className="flex items-center justify-between gap-2 text-xs"><span className="flex min-w-0 items-center gap-2 text-[var(--color-text-muted)]"><i className="size-2 shrink-0 rounded-full" style={{ background: colors[index % colors.length] }} /><span className="truncate">{point.label}</span></span><b className="font-semibold tabular-nums">{formatValue(value)}</b></div>; })}</div>
     </div> : <AnalyticsEmptyState message={emptyMessage} />}
   </DCard>;

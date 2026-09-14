@@ -2,7 +2,7 @@ import { useRuntime } from '@digvation/business-runtime';
 import { DButton, DDropdown, useToast } from '@digvation/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bell } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 
 import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
@@ -49,7 +49,11 @@ export function NotificationBell() {
     enabled: Boolean(session),
   });
 
-  useEffect(() => setOpen(false), [location.key]);
+  const [previousLocationKey, setPreviousLocationKey] = useState(location.key);
+  if (previousLocationKey !== location.key) {
+    setPreviousLocationKey(location.key);
+    setOpen(false);
+  }
 
   const refresh = async () => {
     await queryClient.invalidateQueries({

@@ -27,7 +27,7 @@ export function BusinessInsightWidget({
   previous: DashboardDataset | undefined;
   currency?: string;
   formatMoney(value: string, currency: string): string;
-  seeAllHref?: string;
+  seeAllHref?: string | undefined;
 }) {
   const { copy } = useBackofficeLocalization();
   const { locale, text } = useDashboardI18n();
@@ -39,9 +39,7 @@ export function BusinessInsightWidget({
   const revenueChange = change(revenue, previousRevenue);
   const transactionChange = change(transactions, previousTransactions);
   const paymentPoints = [
-    ...(current?.analytics.breakdowns?.paymentMethod ??
-      current?.analytics.breakdown ??
-      []),
+    ...(current?.analytics.breakdowns?.paymentMethod ?? current?.analytics.breakdown ?? []),
   ];
   paymentPoints.sort((a, b) => numeric(b.value) - numeric(a.value));
   const dominantPayment = paymentPoints[0];
@@ -71,15 +69,13 @@ export function BusinessInsightWidget({
     transactions > 0
       ? `${text('averageTransactionValue')} ${locale === 'id' ? 'adalah' : 'is'} ${formatMoney(String(average), currency)}.`
       : null,
-    dominantPayment
-      ? `${copy(dominantPayment.label)} ${text('leadingPayment')}`
-      : null,
+    dominantPayment ? `${copy(dominantPayment.label)} ${text('leadingPayment')}` : null,
   ].filter((value): value is string => Boolean(value));
 
   return (
     <DCard
       variant="elevated"
-      className="h-full rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-[0_16px_40px_-34px_var(--color-text)]"
+      className="h-full rounded-(--radius-card) border border-(--color-border) bg-(--color-surface) p-5 shadow-[0_16px_40px_-34px_var(--color-text)]"
     >
       <DashboardCardHeader
         title={text('businessInsight')}
@@ -93,14 +89,14 @@ export function BusinessInsightWidget({
         {insights.map((insight) => (
           <div
             key={insight}
-            className="rounded-xl bg-[var(--color-surface-muted)] px-3 py-3 text-xs leading-5 text-[var(--color-text-muted)]"
+            className="rounded-xl bg-(--color-surface-muted) px-3 py-3 text-xs leading-5 text-(--color-text-muted)"
           >
             {insight}
           </div>
         ))}
       </div>
 
-      <p className="mt-4 text-[10px] leading-4 text-[var(--color-text-muted)]">
+      <p className="mt-4 text-[10px] leading-4 text-(--color-text-muted)">
         {text('insightSource')}
       </p>
     </DCard>

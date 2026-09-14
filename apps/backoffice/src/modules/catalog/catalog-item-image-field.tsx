@@ -1,6 +1,6 @@
 import { DButton } from '@digvation/ui';
 import { Image as ImageIcon, Trash2, Upload } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   CATALOG_IMAGE_CONTENT_TYPES,
   CATALOG_IMAGE_MAX_BYTES,
@@ -18,7 +18,7 @@ export function CatalogItemImageField({
   onRemove,
 }: {
   itemName: string;
-  existingImage?: CatalogItemImage | null;
+  existingImage?: CatalogItemImage | null | undefined;
   selectedFile: File | null;
   removeRequested: boolean;
   disabled?: boolean;
@@ -27,18 +27,18 @@ export function CatalogItemImageField({
 }) {
   const { copy } = useCatalogLocalization();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const previewUrl = useMemo(
+    () => (selectedFile ? URL.createObjectURL(selectedFile) : null),
+    [selectedFile],
+  );
 
-  useEffect(() => {
-    if (!selectedFile) {
-      setPreviewUrl(null);
-      return;
-    }
-    const url = URL.createObjectURL(selectedFile);
-    setPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [selectedFile]);
+  useEffect(
+    () => () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    },
+    [previewUrl],
+  );
 
   const visibleUrl = previewUrl ?? (!removeRequested ? existingImage?.url : null) ?? null;
 
@@ -57,9 +57,9 @@ export function CatalogItemImageField({
   };
 
   return (
-    <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] p-4">
+    <section className="rounded-(--radius-card) border border-(--color-border) p-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <div className="grid size-28 shrink-0 place-items-center overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-muted)]">
+        <div className="grid size-28 shrink-0 place-items-center overflow-hidden rounded-2xl border border-(--color-border) bg-(--color-surface-muted)">
           {visibleUrl ? (
             <img
               src={visibleUrl}
@@ -67,12 +67,12 @@ export function CatalogItemImageField({
               className="size-full object-cover"
             />
           ) : (
-            <ImageIcon className="size-8 text-[var(--color-text-muted)]" aria-hidden="true" />
+            <ImageIcon className="size-8 text-(--color-text-muted)" aria-hidden="true" />
           )}
         </div>
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-semibold">{copy('Item image')}</h2>
-          <p className="mt-1 text-xs leading-5 text-[var(--color-text-muted)]">
+          <p className="mt-1 text-xs leading-5 text-(--color-text-muted)">
             {copy('JPEG, PNG, or WebP. Maximum 1 MB. One primary image is kept per item.')}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
@@ -113,11 +113,11 @@ export function CatalogItemImageField({
             ) : null}
           </div>
           {selectedFile ? (
-            <p className="mt-2 text-xs text-[var(--color-text-muted)]">
+            <p className="mt-2 text-xs text-(--color-text-muted)">
               {selectedFile.name} · {(selectedFile.size / 1024).toFixed(0)} KB
             </p>
           ) : null}
-          {error ? <p className="mt-2 text-sm text-[var(--color-danger)]">{error}</p> : null}
+          {error ? <p className="mt-2 text-sm text-(--color-danger)">{error}</p> : null}
         </div>
       </div>
     </section>

@@ -19,7 +19,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { NavLink, Outlet, useLocation } from 'react-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { canAccessBackoffice, type BackofficeCapability } from '../../auth/backoffice-access';
 import { useBackofficeAuth } from '../../auth/backoffice-auth-context';
@@ -111,11 +111,13 @@ export function BackofficeShell() {
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [activeBranchSelectorOpen, setActiveBranchSelectorOpen] = useState(false);
 
-  useEffect(() => {
+  const [previousLocationKey, setPreviousLocationKey] = useState(location.key);
+  if (previousLocationKey !== location.key) {
+    setPreviousLocationKey(location.key);
     setMobileNavigationOpen(false);
     setAccountMenuOpen(false);
     setActiveBranchSelectorOpen(false);
-  }, [location.key]);
+  }
 
   if (!session) return null;
 

@@ -14,16 +14,16 @@ import {
 } from '@digvation/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Clock3, History as HistoryIcon, RotateCcw, Users } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
 import { isSessionExpiredError } from '../../auth/backoffice-auth-context';
+import type { EmployeesApi } from './employees-api';
 import {
   type AttendanceStatus,
   type Employee,
   type EmployeeAttendance,
   type EmployeePosition,
-  EmployeesApi,
 } from './employees-api';
 import { useWorkforceLocalization } from './workforce-localization';
 
@@ -41,13 +41,7 @@ type HistoryRange = {
   to: string;
 };
 
-export function AttendancePanel({
-  api,
-  canManage,
-}: {
-  api: EmployeesApi;
-  canManage: boolean;
-}) {
+export function AttendancePanel({ api, canManage }: { api: EmployeesApi; canManage: boolean }) {
   const { copy, formatDate, locale } = useWorkforceLocalization();
   const today = localDateKey(new Date());
   const [historyMode, setHistoryMode] = useState<HistoryPeriodMode>('MONTH');
@@ -96,9 +90,7 @@ export function AttendancePanel({
       api.listAttendance({
         from: historyRange.from,
         to: historyRange.to,
-        ...(historyEmployeeId !== 'ALL'
-          ? { employeeId: historyEmployeeId }
-          : {}),
+        ...(historyEmployeeId !== 'ALL' ? { employeeId: historyEmployeeId } : {}),
         ...(historyStatus !== 'ALL' ? { status: historyStatus } : {}),
         limit: historyPageSize,
         offset: historyOffset,
@@ -106,13 +98,7 @@ export function AttendancePanel({
   });
 
   const historyCounts = useQuery({
-    queryKey: [
-      ...historyKey,
-      'counts',
-      historyRange.from,
-      historyRange.to,
-      historyEmployeeId,
-    ],
+    queryKey: [...historyKey, 'counts', historyRange.from, historyRange.to, historyEmployeeId],
     queryFn: async () => {
       const statuses: AttendanceStatus[] = ['PRESENT', 'ABSENT', 'LEAVE', 'SICK'];
       const pages = await Promise.all(
@@ -120,9 +106,7 @@ export function AttendancePanel({
           api.listAttendance({
             from: historyRange.from,
             to: historyRange.to,
-            ...(historyEmployeeId !== 'ALL'
-              ? { employeeId: historyEmployeeId }
-              : {}),
+            ...(historyEmployeeId !== 'ALL' ? { employeeId: historyEmployeeId } : {}),
             status,
             limit: 1,
             offset: 0,
@@ -140,10 +124,7 @@ export function AttendancePanel({
   });
 
   const employeeById = useMemo(
-    () =>
-      new Map(
-        (employeeDirectory.data ?? []).map((employee) => [employee.id, employee]),
-      ),
+    () => new Map((employeeDirectory.data ?? []).map((employee) => [employee.id, employee])),
     [employeeDirectory.data],
   );
   const employeeOptions = useMemo(
@@ -177,8 +158,8 @@ export function AttendancePanel({
         const employee = employeeById.get(record.employeeId);
         return employee ? (
           <div>
-            <p className="font-medium text-[var(--color-text)]">{employee.displayName}</p>
-            <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">{employee.code}</p>
+            <p className="font-medium text-(--color-text)">{employee.displayName}</p>
+            <p className="mt-0.5 text-xs text-(--color-text-muted)">{employee.code}</p>
           </div>
         ) : (
           record.employeeId
@@ -188,8 +169,7 @@ export function AttendancePanel({
     {
       key: 'position',
       label: copy('Position'),
-      render: (record) =>
-        employeeById.get(record.employeeId)?.position?.name ?? copy('Not set'),
+      render: (record) => employeeById.get(record.employeeId)?.position?.name ?? copy('Not set'),
     },
     {
       key: 'status',
@@ -200,17 +180,13 @@ export function AttendancePanel({
       key: 'checkInAt',
       label: copy('Check in'),
       render: (record) =>
-        record.checkInAt
-          ? formatDate(new Date(record.checkInAt), { timeStyle: 'short' })
-          : '—',
+        record.checkInAt ? formatDate(new Date(record.checkInAt), { timeStyle: 'short' }) : '—',
     },
     {
       key: 'checkOutAt',
       label: copy('Check out'),
       render: (record) =>
-        record.checkOutAt
-          ? formatDate(new Date(record.checkOutAt), { timeStyle: 'short' })
-          : '—',
+        record.checkOutAt ? formatDate(new Date(record.checkOutAt), { timeStyle: 'short' }) : '—',
     },
     {
       key: 'source',
@@ -243,25 +219,22 @@ export function AttendancePanel({
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <div className="flex items-center gap-2 text-[var(--color-text)]">
+          <div className="flex items-center gap-2 text-(--color-text)">
             <HistoryIcon className="size-4" aria-hidden="true" />
             <h3 className="text-base font-semibold">{copy('Attendance history')}</h3>
           </div>
-          <p className="mt-1 max-w-2xl text-sm text-[var(--color-text-muted)]">
+          <p className="mt-1 max-w-2xl text-sm text-(--color-text-muted)">
             {copy('Review attendance history by day, month, or a custom date range.')}
           </p>
         </div>
         {canManage ? (
-          <DButton
-            leftIcon={<Clock3 className="size-4" />}
-            onClick={() => setAdjustmentOpen(true)}
-          >
+          <DButton leftIcon={<Clock3 className="size-4" />} onClick={() => setAdjustmentOpen(true)}>
             {copy('Adjust attendance')}
           </DButton>
         ) : null}
       </div>
 
-      <div className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:p-5">
+      <div className="rounded-(--radius-card) border border-(--color-border) bg-(--color-surface) p-4 sm:p-5">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <DSelect
             label={copy('Period')}
@@ -299,7 +272,7 @@ export function AttendancePanel({
               clearable={false}
               options={monthOptions}
               onValueChange={(value) => {
-                setHistoryMonth(value);
+                setHistoryMonth(String(value));
                 setHistoryOffset(0);
               }}
             />
@@ -338,7 +311,7 @@ export function AttendancePanel({
             clearable={false}
             options={employeeOptions}
             onValueChange={(value) => {
-              setHistoryEmployeeId(value);
+              setHistoryEmployeeId(String(value));
               setHistoryOffset(0);
             }}
           />
@@ -361,19 +334,27 @@ export function AttendancePanel({
           />
         </div>
 
-        <div className="mt-4 flex flex-col gap-3 border-t border-[var(--color-border)] pt-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-muted)]">
-            <span className="font-semibold text-[var(--color-text)]">
+        <div className="mt-4 flex flex-col gap-3 border-t border-(--color-border) pt-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-(--color-text-muted)">
+            <span className="font-semibold text-(--color-text)">
               {totalRecords} {copy('attendance records')}
             </span>
             <span aria-hidden="true">·</span>
-            <span>{copy('Present')} {counts.PRESENT}</span>
+            <span>
+              {copy('Present')} {counts.PRESENT}
+            </span>
             <span aria-hidden="true">·</span>
-            <span>{copy('Absent')} {counts.ABSENT}</span>
+            <span>
+              {copy('Absent')} {counts.ABSENT}
+            </span>
             <span aria-hidden="true">·</span>
-            <span>{copy('Leave')} {counts.LEAVE}</span>
+            <span>
+              {copy('Leave')} {counts.LEAVE}
+            </span>
             <span aria-hidden="true">·</span>
-            <span>{copy('Sick')} {counts.SICK}</span>
+            <span>
+              {copy('Sick')} {counts.SICK}
+            </span>
           </div>
           <DButton
             variant="secondary"
@@ -403,25 +384,24 @@ export function AttendancePanel({
         }}
       />
 
-      <AttendanceAdjustmentDialog
-        open={adjustmentOpen}
-        api={api}
-        employees={employeeDirectory.data ?? []}
-        positions={positions.data ?? []}
-        onClose={() => setAdjustmentOpen(false)}
-      />
+      {adjustmentOpen ? (
+        <AttendanceAdjustmentDialog
+          api={api}
+          employees={employeeDirectory.data ?? []}
+          positions={positions.data ?? []}
+          onClose={() => setAdjustmentOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }
 
 function AttendanceAdjustmentDialog({
-  open,
   api,
   employees,
   positions,
   onClose,
 }: {
-  open: boolean;
   api: EmployeesApi;
   employees: Employee[];
   positions: EmployeePosition[];
@@ -444,7 +424,7 @@ function AttendanceAdjustmentDialog({
   const attendance = useQuery({
     queryKey: [...adjustmentKey, date],
     queryFn: () => loadAllAttendance(api, { from: date, to: date }),
-    enabled: open,
+    enabled: true,
   });
   const attendanceByEmployee = useMemo(
     () => new Map((attendance.data ?? []).map((record) => [record.employeeId, record])),
@@ -475,22 +455,6 @@ function AttendanceAdjustmentDialog({
       .filter((position) => position.status === 'ACTIVE')
       .map((position) => ({ value: position.id, label: position.name })),
   ];
-
-  useEffect(() => {
-    if (!open) return;
-    setDate(today);
-    setQuery('');
-    setPositionId('ALL');
-    setSelectedIds(new Set());
-    setStatus('PRESENT');
-    setCheckIn('');
-    setCheckOut('');
-    setNote('');
-  }, [open, today]);
-
-  useEffect(() => {
-    setSelectedIds(new Set());
-  }, [date]);
 
   const toggleEmployee = (employeeId: string) => {
     setSelectedIds((current) => {
@@ -557,10 +521,7 @@ function AttendanceAdjustmentDialog({
       if (!isSessionExpiredError(error)) {
         showToast({
           variant: 'danger',
-          title: normalizeBackofficeApiError(
-            error,
-            copy('Could not save attendance.'),
-          ).safeMessage,
+          title: normalizeBackofficeApiError(error, copy('Could not save attendance.')).safeMessage,
         });
       }
     } finally {
@@ -570,7 +531,7 @@ function AttendanceAdjustmentDialog({
 
   return (
     <DDialog
-      open={open}
+      open
       onClose={onClose}
       size="xl"
       title={copy('Adjust attendance')}
@@ -591,7 +552,11 @@ function AttendanceAdjustmentDialog({
           <DDatePicker
             label={copy('Attendance date')}
             value={date}
-            onChange={(value) => value && setDate(value)}
+            onChange={(value) => {
+              if (!value) return;
+              setDate(value);
+              setSelectedIds(new Set());
+            }}
             variant="date"
           />
           <DSelect
@@ -599,11 +564,11 @@ function AttendanceAdjustmentDialog({
             value={positionId}
             clearable={false}
             options={positionOptions}
-            onValueChange={setPositionId}
+            onValueChange={(value) => setPositionId(value == null ? '' : String(value))}
           />
         </div>
 
-        <div className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3 sm:p-4">
+        <div className="rounded-(--radius-card) border border-(--color-border) bg-(--color-surface-muted) p-3 sm:p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
             <div className="min-w-0 flex-1">
               <DInput
@@ -614,7 +579,11 @@ function AttendanceAdjustmentDialog({
               />
             </div>
             <div className="flex flex-wrap gap-2">
-              <DButton variant="secondary" disabled={!selectableEmployees.length} onClick={selectVisible}>
+              <DButton
+                variant="secondary"
+                disabled={!selectableEmployees.length}
+                onClick={selectVisible}
+              >
                 {copy('Select visible')}
               </DButton>
               {selectedIds.size ? (
@@ -625,7 +594,7 @@ function AttendanceAdjustmentDialog({
             </div>
           </div>
 
-          <div className="mt-3 flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
+          <div className="mt-3 flex items-center gap-2 text-xs text-(--color-text-muted)">
             <Users className="size-4" aria-hidden="true" />
             <span>
               {selectedIds.size} {copy('employees selected')}
@@ -644,10 +613,10 @@ function AttendanceAdjustmentDialog({
                     key={employee.id}
                     className={`flex items-start gap-3 rounded-lg border p-3 transition-colors ${
                       selectionDisabled
-                        ? 'cursor-not-allowed border-[var(--color-border)] opacity-60'
+                        ? 'cursor-not-allowed border-(--color-border) opacity-60'
                         : selected
-                          ? 'cursor-pointer border-[var(--color-brand)] bg-[var(--color-surface)]'
-                          : 'cursor-pointer border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-brand)]'
+                          ? 'cursor-pointer border-(--color-brand) bg-(--color-surface)'
+                          : 'cursor-pointer border-(--color-border) bg-(--color-surface) hover:border-(--color-brand)'
                     }`}
                   >
                     <DCheckbox
@@ -658,13 +627,13 @@ function AttendanceAdjustmentDialog({
                     />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium text-[var(--color-text)]">
+                        <span className="font-medium text-(--color-text)">
                           {employee.displayName}
                         </span>
                         {existing ? <AttendanceBadge status={existing.status} /> : null}
                         {readOnly ? <DBadge variant="secondary">HRIS</DBadge> : null}
                       </div>
-                      <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                      <p className="mt-1 text-xs text-(--color-text-muted)">
                         {[employee.code, employee.position?.name].filter(Boolean).join(' · ')}
                       </p>
                     </div>
@@ -672,14 +641,14 @@ function AttendanceAdjustmentDialog({
                 );
               })
             ) : (
-              <p className="py-8 text-center text-sm text-[var(--color-text-muted)]">
+              <p className="py-8 text-center text-sm text-(--color-text-muted)">
                 {copy('No matching employees found.')}
               </p>
             )}
           </div>
         </div>
 
-        <div className="border-t border-[var(--color-border)] pt-4">
+        <div className="border-t border-(--color-border) pt-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <DSelect
               label={copy('Attendance status')}
@@ -711,7 +680,7 @@ function AttendanceAdjustmentDialog({
                   onClear={() => setCheckOut('')}
                 />
               </div>
-              <p className="text-xs leading-5 text-[var(--color-text-muted)]">
+              <p className="text-xs leading-5 text-(--color-text-muted)">
                 {copy('Check-in and check-out times are optional for now.')}
               </p>
             </div>
@@ -743,13 +712,7 @@ export function AttendanceBadge({ status }: { status: AttendanceStatus }) {
           : 'Sick';
   return (
     <DBadge
-      variant={
-        status === 'PRESENT'
-          ? 'success'
-          : status === 'ABSENT'
-            ? 'danger'
-            : 'secondary'
-      }
+      variant={status === 'PRESENT' ? 'success' : status === 'ABSENT' ? 'danger' : 'secondary'}
     >
       {copy(label)}
     </DBadge>
@@ -784,10 +747,7 @@ async function loadAllPositions(api: EmployeesApi) {
   return items;
 }
 
-async function loadAllAttendance(
-  api: EmployeesApi,
-  filter: { from: string; to: string },
-) {
+async function loadAllAttendance(api: EmployeesApi, filter: { from: string; to: string }) {
   const items: EmployeeAttendance[] = [];
   let offset = 0;
   let total = Number.POSITIVE_INFINITY;
@@ -835,7 +795,7 @@ function createMonthOptions(locale: string) {
     year: 'numeric',
   });
   const now = new Date();
-  return Array.from({ length: 24 }, (_, index) => {
+  return Array.from({ length: 24 }, (unusedValue, index) => {
     const date = new Date(now.getFullYear(), now.getMonth() - index, 1);
     const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     return { value, label: formatter.format(date) };

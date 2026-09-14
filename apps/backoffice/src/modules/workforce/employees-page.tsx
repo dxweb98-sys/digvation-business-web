@@ -19,18 +19,12 @@ import {
 } from '@digvation/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CircleCheck, CircleOff, Eye, Pencil, Plus } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
 import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
-import {
-  canAccessBackoffice,
-  canPerformBackofficeAction,
-} from '../../auth/backoffice-access';
-import {
-  isSessionExpiredError,
-  useBackofficeAuth,
-} from '../../auth/backoffice-auth-context';
+import { canAccessBackoffice, canPerformBackofficeAction } from '../../auth/backoffice-access';
+import { isSessionExpiredError, useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import { AttendancePanel } from './attendance-panel';
 import { EmployeeDetailDialog } from './employee-detail-dialog';
 import {
@@ -64,24 +58,11 @@ export function EmployeesPage() {
   const [statusTarget, setStatusTarget] = useState<Employee | null>(null);
   const [statusReason, setStatusReason] = useState('');
 
-  const canCreate = Boolean(
-    session && canPerformBackofficeAction(session, 'createEmployee'),
-  );
-  const canUpdate = Boolean(
-    session && canPerformBackofficeAction(session, 'updateEmployee'),
-  );
-  const attendanceEnabled = Boolean(
-    session &&
-      canAccessBackoffice(
-        session,
-        'attendance',
-        session.effectiveEntitlements,
-      ),
-  );
+  const canCreate = Boolean(session && canPerformBackofficeAction(session, 'createEmployee'));
+  const canUpdate = Boolean(session && canPerformBackofficeAction(session, 'updateEmployee'));
+  const attendanceEnabled = Boolean(session && canAccessBackoffice(session, 'attendance'));
   const canManageAttendance = Boolean(
-    attendanceEnabled &&
-      session &&
-      canPerformBackofficeAction(session, 'manageAttendance'),
+    attendanceEnabled && session && canPerformBackofficeAction(session, 'manageAttendance'),
   );
 
   const employees = useQuery({
@@ -95,16 +76,14 @@ export function EmployeesPage() {
       }),
     enabled: Boolean(session),
   });
-  const selectedEmployeeId =
-    detailId ?? (editorId && editorId !== 'create' ? editorId : null);
+  const selectedEmployeeId = detailId ?? (editorId && editorId !== 'create' ? editorId : null);
   const detail = useQuery({
     queryKey: [...employeeKey, 'detail', selectedEmployeeId],
     queryFn: () => api.get(selectedEmployeeId!),
     enabled: Boolean(session && selectedEmployeeId),
   });
 
-  const refresh = () =>
-    void queryClient.invalidateQueries({ queryKey: employeeKey });
+  const refresh = () => void queryClient.invalidateQueries({ queryKey: employeeKey });
 
   const openStatusChange = (employee: Employee) => {
     setStatusReason('');
@@ -113,33 +92,20 @@ export function EmployeesPage() {
 
   const updateStatus = async () => {
     if (!statusTarget) return;
-    const nextStatus =
-      statusTarget.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+    const nextStatus = statusTarget.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
     try {
       await api.update(statusTarget, {
         status: nextStatus,
-        ...(statusReason.trim()
-          ? { statusReason: statusReason.trim() }
-          : {}),
+        ...(statusReason.trim() ? { statusReason: statusReason.trim() } : {}),
       });
       refresh();
       setStatusTarget(null);
       showToast({
         variant: 'success',
-        title: copy(
-          nextStatus === 'ACTIVE'
-            ? 'Employee reactivated.'
-            : 'Employee deactivated.',
-        ),
+        title: copy(nextStatus === 'ACTIVE' ? 'Employee reactivated.' : 'Employee deactivated.'),
       });
     } catch (error) {
-      handleMutationError(
-        error,
-        refresh,
-        copy,
-        showToast,
-        () => setStatusTarget(null),
-      );
+      handleMutationError(error, refresh, copy, showToast, () => setStatusTarget(null));
     }
   };
 
@@ -160,15 +126,13 @@ export function EmployeesPage() {
         employee.position ? (
           <DBadge
             variant={
-              employee.position.status === 'ACTIVE' &&
-              employee.position.serviceAssignmentEnabled
+              employee.position.status === 'ACTIVE' && employee.position.serviceAssignmentEnabled
                 ? 'success'
                 : 'secondary'
             }
           >
             {copy(
-              employee.position.status === 'ACTIVE' &&
-                employee.position.serviceAssignmentEnabled
+              employee.position.status === 'ACTIVE' && employee.position.serviceAssignmentEnabled
                 ? 'Can perform services'
                 : 'Cannot perform services',
             )}
@@ -180,8 +144,7 @@ export function EmployeesPage() {
     {
       key: 'joinedOn',
       label: copy('Join date'),
-      render: (employee) =>
-        formatJoinedOn(employee.joinedOn, formatDate, copy),
+      render: (employee) => formatJoinedOn(employee.joinedOn, formatDate, copy),
     },
     {
       key: 'status',
@@ -189,8 +152,7 @@ export function EmployeesPage() {
       render: (employee) => <StatusBadge status={employee.status} />,
     },
   ];
-  const nextStatus =
-    statusTarget?.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+  const nextStatus = statusTarget?.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
 
   return (
     <BackofficePage>
@@ -205,9 +167,7 @@ export function EmployeesPage() {
           <DTabsTrigger value="employees">{copy('Employees')}</DTabsTrigger>
           <DTabsTrigger value="positions">{copy('Positions')}</DTabsTrigger>
           {attendanceEnabled ? (
-            <DTabsTrigger value="attendance">
-              {copy('Attendance')}
-            </DTabsTrigger>
+            <DTabsTrigger value="attendance">{copy('Attendance')}</DTabsTrigger>
           ) : null}
         </DTabsList>
 
@@ -281,26 +241,20 @@ export function EmployeesPage() {
                 icon: <CircleOff className="size-4" />,
                 variant: 'danger',
                 onClick: openStatusChange,
-                show: (employee) =>
-                  canUpdate && employee.status === 'ACTIVE',
+                show: (employee) => canUpdate && employee.status === 'ACTIVE',
               },
               {
                 label: copy('Activate employee'),
                 icon: <CircleCheck className="size-4" />,
                 onClick: openStatusChange,
-                show: (employee) =>
-                  canUpdate && employee.status === 'INACTIVE',
+                show: (employee) => canUpdate && employee.status === 'INACTIVE',
               },
             ]}
           />
         </DTabsContent>
 
         <DTabsContent value="positions" className="mt-4">
-          <PositionsPanel
-            api={api}
-            canCreate={canCreate}
-            canUpdate={canUpdate}
-          />
+          <PositionsPanel api={api} canCreate={canCreate} canUpdate={canUpdate} />
         </DTabsContent>
 
         {attendanceEnabled ? (
@@ -310,21 +264,17 @@ export function EmployeesPage() {
         ) : null}
       </DTabs>
 
-      <EmployeeEditor
-        open={editorId !== null}
-        employee={editorId === 'create' ? null : detail.data}
-        isLoading={
-          editorId !== null &&
-          editorId !== 'create' &&
-          detail.isLoading
-        }
-        isError={
-          editorId !== null && editorId !== 'create' && detail.isError
-        }
-        api={api}
-        onClose={() => setEditorId(null)}
-        onSaved={refresh}
-      />
+      {editorId !== null ? (
+        <EmployeeEditor
+          key={editorId === 'create' ? 'create' : `${editorId}:${detail.data?.id ?? 'loading'}`}
+          employee={editorId === 'create' ? null : detail.data}
+          isLoading={editorId !== 'create' && detail.isLoading}
+          isError={editorId !== 'create' && detail.isError}
+          api={api}
+          onClose={() => setEditorId(null)}
+          onSaved={refresh}
+        />
+      ) : null}
 
       <EmployeeDetailDialog
         key={detailId ?? 'employee-detail'}
@@ -340,60 +290,40 @@ export function EmployeesPage() {
       <DDialog
         open={Boolean(statusTarget)}
         onClose={() => setStatusTarget(null)}
-        title={copy(
-          nextStatus === 'INACTIVE'
-            ? 'Deactivate employee?'
-            : 'Reactivate employee?',
-        )}
+        title={copy(nextStatus === 'INACTIVE' ? 'Deactivate employee?' : 'Reactivate employee?')}
         description={
           nextStatus === 'INACTIVE'
             ? copy(
                 'This employee remains in historical records but cannot be selected for new POS assignments.',
               )
-            : copy(
-                'This employee can be selected for POS assignments again.',
-              )
+            : copy('This employee can be selected for POS assignments again.')
         }
         footer={
           <div className="flex justify-end gap-2">
-            <DButton
-              variant="secondary"
-              onClick={() => setStatusTarget(null)}
-            >
+            <DButton variant="secondary" onClick={() => setStatusTarget(null)}>
               {copy('Cancel')}
             </DButton>
             <DButton
-              variant={
-                nextStatus === 'INACTIVE' ? 'danger' : 'primary'
-              }
+              variant={nextStatus === 'INACTIVE' ? 'danger' : 'primary'}
               onClick={() => void updateStatus()}
             >
-              {copy(
-                nextStatus === 'INACTIVE' ? 'Deactivate' : 'Reactivate',
-              )}
+              {copy(nextStatus === 'INACTIVE' ? 'Deactivate' : 'Reactivate')}
             </DButton>
           </div>
         }
       >
         <div className="space-y-4">
-          <div className="rounded-[var(--radius-card)] bg-[var(--color-surface-muted)] p-4">
+          <div className="rounded-(--radius-card) bg-(--color-surface-muted) p-4">
             <p className="font-semibold">{statusTarget?.displayName}</p>
-            <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-              {[
-                statusTarget?.code,
-                statusTarget?.position?.name,
-              ]
-                .filter(Boolean)
-                .join(' · ')}
+            <p className="mt-1 text-sm text-(--color-text-muted)">
+              {[statusTarget?.code, statusTarget?.position?.name].filter(Boolean).join(' · ')}
             </p>
           </div>
           <DTextarea
             label={copy('Reason')}
             value={statusReason}
             onChange={setStatusReason}
-            hint={copy(
-              'Reason is optional and will be recorded in employee history.',
-            )}
+            hint={copy('Reason is optional and will be recorded in employee history.')}
             placeholder={copy('Optional reason for this status change')}
           />
         </div>
@@ -412,7 +342,6 @@ function StatusBadge({ status }: { status: Employee['status'] }) {
 }
 
 function EmployeeEditor({
-  open,
   employee,
   isLoading,
   isError,
@@ -420,7 +349,6 @@ function EmployeeEditor({
   onClose,
   onSaved,
 }: {
-  open: boolean;
   employee: EmployeeDetail | null | undefined;
   isLoading: boolean;
   isError: boolean;
@@ -432,42 +360,22 @@ function EmployeeEditor({
   const { showToast } = useToast();
   const fresh = employee === null;
   const [code, setCode] = useState(employee?.code ?? '');
-  const [displayName, setDisplayName] = useState(
-    employee?.displayName ?? '',
-  );
-  const [positionId, setPositionId] = useState(
-    employee?.positionId ?? '',
-  );
+  const [displayName, setDisplayName] = useState(employee?.displayName ?? '');
+  const [positionId, setPositionId] = useState(employee?.positionId ?? '');
   const [joinedOn, setJoinedOn] = useState(employee?.joinedOn ?? '');
 
   const positions = useQuery({
     queryKey: ['employees', 'positions', 'editor'],
     queryFn: () => api.listPositions({ limit: 100, offset: 0 }),
-    enabled: open,
+    enabled: true,
   });
-
-  useEffect(() => {
-    if (employee) {
-      setCode(employee.code);
-      setDisplayName(employee.displayName);
-      setPositionId(employee.positionId ?? '');
-      setJoinedOn(employee.joinedOn ?? '');
-    } else if (fresh) {
-      setCode('');
-      setDisplayName('');
-      setPositionId('');
-      setJoinedOn('');
-    }
-  }, [employee, fresh, open]);
 
   const save = async () => {
     if (!displayName.trim()) return;
     try {
       if (fresh) {
         await api.create({
-          ...(code.trim()
-            ? { code: code.trim().toUpperCase() }
-            : {}),
+          ...(code.trim() ? { code: code.trim().toUpperCase() } : {}),
           displayName: displayName.trim(),
           positionId: positionId || null,
           ...(joinedOn ? { joinedOn } : {}),
@@ -475,43 +383,31 @@ function EmployeeEditor({
       } else if (employee) {
         await api.update(employee, {
           displayName: displayName.trim(),
-          ...(positionId !== (employee.positionId ?? '')
-            ? { positionId: positionId || null }
-            : {}),
+          ...(positionId !== (employee.positionId ?? '') ? { positionId: positionId || null } : {}),
           joinedOn: joinedOn || null,
         });
       }
       onSaved();
       showToast({
         variant: 'success',
-        title: fresh
-          ? copy('Employee added.')
-          : copy('Employee updated.'),
+        title: fresh ? copy('Employee added.') : copy('Employee updated.'),
       });
       onClose();
     } catch (error) {
       if (!isSessionExpiredError(error))
-        handleMutationError(
-          error,
-          onSaved,
-          copy,
-          showToast,
-          onClose,
-        );
+        handleMutationError(error, onSaved, copy, showToast, onClose);
     }
   };
 
-  const positionOptions = (positions.data?.items ?? []).map(
-    (position: EmployeePosition) => ({
-      value: position.id,
-      label: `${position.name}${position.status === 'INACTIVE' ? ` · ${copy('Inactive')}` : ''}`,
-      disabled: position.status === 'INACTIVE',
-    }),
-  );
+  const positionOptions = (positions.data?.items ?? []).map((position: EmployeePosition) => ({
+    value: position.id,
+    label: `${position.name}${position.status === 'INACTIVE' ? ` · ${copy('Inactive')}` : ''}`,
+    disabled: position.status === 'INACTIVE',
+  }));
 
   return (
     <DDialog
-      open={open}
+      open
       onClose={onClose}
       title={fresh ? copy('Add employee') : copy('Edit employee')}
       description={
@@ -539,7 +435,7 @@ function EmployeeEditor({
           <DSkeleton className="h-16 w-full" />
         </div>
       ) : isError ? (
-        <p className="text-sm text-[var(--color-text-muted)]">
+        <p className="text-sm text-(--color-text-muted)">
           {copy('Could not load employee details.')}
         </p>
       ) : (
@@ -549,9 +445,7 @@ function EmployeeEditor({
             value={code}
             onChange={setCode}
             disabled={!fresh}
-            placeholder={copy(
-              'Leave Employee Code blank to generate it automatically.',
-            )}
+            placeholder={copy('Leave Employee Code blank to generate it automatically.')}
             autoFocus
           />
           <DInput
@@ -563,9 +457,7 @@ function EmployeeEditor({
           <DSelect
             label={copy('Position')}
             value={positionId || null}
-            onValueChange={(value) =>
-              setPositionId(value == null ? '' : String(value))
-            }
+            onValueChange={(value) => setPositionId(value == null ? '' : String(value))}
             options={positionOptions}
             loading={positions.isLoading}
             searchable
@@ -592,10 +484,7 @@ function EmployeeEditor({
 
 function formatJoinedOn(
   joinedOn: string | null,
-  formatDate: (
-    value: Date,
-    options?: Intl.DateTimeFormatOptions,
-  ) => string,
+  formatDate: (value: Date, options?: Intl.DateTimeFormatOptions) => string,
   copy: (value: string) => string,
 ) {
   return joinedOn
@@ -609,16 +498,10 @@ function handleMutationError(
   error: unknown,
   refresh: () => void,
   copy: (value: string) => string,
-  showToast: (input: {
-    variant: 'danger' | 'warning';
-    title: string;
-  }) => void,
+  showToast: (input: { variant: 'danger' | 'warning'; title: string }) => void,
   onConflict?: () => void,
 ) {
-  const normalized = normalizeBackofficeApiError(
-    error,
-    copy('Could not save employee.'),
-  );
+  const normalized = normalizeBackofficeApiError(error, copy('Could not save employee.'));
   if (normalized.code === 'VERSION_CONFLICT') {
     refresh();
     onConflict?.();

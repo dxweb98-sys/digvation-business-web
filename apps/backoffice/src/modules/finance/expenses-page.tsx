@@ -23,6 +23,9 @@ import { useBackofficeLocalization } from '../../app/localization/backoffice-loc
 import { FinancialOperationsApi } from './financial-operations-api';
 import { ExpenseApi, type Expense } from './expense-api';
 const limit = 20;
+function ExpenseFact({ fact }: { fact: [string, string] }) {
+  return <div className="min-w-0"><dt className="text-xs font-medium text-[var(--color-text-muted)]">{fact[0]}</dt><dd className="mt-1 break-words text-sm text-[var(--color-text)]">{fact[1]}</dd></div>;
+}
 export function ExpensesPage() {
   const { session, createApiClient } = useBackofficeAuth();
   const runtime = useRuntime();
@@ -188,12 +191,6 @@ function ExpenseDetail({ item, onClose }: { item: Expense | null; onClose: () =>
     ...(item.approvedAt ? [[copy('Approved by'), item.approvedByActorId || '—'] as [string, string], [copy('Decision time'), formatDate(new Date(item.approvedAt), { dateStyle: 'medium', timeStyle: 'short' })] as [string, string]] : []),
     ...(item.rejectedAt ? [[copy('Rejected by'), item.rejectedByActorId || '—'] as [string, string], [copy('Decision time'), formatDate(new Date(item.rejectedAt), { dateStyle: 'medium', timeStyle: 'short' })] as [string, string], [copy('Decision note'), item.rejectionNote || '—'] as [string, string]] : []),
   ] : [];
-  const Field = ({ fact }: { fact: [string, string] }) => (
-    <div className="min-w-0">
-      <dt className="text-xs font-medium text-[var(--color-text-muted)]">{fact[0]}</dt>
-      <dd className="mt-1 break-words text-sm text-[var(--color-text)]">{fact[1]}</dd>
-    </div>
-  );
   return (
     <DDialog open={Boolean(item)} onClose={onClose} title={copy('Expense details')} footer={<div className="flex justify-end"><DButton variant="secondary" onClick={onClose}>{copy('Close')}</DButton></div>}>
       {item ? <div className="space-y-5">
@@ -202,11 +199,11 @@ function ExpenseDetail({ item, onClose }: { item: Expense | null; onClose: () =>
             <div><p className="text-xs font-medium text-[var(--color-text-muted)]">{copy('Amount')}</p><p className="mt-1 text-2xl font-bold tracking-tight">{formatMoney(item.amount, item.currency)}</p></div>
             <Badge status={item.status} />
           </div>
-          <dl className="mt-4 grid gap-4 sm:grid-cols-2"><Field fact={facts[0]!} /><Field fact={facts[2]!} /></dl>
+          <dl className="mt-4 grid gap-4 sm:grid-cols-2"><ExpenseFact fact={facts[0]!} /><ExpenseFact fact={facts[2]!} /></dl>
         </section>
-        <section><h3 className="mb-3 text-sm font-semibold">{copy('Expense information')}</h3><dl className="grid gap-4 sm:grid-cols-2"><Field fact={facts[5]!} /><Field fact={facts[3]!} /><Field fact={facts[4]!} /></dl></section>
-        <section className="border-t border-[var(--color-border)] pt-4"><h3 className="mb-3 text-sm font-semibold">{copy('Request information')}</h3><dl className="grid gap-4 sm:grid-cols-2"><Field fact={facts[6]!} /><Field fact={facts[7]!} /></dl></section>
-        {facts.length > 9 ? <section className="border-t border-[var(--color-border)] pt-4"><h3 className="mb-3 text-sm font-semibold">{copy('Decision and audit')}</h3><dl className="grid gap-4 sm:grid-cols-2">{facts.slice(9).map((fact) => <Field key={fact[0]} fact={fact} />)}</dl></section> : null}
+        <section><h3 className="mb-3 text-sm font-semibold">{copy('Expense information')}</h3><dl className="grid gap-4 sm:grid-cols-2"><ExpenseFact fact={facts[5]!} /><ExpenseFact fact={facts[3]!} /><ExpenseFact fact={facts[4]!} /></dl></section>
+        <section className="border-t border-[var(--color-border)] pt-4"><h3 className="mb-3 text-sm font-semibold">{copy('Request information')}</h3><dl className="grid gap-4 sm:grid-cols-2"><ExpenseFact fact={facts[6]!} /><ExpenseFact fact={facts[7]!} /></dl></section>
+        {facts.length > 9 ? <section className="border-t border-[var(--color-border)] pt-4"><h3 className="mb-3 text-sm font-semibold">{copy('Decision and audit')}</h3><dl className="grid gap-4 sm:grid-cols-2">{facts.slice(9).map((fact) => <ExpenseFact key={fact[0]} fact={fact} />)}</dl></section> : null}
       </div> : null}
     </DDialog>
   );

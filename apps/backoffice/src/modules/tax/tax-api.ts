@@ -1,4 +1,4 @@
-import { ApiClient } from '@digvation/business-api';
+import type { ApiClient } from '@digvation/business-api';
 
 export interface TaxProfile {
   itemTaxEnabled: boolean;
