@@ -326,20 +326,15 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
   ) => {
     command.clearNotice();
     try {
-      let updated = await command.runMutation(() =>
-        transactionAdapter.setSaleLineAssignments(sale.id, line.id, {
+      const performers = contributors.length
+        ? contributors
+        : employeeIds.map((employeeId) => ({ employeeId }));
+      const updated = await command.runMutation(() =>
+        transactionAdapter.setSaleLinePerformers(sale.id, line.id, {
           expectedVersion: sale.version,
-          employeeIds,
+          performers,
         }),
       );
-      if (line.allowEmployeeContributionSnapshot) {
-        updated = await command.runMutation(() =>
-          transactionAdapter.setSaleLineContributions(sale.id, line.id, {
-            expectedVersion: updated.version,
-            contributors,
-          }),
-        );
-      }
       command.commitSale(updated);
       return updated;
     } catch (error) {
