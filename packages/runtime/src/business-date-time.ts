@@ -35,6 +35,9 @@ export function createBusinessDateTimeFormatter(
     preferences?.dateFormat ?? (locale === 'en-US' ? 'MM/DD/YYYY' : 'DD/MM/YYYY');
   const timeFormat: BusinessTimeFormat = preferences?.timeFormat ?? 'HH:mm';
 
+  const isDateOnly = (value: BusinessDateTimeValue): value is string =>
+    typeof value === 'string' && DATE_ONLY.test(value);
+
   const instant = (value: BusinessDateTimeValue): Date | null => {
     const parsed = value instanceof Date ? value : new Date(value);
     return Number.isNaN(parsed.valueOf()) ? null : parsed;
@@ -68,19 +71,19 @@ export function createBusinessDateTimeFormatter(
   };
 
   const formatDateOnly = (value: string): string => {
-    const match = DATE_ONLY.exec(value.slice(0, 10));
+    const match = DATE_ONLY.exec(value);
     if (!match) return value;
     return renderDateParts({ year: match[1]!, month: match[2]!, day: match[3]! });
   };
 
   const formatDate = (value: BusinessDateTimeValue): string => {
-    if (typeof value === 'string' && DATE_ONLY.test(value))
-      return formatDateOnly(value);
+    if (isDateOnly(value)) return formatDateOnly(value);
     const parsed = instant(value);
     return parsed ? renderDateParts(zonedDateParts(parsed)) : '—';
   };
 
   const formatTime = (value: BusinessDateTimeValue): string => {
+    if (isDateOnly(value)) return '—';
     const parsed = instant(value);
     if (!parsed) return '—';
     const parts = Object.fromEntries(
@@ -103,12 +106,15 @@ export function createBusinessDateTimeFormatter(
   };
 
   const formatDateTime = (value: BusinessDateTimeValue): string =>
-    `${formatDate(value)} ${formatTime(value)}`;
+    isDateOnly(value)
+      ? formatDateOnly(value)
+      : `${formatDate(value)} ${formatTime(value)}`;
 
   const format = (
     value: BusinessDateTimeValue,
     options?: Intl.DateTimeFormatOptions,
   ): string => {
+    if (isDateOnly(value)) return formatDateOnly(value);
     if (!options) return formatDate(value);
     if (options.dateStyle && options.timeStyle) return formatDateTime(value);
     if (options.timeStyle && !options.dateStyle) return formatTime(value);
