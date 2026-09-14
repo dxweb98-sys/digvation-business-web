@@ -26,7 +26,7 @@ export function OperationalTransactionHistoryPage() {
   const runtime = useRuntime();
   const { authPort } = useAuth();
   const { selectedLocationId } = useOperationalSession();
-  const { copy, formatDate, formatMoney } = useOperationalLocalization();
+  const { copy, label, formatDate, formatMoney } = useOperationalLocalization();
   const [offset, setOffset] = useState(0);
   const [createdFrom, setCreatedFrom] = useState('');
   const [createdTo, setCreatedTo] = useState('');
@@ -112,7 +112,7 @@ export function OperationalTransactionHistoryPage() {
       label: copy('Status'),
       render: (row) => (
         <DBadge variant={row.status === 'FINALIZED' ? 'success' : 'outline'}>
-          {row.status}
+          {label(row.status)}
         </DBadge>
       ),
     },
@@ -184,7 +184,7 @@ export function OperationalTransactionHistoryPage() {
             </div>
             <div>
               <dt className="text-[var(--color-text-muted)]">{copy('Status')}</dt>
-              <dd className="mt-1 font-semibold">{detail.data.status}</dd>
+              <dd className="mt-1 font-semibold">{label(detail.data.status)}</dd>
             </div>
             <div>
               <dt className="text-[var(--color-text-muted)]">{copy('Date')}</dt>
