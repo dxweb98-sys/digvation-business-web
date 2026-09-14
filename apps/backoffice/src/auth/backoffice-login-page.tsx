@@ -13,7 +13,7 @@ export function BackofficeLoginPage() {
   const location = useLocation();
   const { status, login } = useBackofficeAuth();
   const { showToast } = useToast();
-  const { copy, t } = useBackofficeLocalization();
+  const { locale, t } = useBackofficeLocalization();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -27,16 +27,17 @@ export function BackofficeLoginPage() {
     event.preventDefault();
     setError(null);
     setSubmitting(true);
+    const fallbackMessage =
+      locale === 'id'
+        ? 'Gagal masuk. Periksa data akun lalu coba lagi.'
+        : 'Could not sign in. Check your account details and try again.';
     try {
       await login({ workspace: runtime.workspace, identifier, password });
     } catch (failure) {
-      setError(t('signInFailed'));
+      setError(fallbackMessage);
       showToast({
         variant: 'danger',
-        title: normalizeBackofficeApiError(
-          failure,
-          t('signInFailed'),
-        ).safeMessage,
+        title: normalizeBackofficeApiError(failure, fallbackMessage).safeMessage,
       });
     } finally {
       setSubmitting(false);
@@ -51,7 +52,7 @@ export function BackofficeLoginPage() {
         </p>
         <h1 className="mt-3 text-2xl font-bold">{t('signInToBackoffice')}</h1>
         <p className="mt-2 text-sm text-[var(--color-text-muted)]">
-          {runtime.branding.businessName ?? runtime.workspace}
+          {runtime.branding.businessName ?? runtime.branding.companyName ?? 'Backoffice'}
         </p>
         <form className="mt-7 space-y-4" onSubmit={submit}>
           <DInput
@@ -60,7 +61,7 @@ export function BackofficeLoginPage() {
             onChange={setIdentifier}
             autoComplete="username"
             disabled={isSubmitting}
-            placeholder={copy('Enter your username or phone number')}
+            placeholder={t('usernameOrPhone')}
           />
           <DInput
             label={t('password')}
@@ -69,7 +70,7 @@ export function BackofficeLoginPage() {
             onChange={setPassword}
             autoComplete="current-password"
             disabled={isSubmitting}
-            placeholder={copy('Enter your password')}
+            placeholder={t('password')}
           />
           {error ? (
             <p role="alert" className="text-sm text-[var(--color-danger)]">
