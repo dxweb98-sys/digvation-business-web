@@ -152,6 +152,7 @@ export function BackofficeAuthProvider({
     (baseUrl: string) =>
       new ApiClient({
         baseUrl,
+        applicationSurface: 'backoffice',
         getAccessToken,
         refreshAccessToken,
         onSessionEnded: expireSession,
