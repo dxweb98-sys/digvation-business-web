@@ -1,12 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { ApplicationSplash } from '@digvation/business-runtime';
-import { Building2 } from 'lucide-react';
 
 import '@digvation/ui/styles.css';
 import './app/app.css';
 
-import { BootstrapTransition } from './app/bootstrap/bootstrap-transition';
 import { bootstrapOperational } from './app/bootstrap/bootstrap-operational';
 
 function renderBootstrapFailure(error: unknown) {
@@ -31,16 +29,12 @@ const root = ReactDOM.createRoot(document.getElementById('root')!);
 
 root.render(
   <React.StrictMode>
-    <ApplicationSplash mark={<Building2 className="size-6" />} />
+    <ApplicationSplash />
   </React.StrictMode>,
 );
 
 void bootstrapOperational()
   .then((app) => {
-    root.render(
-      <React.StrictMode>
-        <BootstrapTransition>{app}</BootstrapTransition>
-      </React.StrictMode>,
-    );
+    root.render(<React.StrictMode>{app}</React.StrictMode>);
   })
   .catch(renderBootstrapFailure);

@@ -1,7 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { ApplicationSplash } from '@digvation/business-runtime';
-import { Building2 } from 'lucide-react';
 
 import '@digvation/ui/styles.css';
 import './app/app.css';
@@ -30,7 +29,7 @@ const root = ReactDOM.createRoot(document.getElementById('root')!);
 
 root.render(
   <React.StrictMode>
-    <ApplicationSplash mark={<Building2 className="size-6" />} />
+    <ApplicationSplash />
   </React.StrictMode>,
 );
 
