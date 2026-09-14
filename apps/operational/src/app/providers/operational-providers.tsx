@@ -6,6 +6,7 @@ import {
   type SessionEndReason,
 } from '@digvation/business-auth';
 import {
+  ApplicationSplash,
   applyEffectiveBusinessConfiguration,
   ConnectivityProvider,
   loadAuthenticatedRuntimeAvailability,
@@ -20,6 +21,7 @@ import {
   useToast,
 } from '@digvation/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Building2 } from 'lucide-react';
 import type { RouterProviderProps } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 
@@ -37,10 +39,7 @@ import { OperationalSessionProvider } from '../../modules/operational/operationa
 import { PosOperationalSessionProvider } from '../../modules/pos/pos-operational-session-provider';
 import { OperationalAvailabilityProvider } from './operational-availability-context';
 
-const SESSION_END_TRANSITION_MS = 5_000;
-const IDLE_SESSION_ENDED_MESSAGE =
-  'Sesi Anda telah berakhir karena tidak ada aktivitas. Silakan masuk kembali.';
-const INVALID_SESSION_ENDED_MESSAGE = 'Sesi Anda telah berakhir. Silakan masuk kembali.';
+const SESSION_ENDED_MESSAGE = 'Sesi Anda telah berakhir. Silakan masuk kembali.';
 
 function hasImplementedOperationalSurface(availability: RuntimeAvailabilityConfig): boolean {
   const permissions = availability.effectivePermissions;
@@ -114,20 +113,19 @@ function AuthenticatedOperationalRuntime({ children }: { children: ReactNode }) 
       </RuntimeProvider>
     );
 
+  if (state === 'loading')
+    return <ApplicationSplash mark={<Building2 className="size-6" />} />;
+
   return (
     <main className="grid min-h-screen place-items-center bg-[var(--color-background)] p-6 text-center">
       <section className="max-w-md rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
         <h1 className="text-lg font-semibold">
-          {state === 'loading'
-            ? 'Memverifikasi akses operasional'
-            : state === 'denied'
-              ? 'Akses operasional tidak tersedia'
-              : 'Konteks operasional belum tersedia'}
+          {state === 'denied'
+            ? 'Akses operasional tidak tersedia'
+            : 'Konteks operasional belum tersedia'}
         </h1>
         <p className="mt-2 text-sm text-[var(--color-text-muted)]">
-          {state === 'loading'
-            ? 'Mohon tunggu.'
-            : 'Hubungi administrator jika akses ini seharusnya tersedia.'}
+          Hubungi administrator jika akses ini seharusnya tersedia.
         </p>
       </section>
     </main>
@@ -164,37 +162,19 @@ function OperationalAuthBoundary({
 }: OperationalAuthBoundaryProps) {
   const [authenticatedSession, setAuthenticatedSession] = useState(session);
   const [isLoggingOut, setLoggingOut] = useState(false);
-  const [sessionEndReason, setSessionEndReason] = useState<SessionEndReason | null>(null);
   const sessionEnded = useRef(false);
-  const sessionEndTimer = useRef<number | null>(null);
   const { showToast } = useToast();
 
-  const clearSessionEndTimer = useCallback(() => {
-    if (sessionEndTimer.current === null) return;
-    window.clearTimeout(sessionEndTimer.current);
-    sessionEndTimer.current = null;
-  }, []);
-
   const handleSessionEnded = useCallback(
-    (reason: SessionEndReason) => {
+    (_reason: SessionEndReason) => {
       if (sessionEnded.current) return;
       sessionEnded.current = true;
-      clearSessionEndTimer();
       setLoggingOut(false);
       setAuthenticatedSession(null);
-      setSessionEndReason(reason);
-      showToast({
-        variant: 'warning',
-        title:
-          reason === 'idle' ? IDLE_SESSION_ENDED_MESSAGE : INVALID_SESSION_ENDED_MESSAGE,
-      });
+      showToast({ variant: 'warning', title: SESSION_ENDED_MESSAGE });
       void authPort.logout();
-      sessionEndTimer.current = window.setTimeout(() => {
-        sessionEndTimer.current = null;
-        setSessionEndReason(null);
-      }, SESSION_END_TRANSITION_MS);
     },
-    [authPort, clearSessionEndTimer, showToast],
+    [authPort, showToast],
   );
 
   useEffect(() => {
@@ -202,17 +182,10 @@ function OperationalAuthBoundary({
     return authPort.subscribeSessionEnded(handleSessionEnded);
   }, [authPort, handleSessionEnded]);
 
-  useEffect(() => () => clearSessionEndTimer(), [clearSessionEndTimer]);
-
-  const handleAuthenticated = useCallback(
-    (nextSession: AuthSession) => {
-      clearSessionEndTimer();
-      sessionEnded.current = false;
-      setSessionEndReason(null);
-      setAuthenticatedSession(nextSession);
-    },
-    [clearSessionEndTimer],
-  );
+  const handleAuthenticated = useCallback((nextSession: AuthSession) => {
+    sessionEnded.current = false;
+    setAuthenticatedSession(nextSession);
+  }, []);
 
   const completeLogoutTransition = (event: TransitionEvent<HTMLDivElement>) => {
     if (event.target !== event.currentTarget || event.propertyName !== 'opacity') return;
@@ -220,19 +193,6 @@ function OperationalAuthBoundary({
     setAuthenticatedSession(null);
     setLoggingOut(false);
   };
-
-  if (sessionEndReason) {
-    return (
-      <main className="grid min-h-screen place-items-center bg-[var(--color-background)] p-6 text-center">
-        <section className="max-w-md rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
-          <h1 className="text-lg font-semibold">Mengakhiri sesi</h1>
-          <p className="mt-2 text-sm text-[var(--color-text-muted)]">
-            Mengalihkan ke halaman masuk...
-          </p>
-        </section>
-      </main>
-    );
-  }
 
   if (!authenticatedSession) {
     return <OperationalLoginPage authPort={authPort} onAuthenticated={handleAuthenticated} />;
