@@ -4,14 +4,15 @@ import {
   DButton,
   DBadge,
   DConnectionError,
+  DCurrencyInput,
   DDataTable,
   DDialog,
-  DInput,
   DSelect,
   DTabs,
   DTabsContent,
   DTabsList,
   DTabsTrigger,
+  DTextarea,
   useToast,
   type TableColumn,
 } from '@digvation/ui';
@@ -20,7 +21,6 @@ import { useRuntime } from '@digvation/business-runtime';
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
 import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
 import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
-import { humanReadableLabel } from '../../app/localization/human-readable-labels';
 import { canPerformBackofficeAction } from '../../auth/backoffice-access';
 import { useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import type { PaymentMethod } from './financial-accounts-api';
@@ -65,28 +65,27 @@ export function FinancialOperationsPage() {
         )}
       />
       <DTabs defaultValue="cash" className="mt-6">
-        <DTabsList>
+        <DTabsList className="max-w-full overflow-x-auto">
           <DTabsTrigger value="cash">{copy('Cash position')}</DTabsTrigger>
           <DTabsTrigger value="settlements">{copy('Settlements')}</DTabsTrigger>
           <DTabsTrigger value="reconciliation">{copy('Reconciliation')}</DTabsTrigger>
         </DTabsList>
-        <DTabsContent value="cash">
+        <DTabsContent value="cash" className="mt-4">
           <CashPanel api={api} />
         </DTabsContent>
-        <DTabsContent value="settlements">
+        <DTabsContent value="settlements" className="mt-4">
           <SettlementPanel api={api} />
         </DTabsContent>
-        <DTabsContent value="reconciliation">
+        <DTabsContent value="reconciliation" className="mt-4">
           <ReconciliationPanel api={api} />
         </DTabsContent>
       </DTabs>
     </BackofficePage>
   );
 }
-
 function CashPanel({ api }: { api: FinancialOperationsApi }) {
   const { session } = useBackofficeAuth();
-  const { copy, locale } = useBackofficeLocalization();
+  const { copy } = useBackofficeLocalization();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [positionOffset, setPositionOffset] = useState(0);
@@ -137,7 +136,7 @@ function CashPanel({ api }: { api: FinancialOperationsApi }) {
       />
     );
   return (
-    <section className="mt-5 space-y-6">
+    <section className="space-y-6">
       <DDataTable
         columns={columns}
         data={(positions.data ?? []).slice(positionOffset, positionOffset + positionPageSize)}
@@ -166,14 +165,10 @@ function CashPanel({ api }: { api: FinancialOperationsApi }) {
         }}
       />
       <div>
-        <h2 className="mb-3 text-base font-bold">{copy('Cash movements')}</h2>
+        <h2 className="mb-3 text-base font-semibold">{copy('Cash movements')}</h2>
         <DDataTable
           columns={[
-            {
-              key: 'type',
-              label: copy('Movement type'),
-              render: (row) => humanReadableLabel(row.type, locale),
-            },
+            { key: 'type', label: copy('Movement type') },
             {
               key: 'amount',
               label: copy('Amount'),
@@ -206,7 +201,6 @@ function CashPanel({ api }: { api: FinancialOperationsApi }) {
     </section>
   );
 }
-
 function SettlementPanel({ api }: { api: FinancialOperationsApi }) {
   const { session } = useBackofficeAuth();
   const { copy } = useBackofficeLocalization();
@@ -251,7 +245,7 @@ function SettlementPanel({ api }: { api: FinancialOperationsApi }) {
     },
   ];
   return (
-    <section className="mt-5">
+    <section>
       <DDataTable
         columns={columns}
         data={query.data?.items ?? []}
@@ -298,7 +292,6 @@ function SettlementPanel({ api }: { api: FinancialOperationsApi }) {
     </section>
   );
 }
-
 function ReconciliationPanel({ api }: { api: FinancialOperationsApi }) {
   const { session } = useBackofficeAuth();
   const { copy } = useBackofficeLocalization();
@@ -359,7 +352,7 @@ function ReconciliationPanel({ api }: { api: FinancialOperationsApi }) {
     }
   };
   return (
-    <section className="mt-5">
+    <section>
       <DDataTable
         columns={columns}
         data={query.data?.items ?? []}
@@ -407,7 +400,6 @@ function ReconciliationPanel({ api }: { api: FinancialOperationsApi }) {
     </section>
   );
 }
-
 function MovementDialog({
   open,
   onClose,
@@ -475,6 +467,7 @@ function MovementDialog({
         <DSelect
           label={copy('Selling location')}
           value={locationId}
+          placeholder={copy('Select selling location')}
           options={(locations.data?.items ?? [])
             .filter((x) => x.status === 'ACTIVE')
             .map((x) => ({ value: x.id, label: x.name }))}
@@ -483,6 +476,7 @@ function MovementDialog({
         <DSelect
           label={copy('Cash account')}
           value={accountId}
+          placeholder={copy('Select cash account')}
           options={(accounts.data?.items ?? [])
             .filter((x) => x.type === 'CASH')
             .map((x) => ({ value: x.id, label: x.name }))}
@@ -497,18 +491,23 @@ function MovementDialog({
           ]}
           onChange={(v) => setType(v as CashMovement['type'])}
         />
-        <DInput label={copy('Amount')} value={amount} onChange={setAmount} />
-        <DInput
+        <DCurrencyInput
+          label={copy('Amount')}
+          value={amount}
+          onValueChange={setAmount}
+          placeholder={copy('For example, 100000')}
+        />
+        <DTextarea
           label={copy('Note')}
           value={note}
           onChange={setNote}
+          placeholder={copy('For example, Petty cash adjustment')}
           containerClassName="sm:col-span-2"
         />
       </div>
     </DDialog>
   );
 }
-
 function SettlementDialog({
   open,
   onClose,
@@ -575,6 +574,7 @@ function SettlementDialog({
         <DSelect
           label={copy('Selling location')}
           value={locationId}
+          placeholder={copy('Select selling location')}
           options={(locations.data?.items ?? [])
             .filter((x) => x.status === 'ACTIVE')
             .map((x) => ({ value: x.id, label: x.name }))}
@@ -589,6 +589,7 @@ function SettlementDialog({
         <DSelect
           label={copy('Settlement destination')}
           value={accountId}
+          placeholder={copy('Select settlement destination')}
           options={(accounts.data?.items ?? []).map((x) => ({ value: x.id, label: x.name }))}
           onChange={(v) => setAccountId(String(v))}
         />
@@ -596,7 +597,6 @@ function SettlementDialog({
     </DDialog>
   );
 }
-
 function SettlementDetail({
   item,
   onClose,
@@ -628,7 +628,10 @@ function SettlementDetail({
     <DDialog
       open={Boolean(item)}
       onClose={onClose}
-      title={copy('Settlement details')}
+      title={item?.sellingLocationName ?? copy('Settlement details')}
+      description={
+        item ? `${copy(label(item.paymentMethod))} · ${item.financialAccountName}` : undefined
+      }
       footer={
         <div className="flex gap-2">
           <DButton variant="secondary" onClick={onClose}>
@@ -648,39 +651,73 @@ function SettlementDetail({
       }
     >
       {item ? (
-        <dl className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <dt className="text-xs font-medium text-[var(--color-text-muted)]">
-              {copy('Expected amount')}
-            </dt>
-            <dd className="mt-1 text-sm font-semibold">
-              {format(item.expectedAmount, item.currency)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium text-[var(--color-text-muted)]">{copy('Status')}</dt>
-            <dd className="mt-1">
+        <div>
+          <section className="border-b border-[var(--color-border)] pb-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="min-w-0">
+                <h2 className="break-words text-2xl font-semibold tracking-tight text-[var(--color-text)]">
+                  {item.sellingLocationName}
+                </h2>
+                <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+                  {copy(label(item.paymentMethod))} · {item.financialAccountName}
+                </p>
+              </div>
               <SettlementBadge status={item.status} />
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium text-[var(--color-text-muted)]">
-              {copy('Settlement destination')}
-            </dt>
-            <dd className="mt-1 text-sm">{item.financialAccountName}</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium text-[var(--color-text-muted)]">
-              {copy('Payments')}
-            </dt>
-            <dd className="mt-1 text-sm">{item.payments.length}</dd>
-          </div>
-        </dl>
+            </div>
+            <div className="mt-5 border-t border-[var(--color-border)] pt-4">
+              <p className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+                {copy('Expected amount')}
+              </p>
+              <p className="mt-1 text-3xl font-semibold tracking-tight text-[var(--color-text)]">
+                {format(item.expectedAmount, item.currency)}
+              </p>
+            </div>
+          </section>
+
+          <section className="pt-5">
+            <h3 className="text-base font-semibold text-[var(--color-text)]">
+              {copy('Settlement information')}
+            </h3>
+            <dl className="mt-4 grid gap-x-6 gap-y-5 sm:grid-cols-2">
+              <div>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+                  {copy('Settlement destination')}
+                </dt>
+                <dd className="mt-1 text-sm font-medium text-[var(--color-text)]">
+                  {item.financialAccountName}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+                  {copy('Payment method')}
+                </dt>
+                <dd className="mt-1 text-sm font-medium text-[var(--color-text)]">
+                  {copy(label(item.paymentMethod))}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+                  {copy('Payments')}
+                </dt>
+                <dd className="mt-1 text-sm font-medium text-[var(--color-text)]">
+                  {item.payments.length}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+                  {copy('Status')}
+                </dt>
+                <dd className="mt-1">
+                  <SettlementBadge status={item.status} />
+                </dd>
+              </div>
+            </dl>
+          </section>
+        </div>
       ) : null}
     </DDialog>
   );
 }
-
 function ReconciliationDialog({
   open,
   onClose,
@@ -732,33 +769,39 @@ function ReconciliationDialog({
         <DSelect
           label={copy('Settlement')}
           value={settlementId}
+          placeholder={copy('Select completed settlement')}
           options={settlements.map((x) => ({
             value: x.id,
             label: `${x.sellingLocationName} · ${format(x.expectedAmount, x.currency)}`,
           }))}
           onChange={(v) => setSettlementId(String(v))}
         />
-        <DInput label={copy('Actual amount')} value={actualAmount} onChange={setActualAmount} />
-        <DInput
+        <DCurrencyInput
+          label={copy('Actual amount')}
+          value={actualAmount}
+          onValueChange={setActualAmount}
+          placeholder={copy('For example, 100000')}
+        />
+        <DTextarea
           label={copy('Note')}
           value={note}
           onChange={setNote}
+          placeholder={copy('For example, Bank statement matched after adjustment')}
           containerClassName="sm:col-span-2"
         />
       </div>
     </DDialog>
   );
 }
-
 function SettlementBadge({ status }: { status: Settlement['status'] }) {
-  const { locale } = useBackofficeLocalization();
+  const { copy } = useBackofficeLocalization();
   return (
     <DBadge
       variant={
-        status === 'COMPLETED' ? 'success' : status === 'CANCELLED' ? 'secondary' : 'outline'
+        status === 'COMPLETED' ? 'success' : status === 'CANCELLED' ? 'secondary' : 'warning'
       }
     >
-      {humanReadableLabel(status, locale)}
+      {copy(status === 'COMPLETED' ? 'Completed' : status === 'CANCELLED' ? 'Cancelled' : 'Draft')}
     </DBadge>
   );
 }

@@ -24,7 +24,12 @@ export interface SaleLine {
   quantity: string;
   netPreTaxAmount: string;
   fulfillmentBehaviorSnapshot: 'INSTANT' | 'TRACKED';
-  fulfillment: { status: FulfillmentStatus; startedAt: string | null; completedAt: string | null; canceledAt: string | null } | null;
+  fulfillment: {
+    status: FulfillmentStatus;
+    startedAt: string | null;
+    completedAt: string | null;
+    canceledAt: string | null;
+  } | null;
 }
 
 export interface Sale {
@@ -44,13 +49,28 @@ export interface Sale {
   payments: Payment[];
 }
 
-interface Page<T> { items: T[]; total: number; limit: number; offset: number; }
+interface Page<T> {
+  items: T[];
+  total: number;
+  limit: number;
+  offset: number;
+}
 type Query = Record<string, string | number | undefined>;
-const queryString = (query: Query) => new URLSearchParams(Object.entries(query).filter(([, value]) => value !== undefined && value !== '') as [string, string][]).toString();
+const queryString = (query: Query) =>
+  new URLSearchParams(
+    Object.entries(query).filter(([, value]) => value !== undefined && value !== '') as [
+      string,
+      string,
+    ][],
+  ).toString();
 
 export class TransactionHistoryApi {
   constructor(private readonly client: ApiClient) {}
 
-  list(query: Query) { return this.client.get<Page<Sale>>(`/api/v1/sales?${queryString(query)}`); }
-  get(id: string) { return this.client.get<Sale>(`/api/v1/sales/${id}`); }
+  list(query: Query) {
+    return this.client.get<Page<Sale>>(`/api/v1/sales?${queryString(query)}`);
+  }
+  get(id: string) {
+    return this.client.get<Sale>(`/api/v1/sales/${id}`);
+  }
 }

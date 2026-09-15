@@ -1,6 +1,5 @@
 import {
   DButton,
-  DCheckbox,
   DCurrencyInput,
   DDialog,
   DInput,
@@ -10,20 +9,14 @@ import {
 } from '@digvation/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
 import { isSessionExpiredError } from '../../auth/backoffice-auth-context';
 import type { CatalogApi, Category, Item, TaxCategory, TaxProfile } from './catalog-api';
 import { CatalogItemImageField } from './catalog-item-image-field';
-import { useCatalogLocalization } from './catalog-localization';
 import { DialogFooter } from './catalog-shared';
 
-type DraftVariant = {
-  key: string;
-  code: string;
-  name: string;
-  price: string;
-};
+type DraftVariant = { key: string; code: string; name: string; price: string };
 
 const draftVariant = (): DraftVariant => ({
   key: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -47,6 +40,7 @@ export function CatalogItemDialog({
   currency,
   api,
   canViewTax,
+  canViewPricing,
   canCreatePricing,
   canCreateVariants,
   canManageImage,
@@ -56,10 +50,11 @@ export function CatalogItemDialog({
   item: Item | null | undefined;
   categories: Category[];
   taxCategories: TaxCategory[];
-  taxProfile?: TaxProfile | undefined;
+  taxProfile?: TaxProfile;
   currency: string;
   api: CatalogApi;
   canViewTax: boolean;
+  canViewPricing: boolean;
   canCreatePricing: boolean;
   canCreateVariants: boolean;
   canManageImage: boolean;
@@ -69,7 +64,6 @@ export function CatalogItemDialog({
   const fresh = item === null;
   const client = useQueryClient();
   const { showToast } = useToast();
-  const { copy } = useCatalogLocalization();
   const [code, setCode] = useState(item?.code ?? '');
   const [name, setName] = useState(item?.name ?? '');
   const [type, setType] = useState<Item['type']>(item?.type ?? 'PRODUCT');
@@ -77,21 +71,13 @@ export function CatalogItemDialog({
   const [taxCategoryId, setTaxCategoryId] = useState(item?.taxCategoryId ?? null);
   const [description, setDescription] = useState(item?.description ?? '');
   const [lifecycle, setLifecycle] = useState<Item['lifecycle']>(item?.lifecycle ?? 'DRAFT');
-  const [fulfillmentBehavior, setFulfillmentBehavior] = useState<Item['fulfillmentBehavior']>(
-    item?.fulfillmentBehavior ?? 'INSTANT',
-  );
   const [defaultPrice, setDefaultPrice] = useState('');
+  const initialPriceRef = useRef<string | null | undefined>(undefined);
   const [variants, setVariants] = useState<DraftVariant[]>([]);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [removeImageRequested, setRemoveImageRequested] = useState(false);
   const [defaultDurationMinutes, setDefaultDurationMinutes] = useState(
     item?.serviceDefinition?.defaultDurationMinutes?.toString() ?? '',
-  );
-  const [employeeAssignmentMode, setEmployeeAssignmentMode] = useState<
-    NonNullable<Item['serviceDefinition']>['employeeAssignmentMode']
-  >(item?.serviceDefinition?.employeeAssignmentMode ?? 'NONE');
-  const [allowEmployeeContribution, setAllowEmployeeContribution] = useState(
-    item?.serviceDefinition?.allowEmployeeContribution ?? false,
   );
   const [saving, setSaving] = useState(false);
 
@@ -101,6 +87,18 @@ export function CatalogItemDialog({
     enabled: Boolean(item),
     staleTime: 60_000,
   });
+  const currentPrice = useQuery({
+    queryKey: ['catalog', 'edit-price', item?.id ?? 'new', currency],
+    queryFn: () => api.listDefaultPrices([item!.id], currency, new Date().toISOString()),
+    enabled: Boolean(item && canViewPricing),
+  });
+
+  useEffect(() => {
+    if (fresh || initialPriceRef.current !== undefined || currentPrice.isLoading) return;
+    const amount = currentPrice.data?.items[0]?.amount ?? null;
+    initialPriceRef.current = amount;
+    setDefaultPrice(amount ?? '');
+  }, [currentPrice.data, currentPrice.isLoading, fresh]);
 
   const parsedDefaultDuration = defaultDurationMinutes.trim()
     ? Number(defaultDurationMinutes)
@@ -115,10 +113,15 @@ export function CatalogItemDialog({
   );
   const validPrice = validOptionalMoney(defaultPrice);
   const disabled = !name.trim() || !validDefaultDuration || !validPrice || invalidVariant || saving;
+  const showPrice = canViewPricing || (fresh && canCreatePricing);
+  const canEditPrice = fresh ? canCreatePricing : canViewPricing && canCreatePricing;
 
-  const activeCategories = useMemo(
-    () => categories.filter((category) => category.status === 'ACTIVE'),
-    [categories],
+  const categoryOptions = useMemo(
+    () =>
+      categories.filter(
+        (category) => category.status === 'ACTIVE' || category.id === item?.categoryId,
+      ),
+    [categories, item?.categoryId],
   );
   const availableTaxCategories = useMemo(
     () =>
@@ -143,8 +146,6 @@ export function CatalogItemDialog({
         type === 'SERVICE'
           ? {
               defaultDurationMinutes: parsedDefaultDuration,
-              employeeAssignmentMode,
-              allowEmployeeContribution,
             }
           : undefined;
       const baseInput = {
@@ -152,7 +153,7 @@ export function CatalogItemDialog({
         categoryId,
         description: description.trim() || null,
         lifecycle,
-        fulfillmentBehavior,
+        fulfillmentBehavior: type === 'SERVICE' ? ('TRACKED' as const) : ('INSTANT' as const),
         ...(serviceDefinition ? { serviceDefinition } : {}),
       };
 
@@ -206,6 +207,31 @@ export function CatalogItemDialog({
           ...baseInput,
           ...(canViewTax && taxCategoryId !== item.taxCategoryId ? { taxCategoryId } : {}),
         });
+
+        const nextPrice = defaultPrice.trim();
+        const initialPrice = initialPriceRef.current ?? null;
+        if (canEditPrice && nextPrice && nextPrice !== initialPrice) {
+          const effectiveFrom = new Date().toISOString();
+          if (initialPrice) {
+            await api.changePrice({
+              catalogItemId: item.id,
+              catalogVariantId: null,
+              locationId: null,
+              currency,
+              amount: nextPrice,
+              effectiveFrom,
+            });
+          } else {
+            await api.createPrice({
+              catalogItemId: item.id,
+              catalogVariantId: null,
+              locationId: null,
+              currency,
+              amount: nextPrice,
+              effectiveFrom,
+            });
+          }
+        }
       }
 
       if (persistedItem && canManageImage) {
@@ -221,7 +247,7 @@ export function CatalogItemDialog({
       onSaved();
       showToast({
         variant: 'success',
-        title: fresh ? copy('Item added.') : copy('Item updated.'),
+        title: fresh ? 'Item berhasil ditambahkan.' : 'Item berhasil diperbarui.',
       });
       onClose();
     } catch (error) {
@@ -230,14 +256,14 @@ export function CatalogItemDialog({
         showToast({
           variant: 'danger',
           title: createdItem
-            ? copy('Item created, but its initial setup is incomplete.')
-            : copy('Item was saved, but its image or related setup could not be completed.'),
+            ? 'Item tersimpan, tetapi pengaturan awal belum lengkap.'
+            : 'Item tersimpan, tetapi harga, gambar, atau pengaturan terkait belum selesai diperbarui.',
         });
         onClose();
       } else if (!isSessionExpiredError(error)) {
         showToast({
           variant: 'danger',
-          title: normalizeBackofficeApiError(error, copy('Could not save item.')).safeMessage,
+          title: normalizeBackofficeApiError(error, 'Item tidak dapat disimpan.').safeMessage,
         });
       }
     } finally {
@@ -250,92 +276,15 @@ export function CatalogItemDialog({
       open={item !== undefined}
       onClose={onClose}
       size="xl"
-      title={(fresh ? copy('Add') : copy('Edit')) + ' ' + copy('Item')}
+      title={fresh ? 'Tambah Item' : 'Edit Item'}
       description={
         fresh
-          ? copy(
-              'Complete the essentials first. Pricing and variants can be prepared in the same flow.',
-            )
-          : copy('Update item identity, tax assignment, and service behavior.')
+          ? 'Lengkapi informasi item, harga jual, dan pengaturan yang diperlukan.'
+          : 'Ubah informasi item dan harga jual dalam satu langkah.'
       }
       footer={<DialogFooter onClose={onClose} onSave={() => void save()} disabled={disabled} />}
     >
       <div className="space-y-5">
-        <section className="rounded-(--radius-card) border border-(--color-border) p-4">
-          <h2 className="text-sm font-semibold">{copy('Basic information')}</h2>
-          <p className="mt-1 text-xs leading-5 text-(--color-text-muted)">
-            {copy('Identity and selling behavior for this catalog item.')}
-          </p>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <DInput
-              label={copy('Item code')}
-              hint={
-                fresh
-                  ? copy('Leave blank to generate a code automatically.')
-                  : copy('Code cannot be changed after creation.')
-              }
-              value={code}
-              onChange={setCode}
-              disabled={!fresh}
-              placeholder="COFFEE_LATTE"
-            />
-            <DInput
-              label={copy('Item name')}
-              value={name}
-              onChange={setName}
-              placeholder={copy('For example, Coffee Latte')}
-            />
-            <DSelect
-              label={copy('Type')}
-              value={type}
-              onChange={(value) => setType(value as Item['type'])}
-              disabled={!fresh}
-              options={[
-                { label: copy('Product'), value: 'PRODUCT' },
-                { label: copy('Service'), value: 'SERVICE' },
-              ]}
-            />
-            <DSelect
-              label={copy('Status')}
-              value={lifecycle}
-              onChange={(value) => setLifecycle(value as Item['lifecycle'])}
-              options={[
-                { label: copy('Draft'), value: 'DRAFT' },
-                { label: copy('Active'), value: 'ACTIVE' },
-                { label: copy('Inactive'), value: 'INACTIVE' },
-              ]}
-            />
-            <DSelect
-              label={copy('Category')}
-              value={categoryId}
-              onChange={(value) => setCategoryId(value as string | null)}
-              clearable
-              options={activeCategories.map((category) => ({
-                label: category.name,
-                value: category.id,
-              }))}
-            />
-            <DSelect
-              label={copy('Fulfillment')}
-              value={fulfillmentBehavior}
-              onChange={(value) => setFulfillmentBehavior(value as Item['fulfillmentBehavior'])}
-              options={[
-                { label: copy('Instant'), value: 'INSTANT' },
-                { label: copy('Tracked'), value: 'TRACKED' },
-              ]}
-            />
-          </div>
-          <div className="mt-4">
-            <DTextarea
-              label={copy('Description')}
-              value={description}
-              onChange={setDescription}
-              placeholder={copy('Add an optional description for this item')}
-              className="min-h-24"
-            />
-          </div>
-        </section>
-
         {canManageImage ? (
           <CatalogItemImageField
             itemName={name}
@@ -351,34 +300,110 @@ export function CatalogItemDialog({
           />
         ) : null}
 
-        {canViewTax || (fresh && canCreatePricing) ? (
-          <section className="rounded-(--radius-card) border border-(--color-border) p-4">
-            <h2 className="text-sm font-semibold">{copy('Pricing & tax')}</h2>
-            <p className="mt-1 text-xs leading-5 text-(--color-text-muted)">
-              {copy(
-                'Set the starting price and item-specific tax behavior without leaving item creation.',
-              )}
-            </p>
+        <section className="border-b border-(--color-border) pb-5">
+          <h2 className="text-sm font-semibold">Informasi Item</h2>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <DInput
+              label="Kode Item"
+              value={code}
+              onChange={setCode}
+              disabled={!fresh}
+              hint={
+                fresh
+                  ? 'Kosongkan untuk membuat kode otomatis.'
+                  : 'Kode tidak dapat diubah setelah dibuat.'
+              }
+            />
+            <DInput
+              label="Nama Item"
+              value={name}
+              onChange={setName}
+              placeholder="Contoh: Coffee Latte"
+            />
+            <DSelect
+              label="Tipe"
+              value={type}
+              onChange={(value) => setType(value as Item['type'])}
+              disabled={!fresh}
+              options={[
+                { label: 'Produk', value: 'PRODUCT' },
+                { label: 'Jasa', value: 'SERVICE' },
+              ]}
+            />
+            <DSelect
+              label="Status"
+              value={lifecycle}
+              onChange={(value) => setLifecycle(value as Item['lifecycle'])}
+              options={[
+                { label: 'Draft', value: 'DRAFT' },
+                { label: 'Aktif', value: 'ACTIVE' },
+                { label: 'Nonaktif', value: 'INACTIVE' },
+              ]}
+            />
+            <DSelect
+              label="Kategori"
+              value={categoryId}
+              onChange={(value) => setCategoryId(value as string | null)}
+              clearable
+              options={categoryOptions.map((category) => ({
+                label: category.status === 'ACTIVE' ? category.name : `${category.name} · Nonaktif`,
+                value: category.id,
+              }))}
+            />
+          </div>
+          <div className="mt-4">
+            <DTextarea
+              label="Deskripsi"
+              value={description}
+              onChange={setDescription}
+              placeholder="Deskripsi item (opsional)"
+              className="min-h-24"
+            />
+          </div>
+        </section>
+
+        {showPrice || canViewTax ? (
+          <section className="border-b border-(--color-border) pb-5">
+            <h2 className="text-sm font-semibold">Harga & Pajak</h2>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              {fresh && canCreatePricing ? (
+              {showPrice ? (
                 <div>
-                  <DCurrencyInput
-                    label={`${copy('Default Price')} (${currency})`}
-                    value={defaultPrice}
-                    onValueChange={setDefaultPrice}
-                    placeholder={copy('For example, 100000')}
-                  />
-                  <p className="mt-1 text-xs leading-5 text-(--color-text-muted)">
-                    {copy(
-                      'Optional. Variant prices inherit this price unless an override is provided.',
-                    )}
-                  </p>
+                  {canEditPrice ? (
+                    <DCurrencyInput
+                      label={`Harga Jual (${currency})`}
+                      value={defaultPrice}
+                      onValueChange={setDefaultPrice}
+                      placeholder="Contoh: 100000"
+                    />
+                  ) : (
+                    <DInput
+                      label={`Harga Jual (${currency})`}
+                      value={defaultPrice}
+                      onChange={setDefaultPrice}
+                      disabled
+                    />
+                  )}
+                  {!fresh && currentPrice.isLoading ? (
+                    <p className="mt-1 text-xs text-(--color-text-muted)">
+                      Memuat harga saat ini...
+                    </p>
+                  ) : null}
+                  {!validPrice ? (
+                    <p className="mt-1 text-sm text-(--color-danger)">
+                      Harga harus lebih dari nol.
+                    </p>
+                  ) : null}
+                  {!canEditPrice && canViewPricing && !currentPrice.isLoading ? (
+                    <p className="mt-1 text-xs text-(--color-text-muted)">
+                      Anda tidak memiliki akses untuk mengubah harga.
+                    </p>
+                  ) : null}
                 </div>
               ) : null}
               {canViewTax ? (
                 <div>
                   <DSelect
-                    label={copy('Item tax category')}
+                    label="Kategori Pajak Item"
                     value={taxCategoryId}
                     onChange={(value) => setTaxCategoryId(value as string | null)}
                     clearable
@@ -386,85 +411,50 @@ export function CatalogItemDialog({
                       label:
                         category.status === 'ACTIVE'
                           ? category.name
-                          : `${category.name} · ${copy('Inactive')}`,
+                          : `${category.name} · Nonaktif`,
                       value: category.id,
                     }))}
                   />
-                  <p className="mt-1 text-xs leading-5 text-(--color-text-muted)">
+                  <p className="mt-1 text-xs text-(--color-text-muted)">
                     {taxProfile?.itemTaxEnabled
-                      ? copy(
-                          'Leave empty when this item has no item-specific tax. Transaction tax may still apply.',
-                        )
-                      : copy(
-                          'Item tax is currently disabled in Tax settings. The category can still be prepared here.',
-                        )}
+                      ? 'Kosongkan jika item tidak memiliki pajak khusus.'
+                      : 'Pajak item sedang dinonaktifkan di pengaturan pajak.'}
                   </p>
                 </div>
               ) : null}
             </div>
-            {!validPrice ? (
-              <p className="mt-2 text-sm text-(--color-danger)">
-                {copy('Price must be greater than zero with up to four decimal places.')}
-              </p>
-            ) : null}
           </section>
         ) : null}
 
         {type === 'SERVICE' ? (
-          <section className="rounded-(--radius-card) border border-(--color-border) p-4">
-            <h2 className="text-sm font-semibold">{copy('Service configuration')}</h2>
-            <p className="mt-1 text-xs leading-5 text-(--color-text-muted)">
-              {copy('Define how this service is staffed and fulfilled.')}
-            </p>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <section className="border-b border-(--color-border) pb-5">
+            <h2 className="text-sm font-semibold">Jasa</h2>
+            <div className="mt-4 max-w-sm">
               <DInput
-                label={copy('Default duration')}
-                hint={copy('Optional, in minutes.')}
+                label="Durasi Layanan (menit)"
+                hint="Opsional."
                 value={defaultDurationMinutes}
                 onChange={setDefaultDurationMinutes}
                 type="number"
                 min={1}
                 placeholder="30"
               />
-              <DSelect
-                label={copy('Employee assignment')}
-                value={employeeAssignmentMode}
-                onChange={(value) =>
-                  setEmployeeAssignmentMode(
-                    value as NonNullable<Item['serviceDefinition']>['employeeAssignmentMode'],
-                  )
-                }
-                options={[
-                  { label: copy('None'), value: 'NONE' },
-                  { label: copy('Optional'), value: 'OPTIONAL' },
-                  { label: copy('Required'), value: 'REQUIRED' },
-                ]}
-              />
             </div>
             {!validDefaultDuration ? (
               <p className="mt-2 text-sm text-(--color-danger)">
-                {copy('Default duration must be a positive whole number.')}
+                Durasi harus berupa angka bulat positif.
               </p>
             ) : null}
-            <label className="mt-4 flex items-center gap-2 text-sm">
-              <DCheckbox
-                checked={allowEmployeeContribution}
-                onChange={(event) => setAllowEmployeeContribution(event.target.checked)}
-              />
-              {copy('Allow employee contribution')}
-            </label>
           </section>
         ) : null}
 
         {fresh && canCreateVariants ? (
-          <section className="rounded-(--radius-card) border border-(--color-border) p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
+          <section>
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="text-sm font-semibold">{copy('Initial variants')}</h2>
-                <p className="mt-1 text-xs leading-5 text-(--color-text-muted)">
-                  {copy(
-                    'Optional. Add the variants you already know now; more can be added from item details later.',
-                  )}
+                <h2 className="text-sm font-semibold">Varian</h2>
+                <p className="mt-1 text-xs text-(--color-text-muted)">
+                  Tambahkan varian sekarang atau kelola nanti dari detail item.
                 </p>
               </div>
               <DButton
@@ -472,34 +462,34 @@ export function CatalogItemDialog({
                 leftIcon={<Plus className="size-4" />}
                 onClick={() => setVariants((current) => [...current, draftVariant()])}
               >
-                {copy('Add variant')}
+                Tambah Varian
               </DButton>
             </div>
             {variants.length ? (
               <div className="mt-4 space-y-3">
-                {variants.map((variant, index) => (
+                {variants.map((variant) => (
                   <div
                     key={variant.key}
-                    className="grid gap-3 rounded-xl bg-(--color-surface-muted) p-3 md:grid-cols-[minmax(0,0.7fr)_minmax(0,1.1fr)_minmax(0,0.8fr)_auto]"
+                    className="grid gap-3 rounded-xl bg-(--color-surface-muted) p-3 md:grid-cols-[0.8fr_1.1fr_0.8fr_auto]"
                   >
                     <DInput
-                      label={`${copy('Code')} ${index + 1}`}
+                      label="Kode"
                       value={variant.code}
                       onChange={(value) => updateVariant(variant.key, { code: value })}
-                      placeholder={copy('Optional')}
+                      placeholder="Opsional"
                     />
                     <DInput
-                      label={copy('Variant name')}
+                      label="Nama Varian"
                       value={variant.name}
                       onChange={(value) => updateVariant(variant.key, { name: value })}
-                      placeholder={copy('For example, Large')}
+                      placeholder="Contoh: Large"
                     />
                     {canCreatePricing ? (
                       <DCurrencyInput
-                        label={`${copy('Price')} (${currency})`}
+                        label={`Harga (${currency})`}
                         value={variant.price}
                         onValueChange={(value) => updateVariant(variant.key, { price: value })}
-                        placeholder={copy('Uses default price')}
+                        placeholder="Mengikuti harga item"
                       />
                     ) : (
                       <div />
@@ -513,23 +503,16 @@ export function CatalogItemDialog({
                           )
                         }
                       >
-                        <span className="inline-flex items-center gap-1.5">
-                          <Trash2 aria-hidden="true" className="size-4" />
-                          <span className="hidden lg:inline">{copy('Remove variant')}</span>
-                        </span>
+                        <Trash2 className="size-4" aria-hidden="true" />
                       </DButton>
                     </div>
                   </div>
                 ))}
               </div>
-            ) : (
-              <p className="mt-4 rounded-xl bg-(--color-surface-muted) px-4 py-3 text-xs text-(--color-text-muted)">
-                {copy('No initial variants. The item will use its default price directly.')}
-              </p>
-            )}
+            ) : null}
             {invalidVariant ? (
               <p className="mt-2 text-sm text-(--color-danger)">
-                {copy('Each configured variant needs a name and any entered price must be valid.')}
+                Setiap varian yang diisi harus memiliki nama dan harga yang valid.
               </p>
             ) : null}
           </section>

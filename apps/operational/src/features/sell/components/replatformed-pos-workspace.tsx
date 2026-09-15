@@ -217,7 +217,7 @@ function quantity(value: string) {
 }
 
 function transactionNumber(saleId: string) {
-  return saleId.startsWith('SALE-DEMO-') ? saleId : `Transaksi ${saleId.slice(0, 8)}`;
+  return saleId.startsWith('SALE-DEMO-') ? saleId : `Sale ${saleId.slice(0, 8)}`;
 }
 
 function saleCustomer(saleId?: string): PosCustomer {
@@ -226,12 +226,12 @@ function saleCustomer(saleId?: string): PosCustomer {
 }
 
 function customerStatus(customer: PosCustomer | null): {
-  label: 'Umum' | 'Member' | 'Pelanggan';
+  label: 'Guest' | 'Member' | 'Non-member';
   variant: 'default' | 'primary' | 'outline';
 } {
-  if (!customer) return { label: 'Umum', variant: 'default' };
+  if (!customer) return { label: 'Guest', variant: 'default' };
   if (customer.membership) return { label: 'Member', variant: 'primary' };
-  return { label: 'Pelanggan', variant: 'outline' };
+  return { label: 'Non-member', variant: 'outline' };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -246,7 +246,7 @@ function employeeSummary(line: SaleLine, employees: readonly Employee[]): string
         : '';
       return `${employee?.displayName ?? participation.employeeId}${share}`;
     })
-    .join(', ');
+    .join(' · ');
 }
 
 function serviceWorkKey(line: SaleLine): string {
@@ -338,7 +338,7 @@ function serviceWorkAssignmentSummary(
         employees.find((employee) => employee.id === contributor.employeeId)?.displayName ??
         contributor.employeeId,
     );
-  return `${names.join(', ')} untuk semua`;
+  return `${names.join(' · ')} untuk semua`;
 }
 
 function employeeWorkSummary(line: SaleLine, employees: readonly Employee[]): string {
@@ -351,13 +351,13 @@ function employeeWorkSummary(line: SaleLine, employees: readonly Employee[]): st
         ? `${createDecimal(participation.shareRate).times(100).toFixed(0)}%`
         : null;
       return share
-        ? `${employee?.displayName ?? participation.employeeId} (${share})`
+        ? `${employee?.displayName ?? participation.employeeId} · ${share}`
         : (employee?.displayName ?? participation.employeeId);
     })
-    .join(', ');
+    .join(' · ');
 }
 
-function queueStatus(sale: Sale, includeOpenSales = false): QueueStatus | null {
+function queueStatus(sale: Sale): QueueStatus | null {
   if (sale.status === 'FINALIZED') return 'COMPLETED';
   if (sale.status === 'VOIDED') return 'CANCELED';
   if (sale.operationalState === 'IN_PROGRESS') return 'PROGRESS';
@@ -408,12 +408,12 @@ function workflowIssues(sale: Sale, serviceWorkUnits: ServiceWorkUnitsByLine = {
     issues.push('Pembayaran berhasil harus sama dengan total transaksi.');
   }
   if (sale.payments.some((payment) => payment.status === 'PENDING')) {
-    issues.push('Selesaikan pembayaran yang masih menunggu.');
+    issues.push('Selesaikan pembayaran yang masih pending.');
   }
 
   for (const line of active) {
     if (!isPositiveDecimal(line.quantity))
-      issues.push(`${line.itemNameSnapshot}: jumlah harus lebih dari 0.`);
+      issues.push(`${line.itemNameSnapshot}: qty harus lebih dari 0.`);
     if (!isPositiveDecimal(line.effectiveUnitPrice))
       issues.push(`${line.itemNameSnapshot}: harga harus valid.`);
     const requiresTrackedServiceAssignment =
@@ -461,12 +461,12 @@ function groupWorkflowIssues(sale: Sale, issues: readonly string[]): WorkflowIss
 }
 
 function processIssues(sale: Sale | null, lines: readonly CartDisplayLine[]): string[] {
-  if (!lines.length) return ['Tambahkan setidaknya satu item ke keranjang.'];
+  if (!lines.length) return ['Tambahkan setidaknya satu item ke cart.'];
   if (sale && sale.status !== 'OPEN') return ['Hanya transaksi aktif yang dapat diproses.'];
 
   return lines.flatMap((line) => {
     if (!isPositiveDecimal(line.quantity))
-      return [`${line.itemNameSnapshot}: jumlah harus lebih dari 0.`];
+      return [`${line.itemNameSnapshot}: qty harus lebih dari 0.`];
     if (!isPositiveDecimal(line.effectiveUnitPrice))
       return [`${line.itemNameSnapshot}: harga belum tersedia.`];
     return [];
@@ -508,7 +508,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const { copy } = useOperationalLocalization();
   const isLocalDemo = isLocalCashierDemoEnabled();
   const adapter = useMemo(
-    () => createCashierTransactionAdapter(runtime, authPort.getAccessToken.bind(authPort)),
+    () => createCashierTransactionAdapter(runtime, authPort.getAccessToken?.bind(authPort)),
     [authPort, runtime],
   );
   const transactionsQuery = useQuery({
@@ -521,7 +521,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const [queuedSaleEntries, setQueuedSaleEntries] = useState<QueuedSaleEntry[]>(() =>
     isLocalDemo ? readQueuedSaleEntries() : [],
   );
-  const [queueIssues, setQueueIssues] = useState<Record<string, string[]>>({});
+  const [queueIssues] = useState<Record<string, string[]>>({});
   const [queueOpen, setQueueOpen] = useState(false);
   const [queueDetail, setQueueDetail] = useState<Sale | null>(null);
   const [cancelTarget, setCancelTarget] = useState<Sale | null>(null);
@@ -600,10 +600,10 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         )
       : locationRecords;
     return {
-      QUEUED: records.filter((record) => queueStatus(record, isLocalDemo) === 'QUEUED'),
-      PROGRESS: records.filter((record) => queueStatus(record, isLocalDemo) === 'PROGRESS'),
-      COMPLETED: records.filter((record) => queueStatus(record, isLocalDemo) === 'COMPLETED'),
-      CANCELED: records.filter((record) => queueStatus(record, isLocalDemo) === 'CANCELED'),
+      QUEUED: records.filter((record) => queueStatus(record) === 'QUEUED'),
+      PROGRESS: records.filter((record) => queueStatus(record) === 'PROGRESS'),
+      COMPLETED: records.filter((record) => queueStatus(record) === 'COMPLETED'),
+      CANCELED: records.filter((record) => queueStatus(record) === 'CANCELED'),
     };
   }, [isLocalDemo, queuedSaleEntries, transactionsQuery.data, workspace.selectedLocationId]);
 
@@ -614,13 +614,13 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const openCheckout = async () => {
     const issues = processIssues(sale, lines);
     if (issues.length) {
-      showToast({ title: 'Transaksi belum siap', description: issues[0], variant: 'warning' });
+      showToast({ title: 'Cart belum siap checkout', description: issues[0], variant: 'warning' });
       return;
     }
     if (workspace.viewModel.synchronization !== 'CLEAN') {
       showToast({
         title: 'Tunggu perubahan selesai',
-        description: 'Keranjang sedang menyimpan perubahan terakhir.',
+        description: 'Cart sedang menyinkronkan perubahan terakhir.',
         variant: 'warning',
       });
       return;
@@ -633,8 +633,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         checkoutTotal = committed.totalAmount;
       } catch (error) {
         showToast({
-          title: 'Transaksi belum dapat dibuat',
-          description: `${cashierTransactionErrorMessage(error)} Keranjang tetap tersimpan. Periksa konfigurasi atau koneksi lalu coba lagi.`,
+          title: 'Cart belum dapat dibuat',
+          description: `${cashierTransactionErrorMessage(error)} Cart tetap disimpan; perbaiki konfigurasi atau koneksi lalu coba lagi.`,
           variant: 'danger',
         });
         return;
@@ -697,7 +697,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           ? `${transactionNumber(completedSale.id)} masuk antrian dan siap dimulai.`
           : wasPaid
             ? `${transactionNumber(completedSale.id)} lunas dan masuk antrian.`
-            : `${transactionNumber(completedSale.id)} masuk antrian. Pembayaran belum diterima.`,
+            : `${transactionNumber(completedSale.id)} masuk antrian. Pembayaran masih belum diterima.`,
       variant: 'success',
     });
   };
@@ -711,7 +711,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     if (!line) {
       showToast({
         title: 'Tidak ada pekerjaan yang dapat dimulai',
-        description: 'Transaksi ini tidak memiliki layanan yang menunggu pengerjaan.',
+        description: 'Transaksi ini tidak memiliki layanan yang menunggu proses operasional.',
         variant: 'warning',
       });
       return false;
@@ -724,14 +724,14 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       await workspace.startQueuedFulfillment(started, line);
       setQueueTab('PROGRESS');
       showToast({
-        title: 'Pengerjaan dimulai',
-        description: `${transactionNumber(transaction.id)} sedang dikerjakan.`,
+        title: 'Pekerjaan dimulai',
+        description: `${transactionNumber(transaction.id)} sekarang sedang dikerjakan.`,
         variant: 'success',
       });
       return true;
     } catch {
       showToast({
-        title: 'Gagal memulai pengerjaan',
+        title: 'Gagal memulai pekerjaan',
         description: 'Transaksi tetap berada dalam antrian.',
         variant: 'danger',
       });
@@ -744,7 +744,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   ) => {
     if (units.some((unit) => !hasValidWorkAssignment(target.line, unit))) {
       showToast({
-        title: 'Lengkapi karyawan',
+        title: 'Lengkapi karyawan terlebih dahulu',
         description: 'Setiap pengerjaan layanan harus memiliki kontribusi tepat 100%.',
         variant: 'warning',
       });
@@ -767,7 +767,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       setQueueDetail(updated);
       setServiceWorkTarget(null);
       showToast({
-        title: 'Pengerjaan berhasil diperbarui.',
+        title: 'Pengerjaan diperbarui',
+        description: 'Pengaturan karyawan tersimpan untuk setiap pengerjaan layanan.',
         variant: 'success',
       });
     } catch {
@@ -797,13 +798,14 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       setReceiptSaleId(hasSuccessfulPayment(finalized) ? finalized.id : null);
       setCompletionConfirmationTarget(null);
       showToast({
-        title: 'Transaksi selesai.',
+        title: 'Transaksi selesai',
+        description: `${transactionNumber(finalized.id)} telah diselesaikan.`,
         variant: 'success',
       });
     } catch {
       showToast({
         title: 'Gagal menyelesaikan transaksi',
-        description: 'Periksa status transaksi lalu coba lagi.',
+        description: 'Periksa kembali status transaksi dan coba lagi.',
         variant: 'danger',
       });
     }
@@ -827,7 +829,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       setQueuePaymentAmount(availableToPay);
     } catch {
       showToast({
-        title: 'Gagal memuat transaksi',
+        title: 'Transaksi gagal dimuat',
         description: 'Muat ulang transaksi sebelum menerima pembayaran.',
         variant: 'danger',
       });
@@ -836,9 +838,9 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const requestCancel = (transaction: Sale) => {
     if (hasSuccessfulPayment(transaction)) {
       showToast({
-        title: 'Pengembalian dana diperlukan',
+        title: 'Refund diperlukan',
         description:
-          'Transaksi yang sudah menerima pembayaran harus melalui proses pengembalian dana.',
+          'Transaksi yang sudah menerima pembayaran tidak dapat dibatalkan tanpa proses refund.',
         variant: 'warning',
       });
       return;
@@ -851,8 +853,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     if (!cancelTarget || !cancelReason.trim()) return;
     if (hasSuccessfulPayment(cancelTarget)) {
       showToast({
-        title: 'Pengembalian dana diperlukan',
-        description: 'Batalkan pembayaran melalui proses pengembalian dana terlebih dahulu.',
+        title: 'Refund diperlukan',
+        description: 'Batalkan pembayaran terlebih dahulu melalui proses refund yang sesuai.',
         variant: 'warning',
       });
       return;
@@ -875,13 +877,14 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       setCancelReason('');
       workspace.clearProcessedDraft();
       showToast({
-        title: 'Transaksi dibatalkan.',
+        title: 'Transaksi dibatalkan',
+        description: 'Alasan pembatalan telah dicatat.',
         variant: 'success',
       });
     } catch {
       showToast({
-        title: 'Gagal membatalkan transaksi',
-        description: 'Transaksi tidak berubah. Periksa status pembayaran.',
+        title: 'Pembatalan gagal',
+        description: 'Transaksi tetap tidak berubah. Periksa kembali status pembayaran.',
         variant: 'danger',
       });
     }
@@ -896,7 +899,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         if (destination === 'START_PROCESS') await startQueuedWork(submitted);
       } catch (error) {
         showToast({
-          title: 'Gagal memproses transaksi',
+          title: 'Checkout gagal',
           description: cashierTransactionErrorMessage(error),
           variant: 'danger',
         });
@@ -917,8 +920,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       );
       if (!hasSuccessfulCheckout(completedSale)) {
         showToast({
-          title: 'Transaksi belum selesai',
-          description: 'Pembayaran belum selesai. Keranjang tetap tersedia.',
+          title: 'Checkout belum selesai',
+          description: 'Pembayaran belum berhasil diselesaikan. Cart tetap tersedia.',
           variant: 'warning',
         });
         return;
@@ -928,8 +931,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       if (destination === 'START_PROCESS') await startQueuedWork(submitted);
     } catch (error) {
       showToast({
-        title: 'Gagal memproses transaksi',
-        description: `${cashierTransactionErrorMessage(error)} Keranjang tidak berubah.`,
+        title: 'Checkout gagal',
+        description: `${cashierTransactionErrorMessage(error)} Cart tidak diubah.`,
         variant: 'danger',
       });
     }
@@ -956,14 +959,15 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       workspace.clearProcessedDraft();
       showToast({
         title: hasSuccessfulCheckout(updatedSale)
-          ? 'Pembayaran lunas.'
-          : 'Pembayaran berhasil dicatat.',
+          ? 'Pembayaran lunas'
+          : 'Pembayaran berhasil dicatat',
+        description: 'Status operasional transaksi tidak berubah.',
         variant: 'success',
       });
     } catch (error) {
       showToast({
         title: 'Pembayaran gagal',
-        description: `${cashierTransactionErrorMessage(error)} Saldo dan antrian tidak berubah.`,
+        description: `${cashierTransactionErrorMessage(error)} Saldo transaksi tidak berubah dan antrian tetap dipertahankan.`,
         variant: 'danger',
       });
     }
@@ -986,19 +990,19 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           <div className="flex min-w-0 gap-2.5">
             <AlertCircle className="mt-0.5 size-4 shrink-0 text-[var(--color-warning)]" />
             <div>
-              <p className="font-semibold">Transaksi perlu diperiksa</p>
+              <p className="font-semibold">Transaction attention</p>
               <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">{workspace.notice}</p>
             </div>
           </div>
           <div className="flex shrink-0 gap-2">
             {workspace.canRetryLastCommand ? (
               <Button size="sm" variant="outline" onClick={workspace.retryLastCommand}>
-                <RotateCcw className="mr-1.5 size-3.5" /> Coba lagi
+                <RotateCcw className="mr-1.5 size-3.5" /> Retry same command
               </Button>
             ) : null}
             {workspace.viewModel.primaryMode === 'CONFLICT_REVIEW' ? (
               <Button size="sm" variant="outline" onClick={workspace.acknowledgeLatestState}>
-                <CheckCircle2 className="mr-1.5 size-3.5" /> Sudah diperiksa
+                <CheckCircle2 className="mr-1.5 size-3.5" /> Reviewed
               </Button>
             ) : null}
           </div>
@@ -1036,7 +1040,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
               <ReferenceTypeButton
                 active={workspace.itemType === 'SERVICE'}
                 icon={<Wrench className="size-3.5" />}
-                label="Layanan"
+                label="Jasa"
                 onClick={() => selectType('SERVICE')}
               />
             </div>
@@ -1082,7 +1086,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
             </div>
           ) : visibleItems.length === 0 ? (
             <div className="flex min-h-[260px] items-center justify-center rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface)]/50 text-sm text-[var(--color-text-muted)]">
-              Item tidak ditemukan.
+              Tidak ada item ditemukan
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
@@ -1180,9 +1184,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         locale={workspace.locale}
         employees={workspace.employees}
         businessName={runtime.branding.businessName ?? runtime.branding.productName}
-        branchName="Cabang utama"
+        branchName="Main Branch"
         cashierName={session.identity.displayName}
-        isLocalDemo={isLocalDemo}
         {...(displayedQueueDetail && cancellationReasons[displayedQueueDetail.id]
           ? { cancellationReason: cancellationReasons[displayedQueueDetail.id] }
           : {})}
@@ -1267,7 +1270,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         title="Selesaikan transaksi"
         message={
           completionConfirmationTarget
-            ? `Selesaikan ${transactionNumber(completionConfirmationTarget.id)}? Pengerjaan yang sudah selesai akan ditutup.`
+            ? `Selesaikan transaksi ${transactionNumber(completionConfirmationTarget.id)}? Tindakan ini menutup pekerjaan yang sudah selesai.`
             : undefined
         }
         confirmLabel="Selesaikan"
@@ -1339,7 +1342,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
               setQueueDetail(updated);
               setQueueAssignmentTarget(null);
               showToast({
-                title: 'Karyawan berhasil diperbarui.',
+                title: 'Karyawan diperbarui',
+                description: 'Penugasan layanan tersimpan pada transaksi yang sedang dikerjakan.',
                 variant: 'success',
               });
             })
@@ -1416,7 +1420,7 @@ function ReferenceCatalogCard({
   return (
     <button
       type="button"
-      aria-label={`Tambah ${item.name}`}
+      aria-label={`Add ${item.name}`}
       disabled={disabled}
       onClick={onAdd}
       className="group rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-left transition-all hover:border-[var(--color-brand)]/40 hover:shadow-md active:scale-[.98] disabled:opacity-50"
@@ -1435,7 +1439,7 @@ function ReferenceCatalogCard({
         <span
           className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${isService ? 'bg-cyan-500/10 text-cyan-700' : 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]'}`}
         >
-          {isService ? 'Layanan' : 'Produk'}
+          {isService ? 'Jasa' : 'Produk'}
         </span>
       </div>
     </button>
@@ -1489,7 +1493,7 @@ function ReferenceQueueBoard({
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <p className="text-sm font-bold">Transaksi antrian</p>
+                <p className="text-sm font-bold">Transaksi Antrian</p>
                 <span
                   className={`inline-flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-[11px] font-bold ${count ? 'bg-[var(--color-brand)] text-white' : 'bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]'}`}
                 >
@@ -1497,7 +1501,9 @@ function ReferenceQueueBoard({
                 </span>
               </div>
               <p className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">
-                {count ? 'Lihat transaksi yang sedang berjalan.' : 'Belum ada transaksi antrian.'}
+                {count
+                  ? 'Klik untuk melihat transaksi yang sedang berjalan.'
+                  : 'Belum ada transaksi antrian.'}
               </p>
             </div>
           </div>
@@ -1568,7 +1574,10 @@ function ReferenceQueueBoard({
                       ) : (
                         <div className="rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)]/20 py-7 text-center">
                           <p className="text-sm font-semibold">
-                            Tidak ada transaksi {statusMeta[status].label.toLowerCase()}.
+                            Tidak ada transaksi {statusMeta[status].label.toLowerCase()}
+                          </p>
+                          <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                            Transaksi akan muncul di sini ketika sudah dibuat.
                           </p>
                         </div>
                       )}
@@ -1614,11 +1623,11 @@ function ReferenceQueueCard({
   const customer = saleCustomer(sale.id);
   const canStartWork = hasStartableQueuedWork(sale);
   const actionItems = [
-    { label: 'Detail', icon: <Eye className="size-3.5" />, onSelect: () => onView(sale) },
+    { label: 'Preview / Detail', icon: <Eye className="size-3.5" />, onSelect: () => onView(sale) },
     ...(hasPayment
       ? [
           {
-            label: 'Lihat struk',
+            label: 'Lihat Struk',
             icon: <Printer className="size-3.5" />,
             onSelect: () => onViewReceipt(sale),
           },
@@ -1629,21 +1638,21 @@ function ReferenceQueueCard({
           ...(canStartWork
             ? [
                 {
-                  label: 'Mulai dikerjakan',
+                  label: 'Mulai Dikerjakan',
                   icon: <PlayCircle className="size-3.5" />,
                   onSelect: () => onStartWork(sale),
                 },
               ]
             : []),
           {
-            label: 'Sesuaikan pesanan',
+            label: 'Sesuaikan Pesanan',
             icon: <ShoppingBag className="size-3.5" />,
             onSelect: () => onAdjust(sale),
           },
           ...(isPositiveDecimal(balanceDue)
             ? [
                 {
-                  label: hasPayment ? 'Bayar sisa' : 'Bayar',
+                  label: hasPayment ? 'Bayar Sisa' : 'Bayar',
                   icon: <CreditCard className="size-3.5" />,
                   onSelect: () => onPay(sale),
                 },
@@ -1662,7 +1671,7 @@ function ReferenceQueueCard({
           ...(isPositiveDecimal(balanceDue)
             ? [
                 {
-                  label: hasPayment ? 'Bayar sisa' : 'Bayar',
+                  label: hasPayment ? 'Bayar Sisa' : 'Bayar',
                   icon: <CreditCard className="size-3.5" />,
                   onSelect: () => onPay(sale),
                 },
@@ -1692,7 +1701,7 @@ function ReferenceQueueCard({
           <span
             className={`inline-flex items-center rounded-full px-2 py-1 text-[10px] font-bold ${paid ? 'bg-[var(--color-success)]/10 text-[var(--color-success)]' : 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]'}`}
           >
-            {paid ? 'Lunas' : hasPayment ? 'Bayar sebagian' : 'Belum dibayar'}
+            {paid ? 'Lunas' : hasPayment ? 'Bayar Sebagian' : 'Belum Bayar'}
           </span>
           <span
             className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold ${meta.tone}`}
@@ -1705,7 +1714,7 @@ function ReferenceQueueCard({
       <div className="mb-3 flex items-end justify-between gap-2">
         <div>
           <p className="text-xs text-[var(--color-text-muted)]">
-            {sale.lines.filter((line) => !line.removedAt).length} item,{' '}
+            {sale.lines.filter((line) => !line.removedAt).length} item ·{' '}
             {new Intl.DateTimeFormat('id-ID', { hour: '2-digit', minute: '2-digit' }).format(
               new Date(sale.createdAt),
             )}
@@ -1722,7 +1731,7 @@ function ReferenceQueueCard({
               leftIcon={<PlayCircle className="size-3.5" />}
               onClick={() => onStartWork(sale)}
             >
-              Mulai dikerjakan
+              Mulai Dikerjakan
             </DButton>
           ) : null}
           <Dropdown
@@ -1733,7 +1742,7 @@ function ReferenceQueueCard({
             trigger={({ open }) => (
               <button
                 type="button"
-                aria-label={`Aksi untuk ${transactionNumber(sale.id)}`}
+                aria-label={`Actions for ${transactionNumber(sale.id)}`}
                 aria-expanded={open}
                 className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 text-[11px] font-semibold text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand)]/20"
               >
@@ -1817,13 +1826,13 @@ function ReferenceFloatingCart({
     <>
       <button
         type="button"
-        aria-label="Tutup keranjang"
+        aria-label="Close active cart"
         onClick={() => onOpenChange(false)}
         className={`fixed inset-0 z-40 hidden bg-transparent md:block ${open ? '' : 'pointer-events-none opacity-0'}`}
       />
       <button
         type="button"
-        aria-label="Keranjang"
+        aria-label="Cart"
         onClick={() => onOpenChange(!open)}
         className={`fixed bottom-6 right-6 z-50 inline-flex items-center gap-3 rounded-2xl bg-[var(--color-brand)] px-4 py-3 text-white shadow-[0_16px_40px_rgb(37_99_235_/_0.28)] transition-all hover:shadow-[0_18px_48px_rgb(37_99_235_/_0.35)] active:scale-[.97] ${open ? 'md:pointer-events-none md:scale-95 md:opacity-0' : ''}`}
       >
@@ -1836,19 +1845,19 @@ function ReferenceFloatingCart({
           ) : null}
         </div>
         <div className="hidden text-left sm:block">
-          <p className="text-xs font-bold leading-none">Keranjang</p>
+          <p className="text-xs font-bold leading-none">Cart</p>
           <p className="mt-1 text-[11px] opacity-90">{money(total, locale)}</p>
         </div>
       </button>
       <div
         role="dialog"
-        aria-label="Keranjang"
+        aria-label="Cart"
         className={`operational-cart-panel fixed bottom-6 right-6 z-50 max-h-[calc(100dvh-48px)] w-[420px] max-w-[calc(100vw-48px)] origin-bottom-right flex-col overflow-hidden rounded-[28px] border border-[var(--color-border)] bg-[var(--color-background)] shadow-[0_24px_70px_rgb(15_23_42_/_0.22)] transition-all duration-200 ease-out ${open ? 'pointer-events-auto translate-y-0 scale-100 opacity-100' : 'pointer-events-none translate-y-4 scale-95 opacity-0'}`}
       >
         <div className="border-b border-[var(--color-border)] bg-[var(--color-surface)] p-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-base font-bold">Keranjang</h2>
+              <h2 className="text-base font-bold">Cart</h2>
               <p className="text-xs text-[var(--color-text-muted)]">
                 {lines.length ? `${lines.length} item dipilih` : 'Belum ada item dipilih'}
               </p>
@@ -1870,14 +1879,14 @@ function ReferenceFloatingCart({
       />
       <div
         role="dialog"
-        aria-label="Keranjang"
+        aria-label="Cart"
         className={`fixed inset-x-0 bottom-0 z-50 h-[86dvh] overflow-hidden rounded-t-[28px] border-t border-[var(--color-border)] bg-[var(--color-background)] shadow-[0_-24px_80px_rgb(15_23_42_/_0.25)] transition-transform duration-300 ease-out md:hidden ${open ? 'translate-y-0' : 'translate-y-full'}`}
       >
         <div className="flex h-full min-h-0 flex-col">
           <div className="shrink-0 border-b border-[var(--color-border)] p-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-base font-bold">Keranjang</h2>
+                <h2 className="text-base font-bold">Cart</h2>
                 <p className="text-xs text-[var(--color-text-muted)]">
                   {lines.length ? `${lines.length} item dipilih` : 'Belum ada item dipilih'}
                 </p>
@@ -1940,7 +1949,7 @@ function ReferenceCartPanel({
       <div className="shrink-0 space-y-2.5 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3">
         <button
           type="button"
-          aria-label="Pilih pelanggan"
+          aria-label="Choose customer"
           onClick={onChooseCustomer}
           className="flex w-full items-center gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-muted)]/45 px-3 py-2.5 text-left transition-colors hover:border-[var(--color-brand)]/35 hover:bg-[var(--color-brand)]/5"
         >
@@ -1978,15 +1987,15 @@ function ReferenceCartPanel({
                     </p>
                     <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
                       {money(line.effectiveUnitPrice, locale)}
-                      {line.variantNameSnapshot ? `, ${line.variantNameSnapshot}` : ''}
+                      {line.variantNameSnapshot ? ` · ${line.variantNameSnapshot}` : ''}
                       {line.itemTypeSnapshot === 'SERVICE' ? (
-                        <span className="ml-1 font-semibold text-cyan-700">, Layanan</span>
+                        <span className="ml-1 font-semibold text-cyan-700">· Jasa</span>
                       ) : null}
                     </p>
                   </div>
                   <button
                     type="button"
-                    aria-label={`Hapus ${line.itemNameSnapshot}`}
+                    aria-label={`Remove ${line.itemNameSnapshot}`}
                     onClick={() => onRemove(line)}
                     className="shrink-0 rounded-lg p-1.5 text-[var(--color-text-muted)] hover:bg-[var(--color-danger)]/10 hover:text-[var(--color-danger)]"
                   >
@@ -1997,7 +2006,7 @@ function ReferenceCartPanel({
                   <div className="inline-grid grid-cols-[36px_48px_36px] items-center overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] shadow-[inset_0_1px_0_rgb(15_23_42_/_0.02)]">
                     <button
                       type="button"
-                      aria-label={`Kurangi jumlah ${line.itemNameSnapshot}`}
+                      aria-label={`Decrease ${line.itemNameSnapshot} quantity`}
                       onClick={() => increment(line, 'down')}
                       disabled={createDecimal(line.quantity).lessThanOrEqualTo(createDecimal('1'))}
                       className="flex h-9 items-center justify-center border-r border-[var(--color-border)] text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)] active:bg-[var(--color-surface-muted)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[var(--color-text-muted)]"
@@ -2005,14 +2014,14 @@ function ReferenceCartPanel({
                       <Minus className="size-3.5" />
                     </button>
                     <output
-                      aria-label={`Jumlah ${line.itemNameSnapshot}`}
+                      aria-label={`Quantity for ${line.itemNameSnapshot}`}
                       className="flex h-9 w-12 items-center justify-center text-xs font-bold tabular-nums text-[var(--color-text)]"
                     >
                       {quantity(line.quantity)}
                     </output>
                     <button
                       type="button"
-                      aria-label={`Tambah jumlah ${line.itemNameSnapshot}`}
+                      aria-label={`Increase ${line.itemNameSnapshot} quantity`}
                       onClick={() => increment(line, 'up')}
                       className="flex h-9 items-center justify-center border-l border-[var(--color-border)] text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)] active:bg-[var(--color-surface-muted)]"
                     >
@@ -2031,7 +2040,10 @@ function ReferenceCartPanel({
             <div className="mb-3 flex size-12 items-center justify-center rounded-2xl bg-[var(--color-brand)]/10 text-[var(--color-brand)]">
               <ShoppingBag className="size-[22px]" />
             </div>
-            <p className="text-sm font-semibold">Belum ada item.</p>
+            <p className="text-sm font-semibold">Cart masih kosong</p>
+            <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+              Pilih produk atau jasa dari katalog.
+            </p>
           </div>
         )}
       </div>
@@ -2061,8 +2073,13 @@ function ReferenceCartPanel({
             onClick={onCheckout}
             leftIcon={<CreditCard className="size-3.5" />}
           >
-            Lanjutkan
+            Checkout
           </Button>
+          {lines.length ? (
+            <p className="text-center text-[11px] text-[var(--color-text-muted)]">
+              Harga dan total otoritatif dikonfirmasi saat Checkout.
+            </p>
+          ) : null}
         </div>
       </div>
     </div>
@@ -2108,9 +2125,10 @@ function ReferenceCustomerDialog({
   return (
     <DDialog
       title="Pilih pelanggan"
+      description="Hanya untuk konteks transaksi ini."
       open={open}
       onClose={onClose}
-      ariaLabel="Pilih pelanggan"
+      ariaLabel="Choose customer"
       closeOnEscape
       closeOnOverlay
       className="pos-reference-dialog w-full max-w-md overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
@@ -2125,15 +2143,15 @@ function ReferenceCustomerDialog({
             <User className="size-4" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">Pelanggan umum</p>
+            <p className="text-sm font-semibold">Gunakan pelanggan umum</p>
             <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
-              Lanjutkan tanpa data pelanggan.
+              Lanjutkan tanpa memilih pelanggan.
             </p>
           </div>
           {customer === null ? <CheckCircle2 className="size-4 text-[var(--color-brand)]" /> : null}
         </button>
         <div className="border-t border-[var(--color-border)] pt-3">
-          <div className="flex gap-2" aria-label="Jenis pelanggan">
+          <div className="flex gap-2" aria-label="Customer type">
             <Button
               size="sm"
               variant={mode === 'MEMBER' ? 'primary' : 'secondary'}
@@ -2154,12 +2172,12 @@ function ReferenceCustomerDialog({
             <div className="mt-3 space-y-3">
               <DCombobox
                 key="member-search"
-                ariaLabel="Cari member berdasarkan nama atau nomor telepon"
+                ariaLabel="Search members by name or phone"
                 value={selectedMember?.customerId ?? ''}
                 options={memberResults.map((member) => ({
                   value: member.customerId,
                   label: member.name,
-                  detail: `${member.phone} (${member.membership.memberCode})`,
+                  detail: `${member.phone} · ${member.membership.memberCode}`,
                 }))}
                 onChange={(customerId) => {
                   setSelectedMember(
@@ -2171,7 +2189,7 @@ function ReferenceCustomerDialog({
                   setSelectedMember(null);
                 }}
                 placeholder="Cari nama atau nomor telepon"
-                idleMessage="Cari nama, nomor telepon, atau kode member."
+                idleMessage="Ketik nama, nomor telepon, atau kode member untuk mencari."
                 renderEmpty={() => 'Member tidak ditemukan.'}
                 renderOption={(option) => {
                   const member = memberResults.find(
@@ -2182,7 +2200,7 @@ function ReferenceCustomerDialog({
                       <span className="block truncate">{option.label}</span>
                       {member ? (
                         <span className="mt-0.5 block truncate text-xs font-normal text-[var(--color-text-muted)]">
-                          {member.phone} ({member.membership.memberCode})
+                          {member.phone} · {member.membership.memberCode}
                         </span>
                       ) : null}
                     </span>
@@ -2200,14 +2218,14 @@ function ReferenceCustomerDialog({
           ) : (
             <div className="mt-3 space-y-3">
               <DInput
-                aria-label="Nama pelanggan"
+                aria-label="Customer name"
                 label="Nama"
                 value={name}
                 onChange={setName}
                 placeholder="Nama pelanggan"
               />
               <DInput
-                aria-label="Nomor telepon pelanggan"
+                aria-label="Customer phone"
                 label="Nomor telepon"
                 value={phone}
                 onChange={setPhone}
@@ -2284,7 +2302,7 @@ function ReferencePaymentDialog({
     { value: 'CASH', label: 'Tunai', icon: <Banknote className="size-[15px]" /> },
     { value: 'BANK_TRANSFER', label: 'Transfer', icon: <CreditCard className="size-[15px]" /> },
     { value: 'QRIS', label: 'QRIS', icon: <QrCode className="size-[15px]" /> },
-    { value: 'WALLET', label: 'Dompet digital', icon: <ShoppingBag className="size-[15px]" /> },
+    { value: 'WALLET', label: 'E-Wallet', icon: <ShoppingBag className="size-[15px]" /> },
   ];
   const providerOptions =
     method === 'BANK_TRANSFER'
@@ -2292,10 +2310,11 @@ function ReferencePaymentDialog({
       : ['DANA', 'GoPay', 'OVO', 'ShopeePay'];
   return (
     <DDialog
-      title="Pembayaran"
+      title="Checkout pembayaran"
+      description="Review transaksi dan pembayaran sebelum masuk antrian."
       open={open}
       onClose={onClose}
-      ariaLabel="Pembayaran"
+      ariaLabel="Checkout payment"
       closeOnEscape
       closeOnOverlay
       className="pos-reference-dialog w-full max-w-lg overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
@@ -2305,7 +2324,7 @@ function ReferencePaymentDialog({
             Batal
           </DButton>
           <DButton disabled={!canConfirm} loading={isSubmitting} onClick={onQueue}>
-            Masuk antrian
+            Masuk Antrian
           </DButton>
         </div>
       }
@@ -2314,7 +2333,7 @@ function ReferencePaymentDialog({
         <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-xs text-[var(--color-text-muted)]">Total pembayaran</p>
+              <p className="text-xs text-[var(--color-text-muted)]">Total Pembayaran</p>
               <h3 className="mt-0.5 text-2xl font-bold leading-tight text-[var(--color-brand)]">
                 {money(total, locale)}
               </h3>
@@ -2349,7 +2368,7 @@ function ReferencePaymentDialog({
               </div>
             ) : null}
             <div className="mt-2 flex justify-between border-t border-[var(--color-border)] pt-2 text-sm">
-              <span className="font-bold">Total</span>
+              <span className="font-bold">Grand total</span>
               <span className="font-bold text-[var(--color-brand)]">{money(total, locale)}</span>
             </div>
           </div>
@@ -2359,7 +2378,7 @@ function ReferencePaymentDialog({
             <div>
               <p className="text-sm font-semibold">Promo</p>
               <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                Promo belum tersedia untuk transaksi ini.
+                Promo akan dihitung dan divalidasi oleh sistem saat kapabilitas backend tersedia.
               </p>
             </div>
             <span className="shrink-0 rounded-full bg-[var(--color-surface-muted)] px-2 py-1 text-[10px] font-semibold text-[var(--color-text-muted)]">
@@ -2373,7 +2392,7 @@ function ReferencePaymentDialog({
               <div>
                 <p className="text-sm font-semibold">Gunakan poin member</p>
                 <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                  Saldo dan nilai penukaran akan diperiksa saat poin digunakan.
+                  Saldo, nilai penukaran, dan kelayakan poin akan divalidasi oleh sistem.
                 </p>
               </div>
               <span className="shrink-0 rounded-full bg-[var(--color-surface-muted)] px-2 py-1 text-[10px] font-semibold text-[var(--color-text-muted)]">
@@ -2385,7 +2404,7 @@ function ReferencePaymentDialog({
         <div className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)]">
           <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-2.5">
             <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
-              Detail pesanan
+              Detail Pesanan
             </p>
             <span className="text-xs text-[var(--color-text-muted)]">{lines.length} item</span>
           </div>
@@ -2398,7 +2417,7 @@ function ReferencePaymentDialog({
                     <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
                       {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
                       {line.itemTypeSnapshot === 'SERVICE' ? (
-                        <span className="ml-1 font-semibold text-[var(--color-brand)]">, Layanan</span>
+                        <span className="ml-1 font-semibold text-[var(--color-brand)]">· Jasa</span>
                       ) : null}
                     </p>
                   </div>
@@ -2419,8 +2438,8 @@ function ReferencePaymentDialog({
             <span className="block text-sm font-semibold">Bayar sekarang</span>
             <span className="mt-0.5 block text-xs leading-4 text-[var(--color-text-muted)]">
               {payNow
-                ? 'Pilih metode pembayaran.'
-                : 'Pembayaran dapat dicatat setelah transaksi dibuat.'}
+                ? 'Pilih metode pembayaran sebelum transaksi diteruskan.'
+                : 'Pembayaran dicatat setelah transaksi dibuat.'}
             </span>
           </span>
         </label>
@@ -2428,7 +2447,7 @@ function ReferencePaymentDialog({
           <>
             <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
               <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
-                Metode pembayaran
+                Metode Pembayaran
               </p>
               <div className="grid grid-cols-4 gap-2">
                 {methods.map((option) => (
@@ -2446,7 +2465,7 @@ function ReferencePaymentDialog({
               {needsProvider ? (
                 <div className="mt-3">
                   <p className="mb-2 text-xs font-semibold text-[var(--color-text-muted)]">
-                    Pilih {method === 'BANK_TRANSFER' ? 'bank' : 'dompet digital'}
+                    Pilih {method === 'BANK_TRANSFER' ? 'Bank' : 'E-Wallet'}
                   </p>
                   <div className="grid grid-cols-4 gap-2">
                     {providerOptions.map((option) => (
@@ -2466,7 +2485,7 @@ function ReferencePaymentDialog({
                 <div className="mt-3 rounded-xl border border-[var(--color-brand)]/20 bg-[var(--color-brand)]/5 p-3">
                   <p className="text-sm font-bold text-[var(--color-brand)]">QRIS</p>
                   <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                    Pembayaran QRIS akan dicatat pada transaksi ini.
+                    Pembayaran QRIS akan dicatat sebagai pembayaran berhasil untuk transaksi ini.
                   </p>
                 </div>
               ) : null}
@@ -2477,7 +2496,7 @@ function ReferencePaymentDialog({
                   Uang dibayar
                   <div className="relative mt-1.5">
                     <PosCurrencyInput
-                      aria-label="Uang tunai dibayar"
+                      aria-label="Cash tendered"
                       className="h-10 rounded-lg bg-[var(--color-surface)] text-right text-lg font-bold"
                       value={tender}
                       onChange={onTender}
@@ -2522,13 +2541,13 @@ function ReferencePaymentDialog({
                 <p className="text-sm font-bold text-[var(--color-brand)]">
                   Pembayaran{' '}
                   {method === 'BANK_TRANSFER'
-                    ? 'transfer'
+                    ? 'Transfer'
                     : method === 'WALLET'
-                      ? 'dompet digital'
+                      ? 'E-Wallet'
                       : 'QRIS'}
                 </p>
                 <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                  Catat pembayaran setelah detailnya sesuai.
+                  Pilih provider bila diperlukan, lalu catat pembayaran ini.
                 </p>
               </div>
             )}
@@ -2546,7 +2565,6 @@ function ReferenceTransactionDetail({
   businessName,
   branchName,
   cashierName,
-  isLocalDemo,
   cancellationReason,
   showPaymentReceipt,
   onClose,
@@ -2563,7 +2581,6 @@ function ReferenceTransactionDetail({
   businessName: string;
   branchName: string;
   cashierName: string;
-  isLocalDemo: boolean;
   cancellationReason?: string;
   showPaymentReceipt: boolean;
   onClose: () => void;
@@ -2577,7 +2594,7 @@ function ReferenceTransactionDetail({
 }) {
   const [receiptPaper, setReceiptPaper] = useState<'58' | '80'>('80');
   if (!sale) return null;
-  const status = queueStatus(sale, isLocalDemo);
+  const status = queueStatus(sale);
   const customerContext = readStoredCustomer(saleCustomerKey(sale.id));
   const customer = customerContext ?? saleCustomer(sale.id);
   const activeLines = sale.lines.filter((line) => !line.removedAt);
@@ -2600,9 +2617,9 @@ function ReferenceTransactionDetail({
       <Dialog
         open
         onClose={onClose}
-        title={showReceipt ? 'Struk pembayaran' : 'Detail transaksi'}
+        title={showReceipt ? 'Preview struk pembayaran' : 'Detail transaksi'}
         description={transactionNumber(sale.id)}
-        ariaLabel={showReceipt ? 'Struk pembayaran' : 'Detail transaksi'}
+        ariaLabel={showReceipt ? 'Receipt preview' : 'Transaction detail'}
         closeOnEscape
         closeOnOverlay
         noPadding
@@ -2620,7 +2637,7 @@ function ReferenceTransactionDetail({
                 variant="outline"
                 onClick={() => onViewReceipt(sale)}
               >
-                Lihat struk
+                Lihat Struk
               </DButton>
             ) : null}
             {!showReceipt && status === 'PROGRESS' ? (
@@ -2724,7 +2741,7 @@ function ReferenceTransactionDetail({
                   </div>
                   {customer.membership ? (
                     <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                      {customer.membership.memberCode} ({customer.membership.status})
+                      {customer.membership.memberCode} · {customer.membership.status}
                     </p>
                   ) : customer.phone ? (
                     <p className="mt-1 text-xs text-[var(--color-text-muted)]">{customer.phone}</p>
@@ -2799,14 +2816,14 @@ function ReferenceTransactionDetail({
                             <p className="text-sm font-semibold">{line.itemNameSnapshot}</p>
                             <p className="mt-1 text-xs text-[var(--color-text-muted)]">
                               {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
-                              {line.variantNameSnapshot ? `, ${line.variantNameSnapshot}` : ''}
+                              {line.variantNameSnapshot ? ` · ${line.variantNameSnapshot}` : ''}
                             </p>
                             {line.fulfillment ? (
                               <p className="mt-1 text-[11px] font-medium text-[var(--color-text-muted)]">
                                 {line.fulfillment.status === 'WAITING'
-                                  ? 'Menunggu pengerjaan'
+                                  ? 'Menunggu proses'
                                   : line.fulfillment.status === 'IN_PROGRESS'
-                                    ? 'Dikerjakan'
+                                    ? 'Sedang diproses'
                                     : line.fulfillment.status === 'COMPLETED'
                                       ? 'Selesai'
                                       : 'Dibatalkan'}
@@ -2968,7 +2985,7 @@ function ReceiptContent({
           </div>
         ) : null}
         <div className="mt-2 flex justify-between gap-3 border-t border-slate-200 pt-2 text-sm font-black">
-          <dt>Total</dt>
+          <dt>TOTAL</dt>
           <dd>{money(sale.totalAmount, locale)}</dd>
         </div>
       </dl>
@@ -2999,7 +3016,7 @@ function ReceiptContent({
       </section>
 
       <div className="my-4 border-t border-dashed border-slate-300" />
-      <p className="text-center text-[11px] text-slate-500">Terima kasih.</p>
+      <p className="text-center text-[11px] text-slate-500">Terima kasih telah bertransaksi.</p>
       <div className="pos-receipt-tear" aria-hidden="true" />
     </>
   );
@@ -3031,11 +3048,11 @@ function ReferenceServiceWorkLine({
           <p className="text-sm font-semibold">{line.itemNameSnapshot}</p>
           <p className="mt-1 text-xs text-[var(--color-text-muted)]">
             {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
-            {line.variantNameSnapshot ? `, ${line.variantNameSnapshot}` : ''}
+            {line.variantNameSnapshot ? ` · ${line.variantNameSnapshot}` : ''}
           </p>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
             <span className="min-w-0 flex-1 truncate text-[var(--color-text-muted)]">
-              {units.length} unit, {employeeWorkSummary}
+              {units.length} unit · {employeeWorkSummary}
             </span>
             {active ? (
               <DButton
@@ -3086,7 +3103,7 @@ function ReferenceFinancialSummary({ sale, locale }: { sale: Sale; locale: strin
             </div>
             {hasDiscount ? (
               <div className="flex justify-between gap-3">
-                <dt className="text-[var(--color-text-muted)]">Promo dan diskon</dt>
+                <dt className="text-[var(--color-text-muted)]">Promo / diskon</dt>
                 <dd>−{money(sale.discountAmount, locale)}</dd>
               </div>
             ) : null}
@@ -3202,16 +3219,16 @@ function ReferenceOrderAdjustmentDialog({
     .slice(0, 12)
     .map((item) => ({
       value: item.id,
-      label: `${item.name} (${item.code})`,
+      label: `${item.name} · ${item.code}`,
     }));
 
   return (
     <Dialog
       open
       onClose={onClose}
-      title="Sesuaikan pesanan"
-      description={transactionNumber(sale.id)}
-      ariaLabel="Sesuaikan transaksi"
+      title="Sesuaikan Pesanan"
+      description={`${transactionNumber(sale.id)} · perubahan tetap pada transaksi ini`}
+      ariaLabel="Adjust queued transaction"
       closeOnEscape
       closeOnOverlay
       className="pos-reference-dialog w-full max-w-xl overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
@@ -3221,7 +3238,7 @@ function ReferenceOrderAdjustmentDialog({
             Batal
           </Button>
           <Button disabled={isMutating} onClick={onClose}>
-            Simpan penyesuaian
+            Konfirmasi penyesuaian
           </Button>
         </div>
       }
@@ -3230,15 +3247,16 @@ function ReferenceOrderAdjustmentDialog({
         {paid ? (
           <div className="rounded-xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 px-3 py-2 text-xs">
             <p className="font-semibold text-[var(--color-warning)]">
-              Pembayaran sebelumnya tetap tersimpan
+              Pembayaran sebelumnya dipertahankan
             </p>
             <p className="mt-1 text-[var(--color-text-muted)]">
-              Pengurangan item berbayar memerlukan proses pengembalian dana.
+              Anda dapat menambahkan item. Pengurangan atau penghapusan item berbayar memerlukan
+              proses refund.
             </p>
           </div>
         ) : (
           <p className="text-xs text-[var(--color-text-muted)]">
-            Ubah jumlah atau hapus item yang belum dimulai.
+            Ubah qty atau hapus item yang belum dimulai, lalu konfirmasi penyesuaian.
           </p>
         )}
         <div className="divide-y divide-[var(--color-border)] overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-background)]">
@@ -3311,7 +3329,7 @@ function ReferenceOrderAdjustmentDialog({
           <Combobox
             ariaLabel="Tambah item ke transaksi"
             value={null}
-            placeholder="Cari item"
+            placeholder="Cari produk atau jasa"
             options={options}
             onSearchChange={setCatalogSearch}
             onChange={(itemId) => {
@@ -3319,7 +3337,7 @@ function ReferenceOrderAdjustmentDialog({
               if (item) onAdd(item);
             }}
             disabled={isMutating}
-            idleMessage="Cari nama atau kode item."
+            idleMessage="Ketik nama atau kode item untuk menambahkan ke transaksi ini."
           />
         </div>
         {variantPicker ? (
@@ -3339,9 +3357,9 @@ function ReferenceOrderAdjustmentDialog({
                   return {
                     value: variant.id,
                     label: isUnavailable
-                      ? `${variant.name} (Harga belum tersedia)`
+                      ? `${variant.name} · Harga belum tersedia`
                       : price
-                        ? `${variant.name} (${money(price, locale)})`
+                        ? `${variant.name} · ${money(price, locale)}`
                         : variant.name,
                     disabled: isUnavailable,
                   };
@@ -3419,7 +3437,7 @@ function ReferenceBalancePaymentDialog({
     { value: 'CASH', label: 'Tunai', icon: <Banknote className="size-4" /> },
     { value: 'BANK_TRANSFER', label: 'Transfer', icon: <CreditCard className="size-4" /> },
     { value: 'QRIS', label: 'QRIS', icon: <QrCode className="size-4" /> },
-    { value: 'WALLET', label: 'Dompet digital', icon: <ShoppingBag className="size-4" /> },
+    { value: 'WALLET', label: 'E-Wallet', icon: <ShoppingBag className="size-4" /> },
   ];
   const providerOptions =
     method === 'BANK_TRANSFER'
@@ -3430,9 +3448,9 @@ function ReferenceBalancePaymentDialog({
     <Dialog
       open
       onClose={onClose}
-      title={hasSuccessfulPayment(sale) ? 'Bayar sisa' : 'Bayar transaksi'}
+      title={hasSuccessfulPayment(sale) ? 'Bayar Sisa' : 'Bayar Transaksi'}
       description={transactionNumber(sale.id)}
-      ariaLabel="Bayar transaksi"
+      ariaLabel="Pay queued transaction"
       closeOnEscape
       closeOnOverlay
       className="pos-reference-dialog w-full max-w-md overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
@@ -3454,7 +3472,7 @@ function ReferenceBalancePaymentDialog({
             <p className="mt-1 font-semibold">{money(totalPaid, locale)}</p>
           </div>
           <div className="text-right">
-            <p className="text-xs text-[var(--color-text-muted)]">Sisa pembayaran</p>
+            <p className="text-xs text-[var(--color-text-muted)]">Tersedia dibayar</p>
             <p className="mt-1 font-bold text-[var(--color-brand)]">{money(balanceDue, locale)}</p>
           </div>
         </div>
@@ -3489,7 +3507,7 @@ function ReferenceBalancePaymentDialog({
           <label className="block text-sm font-medium">
             Uang dibayar
             <PosCurrencyInput
-              aria-label="Uang tunai untuk transaksi"
+              aria-label="Cash tendered for queued transaction"
               className="mt-1.5 h-10 rounded-lg text-right text-lg font-bold"
               value={tender}
               onChange={onTender}
@@ -3503,11 +3521,7 @@ function ReferenceBalancePaymentDialog({
         ) : (
           <p className="rounded-xl border border-[var(--color-brand)]/20 bg-[var(--color-brand)]/5 p-3 text-xs text-[var(--color-text-muted)]">
             Catat pembayaran{' '}
-            {method === 'BANK_TRANSFER'
-              ? 'transfer'
-              : method === 'WALLET'
-                ? 'dompet digital'
-                : 'QRIS'}{' '}
+            {method === 'BANK_TRANSFER' ? 'transfer' : method === 'WALLET' ? 'e-wallet' : 'QRIS'}{' '}
             sebesar {money(balanceDue, locale)}.
           </p>
         )}
@@ -3580,10 +3594,10 @@ function ReferenceReviewDialog({
   return (
     <Dialog
       open
-      title="Selesaikan transaksi"
-      description="Periksa detail transaksi sebelum menyelesaikan."
+      title="Review & Selesaikan"
+      description="Pastikan semua detail transaksi sudah benar sebelum diselesaikan."
       onClose={onClose}
-      ariaLabel="Selesaikan transaksi"
+      ariaLabel="Review and complete transaction"
       closeOnEscape
       closeOnOverlay
       className="pos-reference-dialog w-full max-w-2xl overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
@@ -3597,7 +3611,7 @@ function ReferenceReviewDialog({
             onClick={onComplete}
             leftIcon={<CheckCircle2 className="size-3.5" />}
           >
-            {active ? 'Selesaikan transaksi' : 'Memuat transaksi...'}
+            {active ? 'Selesaikan Transaksi' : 'Memuat transaksi…'}
           </Button>
         </footer>
       }
@@ -3615,14 +3629,14 @@ function ReferenceReviewDialog({
                 ))}
               </ul>
               <Button size="sm" variant="outline" className="mt-3" onClick={onFix}>
-                Kembali ke keranjang
+                Kembali ke cart
               </Button>
             </div>
           ) : null}
           <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)]">
             <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-2.5">
               <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
-                Detail pesanan
+                Detail Pesanan
               </p>
               <span className="text-xs text-[var(--color-text-muted)]">
                 {sale.lines.filter((line) => !line.removedAt).length} item
@@ -3638,7 +3652,7 @@ function ReferenceReviewDialog({
                         <p className="text-sm font-semibold">{line.itemNameSnapshot}</p>
                         <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
                           {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
-                          {line.variantNameSnapshot ? `, ${line.variantNameSnapshot}` : ''}
+                          {line.variantNameSnapshot ? ` · ${line.variantNameSnapshot}` : ''}
                         </p>
                         {line.itemTypeSnapshot === 'SERVICE' ? (
                           <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
@@ -3717,7 +3731,7 @@ function ReferenceReviewDialog({
               icon={<CreditCard className="size-4" />}
               label="Pembayaran"
               value={money(paid.toFixed(4), locale)}
-              sub={`Sisa ${money(outstanding.toFixed(4), locale)}`}
+              sub={`Outstanding ${money(outstanding.toFixed(4), locale)}`}
             />
           </div>
           <div className="rounded-2xl bg-slate-950 p-4 text-white">
@@ -3753,7 +3767,7 @@ function ReferenceCancelDialog({
     <Dialog
       open={Boolean(sale)}
       onClose={onClose}
-      ariaLabel="Batalkan transaksi"
+      ariaLabel="Cancel transaction"
       closeOnEscape
       closeOnOverlay
       className="pos-reference-dialog w-full max-w-md rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
@@ -3762,11 +3776,14 @@ function ReferenceCancelDialog({
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-danger)]">
-              Batalkan transaksi
+              Batalkan Transaksi
             </p>
             <h2 className="mt-1 text-lg font-semibold">Batalkan transaksi ini?</h2>
             <p className="mt-1 text-sm text-[var(--color-text-muted)]">
               {sale ? transactionNumber(sale.id) : ''} tetap tercatat di antrian hari ini.
+            </p>
+            <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+              Alasan ini hanya mengonfirmasi tindakan; kontrak void saat ini tidak menerima alasan.
             </p>
           </div>
           <button
@@ -3792,7 +3809,7 @@ function ReferenceCancelDialog({
             Kembali
           </Button>
           <Button variant="danger" disabled={!reason.trim()} onClick={onConfirm}>
-            Batalkan
+            Ya, Batalkan
           </Button>
         </div>
       </div>
@@ -3871,19 +3888,19 @@ function ReferenceEmployeeDialog({
     <Dialog
       open={isOpen}
       title="Karyawan untuk layanan"
-      description="Pilih karyawan dan atur porsi kontribusi."
+      description="Lengkapi attribution layanan sebelum transaksi diselesaikan. Sistem membagi 100% secara rata."
       onClose={() => {
         setRows([]);
         onClose();
       }}
-      ariaLabel="Karyawan untuk layanan"
+      ariaLabel="Assign service employees"
       closeOnEscape
       closeOnOverlay
       className="pos-reference-dialog w-full max-w-2xl overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
       footer={
         <footer className="flex shrink-0 items-center justify-between gap-2">
           <span className="text-[11px] text-[var(--color-text-muted)]">
-            {valid ? 'Total porsi 100%' : 'Lengkapi karyawan dan porsi kontribusi'}
+            {valid ? 'Semua porsi valid (100%)' : 'Lengkapi karyawan untuk jasa ini'}
           </span>
           <div className="flex gap-2">
             <Button
@@ -3918,7 +3935,7 @@ function ReferenceEmployeeDialog({
           <div>
             <p className="text-sm font-semibold">{line.itemNameSnapshot}</p>
             <p className="text-xs text-[var(--color-text-muted)]">
-              Jumlah {quantity(line.quantity)}, {money(line.totalAmount, locale)}
+              Qty {quantity(line.quantity)} · {money(line.totalAmount, locale)}
             </p>
           </div>
           <span
@@ -3934,7 +3951,7 @@ function ReferenceEmployeeDialog({
                 Karyawan
                 <div className="mt-1">
                   <Combobox
-                    ariaLabel={`Karyawan ${index + 1}`}
+                    ariaLabel={`Employee ${index + 1}`}
                     value={row.employeeId}
                     placeholder="Pilih karyawan"
                     options={employees.map((employee) => ({
@@ -3954,7 +3971,7 @@ function ReferenceEmployeeDialog({
                 Porsi
                 <div className="mt-1">
                   <PosNumericInput
-                    aria-label={`Porsi kontribusi ${index + 1}`}
+                    aria-label={`Contribution ${index + 1}`}
                     className="h-9 rounded-lg text-sm"
                     disabled={activeRows.length === 1}
                     value={row.shareRate}
@@ -3977,7 +3994,7 @@ function ReferenceEmployeeDialog({
               <div className="col-span-3 flex h-9 items-center justify-end gap-1">
                 <button
                   type="button"
-                  title="Bagi otomatis"
+                  title="Auto distribute"
                   disabled={activeRows.length === 1}
                   onClick={() => {
                     const next = [...activeRows];
@@ -4160,7 +4177,7 @@ function ReferenceServiceWorkDialog({
     <Dialog
       open
       title="Kelola pengerjaan"
-      description={`${line.itemNameSnapshot}, ${quantity(line.quantity)} pengerjaan layanan`}
+      description={`${line.itemNameSnapshot} · ${quantity(line.quantity)} pengerjaan layanan`}
       onClose={onClose}
       ariaLabel="Kelola pengerjaan layanan"
       closeOnEscape
@@ -4169,7 +4186,7 @@ function ReferenceServiceWorkDialog({
       footer={
         <div className="flex items-center justify-between gap-3">
           <span className="text-[11px] text-[var(--color-text-muted)]">
-            {valid ? 'Setiap pengerjaan memiliki total porsi 100%' : 'Setiap pengerjaan harus tepat 100%'}
+            {valid ? 'Setiap pengerjaan valid (100%)' : 'Setiap pengerjaan harus tepat 100%'}
           </span>
           <div className="flex gap-2">
             <Button variant="ghost" onClick={onClose}>
@@ -4208,7 +4225,7 @@ function ReferenceServiceWorkDialog({
         {mode === 'SAME' ? (
           <div className="rounded-xl border border-[var(--color-border)] p-3">
             <p className="mb-3 text-xs text-[var(--color-text-muted)]">
-              Berlaku untuk semua {units.length} pengerjaan.
+              Konfigurasi ini diterapkan ke semua {units.length} pengerjaan.
             </p>
             <ServiceWorkContributorEditor
               contributors={sharedContributors}
@@ -4221,7 +4238,7 @@ function ReferenceServiceWorkDialog({
             {unitPlans.map((unit) => (
               <div key={unit.index} className="rounded-xl border border-[var(--color-border)] p-3">
                 <div className="mb-3">
-                  <p className="text-sm font-semibold">Pengerjaan {unit.index + 1}</p>
+                  <p className="text-sm font-semibold">Pengerjaan #{unit.index + 1}</p>
                 </div>
                 <ServiceWorkContributorEditor
                   contributors={unit.contributors}

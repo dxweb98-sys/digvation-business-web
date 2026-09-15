@@ -3,35 +3,26 @@ import { DCard } from '@digvation/ui';
 import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
 import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
 
-const SECTIONS = [
-  {
-    title: { id: 'Cabang', en: 'Branches' },
-    description: { id: 'Kelola lokasi penjualan.', en: 'Manage selling locations.' },
-    icon: Building2,
-  },
-  {
-    title: { id: 'Katalog', en: 'Catalog' },
-    description: { id: 'Kelola item, kategori, dan varian.', en: 'Manage items, categories, and variants.' },
-    icon: Boxes,
-  },
-  {
-    title: { id: 'Harga dan pajak', en: 'Pricing and tax' },
-    description: { id: 'Atur harga dan pajak.', en: 'Configure pricing and tax.' },
-    icon: Tags,
-  },
+const UPCOMING = [
+  ['Branches', Building2, 'Branch configuration maps to the backend Selling Location contract.'],
+  ['Catalog', Boxes, 'Items, categories and variants will use approved backend contracts.'],
+  ['Pricing & Tax', Tags, 'Financial configuration remains backend authoritative.'],
 ] as const;
 
 export function OperationsHomePage() {
-  const { locale } = useBackofficeLocalization();
+  const { copy } = useBackofficeLocalization();
   return (
     <BackofficePage>
       <BackofficePageHeader
-        eyebrow="Backoffice"
-        title={locale === 'id' ? 'Ringkasan' : 'Overview'}
+        eyebrow={copy('Operations')}
+        title={copy('Backoffice foundation')}
+        description={copy(
+          'No fake dashboard metrics are shown. Management capabilities appear only when their backend contract and frontend checkpoint are approved.',
+        )}
       />
 
       <div className="mt-6 grid gap-3 md:grid-cols-3">
-        {SECTIONS.map(({ title, description, icon: Icon }, index) => {
+        {UPCOMING.map(([title, Icon, description], index) => {
           const accents = [
             'var(--color-accent-yellow)',
             'var(--color-accent-sky)',
@@ -39,17 +30,15 @@ export function OperationsHomePage() {
           ] as const;
 
           return (
-            <DCard key={title.en} className="p-5">
+            <DCard key={title} className="p-5">
               <div
                 className="grid size-9 place-items-center rounded-[var(--radius-control)]"
                 style={{ backgroundColor: accents[index] }}
               >
                 <Icon className="size-4.5 text-[var(--color-text)]" />
               </div>
-              <h2 className="mt-4 text-sm font-bold">{title[locale]}</h2>
-              <p className="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">
-                {description[locale]}
-              </p>
+              <h2 className="mt-4 text-sm font-bold">{copy(title)}</h2>
+              <p className="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">{description}</p>
             </DCard>
           );
         })}

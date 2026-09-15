@@ -1,7 +1,7 @@
 import { useConnectivity, useRuntime } from '@digvation/pos-runtime';
 import { useAuth } from '@digvation/pos-auth';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 
 import { useCashierSession } from '../../app/providers/cashier-session-provider';
@@ -39,8 +39,9 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
   const [isCompletionOpen, setCompletionOpen] = useState(false);
   const [resumedSaleId, setResumedSaleId] = useState<string | null>(null);
   const [areEmployeeOptionsEnabled, setEmployeeOptionsEnabled] = useState(false);
+  const pendingPerformerIntent = useRef<{ lineId: string; token: symbol } | null>(null);
   const transactionAdapter = useMemo(
-    () => createCashierTransactionAdapter(runtime, authPort.getAccessToken.bind(authPort)),
+    () => createCashierTransactionAdapter(runtime, authPort.getAccessToken?.bind(authPort)),
     [authPort, runtime],
   );
   const effectiveConnectivity = isLocalCashierDemoEnabled() ? 'ONLINE' : connectivity.state;
@@ -318,6 +319,59 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
       ),
     );
 
+  const setCurrentPerformers = async (
+    line: SaleLine,
+    performers: Array<{ employeeId: string; shareRate?: string }>,
+  ) => {
+    const current = saleWorkspace.sale;
+    if (!current || current.status !== 'OPEN') return;
+    command.clearNotice();
+    try {
+      const updated = await command.runMutation(() =>
+        transactionAdapter.setSaleLinePerformers(current.id, line.id, {
+          expectedVersion: current.version,
+          performers,
+        }),
+      );
+      command.commitSale(updated);
+      void queryClient.invalidateQueries({
+        queryKey: cashierTransactionKeys.contributionPreview(current.id, line.id),
+      });
+    } catch (error) {
+      await command.recoverFailure(error, current.id);
+    }
+  };
+
+  const setAssignments = (line: SaleLine, employeeIds: string[]) => {
+    if (line.itemTypeSnapshot !== 'SERVICE') {
+      core.setAssignments(line, employeeIds);
+      return;
+    }
+    const token = Symbol(line.id);
+    pendingPerformerIntent.current = { lineId: line.id, token };
+    queueMicrotask(() => {
+      const pending = pendingPerformerIntent.current;
+      if (!pending || pending.lineId !== line.id || pending.token !== token) return;
+      pendingPerformerIntent.current = null;
+      void setCurrentPerformers(
+        line,
+        employeeIds.map((employeeId) => ({ employeeId })),
+      );
+    });
+  };
+
+  const setContributions = (
+    line: SaleLine,
+    contributors: Array<{ employeeId: string; shareRate?: string }>,
+  ) => {
+    if (line.itemTypeSnapshot !== 'SERVICE') {
+      core.setContributions(line, contributors);
+      return;
+    }
+    pendingPerformerIntent.current = null;
+    void setCurrentPerformers(line, contributors);
+  };
+
   const setQueuedAssignments = async (
     sale: Sale,
     line: SaleLine,
@@ -326,20 +380,15 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
   ) => {
     command.clearNotice();
     try {
-      let updated = await command.runMutation(() =>
-        transactionAdapter.setSaleLineAssignments(sale.id, line.id, {
+      const performers = contributors.length
+        ? contributors
+        : employeeIds.map((employeeId) => ({ employeeId }));
+      const updated = await command.runMutation(() =>
+        transactionAdapter.setSaleLinePerformers(sale.id, line.id, {
           expectedVersion: sale.version,
-          employeeIds,
+          performers,
         }),
       );
-      if (line.allowEmployeeContributionSnapshot) {
-        updated = await command.runMutation(() =>
-          transactionAdapter.setSaleLineContributions(sale.id, line.id, {
-            expectedVersion: updated.version,
-            contributors,
-          }),
-        );
-      }
       command.commitSale(updated);
       return updated;
     } catch (error) {
@@ -492,8 +541,8 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     clearPriceOverride: core.clearPriceOverride,
     setLineDiscount: core.setLineDiscount,
     clearLineDiscount: core.clearLineDiscount,
-    setAssignments: core.setAssignments,
-    setContributions: core.setContributions,
+    setAssignments,
+    setContributions,
     transitionFulfillment: core.transitionFulfillment,
     startQueuedFulfillment,
     queueSale,

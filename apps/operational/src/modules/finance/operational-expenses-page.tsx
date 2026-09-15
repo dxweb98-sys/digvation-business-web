@@ -22,26 +22,22 @@ import {
   useOperationalAvailability,
 } from '../../app/providers/operational-availability-context';
 import { useOperationalSession } from '../operational/operational-session-provider';
-import {
-  OperationalExpenseApi,
-  type OperationalExpense,
-} from './operational-expense-api';
+import { OperationalExpenseApi, type OperationalExpense } from './operational-expense-api';
 
 const PAGE_SIZE = 20;
-const expenseCategories = ['OPERATIONS', 'TRANSPORT', 'SUPPLIES', 'OTHER'] as const;
 
 export function OperationalExpensesPage() {
   const runtime = useRuntime();
   const { authPort } = useAuth();
   const availability = useOperationalAvailability();
   const { selectedLocationId } = useOperationalSession();
-  const { copy, label, formatDate, formatMoney } = useOperationalLocalization();
+  const { copy, formatDate, formatMoney } = useOperationalLocalization();
   const { showToast } = useToast();
   const queryClient = useQueryClient();
   const [offset, setOffset] = useState(0);
   const [isCreateOpen, setCreateOpen] = useState(false);
   const [financialAccountId, setFinancialAccountId] = useState('');
-  const [categoryCode, setCategoryCode] = useState<(typeof expenseCategories)[number]>('OPERATIONS');
+  const [categoryCode, setCategoryCode] = useState('OPERATIONS');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
 
@@ -82,7 +78,7 @@ export function OperationalExpensesPage() {
       api.create({
         sellingLocationId: selectedLocationId!,
         financialAccountId,
-        categoryCode,
+        categoryCode: categoryCode.trim().toUpperCase(),
         amount,
         occurredAt: new Date().toISOString(),
         note: note.trim() || null,
@@ -91,13 +87,11 @@ export function OperationalExpensesPage() {
       await queryClient.invalidateQueries({ queryKey: ['operational-expenses'] });
       setCreateOpen(false);
       setFinancialAccountId('');
-      setCategoryCode('OPERATIONS');
       setAmount('');
       setNote('');
       showToast({ variant: 'success', title: copy('Expense submitted.') });
     },
-    onError: () =>
-      showToast({ variant: 'danger', title: copy('Could not submit expense.') }),
+    onError: () => showToast({ variant: 'danger', title: copy('Could not submit expense.') }),
   });
 
   if (expenses.isError)
@@ -124,7 +118,7 @@ export function OperationalExpensesPage() {
     {
       key: 'category',
       label: copy('Category'),
-      render: (row) => label(row.categoryCode),
+      render: (row) => row.categoryCode,
     },
     {
       key: 'account',
@@ -140,9 +134,7 @@ export function OperationalExpensesPage() {
       key: 'status',
       label: copy('Status'),
       render: (row) => (
-        <DBadge variant={row.status === 'APPROVED' ? 'success' : 'outline'}>
-          {label(row.status)}
-        </DBadge>
+        <DBadge variant={row.status === 'APPROVED' ? 'success' : 'outline'}>{row.status}</DBadge>
       ),
     },
   ];
@@ -203,6 +195,7 @@ export function OperationalExpensesPage() {
               disabled={
                 !selectedLocationId ||
                 !financialAccountId ||
+                !categoryCode.trim() ||
                 !/^\d+(\.\d{1,4})?$/.test(amount)
               }
               onClick={() => createExpense.mutate()}
@@ -221,15 +214,9 @@ export function OperationalExpensesPage() {
               value: account.id,
               label: `${account.name} · ${account.currency}`,
             }))}
-            onValueChange={setFinancialAccountId}
+            onValueChange={(value) => setFinancialAccountId(String(value ?? ''))}
           />
-          <DSelect
-            label={copy('Category')}
-            value={categoryCode}
-            clearable={false}
-            options={expenseCategories.map((value) => ({ value, label: label(value) }))}
-            onValueChange={(value) => setCategoryCode(value as (typeof expenseCategories)[number])}
-          />
+          <DInput label={copy('Category')} value={categoryCode} onChange={setCategoryCode} />
           <DInput label={copy('Amount')} value={amount} onChange={setAmount} />
           <DInput label={copy('Note')} value={note} onChange={setNote} />
         </div>

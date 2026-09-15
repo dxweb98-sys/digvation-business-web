@@ -1,12 +1,5 @@
 import { useAuth } from '@digvation/business-auth';
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react';
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 
 interface OperationalSessionContextValue {
   selectedLocationId: string | null;

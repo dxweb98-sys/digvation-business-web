@@ -15,10 +15,7 @@ import { useMemo, useState } from 'react';
 
 import { useOperationalLocalization } from '../../app/localization/operational-localization';
 import { useOperationalSession } from '../operational/operational-session-provider';
-import {
-  OperationalTransactionHistoryApi,
-  type OperationalSale,
-} from './transaction-history-api';
+import { OperationalTransactionHistoryApi, type OperationalSale } from './transaction-history-api';
 
 const PAGE_SIZE = 20;
 
@@ -26,7 +23,7 @@ export function OperationalTransactionHistoryPage() {
   const runtime = useRuntime();
   const { authPort } = useAuth();
   const { selectedLocationId } = useOperationalSession();
-  const { copy, label, formatDate, formatMoney } = useOperationalLocalization();
+  const { copy, formatDate, formatMoney } = useOperationalLocalization();
   const [offset, setOffset] = useState(0);
   const [createdFrom, setCreatedFrom] = useState('');
   const [createdTo, setCreatedTo] = useState('');
@@ -111,9 +108,7 @@ export function OperationalTransactionHistoryPage() {
       key: 'status',
       label: copy('Status'),
       render: (row) => (
-        <DBadge variant={row.status === 'FINALIZED' ? 'success' : 'outline'}>
-          {label(row.status)}
-        </DBadge>
+        <DBadge variant={row.status === 'FINALIZED' ? 'success' : 'outline'}>{row.status}</DBadge>
       ),
     },
   ];
@@ -177,14 +172,12 @@ export function OperationalTransactionHistoryPage() {
         ) : detail.data ? (
           <dl className="grid gap-4 text-sm sm:grid-cols-2">
             <div>
-              <dt className="text-[var(--color-text-muted)]">
-                {copy('Transaction number')}
-              </dt>
+              <dt className="text-[var(--color-text-muted)]">{copy('Transaction number')}</dt>
               <dd className="mt-1 font-mono font-semibold">{detail.data.saleNumber}</dd>
             </div>
             <div>
               <dt className="text-[var(--color-text-muted)]">{copy('Status')}</dt>
-              <dd className="mt-1 font-semibold">{label(detail.data.status)}</dd>
+              <dd className="mt-1 font-semibold">{detail.data.status}</dd>
             </div>
             <div>
               <dt className="text-[var(--color-text-muted)]">{copy('Date')}</dt>

@@ -10,7 +10,11 @@ export function PlaceholderPage({ title }: { title: BackofficeMessageKey }) {
   return (
     <BackofficePage>
       <BackofficePageHeader title={t(title)} />
-      <DEmptyState className="mt-6" title={t('notAvailableYet')} />
+      <DEmptyState
+        className="mt-6"
+        title={t('notAvailableYet')}
+        description={t('notAvailableDescription')}
+      />
     </BackofficePage>
   );
 }

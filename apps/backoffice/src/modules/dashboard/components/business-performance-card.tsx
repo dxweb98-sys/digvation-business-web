@@ -54,9 +54,7 @@ function Delta({ value }: { value: number | null }) {
     <span
       className={[
         'rounded-full px-1.5 py-0.5 text-[9px] font-semibold tabular-nums',
-        positive
-          ? 'bg-emerald-50 text-emerald-600'
-          : 'bg-rose-50 text-rose-600',
+        positive ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600',
       ].join(' ')}
     >
       {positive ? '↗ ' : '↘ '}
@@ -189,7 +187,10 @@ export function BusinessPerformanceCard({
       <div className="relative mt-2 h-[142px] overflow-hidden rounded-xl bg-[linear-gradient(180deg,var(--color-surface-muted),transparent)] px-2 pb-6 pt-2">
         <div className="pointer-events-none absolute inset-x-2 bottom-6 top-2 flex flex-col justify-between">
           {[0, 1, 2, 3].map((line) => (
-            <span key={line} className="block border-t border-dashed border-[var(--color-border)]" />
+            <span
+              key={line}
+              className="block border-t border-dashed border-[var(--color-border)]"
+            />
           ))}
         </div>
 
@@ -212,7 +213,9 @@ export function BusinessPerformanceCard({
               </linearGradient>
             </defs>
             {revenueArea ? <path d={revenueArea} fill="url(#dashboardRevenueArea)" /> : null}
-            {transactionArea ? <path d={transactionArea} fill="url(#dashboardTransactionArea)" /> : null}
+            {transactionArea ? (
+              <path d={transactionArea} fill="url(#dashboardTransactionArea)" />
+            ) : null}
             {revenuePath ? (
               <path
                 d={revenuePath}
