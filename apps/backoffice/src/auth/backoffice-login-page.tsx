@@ -111,8 +111,14 @@ export function BackofficeLoginPage() {
           }}
           aria-hidden="true"
         />
-        <div className="pointer-events-none absolute -bottom-28 -right-24 size-[420px] rotate-12 rounded-[72px] border border-white/15" aria-hidden="true" />
-        <div className="pointer-events-none absolute -bottom-10 right-10 size-[300px] rotate-12 rounded-[56px] border border-white/10" aria-hidden="true" />
+        <div
+          className="pointer-events-none absolute -bottom-28 -right-24 size-[420px] rotate-12 rounded-[72px] border border-white/15"
+          aria-hidden="true"
+        />
+        <div
+          className="pointer-events-none absolute -bottom-10 right-10 size-[300px] rotate-12 rounded-[56px] border border-white/10"
+          aria-hidden="true"
+        />
 
         <div className="relative flex items-center gap-3">
           <BrandMark
@@ -135,9 +141,14 @@ export function BackofficeLoginPage() {
             Backoffice
           </p>
           <h2 className="mt-5 max-w-lg text-[clamp(2.5rem,4.5vw,4.75rem)] font-semibold leading-[0.98] tracking-[-0.055em]">
-            {isIndonesian ? 'Kelola bisnis dalam satu tempat.' : 'Manage your business in one place.'}
+            {isIndonesian
+              ? 'Kelola bisnis dalam satu tempat.'
+              : 'Manage your business in one place.'}
           </h2>
-          <div className="mt-10 grid max-w-md grid-cols-[80px_1fr] items-center gap-4" aria-hidden="true">
+          <div
+            className="mt-10 grid max-w-md grid-cols-[80px_1fr] items-center gap-4"
+            aria-hidden="true"
+          >
             <span className="h-px bg-white/60" />
             <span className="h-px bg-white/20" />
           </div>
@@ -174,7 +185,9 @@ export function BackofficeLoginPage() {
             {isIndonesian ? 'Selamat datang' : 'Welcome back'}
           </h1>
           <p className="mt-3 max-w-sm text-sm leading-6 text-[var(--color-text-muted)]">
-            {isIndonesian ? 'Masuk ke Backoffice bisnis Anda.' : 'Sign in to your business Backoffice.'}
+            {isIndonesian
+              ? 'Masuk ke Backoffice bisnis Anda.'
+              : 'Sign in to your business Backoffice.'}
           </p>
           {brandContext ? (
             <p className="mt-2 text-sm font-medium text-[var(--color-text)]">{brandContext}</p>

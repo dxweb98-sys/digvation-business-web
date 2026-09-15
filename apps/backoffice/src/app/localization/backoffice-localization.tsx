@@ -1,8 +1,5 @@
 import { useMemo } from 'react';
-import {
-  createBusinessDateTimeFormatter,
-  useRuntime,
-} from '@digvation/business-runtime';
+import { createBusinessDateTimeFormatter, useRuntime } from '@digvation/business-runtime';
 
 import {
   BackofficeLocalizationProvider,
@@ -11,10 +8,7 @@ import {
 } from './backoffice-localization-core';
 
 export { BackofficeLocalizationProvider, readStoredBackofficeLocale };
-export type {
-  BackofficeLocale,
-  BackofficeMessageKey,
-} from './backoffice-localization-core';
+export type { BackofficeLocale, BackofficeMessageKey } from './backoffice-localization-core';
 
 export function useBackofficeLocalization() {
   const localization = useLegacyBackofficeLocalization();

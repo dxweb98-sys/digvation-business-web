@@ -42,9 +42,7 @@ function loginFailureMessage(error: unknown, locale: 'id-ID' | 'en-US') {
       (error.status === 401 || error.code === 'INVALID_CREDENTIALS')) ||
     (error instanceof Error && error.message === 'INVALID_CREDENTIALS')
   ) {
-    return isIndonesian
-      ? 'Username atau kata sandi salah.'
-      : 'Username or password is incorrect.';
+    return isIndonesian ? 'Username atau kata sandi salah.' : 'Username or password is incorrect.';
   }
   if (error instanceof TypeError) {
     return isIndonesian
@@ -122,7 +120,10 @@ export function OperationalLoginPage({ authPort, onAuthenticated }: OperationalL
         className="pointer-events-none absolute left-1/2 top-1/2 size-[min(58vw,560px)] -translate-x-1/2 -translate-y-1/2 -rotate-3 rounded-[4rem] border border-[var(--color-brand)]/10"
         aria-hidden="true"
       />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-[var(--color-brand)]" aria-hidden="true" />
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-[var(--color-brand)]"
+        aria-hidden="true"
+      />
 
       <section className="relative z-10 w-full max-w-[500px]">
         <header className="text-center">

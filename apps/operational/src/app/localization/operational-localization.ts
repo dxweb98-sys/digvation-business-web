@@ -1,7 +1,4 @@
-import {
-  createBusinessDateTimeFormatter,
-  useRuntime,
-} from '@digvation/business-runtime';
+import { createBusinessDateTimeFormatter, useRuntime } from '@digvation/business-runtime';
 
 import {
   operationalCopy,
@@ -10,11 +7,7 @@ import {
   type OperationalLocale,
 } from './operational-localization-core';
 
-export {
-  operationalCopy,
-  operationalLabel,
-  resolveOperationalLocale,
-};
+export { operationalCopy, operationalLabel, resolveOperationalLocale };
 export type { OperationalLocale };
 
 export function useOperationalLocalization() {
