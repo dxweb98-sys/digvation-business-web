@@ -136,7 +136,8 @@ export function saleDisplayLines(
       itemNameSnapshot: line.itemNameSnapshot,
       itemTypeSnapshot: line.itemTypeSnapshot,
       variantNameSnapshot:
-        [line.variantNameSnapshot, promotionLabel].filter(Boolean).join(' · ') || null,
+        [line.variantNameSnapshot, promotionLabel].filter(Boolean).join(' · ') ||
+        null,
       quantity: line.quantity,
       effectiveUnitPrice: line.effectiveUnitPrice,
       totalAmount: line.totalAmount,
