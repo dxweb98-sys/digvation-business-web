@@ -58,9 +58,6 @@ function AuthenticatedOperationalRuntime({ children }: { children: ReactNode }) 
 
   useEffect(() => {
     let active = true;
-    setState('loading');
-    setEffectiveRuntime(null);
-    setAvailability(null);
     void (async () => {
       const token = await authPort.getAccessToken?.();
       if (!token) {
@@ -237,7 +234,9 @@ function OperationalAuthBoundary({
       authPort={authPort}
       onLogout={() => setLoggingOut(true)}
     >
-      <AuthenticatedOperationalRuntime>
+      <AuthenticatedOperationalRuntime
+        key={`${authenticatedSession.identity.userId}:${runtime.apiBaseUrl}`}
+      >
         <OperationalSessionProvider>
           <PosOperationalSessionProvider>
             <div

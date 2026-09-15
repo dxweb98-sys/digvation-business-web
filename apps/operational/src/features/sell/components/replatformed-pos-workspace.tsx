@@ -357,7 +357,7 @@ function employeeWorkSummary(line: SaleLine, employees: readonly Employee[]): st
     .join(' · ');
 }
 
-function queueStatus(sale: Sale, includeOpenSales = false): QueueStatus | null {
+function queueStatus(sale: Sale): QueueStatus | null {
   if (sale.status === 'FINALIZED') return 'COMPLETED';
   if (sale.status === 'VOIDED') return 'CANCELED';
   if (sale.operationalState === 'IN_PROGRESS') return 'PROGRESS';
@@ -521,7 +521,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const [queuedSaleEntries, setQueuedSaleEntries] = useState<QueuedSaleEntry[]>(() =>
     isLocalDemo ? readQueuedSaleEntries() : [],
   );
-  const [queueIssues, setQueueIssues] = useState<Record<string, string[]>>({});
+  const [queueIssues] = useState<Record<string, string[]>>({});
   const [queueOpen, setQueueOpen] = useState(false);
   const [queueDetail, setQueueDetail] = useState<Sale | null>(null);
   const [cancelTarget, setCancelTarget] = useState<Sale | null>(null);
@@ -600,10 +600,10 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         )
       : locationRecords;
     return {
-      QUEUED: records.filter((record) => queueStatus(record, isLocalDemo) === 'QUEUED'),
-      PROGRESS: records.filter((record) => queueStatus(record, isLocalDemo) === 'PROGRESS'),
-      COMPLETED: records.filter((record) => queueStatus(record, isLocalDemo) === 'COMPLETED'),
-      CANCELED: records.filter((record) => queueStatus(record, isLocalDemo) === 'CANCELED'),
+      QUEUED: records.filter((record) => queueStatus(record) === 'QUEUED'),
+      PROGRESS: records.filter((record) => queueStatus(record) === 'PROGRESS'),
+      COMPLETED: records.filter((record) => queueStatus(record) === 'COMPLETED'),
+      CANCELED: records.filter((record) => queueStatus(record) === 'CANCELED'),
     };
   }, [isLocalDemo, queuedSaleEntries, transactionsQuery.data, workspace.selectedLocationId]);
 
