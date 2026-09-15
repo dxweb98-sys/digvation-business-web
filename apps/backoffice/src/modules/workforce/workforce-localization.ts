@@ -35,6 +35,7 @@ const workforceCopy: Record<string, { id: string; en: string }> = {
   'System information': { id: 'Informasi data', en: 'Record information' },
   'Record version': { id: 'Versi data', en: 'Record version' },
   'Position not set': { id: 'Jabatan belum diatur', en: 'Position not set' },
+  'Not set': { id: 'Belum diatur', en: 'Not set' },
   'Service assignment': { id: 'Penugasan layanan', en: 'Service assignment' },
   'Can perform services': { id: 'Dapat mengerjakan layanan', en: 'Can perform services' },
   'Cannot perform services': { id: 'Tidak dapat mengerjakan layanan', en: 'Cannot perform services' },
@@ -71,6 +72,7 @@ const workforceCopy: Record<string, { id: string; en: string }> = {
   'Select position': { id: 'Pilih jabatan', en: 'Select position' },
   'All positions': { id: 'Semua jabatan', en: 'All positions' },
   'Attendance date': { id: 'Tanggal absensi', en: 'Attendance date' },
+  'Select attendance date': { id: 'Pilih tanggal absensi', en: 'Select attendance date' },
   Present: { id: 'Hadir', en: 'Present' },
   Absent: { id: 'Tidak hadir', en: 'Absent' },
   Leave: { id: 'Izin', en: 'Leave' },
@@ -100,6 +102,14 @@ const workforceCopy: Record<string, { id: string; en: string }> = {
   'Check-in and check-out times are optional for now.': {
     id: 'Jam masuk dan pulang bersifat opsional.',
     en: 'Check-in and check-out times are optional.',
+  },
+  'Optional reason or attendance note': {
+    id: 'Alasan atau catatan absensi (opsional)',
+    en: 'Optional reason or attendance note',
+  },
+  'No matching employees found.': {
+    id: 'Tidak ada karyawan yang sesuai.',
+    en: 'No matching employees found.',
   },
   Note: { id: 'Catatan', en: 'Note' },
   Source: { id: 'Sumber', en: 'Source' },
