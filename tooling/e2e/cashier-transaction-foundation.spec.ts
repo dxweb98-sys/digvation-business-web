@@ -203,6 +203,18 @@ async function installRoutes(page: Page, options: Partial<RouteState> = {}) {
       });
       return;
     }
+    if (method === 'GET' && url.pathname === '/api/v1/operational-access/context') {
+      await route.fulfill({
+        json: envelope({
+          organizationWide: true,
+          resolution: 'AUTO_RESOLVED',
+          selectedLocationId: branch.id,
+          mainLocationId: branch.id,
+          locations: [{ id: branch.id, code: branch.code, name: branch.name }],
+        }),
+      });
+      return;
+    }
     if (method === 'GET' && url.pathname === '/api/v1/locations') {
       await route.fulfill({ json: envelope({ items: [branch], limit: 100, offset: 0 }) });
       return;
@@ -400,7 +412,7 @@ test('quantity and remove use the latest authoritative Sale version', async ({ p
   await page.getByRole('button', { name: 'Keranjang', exact: true }).click();
   const cart = page.locator('[role="dialog"][aria-label="Keranjang"]').first();
   await cart.getByRole('button', { name: 'Tambah jumlah Hair Cut' }).click();
-  await expect(cart.getByLabel('Jumlah Hair Cut')).toHaveValue('2');
+  await expect(cart.getByLabel('Jumlah Hair Cut')).toHaveText('2');
   expect(state.quantityExpectedVersions).toEqual([2]);
 
   await cart.getByRole('button', { name: 'Hapus Hair Cut' }).click();
