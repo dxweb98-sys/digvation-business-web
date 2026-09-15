@@ -9,6 +9,7 @@ export interface PromotionReferenceOption {
   id: string;
   code: string;
   name: string;
+  categoryId?: string | null;
 }
 
 export interface PromotionReferenceOptions {
