@@ -94,6 +94,18 @@ export function attachOperationalProjection(
       { expectedVersion },
     );
 
+  operational.setSaleLinePerformers = (saleId, saleLineId, input) =>
+    client.post<Sale>(
+      `${OPERATIONAL_PREFIX}/transactions/${saleId}/lines/${saleLineId}/performers`,
+      input,
+    );
+
+  operational.transitionSaleLineFulfillment = (saleId, saleLineId, input) =>
+    client.post<Sale>(
+      `${OPERATIONAL_PREFIX}/transactions/${saleId}/lines/${saleLineId}/fulfillment`,
+      input,
+    );
+
   operational.createSalePayment = (
     saleId: string,
     input: CreatePaymentInput,
@@ -113,6 +125,20 @@ export function attachOperationalProjection(
   operational.startSaleWork = (saleId, expectedVersion, idempotencyKey) =>
     client.post<Sale>(
       `${OPERATIONAL_PREFIX}/transactions/${saleId}/start-work`,
+      { expectedVersion },
+      { headers: { 'Idempotency-Key': idempotencyKey } },
+    );
+
+  operational.finalizeSale = (saleId, expectedVersion, idempotencyKey) =>
+    client.post<Sale>(
+      `${OPERATIONAL_PREFIX}/transactions/${saleId}/finalize`,
+      { expectedVersion },
+      { headers: { 'Idempotency-Key': idempotencyKey } },
+    );
+
+  operational.voidSale = (saleId, expectedVersion, idempotencyKey) =>
+    client.post<Sale>(
+      `${OPERATIONAL_PREFIX}/transactions/${saleId}/void`,
       { expectedVersion },
       { headers: { 'Idempotency-Key': idempotencyKey } },
     );
