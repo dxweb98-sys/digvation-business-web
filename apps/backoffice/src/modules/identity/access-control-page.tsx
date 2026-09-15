@@ -406,7 +406,7 @@ function InvitationsTable({
   onChanged: () => void;
   onRevoke: (invitation: UserInvitation) => void;
 }) {
-  const { copy } = useBackofficeLocalization();
+  const { copy, formatDate } = useBackofficeLocalization();
   const { showToast } = useToast();
   const columns: TableColumn<UserInvitation>[] = [
     {
@@ -430,7 +430,11 @@ function InvitationsTable({
     {
       key: 'expiresAt',
       label: copy('Expires'),
-      render: (invitation) => new Date(invitation.expiresAt).toLocaleString(),
+      render: (invitation) =>
+        formatDate(new Date(invitation.expiresAt), {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        }),
     },
     {
       key: 'acceptedAt',
@@ -589,21 +593,27 @@ function RoleEditor({
             {copy('System roles are protected by the Business Runtime authorization policy.')}
           </p>
         )}
-        <div>
+        <section className="border-t border-[var(--color-border)] pt-4">
           <p className="text-sm font-semibold">{copy('Permissions')}</p>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <div className="mt-3 divide-y divide-[var(--color-border)] border-y border-[var(--color-border)]">
             {permissions.map((permission) => (
-              <label key={permission} className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm">
+              <label key={permission} className="flex items-center gap-3 py-2.5 text-sm">
                 <DCheckbox
                   checked={selected.includes(permission)}
-                  onChange={() => setSelected((values) => values.includes(permission) ? values.filter((item) => item !== permission) : [...values, permission])}
+                  onChange={() =>
+                    setSelected((values) =>
+                      values.includes(permission)
+                        ? values.filter((item) => item !== permission)
+                        : [...values, permission],
+                    )
+                  }
                   disabled={Boolean(role?.systemKey) || (!isNew && !canManagePermissions)}
                 />
-                {permission}
+                <span className="min-w-0 break-words">{permission}</span>
               </label>
             ))}
           </div>
-        </div>
+        </section>
       </div>
     </DDialog>
   );
@@ -697,7 +707,11 @@ function UserEditor({
             items={roles.filter((role) => role.status === 'ACTIVE').map((role) => ({ id: role.id, label: role.name }))}
             selected={selectedRoles}
             disabled={!canManageRoles}
-            onToggle={(id) => setSelectedRoles((values) => values.includes(id) ? values.filter((item) => item !== id) : [...values, id])}
+            onToggle={(id) =>
+              setSelectedRoles((values) =>
+                values.includes(id) ? values.filter((item) => item !== id) : [...values, id],
+              )
+            }
           />
           {canViewLocations ? (
             <SelectionList
@@ -794,20 +808,26 @@ function InvitationDialog({
           placeholder={copy('For example, Siti Rahma')}
         />
       </div>
-      <div className="mt-5">
+      <section className="mt-5 border-t border-[var(--color-border)] pt-4">
         <p className="text-sm font-semibold">{copy('Roles')}</p>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        <div className="mt-3 divide-y divide-[var(--color-border)] border-y border-[var(--color-border)]">
           {roles.map((role) => (
-            <label key={role.id} className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm">
+            <label key={role.id} className="flex items-center gap-3 py-2.5 text-sm">
               <DCheckbox
                 checked={roleIds.includes(role.id)}
-                onChange={() => setRoleIds((values) => values.includes(role.id) ? values.filter((item) => item !== role.id) : [...values, role.id])}
+                onChange={() =>
+                  setRoleIds((values) =>
+                    values.includes(role.id)
+                      ? values.filter((item) => item !== role.id)
+                      : [...values, role.id],
+                  )
+                }
               />
-              {role.name}
+              <span className="min-w-0 break-words">{role.name}</span>
             </label>
           ))}
         </div>
-      </div>
+      </section>
     </DDialog>
   );
 }
@@ -826,20 +846,20 @@ function SelectionList({
   onToggle: (id: string) => void;
 }) {
   return (
-    <div>
+    <section>
       <p className="text-sm font-semibold">{title}</p>
-      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+      <div className="mt-3 divide-y divide-[var(--color-border)] border-y border-[var(--color-border)]">
         {items.map((item) => (
-          <label key={item.id} className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm">
+          <label key={item.id} className="flex items-center gap-3 py-2.5 text-sm">
             <DCheckbox
               checked={selected.includes(item.id)}
               onChange={() => onToggle(item.id)}
               disabled={disabled}
             />
-            {item.label}
+            <span className="min-w-0 break-words">{item.label}</span>
           </label>
         ))}
       </div>
-    </div>
+    </section>
   );
 }
