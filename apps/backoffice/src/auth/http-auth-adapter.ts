@@ -104,10 +104,7 @@ export class HttpAuthAdapter {
       name,
       systemKey,
     }));
-    const availability = await loadAuthenticatedRuntimeAvailability(
-      this.apiBaseUrl,
-      accessToken,
-    );
+    const availability = await loadAuthenticatedRuntimeAvailability(this.apiBaseUrl, accessToken);
 
     return {
       identity: {

@@ -629,7 +629,9 @@ function SettlementDetail({
       open={Boolean(item)}
       onClose={onClose}
       title={item?.sellingLocationName ?? copy('Settlement details')}
-      description={item ? `${copy(label(item.paymentMethod))} · ${item.financialAccountName}` : undefined}
+      description={
+        item ? `${copy(label(item.paymentMethod))} · ${item.financialAccountName}` : undefined
+      }
       footer={
         <div className="flex gap-2">
           <DButton variant="secondary" onClick={onClose}>

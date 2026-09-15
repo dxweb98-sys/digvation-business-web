@@ -18,8 +18,7 @@ function useOperationalSurfaceAccess() {
   const availability = useOperationalAvailability();
   const permissions = availability.effectivePermissions;
   const hasPos = availability.effectiveEntitlements.products.includes('POS');
-  const hasFinance =
-    availability.effectiveEntitlements.capabilities.includes('FINANCE_OPERATIONS');
+  const hasFinance = availability.effectiveEntitlements.capabilities.includes('FINANCE_OPERATIONS');
   return {
     canSell: hasPos && permissions.includes('sales:create'),
     canReadSales: hasPos && permissions.includes('sales:read'),

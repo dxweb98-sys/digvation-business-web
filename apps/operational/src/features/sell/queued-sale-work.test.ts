@@ -74,10 +74,8 @@ function queuedSale(
                 saleLineId: LINE_ID,
                 status: fulfillmentStatus,
                 startedAt: fulfillmentStatus === 'WAITING' ? null : '2026-09-14T00:02:00.000Z',
-                completedAt:
-                  fulfillmentStatus === 'COMPLETED' ? '2026-09-14T00:03:00.000Z' : null,
-                canceledAt:
-                  fulfillmentStatus === 'CANCELED' ? '2026-09-14T00:03:00.000Z' : null,
+                completedAt: fulfillmentStatus === 'COMPLETED' ? '2026-09-14T00:03:00.000Z' : null,
+                canceledAt: fulfillmentStatus === 'CANCELED' ? '2026-09-14T00:03:00.000Z' : null,
               }
             : null,
         participations: [],

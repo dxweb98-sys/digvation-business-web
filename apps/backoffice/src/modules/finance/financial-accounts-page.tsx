@@ -419,7 +419,9 @@ function AccountDetail({
       open={Boolean(account)}
       onClose={onClose}
       title={account?.name ?? copy('Financial account details')}
-      description={account ? `${account.code} · ${copy(accountTypeLabel(account.type))}` : undefined}
+      description={
+        account ? `${account.code} · ${copy(accountTypeLabel(account.type))}` : undefined
+      }
       footer={
         <div className="flex justify-end">
           <DButton variant="secondary" onClick={onClose}>

@@ -357,7 +357,7 @@ function employeeWorkSummary(line: SaleLine, employees: readonly Employee[]): st
     .join(' · ');
 }
 
-function queueStatus(sale: Sale, includeOpenSales = false): QueueStatus | null {
+function queueStatus(sale: Sale): QueueStatus | null {
   if (sale.status === 'FINALIZED') return 'COMPLETED';
   if (sale.status === 'VOIDED') return 'CANCELED';
   if (sale.operationalState === 'IN_PROGRESS') return 'PROGRESS';
@@ -508,7 +508,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const { copy } = useOperationalLocalization();
   const isLocalDemo = isLocalCashierDemoEnabled();
   const adapter = useMemo(
-    () => createCashierTransactionAdapter(runtime, authPort.getAccessToken.bind(authPort)),
+    () => createCashierTransactionAdapter(runtime, authPort.getAccessToken?.bind(authPort)),
     [authPort, runtime],
   );
   const transactionsQuery = useQuery({
@@ -521,7 +521,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const [queuedSaleEntries, setQueuedSaleEntries] = useState<QueuedSaleEntry[]>(() =>
     isLocalDemo ? readQueuedSaleEntries() : [],
   );
-  const [queueIssues, setQueueIssues] = useState<Record<string, string[]>>({});
+  const [queueIssues] = useState<Record<string, string[]>>({});
   const [queueOpen, setQueueOpen] = useState(false);
   const [queueDetail, setQueueDetail] = useState<Sale | null>(null);
   const [cancelTarget, setCancelTarget] = useState<Sale | null>(null);
@@ -600,10 +600,10 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         )
       : locationRecords;
     return {
-      QUEUED: records.filter((record) => queueStatus(record, isLocalDemo) === 'QUEUED'),
-      PROGRESS: records.filter((record) => queueStatus(record, isLocalDemo) === 'PROGRESS'),
-      COMPLETED: records.filter((record) => queueStatus(record, isLocalDemo) === 'COMPLETED'),
-      CANCELED: records.filter((record) => queueStatus(record, isLocalDemo) === 'CANCELED'),
+      QUEUED: records.filter((record) => queueStatus(record) === 'QUEUED'),
+      PROGRESS: records.filter((record) => queueStatus(record) === 'PROGRESS'),
+      COMPLETED: records.filter((record) => queueStatus(record) === 'COMPLETED'),
+      CANCELED: records.filter((record) => queueStatus(record) === 'CANCELED'),
     };
   }, [isLocalDemo, queuedSaleEntries, transactionsQuery.data, workspace.selectedLocationId]);
 
@@ -1186,7 +1186,6 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         businessName={runtime.branding.businessName ?? runtime.branding.productName}
         branchName="Main Branch"
         cashierName={session.identity.displayName}
-        isLocalDemo={isLocalDemo}
         {...(displayedQueueDetail && cancellationReasons[displayedQueueDetail.id]
           ? { cancellationReason: cancellationReasons[displayedQueueDetail.id] }
           : {})}
@@ -2566,7 +2565,6 @@ function ReferenceTransactionDetail({
   businessName,
   branchName,
   cashierName,
-  isLocalDemo,
   cancellationReason,
   showPaymentReceipt,
   onClose,
@@ -2583,7 +2581,6 @@ function ReferenceTransactionDetail({
   businessName: string;
   branchName: string;
   cashierName: string;
-  isLocalDemo: boolean;
   cancellationReason?: string;
   showPaymentReceipt: boolean;
   onClose: () => void;
@@ -2597,7 +2594,7 @@ function ReferenceTransactionDetail({
 }) {
   const [receiptPaper, setReceiptPaper] = useState<'58' | '80'>('80');
   if (!sale) return null;
-  const status = queueStatus(sale, isLocalDemo);
+  const status = queueStatus(sale);
   const customerContext = readStoredCustomer(saleCustomerKey(sale.id));
   const customer = customerContext ?? saleCustomer(sale.id);
   const activeLines = sale.lines.filter((line) => !line.removedAt);

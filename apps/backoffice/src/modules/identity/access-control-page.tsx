@@ -19,16 +19,10 @@ import { Ban, Pencil, Plus, RefreshCw, UserCog, UserPlus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
-import {
-  BackofficePage,
-  BackofficePageHeader,
-} from '../../app/layout/backoffice-page';
+import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
 import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
 import { canPerformBackofficeAction } from '../../auth/backoffice-access';
-import {
-  isSessionExpiredError,
-  useBackofficeAuth,
-} from '../../auth/backoffice-auth-context';
+import { isSessionExpiredError, useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import {
   AccessControlApi,
   type AccessRole,
@@ -63,24 +57,14 @@ export function AccessControlPage() {
     [createApiClient, runtime.apiBaseUrl],
   );
 
-  const canViewUsers = Boolean(
-    session && canPerformBackofficeAction(session, 'viewUsers'),
-  );
-  const canInviteUsers = Boolean(
-    session && canPerformBackofficeAction(session, 'inviteUsers'),
-  );
-  const canCreateRole = Boolean(
-    session && canPerformBackofficeAction(session, 'createRole'),
-  );
-  const canUpdateRole = Boolean(
-    session && canPerformBackofficeAction(session, 'updateRole'),
-  );
+  const canViewUsers = Boolean(session && canPerformBackofficeAction(session, 'viewUsers'));
+  const canInviteUsers = Boolean(session && canPerformBackofficeAction(session, 'inviteUsers'));
+  const canCreateRole = Boolean(session && canPerformBackofficeAction(session, 'createRole'));
+  const canUpdateRole = Boolean(session && canPerformBackofficeAction(session, 'updateRole'));
   const canManagePermissions = Boolean(
     session && canPerformBackofficeAction(session, 'manageRolePermissions'),
   );
-  const canManageUsers = Boolean(
-    session && canPerformBackofficeAction(session, 'manageUserRoles'),
-  );
+  const canManageUsers = Boolean(session && canPerformBackofficeAction(session, 'manageUserRoles'));
   const canViewLocations = Boolean(
     session && canPerformBackofficeAction(session, 'viewOperationalAccess'),
   );
@@ -93,8 +77,7 @@ export function AccessControlPage() {
   const [deactivatingRole, setDeactivatingRole] = useState<AccessRole | null>(null);
   const [editingUser, setEditingUser] = useState<AccessUser | null>(null);
   const [inviting, setInviting] = useState(false);
-  const [revokingInvitation, setRevokingInvitation] =
-    useState<UserInvitation | null>(null);
+  const [revokingInvitation, setRevokingInvitation] = useState<UserInvitation | null>(null);
 
   const roles = useQuery({
     queryKey: keys.roles,
@@ -145,6 +128,7 @@ export function AccessControlPage() {
       />
 
       <DTabs
+        defaultValue="roles"
         value={section}
         onValueChange={(value) => setSection(value as Section)}
         className="mt-6"
@@ -231,12 +215,10 @@ export function AccessControlPage() {
         onClose={() => setDeactivatingRole(null)}
         onConfirm={() => {
           if (!deactivatingRole) return;
-          void api
-            .deactivateRole(deactivatingRole)
-            .then(() => {
-              invalidate(keys.roles);
-              setDeactivatingRole(null);
-            });
+          void api.deactivateRole(deactivatingRole).then(() => {
+            invalidate(keys.roles);
+            setDeactivatingRole(null);
+          });
         }}
         title={copy('Deactivate role?')}
         message={copy("Users will no longer receive this role's permissions.")}
@@ -248,12 +230,10 @@ export function AccessControlPage() {
         onClose={() => setRevokingInvitation(null)}
         onConfirm={() => {
           if (!revokingInvitation) return;
-          void api
-            .revokeInvitation(revokingInvitation.id)
-            .then(() => {
-              invalidate(keys.invitations);
-              setRevokingInvitation(null);
-            });
+          void api.revokeInvitation(revokingInvitation.id).then(() => {
+            invalidate(keys.invitations);
+            setRevokingInvitation(null);
+          });
         }}
         title={copy('Revoke invitation?')}
         message={copy('The pending invitation can no longer be used to activate an account.')}
@@ -351,9 +331,7 @@ function UsersTable({
       render: (user) => (
         <div>
           <p className="font-medium">{user.displayName}</p>
-          <p className="text-xs text-[var(--color-text-muted)]">
-            {user.username ?? '—'}
-          </p>
+          <p className="text-xs text-[var(--color-text-muted)]">{user.username ?? '—'}</p>
         </div>
       ),
     },
@@ -415,17 +393,14 @@ function InvitationsTable({
       render: (invitation) => (
         <div>
           <p className="font-medium">{invitation.displayName}</p>
-          <p className="text-xs text-[var(--color-text-muted)]">
-            {invitation.phoneE164}
-          </p>
+          <p className="text-xs text-[var(--color-text-muted)]">{invitation.phoneE164}</p>
         </div>
       ),
     },
     {
       key: 'roles',
       label: copy('Roles'),
-      render: (invitation) =>
-        invitation.roles.map((role) => role.name).join(', ') || '—',
+      render: (invitation) => invitation.roles.map((role) => role.name).join(', ') || '—',
     },
     {
       key: 'expiresAt',
@@ -441,15 +416,11 @@ function InvitationsTable({
       label: copy('Status'),
       render: (invitation) => (
         <DBadge
-          variant={invitation.acceptedAt ? 'success' : invitation.revokedAt ? 'secondary' : 'warning'}
+          variant={
+            invitation.acceptedAt ? 'success' : invitation.revokedAt ? 'secondary' : 'warning'
+          }
         >
-          {copy(
-            invitation.acceptedAt
-              ? 'Accepted'
-              : invitation.revokedAt
-                ? 'Revoked'
-                : 'Pending',
-          )}
+          {copy(invitation.acceptedAt ? 'Accepted' : invitation.revokedAt ? 'Revoked' : 'Pending')}
         </DBadge>
       ),
     },
@@ -464,7 +435,8 @@ function InvitationsTable({
       if (!isSessionExpiredError(error))
         showToast({
           variant: 'danger',
-          title: normalizeBackofficeApiError(error, copy('Could not resend invitation.')).safeMessage,
+          title: normalizeBackofficeApiError(error, copy('Could not resend invitation.'))
+            .safeMessage,
         });
     }
   };
@@ -492,8 +464,7 @@ function InvitationsTable({
           icon: <Ban className="size-4" />,
           variant: 'danger',
           onClick: onRevoke,
-          show: (invitation) =>
-            canManage && !invitation.acceptedAt && !invitation.revokedAt,
+          show: (invitation) => canManage && !invitation.acceptedAt && !invitation.revokedAt,
         },
       ]}
     />
@@ -537,8 +508,7 @@ function RoleEditor({
         let current = role;
         if (canUpdate && name.trim() !== role.name)
           current = await api.updateRole(role, name.trim());
-        if (canManagePermissions)
-          await api.replacePermissions(current, selected);
+        if (canManagePermissions) await api.replacePermissions(current, selected);
       }
       onChanged();
       onClose();
@@ -561,7 +531,9 @@ function RoleEditor({
       footer={
         !role?.systemKey && (isNew || canUpdate || canManagePermissions) ? (
           <div className="flex justify-end gap-2">
-            <DButton variant="secondary" onClick={onClose}>{copy('Cancel')}</DButton>
+            <DButton variant="secondary" onClick={onClose}>
+              {copy('Cancel')}
+            </DButton>
             <DButton onClick={() => void save()} disabled={!name.trim() || (isNew && !code.trim())}>
               {copy('Save role')}
             </DButton>
@@ -642,8 +614,8 @@ function UserEditor({
 }) {
   const { copy } = useBackofficeLocalization();
   const { showToast } = useToast();
-  const [selectedRoles, setSelectedRoles] = useState<string[]>(() =>
-    user?.roles.map((role) => role.id) ?? [],
+  const [selectedRoles, setSelectedRoles] = useState<string[]>(
+    () => user?.roles.map((role) => role.id) ?? [],
   );
   const [selectedLocations, setSelectedLocations] = useState<string[] | null>(null);
 
@@ -662,8 +634,7 @@ function UserEditor({
   const save = async () => {
     if (!user) return;
     try {
-      if (canManageRoles)
-        await api.replaceUserRoles(user, selectedRoles);
+      if (canManageRoles) await api.replaceUserRoles(user, selectedRoles);
       if (canManageLocations)
         await operationalAccess.replaceUserLocations(user.id, effectiveSelectedLocations);
       onChanged();
@@ -673,7 +644,8 @@ function UserEditor({
       if (!isSessionExpiredError(error))
         showToast({
           variant: 'danger',
-          title: normalizeBackofficeApiError(error, copy('Could not update user access.')).safeMessage,
+          title: normalizeBackofficeApiError(error, copy('Could not update user access.'))
+            .safeMessage,
         });
     }
   };
@@ -690,7 +662,9 @@ function UserEditor({
       footer={
         !isOwner && (canManageRoles || canManageLocations) ? (
           <div className="flex justify-end gap-2">
-            <DButton variant="secondary" onClick={onClose}>{copy('Cancel')}</DButton>
+            <DButton variant="secondary" onClick={onClose}>
+              {copy('Cancel')}
+            </DButton>
             <DButton onClick={() => void save()}>{copy('Save access')}</DButton>
           </div>
         ) : null
@@ -704,7 +678,9 @@ function UserEditor({
         <div className="space-y-6">
           <SelectionList
             title={copy('Roles')}
-            items={roles.filter((role) => role.status === 'ACTIVE').map((role) => ({ id: role.id, label: role.name }))}
+            items={roles
+              .filter((role) => role.status === 'ACTIVE')
+              .map((role) => ({ id: role.id, label: role.name }))}
             selected={selectedRoles}
             disabled={!canManageRoles}
             onToggle={(id) =>
@@ -716,7 +692,10 @@ function UserEditor({
           {canViewLocations ? (
             <SelectionList
               title={copy('Location Access')}
-              items={locations.map((location) => ({ id: location.id, label: `${location.code} — ${location.name}` }))}
+              items={locations.map((location) => ({
+                id: location.id,
+                label: `${location.code} — ${location.name}`,
+              }))}
               selected={effectiveSelectedLocations}
               disabled={!canManageLocations}
               onToggle={(id) =>
@@ -772,7 +751,8 @@ function InvitationDialog({
       if (!isSessionExpiredError(error))
         showToast({
           variant: 'danger',
-          title: normalizeBackofficeApiError(error, copy('Could not create invitation.')).safeMessage,
+          title: normalizeBackofficeApiError(error, copy('Could not create invitation.'))
+            .safeMessage,
         });
     } finally {
       setSaving(false);
@@ -784,17 +764,28 @@ function InvitationDialog({
       open
       onClose={onClose}
       title={copy('Invite user')}
-      description={copy('Use the existing Runtime invitation contract. The user activates the account through the invitation flow.')}
+      description={copy(
+        'Use the existing Runtime invitation contract. The user activates the account through the invitation flow.',
+      )}
       size="lg"
       footer={
         <div className="flex justify-end gap-2">
-          <DButton variant="secondary" onClick={onClose}>{copy('Cancel')}</DButton>
-          <DButton onClick={() => void save()} disabled={!valid || saving}>{copy('Send invitation')}</DButton>
+          <DButton variant="secondary" onClick={onClose}>
+            {copy('Cancel')}
+          </DButton>
+          <DButton onClick={() => void save()} disabled={!valid || saving}>
+            {copy('Send invitation')}
+          </DButton>
         </div>
       }
     >
       <div className="grid gap-4 sm:grid-cols-2">
-        <DInput label={copy('Phone (E.164)')} value={phone} onChange={setPhone} placeholder="+628111111111" />
+        <DInput
+          label={copy('Phone (E.164)')}
+          value={phone}
+          onChange={setPhone}
+          placeholder="+628111111111"
+        />
         <DInput
           label={copy('Username (optional)')}
           value={username}

@@ -51,10 +51,7 @@ describe('authenticated runtime context', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(runtimeResponse()));
 
     await expect(
-      loadAuthenticatedRuntimeAvailability(
-        'http://127.0.0.1:4003',
-        'access-token',
-      ),
+      loadAuthenticatedRuntimeAvailability('http://127.0.0.1:4003', 'access-token'),
     ).resolves.toEqual({
       effectiveEntitlements: {
         products: ['POS'],
@@ -99,10 +96,7 @@ describe('authenticated runtime context', () => {
     );
 
     await expect(
-      loadAuthenticatedRuntimeAvailability(
-        'http://127.0.0.1:4003',
-        'access-token',
-      ),
+      loadAuthenticatedRuntimeAvailability('http://127.0.0.1:4003', 'access-token'),
     ).resolves.toEqual({
       effectiveEntitlements: {
         products: ['POS'],

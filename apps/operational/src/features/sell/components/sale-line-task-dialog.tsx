@@ -113,10 +113,7 @@ export function SaleLineTaskDialog({
     Object.fromEntries(
       line.participations
         .filter((participation) => participation.assigned)
-        .map((participation) => [
-          participation.employeeId,
-          rateToPercent(participation.shareRate),
-        ]),
+        .map((participation) => [participation.employeeId, rateToPercent(participation.shareRate)]),
     ),
   );
   const [overrideAmount, setOverrideAmount] = useState(
@@ -191,7 +188,10 @@ export function SaleLineTaskDialog({
       setFormError('Jika semua porsi diisi, total porsi harus tepat 100%.');
       return;
     }
-    if (explicitCount < assignedIds.length && explicitTotal.greaterThanOrEqualTo(createDecimal('100'))) {
+    if (
+      explicitCount < assignedIds.length &&
+      explicitTotal.greaterThanOrEqualTo(createDecimal('100'))
+    ) {
       setFormError('Sisakan porsi untuk pelaksana yang dibagi otomatis.');
       return;
     }
@@ -284,7 +284,9 @@ export function SaleLineTaskDialog({
                           onChange={() => togglePerformer(employee.id)}
                         />
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate font-semibold">{employee.displayName}</span>
+                          <span className="block truncate font-semibold">
+                            {employee.displayName}
+                          </span>
                           <span className="block text-xs text-[var(--color-text-muted)]">
                             {employee.code}
                           </span>
@@ -346,7 +348,8 @@ export function SaleLineTaskDialog({
                     {contributionPreview.preview.map((entry) => (
                       <div key={entry.employeeId} className="flex justify-between gap-3">
                         <span className="truncate text-[var(--color-text-muted)]">
-                          {employeeById.get(entry.employeeId)?.displayName ?? entry.employeeId.slice(0, 8)}
+                          {employeeById.get(entry.employeeId)?.displayName ??
+                            entry.employeeId.slice(0, 8)}
                         </span>
                         <span className="font-semibold tabular-nums">
                           {formatMoney(entry.contributionAmount, line.currency, locale)}

@@ -81,7 +81,9 @@ export function PositionsPanel({
       label: copy('Service assignment'),
       render: (position) => (
         <DBadge variant={position.serviceAssignmentEnabled ? 'success' : 'secondary'}>
-          {copy(position.serviceAssignmentEnabled ? 'Can perform services' : 'Cannot perform services')}
+          {copy(
+            position.serviceAssignmentEnabled ? 'Can perform services' : 'Cannot perform services',
+          )}
         </DBadge>
       ),
     },

@@ -262,7 +262,9 @@ function ExpenseDetail({ item, onClose }: { item: Expense | null; onClose: () =>
               <ExpenseFact fact={[copy('Description'), item.note || '—']} />
               <ExpenseFact fact={[copy('Source financial account'), item.financialAccountName]} />
               <ExpenseFact fact={[copy('Location'), item.sellingLocationName]} />
-              <ExpenseFact fact={[copy('Category'), expenseCategoryLabel(item.categoryCode, copy)]} />
+              <ExpenseFact
+                fact={[copy('Category'), expenseCategoryLabel(item.categoryCode, copy)]}
+              />
             </dl>
           </section>
 

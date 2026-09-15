@@ -29,7 +29,11 @@ export function CatalogItemThumbnail({
       ) : (
         <ImageIcon
           aria-hidden="true"
-          className={size === 'detail' ? 'size-8 text-[var(--color-text-muted)]' : 'size-4 text-[var(--color-text-muted)]'}
+          className={
+            size === 'detail'
+              ? 'size-8 text-[var(--color-text-muted)]'
+              : 'size-4 text-[var(--color-text-muted)]'
+          }
         />
       )}
     </div>

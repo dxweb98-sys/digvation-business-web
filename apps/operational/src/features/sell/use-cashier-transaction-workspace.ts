@@ -41,7 +41,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
   const [areEmployeeOptionsEnabled, setEmployeeOptionsEnabled] = useState(false);
   const pendingPerformerIntent = useRef<{ lineId: string; token: symbol } | null>(null);
   const transactionAdapter = useMemo(
-    () => createCashierTransactionAdapter(runtime, authPort.getAccessToken.bind(authPort)),
+    () => createCashierTransactionAdapter(runtime, authPort.getAccessToken?.bind(authPort)),
     [authPort, runtime],
   );
   const effectiveConnectivity = isLocalCashierDemoEnabled() ? 'ONLINE' : connectivity.state;

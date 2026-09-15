@@ -173,13 +173,9 @@ export function PriceChangeDialog({
   const { showToast } = useToast();
   const { copy } = useCatalogLocalization();
   const [amount, setAmount] = useState('');
-  const [effectiveFrom, setEffectiveFrom] = useState(() =>
-    new Date().toISOString().slice(0, 16),
-  );
+  const [effectiveFrom, setEffectiveFrom] = useState(() => new Date().toISOString().slice(0, 16));
   const variant = target && target !== 'default' ? target : null;
-  const validEffectiveFrom = /^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d$/.test(
-    effectiveFrom,
-  );
+  const validEffectiveFrom = /^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d$/.test(effectiveFrom);
 
   const save = async () => {
     if (!target || !amount.trim() || !validEffectiveFrom) return;

@@ -341,7 +341,11 @@ function TransactionDetail({
                 value={formatMoney(item.discountAmount, item.currency)}
               />
               <Fact label={copy('Tax')} value={formatMoney(item.taxAmount, item.currency)} />
-              <Fact label={copy('Total')} value={formatMoney(item.totalAmount, item.currency)} emphasized />
+              <Fact
+                label={copy('Total')}
+                value={formatMoney(item.totalAmount, item.currency)}
+                emphasized
+              />
               <Fact label={copy('Currency')} value={item.currency} />
             </dl>
           </section>
@@ -368,12 +372,14 @@ function TransactionDetail({
                       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--color-text-muted)]">
                         {payment.tenderedAmount ? (
                           <span>
-                            {copy('Tendered Amount')}: {formatMoney(payment.tenderedAmount, payment.currency)}
+                            {copy('Tendered Amount')}:{' '}
+                            {formatMoney(payment.tenderedAmount, payment.currency)}
                           </span>
                         ) : null}
                         {payment.changeAmount ? (
                           <span>
-                            {copy('Change Amount')}: {formatMoney(payment.changeAmount, payment.currency)}
+                            {copy('Change Amount')}:{' '}
+                            {formatMoney(payment.changeAmount, payment.currency)}
                           </span>
                         ) : null}
                       </div>
@@ -406,12 +412,11 @@ function TransactionDetail({
                 {item.lines
                   .filter((line) => line.fulfillment)
                   .map((line) => (
-                    <div
-                      key={line.id}
-                      className="flex items-start justify-between gap-4 py-4"
-                    >
+                    <div key={line.id} className="flex items-start justify-between gap-4 py-4">
                       <div className="min-w-0">
-                        <p className="font-medium text-[var(--color-text)]">{line.itemNameSnapshot}</p>
+                        <p className="font-medium text-[var(--color-text)]">
+                          {line.itemNameSnapshot}
+                        </p>
                         {line.variantNameSnapshot ? (
                           <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
                             {line.variantNameSnapshot}
