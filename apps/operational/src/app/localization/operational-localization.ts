@@ -1,12 +1,13 @@
 import { useRuntime } from '@digvation/business-runtime';
 
-type OperationalLocale = 'id-ID' | 'en-US';
+export type OperationalLocale = 'id-ID' | 'en-US';
 type LocalizedLabel = Record<OperationalLocale, string>;
 
 const copy: Record<string, LocalizedLabel> = {
   Sales: { 'id-ID': 'Penjualan', 'en-US': 'Sales' },
   Sell: { 'id-ID': 'Jual', 'en-US': 'Sell' },
   Operations: { 'id-ID': 'Operasional', 'en-US': 'Operations' },
+  Operational: { 'id-ID': 'Operational', 'en-US': 'Operational' },
   Expenses: { 'id-ID': 'Pengeluaran', 'en-US': 'Expenses' },
   'Transaction history': { 'id-ID': 'Riwayat transaksi', 'en-US': 'Transaction history' },
   Date: { 'id-ID': 'Tanggal', 'en-US': 'Date' },
@@ -24,7 +25,7 @@ const copy: Record<string, LocalizedLabel> = {
     'en-US': 'No transactions match the current period.',
   },
   'Could not load transaction history.': {
-    'id-ID': 'Gagal memuat riwayat transaksi.',
+    'id-ID': 'Riwayat transaksi tidak dapat dimuat.',
     'en-US': 'Could not load transaction history.',
   },
   'Try loading transaction history again.': {
@@ -54,22 +55,24 @@ const copy: Record<string, LocalizedLabel> = {
   Note: { 'id-ID': 'Catatan', 'en-US': 'Note' },
   Save: { 'id-ID': 'Simpan', 'en-US': 'Save' },
   Cancel: { 'id-ID': 'Batal', 'en-US': 'Cancel' },
+  Close: { 'id-ID': 'Tutup', 'en-US': 'Close' },
+  Logout: { 'id-ID': 'Keluar', 'en-US': 'Logout' },
   'Not available': { 'id-ID': 'Tidak tersedia', 'en-US': 'Not available' },
   'No operational expenses yet.': {
     'id-ID': 'Belum ada pengeluaran operasional.',
     'en-US': 'No operational expenses yet.',
   },
   'Could not load expenses.': {
-    'id-ID': 'Gagal memuat pengeluaran.',
+    'id-ID': 'Pengeluaran tidak dapat dimuat.',
     'en-US': 'Could not load expenses.',
   },
   'Try loading expenses again.': {
     'id-ID': 'Coba muat ulang pengeluaran.',
     'en-US': 'Try loading expenses again.',
   },
-  'Expense submitted.': { 'id-ID': 'Pengeluaran berhasil diajukan.', 'en-US': 'Expense submitted.' },
+  'Expense submitted.': { 'id-ID': 'Pengeluaran diajukan.', 'en-US': 'Expense submitted.' },
   'Could not submit expense.': {
-    'id-ID': 'Gagal mengajukan pengeluaran.',
+    'id-ID': 'Pengeluaran tidak dapat diajukan.',
     'en-US': 'Could not submit expense.',
   },
   'Active branch': { 'id-ID': 'Cabang aktif', 'en-US': 'Active branch' },
@@ -96,10 +99,144 @@ const copy: Record<string, LocalizedLabel> = {
     'id-ID': 'Akun yang digunakan pada sesi ini.',
     'en-US': 'Account used for this session.',
   },
-  'Request password change': { 'id-ID': 'Ubah kata sandi', 'en-US': 'Request password change' },
+  'Request password change': { 'id-ID': 'Ubah kata sandi', 'en-US': 'Change password' },
   Branch: { 'id-ID': 'Cabang', 'en-US': 'Branch' },
-  Close: { 'id-ID': 'Tutup', 'en-US': 'Close' },
-  Logout: { 'id-ID': 'Keluar', 'en-US': 'Logout' },
+
+  'Sign in to Operational': { 'id-ID': 'Masuk ke Operational', 'en-US': 'Sign in to Operational' },
+  'User ID': { 'id-ID': 'ID pengguna', 'en-US': 'User ID' },
+  'Username or email': { 'id-ID': 'Nama pengguna atau email', 'en-US': 'Username or email' },
+  Password: { 'id-ID': 'Kata sandi', 'en-US': 'Password' },
+  'Complete account details': { 'id-ID': 'Lengkapi data akun', 'en-US': 'Complete account details' },
+  'Enter user ID and password.': {
+    'id-ID': 'Isi ID pengguna dan kata sandi.',
+    'en-US': 'Enter your user ID and password.',
+  },
+  'Invalid user ID or password.': {
+    'id-ID': 'ID pengguna atau kata sandi tidak valid.',
+    'en-US': 'Invalid user ID or password.',
+  },
+  'Sign in failed. Try again.': {
+    'id-ID': 'Gagal masuk. Coba lagi.',
+    'en-US': 'Sign in failed. Try again.',
+  },
+  'Sign in failed': { 'id-ID': 'Gagal masuk', 'en-US': 'Sign in failed' },
+  'Signed in': { 'id-ID': 'Berhasil masuk', 'en-US': 'Signed in' },
+  'Opening Operational...': { 'id-ID': 'Membuka Operational...', 'en-US': 'Opening Operational...' },
+  'Signing in...': { 'id-ID': 'Masuk...', 'en-US': 'Signing in...' },
+  'Sign in': { 'id-ID': 'Masuk', 'en-US': 'Sign in' },
+
+  'Verifying operational access': {
+    'id-ID': 'Memverifikasi akses operasional',
+    'en-US': 'Verifying operational access',
+  },
+  'Operational access unavailable': {
+    'id-ID': 'Akses operasional tidak tersedia',
+    'en-US': 'Operational access unavailable',
+  },
+  'Operational context unavailable': {
+    'id-ID': 'Konteks operasional belum tersedia',
+    'en-US': 'Operational context unavailable',
+  },
+  'Please wait.': { 'id-ID': 'Mohon tunggu.', 'en-US': 'Please wait.' },
+  'Contact an administrator if this access should be available.': {
+    'id-ID': 'Hubungi administrator jika akses ini seharusnya tersedia.',
+    'en-US': 'Contact an administrator if this access should be available.',
+  },
+  'Your session ended due to inactivity. Sign in again.': {
+    'id-ID': 'Sesi berakhir karena tidak ada aktivitas. Silakan masuk kembali.',
+    'en-US': 'Your session ended due to inactivity. Sign in again.',
+  },
+  'Your session has ended. Sign in again.': {
+    'id-ID': 'Sesi telah berakhir. Silakan masuk kembali.',
+    'en-US': 'Your session has ended. Sign in again.',
+  },
+  'Ending session': { 'id-ID': 'Mengakhiri sesi', 'en-US': 'Ending session' },
+  'Redirecting to sign in...': {
+    'id-ID': 'Mengalihkan ke halaman masuk...',
+    'en-US': 'Redirecting to sign in...',
+  },
+  'Operational location access unavailable': {
+    'id-ID': 'Akses lokasi operasional tidak tersedia',
+    'en-US': 'Operational location access unavailable',
+  },
+  'This account has no authorized operational location.': {
+    'id-ID': 'Akun ini belum memiliki lokasi operasional yang diizinkan.',
+    'en-US': 'This account has no authorized operational location.',
+  },
+  'Logout failed': { 'id-ID': 'Gagal keluar', 'en-US': 'Logout failed' },
+  'Try again.': { 'id-ID': 'Coba lagi.', 'en-US': 'Try again.' },
+  'Email unavailable': { 'id-ID': 'Email tidak tersedia', 'en-US': 'Email unavailable' },
+  'Contact an administrator to change your password.': {
+    'id-ID': 'Hubungi administrator untuk mengubah kata sandi.',
+    'en-US': 'Contact an administrator to change your password.',
+  },
+  'Request received': { 'id-ID': 'Permintaan diterima', 'en-US': 'Request received' },
+  'Instructions will be sent to the account email.': {
+    'id-ID': 'Instruksi akan dikirim ke email akun.',
+    'en-US': 'Instructions will be sent to the account email.',
+  },
+  'Password change request failed': {
+    'id-ID': 'Gagal meminta perubahan kata sandi',
+    'en-US': 'Password change request failed',
+  },
+  'Try again or contact an administrator.': {
+    'id-ID': 'Coba lagi atau hubungi administrator.',
+    'en-US': 'Try again or contact an administrator.',
+  },
+
+  Cart: { 'id-ID': 'Keranjang', 'en-US': 'Cart' },
+  Checkout: { 'id-ID': 'Pembayaran', 'en-US': 'Checkout' },
+  Product: { 'id-ID': 'Produk', 'en-US': 'Product' },
+  Service: { 'id-ID': 'Layanan', 'en-US': 'Service' },
+  All: { 'id-ID': 'Semua', 'en-US': 'All' },
+  'Search items...': { 'id-ID': 'Cari item...', 'en-US': 'Search items...' },
+  'No items found': { 'id-ID': 'Item tidak ditemukan', 'en-US': 'No items found' },
+  'Transaction needs attention': {
+    'id-ID': 'Transaksi perlu diperiksa',
+    'en-US': 'Transaction needs attention',
+  },
+  Retry: { 'id-ID': 'Coba lagi', 'en-US': 'Retry' },
+  Reviewed: { 'id-ID': 'Sudah ditinjau', 'en-US': 'Reviewed' },
+  'Queue transactions': { 'id-ID': 'Antrian transaksi', 'en-US': 'Queue transactions' },
+  'No queued transactions.': {
+    'id-ID': 'Belum ada transaksi dalam antrian.',
+    'en-US': 'No queued transactions.',
+  },
+  'Select products or services from the catalog.': {
+    'id-ID': 'Pilih produk atau layanan dari katalog.',
+    'en-US': 'Select products or services from the catalog.',
+  },
+  'Cart is empty': { 'id-ID': 'Keranjang kosong', 'en-US': 'Cart is empty' },
+  'General customer': { 'id-ID': 'Pelanggan umum', 'en-US': 'General customer' },
+  Guest: { 'id-ID': 'Umum', 'en-US': 'Guest' },
+  Member: { 'id-ID': 'Member', 'en-US': 'Member' },
+  'Non-member': { 'id-ID': 'Non-member', 'en-US': 'Non-member' },
+  Subtotal: { 'id-ID': 'Subtotal', 'en-US': 'Subtotal' },
+  'Estimated subtotal': { 'id-ID': 'Estimasi subtotal', 'en-US': 'Estimated subtotal' },
+  'Estimated total': { 'id-ID': 'Estimasi total', 'en-US': 'Estimated total' },
+  Payment: { 'id-ID': 'Pembayaran', 'en-US': 'Payment' },
+  'Payment method': { 'id-ID': 'Metode pembayaran', 'en-US': 'Payment method' },
+  Cash: { 'id-ID': 'Tunai', 'en-US': 'Cash' },
+  Transfer: { 'id-ID': 'Transfer', 'en-US': 'Transfer' },
+  'Digital wallet': { 'id-ID': 'Dompet digital', 'en-US': 'Digital wallet' },
+  'Pay now': { 'id-ID': 'Bayar sekarang', 'en-US': 'Pay now' },
+  'Payment successful': { 'id-ID': 'Pembayaran berhasil', 'en-US': 'Payment successful' },
+  'Payment failed': { 'id-ID': 'Pembayaran gagal', 'en-US': 'Payment failed' },
+  'Transaction completed': { 'id-ID': 'Transaksi selesai', 'en-US': 'Transaction completed' },
+  'Transaction canceled': { 'id-ID': 'Transaksi dibatalkan', 'en-US': 'Transaction canceled' },
+  'Complete transaction': { 'id-ID': 'Selesaikan transaksi', 'en-US': 'Complete transaction' },
+  'Cancel transaction': { 'id-ID': 'Batalkan transaksi', 'en-US': 'Cancel transaction' },
+  'Transaction details': { 'id-ID': 'Detail transaksi', 'en-US': 'Transaction details' },
+  Receipt: { 'id-ID': 'Struk', 'en-US': 'Receipt' },
+  'View receipt': { 'id-ID': 'Lihat struk', 'en-US': 'View receipt' },
+  'Start work': { 'id-ID': 'Mulai pengerjaan', 'en-US': 'Start work' },
+  'Work started': { 'id-ID': 'Pengerjaan dimulai', 'en-US': 'Work started' },
+  'Adjust order': { 'id-ID': 'Sesuaikan pesanan', 'en-US': 'Adjust order' },
+  'Pay balance': { 'id-ID': 'Bayar sisa', 'en-US': 'Pay balance' },
+  'Quantity must be greater than zero.': {
+    'id-ID': 'Jumlah harus lebih dari nol.',
+    'en-US': 'Quantity must be greater than zero.',
+  },
 };
 
 const technicalLabels: Record<string, LocalizedLabel> = {
@@ -140,6 +277,9 @@ const technicalLabels: Record<string, LocalizedLabel> = {
   TRANSPORT: { 'id-ID': 'Transportasi', 'en-US': 'Transport' },
   SUPPLIES: { 'id-ID': 'Perlengkapan', 'en-US': 'Supplies' },
   OTHER: { 'id-ID': 'Lainnya', 'en-US': 'Other' },
+  BACKOFFICE: { 'id-ID': 'Backoffice', 'en-US': 'Backoffice' },
+  OPERATIONAL: { 'id-ID': 'Operational', 'en-US': 'Operational' },
+  SYSTEM: { 'id-ID': 'Sistem', 'en-US': 'System' },
 };
 
 function humanizeTechnicalValue(value: string): string {
@@ -151,13 +291,21 @@ function humanizeTechnicalValue(value: string): string {
     .join(' ');
 }
 
+export function operationalCopy(value: string, locale: OperationalLocale): string {
+  return copy[value]?.[locale] ?? value;
+}
+
+export function operationalLabel(value: string, locale: OperationalLocale): string {
+  return technicalLabels[value]?.[locale] ?? humanizeTechnicalValue(value);
+}
+
 export function useOperationalLocalization() {
   const runtime = useRuntime();
   const locale: OperationalLocale = runtime.locale === 'en-US' ? 'en-US' : 'id-ID';
   return {
     locale,
-    copy: (value: string) => copy[value]?.[locale] ?? value,
-    label: (value: string) => technicalLabels[value]?.[locale] ?? humanizeTechnicalValue(value),
+    copy: (value: string) => operationalCopy(value, locale),
+    label: (value: string) => operationalLabel(value, locale),
     formatDate: (value: Date, options?: Intl.DateTimeFormatOptions) =>
       new Intl.DateTimeFormat(locale, options).format(value),
     formatMoney: (amount: string, currency: string) =>

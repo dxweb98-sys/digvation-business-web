@@ -4,22 +4,24 @@ import { useRef, useState, type FormEvent, type TransitionEvent } from 'react';
 
 import type { AuthPort, AuthSession } from '@digvation/business-auth';
 import { useRuntime } from '@digvation/business-runtime';
+import { useOperationalLocalization } from '../../app/localization/operational-localization';
 
 interface OperationalLoginPageProps {
   authPort: AuthPort;
   onAuthenticated: (session: AuthSession) => void;
 }
 
-function loginFailureMessage(error: unknown) {
+function loginFailureMessage(error: unknown, copy: (value: string) => string) {
   if (error instanceof Error && error.message === 'INVALID_CREDENTIALS') {
-    return 'ID pengguna atau kata sandi tidak valid.';
+    return copy('Invalid user ID or password.');
   }
-  return 'Gagal masuk. Silakan coba lagi.';
+  return copy('Sign in failed. Try again.');
 }
 
 /** Operational-owned login composition using the canonical shared field, button, and toast primitives. */
 export function OperationalLoginPage({ authPort, onAuthenticated }: OperationalLoginPageProps) {
   const runtime = useRuntime();
+  const { copy } = useOperationalLocalization();
   const { showToast } = useToast();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -41,8 +43,8 @@ export function OperationalLoginPage({ authPort, onAuthenticated }: OperationalL
 
     if (!identifier.trim() || !password) {
       showToast({
-        title: 'Lengkapi data akun',
-        description: 'Isi ID pengguna dan kata sandi.',
+        title: copy('Complete account details'),
+        description: copy('Enter user ID and password.'),
         variant: 'danger',
       });
       return;
@@ -53,15 +55,15 @@ export function OperationalLoginPage({ authPort, onAuthenticated }: OperationalL
       const session = await authPort.login({ identifier: identifier.trim(), password });
       authenticatedSession.current = session;
       showToast({
-        title: 'Berhasil masuk.',
+        title: copy('Signed in'),
         variant: 'success',
       });
       setLeaving(true);
     } catch (error) {
       setSubmitting(false);
       showToast({
-        title: 'Gagal masuk',
-        description: loginFailureMessage(error),
+        title: copy('Sign in failed'),
+        description: loginFailureMessage(error, copy),
         variant: 'danger',
       });
     }
@@ -86,21 +88,23 @@ export function OperationalLoginPage({ authPort, onAuthenticated }: OperationalL
           <h1 className="text-3xl font-bold tracking-[-0.04em] text-[var(--color-text)]">
             {runtime.branding.productName}
           </h1>
-          <p className="mt-2 text-sm text-[var(--color-text-muted)]">Operational</p>
+          <p className="mt-2 text-sm text-[var(--color-text-muted)]">{copy('Operational')}</p>
         </header>
 
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-[var(--shadow-panel)]">
-          <h2 className="text-lg font-semibold text-[var(--color-text)]">Masuk ke Operasional</h2>
+          <h2 className="text-lg font-semibold text-[var(--color-text)]">
+            {copy('Sign in to Operational')}
+          </h2>
 
           <form autoComplete="on" className="mt-6 space-y-4" onSubmit={submit}>
             <DInput
               id="operational-identifier"
               name="username"
-              label="ID pengguna"
+              label={copy('User ID')}
               value={identifier}
               disabled={isSubmitting}
               onChange={setIdentifier}
-              placeholder="Nama pengguna atau email"
+              placeholder={copy('Username or email')}
               autoComplete="username"
               autoCapitalize="none"
               spellCheck={false}
@@ -108,16 +112,20 @@ export function OperationalLoginPage({ authPort, onAuthenticated }: OperationalL
             <DInput
               id="operational-password"
               name="password"
-              label="Kata sandi"
+              label={copy('Password')}
               type="password"
               value={password}
               disabled={isSubmitting}
               onChange={setPassword}
-              placeholder="Kata sandi"
+              placeholder={copy('Password')}
               autoComplete="current-password"
             />
             <DButton type="submit" fullWidth loading={isSubmitting} className="mt-2">
-              {isLeaving ? 'Membuka Operasional...' : isSubmitting ? 'Masuk...' : 'Masuk'}
+              {isLeaving
+                ? copy('Opening Operational...')
+                : isSubmitting
+                  ? copy('Signing in...')
+                  : copy('Sign in')}
             </DButton>
           </form>
         </div>

@@ -28,15 +28,20 @@ import {
   type TransitionEvent,
 } from 'react';
 
+import {
+  operationalCopy,
+  type OperationalLocale,
+} from '../localization/operational-localization';
 import { OperationalLoginPage } from '../../modules/operational/operational-login-page';
 import { OperationalSessionProvider } from '../../modules/operational/operational-session-provider';
 import { PosOperationalSessionProvider } from '../../modules/pos/pos-operational-session-provider';
 import { OperationalAvailabilityProvider } from './operational-availability-context';
 
 const SESSION_END_TRANSITION_MS = 5_000;
-const IDLE_SESSION_ENDED_MESSAGE =
-  'Sesi Anda telah berakhir karena tidak ada aktivitas. Silakan masuk kembali.';
-const INVALID_SESSION_ENDED_MESSAGE = 'Sesi Anda telah berakhir. Silakan masuk kembali.';
+
+function runtimeLocale(locale: string): OperationalLocale {
+  return locale === 'en-US' ? 'en-US' : 'id-ID';
+}
 
 function hasImplementedOperationalSurface(availability: RuntimeAvailabilityConfig): boolean {
   const permissions = availability.effectivePermissions;
@@ -52,6 +57,8 @@ function hasImplementedOperationalSurface(availability: RuntimeAvailabilityConfi
 function AuthenticatedOperationalRuntime({ children }: { children: ReactNode }) {
   const { session, authPort } = useAuth();
   const bootstrapRuntime = useRuntime();
+  const locale = runtimeLocale(bootstrapRuntime.locale);
+  const copy = (value: string) => operationalCopy(value, locale);
   const [state, setState] = useState<'loading' | 'allowed' | 'denied' | 'unavailable'>('loading');
   const [effectiveRuntime, setEffectiveRuntime] = useState<RuntimeConfig | null>(null);
   const [availability, setAvailability] = useState<RuntimeAvailabilityConfig | null>(null);
@@ -98,7 +105,7 @@ function AuthenticatedOperationalRuntime({ children }: { children: ReactNode }) 
     return (
       <RuntimeProvider config={effectiveRuntime}>
         <OperationalAvailabilityProvider availability={availability}>
-          <DLocalizationProvider locale={effectiveRuntime.locale === 'en-US' ? 'en-US' : 'id-ID'}>
+          <DLocalizationProvider locale={runtimeLocale(effectiveRuntime.locale)}>
             {children}
           </DLocalizationProvider>
         </OperationalAvailabilityProvider>
@@ -110,15 +117,15 @@ function AuthenticatedOperationalRuntime({ children }: { children: ReactNode }) 
       <section className="max-w-md rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
         <h1 className="text-lg font-semibold">
           {state === 'loading'
-            ? 'Memverifikasi akses operasional'
+            ? copy('Verifying operational access')
             : state === 'denied'
-              ? 'Akses operasional tidak tersedia'
-              : 'Konteks operasional belum tersedia'}
+              ? copy('Operational access unavailable')
+              : copy('Operational context unavailable')}
         </h1>
         <p className="mt-2 text-sm text-[var(--color-text-muted)]">
           {state === 'loading'
-            ? 'Mohon tunggu.'
-            : 'Hubungi administrator jika akses ini seharusnya tersedia.'}
+            ? copy('Please wait.')
+            : copy('Contact an administrator if this access should be available.')}
         </p>
       </section>
     </main>
@@ -153,6 +160,8 @@ function OperationalAuthBoundary({
   authPort,
   router,
 }: OperationalAuthBoundaryProps) {
+  const locale = runtimeLocale(runtime.locale);
+  const copy = (value: string) => operationalCopy(value, locale);
   const [authenticatedSession, setAuthenticatedSession] = useState(session);
   const [isLoggingOut, setLoggingOut] = useState(false);
   const [sessionEndReason, setSessionEndReason] = useState<SessionEndReason | null>(null);
@@ -176,7 +185,11 @@ function OperationalAuthBoundary({
       setSessionEndReason(reason);
       showToast({
         variant: 'warning',
-        title: reason === 'idle' ? IDLE_SESSION_ENDED_MESSAGE : INVALID_SESSION_ENDED_MESSAGE,
+        title: copy(
+          reason === 'idle'
+            ? 'Your session ended due to inactivity. Sign in again.'
+            : 'Your session has ended. Sign in again.',
+        ),
       });
       void authPort.logout();
       sessionEndTimer.current = window.setTimeout(() => {
@@ -184,7 +197,7 @@ function OperationalAuthBoundary({
         setSessionEndReason(null);
       }, SESSION_END_TRANSITION_MS);
     },
-    [authPort, clearSessionEndTimer, showToast],
+    [authPort, clearSessionEndTimer, copy, showToast],
   );
 
   useEffect(() => {
@@ -215,9 +228,9 @@ function OperationalAuthBoundary({
     return (
       <main className="grid min-h-screen place-items-center bg-[var(--color-background)] p-6 text-center">
         <section className="max-w-md rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
-          <h1 className="text-lg font-semibold">Mengakhiri sesi</h1>
+          <h1 className="text-lg font-semibold">{copy('Ending session')}</h1>
           <p className="mt-2 text-sm text-[var(--color-text-muted)]">
-            Mengalihkan ke halaman masuk...
+            {copy('Redirecting to sign in...')}
           </p>
         </section>
       </main>

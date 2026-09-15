@@ -80,7 +80,7 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
   );
   const selectedLocation = locations.find((location) => location.id === selectedLocationId) ?? null;
   const brandSubtitle =
-    runtime.branding.businessName ?? runtime.branding.companyName ?? 'Operational';
+    runtime.branding.businessName ?? runtime.branding.companyName ?? copy('Operational');
   const userInitials = identityInitials(session.identity.displayName, session.identity.initials);
 
   useEffect(() => {
@@ -96,9 +96,11 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
     return (
       <main className="grid min-h-screen place-items-center bg-[var(--color-background)] p-6 text-center">
         <section className="max-w-md rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
-          <h1 className="text-lg font-semibold">Akses lokasi operasional tidak tersedia</h1>
+          <h1 className="text-lg font-semibold">
+            {copy('Operational location access unavailable')}
+          </h1>
           <p className="mt-2 text-sm text-[var(--color-text-muted)]">
-            Akun ini belum memiliki lokasi operasional yang diizinkan.
+            {copy('This account has no authorized operational location.')}
           </p>
           <DButton className="mt-5" variant="secondary" onClick={() => void logout()}>
             {copy('Logout')}
@@ -134,8 +136,8 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
     } catch {
       setLoggingOut(false);
       showToast({
-        title: 'Gagal keluar',
-        description: 'Coba lagi.',
+        title: copy('Logout failed'),
+        description: copy('Try again.'),
         variant: 'danger',
       });
     }
@@ -146,8 +148,8 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
     const email = session.identity.email;
     if (!email) {
       showToast({
-        title: 'Email tidak tersedia',
-        description: 'Hubungi administrator untuk mengubah kata sandi.',
+        title: copy('Email unavailable'),
+        description: copy('Contact an administrator to change your password.'),
         variant: 'warning',
       });
       return;
@@ -157,14 +159,14 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
     try {
       await authPort.requestPasswordChange({ email });
       showToast({
-        title: 'Permintaan diterima',
-        description: 'Instruksi akan dikirim ke email akun.',
+        title: copy('Request received'),
+        description: copy('Instructions will be sent to the account email.'),
         variant: 'success',
       });
     } catch {
       showToast({
-        title: 'Gagal meminta perubahan kata sandi',
-        description: 'Coba lagi atau hubungi administrator.',
+        title: copy('Password change request failed'),
+        description: copy('Try again or contact an administrator.'),
         variant: 'danger',
       });
     } finally {
