@@ -9,8 +9,14 @@ import { BrowserSessionClient } from './browser-session-client';
 
 interface AuthUser {
   id: string;
+  username: string | null;
   displayName: string;
-  roles: Array<{ permissions: string[] }>;
+  roles: Array<{
+    code: string;
+    name: string;
+    systemKey?: string | null;
+    permissions: string[];
+  }>;
 }
 interface ApiResponse<T> {
   success: boolean;
@@ -93,7 +99,13 @@ export class HttpAuthAdapter implements AuthPort {
       identity: {
         userId: user.id,
         displayName: user.displayName,
+        username: user.username,
         workspace: this.workspace,
+        roles: user.roles.map((role) => ({
+          code: role.code,
+          name: role.name,
+          systemKey: role.systemKey ?? null,
+        })),
         permissions: [...new Set(['auth:self', ...user.roles.flatMap((role) => role.permissions)])],
       },
     };
