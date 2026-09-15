@@ -121,7 +121,15 @@ export function NotificationsPage() {
       key: 'severity',
       label: notificationText(locale, 'severity'),
       render: (notification) => (
-        <DBadge variant="outline">
+        <DBadge
+          variant={
+            notification.severity === 'CRITICAL'
+              ? 'danger'
+              : notification.severity === 'WARNING'
+                ? 'warning'
+                : 'outline'
+          }
+        >
           {notificationSeverityLabel(locale, notification.severity)}
         </DBadge>
       ),
