@@ -711,6 +711,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     voidSale,
     newSale,
     clearProcessedDraft,
+    resumeSale: openQueueContext,
     openQueueContext,
     hydrateQueuedSale,
     hydrateQueuedPayment,
