@@ -65,18 +65,18 @@ export function FinancialOperationsPage() {
         )}
       />
       <DTabs defaultValue="cash" className="mt-6">
-        <DTabsList>
+        <DTabsList className="max-w-full overflow-x-auto">
           <DTabsTrigger value="cash">{copy('Cash position')}</DTabsTrigger>
           <DTabsTrigger value="settlements">{copy('Settlements')}</DTabsTrigger>
           <DTabsTrigger value="reconciliation">{copy('Reconciliation')}</DTabsTrigger>
         </DTabsList>
-        <DTabsContent value="cash">
+        <DTabsContent value="cash" className="mt-4">
           <CashPanel api={api} />
         </DTabsContent>
-        <DTabsContent value="settlements">
+        <DTabsContent value="settlements" className="mt-4">
           <SettlementPanel api={api} />
         </DTabsContent>
-        <DTabsContent value="reconciliation">
+        <DTabsContent value="reconciliation" className="mt-4">
           <ReconciliationPanel api={api} />
         </DTabsContent>
       </DTabs>
@@ -136,7 +136,7 @@ function CashPanel({ api }: { api: FinancialOperationsApi }) {
       />
     );
   return (
-    <section className="mt-5 space-y-6">
+    <section className="space-y-6">
       <DDataTable
         columns={columns}
         data={(positions.data ?? []).slice(positionOffset, positionOffset + positionPageSize)}
@@ -165,7 +165,7 @@ function CashPanel({ api }: { api: FinancialOperationsApi }) {
         }}
       />
       <div>
-        <h2 className="mb-3 text-base font-bold">{copy('Cash movements')}</h2>
+        <h2 className="mb-3 text-base font-semibold">{copy('Cash movements')}</h2>
         <DDataTable
           columns={[
             { key: 'type', label: copy('Movement type') },
@@ -245,7 +245,7 @@ function SettlementPanel({ api }: { api: FinancialOperationsApi }) {
     },
   ];
   return (
-    <section className="mt-5">
+    <section>
       <DDataTable
         columns={columns}
         data={query.data?.items ?? []}
@@ -352,7 +352,7 @@ function ReconciliationPanel({ api }: { api: FinancialOperationsApi }) {
     }
   };
   return (
-    <section className="mt-5">
+    <section>
       <DDataTable
         columns={columns}
         data={query.data?.items ?? []}
