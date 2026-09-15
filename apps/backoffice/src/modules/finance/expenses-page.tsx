@@ -24,7 +24,14 @@ import { FinancialOperationsApi } from './financial-operations-api';
 import { ExpenseApi, type Expense } from './expense-api';
 const limit = 20;
 function ExpenseFact({ fact }: { fact: [string, string] }) {
-  return <div className="min-w-0"><dt className="text-xs font-medium text-[var(--color-text-muted)]">{fact[0]}</dt><dd className="mt-1 break-words text-sm text-[var(--color-text)]">{fact[1]}</dd></div>;
+  return (
+    <div className="min-w-0">
+      <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+        {fact[0]}
+      </dt>
+      <dd className="mt-1 break-words text-sm font-medium text-[var(--color-text)]">{fact[1]}</dd>
+    </div>
+  );
 }
 export function ExpensesPage() {
   const { session, createApiClient } = useBackofficeAuth();
@@ -166,10 +173,36 @@ export function ExpensesPage() {
       <ExpenseDetail item={detail} onClose={() => setDetail(null)} />
       <DDialog
         open={Boolean(rejecting)}
-        onClose={() => { setRejecting(null); setRejectionNote(''); }}
+        onClose={() => {
+          setRejecting(null);
+          setRejectionNote('');
+        }}
         title={copy('Reject expense?')}
         description={copy('This expense will not be realized. A rejection note is required.')}
-        footer={<div className="flex justify-end gap-2"><DButton variant="secondary" onClick={() => { setRejecting(null); setRejectionNote(''); }}>{copy('Cancel')}</DButton><DButton variant="danger" disabled={!rejectionNote.trim()} onClick={() => { if (rejecting) void api.reject(rejecting, rejectionNote).then(refresh); setRejecting(null); setRejectionNote(''); }}>{copy('Reject')}</DButton></div>}
+        footer={
+          <div className="flex justify-end gap-2">
+            <DButton
+              variant="secondary"
+              onClick={() => {
+                setRejecting(null);
+                setRejectionNote('');
+              }}
+            >
+              {copy('Cancel')}
+            </DButton>
+            <DButton
+              variant="danger"
+              disabled={!rejectionNote.trim()}
+              onClick={() => {
+                if (rejecting) void api.reject(rejecting, rejectionNote).then(refresh);
+                setRejecting(null);
+                setRejectionNote('');
+              }}
+            >
+              {copy('Reject')}
+            </DButton>
+          </div>
+        }
       >
         <DTextarea
           label={copy('Rejection note')}
@@ -183,38 +216,116 @@ export function ExpensesPage() {
 }
 function ExpenseDetail({ item, onClose }: { item: Expense | null; onClose: () => void }) {
   const { copy, formatDate, formatMoney } = useBackofficeLocalization();
-  const facts: Array<[string, string]> = item ? [
-    [copy('Category'), expenseCategoryLabel(item.categoryCode, copy)],
-    [copy('Amount'), formatMoney(item.amount, item.currency)],
-    [copy('Occurred date'), formatDate(new Date(item.occurredAt), { dateStyle: 'medium' })],
-    [copy('Source financial account'), item.financialAccountName],
-    [copy('Location'), item.sellingLocationName],
-    [copy('Description'), item.note || '—'],
-    [copy('Origin'), copy(item.origin)],
-    [copy('Requested by'), item.createdByActorId],
-    [copy('Status'), item.status],
-    ...(item.approvedAt ? [[copy('Approved by'), item.approvedByActorId || '—'] as [string, string], [copy('Decision time'), formatDate(new Date(item.approvedAt), { dateStyle: 'medium', timeStyle: 'short' })] as [string, string]] : []),
-    ...(item.rejectedAt ? [[copy('Rejected by'), item.rejectedByActorId || '—'] as [string, string], [copy('Decision time'), formatDate(new Date(item.rejectedAt), { dateStyle: 'medium', timeStyle: 'short' })] as [string, string], [copy('Decision note'), item.rejectionNote || '—'] as [string, string]] : []),
-  ] : [];
   return (
-    <DDialog open={Boolean(item)} onClose={onClose} title={copy('Expense details')} footer={<div className="flex justify-end"><DButton variant="secondary" onClick={onClose}>{copy('Close')}</DButton></div>}>
-      {item ? <div className="space-y-5">
-        <section className="border-b border-[var(--color-border)] pb-4">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div><p className="text-xs font-medium text-[var(--color-text-muted)]">{copy('Amount')}</p><p className="mt-1 text-2xl font-bold tracking-tight">{formatMoney(item.amount, item.currency)}</p></div>
-            <Badge status={item.status} />
-          </div>
-          <dl className="mt-4 grid gap-4 sm:grid-cols-2"><ExpenseFact fact={facts[0]!} /><ExpenseFact fact={facts[2]!} /></dl>
-        </section>
-        <section><h3 className="mb-3 text-sm font-semibold">{copy('Expense information')}</h3><dl className="grid gap-4 sm:grid-cols-2"><ExpenseFact fact={facts[5]!} /><ExpenseFact fact={facts[3]!} /><ExpenseFact fact={facts[4]!} /></dl></section>
-        <section className="border-t border-[var(--color-border)] pt-4"><h3 className="mb-3 text-sm font-semibold">{copy('Request information')}</h3><dl className="grid gap-4 sm:grid-cols-2"><ExpenseFact fact={facts[6]!} /><ExpenseFact fact={facts[7]!} /></dl></section>
-        {facts.length > 9 ? <section className="border-t border-[var(--color-border)] pt-4"><h3 className="mb-3 text-sm font-semibold">{copy('Decision and audit')}</h3><dl className="grid gap-4 sm:grid-cols-2">{facts.slice(9).map((fact) => <ExpenseFact key={fact[0]} fact={fact} />)}</dl></section> : null}
-      </div> : null}
+    <DDialog
+      open={Boolean(item)}
+      onClose={onClose}
+      title={copy('Expense details')}
+      footer={
+        <div className="flex justify-end">
+          <DButton variant="secondary" onClick={onClose}>
+            {copy('Close')}
+          </DButton>
+        </div>
+      }
+    >
+      {item ? (
+        <div>
+          <section className="border-b border-[var(--color-border)] pb-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="min-w-0">
+                <h2 className="break-words text-2xl font-semibold tracking-tight text-[var(--color-text)]">
+                  {expenseCategoryLabel(item.categoryCode, copy)}
+                </h2>
+                <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+                  {item.sellingLocationName} ·{' '}
+                  {formatDate(new Date(item.occurredAt), { dateStyle: 'medium' })}
+                </p>
+              </div>
+              <Badge status={item.status} />
+            </div>
+            <div className="mt-5 border-t border-[var(--color-border)] pt-4">
+              <p className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+                {copy('Amount')}
+              </p>
+              <p className="mt-1 text-3xl font-semibold tracking-tight text-[var(--color-text)]">
+                {formatMoney(item.amount, item.currency)}
+              </p>
+            </div>
+          </section>
+
+          <section className="border-b border-[var(--color-border)] py-5">
+            <h3 className="text-base font-semibold text-[var(--color-text)]">
+              {copy('Expense information')}
+            </h3>
+            <dl className="mt-4 grid gap-x-6 gap-y-5 sm:grid-cols-2">
+              <ExpenseFact fact={[copy('Description'), item.note || '—']} />
+              <ExpenseFact fact={[copy('Source financial account'), item.financialAccountName]} />
+              <ExpenseFact fact={[copy('Location'), item.sellingLocationName]} />
+              <ExpenseFact fact={[copy('Category'), expenseCategoryLabel(item.categoryCode, copy)]} />
+            </dl>
+          </section>
+
+          <section className="border-b border-[var(--color-border)] py-5">
+            <h3 className="text-base font-semibold text-[var(--color-text)]">
+              {copy('Request information')}
+            </h3>
+            <dl className="mt-4 grid gap-x-6 gap-y-5 sm:grid-cols-2">
+              <ExpenseFact fact={[copy('Origin'), copy(item.origin)]} />
+              <ExpenseFact fact={[copy('Requested by'), item.createdByActorId]} />
+            </dl>
+          </section>
+
+          {item.approvedAt || item.rejectedAt ? (
+            <section className="pt-5">
+              <h3 className="text-base font-semibold text-[var(--color-text)]">
+                {copy('Decision and audit')}
+              </h3>
+              <dl className="mt-4 grid gap-x-6 gap-y-5 sm:grid-cols-2">
+                {item.approvedAt ? (
+                  <>
+                    <ExpenseFact fact={[copy('Approved by'), item.approvedByActorId || '—']} />
+                    <ExpenseFact
+                      fact={[
+                        copy('Decision time'),
+                        formatDate(new Date(item.approvedAt), {
+                          dateStyle: 'medium',
+                          timeStyle: 'short',
+                        }),
+                      ]}
+                    />
+                  </>
+                ) : null}
+                {item.rejectedAt ? (
+                  <>
+                    <ExpenseFact fact={[copy('Rejected by'), item.rejectedByActorId || '—']} />
+                    <ExpenseFact
+                      fact={[
+                        copy('Decision time'),
+                        formatDate(new Date(item.rejectedAt), {
+                          dateStyle: 'medium',
+                          timeStyle: 'short',
+                        }),
+                      ]}
+                    />
+                    <ExpenseFact fact={[copy('Decision note'), item.rejectionNote || '—']} />
+                  </>
+                ) : null}
+              </dl>
+            </section>
+          ) : null}
+        </div>
+      ) : null}
     </DDialog>
   );
 }
 function expenseCategoryLabel(categoryCode: string, copy: (value: string) => string) {
-  const labels: Record<string, string> = { OPERATIONS: 'Operations', TRANSPORT: 'Transport', SUPPLIES: 'Supplies', OTHER: 'Other' };
+  const labels: Record<string, string> = {
+    OPERATIONS: 'Operations',
+    TRANSPORT: 'Transport',
+    SUPPLIES: 'Supplies',
+    OTHER: 'Other',
+  };
   return copy(labels[categoryCode] ?? categoryCode);
 }
 function ExpenseDialog({
@@ -284,7 +395,10 @@ function ExpenseDialog({
           <DButton variant="secondary" onClick={onClose}>
             {copy('Cancel')}
           </DButton>
-          <DButton disabled={!locationId || !accountId || !amount || !categoryCode} onClick={() => void save()}>
+          <DButton
+            disabled={!locationId || !accountId || !amount || !categoryCode}
+            onClick={() => void save()}
+          >
             {copy('Save')}
           </DButton>
         </div>
