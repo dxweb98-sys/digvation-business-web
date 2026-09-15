@@ -10,6 +10,29 @@ export interface AccessRole {
   permissions: string[];
 }
 
+export interface AccessPermissionLabel {
+  id: string;
+  en: string;
+}
+
+export interface AccessPermissionGroupMetadata {
+  key: string;
+  label: AccessPermissionLabel;
+  order: number;
+}
+
+export interface AccessPermission {
+  key: string;
+  label: AccessPermissionLabel;
+  product: string | null;
+  capability: string | null;
+  section: AccessPermissionGroupMetadata;
+  businessArea: AccessPermissionGroupMetadata;
+  surface: 'BACKOFFICE' | 'OPERATIONAL' | 'BOTH' | 'SYSTEM';
+  configurable: boolean;
+  order: number;
+}
+
 export interface AccessUser {
   id: string;
   username: string | null;
@@ -53,7 +76,7 @@ export class AccessControlApi {
     );
   }
   listPermissions() {
-    return this.client.get<Page<{ key: string }>>('/api/v1/roles/permissions');
+    return this.client.get<Page<AccessPermission>>('/api/v1/roles/permissions');
   }
   listUsers(page: PageRequest) {
     return this.client.get<Page<AccessUser>>(
