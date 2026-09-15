@@ -26,7 +26,8 @@ export function useSellingCatalog({
   const categoriesQuery = useQuery({
     queryKey: cashierTransactionKeys.categories(),
     queryFn: ({ signal }) => query.listCatalogCategories(signal),
-    staleTime: 300_000,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
   const itemsQuery = useQuery({
     queryKey: cashierTransactionKeys.items(sellingLocationId, currency),
@@ -37,7 +38,8 @@ export function useSellingCatalog({
       return query.listCatalogItems(signal);
     },
     enabled: Boolean(sellingLocationId && currency),
-    staleTime: 300_000,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const activeItems = useMemo(
@@ -57,7 +59,7 @@ export function useSellingCatalog({
     const page = await queryClient.fetchQuery({
       queryKey: cashierTransactionKeys.variants(item.id),
       queryFn: ({ signal }) => query.listCatalogVariants(item.id, signal),
-      staleTime: 300_000,
+      staleTime: 0,
     });
     return page.items.filter((variant) => variant.status === 'ACTIVE');
   };
