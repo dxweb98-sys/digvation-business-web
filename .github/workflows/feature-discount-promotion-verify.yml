@@ -23,8 +23,26 @@ jobs:
       - run: corepack enable
       - run: corepack prepare pnpm@11.22.0 --activate
       - run: pnpm install --frozen-lockfile
-      - name: Format diagnostic
-        run: |
-          pnpm exec prettier --write apps/operational/src/features/sell/cart-draft.ts
-          git diff -- apps/operational/src/features/sell/cart-draft.ts
-          exit 1
+      - name: Contract check
+        run: pnpm contract:check
+      - name: Feature format check
+        run: >-
+          pnpm exec prettier --check
+          apps/backoffice/src/modules/promotions/*.ts
+          apps/backoffice/src/modules/promotions/*.tsx
+          apps/operational/src/features/sell/cart-draft.ts
+          apps/operational/src/features/sell/cart-draft.test.ts
+          apps/operational/src/features/sell/cashier-transaction.types.ts
+          apps/operational/src/features/sell/operational-projection-client.ts
+          apps/operational/src/features/sell/use-sale-workspace-controller.ts
+          apps/operational/src/features/sell/components/sale-adjustment-controls.tsx
+      - name: Lint
+        run: pnpm lint
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Tests
+        run: pnpm test
+      - name: Build
+        env:
+          VITE_BUILD_REVISION: ${{ github.sha }}
+        run: pnpm build
