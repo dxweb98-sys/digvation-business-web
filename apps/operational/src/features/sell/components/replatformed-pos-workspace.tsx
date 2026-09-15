@@ -598,8 +598,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
 
   useEffect(() => {
     writeStoredCustomer(CURRENT_CUSTOMER_KEY, cartCustomer);
-    if (sale?.id) writeStoredCustomer(saleCustomerKey(sale.id), cartCustomer);
-  }, [cartCustomer, sale?.id]);
+  }, [cartCustomer]);
 
   const displayedQueueDetail =
     receiptSaleId && sale?.id === receiptSaleId && hasSuccessfulPayment(sale) ? sale : queueDetail;
@@ -859,7 +858,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     if (transaction.status !== 'OPEN') return;
     setQueueDetail(null);
     setAdjustmentTarget(transaction);
-    workspace.resumeSale(transaction.id);
+    workspace.openQueueContext(transaction.id);
   };
 
   const openQueuePayment = async (transaction: Sale) => {
@@ -893,7 +892,6 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     }
     setCancelTarget(transaction);
     setCancelReason('');
-    workspace.resumeSale(transaction.id);
   };
 
   const confirmCancel = async () => {
@@ -906,12 +904,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       });
       return;
     }
-    if (sale?.id !== cancelTarget.id) {
-      workspace.resumeSale(cancelTarget.id);
-      return;
-    }
     try {
-      const canceledSale = await workspace.voidSale();
+      const canceledSale = await workspace.voidQueuedSale(cancelTarget);
       if (isLocalDemo) {
         writeCancellationReason(canceledSale.id, cancelReason.trim());
         setCancellationReasons((current) => ({
@@ -922,7 +916,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       setQueueDetail(canceledSale);
       setCancelTarget(null);
       setCancelReason('');
-      workspace.clearProcessedDraft();
+      workspace.closeQueueContext();
       showToast({
         title: copy('Transaction canceled'),
         description: copy('Cancellation reason saved.'),
@@ -988,14 +982,15 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
 
   const payQueueBalance = async () => {
     const transaction = displayedQueuePaymentTarget;
-    if (!transaction || sale?.id !== transaction.id || !queuePaymentAmount) return;
+    if (!transaction || !queuePaymentAmount) return;
     const due = queuePaymentAmount;
     const applied = paymentMethod === 'CASH' ? tender || due : due;
     if (!isPositiveDecimal(applied)) return;
     if (paymentMethod === 'CASH' && createDecimal(applied).lessThan(createDecimal(due))) return;
     if ((paymentMethod === 'BANK_TRANSFER' || paymentMethod === 'WALLET') && !provider) return;
     try {
-      const updatedSale = await workspace.createPayment(
+      const updatedSale = await workspace.createQueuedPayment(
+        transaction,
         paymentMethod,
         due,
         paymentMethod === 'CASH' ? applied : undefined,
@@ -1005,7 +1000,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       setQueuePaymentAmount(null);
       setQueueDetail(updatedSale);
       setReceiptSaleId(updatedSale.id);
-      workspace.clearProcessedDraft();
+      workspace.closeQueueContext();
       showToast({
         title: hasSuccessfulCheckout(updatedSale)
           ? copy('Payment complete')
@@ -1205,10 +1200,12 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         onClose={() => setCustomerPickerOpen(false)}
         onChoose={(customer) => {
           setCartCustomer(customer);
+          if (sale?.id) writeStoredCustomer(saleCustomerKey(sale.id), customer);
           setCustomerPickerOpen(false);
         }}
         onUseGeneralCustomer={() => {
           setCartCustomer(null);
+          if (sale?.id) writeStoredCustomer(saleCustomerKey(sale.id), null);
           setCustomerPickerOpen(false);
         }}
       />
@@ -1302,7 +1299,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         onClose={() => {
           workspace.closeVariantPicker();
           setAdjustmentTarget(null);
-          workspace.clearProcessedDraft();
+          workspace.closeQueueContext();
         }}
         onAdd={(item) => void workspace.selectItem(item, 'TRANSACTION_ADJUSTMENT')}
         onAddVariant={(variantId) => void workspace.selectVariant(variantId)}
@@ -1321,7 +1318,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         onClose={() => {
           setQueuePaymentTarget(null);
           setQueuePaymentAmount(null);
-          workspace.clearProcessedDraft();
+          workspace.closeQueueContext();
         }}
         onMethod={(next) => {
           setPaymentMethod(next);
@@ -1352,7 +1349,10 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         sale={cancelTarget}
         reason={cancelReason}
         onReasonChange={setCancelReason}
-        onClose={() => setCancelTarget(null)}
+        onClose={() => {
+          setCancelTarget(null);
+          workspace.closeQueueContext();
+        }}
         onConfirm={confirmCancel}
       />
 
@@ -1764,6 +1764,11 @@ function ReferenceQueueCard({
       : []),
     ...(status === 'PROGRESS'
       ? [
+          {
+            label: copy('Adjust order'),
+            icon: <ShoppingBag className="size-3.5" />,
+            onSelect: () => onAdjust(sale),
+          },
           ...(isPositiveDecimal(balanceDue)
             ? [
                 {
