@@ -36,7 +36,6 @@ jobs:
           apps/operational/src/features/sell/operational-projection-client.ts
           apps/operational/src/features/sell/use-sale-workspace-controller.ts
           apps/operational/src/features/sell/components/sale-adjustment-controls.tsx
-          apps/operational/src/features/sell/components/replatformed-pos-workspace.tsx
       - name: Lint
         run: pnpm lint
       - name: Typecheck
