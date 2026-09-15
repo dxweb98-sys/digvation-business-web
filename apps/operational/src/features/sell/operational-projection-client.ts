@@ -99,11 +99,7 @@ export function attachOperationalProjection(
   operational.getSale = (saleId, signal) =>
     client.get<Sale>(`${OPERATIONAL_PREFIX}/transactions/${saleId}`, { signal });
 
-  operational.addSaleLine = (
-    saleId: string,
-    input: AddSaleLineInput,
-    idempotencyKey: string,
-  ) =>
+  operational.addSaleLine = (saleId: string, input: AddSaleLineInput, idempotencyKey: string) =>
     client.post<Sale>(`${OPERATIONAL_PREFIX}/transactions/${saleId}/lines`, input, {
       headers: { 'Idempotency-Key': idempotencyKey },
     });
@@ -119,10 +115,9 @@ export function attachOperationalProjection(
     );
 
   operational.removeSaleLine = (saleId, saleLineId, expectedVersion) =>
-    client.post<Sale>(
-      `${OPERATIONAL_PREFIX}/transactions/${saleId}/lines/${saleLineId}/remove`,
-      { expectedVersion },
-    );
+    client.post<Sale>(`${OPERATIONAL_PREFIX}/transactions/${saleId}/lines/${saleLineId}/remove`, {
+      expectedVersion,
+    });
 
   operational.setSaleLinePriceOverride = (saleId, saleLineId, input) =>
     client.post<Sale>(
@@ -165,11 +160,9 @@ export function attachOperationalProjection(
     );
 
   operational.setPromotionCode = (saleId, input, idempotencyKey) =>
-    client.post<Sale>(
-      `${OPERATIONAL_PREFIX}/transactions/${saleId}/promo-code`,
-      input,
-      { headers: { 'Idempotency-Key': idempotencyKey } },
-    );
+    client.post<Sale>(`${OPERATIONAL_PREFIX}/transactions/${saleId}/promo-code`, input, {
+      headers: { 'Idempotency-Key': idempotencyKey },
+    });
 
   operational.clearPromotionCode = (saleId, expectedVersion, idempotencyKey) =>
     client.post<Sale>(

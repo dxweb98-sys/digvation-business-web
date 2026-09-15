@@ -85,7 +85,8 @@ export function PromotionsPage() {
     {
       key: 'scope',
       label: promotionCopy('scope'),
-      render: (row) => promotionCopy(row.scope.toLowerCase() as 'item' | 'category' | 'transaction'),
+      render: (row) =>
+        promotionCopy(row.scope.toLowerCase() as 'item' | 'category' | 'transaction'),
     },
     {
       key: 'discountValue',
@@ -242,8 +243,7 @@ function PromotionDialog({
     discountType === 'FIXED_AMOUNT' || maximumDiscount !== '' || minimumPurchase !== '';
   const currencyValid = !needsCurrency || /^[A-Z]{3}$/.test(currency.trim().toUpperCase());
   const targetValid =
-    scope === 'TRANSACTION' ||
-    (scope === 'ITEM' ? itemIds.length > 0 : categoryIds.length > 0);
+    scope === 'TRANSACTION' || (scope === 'ITEM' ? itemIds.length > 0 : categoryIds.length > 0);
   const valueValid =
     Number.isFinite(numericValue) &&
     numericValue > 0 &&

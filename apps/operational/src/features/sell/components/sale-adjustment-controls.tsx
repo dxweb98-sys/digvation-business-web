@@ -92,10 +92,7 @@ function discountValueForApi(type: DiscountType, value: string): string | null {
   return trimmed;
 }
 
-function commitSaleToCache(
-  queryClient: ReturnType<typeof useQueryClient>,
-  sale: Sale,
-): void {
+function commitSaleToCache(queryClient: ReturnType<typeof useQueryClient>, sale: Sale): void {
   queryClient.setQueryData(cashierTransactionKeys.sale(sale.id), sale);
   queryClient.setQueryData<ApiPage<Sale>>(cashierTransactionKeys.sales(), (page) => {
     if (!page) return page;
@@ -323,9 +320,7 @@ export function SaleAdjustmentControls({ workspace }: SaleAdjustmentControlsProp
                   onValueChange={(value) => setDiscountType(value as DiscountType)}
                 />
                 <DInput
-                  label={text(
-                    discountType === 'PERCENTAGE' ? 'Discount (%)' : 'Discount amount',
-                  )}
+                  label={text(discountType === 'PERCENTAGE' ? 'Discount (%)' : 'Discount amount')}
                   value={discountValue}
                   inputMode="decimal"
                   disabled={!monetaryAvailable || workspace.isCoreMutating}
@@ -414,9 +409,7 @@ export function SaleAdjustmentControls({ workspace }: SaleAdjustmentControlsProp
                         <p className="truncate text-xs font-semibold">{adjustment.label}</p>
                         <p className="mt-0.5 text-[11px] text-[var(--color-text-muted)]">
                           {text(
-                            adjustment.source === 'PROMOTION'
-                              ? 'Promotion'
-                              : 'Manual discount',
+                            adjustment.source === 'PROMOTION' ? 'Promotion' : 'Manual discount',
                           )}
                           {adjustment.reason ? ` · ${adjustment.reason}` : ''}
                         </p>

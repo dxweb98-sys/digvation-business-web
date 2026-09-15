@@ -3,7 +3,8 @@ import { useBackofficeLocalization } from '../../app/localization/backoffice-loc
 const messages = {
   id: {
     title: 'Diskon & promo',
-    description: 'Atur promo otomatis dan kode promo yang diterapkan pada transaksi yang memenuhi syarat.',
+    description:
+      'Atur promo otomatis dan kode promo yang diterapkan pada transaksi yang memenuhi syarat.',
     add: 'Tambah promo',
     edit: 'Ubah promo',
     name: 'Nama',
