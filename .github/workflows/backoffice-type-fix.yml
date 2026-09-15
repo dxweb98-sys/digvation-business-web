@@ -1,0 +1,52 @@
+name: Temporary Backoffice Type Fix
+
+on:
+  push:
+    branches:
+      - fix/ci-formatting
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: ${{ !contains(github.event.head_commit.message, '[backoffice-type-bot]') && !contains(github.event.head_commit.message, '[remove-backoffice-type-workflow]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref_name }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - run: corepack enable
+      - run: corepack prepare pnpm@11.22.0 --activate
+      - run: pnpm install --frozen-lockfile
+      - name: Apply Backoffice component contract fixes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          catalog = Path('apps/backoffice/src/modules/catalog/catalog-item-detail-dialog.tsx')
+          text = catalog.read_text()
+          old = "variant={statusTarget?.status === 'ACTIVE' ? 'danger' : 'default'}"
+          if old not in text:
+              raise SystemExit('catalog confirm variant marker not found')
+          catalog.write_text(text.replace(old, "variant={statusTarget?.status === 'ACTIVE' ? 'danger' : 'primary'}", 1))
+
+          access = Path('apps/backoffice/src/modules/identity/access-control-page.tsx')
+          text = access.read_text()
+          old = """      <DTabs\n        value={section}\n"""
+          new = """      <DTabs\n        defaultValue=\"roles\"\n        value={section}\n"""
+          if old not in text:
+              raise SystemExit('access tabs marker not found')
+          access.write_text(text.replace(old, new, 1))
+          PY
+          pnpm exec prettier --write apps/backoffice/src/modules/catalog/catalog-item-detail-dialog.tsx apps/backoffice/src/modules/identity/access-control-page.tsx
+      - name: Commit fixes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/backoffice/src/modules/catalog/catalog-item-detail-dialog.tsx apps/backoffice/src/modules/identity/access-control-page.tsx
+          git commit -m "fix(backoffice): align UI component contracts [backoffice-type-bot]"
+          git push origin HEAD:${{ github.ref_name }}
