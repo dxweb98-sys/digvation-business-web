@@ -127,14 +127,16 @@ export function saleDisplayLines(
 ): CartDisplayLine[] {
   return lines.map((line) => {
     const promotion = adjustments.find(
-      (adjustment) => adjustment.source === 'PROMOTION' && adjustment.saleLineId === line.id,
+      (adjustment) =>
+        adjustment.source === 'PROMOTION' && adjustment.saleLineId === line.id,
     );
     const promotionLabel = promotion ? `Promo: ${promotion.label}` : null;
     return {
       id: line.id,
       itemNameSnapshot: line.itemNameSnapshot,
       itemTypeSnapshot: line.itemTypeSnapshot,
-      variantNameSnapshot: [line.variantNameSnapshot, promotionLabel].filter(Boolean).join(' · ') || null,
+      variantNameSnapshot:
+        [line.variantNameSnapshot, promotionLabel].filter(Boolean).join(' · ') || null,
       quantity: line.quantity,
       effectiveUnitPrice: line.effectiveUnitPrice,
       totalAmount: line.totalAmount,
