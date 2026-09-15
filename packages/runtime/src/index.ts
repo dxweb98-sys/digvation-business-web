@@ -1,4 +1,5 @@
 export { assertApplicationEnabled } from './application-availability';
+export { ApplicationSplash } from './application-splash';
 export {
   loadAuthenticatedEntitlements,
   loadAuthenticatedRuntimeAvailability,

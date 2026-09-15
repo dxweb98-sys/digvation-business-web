@@ -1,14 +1,16 @@
-import { Building2 } from 'lucide-react';
+import type { ReactNode } from 'react';
 
-interface AppBootScreenProps {
+interface ApplicationSplashProps {
   productName?: string;
   message?: string;
+  mark?: ReactNode;
 }
 
-export function AppBootScreen({
+export function ApplicationSplash({
   productName = 'Digvation Business',
-  message = 'Memuat Operasional...',
-}: AppBootScreenProps) {
+  message = 'Menyiapkan aplikasi',
+  mark = <span className="text-lg font-bold">D</span>,
+}: ApplicationSplashProps) {
   return (
     <main
       aria-busy="true"
@@ -19,8 +21,10 @@ export function AppBootScreen({
       <div className="pointer-events-none absolute bottom-[12%] right-[14%] size-56 rounded-full bg-[var(--color-accent-lavender)]/25 blur-3xl" />
       <section className="relative w-full max-w-sm">
         <div className="relative mx-auto grid size-14 place-items-center rounded-[var(--radius-card)] bg-[var(--color-brand)] text-white shadow-lg shadow-[var(--color-brand)]/20">
-          <span className="absolute inset-0 rounded-[var(--radius-card)] bg-[var(--color-brand)]/20 animate-ping [animation-duration:2s]" />
-          <Building2 className="relative size-6" />
+          <span className="absolute inset-0 animate-ping rounded-[var(--radius-card)] bg-[var(--color-brand)]/20 [animation-duration:2s]" />
+          <span className="relative grid place-items-center" aria-hidden="true">
+            {mark}
+          </span>
         </div>
         <h1 className="mt-5 text-2xl font-bold tracking-[-0.04em]">{productName}</h1>
         <p className="mt-2 text-sm text-[var(--color-text-muted)]">{message}</p>

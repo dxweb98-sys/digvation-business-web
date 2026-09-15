@@ -31,9 +31,6 @@ interface BackofficeAuthContextValue {
 
 const BackofficeAuthContext = createContext<BackofficeAuthContextValue | null>(null);
 const BUSINESS_CONFIGURATION_CHANGED_EVENT = 'digvation:business-configuration-changed';
-const SESSION_END_TRANSITION_MS = 5_000;
-const IDLE_SESSION_ENDED_MESSAGE =
-  'Sesi Anda telah berakhir karena tidak ada aktivitas. Silakan masuk kembali.';
 
 export function BackofficeAuthProvider({
   auth,
@@ -47,32 +44,17 @@ export function BackofficeAuthProvider({
   const { showToast } = useToast();
   const { t } = useBackofficeLocalization();
   const sessionExpired = useRef(false);
-  const sessionEndTimer = useRef<number | null>(null);
-
-  const clearSessionEndTimer = useCallback(() => {
-    if (sessionEndTimer.current === null) return;
-    window.clearTimeout(sessionEndTimer.current);
-    sessionEndTimer.current = null;
-  }, []);
 
   const expireSession = useCallback(
-    (reason: SessionEndReason) => {
+    (_reason: SessionEndReason) => {
       if (sessionExpired.current) return;
       sessionExpired.current = true;
-      clearSessionEndTimer();
       setSession(null);
-      setStatus('hydrating');
-      showToast({
-        variant: 'warning',
-        title: reason === 'idle' ? IDLE_SESSION_ENDED_MESSAGE : t('sessionExpired'),
-      });
+      setStatus('unauthenticated');
+      showToast({ variant: 'warning', title: t('sessionExpired') });
       void auth.logout();
-      sessionEndTimer.current = window.setTimeout(() => {
-        sessionEndTimer.current = null;
-        setStatus('unauthenticated');
-      }, SESSION_END_TRANSITION_MS);
     },
-    [auth, clearSessionEndTimer, showToast, t],
+    [auth, showToast, t],
   );
 
   useEffect(() => auth.subscribeSessionEnded(expireSession), [auth, expireSession]);
@@ -96,27 +78,24 @@ export function BackofficeAuthProvider({
     };
   }, [auth]);
 
-  useEffect(() => () => clearSessionEndTimer(), [clearSessionEndTimer]);
-
   const login = useCallback(
     async (input: LoginCredentials) => {
       const authenticated = await auth.login(input);
-      clearSessionEndTimer();
       sessionExpired.current = false;
       setSession(authenticated);
       setStatus('authenticated');
     },
-    [auth, clearSessionEndTimer],
+    [auth],
   );
 
   const logout = useCallback(async () => {
-    clearSessionEndTimer();
     sessionExpired.current = false;
-    await auth.logout();
+    const revocation = auth.logout();
     setSession(null);
     setStatus('unauthenticated');
     showToast({ variant: 'success', title: t('signedOut') });
-  }, [auth, clearSessionEndTimer, showToast, t]);
+    await revocation;
+  }, [auth, showToast, t]);
 
   const refresh = useCallback(async () => {
     const restored = await auth.restore();

@@ -1,18 +1,27 @@
-import { DSkeleton } from '@digvation/ui';
+import { ApplicationSplash, useRuntime } from '@digvation/business-runtime';
+import { useBackofficeLocalization } from '../app/localization/backoffice-localization';
 
 export function AuthenticationLoading() {
+  const runtime = useRuntime();
+  const { locale } = useBackofficeLocalization();
+
   return (
-    <main className="min-h-screen bg-[var(--color-background)] p-6 lg:p-8" aria-busy="true">
-      <div className="mx-auto max-w-6xl space-y-6">
-        <DSkeleton className="h-16 w-full" />
-        <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
-          <DSkeleton className="h-64" />
-          <div className="space-y-4">
-            <DSkeleton className="h-8 w-52" />
-            <DSkeleton className="h-28 w-full" />
-          </div>
-        </div>
-      </div>
-    </main>
+    <ApplicationSplash
+      productName={runtime.branding.productName}
+      message={locale === 'id' ? 'Menyiapkan Backoffice' : 'Preparing Backoffice'}
+      mark={
+        runtime.branding.logoUrl ? (
+          <span className="grid size-9 place-items-center rounded-[var(--radius-control)] bg-white p-1">
+            <img src={runtime.branding.logoUrl} alt="" className="size-full object-contain" />
+          </span>
+        ) : (
+          <span className="flex h-5 items-end gap-1">
+            <span className="h-3 w-1.5 rounded-full bg-current" />
+            <span className="h-5 w-1.5 rounded-full bg-current" />
+            <span className="h-4 w-1.5 rounded-full bg-current" />
+          </span>
+        )
+      }
+    />
   );
 }

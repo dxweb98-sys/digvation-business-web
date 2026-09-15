@@ -10,6 +10,7 @@ import { useEffect, useMemo } from 'react';
 import type { RouterProviderProps } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 
+import { AuthenticationLoading } from '../../auth/authentication-loading';
 import { BackofficeAuthProvider, useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import type { HttpAuthAdapter } from '../../auth/http-auth-adapter';
 import { resolveBackofficeLocale } from '../localization/backoffice-locale';
@@ -61,7 +62,7 @@ function BackofficeDesignSystemProviders({
 
 function AuthenticatedBackofficeProviders({ router }: Pick<BackofficeProvidersProps, 'router'>) {
   const bootstrapRuntime = useRuntime();
-  const { session } = useBackofficeAuth();
+  const { session, status } = useBackofficeAuth();
   const { setLocale } = useBackofficeLocalization();
   const runtime = useMemo(
     () => applyEffectiveBusinessConfiguration(bootstrapRuntime, session?.businessConfiguration),
@@ -73,6 +74,8 @@ function AuthenticatedBackofficeProviders({ router }: Pick<BackofficeProvidersPr
   useEffect(() => {
     setLocale(resolveBackofficeLocale(configuredLocale));
   }, [configuredLocale, setLocale]);
+
+  if (status === 'hydrating') return <AuthenticationLoading />;
 
   return (
     <RuntimeProvider config={runtime}>

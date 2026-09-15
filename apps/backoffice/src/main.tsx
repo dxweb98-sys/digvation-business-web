@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { ApplicationSplash } from '@digvation/business-runtime';
 
 import '@digvation/ui/styles.css';
 import './app/app.css';
@@ -9,7 +10,7 @@ import { bootstrapBackoffice } from './app/bootstrap/bootstrap-backoffice';
 function renderBootstrapFailure(error: unknown) {
   const message = error instanceof Error ? error.message : 'Unknown startup error';
 
-  ReactDOM.createRoot(document.getElementById('root')!).render(
+  root.render(
     <React.StrictMode>
       <main className="grid min-h-screen place-items-center p-6">
         <section className="max-w-lg rounded-2xl border border-(--color-border) bg-white p-6 shadow-sm">
@@ -24,10 +25,16 @@ function renderBootstrapFailure(error: unknown) {
   );
 }
 
+const root = ReactDOM.createRoot(document.getElementById('root')!);
+
+root.render(
+  <React.StrictMode>
+    <ApplicationSplash />
+  </React.StrictMode>,
+);
+
 void bootstrapBackoffice()
   .then((app) => {
-    ReactDOM.createRoot(document.getElementById('root')!).render(
-      <React.StrictMode>{app}</React.StrictMode>,
-    );
+    root.render(<React.StrictMode>{app}</React.StrictMode>);
   })
   .catch(renderBootstrapFailure);
