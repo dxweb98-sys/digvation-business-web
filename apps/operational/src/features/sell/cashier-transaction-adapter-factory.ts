@@ -5,13 +5,10 @@ import {
   HttpCashierTransactionAdapter,
   type SaleTransactionPort,
 } from './cashier-transaction.adapter';
-import { LocalCashierTransactionAdapter } from './local-cashier-transaction.adapter';
 import {
   attachOperationalProjection,
   type OperationalProjectionQuery,
 } from './operational-projection-client';
-
-let localDemoAdapter: LocalCashierTransactionAdapter | null = null;
 
 type PerformerCapableTransactionPort = SaleTransactionPort & {
   setSaleLinePerformers: NonNullable<SaleTransactionPort['setSaleLinePerformers']>;
@@ -34,20 +31,16 @@ function withServicePerformers(adapter: SaleTransactionPort): PerformerCapableTr
   return adapter as PerformerCapableTransactionPort;
 }
 
+/** Operational integration never falls back to the legacy in-memory cashier demo. */
 export function isLocalCashierDemoEnabled(): boolean {
-  return import.meta.env.DEV && import.meta.env.VITE_CASHIER_DEMO === 'true';
+  return false;
 }
 
-/** Selects the transaction boundary once; Cashier presentation never selects a transport. */
+/** Selects the Runtime-backed Operational transaction boundary once. */
 export function createCashierTransactionAdapter(
   runtime: RuntimeConfig,
   getAccessToken?: () => Promise<string | null>,
 ): OperationalCashierTransactionPort {
-  if (isLocalCashierDemoEnabled()) {
-    localDemoAdapter ??= new LocalCashierTransactionAdapter();
-    return withServicePerformers(localDemoAdapter) as OperationalCashierTransactionPort;
-  }
-
   const client = new ApiClient({
     baseUrl: runtime.apiBaseUrl,
     applicationSurface: 'operational',
