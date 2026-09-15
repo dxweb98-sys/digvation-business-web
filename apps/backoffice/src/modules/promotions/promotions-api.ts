@@ -5,6 +5,18 @@ export type PromotionScope = 'ITEM' | 'CATEGORY' | 'TRANSACTION';
 export type PromotionDiscountType = 'PERCENTAGE' | 'FIXED_AMOUNT';
 export type PromotionStatus = 'ACTIVE' | 'SCHEDULED' | 'EXPIRED' | 'DISABLED';
 
+export interface PromotionReferenceOption {
+  id: string;
+  code: string;
+  name: string;
+}
+
+export interface PromotionReferenceOptions {
+  items: PromotionReferenceOption[];
+  categories: PromotionReferenceOption[];
+  locations: PromotionReferenceOption[];
+}
+
 export interface Promotion {
   id: string;
   name: string;
@@ -57,6 +69,10 @@ export class PromotionsApi {
 
   list() {
     return this.client.get<PromotionPage>('/api/v1/promotions?limit=100&offset=0');
+  }
+
+  options() {
+    return this.client.get<PromotionReferenceOptions>('/api/v1/promotions/options');
   }
 
   create(input: PromotionWriteInput) {
