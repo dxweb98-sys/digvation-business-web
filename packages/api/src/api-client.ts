@@ -114,8 +114,7 @@ export class ApiClient {
           if (refreshed.kind === 'ended') this.options.onSessionEnded?.(refreshed.reason);
         } else if (this.options.getAccessToken) {
           const refreshedToken = await this.options.getAccessToken(true);
-          if (refreshedToken && refreshedToken !== token)
-            return this.request<T>(path, init, false);
+          if (refreshedToken && refreshedToken !== token) return this.request<T>(path, init, false);
           this.options.onUnauthorized?.();
         } else {
           this.options.onUnauthorized?.();

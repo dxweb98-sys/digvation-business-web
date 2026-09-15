@@ -1,8 +1,11 @@
 import { DButton, DInput, useToast } from '@digvation/ui';
-import { Building2 } from 'lucide-react';
-import { useRef, useState, type FormEvent, type TransitionEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 
-import type { AuthPort, AuthSession } from '@digvation/business-auth';
+import {
+  BrowserSessionRequestError,
+  type AuthPort,
+  type AuthSession,
+} from '@digvation/business-auth';
 import { useRuntime } from '@digvation/business-runtime';
 import { useOperationalLocalization } from '../../app/localization/operational-localization';
 
@@ -11,40 +14,67 @@ interface OperationalLoginPageProps {
   onAuthenticated: (session: AuthSession) => void;
 }
 
-function loginFailureMessage(error: unknown, copy: (value: string) => string) {
-  if (error instanceof Error && error.message === 'INVALID_CREDENTIALS') {
-    return copy('Invalid user ID or password.');
+function BrandMark({ logoUrl }: { logoUrl: string | undefined }) {
+  return (
+    <span
+      className="grid size-14 place-items-center overflow-hidden rounded-2xl border border-[var(--color-brand)]/15 bg-[var(--color-brand)] text-white shadow-[0_14px_40px_-24px_var(--color-brand)]"
+      aria-hidden="true"
+    >
+      {logoUrl ? (
+        <span className="grid size-11 place-items-center rounded-xl bg-white p-1.5">
+          <img src={logoUrl} alt="" className="size-full object-contain" />
+        </span>
+      ) : (
+        <span className="flex h-6 items-end gap-1.5">
+          <span className="h-3.5 w-1.5 rounded-full bg-current" />
+          <span className="h-6 w-1.5 rounded-full bg-current" />
+          <span className="h-[18px] w-1.5 rounded-full bg-current" />
+        </span>
+      )}
+    </span>
+  );
+}
+
+function loginFailureMessage(error: unknown, locale: 'id-ID' | 'en-US') {
+  const isIndonesian = locale === 'id-ID';
+  if (
+    (error instanceof BrowserSessionRequestError &&
+      (error.status === 401 || error.code === 'INVALID_CREDENTIALS')) ||
+    (error instanceof Error && error.message === 'INVALID_CREDENTIALS')
+  ) {
+    return isIndonesian ? 'Username atau kata sandi salah.' : 'Username or password is incorrect.';
   }
-  return copy('Sign in failed. Try again.');
+  if (error instanceof TypeError) {
+    return isIndonesian
+      ? 'Tidak dapat terhubung. Coba lagi.'
+      : 'Unable to connect. Please try again.';
+  }
+  return isIndonesian
+    ? 'Masuk belum dapat diproses. Coba lagi.'
+    : 'Sign in could not be completed. Please try again.';
 }
 
 /** Operational-owned login composition using the canonical shared field, button, and toast primitives. */
 export function OperationalLoginPage({ authPort, onAuthenticated }: OperationalLoginPageProps) {
   const runtime = useRuntime();
-  const { copy } = useOperationalLocalization();
+  const { locale } = useOperationalLocalization();
   const { showToast } = useToast();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setSubmitting] = useState(false);
-  const [isLeaving, setLeaving] = useState(false);
-  const authenticatedSession = useRef<AuthSession | null>(null);
-  const hasCompletedTransition = useRef(false);
-
-  const completeTransition = (event: TransitionEvent<HTMLElement>) => {
-    if (event.target !== event.currentTarget || event.propertyName !== 'opacity') return;
-    if (!isLeaving || hasCompletedTransition.current || !authenticatedSession.current) return;
-    hasCompletedTransition.current = true;
-    onAuthenticated(authenticatedSession.current);
-  };
+  const isIndonesian = locale === 'id-ID';
+  const brandContext = runtime.branding.businessName ?? runtime.branding.companyName;
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (isSubmitting || isLeaving) return;
+    if (isSubmitting) return;
 
     if (!identifier.trim() || !password) {
       showToast({
-        title: copy('Complete account details'),
-        description: copy('Enter user ID and password.'),
+        title: isIndonesian ? 'Data masuk belum lengkap' : 'Sign-in details are incomplete',
+        description: isIndonesian
+          ? 'Masukkan ID pengguna dan kata sandi.'
+          : 'Enter your user ID and password.',
         variant: 'danger',
       });
       return;
@@ -53,58 +83,82 @@ export function OperationalLoginPage({ authPort, onAuthenticated }: OperationalL
     setSubmitting(true);
     try {
       const session = await authPort.login({ identifier: identifier.trim(), password });
-      authenticatedSession.current = session;
       showToast({
-        title: copy('Signed in'),
+        title: isIndonesian ? 'Masuk berhasil' : 'Signed in',
+        description: isIndonesian
+          ? `Selamat datang, ${session.identity.displayName}.`
+          : `Welcome, ${session.identity.displayName}.`,
         variant: 'success',
       });
-      setLeaving(true);
+      onAuthenticated(session);
     } catch (error) {
       setSubmitting(false);
       showToast({
-        title: copy('Sign in failed'),
-        description: loginFailureMessage(error, copy),
+        title: isIndonesian ? 'Masuk gagal' : 'Sign in failed',
+        description: loginFailureMessage(error, locale),
         variant: 'danger',
       });
     }
   };
 
   return (
-    <main
-      className={`grid min-h-screen place-items-center overflow-hidden bg-[var(--color-background)] px-4 py-8 transition-[opacity,transform] duration-200 ease-out sm:px-6 ${
-        isLeaving ? 'pointer-events-none -translate-y-1 opacity-0' : 'translate-y-0 opacity-100'
-      }`}
-      onTransitionEnd={completeTransition}
-    >
-      <div className="pointer-events-none absolute left-[12%] top-[18%] size-64 rounded-full bg-[var(--color-brand)]/[0.035] blur-3xl" />
-      <div className="pointer-events-none absolute bottom-[12%] right-[14%] size-56 rounded-full bg-[var(--color-accent-lavender)]/25 blur-3xl" />
+    <main className="relative flex h-[100svh] items-center justify-center overflow-y-auto overflow-x-hidden bg-[var(--color-background)] px-5 py-10 text-[var(--color-text)] sm:px-8">
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.055]"
+        style={{
+          backgroundImage:
+            'linear-gradient(var(--color-brand) 1px, transparent 1px), linear-gradient(90deg, var(--color-brand) 1px, transparent 1px)',
+          backgroundSize: '48px 48px',
+        }}
+        aria-hidden="true"
+      />
+      <div
+        className="pointer-events-none absolute left-1/2 top-1/2 size-[min(78vw,760px)] -translate-x-1/2 -translate-y-1/2 rotate-6 rounded-[5rem] border border-[var(--color-brand)]/10"
+        aria-hidden="true"
+      />
+      <div
+        className="pointer-events-none absolute left-1/2 top-1/2 size-[min(58vw,560px)] -translate-x-1/2 -translate-y-1/2 -rotate-3 rounded-[4rem] border border-[var(--color-brand)]/10"
+        aria-hidden="true"
+      />
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-[var(--color-brand)]"
+        aria-hidden="true"
+      />
 
-      <section className="relative w-full max-w-sm">
-        <header className="mb-8 text-center">
-          <div className="relative mx-auto mb-4 grid size-14 place-items-center rounded-2xl bg-[var(--color-brand)] text-white shadow-lg shadow-[var(--color-brand)]/20">
-            <Building2 className="size-6" aria-hidden="true" />
-            <span className="absolute inset-0 -z-10 rounded-2xl bg-[var(--color-brand)]/20 animate-ping [animation-duration:2s]" />
+      <section className="relative z-10 w-full max-w-[500px]">
+        <header className="text-center">
+          <div className="flex justify-center">
+            <BrandMark logoUrl={runtime.branding.logoUrl} />
           </div>
-          <h1 className="text-3xl font-bold tracking-[-0.04em] text-[var(--color-text)]">
+          <p className="mt-5 text-sm font-semibold tracking-[-0.01em] text-[var(--color-text-muted)]">
             {runtime.branding.productName}
+          </p>
+          <h1 className="mt-2 text-[clamp(2.6rem,8vw,4.5rem)] font-semibold leading-none tracking-[-0.06em]">
+            {isIndonesian ? 'Operasional' : 'Operational'}
           </h1>
-          <p className="mt-2 text-sm text-[var(--color-text-muted)]">{copy('Operational')}</p>
+          {brandContext ? (
+            <div className="mt-5 flex justify-center">
+              <span className="max-w-full truncate rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-3.5 py-1.5 text-xs font-semibold text-[var(--color-text-muted)] shadow-sm">
+                {brandContext}
+              </span>
+            </div>
+          ) : null}
         </header>
 
-        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-[var(--shadow-panel)]">
-          <h2 className="text-lg font-semibold text-[var(--color-text)]">
-            {copy('Sign in to Operational')}
-          </h2>
-
-          <form autoComplete="on" className="mt-6 space-y-4" onSubmit={submit}>
+        <form
+          autoComplete="on"
+          className="mt-9 border-y border-[var(--color-border)] bg-[var(--color-surface)]/70 py-7 sm:px-6 sm:py-8 [&_input]:min-h-12 [&_input]:text-base"
+          onSubmit={submit}
+        >
+          <div className="space-y-5">
             <DInput
               id="operational-identifier"
               name="username"
-              label={copy('User ID')}
+              label={isIndonesian ? 'ID pengguna' : 'User ID'}
               value={identifier}
               disabled={isSubmitting}
               onChange={setIdentifier}
-              placeholder={copy('Username or email')}
+              placeholder={isIndonesian ? 'Username atau email' : 'Username or email'}
               autoComplete="username"
               autoCapitalize="none"
               spellCheck={false}
@@ -112,23 +166,25 @@ export function OperationalLoginPage({ authPort, onAuthenticated }: OperationalL
             <DInput
               id="operational-password"
               name="password"
-              label={copy('Password')}
+              label={isIndonesian ? 'Kata sandi' : 'Password'}
               type="password"
               value={password}
               disabled={isSubmitting}
               onChange={setPassword}
-              placeholder={copy('Password')}
+              placeholder={isIndonesian ? 'Masukkan kata sandi' : 'Enter your password'}
               autoComplete="current-password"
             />
-            <DButton type="submit" fullWidth loading={isSubmitting} className="mt-2">
-              {isLeaving
-                ? copy('Opening Operational...')
-                : isSubmitting
-                  ? copy('Signing in...')
-                  : copy('Sign in')}
+            <DButton type="submit" fullWidth loading={isSubmitting} className="min-h-12 text-base">
+              {isIndonesian ? 'Masuk' : 'Sign in'}
             </DButton>
-          </form>
-        </div>
+          </div>
+        </form>
+
+        <p className="mx-auto mt-5 max-w-sm text-center text-xs leading-5 text-[var(--color-text-muted)]">
+          {isIndonesian
+            ? 'Masuk untuk membuka ruang kerja operasional yang tersedia untuk akun Anda.'
+            : 'Sign in to open the operational workspace available to your account.'}
+        </p>
       </section>
     </main>
   );

@@ -525,7 +525,9 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     items: catalog.items,
     categories: catalog.categories,
     employees: employeeOptions.employees,
-    paymentRoutes: (paymentRoutesQuery.data?.items ?? []).filter((route) => route.status === 'ACTIVE'),
+    paymentRoutes: (paymentRoutesQuery.data?.items ?? []).filter(
+      (route) => route.status === 'ACTIVE',
+    ),
     selectedLocationId: selectedLocationId ?? '',
     search: catalog.search,
     itemType: catalog.itemType,

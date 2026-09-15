@@ -8,7 +8,6 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import type { SessionEndReason } from '@digvation/business-auth';
 import { useToast } from '@digvation/ui';
 import { ApiClient } from '@digvation/business-api';
 
@@ -45,17 +44,14 @@ export function BackofficeAuthProvider({
   const { t } = useBackofficeLocalization();
   const sessionExpired = useRef(false);
 
-  const expireSession = useCallback(
-    (_reason: SessionEndReason) => {
-      if (sessionExpired.current) return;
-      sessionExpired.current = true;
-      setSession(null);
-      setStatus('unauthenticated');
-      showToast({ variant: 'warning', title: t('sessionExpired') });
-      void auth.logout();
-    },
-    [auth, showToast, t],
-  );
+  const expireSession = useCallback(() => {
+    if (sessionExpired.current) return;
+    sessionExpired.current = true;
+    setSession(null);
+    setStatus('unauthenticated');
+    showToast({ variant: 'warning', title: t('sessionExpired') });
+    void auth.logout();
+  }, [auth, showToast, t]);
 
   useEffect(() => auth.subscribeSessionEnded(expireSession), [auth, expireSession]);
 

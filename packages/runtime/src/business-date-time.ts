@@ -1,18 +1,11 @@
-import type {
-  BusinessDateFormat,
-  BusinessTimeFormat,
-  RuntimeConfig,
-} from './runtime-config.types';
+import type { BusinessDateFormat, BusinessTimeFormat, RuntimeConfig } from './runtime-config.types';
 
 export type BusinessDateTimeValue = Date | string | number;
 
 export interface BusinessDateTimeFormatter {
   readonly timezone: string;
   readonly locale: string;
-  format(
-    value: BusinessDateTimeValue,
-    options?: Intl.DateTimeFormatOptions,
-  ): string;
+  format(value: BusinessDateTimeValue, options?: Intl.DateTimeFormatOptions): string;
   formatDate(value: BusinessDateTimeValue): string;
   formatTime(value: BusinessDateTimeValue): string;
   formatDateTime(value: BusinessDateTimeValue): string;
@@ -91,29 +84,20 @@ export function createBusinessDateTimeFormatter(
         timeZone: timezone,
         hour: '2-digit',
         minute: '2-digit',
-        ...(timeFormat === 'hh:mm a'
-          ? { hour12: true }
-          : { hourCycle: 'h23' as const }),
+        ...(timeFormat === 'hh:mm a' ? { hour12: true } : { hourCycle: 'h23' as const }),
       })
         .formatToParts(parsed)
         .filter((part) => part.type !== 'literal')
         .map((part) => [part.type, part.value]),
     ) as Record<string, string>;
     const base = `${parts.hour ?? '00'}:${parts.minute ?? '00'}`;
-    return timeFormat === 'hh:mm a' && parts.dayPeriod
-      ? `${base} ${parts.dayPeriod}`
-      : base;
+    return timeFormat === 'hh:mm a' && parts.dayPeriod ? `${base} ${parts.dayPeriod}` : base;
   };
 
   const formatDateTime = (value: BusinessDateTimeValue): string =>
-    isDateOnly(value)
-      ? formatDateOnly(value)
-      : `${formatDate(value)} ${formatTime(value)}`;
+    isDateOnly(value) ? formatDateOnly(value) : `${formatDate(value)} ${formatTime(value)}`;
 
-  const format = (
-    value: BusinessDateTimeValue,
-    options?: Intl.DateTimeFormatOptions,
-  ): string => {
+  const format = (value: BusinessDateTimeValue, options?: Intl.DateTimeFormatOptions): string => {
     if (isDateOnly(value)) return formatDateOnly(value);
     if (!options) return formatDate(value);
     if (options.dateStyle && options.timeStyle) return formatDateTime(value);
@@ -121,9 +105,7 @@ export function createBusinessDateTimeFormatter(
     if (options.dateStyle && !options.timeStyle) return formatDate(value);
     const parsed = instant(value);
     return parsed
-      ? new Intl.DateTimeFormat(locale, { ...options, timeZone: timezone }).format(
-          parsed,
-        )
+      ? new Intl.DateTimeFormat(locale, { ...options, timeZone: timezone }).format(parsed)
       : '—';
   };
 
