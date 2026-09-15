@@ -9,6 +9,7 @@ import type {
 import type {
   ApiPage,
   OperationalCatalogProjection,
+  PaymentRoute,
   Sale,
 } from './cashier-transaction.types';
 
@@ -36,6 +37,17 @@ export function attachOperationalProjection(
     });
     return client.get<OperationalCatalogProjection>(
       `${OPERATIONAL_PREFIX}/catalog?${query.toString()}`,
+      { signal },
+    );
+  };
+
+  operational.listPaymentRoutes = (input, signal) => {
+    const query = new URLSearchParams({
+      sellingLocationId: input.sellingLocationId,
+      currency: input.currency,
+    });
+    return client.get<ApiPage<PaymentRoute>>(
+      `${OPERATIONAL_PREFIX}/payment-routes?${query.toString()}`,
       { signal },
     );
   };
