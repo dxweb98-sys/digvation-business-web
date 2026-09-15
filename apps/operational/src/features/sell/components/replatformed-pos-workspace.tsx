@@ -197,25 +197,25 @@ const statusMeta: Record<
 > = {
   QUEUED: {
     value: 'QUEUED',
-    icon: <Clock className="size-[15px]" />,
+    icon: <Clock className="size-3.75" />,
     tone: 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]',
     soft: 'bg-[var(--color-warning)]/[.045]',
   },
   PROGRESS: {
     value: 'IN_PROGRESS',
-    icon: <PlayCircle className="size-[15px]" />,
+    icon: <PlayCircle className="size-3.75" />,
     tone: 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]',
     soft: 'bg-[var(--color-brand)]/[.045]',
   },
   COMPLETED: {
     value: 'COMPLETED',
-    icon: <CheckCircle2 className="size-[15px]" />,
+    icon: <CheckCircle2 className="size-3.75" />,
     tone: 'bg-[var(--color-success)]/10 text-[var(--color-success)]',
     soft: 'bg-[var(--color-success)]/[.045]',
   },
   CANCELED: {
     value: 'CANCELED',
-    icon: <XCircle className="size-[15px]" />,
+    icon: <XCircle className="size-3.75" />,
     tone: 'bg-[var(--color-danger)]/10 text-[var(--color-danger)]',
     soft: 'bg-[var(--color-danger)]/[.045]',
   },
@@ -1029,7 +1029,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const normalizedTotal = normalizeCurrencyPresentationInput(total);
   const effectiveTender = tender || normalizedTotal;
   const cashShort =
-    paymentMethod === 'CASH' && createDecimal(effectiveTender).lessThan(createDecimal(normalizedTotal));
+    paymentMethod === 'CASH' &&
+    createDecimal(effectiveTender).lessThan(createDecimal(normalizedTotal));
   const change = cashShort
     ? '0'
     : createDecimal(effectiveTender).minus(createDecimal(normalizedTotal)).toFixed(0);
@@ -1039,13 +1040,13 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       {workspace.notice ? (
         <div
           role="alert"
-          className="mb-3 flex shrink-0 flex-col gap-3 rounded-2xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 p-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+          className="mb-3 flex shrink-0 flex-col gap-3 rounded-2xl border border-(--color-warning)/30 bg-(--color-warning)/10 p-3 text-sm sm:flex-row sm:items-center sm:justify-between"
         >
           <div className="flex min-w-0 gap-2.5">
-            <AlertCircle className="mt-0.5 size-4 shrink-0 text-[var(--color-warning)]" />
+            <AlertCircle className="mt-0.5 size-4 shrink-0 text-(--color-warning)" />
             <div>
               <p className="font-semibold">{copy('Transaction needs attention')}</p>
-              <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">{workspace.notice}</p>
+              <p className="mt-0.5 text-xs text-(--color-text-muted)">{workspace.notice}</p>
             </div>
           </div>
           <div className="flex shrink-0 gap-2">
@@ -1064,7 +1065,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       ) : null}
 
       {transactionsQuery.isLoading ? (
-        <div className="mb-4 shrink-0 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm">
+        <div className="mb-4 shrink-0 rounded-2xl border border-(--color-border) bg-(--color-surface) p-4 shadow-sm">
           <div className="flex items-center gap-3">
             <Skeleton className="size-10 shrink-0 rounded-2xl" />
             <div className="min-w-0 flex-1 space-y-2">
@@ -1097,8 +1098,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
 
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="shrink-0 pb-2">
-          <div className="flex flex-wrap items-center gap-2 border-b border-[var(--color-border)] pb-2 lg:flex-nowrap">
-            <div className="grid shrink-0 grid-cols-2 rounded-xl bg-[var(--color-surface-muted)]/75 p-1 sm:inline-flex sm:items-center">
+          <div className="flex flex-wrap items-center gap-2 border-b border-(--color-border) pb-2 lg:flex-nowrap">
+            <div className="grid shrink-0 grid-cols-2 rounded-xl bg-(--color-surface-muted)/75 p-1 sm:inline-flex sm:items-center">
               <ReferenceTypeButton
                 active={workspace.itemType === 'PRODUCT'}
                 icon={<ShoppingBag className="size-3.5" />}
@@ -1121,13 +1122,13 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
                 expandedWidth="min(280px, calc(100vw - 140px))"
               />
             </div>
-            <div className="hidden h-6 w-px bg-[var(--color-border)] lg:block" aria-hidden="true" />
-            <div className="order-3 min-w-0 flex-1 basis-full lg:order-none lg:basis-0">
-              <div className="no-scrollbar flex h-9 items-center gap-1.5 overflow-x-auto border-l border-[var(--color-border)]/70 pl-2 lg:border-l-0 lg:pl-0">
+            <div className="hidden h-6 w-px bg-(--color-border) lg:block" aria-hidden="true" />
+            <div className="order-3 min-w-0 flex-1 basis-full lg:order-0 lg:basis-0">
+              <div className="no-scrollbar flex h-9 items-center gap-1.5 overflow-x-auto border-l border-(--color-border)/70 pl-2 lg:border-l-0 lg:pl-0">
                 <button
                   type="button"
                   onClick={() => setSelectedCategory('')}
-                  className={`inline-flex h-9 shrink-0 items-center rounded-lg px-2.5 text-xs font-semibold transition-colors ${selectedCategory ? 'bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]' : 'bg-[var(--color-brand)] text-white'}`}
+                  className={`inline-flex h-9 shrink-0 items-center rounded-lg px-2.5 text-xs font-semibold transition-colors ${selectedCategory ? 'bg-(--color-surface-muted) text-(--color-text-muted)' : 'bg-[var(--color-brand)] text-white'}`}
                 >
                   {copy('All')}
                 </button>
@@ -1136,7 +1137,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
                     key={category.id}
                     type="button"
                     onClick={() => setSelectedCategory(category.id)}
-                    className={`inline-flex h-9 shrink-0 items-center rounded-lg px-2.5 text-xs font-semibold transition-colors ${selectedCategory === category.id ? 'bg-[var(--color-brand)] text-white' : 'bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]'}`}
+                    className={`inline-flex h-9 shrink-0 items-center rounded-lg px-2.5 text-xs font-semibold transition-colors ${selectedCategory === category.id ? 'bg-(--color-brand) text-white' : 'bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]'}`}
                   >
                     {category.name}
                   </button>
@@ -1511,12 +1512,7 @@ function ReferenceCatalogCard({
         className={`mb-2 flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl ${isService ? 'bg-cyan-500/10 text-cyan-600' : 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]'}`}
       >
         {item.image?.url ? (
-          <img
-            src={item.image.url}
-            alt=""
-            loading="lazy"
-            className="size-full object-cover"
-          />
+          <img src={item.image.url} alt="" loading="lazy" className="size-full object-cover" />
         ) : isService ? (
           <Wrench className="size-7" />
         ) : (
@@ -2761,69 +2757,71 @@ function ReferenceTransactionDetail({
         closeOnEscape
         closeOnOverlay
         noPadding
-        className={`pos-reference-dialog max-h-[92dvh] w-full overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl ${showReceipt ? 'max-w-md' : 'max-w-lg'}`}
+        className={`pos-reference-dialog max-h-[92dvh] w-full overflow-hidden rounded-t-2xl bg-(--color-surface) shadow-xl sm:rounded-xl ${showReceipt ? 'max-w-md' : 'max-w-lg'}`}
         footer={
-          <div
-            className={`flex shrink-0 flex-col-reverse justify-end gap-2 sm:flex-row ${showReceipt ? 'pos-receipt-actions' : ''}`}
-          >
-            <DButton variant="ghost" onClick={onClose}>
-              {copy('Close')}
-            </DButton>
-            {!showReceipt && receiptAvailable ? (
-              <DButton
-                rightIcon={<Printer className="size-3.5" />}
-                variant="outline"
-                onClick={() => onViewReceipt(sale)}
-              >
-                {copy('View receipt')}
-              </DButton>
-            ) : null}
-            {!showReceipt && status === 'PROGRESS' ? (
-              <DButton
-                variant="primary"
-                disabled={completionIssues.length > 0}
-                loading={isMutating}
-                leftIcon={<CheckCircle2 className="size-3.5" />}
-                onClick={onComplete}
-              >
-                {copy('Complete transaction')}
-              </DButton>
-            ) : null}
+          <div className="flex shrink-0 flex-col-reverse justify-between items-center gap-2 sm:flex-row">
             {showReceipt ? (
-              <DButton
-                rightIcon={<Printer className="size-3.5" />}
-                variant="outline"
-                onClick={() => window.print()}
-              >
-                {copy('Print')}
-              </DButton>
+              <div className="pos-receipt-preview-toolbar flex items-center justify-between gap-3">
+                <div className="flex items-center gap-1.5" aria-label={copy('Paper size')}>
+                  <DButton
+                    size="sm"
+                    variant={receiptPaper === '58' ? 'primary' : 'secondary'}
+                    onClick={() => setReceiptPaper('58')}
+                  >
+                    58 mm
+                  </DButton>
+                  <DButton
+                    size="sm"
+                    variant={receiptPaper === '80' ? 'primary' : 'secondary'}
+                    onClick={() => setReceiptPaper('80')}
+                  >
+                    80 mm
+                  </DButton>
+                </div>
+              </div>
             ) : null}
+
+            <div
+              className={`flex shrink-0 flex-col-reverse justify-end items-center gap-2 sm:flex-row ${showReceipt ? 'pos-receipt-actions' : ''}`}
+            >
+              <DButton variant="ghost" onClick={onClose}>
+                {copy('Close')}
+              </DButton>
+              {!showReceipt && receiptAvailable ? (
+                <DButton
+                  rightIcon={<Printer className="size-3.5" />}
+                  variant="outline"
+                  onClick={() => onViewReceipt(sale)}
+                >
+                  {copy('View receipt')}
+                </DButton>
+              ) : null}
+              {!showReceipt && status === 'PROGRESS' ? (
+                <DButton
+                  variant="primary"
+                  disabled={completionIssues.length > 0}
+                  loading={isMutating}
+                  leftIcon={<CheckCircle2 className="size-3.5" />}
+                  onClick={onComplete}
+                >
+                  {copy('Complete transaction')}
+                </DButton>
+              ) : null}
+              {showReceipt ? (
+                <DButton
+                  rightIcon={<Printer className="size-3.5" />}
+                  variant="outline"
+                  onClick={() => window.print()}
+                >
+                  {copy('Print')}
+                </DButton>
+              ) : null}
+            </div>
           </div>
         }
       >
         {showReceipt ? (
           <div className="flex max-h-[92dvh] min-h-0 flex-col px-5 py-4 sm:px-6">
-            <div className="pos-receipt-preview-toolbar mb-3 flex items-center justify-between gap-3">
-              <span className="text-xs font-medium text-[var(--color-text-muted)]">
-                {copy('Paper size')}
-              </span>
-              <div className="flex items-center gap-1.5" aria-label={copy('Paper size')}>
-                <DButton
-                  size="sm"
-                  variant={receiptPaper === '58' ? 'primary' : 'secondary'}
-                  onClick={() => setReceiptPaper('58')}
-                >
-                  58 mm
-                </DButton>
-                <DButton
-                  size="sm"
-                  variant={receiptPaper === '80' ? 'primary' : 'secondary'}
-                  onClick={() => setReceiptPaper('80')}
-                >
-                  80 mm
-                </DButton>
-              </div>
-            </div>
             <div
               className={`pos-receipt-preview pos-receipt-print--${receiptPaper} min-h-0 flex-1 overflow-y-auto bg-white text-slate-950`}
             >
@@ -3124,7 +3122,14 @@ function ReceiptContent({
         {hasTax ? (
           <div className="flex justify-between gap-3">
             <dt className="text-slate-500">{copy('Tax')}</dt>
-            <dd>{money(sale.taxAmount, locale)}</dd>
+
+            <dd>
+              (
+              {sale.totalAmount > sale.taxAmount
+                ? ((sale.taxAmount / (sale.totalAmount - sale.taxAmount)) * 100).toFixed(0)
+                : 0}
+              %) {money(sale.taxAmount, locale)}
+            </dd>
           </div>
         ) : null}
         <div className="mt-2 flex justify-between gap-3 border-t border-slate-200 pt-2 text-sm font-black">
@@ -3411,12 +3416,9 @@ function ReferenceOrderAdjustmentDialog({
         )}
         <div className="divide-y divide-[var(--color-border)] overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-background)]">
           {activeLines.map((line) => {
-            const lineMutable =
-              !line.fulfillment || line.fulfillment.status === 'WAITING';
+            const lineMutable = !line.fulfillment || line.fulfillment.status === 'WAITING';
             const canDecrease =
-              !paid &&
-              lineMutable &&
-              createDecimal(line.quantity).greaterThan(createDecimal('1'));
+              !paid && lineMutable && createDecimal(line.quantity).greaterThan(createDecimal('1'));
             const canRemove = !paid && lineMutable;
             const projectedTotalAfterRemoval = saleTotal.minus(createDecimal(line.totalAmount));
             const removalRefund = paidAmount.greaterThan(projectedTotalAfterRemoval)

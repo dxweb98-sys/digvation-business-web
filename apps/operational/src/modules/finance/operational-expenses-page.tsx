@@ -5,10 +5,11 @@ import {
   DBadge,
   DButton,
   DConnectionError,
+  DCurrencyInput,
   DDataTable,
   DDialog,
-  DInput,
   DSelect,
+  DTextarea,
   useToast,
   type TableColumn,
 } from '@digvation/ui';
@@ -132,6 +133,11 @@ export function OperationalExpensesPage() {
       render: (row) => formatMoney(row.amount, row.currency),
     },
     {
+      key: 'description',
+      label: copy('Description'),
+      render: (row) => row.note || '-',
+    },
+    {
       key: 'status',
       label: copy('Status'),
       render: (row) => (
@@ -208,7 +214,7 @@ export function OperationalExpensesPage() {
           </div>
         }
       >
-        <div className="grid gap-4">
+        <div className="grid gap-4 sm:grid-cols-2">
           <DSelect
             label={copy('Account')}
             value={financialAccountId}
@@ -219,9 +225,31 @@ export function OperationalExpensesPage() {
             }))}
             onValueChange={(value) => setFinancialAccountId(String(value ?? ''))}
           />
-          <DInput label={copy('Category')} value={categoryCode} onChange={setCategoryCode} />
-          <DInput label={copy('Amount')} value={amount} onChange={setAmount} />
-          <DInput label={copy('Note')} value={note} onChange={setNote} />
+          <DSelect
+            label={copy('Category')}
+            value={categoryCode}
+            placeholder={copy('Select expense category')}
+            options={[
+              { value: 'OPERATIONS', label: copy('Operations') },
+              { value: 'TRANSPORT', label: copy('Transport') },
+              { value: 'SUPPLIES', label: copy('Supplies') },
+              { value: 'OTHER', label: copy('Other') },
+            ]}
+            onChange={(x) => setCategoryCode(String(x))}
+          />
+          <DCurrencyInput
+            label={copy('Amount')}
+            value={amount}
+            onValueChange={setAmount}
+            placeholder={copy('For example, 150000')}
+          />
+          <DTextarea
+            label={copy('Note')}
+            value={note}
+            onChange={setNote}
+            placeholder={copy('For example, Additional notes')}
+            containerClassName="sm:col-span-2"
+          />
         </div>
       </DDialog>
     </div>
