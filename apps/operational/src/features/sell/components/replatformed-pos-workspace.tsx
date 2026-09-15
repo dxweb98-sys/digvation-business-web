@@ -48,7 +48,12 @@ import {
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
-import { useOperationalLocalization } from '../../../app/localization/operational-localization';
+import {
+  operationalCopy,
+  operationalLabel,
+  resolveOperationalLocale,
+  useOperationalLocalization,
+} from '../../../app/localization/operational-localization';
 import { cashierTransactionKeys } from '../cashier-transaction-keys';
 import { cashierTransactionErrorMessage } from '../cashier-transaction-errors';
 import type { CartDisplayLine } from '../cart-draft';
@@ -104,6 +109,14 @@ const CURRENT_CUSTOMER_KEY = 'digvation-pos-demo-current-customer';
 const QUEUED_SALE_IDS_KEY = 'digvation-pos-demo-queued-sale-ids';
 const CANCELED_SALE_REASONS_KEY = 'digvation-pos-demo-canceled-sale-reasons';
 const saleCustomerKey = (saleId: string) => `digvation-pos-demo-customer:${saleId}`;
+
+function copyFor(value: string, locale: string): string {
+  return operationalCopy(value, resolveOperationalLocale(locale));
+}
+
+function labelFor(value: string, locale: string): string {
+  return operationalLabel(value, resolveOperationalLocale(locale));
+}
 
 function readStoredCustomer(key: string): PosCustomer | null {
   try {
@@ -177,30 +190,27 @@ function writeCancellationReason(saleId: string, reason: string): void {
   }
 }
 
-const statusMeta: Record<
-  QueueStatus,
-  { label: string; icon: ReactNode; tone: string; soft: string }
-> = {
+const statusMeta: Record<QueueStatus, { value: string; icon: ReactNode; tone: string; soft: string }> = {
   QUEUED: {
-    label: 'Antrian',
+    value: 'QUEUED',
     icon: <Clock className="size-[15px]" />,
     tone: 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]',
     soft: 'bg-[var(--color-warning)]/[.045]',
   },
   PROGRESS: {
-    label: 'Dikerjakan',
+    value: 'IN_PROGRESS',
     icon: <PlayCircle className="size-[15px]" />,
     tone: 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]',
     soft: 'bg-[var(--color-brand)]/[.045]',
   },
   COMPLETED: {
-    label: 'Selesai',
+    value: 'COMPLETED',
     icon: <CheckCircle2 className="size-[15px]" />,
     tone: 'bg-[var(--color-success)]/10 text-[var(--color-success)]',
     soft: 'bg-[var(--color-success)]/[.045]',
   },
   CANCELED: {
-    label: 'Dibatalkan',
+    value: 'CANCELED',
     icon: <XCircle className="size-[15px]" />,
     tone: 'bg-[var(--color-danger)]/10 text-[var(--color-danger)]',
     soft: 'bg-[var(--color-danger)]/[.045]',
@@ -216,13 +226,15 @@ function quantity(value: string) {
   return normalized === '-0' ? '0' : normalized;
 }
 
-function transactionNumber(saleId: string) {
-  return saleId.startsWith('SALE-DEMO-') ? saleId : `Sale ${saleId.slice(0, 8)}`;
+function transactionNumber(saleId: string, locale: string) {
+  return saleId.startsWith('SALE-DEMO-')
+    ? saleId
+    : `${copyFor('Transaction', locale)} ${saleId.slice(0, 8)}`;
 }
 
-function saleCustomer(saleId?: string): PosCustomer {
+function saleCustomer(saleId: string | undefined, locale: string): PosCustomer {
   const stored = saleId ? readStoredCustomer(saleCustomerKey(saleId)) : null;
-  return stored ?? { name: 'Pelanggan umum', phone: '' };
+  return stored ?? { name: copyFor('General customer', locale), phone: '' };
 }
 
 function customerStatus(customer: PosCustomer | null): {
@@ -232,21 +244,6 @@ function customerStatus(customer: PosCustomer | null): {
   if (!customer) return { label: 'Guest', variant: 'default' };
   if (customer.membership) return { label: 'Member', variant: 'primary' };
   return { label: 'Non-member', variant: 'outline' };
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function employeeSummary(line: SaleLine, employees: readonly Employee[]): string {
-  const assigned = line.participations.filter((participation) => participation.assigned);
-  if (!assigned.length) return 'Pilih karyawan';
-  return assigned
-    .map((participation) => {
-      const employee = employees.find((candidate) => candidate.id === participation.employeeId);
-      const share = participation.shareRate
-        ? ` ${createDecimal(participation.shareRate).times(100).toFixed(0)}%`
-        : '';
-      return `${employee?.displayName ?? participation.employeeId}${share}`;
-    })
-    .join(' · ');
 }
 
 function serviceWorkKey(line: SaleLine): string {
@@ -318,6 +315,7 @@ function hasValidWorkAssignment(line: SaleLine, unit: ServiceWorkUnit): boolean 
 function serviceWorkAssignmentSummary(
   units: readonly ServiceWorkUnit[],
   employees: readonly Employee[],
+  locale: string,
 ): string {
   const assignments = units.map((unit) =>
     unit.contributors
@@ -327,9 +325,10 @@ function serviceWorkAssignmentSummary(
   );
   const firstAssignment = assignments[0] ?? '';
   if (!firstAssignment || assignments.some((assignment) => !assignment))
-    return 'Belum ada karyawan';
+    return copyFor('No employees assigned', locale);
   const configurationCount = new Set(assignments).size;
-  if (configurationCount > 1) return `${configurationCount} konfigurasi`;
+  if (configurationCount > 1)
+    return `${configurationCount} ${copyFor('configurations', locale)}`;
 
   const names = (units[0]?.contributors ?? [])
     .filter((contributor) => contributor.employeeId)
@@ -338,12 +337,12 @@ function serviceWorkAssignmentSummary(
         employees.find((employee) => employee.id === contributor.employeeId)?.displayName ??
         contributor.employeeId,
     );
-  return `${names.join(' · ')} untuk semua`;
+  return `${names.join(', ')} ${copyFor('for all work units', locale)}`;
 }
 
-function employeeWorkSummary(line: SaleLine, employees: readonly Employee[]): string {
+function employeeWorkSummary(line: SaleLine, employees: readonly Employee[], locale: string): string {
   const assigned = line.participations.filter((participation) => participation.assigned);
-  if (!assigned.length) return 'Belum ditentukan';
+  if (!assigned.length) return copyFor('Not assigned', locale);
   return assigned
     .map((participation) => {
       const employee = employees.find((candidate) => candidate.id === participation.employeeId);
@@ -351,10 +350,10 @@ function employeeWorkSummary(line: SaleLine, employees: readonly Employee[]): st
         ? `${createDecimal(participation.shareRate).times(100).toFixed(0)}%`
         : null;
       return share
-        ? `${employee?.displayName ?? participation.employeeId} · ${share}`
+        ? `${employee?.displayName ?? participation.employeeId} ${share}`
         : (employee?.displayName ?? participation.employeeId);
     })
-    .join(' · ');
+    .join(', ');
 }
 
 function queueStatus(sale: Sale): QueueStatus | null {
@@ -373,13 +372,13 @@ function isPositiveDecimal(value: string) {
   }
 }
 
-function employeeAssignmentIssues(line: SaleLine): string[] {
+function employeeAssignmentIssues(line: SaleLine, locale: string): string[] {
   const issues: string[] = [];
   if (
     line.employeeAssignmentModeSnapshot === 'REQUIRED' &&
     !line.participations.some((participation) => participation.assigned)
   ) {
-    issues.push(`${line.itemNameSnapshot}: pilih karyawan.`);
+    issues.push(`${line.itemNameSnapshot}: ${copyFor('Select an employee.', locale)}`);
   }
   if (line.allowEmployeeContributionSnapshot) {
     const shares = line.participations.filter(
@@ -390,32 +389,36 @@ function employeeAssignmentIssues(line: SaleLine): string[] {
       createDecimal('0'),
     );
     if (!shares.length || !total.equals(createDecimal('1'))) {
-      issues.push(`${line.itemNameSnapshot}: kontribusi karyawan harus tepat 100%.`);
+      issues.push(`${line.itemNameSnapshot}: ${copyFor('Employee contribution must total 100%.', locale)}`);
     }
   }
   return issues;
 }
 
-function workflowIssues(sale: Sale, serviceWorkUnits: ServiceWorkUnitsByLine = {}) {
+function workflowIssues(
+  sale: Sale,
+  serviceWorkUnits: ServiceWorkUnitsByLine = {},
+  locale: string,
+) {
   const issues: string[] = [];
   const active = sale.lines.filter((line) => line.removedAt === null);
-  if (!active.length) issues.push('Tambahkan setidaknya satu item.');
+  if (!active.length) issues.push(copyFor('Add at least one item.', locale));
 
   const succeeded = sale.payments
     .filter((payment) => payment.status === 'SUCCEEDED')
     .reduce((sum, payment) => sum.plus(createDecimal(payment.appliedAmount)), createDecimal('0'));
   if (!succeeded.equals(createDecimal(sale.totalAmount))) {
-    issues.push('Pembayaran berhasil harus sama dengan total transaksi.');
+    issues.push(copyFor('Payments must match the transaction total.', locale));
   }
   if (sale.payments.some((payment) => payment.status === 'PENDING')) {
-    issues.push('Selesaikan pembayaran yang masih pending.');
+    issues.push(copyFor('Resolve pending payments.', locale));
   }
 
   for (const line of active) {
     if (!isPositiveDecimal(line.quantity))
-      issues.push(`${line.itemNameSnapshot}: qty harus lebih dari 0.`);
+      issues.push(`${line.itemNameSnapshot}: ${copyFor('Quantity must be greater than zero.', locale)}`);
     if (!isPositiveDecimal(line.effectiveUnitPrice))
-      issues.push(`${line.itemNameSnapshot}: harga harus valid.`);
+      issues.push(`${line.itemNameSnapshot}: ${copyFor('Price is not available.', locale)}`);
     const requiresTrackedServiceAssignment =
       line.itemTypeSnapshot === 'SERVICE' && line.fulfillmentBehaviorSnapshot === 'TRACKED';
     if (!requiresTrackedServiceAssignment) continue;
@@ -424,13 +427,13 @@ function workflowIssues(sale: Sale, serviceWorkUnits: ServiceWorkUnitsByLine = {
     if (units.length > 1) {
       if (units.some((unit) => !hasValidWorkAssignment(line, unit))) {
         issues.push(
-          `${line.itemNameSnapshot}: setiap pengerjaan membutuhkan karyawan dengan kontribusi tepat 100%.`,
+          `${line.itemNameSnapshot}: ${copyFor('Each service unit must have employee contribution totaling 100%.', locale)}`,
         );
       }
       continue;
     }
 
-    issues.push(...employeeAssignmentIssues(line));
+    issues.push(...employeeAssignmentIssues(line, locale));
   }
   return issues;
 }
@@ -441,7 +444,11 @@ interface WorkflowIssueGroup {
   issues: string[];
 }
 
-function groupWorkflowIssues(sale: Sale, issues: readonly string[]): WorkflowIssueGroup[] {
+function groupWorkflowIssues(
+  sale: Sale,
+  issues: readonly string[],
+  locale: string,
+): WorkflowIssueGroup[] {
   const activeLines = sale.lines.filter((line) => line.removedAt === null);
   const groups = new Map<string, WorkflowIssueGroup>();
 
@@ -450,7 +457,7 @@ function groupWorkflowIssues(sale: Sale, issues: readonly string[]): WorkflowIss
       issue.startsWith(`${candidate.itemNameSnapshot}:`),
     );
     const id = line?.id ?? 'transaction';
-    const label = line?.itemNameSnapshot ?? 'Transaksi';
+    const label = line?.itemNameSnapshot ?? copyFor('Transaction', locale);
     const detail = line ? issue.slice(`${line.itemNameSnapshot}:`.length).trim() : issue;
     const group = groups.get(id) ?? { id, label, issues: [] };
     group.issues.push(detail);
@@ -460,15 +467,19 @@ function groupWorkflowIssues(sale: Sale, issues: readonly string[]): WorkflowIss
   return [...groups.values()];
 }
 
-function processIssues(sale: Sale | null, lines: readonly CartDisplayLine[]): string[] {
-  if (!lines.length) return ['Tambahkan setidaknya satu item ke cart.'];
-  if (sale && sale.status !== 'OPEN') return ['Hanya transaksi aktif yang dapat diproses.'];
+function processIssues(
+  sale: Sale | null,
+  lines: readonly CartDisplayLine[],
+  locale: string,
+): string[] {
+  if (!lines.length) return [copyFor('Add at least one item.', locale)];
+  if (sale && sale.status !== 'OPEN') return [copyFor('Only active transactions can be processed.', locale)];
 
   return lines.flatMap((line) => {
     if (!isPositiveDecimal(line.quantity))
-      return [`${line.itemNameSnapshot}: qty harus lebih dari 0.`];
+      return [`${line.itemNameSnapshot}: ${copyFor('Quantity must be greater than zero.', locale)}`];
     if (!isPositiveDecimal(line.effectiveUnitPrice))
-      return [`${line.itemNameSnapshot}: harga belum tersedia.`];
+      return [`${line.itemNameSnapshot}: ${copyFor('Price is not available.', locale)}`];
     return [];
   });
 }
@@ -611,16 +622,21 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     workspace.setItemType(type);
     setSelectedCategory('');
   };
+
   const openCheckout = async () => {
-    const issues = processIssues(sale, lines);
+    const issues = processIssues(sale, lines, workspace.locale);
     if (issues.length) {
-      showToast({ title: 'Cart belum siap checkout', description: issues[0], variant: 'warning' });
+      showToast({
+        title: copy('Cart is not ready for payment'),
+        description: issues[0],
+        variant: 'warning',
+      });
       return;
     }
     if (workspace.viewModel.synchronization !== 'CLEAN') {
       showToast({
-        title: 'Tunggu perubahan selesai',
-        description: 'Cart sedang menyinkronkan perubahan terakhir.',
+        title: copy('Wait for changes to finish'),
+        description: copy('The cart is still syncing the latest changes.'),
         variant: 'warning',
       });
       return;
@@ -633,8 +649,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         checkoutTotal = committed.totalAmount;
       } catch (error) {
         showToast({
-          title: 'Cart belum dapat dibuat',
-          description: `${cashierTransactionErrorMessage(error)} Cart tetap disimpan; perbaiki konfigurasi atau koneksi lalu coba lagi.`,
+          title: copy('Could not create transaction'),
+          description: `${cashierTransactionErrorMessage(error)} ${copy('The cart is unchanged. Check the configuration or connection and try again.')}`,
           variant: 'danger',
         });
         return;
@@ -691,16 +707,17 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     }
 
     showToast({
-      title: wasPaid ? 'Pembayaran berhasil' : 'Transaksi berhasil dibuat',
+      title: wasPaid ? copy('Payment successful') : copy('Transaction created'),
       description:
         destination === 'START_PROCESS'
-          ? `${transactionNumber(completedSale.id)} masuk antrian dan siap dimulai.`
+          ? `${transactionNumber(completedSale.id, workspace.locale)} ${copy('Added to queue and ready to start.')}`
           : wasPaid
-            ? `${transactionNumber(completedSale.id)} lunas dan masuk antrian.`
-            : `${transactionNumber(completedSale.id)} masuk antrian. Pembayaran masih belum diterima.`,
+            ? `${transactionNumber(completedSale.id, workspace.locale)} ${copy('Paid and added to queue.')}`
+            : `${transactionNumber(completedSale.id, workspace.locale)} ${copy('Added to queue. Payment has not been received.')}`,
       variant: 'success',
     });
   };
+
   const startQueuedWork = async (transaction: Sale) => {
     const line = transaction.lines.find(
       (candidate) =>
@@ -710,8 +727,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     );
     if (!line) {
       showToast({
-        title: 'Tidak ada pekerjaan yang dapat dimulai',
-        description: 'Transaksi ini tidak memiliki layanan yang menunggu proses operasional.',
+        title: copy('No work can be started'),
+        description: copy('This transaction has no services waiting to be worked on.'),
         variant: 'warning',
       });
       return false;
@@ -724,28 +741,29 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       await workspace.startQueuedFulfillment(started, line);
       setQueueTab('PROGRESS');
       showToast({
-        title: 'Pekerjaan dimulai',
-        description: `${transactionNumber(transaction.id)} sekarang sedang dikerjakan.`,
+        title: copy('Work started'),
+        description: `${transactionNumber(transaction.id, workspace.locale)} ${copy('is now being worked on.')}`,
         variant: 'success',
       });
       return true;
     } catch {
       showToast({
-        title: 'Gagal memulai pekerjaan',
-        description: 'Transaksi tetap berada dalam antrian.',
+        title: copy('Could not start work'),
+        description: copy('The transaction remains in the queue.'),
         variant: 'danger',
       });
       return false;
     }
   };
+
   const saveServiceWorkUnits = async (
     target: { sale: Sale; line: SaleLine },
     units: readonly ServiceWorkUnit[],
   ) => {
     if (units.some((unit) => !hasValidWorkAssignment(target.line, unit))) {
       showToast({
-        title: 'Lengkapi karyawan terlebih dahulu',
-        description: 'Setiap pengerjaan layanan harus memiliki kontribusi tepat 100%.',
+        title: copy('Complete employee assignment'),
+        description: copy('Each service unit must have employee contribution totaling 100%.'),
         variant: 'warning',
       });
       return;
@@ -767,27 +785,29 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       setQueueDetail(updated);
       setServiceWorkTarget(null);
       showToast({
-        title: 'Pengerjaan diperbarui',
-        description: 'Pengaturan karyawan tersimpan untuk setiap pengerjaan layanan.',
+        title: copy('Work assignment updated'),
+        description: copy('Employee assignments were saved for each service unit.'),
         variant: 'success',
       });
     } catch {
       showToast({
-        title: 'Gagal memperbarui pengerjaan',
-        description: 'Pengaturan karyawan belum berubah. Coba lagi.',
+        title: copy('Could not update work assignment'),
+        description: copy('Employee assignments were not changed. Try again.'),
         variant: 'danger',
       });
     }
   };
+
   const completeQueuedTransaction = (transaction: Sale) => {
-    const issues = workflowIssues(transaction, serviceWorkUnits);
+    const issues = workflowIssues(transaction, serviceWorkUnits, workspace.locale);
     if (issues.length) return;
     setCompletionConfirmationTarget(transaction);
   };
+
   const confirmQueuedCompletion = async () => {
     if (
       !completionConfirmationTarget ||
-      workflowIssues(completionConfirmationTarget, serviceWorkUnits).length
+      workflowIssues(completionConfirmationTarget, serviceWorkUnits, workspace.locale).length
     ) {
       return;
     }
@@ -798,24 +818,26 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       setReceiptSaleId(hasSuccessfulPayment(finalized) ? finalized.id : null);
       setCompletionConfirmationTarget(null);
       showToast({
-        title: 'Transaksi selesai',
-        description: `${transactionNumber(finalized.id)} telah diselesaikan.`,
+        title: copy('Transaction completed'),
+        description: `${transactionNumber(finalized.id, workspace.locale)} ${copy('has been completed.')}`,
         variant: 'success',
       });
     } catch {
       showToast({
-        title: 'Gagal menyelesaikan transaksi',
-        description: 'Periksa kembali status transaksi dan coba lagi.',
+        title: copy('Could not complete transaction'),
+        description: copy('Check the transaction status and try again.'),
         variant: 'danger',
       });
     }
   };
+
   const openAdjustment = (transaction: Sale) => {
     if (transaction.status !== 'OPEN') return;
     setQueueDetail(null);
     setAdjustmentTarget(transaction);
     workspace.resumeSale(transaction.id);
   };
+
   const openQueuePayment = async (transaction: Sale) => {
     try {
       const { sale: hydrated, availableToPay } = await workspace.hydrateQueuedPayment(
@@ -829,18 +851,18 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       setQueuePaymentAmount(availableToPay);
     } catch {
       showToast({
-        title: 'Transaksi gagal dimuat',
-        description: 'Muat ulang transaksi sebelum menerima pembayaran.',
+        title: copy('Could not load transaction'),
+        description: copy('Reload the transaction before accepting payment.'),
         variant: 'danger',
       });
     }
   };
+
   const requestCancel = (transaction: Sale) => {
     if (hasSuccessfulPayment(transaction)) {
       showToast({
-        title: 'Refund diperlukan',
-        description:
-          'Transaksi yang sudah menerima pembayaran tidak dapat dibatalkan tanpa proses refund.',
+        title: copy('Refund required'),
+        description: copy('A paid transaction must be refunded before it can be canceled.'),
         variant: 'warning',
       });
       return;
@@ -849,12 +871,13 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     setCancelReason('');
     workspace.resumeSale(transaction.id);
   };
+
   const confirmCancel = async () => {
     if (!cancelTarget || !cancelReason.trim()) return;
     if (hasSuccessfulPayment(cancelTarget)) {
       showToast({
-        title: 'Refund diperlukan',
-        description: 'Batalkan pembayaran terlebih dahulu melalui proses refund yang sesuai.',
+        title: copy('Refund required'),
+        description: copy('Refund the payment before canceling the transaction.'),
         variant: 'warning',
       });
       return;
@@ -877,18 +900,19 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       setCancelReason('');
       workspace.clearProcessedDraft();
       showToast({
-        title: 'Transaksi dibatalkan',
-        description: 'Alasan pembatalan telah dicatat.',
+        title: copy('Transaction canceled'),
+        description: copy('Cancellation reason saved.'),
         variant: 'success',
       });
     } catch {
       showToast({
-        title: 'Pembatalan gagal',
-        description: 'Transaksi tetap tidak berubah. Periksa kembali status pembayaran.',
+        title: copy('Cancellation failed'),
+        description: copy('The transaction was not changed. Check payment status.'),
         variant: 'danger',
       });
     }
   };
+
   const completeCheckout = async (destination: FulfillmentDestination) => {
     if (!sale || !lines.length) return;
 
@@ -899,7 +923,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         if (destination === 'START_PROCESS') await startQueuedWork(submitted);
       } catch (error) {
         showToast({
-          title: 'Checkout gagal',
+          title: copy('Checkout failed'),
           description: cashierTransactionErrorMessage(error),
           variant: 'danger',
         });
@@ -920,8 +944,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       );
       if (!hasSuccessfulCheckout(completedSale)) {
         showToast({
-          title: 'Checkout belum selesai',
-          description: 'Pembayaran belum berhasil diselesaikan. Cart tetap tersedia.',
+          title: copy('Payment incomplete'),
+          description: copy('Payment was not completed. The cart remains available.'),
           variant: 'warning',
         });
         return;
@@ -931,12 +955,13 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       if (destination === 'START_PROCESS') await startQueuedWork(submitted);
     } catch (error) {
       showToast({
-        title: 'Checkout gagal',
-        description: `${cashierTransactionErrorMessage(error)} Cart tidak diubah.`,
+        title: copy('Checkout failed'),
+        description: `${cashierTransactionErrorMessage(error)} ${copy('The cart was not changed.')}`,
         variant: 'danger',
       });
     }
   };
+
   const payQueueBalance = async () => {
     const transaction = displayedQueuePaymentTarget;
     if (!transaction || sale?.id !== transaction.id || !queuePaymentAmount) return;
@@ -958,20 +983,19 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       setReceiptSaleId(updatedSale.id);
       workspace.clearProcessedDraft();
       showToast({
-        title: hasSuccessfulCheckout(updatedSale)
-          ? 'Pembayaran lunas'
-          : 'Pembayaran berhasil dicatat',
-        description: 'Status operasional transaksi tidak berubah.',
+        title: hasSuccessfulCheckout(updatedSale) ? copy('Payment complete') : copy('Payment recorded'),
+        description: copy('Transaction status was not changed.'),
         variant: 'success',
       });
     } catch (error) {
       showToast({
-        title: 'Pembayaran gagal',
-        description: `${cashierTransactionErrorMessage(error)} Saldo transaksi tidak berubah dan antrian tetap dipertahankan.`,
+        title: copy('Payment failed'),
+        description: `${cashierTransactionErrorMessage(error)} ${copy('The balance and queue were not changed.')}`,
         variant: 'danger',
       });
     }
   };
+
   const quickTender = ['50000', '100000', '150000', '200000', '500000'];
   const effectiveTender = tender || total;
   const cashShort =
@@ -990,24 +1014,25 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           <div className="flex min-w-0 gap-2.5">
             <AlertCircle className="mt-0.5 size-4 shrink-0 text-[var(--color-warning)]" />
             <div>
-              <p className="font-semibold">Transaction attention</p>
+              <p className="font-semibold">{copy('Transaction needs attention')}</p>
               <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">{workspace.notice}</p>
             </div>
           </div>
           <div className="flex shrink-0 gap-2">
             {workspace.canRetryLastCommand ? (
               <Button size="sm" variant="outline" onClick={workspace.retryLastCommand}>
-                <RotateCcw className="mr-1.5 size-3.5" /> Retry same command
+                <RotateCcw className="mr-1.5 size-3.5" /> {copy('Try same action')}
               </Button>
             ) : null}
             {workspace.viewModel.primaryMode === 'CONFLICT_REVIEW' ? (
               <Button size="sm" variant="outline" onClick={workspace.acknowledgeLatestState}>
-                <CheckCircle2 className="mr-1.5 size-3.5" /> Reviewed
+                <CheckCircle2 className="mr-1.5 size-3.5" /> {copy('Reviewed')}
               </Button>
             ) : null}
           </div>
         </div>
       ) : null}
+
       <ReferenceQueueBoard
         open={queueOpen}
         onOpenChange={setQueueOpen}
@@ -1034,13 +1059,13 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
               <ReferenceTypeButton
                 active={workspace.itemType === 'PRODUCT'}
                 icon={<ShoppingBag className="size-3.5" />}
-                label="Produk"
+                label={copy('Product')}
                 onClick={() => selectType('PRODUCT')}
               />
               <ReferenceTypeButton
                 active={workspace.itemType === 'SERVICE'}
                 icon={<Wrench className="size-3.5" />}
-                label="Jasa"
+                label={copy('Service')}
                 onClick={() => selectType('SERVICE')}
               />
             </div>
@@ -1048,7 +1073,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
               <SearchInput
                 value={search}
                 onChange={setSearch}
-                placeholder="Cari item..."
+                placeholder={copy('Search items...')}
                 debounceMs={0}
                 expandedWidth="min(280px, calc(100vw - 140px))"
               />
@@ -1061,7 +1086,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
                   onClick={() => setSelectedCategory('')}
                   className={`inline-flex h-9 shrink-0 items-center rounded-lg px-2.5 text-xs font-semibold transition-colors ${selectedCategory ? 'bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]' : 'bg-[var(--color-brand)] text-white'}`}
                 >
-                  Semua
+                  {copy('All')}
                 </button>
                 {categories.map((category) => (
                   <button
@@ -1086,7 +1111,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
             </div>
           ) : visibleItems.length === 0 ? (
             <div className="flex min-h-[260px] items-center justify-center rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface)]/50 text-sm text-[var(--color-text-muted)]">
-              Tidak ada item ditemukan
+              {copy('No items found')}
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
@@ -1179,12 +1204,13 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         isSubmitting={workspace.isCoreMutating}
         onQueue={() => void completeCheckout('QUEUE')}
       />
+
       <ReferenceTransactionDetail
         sale={displayedQueueDetail}
         locale={workspace.locale}
         employees={workspace.employees}
         businessName={runtime.branding.businessName ?? runtime.branding.productName}
-        branchName="Main Branch"
+        branchName={copy('Main branch')}
         cashierName={session.identity.displayName}
         {...(displayedQueueDetail && cancellationReasons[displayedQueueDetail.id]
           ? { cancellationReason: cancellationReasons[displayedQueueDetail.id] }
@@ -1222,6 +1248,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         }}
         isMutating={workspace.isCoreMutating}
       />
+
       <ReferenceOrderAdjustmentDialog
         sale={displayedAdjustmentTarget}
         items={workspace.items}
@@ -1242,6 +1269,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         onQuantity={(line, next) => workspace.changeQuantity(line, next)}
         onRemove={workspace.removeLine}
       />
+
       <ReferenceBalancePaymentDialog
         sale={displayedQueuePaymentTarget}
         availableToPay={queuePaymentAmount}
@@ -1263,21 +1291,23 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         onTender={setTender}
         onPay={() => void payQueueBalance()}
       />
+
       <DConfirmDialog
         open={Boolean(completionConfirmationTarget)}
         onClose={() => setCompletionConfirmationTarget(null)}
         onConfirm={() => void confirmQueuedCompletion()}
-        title="Selesaikan transaksi"
+        title={copy('Complete transaction')}
         message={
           completionConfirmationTarget
-            ? `Selesaikan transaksi ${transactionNumber(completionConfirmationTarget.id)}? Tindakan ini menutup pekerjaan yang sudah selesai.`
+            ? `${copy('Complete transaction')} ${transactionNumber(completionConfirmationTarget.id, workspace.locale)}? ${copy('Completing this transaction closes finished work.')}`
             : undefined
         }
-        confirmLabel="Selesaikan"
-        cancelLabel="Batal"
+        confirmLabel={copy('Complete transaction')}
+        cancelLabel={copy('Cancel')}
         variant="primary"
         loading={workspace.isCoreMutating}
       />
+
       <ReferenceCancelDialog
         sale={cancelTarget}
         reason={cancelReason}
@@ -1285,14 +1315,13 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         onClose={() => setCancelTarget(null)}
         onConfirm={confirmCancel}
       />
+
       <ReferenceEmployeeDialog
         key={assignmentLine?.id ?? 'closed'}
         line={assignmentLine}
         employees={workspace.employees}
         locale={workspace.locale}
-        onClose={() => {
-          setAssignmentLine(null);
-        }}
+        onClose={() => setAssignmentLine(null)}
         onSave={(employeeIds, contributors) => {
           if (!assignmentLine) return;
           workspace.setAssignments(assignmentLine, employeeIds);
@@ -1301,6 +1330,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           setAssignmentLine(null);
         }}
       />
+
       <ReferenceServiceWorkDialog
         key={
           serviceWorkTarget
@@ -1323,6 +1353,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           if (serviceWorkTarget) void saveServiceWorkUnits(serviceWorkTarget, units);
         }}
       />
+
       <ReferenceEmployeeDialog
         key={
           queueAssignmentTarget
@@ -1342,20 +1373,21 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
               setQueueDetail(updated);
               setQueueAssignmentTarget(null);
               showToast({
-                title: 'Karyawan diperbarui',
-                description: 'Penugasan layanan tersimpan pada transaksi yang sedang dikerjakan.',
+                title: copy('Employee updated'),
+                description: copy('Service assignment saved for this transaction.'),
                 variant: 'success',
               });
             })
             .catch(() => {
               showToast({
-                title: 'Gagal memperbarui karyawan',
-                description: 'Penugasan belum berubah. Coba lagi.',
+                title: copy('Could not update employee'),
+                description: copy('Assignment was not changed. Try again.'),
                 variant: 'danger',
               });
             });
         }}
       />
+
       {workspace.lineTask ? (
         <SaleLineTaskDialog
           line={workspace.lineTask}
@@ -1416,11 +1448,12 @@ function ReferenceCatalogCard({
   disabled: boolean;
   onAdd: () => void;
 }) {
+  const { copy } = useOperationalLocalization();
   const isService = item.type === 'SERVICE';
   return (
     <button
       type="button"
-      aria-label={`Add ${item.name}`}
+      aria-label={`${copy('Add')} ${item.name}`}
       disabled={disabled}
       onClick={onAdd}
       className="group rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-left transition-all hover:border-[var(--color-brand)]/40 hover:shadow-md active:scale-[.98] disabled:opacity-50"
@@ -1434,12 +1467,12 @@ function ReferenceCatalogCard({
       <p className="mt-1 line-clamp-2 min-h-10 text-sm font-semibold leading-tight">{item.name}</p>
       <div className="mt-2 flex items-center justify-between gap-2">
         <p className="text-xs font-semibold text-[var(--color-text-muted)]">
-          {price ? money(price, locale) : 'Harga saat dipilih'}
+          {price ? money(price, locale) : copy('Price available when selected')}
         </p>
         <span
           className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${isService ? 'bg-cyan-500/10 text-cyan-700' : 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]'}`}
         >
-          {isService ? 'Jasa' : 'Produk'}
+          {copy(isService ? 'Service' : 'Product')}
         </span>
       </div>
     </button>
@@ -1475,8 +1508,10 @@ function ReferenceQueueBoard({
   onView: (sale: Sale) => void;
   onViewReceipt: (sale: Sale) => void;
 }) {
+  const { copy, label } = useOperationalLocalization();
   const statuses = Object.keys(statusMeta) as QueueStatus[];
   const count = groups.QUEUED.length + groups.PROGRESS.length;
+  const statusLabel = (status: QueueStatus) => label(statusMeta[status].value);
   return (
     <div className="mb-4 shrink-0">
       <div className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm">
@@ -1493,7 +1528,7 @@ function ReferenceQueueBoard({
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <p className="text-sm font-bold">Transaksi Antrian</p>
+                <p className="text-sm font-bold">{copy('Queue transactions')}</p>
                 <span
                   className={`inline-flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-[11px] font-bold ${count ? 'bg-[var(--color-brand)] text-white' : 'bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]'}`}
                 >
@@ -1501,9 +1536,7 @@ function ReferenceQueueBoard({
                 </span>
               </div>
               <p className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">
-                {count
-                  ? 'Klik untuk melihat transaksi yang sedang berjalan.'
-                  : 'Belum ada transaksi antrian.'}
+                {count ? copy('Click to view active transactions.') : copy('No queued transactions.')}
               </p>
             </div>
           </div>
@@ -1514,7 +1547,7 @@ function ReferenceQueueBoard({
                 className={`inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-[11px] font-semibold ${statusMeta[status].tone}`}
               >
                 {statusMeta[status].icon}
-                {statusMeta[status].label}
+                {statusLabel(status)}
                 <span>{groups[status].length}</span>
               </span>
             ))}
@@ -1539,7 +1572,7 @@ function ReferenceQueueBoard({
               <DTabsList className="max-w-full overflow-x-auto">
                 {statuses.map((status) => (
                   <DTabsTrigger key={status} value={status}>
-                    {statusMeta[status].label} ({groups[status].length})
+                    {statusLabel(status)} ({groups[status].length})
                   </DTabsTrigger>
                 ))}
               </DTabsList>
@@ -1573,11 +1606,9 @@ function ReferenceQueueBoard({
                         </div>
                       ) : (
                         <div className="rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)]/20 py-7 text-center">
-                          <p className="text-sm font-semibold">
-                            Tidak ada transaksi {statusMeta[status].label.toLowerCase()}
-                          </p>
+                          <p className="text-sm font-semibold">{copy('No transactions in this status.')}</p>
                           <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                            Transaksi akan muncul di sini ketika sudah dibuat.
+                            {copy('Transactions appear here after they are created.')}
                           </p>
                         </div>
                       )}
@@ -1616,18 +1647,19 @@ function ReferenceQueueCard({
   onView: (sale: Sale) => void;
   onViewReceipt: (sale: Sale) => void;
 }) {
+  const { copy, label } = useOperationalLocalization();
   const meta = statusMeta[status];
   const { balanceDue } = financialSummary(sale);
   const hasPayment = hasSuccessfulPayment(sale);
   const paid = hasSuccessfulCheckout(sale);
-  const customer = saleCustomer(sale.id);
+  const customer = saleCustomer(sale.id, locale);
   const canStartWork = hasStartableQueuedWork(sale);
   const actionItems = [
-    { label: 'Preview / Detail', icon: <Eye className="size-3.5" />, onSelect: () => onView(sale) },
+    { label: copy('Preview details'), icon: <Eye className="size-3.5" />, onSelect: () => onView(sale) },
     ...(hasPayment
       ? [
           {
-            label: 'Lihat Struk',
+            label: copy('View receipt'),
             icon: <Printer className="size-3.5" />,
             onSelect: () => onViewReceipt(sale),
           },
@@ -1638,28 +1670,28 @@ function ReferenceQueueCard({
           ...(canStartWork
             ? [
                 {
-                  label: 'Mulai Dikerjakan',
+                  label: copy('Start work'),
                   icon: <PlayCircle className="size-3.5" />,
                   onSelect: () => onStartWork(sale),
                 },
               ]
             : []),
           {
-            label: 'Sesuaikan Pesanan',
+            label: copy('Adjust order'),
             icon: <ShoppingBag className="size-3.5" />,
             onSelect: () => onAdjust(sale),
           },
           ...(isPositiveDecimal(balanceDue)
             ? [
                 {
-                  label: hasPayment ? 'Bayar Sisa' : 'Bayar',
+                  label: copy(hasPayment ? 'Pay balance' : 'Pay'),
                   icon: <CreditCard className="size-3.5" />,
                   onSelect: () => onPay(sale),
                 },
               ]
             : []),
           {
-            label: 'Batalkan',
+            label: copy('Cancel'),
             icon: <XCircle className="size-3.5" />,
             destructive: true,
             onSelect: () => onCancel(sale),
@@ -1671,14 +1703,14 @@ function ReferenceQueueCard({
           ...(isPositiveDecimal(balanceDue)
             ? [
                 {
-                  label: hasPayment ? 'Bayar Sisa' : 'Bayar',
+                  label: copy(hasPayment ? 'Pay balance' : 'Pay'),
                   icon: <CreditCard className="size-3.5" />,
                   onSelect: () => onPay(sale),
                 },
               ]
             : []),
           {
-            label: 'Batalkan',
+            label: copy('Cancel'),
             icon: <XCircle className="size-3.5" />,
             destructive: true,
             onSelect: () => onCancel(sale),
@@ -1686,6 +1718,7 @@ function ReferenceQueueCard({
         ]
       : []),
   ];
+
   return (
     <article
       className={`w-[360px] shrink-0 rounded-2xl border border-[var(--color-border)] p-4 transition-shadow hover:shadow-sm ${meta.soft}`}
@@ -1693,29 +1726,29 @@ function ReferenceQueueCard({
       <div className="mb-2 flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="font-mono text-[11px] text-[var(--color-text-muted)]">
-            {transactionNumber(sale.id)}
+            {transactionNumber(sale.id, locale)}
           </p>
-          <p className="mt-0.5 truncate text-sm font-bold">{customer.name || 'Umum'}</p>
+          <p className="mt-0.5 truncate text-sm font-bold">{customer.name}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <span
             className={`inline-flex items-center rounded-full px-2 py-1 text-[10px] font-bold ${paid ? 'bg-[var(--color-success)]/10 text-[var(--color-success)]' : 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]'}`}
           >
-            {paid ? 'Lunas' : hasPayment ? 'Bayar Sebagian' : 'Belum Bayar'}
+            {copy(paid ? 'Paid' : hasPayment ? 'Partially paid' : 'Unpaid')}
           </span>
           <span
             className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold ${meta.tone}`}
           >
             {meta.icon}
-            {meta.label}
+            {label(meta.value)}
           </span>
         </div>
       </div>
       <div className="mb-3 flex items-end justify-between gap-2">
         <div>
           <p className="text-xs text-[var(--color-text-muted)]">
-            {sale.lines.filter((line) => !line.removedAt).length} item ·{' '}
-            {new Intl.DateTimeFormat('id-ID', { hour: '2-digit', minute: '2-digit' }).format(
+            {sale.lines.filter((line) => !line.removedAt).length} {copy('items')},{' '}
+            {new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(
               new Date(sale.createdAt),
             )}
           </p>
@@ -1731,7 +1764,7 @@ function ReferenceQueueCard({
               leftIcon={<PlayCircle className="size-3.5" />}
               onClick={() => onStartWork(sale)}
             >
-              Mulai Dikerjakan
+              {copy('Start work')}
             </DButton>
           ) : null}
           <Dropdown
@@ -1742,7 +1775,7 @@ function ReferenceQueueCard({
             trigger={({ open }) => (
               <button
                 type="button"
-                aria-label={`Actions for ${transactionNumber(sale.id)}`}
+                aria-label={`${copy('Actions for')} ${transactionNumber(sale.id, locale)}`}
                 aria-expanded={open}
                 className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 text-[11px] font-semibold text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand)]/20"
               >
@@ -1767,7 +1800,7 @@ function ReferenceQueueCard({
       </div>
       {issues.length ? (
         <div className="mt-3 rounded-xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 px-3 py-2 text-xs">
-          <p className="font-semibold text-[var(--color-warning)]">Lengkapi sebelum mulai</p>
+          <p className="font-semibold text-[var(--color-warning)]">{copy('Complete before starting')}</p>
           <p className="mt-0.5 text-[var(--color-text-muted)]">{issues[0]}</p>
         </div>
       ) : null}
@@ -1806,6 +1839,7 @@ function ReferenceFloatingCart({
   onRemove: (line: CartDisplayLine) => void;
   onCheckout: () => void;
 }) {
+  const { copy } = useOperationalLocalization();
   const panel = (
     <ReferenceCartPanel
       lines={lines}
@@ -1822,17 +1856,18 @@ function ReferenceFloatingCart({
       onCheckout={onCheckout}
     />
   );
+  const countLabel = lines.length ? `${lines.length} ${copy('items selected')}` : copy('No items selected');
   return (
     <>
       <button
         type="button"
-        aria-label="Close active cart"
+        aria-label={copy('Close active cart')}
         onClick={() => onOpenChange(false)}
         className={`fixed inset-0 z-40 hidden bg-transparent md:block ${open ? '' : 'pointer-events-none opacity-0'}`}
       />
       <button
         type="button"
-        aria-label="Cart"
+        aria-label={copy('Cart')}
         onClick={() => onOpenChange(!open)}
         className={`fixed bottom-6 right-6 z-50 inline-flex items-center gap-3 rounded-2xl bg-[var(--color-brand)] px-4 py-3 text-white shadow-[0_16px_40px_rgb(37_99_235_/_0.28)] transition-all hover:shadow-[0_18px_48px_rgb(37_99_235_/_0.35)] active:scale-[.97] ${open ? 'md:pointer-events-none md:scale-95 md:opacity-0' : ''}`}
       >
@@ -1845,25 +1880,24 @@ function ReferenceFloatingCart({
           ) : null}
         </div>
         <div className="hidden text-left sm:block">
-          <p className="text-xs font-bold leading-none">Cart</p>
+          <p className="text-xs font-bold leading-none">{copy('Cart')}</p>
           <p className="mt-1 text-[11px] opacity-90">{money(total, locale)}</p>
         </div>
       </button>
       <div
         role="dialog"
-        aria-label="Cart"
+        aria-label={copy('Cart')}
         className={`operational-cart-panel fixed bottom-6 right-6 z-50 max-h-[calc(100dvh-48px)] w-[420px] max-w-[calc(100vw-48px)] origin-bottom-right flex-col overflow-hidden rounded-[28px] border border-[var(--color-border)] bg-[var(--color-background)] shadow-[0_24px_70px_rgb(15_23_42_/_0.22)] transition-all duration-200 ease-out ${open ? 'pointer-events-auto translate-y-0 scale-100 opacity-100' : 'pointer-events-none translate-y-4 scale-95 opacity-0'}`}
       >
         <div className="border-b border-[var(--color-border)] bg-[var(--color-surface)] p-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-base font-bold">Cart</h2>
-              <p className="text-xs text-[var(--color-text-muted)]">
-                {lines.length ? `${lines.length} item dipilih` : 'Belum ada item dipilih'}
-              </p>
+              <h2 className="text-base font-bold">{copy('Cart')}</h2>
+              <p className="text-xs text-[var(--color-text-muted)]">{countLabel}</p>
             </div>
             <button
               type="button"
+              aria-label={copy('Close')}
               onClick={() => onOpenChange(false)}
               className="rounded-xl p-2 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]"
             >
@@ -1879,20 +1913,19 @@ function ReferenceFloatingCart({
       />
       <div
         role="dialog"
-        aria-label="Cart"
+        aria-label={copy('Cart')}
         className={`fixed inset-x-0 bottom-0 z-50 h-[86dvh] overflow-hidden rounded-t-[28px] border-t border-[var(--color-border)] bg-[var(--color-background)] shadow-[0_-24px_80px_rgb(15_23_42_/_0.25)] transition-transform duration-300 ease-out md:hidden ${open ? 'translate-y-0' : 'translate-y-full'}`}
       >
         <div className="flex h-full min-h-0 flex-col">
           <div className="shrink-0 border-b border-[var(--color-border)] p-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-base font-bold">Cart</h2>
-                <p className="text-xs text-[var(--color-text-muted)]">
-                  {lines.length ? `${lines.length} item dipilih` : 'Belum ada item dipilih'}
-                </p>
+                <h2 className="text-base font-bold">{copy('Cart')}</h2>
+                <p className="text-xs text-[var(--color-text-muted)]">{countLabel}</p>
               </div>
               <button
                 type="button"
+                aria-label={copy('Close')}
                 onClick={() => onOpenChange(false)}
                 className="rounded-xl p-2 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]"
               >
@@ -1934,6 +1967,7 @@ function ReferenceCartPanel({
   onRemove: (line: CartDisplayLine) => void;
   onCheckout: () => void;
 }) {
+  const { copy } = useOperationalLocalization();
   const status = customerStatus(customer);
   const hasTax = !createDecimal(taxAmount).equals(createDecimal('0'));
   const increment = (line: CartDisplayLine, direction: 'up' | 'down') => {
@@ -1949,7 +1983,7 @@ function ReferenceCartPanel({
       <div className="shrink-0 space-y-2.5 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3">
         <button
           type="button"
-          aria-label="Choose customer"
+          aria-label={copy('Choose customer')}
           onClick={onChooseCustomer}
           className="flex w-full items-center gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-muted)]/45 px-3 py-2.5 text-left transition-colors hover:border-[var(--color-brand)]/35 hover:bg-[var(--color-brand)]/5"
         >
@@ -1958,13 +1992,15 @@ function ReferenceCartPanel({
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-1.5">
-              <p className="truncate text-xs font-semibold">{customer?.name ?? 'Pelanggan umum'}</p>
+              <p className="truncate text-xs font-semibold">
+                {customer?.name ?? copy('General customer')}
+              </p>
               <Badge variant={status.variant} className="shrink-0 px-2 py-0 text-[10px]">
-                {status.label}
+                {copy(status.label)}
               </Badge>
             </div>
             <p className="mt-0.5 truncate text-[11px] text-[var(--color-text-muted)]">
-              {customer?.phone ?? 'Pilih pelanggan untuk transaksi ini'}
+              {customer?.phone ?? copy('Choose customer')}
             </p>
           </div>
           <ChevronDown className="size-4 shrink-0 text-[var(--color-text-muted)]" />
@@ -1987,15 +2023,15 @@ function ReferenceCartPanel({
                     </p>
                     <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
                       {money(line.effectiveUnitPrice, locale)}
-                      {line.variantNameSnapshot ? ` · ${line.variantNameSnapshot}` : ''}
+                      {line.variantNameSnapshot ? `, ${line.variantNameSnapshot}` : ''}
                       {line.itemTypeSnapshot === 'SERVICE' ? (
-                        <span className="ml-1 font-semibold text-cyan-700">· Jasa</span>
+                        <span className="ml-1 font-semibold text-cyan-700">{copy('Service')}</span>
                       ) : null}
                     </p>
                   </div>
                   <button
                     type="button"
-                    aria-label={`Remove ${line.itemNameSnapshot}`}
+                    aria-label={`${copy('Remove')} ${line.itemNameSnapshot}`}
                     onClick={() => onRemove(line)}
                     className="shrink-0 rounded-lg p-1.5 text-[var(--color-text-muted)] hover:bg-[var(--color-danger)]/10 hover:text-[var(--color-danger)]"
                   >
@@ -2006,7 +2042,7 @@ function ReferenceCartPanel({
                   <div className="inline-grid grid-cols-[36px_48px_36px] items-center overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] shadow-[inset_0_1px_0_rgb(15_23_42_/_0.02)]">
                     <button
                       type="button"
-                      aria-label={`Decrease ${line.itemNameSnapshot} quantity`}
+                      aria-label={`${copy('Decrease quantity')} ${line.itemNameSnapshot}`}
                       onClick={() => increment(line, 'down')}
                       disabled={createDecimal(line.quantity).lessThanOrEqualTo(createDecimal('1'))}
                       className="flex h-9 items-center justify-center border-r border-[var(--color-border)] text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)] active:bg-[var(--color-surface-muted)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[var(--color-text-muted)]"
@@ -2014,14 +2050,14 @@ function ReferenceCartPanel({
                       <Minus className="size-3.5" />
                     </button>
                     <output
-                      aria-label={`Quantity for ${line.itemNameSnapshot}`}
+                      aria-label={`${copy('Quantity')} ${line.itemNameSnapshot}`}
                       className="flex h-9 w-12 items-center justify-center text-xs font-bold tabular-nums text-[var(--color-text)]"
                     >
                       {quantity(line.quantity)}
                     </output>
                     <button
                       type="button"
-                      aria-label={`Increase ${line.itemNameSnapshot} quantity`}
+                      aria-label={`${copy('Increase quantity')} ${line.itemNameSnapshot}`}
                       onClick={() => increment(line, 'up')}
                       className="flex h-9 items-center justify-center border-l border-[var(--color-border)] text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)] active:bg-[var(--color-surface-muted)]"
                     >
@@ -2040,9 +2076,9 @@ function ReferenceCartPanel({
             <div className="mb-3 flex size-12 items-center justify-center rounded-2xl bg-[var(--color-brand)]/10 text-[var(--color-brand)]">
               <ShoppingBag className="size-[22px]" />
             </div>
-            <p className="text-sm font-semibold">Cart masih kosong</p>
+            <p className="text-sm font-semibold">{copy('Cart is empty')}</p>
             <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-              Pilih produk atau jasa dari katalog.
+              {copy('Select products or services from the catalog.')}
             </p>
           </div>
         )}
@@ -2051,7 +2087,7 @@ function ReferenceCartPanel({
         <div className="space-y-2 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
           <div className="flex items-center justify-between text-xs">
             <span className="text-[var(--color-text-muted)]">
-              {isEstimate ? 'Estimasi subtotal' : 'Subtotal'}
+              {copy(isEstimate ? 'Estimated subtotal' : 'Subtotal')}
             </span>
             <span className="font-medium">{money(gross, locale)}</span>
           </div>
@@ -2062,7 +2098,7 @@ function ReferenceCartPanel({
             </div>
           ) : null}
           <div className="flex items-center justify-between border-t border-[var(--color-border)] pt-2">
-            <span className="text-sm font-bold">{isEstimate ? 'Estimasi total' : 'Total'}</span>
+            <span className="text-sm font-bold">{copy(isEstimate ? 'Estimated total' : 'Total')}</span>
             <span className="text-lg font-bold text-[var(--color-brand)]">
               {money(total, locale)}
             </span>
@@ -2073,13 +2109,8 @@ function ReferenceCartPanel({
             onClick={onCheckout}
             leftIcon={<CreditCard className="size-3.5" />}
           >
-            Checkout
+            {copy('Checkout')}
           </Button>
-          {lines.length ? (
-            <p className="text-center text-[11px] text-[var(--color-text-muted)]">
-              Harga dan total otoritatif dikonfirmasi saat Checkout.
-            </p>
-          ) : null}
         </div>
       </div>
     </div>
@@ -2099,6 +2130,7 @@ function ReferenceCustomerDialog({
   onChoose: (customer: PosCustomer) => void;
   onUseGeneralCustomer: () => void;
 }) {
+  const { copy } = useOperationalLocalization();
   const [mode, setMode] = useState<'MEMBER' | 'NON_MEMBER'>('MEMBER');
   const [memberSearch, setMemberSearch] = useState('');
   const [selectedMember, setSelectedMember] = useState<MemberCustomerLookupResult | null>(null);
@@ -2124,11 +2156,10 @@ function ReferenceCustomerDialog({
 
   return (
     <DDialog
-      title="Pilih pelanggan"
-      description="Hanya untuk konteks transaksi ini."
+      title={copy('Choose customer')}
       open={open}
       onClose={onClose}
-      ariaLabel="Choose customer"
+      ariaLabel={copy('Choose customer')}
       closeOnEscape
       closeOnOverlay
       className="pos-reference-dialog w-full max-w-md overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
@@ -2143,28 +2174,28 @@ function ReferenceCustomerDialog({
             <User className="size-4" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">Gunakan pelanggan umum</p>
+            <p className="text-sm font-semibold">{copy('Use general customer')}</p>
             <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
-              Lanjutkan tanpa memilih pelanggan.
+              {copy('Continue without selecting a customer.')}
             </p>
           </div>
           {customer === null ? <CheckCircle2 className="size-4 text-[var(--color-brand)]" /> : null}
         </button>
         <div className="border-t border-[var(--color-border)] pt-3">
-          <div className="flex gap-2" aria-label="Customer type">
+          <div className="flex gap-2" aria-label={copy('Customer')}>
             <Button
               size="sm"
               variant={mode === 'MEMBER' ? 'primary' : 'secondary'}
               onClick={() => changeMode('MEMBER')}
             >
-              Member
+              {copy('Member')}
             </Button>
             <Button
               size="sm"
               variant={mode === 'NON_MEMBER' ? 'primary' : 'secondary'}
               onClick={() => changeMode('NON_MEMBER')}
             >
-              Non-member
+              {copy('Non-member')}
             </Button>
           </div>
 
@@ -2172,12 +2203,12 @@ function ReferenceCustomerDialog({
             <div className="mt-3 space-y-3">
               <DCombobox
                 key="member-search"
-                ariaLabel="Search members by name or phone"
+                ariaLabel={copy('Search name or phone number')}
                 value={selectedMember?.customerId ?? ''}
                 options={memberResults.map((member) => ({
                   value: member.customerId,
                   label: member.name,
-                  detail: `${member.phone} · ${member.membership.memberCode}`,
+                  detail: `${member.phone}, ${member.membership.memberCode}`,
                 }))}
                 onChange={(customerId) => {
                   setSelectedMember(
@@ -2188,9 +2219,9 @@ function ReferenceCustomerDialog({
                   setMemberSearch(query);
                   setSelectedMember(null);
                 }}
-                placeholder="Cari nama atau nomor telepon"
-                idleMessage="Ketik nama, nomor telepon, atau kode member untuk mencari."
-                renderEmpty={() => 'Member tidak ditemukan.'}
+                placeholder={copy('Search name or phone number')}
+                idleMessage={copy('Search by name, phone number, or member code.')}
+                renderEmpty={() => copy('Member not found.')}
                 renderOption={(option) => {
                   const member = memberResults.find(
                     (result) => result.customerId === String(option.value),
@@ -2200,7 +2231,7 @@ function ReferenceCustomerDialog({
                       <span className="block truncate">{option.label}</span>
                       {member ? (
                         <span className="mt-0.5 block truncate text-xs font-normal text-[var(--color-text-muted)]">
-                          {member.phone} · {member.membership.memberCode}
+                          {member.phone}, {member.membership.memberCode}
                         </span>
                       ) : null}
                     </span>
@@ -2212,28 +2243,28 @@ function ReferenceCustomerDialog({
                 disabled={!selectedMember}
                 onClick={() => selectedMember && onChoose(selectedMember)}
               >
-                Gunakan pelanggan
+                {copy('Use customer')}
               </Button>
             </div>
           ) : (
             <div className="mt-3 space-y-3">
               <DInput
-                aria-label="Customer name"
-                label="Nama"
+                aria-label={copy('Customer name')}
+                label={copy('Name')}
                 value={name}
                 onChange={setName}
-                placeholder="Nama pelanggan"
+                placeholder={copy('Customer name')}
               />
               <DInput
-                aria-label="Customer phone"
-                label="Nomor telepon"
+                aria-label={copy('Phone number')}
+                label={copy('Phone number')}
                 value={phone}
                 onChange={setPhone}
-                placeholder="Nomor telepon"
+                placeholder={copy('Phone number')}
                 inputMode="tel"
               />
               <Button fullWidth disabled={!name.trim() || !phone.trim()} onClick={chooseNonMember}>
-                Gunakan pelanggan
+                {copy('Use customer')}
               </Button>
             </div>
           )}
@@ -2292,39 +2323,40 @@ function ReferencePaymentDialog({
   isSubmitting: boolean;
   onQueue: () => void;
 }) {
+  const { copy, label } = useOperationalLocalization();
   const isCash = method === 'CASH';
   const needsProvider = method === 'BANK_TRANSFER' || method === 'WALLET';
   const hasTax = !createDecimal(taxAmount).equals(createDecimal('0'));
   const canPay =
     lines.length > 0 && !isCashShort && (!needsProvider || Boolean(provider)) && !isSubmitting;
   const canConfirm = payNow ? canPay : lines.length > 0 && !isSubmitting;
-  const methods: Array<{ value: PaymentMethod; label: string; icon: ReactNode }> = [
-    { value: 'CASH', label: 'Tunai', icon: <Banknote className="size-[15px]" /> },
-    { value: 'BANK_TRANSFER', label: 'Transfer', icon: <CreditCard className="size-[15px]" /> },
-    { value: 'QRIS', label: 'QRIS', icon: <QrCode className="size-[15px]" /> },
-    { value: 'WALLET', label: 'E-Wallet', icon: <ShoppingBag className="size-[15px]" /> },
+  const methods: Array<{ value: PaymentMethod; icon: ReactNode }> = [
+    { value: 'CASH', icon: <Banknote className="size-[15px]" /> },
+    { value: 'BANK_TRANSFER', icon: <CreditCard className="size-[15px]" /> },
+    { value: 'QRIS', icon: <QrCode className="size-[15px]" /> },
+    { value: 'WALLET', icon: <ShoppingBag className="size-[15px]" /> },
   ];
   const providerOptions =
     method === 'BANK_TRANSFER'
       ? ['BCA', 'Mandiri', 'BRI', 'BNI']
       : ['DANA', 'GoPay', 'OVO', 'ShopeePay'];
+
   return (
     <DDialog
-      title="Checkout pembayaran"
-      description="Review transaksi dan pembayaran sebelum masuk antrian."
+      title={copy('Checkout')}
       open={open}
       onClose={onClose}
-      ariaLabel="Checkout payment"
+      ariaLabel={copy('Checkout')}
       closeOnEscape
       closeOnOverlay
       className="pos-reference-dialog w-full max-w-lg overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
       footer={
         <div className="flex shrink-0 flex-col-reverse justify-end gap-2 sm:flex-row">
           <DButton variant="ghost" onClick={onClose}>
-            Batal
+            {copy('Cancel')}
           </DButton>
           <DButton disabled={!canConfirm} loading={isSubmitting} onClick={onQueue}>
-            Masuk Antrian
+            {copy('Add to queue')}
           </DButton>
         </div>
       }
@@ -2333,32 +2365,34 @@ function ReferencePaymentDialog({
         <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-xs text-[var(--color-text-muted)]">Total Pembayaran</p>
+              <p className="text-xs text-[var(--color-text-muted)]">{copy('Payment total')}</p>
               <h3 className="mt-0.5 text-2xl font-bold leading-tight text-[var(--color-brand)]">
                 {money(total, locale)}
               </h3>
             </div>
             <div className="min-w-0 text-right">
-              <p className="text-xs text-[var(--color-text-muted)]">Pelanggan</p>
+              <p className="text-xs text-[var(--color-text-muted)]">{copy('Customer')}</p>
               <p className="max-w-[170px] truncate text-sm font-semibold">
-                {customer?.name ?? 'Pelanggan umum'}
+                {customer?.name ?? copy('General customer')}
               </p>
               <Badge
                 variant={customerStatus(customer).variant}
                 className="mt-1 px-2 py-0 text-[10px]"
               >
-                {customerStatus(customer).label}
+                {copy(customerStatus(customer).label)}
               </Badge>
-              <p className="text-[11px] text-[var(--color-text-muted)]">{lines.length} item</p>
+              <p className="text-[11px] text-[var(--color-text-muted)]">
+                {lines.length} {copy('items')}
+              </p>
             </div>
           </div>
           <div className="mt-3 rounded-xl bg-[var(--color-surface-muted)]/60 px-3 py-2 text-xs">
             <div className="flex justify-between">
-              <span className="text-[var(--color-text-muted)]">Subtotal</span>
+              <span className="text-[var(--color-text-muted)]">{copy('Subtotal')}</span>
               <span className="font-semibold">{money(gross, locale)}</span>
             </div>
             <div className="mt-1 flex justify-between">
-              <span className="text-[var(--color-text-muted)]">Diskon transaksi</span>
+              <span className="text-[var(--color-text-muted)]">{copy('Transaction discount')}</span>
               <span className="font-semibold">{money(discountAmount, locale)}</span>
             </div>
             {hasTax ? (
@@ -2368,45 +2402,40 @@ function ReferencePaymentDialog({
               </div>
             ) : null}
             <div className="mt-2 flex justify-between border-t border-[var(--color-border)] pt-2 text-sm">
-              <span className="font-bold">Grand total</span>
+              <span className="font-bold">{copy('Total')}</span>
               <span className="font-bold text-[var(--color-brand)]">{money(total, locale)}</span>
             </div>
           </div>
         </div>
+
         <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
           <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold">Promo</p>
-              <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                Promo akan dihitung dan divalidasi oleh sistem saat kapabilitas backend tersedia.
-              </p>
-            </div>
+            <p className="text-sm font-semibold">{copy('Promotion')}</p>
             <span className="shrink-0 rounded-full bg-[var(--color-surface-muted)] px-2 py-1 text-[10px] font-semibold text-[var(--color-text-muted)]">
-              Belum tersedia
+              {copy('Not available')}
             </span>
           </div>
         </div>
+
         {customer?.membership ? (
           <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
             <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold">Gunakan poin member</p>
-                <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                  Saldo, nilai penukaran, dan kelayakan poin akan divalidasi oleh sistem.
-                </p>
-              </div>
+              <p className="text-sm font-semibold">{copy('Use member points')}</p>
               <span className="shrink-0 rounded-full bg-[var(--color-surface-muted)] px-2 py-1 text-[10px] font-semibold text-[var(--color-text-muted)]">
-                Opsional
+                {label('OPTIONAL')}
               </span>
             </div>
           </div>
         ) : null}
+
         <div className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)]">
           <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-2.5">
             <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
-              Detail Pesanan
+              {copy('Order details')}
             </p>
-            <span className="text-xs text-[var(--color-text-muted)]">{lines.length} item</span>
+            <span className="text-xs text-[var(--color-text-muted)]">
+              {lines.length} {copy('items')}
+            </span>
           </div>
           <div className="max-h-[120px] divide-y divide-[var(--color-border)] overflow-y-auto">
             {lines.map((line) => (
@@ -2417,7 +2446,9 @@ function ReferencePaymentDialog({
                     <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
                       {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
                       {line.itemTypeSnapshot === 'SERVICE' ? (
-                        <span className="ml-1 font-semibold text-[var(--color-brand)]">· Jasa</span>
+                        <span className="ml-1 font-semibold text-[var(--color-brand)]">
+                          {copy('Service')}
+                        </span>
                       ) : null}
                     </p>
                   </div>
@@ -2427,6 +2458,7 @@ function ReferencePaymentDialog({
             ))}
           </div>
         </div>
+
         <label className="flex cursor-pointer items-start gap-2.5 px-1 py-1.5">
           <span className="mt-0.5 shrink-0">
             <DCheckbox
@@ -2435,19 +2467,22 @@ function ReferencePaymentDialog({
             />
           </span>
           <span className="min-w-0">
-            <span className="block text-sm font-semibold">Bayar sekarang</span>
+            <span className="block text-sm font-semibold">{copy('Pay now')}</span>
             <span className="mt-0.5 block text-xs leading-4 text-[var(--color-text-muted)]">
-              {payNow
-                ? 'Pilih metode pembayaran sebelum transaksi diteruskan.'
-                : 'Pembayaran dicatat setelah transaksi dibuat.'}
+              {copy(
+                payNow
+                  ? 'Choose a payment method before continuing.'
+                  : 'Payment can be recorded after transaction creation.',
+              )}
             </span>
           </span>
         </label>
+
         {payNow ? (
           <>
             <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
               <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
-                Metode Pembayaran
+                {copy('Payment method')}
               </p>
               <div className="grid grid-cols-4 gap-2">
                 {methods.map((option) => (
@@ -2458,14 +2493,14 @@ function ReferencePaymentDialog({
                     className={`flex h-10 items-center justify-center gap-1.5 rounded-xl border text-xs font-semibold transition-all active:scale-[.98] ${method === option.value ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white shadow-sm' : 'border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)]'}`}
                   >
                     {option.icon}
-                    <span className="hidden sm:inline">{option.label}</span>
+                    <span className="hidden sm:inline">{label(option.value)}</span>
                   </button>
                 ))}
               </div>
               {needsProvider ? (
                 <div className="mt-3">
                   <p className="mb-2 text-xs font-semibold text-[var(--color-text-muted)]">
-                    Pilih {method === 'BANK_TRANSFER' ? 'Bank' : 'E-Wallet'}
+                    {copy(method === 'BANK_TRANSFER' ? 'Select bank' : 'Select digital wallet')}
                   </p>
                   <div className="grid grid-cols-4 gap-2">
                     {providerOptions.map((option) => (
@@ -2485,18 +2520,19 @@ function ReferencePaymentDialog({
                 <div className="mt-3 rounded-xl border border-[var(--color-brand)]/20 bg-[var(--color-brand)]/5 p-3">
                   <p className="text-sm font-bold text-[var(--color-brand)]">QRIS</p>
                   <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                    Pembayaran QRIS akan dicatat sebagai pembayaran berhasil untuk transaksi ini.
+                    {copy('QRIS payment will be recorded for this transaction.')}
                   </p>
                 </div>
               ) : null}
             </div>
+
             {isCash ? (
               <div className="space-y-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
                 <label className="block text-sm font-medium">
-                  Uang dibayar
+                  {copy('Amount paid')}
                   <div className="relative mt-1.5">
                     <PosCurrencyInput
-                      aria-label="Cash tendered"
+                      aria-label={copy('Amount paid')}
                       className="h-10 rounded-lg bg-[var(--color-surface)] text-right text-lg font-bold"
                       value={tender}
                       onChange={onTender}
@@ -2522,7 +2558,7 @@ function ReferencePaymentDialog({
                   className={`flex items-center justify-between rounded-xl px-3 py-2 ${isCashShort ? 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]' : 'bg-[var(--color-success)]/10 text-[var(--color-success)]'}`}
                 >
                   <span className="text-sm font-bold">
-                    {isCashShort ? 'Pembayaran kurang' : 'Kembalian'}
+                    {copy(isCashShort ? 'Payment short' : 'Change')}
                   </span>
                   <span className="text-sm font-bold">
                     {isCashShort
@@ -2539,15 +2575,10 @@ function ReferencePaymentDialog({
             ) : (
               <div className="rounded-2xl border border-[var(--color-brand)]/20 bg-[var(--color-brand)]/5 p-3">
                 <p className="text-sm font-bold text-[var(--color-brand)]">
-                  Pembayaran{' '}
-                  {method === 'BANK_TRANSFER'
-                    ? 'Transfer'
-                    : method === 'WALLET'
-                      ? 'E-Wallet'
-                      : 'QRIS'}
+                  {copy('Payment')} {label(method)}
                 </p>
                 <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                  Pilih provider bila diperlukan, lalu catat pembayaran ini.
+                  {copy('Select a provider if required, then record the payment.')}
                 </p>
               </div>
             )}
@@ -2592,11 +2623,12 @@ function ReferenceTransactionDetail({
   onComplete: () => void;
   isMutating: boolean;
 }) {
+  const { copy, label } = useOperationalLocalization();
   const [receiptPaper, setReceiptPaper] = useState<'58' | '80'>('80');
   if (!sale) return null;
   const status = queueStatus(sale);
   const customerContext = readStoredCustomer(saleCustomerKey(sale.id));
-  const customer = customerContext ?? saleCustomer(sale.id);
+  const customer = customerContext ?? saleCustomer(sale.id, locale);
   const activeLines = sale.lines.filter((line) => !line.removedAt);
   const payments = successfulPayments(sale);
   const payment = payments[payments.length - 1] ?? null;
@@ -2605,8 +2637,9 @@ function ReferenceTransactionDetail({
   const { totalPaid } = financialSummary(sale);
   const hasDiscount = !createDecimal(sale.discountAmount).equals(createDecimal('0'));
   const hasTax = !createDecimal(sale.taxAmount).equals(createDecimal('0'));
-  const completionIssues = status === 'PROGRESS' ? workflowIssues(sale, serviceWorkUnits) : [];
-  const completionIssueGroups = groupWorkflowIssues(sale, completionIssues);
+  const completionIssues =
+    status === 'PROGRESS' ? workflowIssues(sale, serviceWorkUnits, locale) : [];
+  const completionIssueGroups = groupWorkflowIssues(sale, completionIssues, locale);
   const transactionDate = new Intl.DateTimeFormat(locale, {
     dateStyle: 'medium',
     timeStyle: 'short',
@@ -2617,9 +2650,9 @@ function ReferenceTransactionDetail({
       <Dialog
         open
         onClose={onClose}
-        title={showReceipt ? 'Preview struk pembayaran' : 'Detail transaksi'}
-        description={transactionNumber(sale.id)}
-        ariaLabel={showReceipt ? 'Receipt preview' : 'Transaction detail'}
+        title={copy(showReceipt ? 'Preview receipt' : 'Transaction details')}
+        description={transactionNumber(sale.id, locale)}
+        ariaLabel={copy(showReceipt ? 'Preview receipt' : 'Transaction details')}
         closeOnEscape
         closeOnOverlay
         noPadding
@@ -2629,7 +2662,7 @@ function ReferenceTransactionDetail({
             className={`flex shrink-0 flex-col-reverse justify-end gap-2 sm:flex-row ${showReceipt ? 'pos-receipt-actions' : ''}`}
           >
             <DButton variant="ghost" onClick={onClose}>
-              Tutup
+              {copy('Close')}
             </DButton>
             {!showReceipt && receiptAvailable ? (
               <DButton
@@ -2637,7 +2670,7 @@ function ReferenceTransactionDetail({
                 variant="outline"
                 onClick={() => onViewReceipt(sale)}
               >
-                Lihat Struk
+                {copy('View receipt')}
               </DButton>
             ) : null}
             {!showReceipt && status === 'PROGRESS' ? (
@@ -2648,7 +2681,7 @@ function ReferenceTransactionDetail({
                 leftIcon={<CheckCircle2 className="size-3.5" />}
                 onClick={onComplete}
               >
-                Selesaikan
+                {copy('Complete transaction')}
               </DButton>
             ) : null}
             {showReceipt ? (
@@ -2657,7 +2690,7 @@ function ReferenceTransactionDetail({
                 variant="outline"
                 onClick={() => window.print()}
               >
-                Cetak
+                {copy('Print')}
               </DButton>
             ) : null}
           </div>
@@ -2667,9 +2700,9 @@ function ReferenceTransactionDetail({
           <div className="flex max-h-[92dvh] min-h-0 flex-col px-5 py-4 sm:px-6">
             <div className="pos-receipt-preview-toolbar mb-3 flex items-center justify-between gap-3">
               <span className="text-xs font-medium text-[var(--color-text-muted)]">
-                Ukuran kertas
+                {copy('Paper size')}
               </span>
-              <div className="flex items-center gap-1.5" aria-label="Ukuran struk">
+              <div className="flex items-center gap-1.5" aria-label={copy('Paper size')}>
                 <DButton
                   size="sm"
                   variant={receiptPaper === '58' ? 'primary' : 'secondary'}
@@ -2711,22 +2744,18 @@ function ReferenceTransactionDetail({
               <div className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)]">
                 <div className="bg-gradient-to-br from-[var(--color-brand)]/5 to-transparent px-5 py-4">
                   <p className="font-mono text-xs text-[var(--color-text-muted)]">
-                    {transactionNumber(sale.id)}
+                    {transactionNumber(sale.id, locale)}
                   </p>
                   <div className="mt-3 flex flex-wrap gap-1">
                     <span
                       className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${status ? statusMeta[status].tone : 'bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]'}`}
                     >
-                      {status ? statusMeta[status].label : 'Terbuka'}
+                      {status ? label(statusMeta[status].value) : label('OPEN')}
                     </span>
                     <span
                       className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${hasSuccessfulCheckout(sale) ? 'bg-[var(--color-success)]/10 text-[var(--color-success)]' : receiptAvailable ? 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]' : 'bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]'}`}
                     >
-                      {hasSuccessfulCheckout(sale)
-                        ? 'Lunas'
-                        : receiptAvailable
-                          ? 'Bayar sebagian'
-                          : 'Belum dibayar'}
+                      {copy(hasSuccessfulCheckout(sale) ? 'Paid' : receiptAvailable ? 'Partially paid' : 'Unpaid')}
                     </span>
                   </div>
                   <p className="mt-3 text-xs text-[var(--color-text-muted)]">{transactionDate}</p>
@@ -2736,29 +2765,29 @@ function ReferenceTransactionDetail({
                       variant={customerStatus(customerContext).variant}
                       className="shrink-0 text-[10px]"
                     >
-                      {customerStatus(customerContext).label}
+                      {copy(customerStatus(customerContext).label)}
                     </Badge>
                   </div>
                   {customer.membership ? (
                     <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                      {customer.membership.memberCode} · {customer.membership.status}
+                      {customer.membership.memberCode}, {label(customer.membership.status)}
                     </p>
                   ) : customer.phone ? (
                     <p className="mt-1 text-xs text-[var(--color-text-muted)]">{customer.phone}</p>
                   ) : null}
                 </div>
               </div>
+
               {sale.status === 'VOIDED' && cancellationReason ? (
                 <div className="rounded-xl border border-[var(--color-danger)]/25 bg-[var(--color-danger)]/10 px-3 py-2 text-xs">
-                  <p className="font-semibold text-[var(--color-danger)]">Alasan pembatalan</p>
+                  <p className="font-semibold text-[var(--color-danger)]">{copy('Cancellation reason')}</p>
                   <p className="mt-1 text-[var(--color-text-muted)]">{cancellationReason}</p>
                 </div>
               ) : null}
+
               {completionIssues.length ? (
                 <div className="rounded-xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 px-3 py-2 text-xs">
-                  <p className="font-semibold text-[var(--color-warning)]">
-                    Belum siap diselesaikan
-                  </p>
+                  <p className="font-semibold text-[var(--color-warning)]">{copy('Not ready to complete')}</p>
                   <div className="mt-2 space-y-2 text-[var(--color-text-muted)]">
                     {completionIssueGroups.map((group) => (
                       <div key={group.id}>
@@ -2773,11 +2802,12 @@ function ReferenceTransactionDetail({
                   </div>
                 </div>
               ) : null}
+
               <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)]">
                 <header className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-3">
-                  <h3 className="text-sm font-semibold">Pesanan</h3>
+                  <h3 className="text-sm font-semibold">{copy('Order')}</h3>
                   <span className="text-xs text-[var(--color-text-muted)]">
-                    {activeLines.length} item
+                    {activeLines.length} {copy('items')}
                   </span>
                 </header>
                 <div className="min-h-[144px] max-h-[min(38dvh,360px)] flex-1 divide-y divide-[var(--color-border)] overflow-y-auto overscroll-contain">
@@ -2794,7 +2824,7 @@ function ReferenceTransactionDetail({
                     const requiresEmployeeAttribution =
                       line.employeeAssignmentModeSnapshot !== 'NONE' ||
                       line.allowEmployeeContributionSnapshot;
-                    const employeeIssues = employeeAssignmentIssues(line);
+                    const employeeIssues = employeeAssignmentIssues(line, locale);
                     if (isMultiUnitService) {
                       return (
                         <ReferenceServiceWorkLine
@@ -2816,26 +2846,20 @@ function ReferenceTransactionDetail({
                             <p className="text-sm font-semibold">{line.itemNameSnapshot}</p>
                             <p className="mt-1 text-xs text-[var(--color-text-muted)]">
                               {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
-                              {line.variantNameSnapshot ? ` · ${line.variantNameSnapshot}` : ''}
+                              {line.variantNameSnapshot ? `, ${line.variantNameSnapshot}` : ''}
                             </p>
                             {line.fulfillment ? (
                               <p className="mt-1 text-[11px] font-medium text-[var(--color-text-muted)]">
-                                {line.fulfillment.status === 'WAITING'
-                                  ? 'Menunggu proses'
-                                  : line.fulfillment.status === 'IN_PROGRESS'
-                                    ? 'Sedang diproses'
-                                    : line.fulfillment.status === 'COMPLETED'
-                                      ? 'Selesai'
-                                      : 'Dibatalkan'}
+                                {label(line.fulfillment.status)}
                               </p>
                             ) : null}
                             {isTrackedService && requiresEmployeeAttribution ? (
                               <div className="mt-2 flex min-w-0 items-center gap-2 text-xs">
                                 <span className="shrink-0 font-medium text-[var(--color-text-muted)]">
-                                  Pengerjaan
+                                  {copy('Work')}
                                 </span>
                                 <span className="min-w-0 flex-1 truncate text-[var(--color-text-muted)]">
-                                  {employeeWorkSummary(line, employees)}
+                                  {employeeWorkSummary(line, employees, locale)}
                                 </span>
                                 {canEditServiceWork ? (
                                   employeeIssues.length > 0 ? (
@@ -2846,14 +2870,14 @@ function ReferenceTransactionDetail({
                                       className="h-7 px-2 text-[11px]"
                                       onClick={() => onAssign(line)}
                                     >
-                                      Atur
+                                      {copy('Configure')}
                                     </DButton>
                                   ) : (
                                     <DButton
                                       size="icon"
                                       variant="ghost"
                                       disabled={isMutating}
-                                      aria-label={`Ubah pengerjaan ${line.itemNameSnapshot}`}
+                                      aria-label={`${copy('Configure')} ${line.itemNameSnapshot}`}
                                       onClick={() => onAssign(line)}
                                     >
                                       <Pencil className="size-3.5" />
@@ -2875,6 +2899,7 @@ function ReferenceTransactionDetail({
           </div>
         )}
       </Dialog>
+
       {showReceipt
         ? createPortal(
             <div className={`pos-receipt-print pos-receipt-print--${receiptPaper}`}>
@@ -2927,19 +2952,20 @@ function ReceiptContent({
   hasDiscount: boolean;
   hasTax: boolean;
 }) {
+  const { copy } = useOperationalLocalization();
   return (
     <>
       <header className="text-center">
         <h2 className="text-lg font-black tracking-tight">{businessName}</h2>
         <p className="mt-1 text-xs text-slate-500">{branchName}</p>
         <div className="my-4 border-t border-dashed border-slate-300" />
-        <p className="font-mono text-xs font-semibold">{transactionNumber(sale.id)}</p>
+        <p className="font-mono text-xs font-semibold">{transactionNumber(sale.id, locale)}</p>
         <p className="mt-1 text-[11px] text-slate-500">{transactionDate}</p>
-        <p className="mt-1 text-[11px] text-slate-500">Kasir: {cashierName}</p>
+        <p className="mt-1 text-[11px] text-slate-500">{copy('Cashier')}: {cashierName}</p>
       </header>
 
       <section className="mt-4 text-xs">
-        <p className="font-semibold">Pelanggan</p>
+        <p className="font-semibold">{copy('Customer')}</p>
         <p className="mt-1">{customer.name}</p>
         {customer.phone ? <p className="text-slate-500">{customer.phone}</p> : null}
       </section>
@@ -2969,23 +2995,23 @@ function ReceiptContent({
 
       <dl className="space-y-1.5 text-xs">
         <div className="flex justify-between gap-3">
-          <dt className="text-slate-500">Subtotal</dt>
+          <dt className="text-slate-500">{copy('Subtotal')}</dt>
           <dd>{money(sale.grossAmount, locale)}</dd>
         </div>
         {hasDiscount ? (
           <div className="flex justify-between gap-3">
-            <dt className="text-slate-500">Diskon</dt>
+            <dt className="text-slate-500">{copy('Discount')}</dt>
             <dd>−{money(sale.discountAmount, locale)}</dd>
           </div>
         ) : null}
         {hasTax ? (
           <div className="flex justify-between gap-3">
-            <dt className="text-slate-500">Pajak</dt>
+            <dt className="text-slate-500">{copy('Tax')}</dt>
             <dd>{money(sale.taxAmount, locale)}</dd>
           </div>
         ) : null}
         <div className="mt-2 flex justify-between gap-3 border-t border-slate-200 pt-2 text-sm font-black">
-          <dt>TOTAL</dt>
+          <dt>{copy('Total').toUpperCase()}</dt>
           <dd>{money(sale.totalAmount, locale)}</dd>
         </div>
       </dl>
@@ -2994,20 +3020,20 @@ function ReceiptContent({
 
       <section className="space-y-1.5 text-xs">
         <div className="flex justify-between gap-3">
-          <span className="text-slate-500">Dibayar</span>
+          <span className="text-slate-500">{copy('Paid amount')}</span>
           <span>{money(totalPaid, locale)}</span>
         </div>
         {payment?.method === 'CASH' ? (
           <>
             {payment.tenderedAmount ? (
               <div className="flex justify-between gap-3">
-                <span className="text-slate-500">Uang diterima</span>
+                <span className="text-slate-500">{copy('Cash received')}</span>
                 <span>{money(payment.tenderedAmount, locale)}</span>
               </div>
             ) : null}
             {isPositiveDecimal(payment.changeAmount ?? '0') ? (
               <div className="flex justify-between gap-3">
-                <span className="text-slate-500">Kembalian</span>
+                <span className="text-slate-500">{copy('Change')}</span>
                 <span>{money(payment.changeAmount ?? '0.0000', locale)}</span>
               </div>
             ) : null}
@@ -3016,7 +3042,7 @@ function ReceiptContent({
       </section>
 
       <div className="my-4 border-t border-dashed border-slate-300" />
-      <p className="text-center text-[11px] text-slate-500">Terima kasih telah bertransaksi.</p>
+      <p className="text-center text-[11px] text-slate-500">{copy('Thank you for your purchase.')}</p>
       <div className="pos-receipt-tear" aria-hidden="true" />
     </>
   );
@@ -3039,7 +3065,8 @@ function ReferenceServiceWorkLine({
   isMutating: boolean;
   onManage: () => void;
 }) {
-  const employeeWorkSummary = serviceWorkAssignmentSummary(units, employees);
+  const { copy } = useOperationalLocalization();
+  const workSummary = serviceWorkAssignmentSummary(units, employees, locale);
 
   return (
     <div className="p-4">
@@ -3048,18 +3075,18 @@ function ReferenceServiceWorkLine({
           <p className="text-sm font-semibold">{line.itemNameSnapshot}</p>
           <p className="mt-1 text-xs text-[var(--color-text-muted)]">
             {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
-            {line.variantNameSnapshot ? ` · ${line.variantNameSnapshot}` : ''}
+            {line.variantNameSnapshot ? `, ${line.variantNameSnapshot}` : ''}
           </p>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
             <span className="min-w-0 flex-1 truncate text-[var(--color-text-muted)]">
-              {units.length} unit · {employeeWorkSummary}
+              {units.length} {copy('work units')}, {workSummary}
             </span>
             {active ? (
               <DButton
                 size="icon"
                 variant="ghost"
                 disabled={isMutating}
-                aria-label={`Ubah pengerjaan ${line.itemNameSnapshot}`}
+                aria-label={`${copy('Configure')} ${line.itemNameSnapshot}`}
                 onClick={onManage}
               >
                 <Pencil className="size-3.5" />
@@ -3074,6 +3101,7 @@ function ReferenceServiceWorkLine({
 }
 
 function ReferenceFinancialSummary({ sale, locale }: { sale: Sale; locale: string }) {
+  const { copy } = useOperationalLocalization();
   const [expanded, setExpanded] = useState(false);
   const { totalPaid, balanceDue } = financialSummary(sale);
   const hasDiscount = !createDecimal(sale.discountAmount).equals(createDecimal('0'));
@@ -3098,42 +3126,42 @@ function ReferenceFinancialSummary({ sale, locale }: { sale: Sale; locale: strin
         <div className="overflow-hidden">
           <dl className="space-y-1.5 border-b border-[var(--color-border)] px-5 py-3 text-xs">
             <div className="flex justify-between gap-3">
-              <dt className="text-[var(--color-text-muted)]">Subtotal</dt>
+              <dt className="text-[var(--color-text-muted)]">{copy('Subtotal')}</dt>
               <dd>{money(sale.grossAmount, locale)}</dd>
             </div>
             {hasDiscount ? (
               <div className="flex justify-between gap-3">
-                <dt className="text-[var(--color-text-muted)]">Promo / diskon</dt>
+                <dt className="text-[var(--color-text-muted)]">{copy('Promotion discount')}</dt>
                 <dd>−{money(sale.discountAmount, locale)}</dd>
               </div>
             ) : null}
             {hasTax ? (
               <div className="flex justify-between gap-3">
-                <dt className="text-[var(--color-text-muted)]">Pajak</dt>
+                <dt className="text-[var(--color-text-muted)]">{copy('Tax')}</dt>
                 <dd>{money(sale.taxAmount, locale)}</dd>
               </div>
             ) : null}
             <div className="flex justify-between gap-3 border-t border-[var(--color-border)] pt-2 font-semibold">
-              <dt>Total</dt>
+              <dt>{copy('Total')}</dt>
               <dd>{money(sale.totalAmount, locale)}</dd>
             </div>
             <div className="flex justify-between gap-3">
-              <dt className="text-[var(--color-text-muted)]">Dibayar</dt>
+              <dt className="text-[var(--color-text-muted)]">{copy('Paid amount')}</dt>
               <dd>{money(totalPaid, locale)}</dd>
             </div>
             <div className="flex justify-between gap-3 font-semibold text-[var(--color-brand)]">
-              <dt>Sisa</dt>
+              <dt>{copy('Balance')}</dt>
               <dd>{money(balanceDue, locale)}</dd>
             </div>
             {hasCashTendered ? (
               <div className="flex justify-between gap-3">
-                <dt className="text-[var(--color-text-muted)]">Uang diterima</dt>
+                <dt className="text-[var(--color-text-muted)]">{copy('Cash received')}</dt>
                 <dd>{money(cashTendered.toFixed(4), locale)}</dd>
               </div>
             ) : null}
             {hasCashChange ? (
               <div className="flex justify-between gap-3">
-                <dt className="text-[var(--color-text-muted)]">Kembalian</dt>
+                <dt className="text-[var(--color-text-muted)]">{copy('Change')}</dt>
                 <dd>{money(cashChange.toFixed(4), locale)}</dd>
               </div>
             ) : null}
@@ -3148,19 +3176,19 @@ function ReferenceFinancialSummary({ sale, locale }: { sale: Sale; locale: strin
       >
         <span>
           <span className="block text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]">
-            Total
+            {copy('Total')}
           </span>
           <span className="mt-0.5 block font-semibold">{money(sale.totalAmount, locale)}</span>
         </span>
         <span>
           <span className="block text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]">
-            Dibayar
+            {copy('Paid amount')}
           </span>
           <span className="mt-0.5 block font-semibold">{money(totalPaid, locale)}</span>
         </span>
         <span className="text-right">
           <span className="block text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]">
-            Sisa
+            {copy('Balance')}
           </span>
           <span className="mt-0.5 block font-semibold text-[var(--color-brand)]">
             {money(balanceDue, locale)}
@@ -3197,6 +3225,7 @@ function ReferenceOrderAdjustmentDialog({
   onQuantity: (line: SaleLine, quantity: string) => void;
   onRemove: (line: SaleLine) => void;
 }) {
+  const { copy } = useOperationalLocalization();
   const [catalogSearch, setCatalogSearch] = useState('');
   const [variantSelection, setVariantSelection] = useState<{
     itemId: string;
@@ -3219,26 +3248,26 @@ function ReferenceOrderAdjustmentDialog({
     .slice(0, 12)
     .map((item) => ({
       value: item.id,
-      label: `${item.name} · ${item.code}`,
+      label: `${item.name} (${item.code})`,
     }));
 
   return (
     <Dialog
       open
       onClose={onClose}
-      title="Sesuaikan Pesanan"
-      description={`${transactionNumber(sale.id)} · perubahan tetap pada transaksi ini`}
-      ariaLabel="Adjust queued transaction"
+      title={copy('Adjust order')}
+      description={`${transactionNumber(sale.id, locale)}. ${copy('Changes apply to this transaction.')}`}
+      ariaLabel={copy('Adjust order')}
       closeOnEscape
       closeOnOverlay
       className="pos-reference-dialog w-full max-w-xl overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
       footer={
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={onClose}>
-            Batal
+            {copy('Cancel')}
           </Button>
           <Button disabled={isMutating} onClick={onClose}>
-            Konfirmasi penyesuaian
+            {copy('Confirm adjustment')}
           </Button>
         </div>
       }
@@ -3247,16 +3276,15 @@ function ReferenceOrderAdjustmentDialog({
         {paid ? (
           <div className="rounded-xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 px-3 py-2 text-xs">
             <p className="font-semibold text-[var(--color-warning)]">
-              Pembayaran sebelumnya dipertahankan
+              {copy('Previous payment remains recorded')}
             </p>
             <p className="mt-1 text-[var(--color-text-muted)]">
-              Anda dapat menambahkan item. Pengurangan atau penghapusan item berbayar memerlukan
-              proses refund.
+              {copy('You can add items. Reducing or removing paid items requires a refund.')}
             </p>
           </div>
         ) : (
           <p className="text-xs text-[var(--color-text-muted)]">
-            Ubah qty atau hapus item yang belum dimulai, lalu konfirmasi penyesuaian.
+            {copy('Change quantity or remove items that have not started, then confirm.')}
           </p>
         )}
         <div className="divide-y divide-[var(--color-border)] overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-background)]">
@@ -3279,7 +3307,7 @@ function ReferenceOrderAdjustmentDialog({
                 <div className="flex shrink-0 items-center gap-1">
                   <button
                     type="button"
-                    aria-label={`Kurangi ${line.itemNameSnapshot}`}
+                    aria-label={`${copy('Decrease quantity')} ${line.itemNameSnapshot}`}
                     disabled={!canDecrease || isMutating}
                     onClick={() =>
                       onQuantity(
@@ -3296,7 +3324,7 @@ function ReferenceOrderAdjustmentDialog({
                   </span>
                   <button
                     type="button"
-                    aria-label={`Tambah ${line.itemNameSnapshot}`}
+                    aria-label={`${copy('Increase quantity')} ${line.itemNameSnapshot}`}
                     disabled={isMutating}
                     onClick={() =>
                       onQuantity(
@@ -3310,7 +3338,7 @@ function ReferenceOrderAdjustmentDialog({
                   </button>
                   <button
                     type="button"
-                    aria-label={`Hapus ${line.itemNameSnapshot}`}
+                    aria-label={`${copy('Remove')} ${line.itemNameSnapshot}`}
                     disabled={paid || isMutating}
                     onClick={() => onRemove(line)}
                     className="ml-1 flex size-8 items-center justify-center rounded-lg text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 disabled:cursor-not-allowed disabled:opacity-40"
@@ -3322,14 +3350,15 @@ function ReferenceOrderAdjustmentDialog({
             );
           })}
         </div>
+
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] p-3">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
-            Tambah item dari katalog
+            {copy('Add item from catalog')}
           </p>
           <Combobox
-            ariaLabel="Tambah item ke transaksi"
+            ariaLabel={copy('Add item from catalog')}
             value={null}
-            placeholder="Cari produk atau jasa"
+            placeholder={copy('Search product or service')}
             options={options}
             onSearchChange={setCatalogSearch}
             onChange={(itemId) => {
@@ -3337,9 +3366,10 @@ function ReferenceOrderAdjustmentDialog({
               if (item) onAdd(item);
             }}
             disabled={isMutating}
-            idleMessage="Ketik nama atau kode item untuk menambahkan ke transaksi ini."
+            idleMessage={copy('Search by item name or code.')}
           />
         </div>
+
         {variantPicker ? (
           <section className="border-t border-[var(--color-border)] pt-3">
             <div className="space-y-3">
@@ -3347,9 +3377,9 @@ function ReferenceOrderAdjustmentDialog({
                 {variantPicker.item.name}
               </p>
               <Select
-                label="Varian"
+                label={copy('Variant')}
                 value={selectedVariantId}
-                placeholder="Pilih varian"
+                placeholder={copy('Select variant')}
                 options={variantPicker.variants.map((variant) => {
                   const price = variantPicker.pricesByVariantId?.[variant.id];
                   const isUnavailable =
@@ -3357,9 +3387,9 @@ function ReferenceOrderAdjustmentDialog({
                   return {
                     value: variant.id,
                     label: isUnavailable
-                      ? `${variant.name} · Harga belum tersedia`
+                      ? `${variant.name} (${copy('Price unavailable')})`
                       : price
-                        ? `${variant.name} · ${money(price, locale)}`
+                        ? `${variant.name} (${money(price, locale)})`
                         : variant.name,
                     disabled: isUnavailable,
                   };
@@ -3383,7 +3413,7 @@ function ReferenceOrderAdjustmentDialog({
                     if (selectedVariantId) onAddVariant(selectedVariantId);
                   }}
                 >
-                  Tambahkan item
+                  {copy('Add item')}
                 </Button>
               </div>
             </div>
@@ -3421,6 +3451,7 @@ function ReferenceBalancePaymentDialog({
   onTender: (amount: string) => void;
   onPay: () => void;
 }) {
+  const { copy, label } = useOperationalLocalization();
   if (!sale) return null;
   const { totalPaid } = financialSummary(sale);
   const balanceDue = availableToPay ?? '0.0000';
@@ -3433,11 +3464,11 @@ function ReferenceBalancePaymentDialog({
     !cashShort &&
     (!needsProvider || Boolean(provider)) &&
     !isMutating;
-  const methods: Array<{ value: PaymentMethod; label: string; icon: ReactNode }> = [
-    { value: 'CASH', label: 'Tunai', icon: <Banknote className="size-4" /> },
-    { value: 'BANK_TRANSFER', label: 'Transfer', icon: <CreditCard className="size-4" /> },
-    { value: 'QRIS', label: 'QRIS', icon: <QrCode className="size-4" /> },
-    { value: 'WALLET', label: 'E-Wallet', icon: <ShoppingBag className="size-4" /> },
+  const methods: Array<{ value: PaymentMethod; icon: ReactNode }> = [
+    { value: 'CASH', icon: <Banknote className="size-4" /> },
+    { value: 'BANK_TRANSFER', icon: <CreditCard className="size-4" /> },
+    { value: 'QRIS', icon: <QrCode className="size-4" /> },
+    { value: 'WALLET', icon: <ShoppingBag className="size-4" /> },
   ];
   const providerOptions =
     method === 'BANK_TRANSFER'
@@ -3448,19 +3479,19 @@ function ReferenceBalancePaymentDialog({
     <Dialog
       open
       onClose={onClose}
-      title={hasSuccessfulPayment(sale) ? 'Bayar Sisa' : 'Bayar Transaksi'}
-      description={transactionNumber(sale.id)}
-      ariaLabel="Pay queued transaction"
+      title={copy(hasSuccessfulPayment(sale) ? 'Pay balance' : 'Pay')}
+      description={transactionNumber(sale.id, locale)}
+      ariaLabel={copy('Payment')}
       closeOnEscape
       closeOnOverlay
       className="pos-reference-dialog w-full max-w-md overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
       footer={
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={onClose}>
-            Batal
+            {copy('Cancel')}
           </Button>
           <Button disabled={!canPay} loading={isMutating} onClick={onPay}>
-            Bayar {money(balanceDue, locale)}
+            {copy('Pay')} {money(balanceDue, locale)}
           </Button>
         </div>
       }
@@ -3468,11 +3499,11 @@ function ReferenceBalancePaymentDialog({
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
         <div className="grid grid-cols-2 gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] p-3 text-sm">
           <div>
-            <p className="text-xs text-[var(--color-text-muted)]">Sudah dibayar</p>
+            <p className="text-xs text-[var(--color-text-muted)]">{copy('Paid amount')}</p>
             <p className="mt-1 font-semibold">{money(totalPaid, locale)}</p>
           </div>
           <div className="text-right">
-            <p className="text-xs text-[var(--color-text-muted)]">Tersedia dibayar</p>
+            <p className="text-xs text-[var(--color-text-muted)]">{copy('Balance')}</p>
             <p className="mt-1 font-bold text-[var(--color-brand)]">{money(balanceDue, locale)}</p>
           </div>
         </div>
@@ -3485,7 +3516,7 @@ function ReferenceBalancePaymentDialog({
               className={`flex h-10 items-center justify-center gap-1 rounded-xl border text-xs font-semibold ${method === option.value ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white' : 'border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]'}`}
             >
               {option.icon}
-              <span className="hidden sm:inline">{option.label}</span>
+              <span className="hidden sm:inline">{label(option.value)}</span>
             </button>
           ))}
         </div>
@@ -3505,246 +3536,24 @@ function ReferenceBalancePaymentDialog({
         ) : null}
         {isCash ? (
           <label className="block text-sm font-medium">
-            Uang dibayar
+            {copy('Amount paid')}
             <PosCurrencyInput
-              aria-label="Cash tendered for queued transaction"
+              aria-label={copy('Amount paid')}
               className="mt-1.5 h-10 rounded-lg text-right text-lg font-bold"
               value={tender}
               onChange={onTender}
             />
             {cashShort ? (
               <span className="mt-1 block text-xs text-[var(--color-warning)]">
-                Nominal pembayaran belum mencukupi.
+                {copy('Payment amount is insufficient.')}
               </span>
             ) : null}
           </label>
         ) : (
           <p className="rounded-xl border border-[var(--color-brand)]/20 bg-[var(--color-brand)]/5 p-3 text-xs text-[var(--color-text-muted)]">
-            Catat pembayaran{' '}
-            {method === 'BANK_TRANSFER' ? 'transfer' : method === 'WALLET' ? 'e-wallet' : 'QRIS'}{' '}
-            sebesar {money(balanceDue, locale)}.
+            {copy('Record payment')} {label(method)} {money(balanceDue, locale)}.
           </p>
         )}
-      </div>
-    </Dialog>
-  );
-}
-
-function ReferenceInfoTile({
-  icon,
-  label,
-  value,
-  sub,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: ReactNode;
-  sub?: ReactNode;
-}) {
-  return (
-    <div className="flex items-start gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] p-3">
-      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]">
-        {icon}
-      </div>
-      <div className="min-w-0">
-        <p className="text-[11px] uppercase tracking-wide text-[var(--color-text-muted)]">
-          {label}
-        </p>
-        <p className="mt-0.5 truncate text-sm font-semibold">{value}</p>
-        {sub ? (
-          <p className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">{sub}</p>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function ReferenceReviewDialog({
-  sale,
-  activeSale,
-  locale,
-  employees,
-  issues,
-  onClose,
-  onFix,
-  onAssign,
-  onFulfillment,
-  onComplete,
-}: {
-  sale: Sale | null;
-  activeSale: Sale | null;
-  locale: string;
-  employees: readonly Employee[];
-  issues: string[];
-  onClose: () => void;
-  onFix: () => void;
-  onAssign: (line: SaleLine) => void;
-  onFulfillment: (line: SaleLine, status: 'IN_PROGRESS' | 'COMPLETED') => void;
-  onComplete: () => void;
-}) {
-  if (!sale) return null;
-  const active = activeSale?.id === sale.id;
-  const paid = sale.payments
-    .filter((payment) => payment.status === 'SUCCEEDED')
-    .reduce((sum, payment) => sum.plus(createDecimal(payment.appliedAmount)), createDecimal('0'));
-  const outstanding = createDecimal(sale.totalAmount).minus(paid);
-  const name = (employeeId: string) =>
-    employees.find((employee) => employee.id === employeeId)?.displayName ?? 'Karyawan';
-  return (
-    <Dialog
-      open
-      title="Review & Selesaikan"
-      description="Pastikan semua detail transaksi sudah benar sebelum diselesaikan."
-      onClose={onClose}
-      ariaLabel="Review and complete transaction"
-      closeOnEscape
-      closeOnOverlay
-      className="pos-reference-dialog w-full max-w-2xl overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
-      footer={
-        <footer className="flex shrink-0 justify-end gap-2">
-          <Button variant="ghost" onClick={onClose}>
-            Batal
-          </Button>
-          <Button
-            disabled={!active || issues.length > 0}
-            onClick={onComplete}
-            leftIcon={<CheckCircle2 className="size-3.5" />}
-          >
-            {active ? 'Selesaikan Transaksi' : 'Memuat transaksi…'}
-          </Button>
-        </footer>
-      }
-    >
-      <div className="flex flex-col">
-        <div className="min-h-0 flex-1 space-y-4">
-          {issues.length ? (
-            <div className="rounded-2xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 p-3">
-              <p className="text-sm font-bold text-[var(--color-warning)]">
-                Transaksi perlu dilengkapi
-              </p>
-              <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs text-[var(--color-text)]">
-                {issues.map((issue) => (
-                  <li key={issue}>{issue}</li>
-                ))}
-              </ul>
-              <Button size="sm" variant="outline" className="mt-3" onClick={onFix}>
-                Kembali ke cart
-              </Button>
-            </div>
-          ) : null}
-          <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)]">
-            <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-2.5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
-                Detail Pesanan
-              </p>
-              <span className="text-xs text-[var(--color-text-muted)]">
-                {sale.lines.filter((line) => !line.removedAt).length} item
-              </span>
-            </div>
-            <div className="divide-y divide-[var(--color-border)]">
-              {sale.lines
-                .filter((line) => !line.removedAt)
-                .map((line) => (
-                  <div key={line.id} className="px-4 py-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold">{line.itemNameSnapshot}</p>
-                        <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
-                          {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
-                          {line.variantNameSnapshot ? ` · ${line.variantNameSnapshot}` : ''}
-                        </p>
-                        {line.itemTypeSnapshot === 'SERVICE' ? (
-                          <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
-                            <span className="text-[var(--color-text-muted)]">
-                              {line.participations.filter((participation) => participation.assigned)
-                                .length
-                                ? line.participations
-                                    .filter((participation) => participation.assigned)
-                                    .map(
-                                      (participation) =>
-                                        `${name(participation.employeeId)}${participation.shareRate ? ` ${createDecimal(participation.shareRate).times(100).toFixed(0)}%` : ''}`,
-                                    )
-                                    .join(', ')
-                                : 'Karyawan belum dipilih'}
-                            </span>
-                            {line.employeeAssignmentModeSnapshot === 'REQUIRED' ? (
-                              <button
-                                type="button"
-                                onClick={() => onAssign(line)}
-                                className={`rounded-md px-2 py-1 font-semibold transition-colors ${line.participations.some((participation) => participation.assigned) ? 'bg-[var(--color-brand)]/10 text-[var(--color-brand)] hover:bg-[var(--color-brand)]/15' : 'bg-[var(--color-warning)]/10 text-[var(--color-warning)] hover:bg-[var(--color-warning)]/15'}`}
-                              >
-                                {line.participations.some((participation) => participation.assigned)
-                                  ? 'Ubah karyawan'
-                                  : 'Pilih karyawan'}
-                              </button>
-                            ) : null}
-                            {line.fulfillmentBehaviorSnapshot === 'TRACKED' ? (
-                              <>
-                                <span className="rounded-md bg-[var(--color-surface-muted)] px-2 py-1 font-semibold text-[var(--color-text-muted)]">
-                                  {line.fulfillment?.status === 'COMPLETED'
-                                    ? 'Pekerjaan selesai'
-                                    : line.fulfillment?.status === 'IN_PROGRESS'
-                                      ? 'Sedang dikerjakan'
-                                      : 'Menunggu dikerjakan'}
-                                </span>
-                                {line.fulfillment?.status !== 'COMPLETED' ? (
-                                  <button
-                                    type="button"
-                                    disabled={!active}
-                                    onClick={() =>
-                                      onFulfillment(
-                                        line,
-                                        line.fulfillment?.status === 'IN_PROGRESS'
-                                          ? 'COMPLETED'
-                                          : 'IN_PROGRESS',
-                                      )
-                                    }
-                                    className="rounded-md bg-[var(--color-brand)]/10 px-2 py-1 font-semibold text-[var(--color-brand)] transition-colors hover:bg-[var(--color-brand)]/15 disabled:opacity-50"
-                                  >
-                                    {line.fulfillment?.status === 'IN_PROGRESS'
-                                      ? 'Tandai selesai'
-                                      : 'Mulai pekerjaan'}
-                                  </button>
-                                ) : null}
-                              </>
-                            ) : null}
-                          </div>
-                        ) : null}
-                      </div>
-                      <p className="shrink-0 text-sm font-bold">
-                        {money(line.totalAmount, locale)}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-            </div>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <ReferenceInfoTile
-              icon={<User className="size-4" />}
-              label="Pelanggan"
-              value={saleCustomer(sale.id).name}
-              sub={saleCustomer(sale.id).phone || undefined}
-            />
-            <ReferenceInfoTile
-              icon={<CreditCard className="size-4" />}
-              label="Pembayaran"
-              value={money(paid.toFixed(4), locale)}
-              sub={`Outstanding ${money(outstanding.toFixed(4), locale)}`}
-            />
-          </div>
-          <div className="rounded-2xl bg-slate-950 p-4 text-white">
-            <div className="flex justify-between text-sm text-slate-300">
-              <span>Subtotal</span>
-              <span>{money(sale.grossAmount, locale)}</span>
-            </div>
-            <div className="mt-2 flex justify-between text-lg font-bold">
-              <span>Total</span>
-              <span>{money(sale.totalAmount, locale)}</span>
-            </div>
-          </div>
-        </div>
       </div>
     </Dialog>
   );
@@ -3763,11 +3572,12 @@ function ReferenceCancelDialog({
   onClose: () => void;
   onConfirm: () => void;
 }) {
+  const { copy, locale } = useOperationalLocalization();
   return (
     <Dialog
       open={Boolean(sale)}
       onClose={onClose}
-      ariaLabel="Cancel transaction"
+      ariaLabel={copy('Cancel transaction')}
       closeOnEscape
       closeOnOverlay
       className="pos-reference-dialog w-full max-w-md rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
@@ -3776,18 +3586,16 @@ function ReferenceCancelDialog({
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-danger)]">
-              Batalkan Transaksi
+              {copy('Cancel transaction')}
             </p>
-            <h2 className="mt-1 text-lg font-semibold">Batalkan transaksi ini?</h2>
+            <h2 className="mt-1 text-lg font-semibold">{copy('Cancel this transaction?')}</h2>
             <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-              {sale ? transactionNumber(sale.id) : ''} tetap tercatat di antrian hari ini.
-            </p>
-            <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-              Alasan ini hanya mengonfirmasi tindakan; kontrak void saat ini tidak menerima alasan.
+              {sale ? transactionNumber(sale.id, locale) : ''}. {copy('The transaction remains recorded in today queue.')}
             </p>
           </div>
           <button
             type="button"
+            aria-label={copy('Close')}
             onClick={onClose}
             className="rounded-lg p-2 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]"
           >
@@ -3795,21 +3603,21 @@ function ReferenceCancelDialog({
           </button>
         </div>
         <label className="mt-5 block text-sm font-medium">
-          Alasan pembatalan
+          {copy('Cancellation reason')}
           <Input
             className="mt-1.5 h-10 rounded-lg"
             autoFocus
             value={reason}
             onChange={onReasonChange}
-            placeholder="Contoh: Permintaan pelanggan"
+            placeholder={copy('Example: Customer request')}
           />
         </label>
         <div className="mt-5 flex justify-end gap-2">
           <Button variant="outline" onClick={onClose}>
-            Kembali
+            {copy('Back')}
           </Button>
           <Button variant="danger" disabled={!reason.trim()} onClick={onConfirm}>
-            Ya, Batalkan
+            {copy('Confirm cancellation')}
           </Button>
         </div>
       </div>
@@ -3833,6 +3641,7 @@ function ReferenceEmployeeDialog({
     contributors: Array<{ employeeId: string; shareRate: string }>,
   ) => void;
 }) {
+  const { copy } = useOperationalLocalization();
   const initialRows =
     line?.participations
       .filter((participation) => participation.assigned)
@@ -3884,23 +3693,24 @@ function ReferenceEmployeeDialog({
     activeRows.every((row) => row.employeeId) &&
     total.equals(createDecimal('100'));
   if (!line) return null;
+
   return (
     <Dialog
       open={isOpen}
-      title="Karyawan untuk layanan"
-      description="Lengkapi attribution layanan sebelum transaksi diselesaikan. Sistem membagi 100% secara rata."
+      title={copy('Employees for service')}
+      description={copy('Set employees and contribution shares before completing the transaction.')}
       onClose={() => {
         setRows([]);
         onClose();
       }}
-      ariaLabel="Assign service employees"
+      ariaLabel={copy('Employees for service')}
       closeOnEscape
       closeOnOverlay
       className="pos-reference-dialog w-full max-w-2xl overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
       footer={
         <footer className="flex shrink-0 items-center justify-between gap-2">
           <span className="text-[11px] text-[var(--color-text-muted)]">
-            {valid ? 'Semua porsi valid (100%)' : 'Lengkapi karyawan untuk jasa ini'}
+            {copy(valid ? 'All shares total 100%' : 'Complete employee shares')}
           </span>
           <div className="flex gap-2">
             <Button
@@ -3910,7 +3720,7 @@ function ReferenceEmployeeDialog({
                 onClose();
               }}
             >
-              Batal
+              {copy('Cancel')}
             </Button>
             <Button
               disabled={!valid}
@@ -3924,7 +3734,7 @@ function ReferenceEmployeeDialog({
                 )
               }
             >
-              Simpan
+              {copy('Save')}
             </Button>
           </div>
         </footer>
@@ -3935,25 +3745,25 @@ function ReferenceEmployeeDialog({
           <div>
             <p className="text-sm font-semibold">{line.itemNameSnapshot}</p>
             <p className="text-xs text-[var(--color-text-muted)]">
-              Qty {quantity(line.quantity)} · {money(line.totalAmount, locale)}
+              {copy('Quantity')} {quantity(line.quantity)}, {money(line.totalAmount, locale)}
             </p>
           </div>
           <span
             className={`rounded-full px-2.5 py-1 text-xs font-semibold ${valid ? 'bg-[var(--color-success)]/10 text-[var(--color-success)]' : 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]'}`}
           >
-            Total {total.toFixed(0)}%
+            {copy('Total')} {total.toFixed(0)}%
           </span>
         </div>
         <div className="space-y-2">
           {activeRows.map((row, index) => (
             <div key={`${row.employeeId}-${index}`} className="grid grid-cols-12 items-end gap-2">
               <label className="col-span-6 text-xs font-medium">
-                Karyawan
+                {copy('Employee')}
                 <div className="mt-1">
                   <Combobox
-                    ariaLabel={`Employee ${index + 1}`}
+                    ariaLabel={`${copy('Employee')} ${index + 1}`}
                     value={row.employeeId}
-                    placeholder="Pilih karyawan"
+                    placeholder={copy('Select an employee.')}
                     options={employees.map((employee) => ({
                       value: employee.id,
                       label: employee.displayName,
@@ -3968,10 +3778,10 @@ function ReferenceEmployeeDialog({
                 </div>
               </label>
               <label className="col-span-3 text-xs font-medium">
-                Porsi
+                {copy('Share')}
                 <div className="mt-1">
                   <PosNumericInput
-                    aria-label={`Contribution ${index + 1}`}
+                    aria-label={`${copy('Share')} ${index + 1}`}
                     className="h-9 rounded-lg text-sm"
                     disabled={activeRows.length === 1}
                     value={row.shareRate}
@@ -3994,7 +3804,7 @@ function ReferenceEmployeeDialog({
               <div className="col-span-3 flex h-9 items-center justify-end gap-1">
                 <button
                   type="button"
-                  title="Auto distribute"
+                  title={copy('Split evenly')}
                   disabled={activeRows.length === 1}
                   onClick={() => {
                     const next = [...activeRows];
@@ -4007,6 +3817,7 @@ function ReferenceEmployeeDialog({
                 </button>
                 <button
                   type="button"
+                  aria-label={`${copy('Remove')} ${copy('Employee')} ${index + 1}`}
                   disabled={activeRows.length === 1}
                   onClick={() =>
                     setRows(
@@ -4031,11 +3842,11 @@ function ReferenceEmployeeDialog({
           className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-[var(--color-brand)] hover:underline"
         >
           <UserPlus className="size-3" />
-          Tambah karyawan
+          {copy('Add employee')}
         </button>
         {!valid ? (
           <p className="mt-2 text-xs text-[var(--color-warning)]">
-            Lengkapi karyawan dan pastikan total porsi tepat 100%.
+            {copy('Complete employees and make sure total share is 100%.')}
           </p>
         ) : null}
       </div>
@@ -4060,6 +3871,7 @@ function ServiceWorkContributorEditor({
   employees: readonly Employee[];
   onChange: (contributors: ServiceWorkContributor[]) => void;
 }) {
+  const { copy } = useOperationalLocalization();
   const rows = editableWorkContributors(contributors);
   const total = contributionTotal(rows).times(100).toFixed(0);
 
@@ -4071,11 +3883,11 @@ function ServiceWorkContributorEditor({
           className="grid grid-cols-[minmax(0,1fr)_74px_28px] items-end gap-2"
         >
           <label className="text-[11px] font-medium text-[var(--color-text-muted)]">
-            Karyawan
+            {copy('Employee')}
             <Combobox
-              ariaLabel={`Karyawan pengerjaan ${index + 1}`}
+              ariaLabel={`${copy('Employee')} ${index + 1}`}
               value={row.employeeId}
-              placeholder="Pilih karyawan"
+              placeholder={copy('Select an employee.')}
               options={employees.map((employee) => ({
                 value: employee.id,
                 label: employee.displayName,
@@ -4089,9 +3901,9 @@ function ServiceWorkContributorEditor({
             />
           </label>
           <label className="text-[11px] font-medium text-[var(--color-text-muted)]">
-            Porsi
+            {copy('Share')}
             <PosNumericInput
-              aria-label={`Porsi pengerjaan ${index + 1}`}
+              aria-label={`${copy('Share')} ${index + 1}`}
               className="h-9 rounded-lg text-sm"
               value={createDecimal(row.shareRate).times(100).toFixed(0)}
               integer
@@ -4113,7 +3925,7 @@ function ServiceWorkContributorEditor({
           <button
             type="button"
             disabled={rows.length === 1}
-            aria-label={`Hapus karyawan ${index + 1}`}
+            aria-label={`${copy('Remove')} ${copy('Employee')} ${index + 1}`}
             onClick={() => onChange([...rows.slice(0, index), ...rows.slice(index + 1)])}
             className="mb-0.5 rounded-lg p-2 text-[var(--color-danger)] transition-colors hover:bg-[var(--color-danger)]/10 disabled:opacity-40"
           >
@@ -4128,12 +3940,12 @@ function ServiceWorkContributorEditor({
           className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--color-brand)] hover:underline"
         >
           <UserPlus className="size-3" />
-          Tambah karyawan
+          {copy('Add employee')}
         </button>
         <span
           className={`text-xs font-semibold ${total === '100' ? 'text-[var(--color-success)]' : 'text-[var(--color-warning)]'}`}
         >
-          Total {total}%
+          {copy('Total')} {total}%
         </span>
       </div>
     </div>
@@ -4155,6 +3967,7 @@ function ReferenceServiceWorkDialog({
   onClose: () => void;
   onSave: (units: readonly ServiceWorkUnit[]) => void;
 }) {
+  const { copy } = useOperationalLocalization();
   const [mode, setMode] = useState<'SAME' | 'PER_UNIT'>('SAME');
   const [sharedContributors, setSharedContributors] = useState<ServiceWorkContributor[]>(() =>
     editableWorkContributors(units[0]?.contributors ?? []),
@@ -4176,24 +3989,24 @@ function ReferenceServiceWorkDialog({
   return (
     <Dialog
       open
-      title="Kelola pengerjaan"
-      description={`${line.itemNameSnapshot} · ${quantity(line.quantity)} pengerjaan layanan`}
+      title={copy('Manage work')}
+      description={`${line.itemNameSnapshot}, ${quantity(line.quantity)} ${copy('work units')}`}
       onClose={onClose}
-      ariaLabel="Kelola pengerjaan layanan"
+      ariaLabel={copy('Manage work')}
       closeOnEscape
       closeOnOverlay
       className="pos-reference-dialog w-full max-w-2xl overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
       footer={
         <div className="flex items-center justify-between gap-3">
           <span className="text-[11px] text-[var(--color-text-muted)]">
-            {valid ? 'Setiap pengerjaan valid (100%)' : 'Setiap pengerjaan harus tepat 100%'}
+            {copy(valid ? 'Each work unit totals 100%' : 'Each work unit must total 100%')}
           </span>
           <div className="flex gap-2">
             <Button variant="ghost" onClick={onClose}>
-              Batal
+              {copy('Cancel')}
             </Button>
             <Button disabled={!valid} onClick={() => onSave(plannedUnits)}>
-              Simpan pengerjaan
+              {copy('Save work')}
             </Button>
           </div>
         </div>
@@ -4206,26 +4019,26 @@ function ReferenceServiceWorkDialog({
             {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
           </p>
         </div>
-        <div className="flex gap-2" aria-label="Mode pengerjaan">
+        <div className="flex gap-2" aria-label={copy('Work mode')}>
           <DButton
             size="sm"
             variant={mode === 'SAME' ? 'primary' : 'secondary'}
             onClick={() => setMode('SAME')}
           >
-            Sama untuk semua
+            {copy('Same for all')}
           </DButton>
           <DButton
             size="sm"
             variant={mode === 'PER_UNIT' ? 'primary' : 'secondary'}
             onClick={() => setMode('PER_UNIT')}
           >
-            Atur per pengerjaan
+            {copy('Set per work unit')}
           </DButton>
         </div>
         {mode === 'SAME' ? (
           <div className="rounded-xl border border-[var(--color-border)] p-3">
             <p className="mb-3 text-xs text-[var(--color-text-muted)]">
-              Konfigurasi ini diterapkan ke semua {units.length} pengerjaan.
+              {copy('Apply this configuration to all work units.')}
             </p>
             <ServiceWorkContributorEditor
               contributors={sharedContributors}
@@ -4238,7 +4051,9 @@ function ReferenceServiceWorkDialog({
             {unitPlans.map((unit) => (
               <div key={unit.index} className="rounded-xl border border-[var(--color-border)] p-3">
                 <div className="mb-3">
-                  <p className="text-sm font-semibold">Pengerjaan #{unit.index + 1}</p>
+                  <p className="text-sm font-semibold">
+                    {copy('Work unit')} #{unit.index + 1}
+                  </p>
                 </div>
                 <ServiceWorkContributorEditor
                   contributors={unit.contributors}
