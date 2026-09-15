@@ -15,6 +15,7 @@ import { useRuntime } from '@digvation/business-runtime';
 import { useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
 import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
+import { humanReadableLabel } from '../../app/localization/human-readable-labels';
 import {
   TransactionHistoryApi,
   type FulfillmentStatus,
@@ -25,10 +26,50 @@ import {
 
 const defaultPageSize = 20;
 
+const transactionCopy = {
+  id: {
+    description: 'Lihat transaksi, pembayaran, dan status pengerjaan.',
+    saleStatus: 'Status transaksi',
+    payments: 'Pembayaran',
+    workStatus: 'Status pengerjaan',
+    work: 'Pengerjaan',
+    search: 'Cari referensi pembayaran atau lokasi...',
+    noPayments: 'Belum ada pembayaran.',
+    noWork: 'Belum ada pengerjaan yang dicatat.',
+    saleInformation: 'Informasi transaksi',
+    paymentInformation: 'Informasi pembayaran',
+    workInformation: 'Informasi pengerjaan',
+    tendered: 'Uang diterima',
+    change: 'Kembalian',
+    invoice: 'Nomor faktur',
+    currency: 'Mata uang',
+    quantity: 'Jumlah',
+  },
+  en: {
+    description: 'Review transactions, payments, and work status.',
+    saleStatus: 'Transaction status',
+    payments: 'Payments',
+    workStatus: 'Work status',
+    work: 'Work',
+    search: 'Search payment reference or location...',
+    noPayments: 'No payments recorded yet.',
+    noWork: 'No work has been recorded yet.',
+    saleInformation: 'Transaction information',
+    paymentInformation: 'Payment information',
+    workInformation: 'Work information',
+    tendered: 'Cash received',
+    change: 'Change',
+    invoice: 'Invoice number',
+    currency: 'Currency',
+    quantity: 'Quantity',
+  },
+} as const;
+
 export function TransactionHistoryPage() {
   const { createApiClient } = useBackofficeAuth();
   const runtime = useRuntime();
-  const { copy, formatDate, formatMoney } = useBackofficeLocalization();
+  const { copy, formatDate, formatMoney, locale } = useBackofficeLocalization();
+  const text = transactionCopy[locale];
   const api = useMemo(
     () => new TransactionHistoryApi(createApiClient(runtime.apiBaseUrl)),
     [createApiClient, runtime.apiBaseUrl],
@@ -107,12 +148,12 @@ export function TransactionHistoryPage() {
     },
     {
       key: 'saleStatus',
-      label: copy('Sale status'),
+      label: text.saleStatus,
       render: (row) => <StatusBadge status={row.status} />,
     },
     {
       key: 'payments',
-      label: copy('Payments'),
+      label: text.payments,
       render: (row) =>
         row.payments.length ? (
           <div className="flex flex-wrap gap-1">
@@ -121,12 +162,12 @@ export function TransactionHistoryPage() {
             ))}
           </div>
         ) : (
-          '—'
+          '-'
         ),
     },
     {
       key: 'fulfillment',
-      label: copy('Fulfillment'),
+      label: text.work,
       render: (row) => <FulfillmentSummary lines={row.lines} />,
     },
   ];
@@ -136,9 +177,7 @@ export function TransactionHistoryPage() {
       <BackofficePageHeader
         eyebrow={copy('Reporting')}
         title={copy('Transaction history')}
-        description={copy(
-          'Review sale, payment, and fulfillment facts without changing their lifecycle.',
-        )}
+        description={text.description}
       />
       <section className="mt-6">
         <DDataTable
@@ -147,7 +186,7 @@ export function TransactionHistoryPage() {
           loading={list.isLoading}
           rowKey="id"
           searchable
-          searchPlaceholder={copy('Search payment reference or location...')}
+          searchPlaceholder={text.search}
           searchValue={q}
           onSearchChange={(value) => {
             setQ(value);
@@ -156,14 +195,17 @@ export function TransactionHistoryPage() {
           filters={
             <div className="flex flex-wrap gap-2">
               <DSelectFilter
-                label={copy('Sale status')}
+                label={text.saleStatus}
                 value={saleStatus || null}
                 clearable
                 onChange={(value) => {
                   setSaleStatus(String(value ?? ''));
                   resetPage();
                 }}
-                options={saleStatuses.map((value) => ({ value, label: copy(value) }))}
+                options={saleStatuses.map((value) => ({
+                  value,
+                  label: humanReadableLabel(value, locale),
+                }))}
               />
               <DSelectFilter
                 label={copy('Payment status')}
@@ -173,17 +215,23 @@ export function TransactionHistoryPage() {
                   setPaymentStatus(String(value ?? ''));
                   resetPage();
                 }}
-                options={paymentStatuses.map((value) => ({ value, label: copy(value) }))}
+                options={paymentStatuses.map((value) => ({
+                  value,
+                  label: humanReadableLabel(value, locale),
+                }))}
               />
               <DSelectFilter
-                label={copy('Fulfillment status')}
+                label={text.workStatus}
                 value={fulfillmentStatus || null}
                 clearable
                 onChange={(value) => {
                   setFulfillmentStatus(String(value ?? ''));
                   resetPage();
                 }}
-                options={fulfillmentStatuses.map((value) => ({ value, label: copy(value) }))}
+                options={fulfillmentStatuses.map((value) => ({
+                  value,
+                  label: humanReadableLabel(value, locale),
+                }))}
               />
               <DDateRangeFilter
                 from={createdFrom}
@@ -245,7 +293,7 @@ const fulfillmentStatuses: FulfillmentStatus[] = [
 ];
 
 function StatusBadge({ status }: { status: SaleStatus | PaymentStatus | FulfillmentStatus }) {
-  const { copy } = useBackofficeLocalization();
+  const { locale } = useBackofficeLocalization();
   const variant = ['FINALIZED', 'SUCCEEDED', 'COMPLETED'].includes(status)
     ? 'success'
     : ['VOIDED', 'FAILED', 'CANCELLED', 'EXPIRED', 'CANCELED'].includes(status)
@@ -253,8 +301,9 @@ function StatusBadge({ status }: { status: SaleStatus | PaymentStatus | Fulfillm
       : status === 'PENDING' || status === 'IN_PROGRESS'
         ? 'warning'
         : 'outline';
-  return <DBadge variant={variant}>{copy(status)}</DBadge>;
+  return <DBadge variant={variant}>{humanReadableLabel(status, locale)}</DBadge>;
 }
+
 function FulfillmentSummary({ lines }: { lines: Sale['lines'] }) {
   const tracked = lines.filter((line) => line.fulfillment);
   return tracked.length ? (
@@ -264,9 +313,10 @@ function FulfillmentSummary({ lines }: { lines: Sale['lines'] }) {
       ))}
     </div>
   ) : (
-    '—'
+    '-'
   );
 }
+
 function TransactionDetail({
   open,
   item,
@@ -280,7 +330,8 @@ function TransactionDetail({
   error: boolean;
   onClose: () => void;
 }) {
-  const { copy, formatDate, formatMoney } = useBackofficeLocalization();
+  const { copy, formatDate, formatMoney, locale } = useBackofficeLocalization();
+  const text = transactionCopy[locale];
   return (
     <DDialog
       open={open}
@@ -314,7 +365,7 @@ function TransactionDetail({
                   {item.saleNumber}
                 </h3>
                 <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-                  {item.invoiceNumber ? `${copy('Invoice number')}: ${item.invoiceNumber} · ` : ''}
+                  {item.invoiceNumber ? `${text.invoice}: ${item.invoiceNumber}, ` : ''}
                   {formatDate(new Date(item.createdAt), {
                     dateStyle: 'medium',
                     timeStyle: 'short',
@@ -334,7 +385,7 @@ function TransactionDetail({
           </section>
 
           <section className="border-b border-[var(--color-border)] py-5">
-            <h3 className="text-base font-semibold">{copy('Sale information')}</h3>
+            <h3 className="text-base font-semibold">{text.saleInformation}</h3>
             <dl className="mt-4 grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
               <Fact
                 label={copy('Discount')}
@@ -346,13 +397,13 @@ function TransactionDetail({
                 value={formatMoney(item.totalAmount, item.currency)}
                 emphasized
               />
-              <Fact label={copy('Currency')} value={item.currency} />
+              <Fact label={text.currency} value={item.currency} />
             </dl>
           </section>
 
           <section className="border-b border-[var(--color-border)] py-5">
             <div className="flex items-center gap-2">
-              <h3 className="text-base font-semibold">{copy('Payment information')}</h3>
+              <h3 className="text-base font-semibold">{text.paymentInformation}</h3>
               <DBadge variant="secondary">{item.payments.length}</DBadge>
             </div>
             {item.payments.length ? (
@@ -363,7 +414,9 @@ function TransactionDetail({
                     className="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:justify-between"
                   >
                     <div className="min-w-0">
-                      <p className="font-medium text-[var(--color-text)]">{copy(payment.method)}</p>
+                      <p className="font-medium text-[var(--color-text)]">
+                        {humanReadableLabel(payment.method, locale)}
+                      </p>
                       {payment.providerReference ? (
                         <p className="mt-1 break-words font-mono text-xs text-[var(--color-text-muted)]">
                           {payment.providerReference}
@@ -372,14 +425,12 @@ function TransactionDetail({
                       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--color-text-muted)]">
                         {payment.tenderedAmount ? (
                           <span>
-                            {copy('Tendered Amount')}:{' '}
-                            {formatMoney(payment.tenderedAmount, payment.currency)}
+                            {text.tendered}: {formatMoney(payment.tenderedAmount, payment.currency)}
                           </span>
                         ) : null}
                         {payment.changeAmount ? (
                           <span>
-                            {copy('Change Amount')}:{' '}
-                            {formatMoney(payment.changeAmount, payment.currency)}
+                            {text.change}: {formatMoney(payment.changeAmount, payment.currency)}
                           </span>
                         ) : null}
                       </div>
@@ -394,15 +445,13 @@ function TransactionDetail({
                 ))}
               </div>
             ) : (
-              <p className="mt-4 text-sm text-[var(--color-text-muted)]">
-                {copy('No payment attempts are recorded.')}
-              </p>
+              <p className="mt-4 text-sm text-[var(--color-text-muted)]">{text.noPayments}</p>
             )}
           </section>
 
           <section className="pt-5">
             <div className="flex items-center gap-2">
-              <h3 className="text-base font-semibold">{copy('Fulfillment information')}</h3>
+              <h3 className="text-base font-semibold">{text.workInformation}</h3>
               <DBadge variant="secondary">
                 {item.lines.filter((line) => line.fulfillment).length}
               </DBadge>
@@ -423,7 +472,7 @@ function TransactionDetail({
                           </p>
                         ) : null}
                         <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                          {copy('Quantity')}: {line.quantity}
+                          {text.quantity}: {line.quantity}
                         </p>
                       </div>
                       <StatusBadge status={line.fulfillment!.status} />
@@ -431,9 +480,7 @@ function TransactionDetail({
                   ))}
               </div>
             ) : (
-              <p className="mt-4 text-sm text-[var(--color-text-muted)]">
-                {copy('No tracked fulfillment is recorded.')}
-              </p>
+              <p className="mt-4 text-sm text-[var(--color-text-muted)]">{text.noWork}</p>
             )}
           </section>
         </div>
@@ -441,6 +488,7 @@ function TransactionDetail({
     </DDialog>
   );
 }
+
 function Fact({
   label,
   value,
