@@ -1,16 +1,25 @@
 import { ApiError } from '@digvation/pos-api';
 
-export function cashierTransactionErrorMessage(error: unknown): string {
+import {
+  operationalCopy,
+  resolveOperationalLocale,
+} from '../../app/localization/operational-localization';
+
+function copyForLocale(value: string, locale?: string): string {
+  return operationalCopy(value, resolveOperationalLocale(locale));
+}
+
+export function cashierTransactionErrorMessage(error: unknown, locale?: string): string {
   if (
     isApiErrorCode(error, 'PRICE_NOT_FOUND') ||
     isApiErrorCode(error, 'CATALOG_PRICE_NOT_FOUND')
   ) {
-    return 'Harga item belum tersedia untuk pilihan ini.';
+    return copyForLocale('Item price is unavailable for this selection.', locale);
   }
   if (isApiErrorCode(error, 'SALE_VERSION_CONFLICT')) {
-    return 'Transaksi telah berubah. Tinjau data terbaru sebelum melanjutkan.';
+    return copyForLocale('Transaction changed. Review the latest data before continuing.', locale);
   }
-  return 'Transaksi tidak dapat diproses. Coba lagi.';
+  return copyForLocale('Transaction could not be processed. Try again.', locale);
 }
 
 export function isApiErrorCode(error: unknown, code: string): boolean {
