@@ -48,7 +48,9 @@ function canonicalIntegerCurrency(value: string): string | null {
   const match = /^(-?)(\d+)\.(\d+)$/.exec(trimmed);
   if (!match) return null;
 
-  const [, sign, whole, fraction] = match;
+  const sign = match[1] ?? '';
+  const whole = match[2] ?? '0';
+  const fraction = match[3] ?? '';
   if (!fraction || !/^0+$/.test(fraction)) return null;
 
   const normalizedWhole = whole.replace(/^0+(?=\d)/, '') || '0';
