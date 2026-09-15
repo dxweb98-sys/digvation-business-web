@@ -364,7 +364,7 @@ export function CatalogPage() {
         item={item}
         categories={allCategories}
         taxCategories={taxCategories.data?.items ?? []}
-        taxProfile={taxProfile.data}
+        {...(taxProfile.data ? { taxProfile: taxProfile.data } : {})}
         currency={currency}
         api={api}
         canViewTax={canViewTax}

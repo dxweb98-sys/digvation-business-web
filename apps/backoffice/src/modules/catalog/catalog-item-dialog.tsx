@@ -249,6 +249,10 @@ export function CatalogItemDialog({
         variant: 'success',
         title: fresh ? 'Item berhasil ditambahkan.' : 'Item berhasil diperbarui.',
       });
+      showToast({
+        variant: 'success',
+        title: fresh ? 'Item berhasil ditambahkan.' : 'Item berhasil diperbarui.',
+      });
       onClose();
     } catch (error) {
       if (persistedItem) {
@@ -300,7 +304,7 @@ export function CatalogItemDialog({
           />
         ) : null}
 
-        <section className="border-b border-[var(--color-border)] pb-5">
+        <section className="border-b border-(--color-border) pb-5">
           <h2 className="text-sm font-semibold">Informasi Item</h2>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <DInput
@@ -346,8 +350,7 @@ export function CatalogItemDialog({
               onChange={(value) => setCategoryId(value as string | null)}
               clearable
               options={categoryOptions.map((category) => ({
-                label:
-                  category.status === 'ACTIVE' ? category.name : `${category.name} · Nonaktif`,
+                label: category.status === 'ACTIVE' ? category.name : `${category.name} · Nonaktif`,
                 value: category.id,
               }))}
             />
@@ -364,7 +367,7 @@ export function CatalogItemDialog({
         </section>
 
         {showPrice || canViewTax ? (
-          <section className="border-b border-[var(--color-border)] pb-5">
+          <section className="border-b border-(--color-border) pb-5">
             <h2 className="text-sm font-semibold">Harga & Pajak</h2>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               {showPrice ? (
@@ -385,17 +388,17 @@ export function CatalogItemDialog({
                     />
                   )}
                   {!fresh && currentPrice.isLoading ? (
-                    <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                    <p className="mt-1 text-xs text-(--color-text-muted)">
                       Memuat harga saat ini...
                     </p>
                   ) : null}
                   {!validPrice ? (
-                    <p className="mt-1 text-sm text-[var(--color-danger)]">
+                    <p className="mt-1 text-sm text-(--color-danger)">
                       Harga harus lebih dari nol.
                     </p>
                   ) : null}
                   {!canEditPrice && canViewPricing && !currentPrice.isLoading ? (
-                    <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                    <p className="mt-1 text-xs text-(--color-text-muted)">
                       Anda tidak memiliki akses untuk mengubah harga.
                     </p>
                   ) : null}
@@ -416,7 +419,7 @@ export function CatalogItemDialog({
                       value: category.id,
                     }))}
                   />
-                  <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                  <p className="mt-1 text-xs text-(--color-text-muted)">
                     {taxProfile?.itemTaxEnabled
                       ? 'Kosongkan jika item tidak memiliki pajak khusus.'
                       : 'Pajak item sedang dinonaktifkan di pengaturan pajak.'}
@@ -428,7 +431,7 @@ export function CatalogItemDialog({
         ) : null}
 
         {type === 'SERVICE' ? (
-          <section className="border-b border-[var(--color-border)] pb-5">
+          <section className="border-b border-(--color-border) pb-5">
             <h2 className="text-sm font-semibold">Jasa</h2>
             <div className="mt-4 max-w-sm">
               <DInput
@@ -442,7 +445,7 @@ export function CatalogItemDialog({
               />
             </div>
             {!validDefaultDuration ? (
-              <p className="mt-2 text-sm text-[var(--color-danger)]">
+              <p className="mt-2 text-sm text-(--color-danger)">
                 Durasi harus berupa angka bulat positif.
               </p>
             ) : null}
@@ -454,7 +457,7 @@ export function CatalogItemDialog({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-sm font-semibold">Varian</h2>
-                <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                <p className="mt-1 text-xs text-(--color-text-muted)">
                   Tambahkan varian sekarang atau kelola nanti dari detail item.
                 </p>
               </div>
@@ -471,7 +474,7 @@ export function CatalogItemDialog({
                 {variants.map((variant) => (
                   <div
                     key={variant.key}
-                    className="grid gap-3 rounded-xl bg-[var(--color-surface-muted)] p-3 md:grid-cols-[0.8fr_1.1fr_0.8fr_auto]"
+                    className="grid gap-3 rounded-xl bg-(--color-surface-muted) p-3 md:grid-cols-[0.8fr_1.1fr_0.8fr_auto]"
                   >
                     <DInput
                       label="Kode"
@@ -512,7 +515,7 @@ export function CatalogItemDialog({
               </div>
             ) : null}
             {invalidVariant ? (
-              <p className="mt-2 text-sm text-[var(--color-danger)]">
+              <p className="mt-2 text-sm text-(--color-danger)">
                 Setiap varian yang diisi harus memiliki nama dan harga yang valid.
               </p>
             ) : null}
