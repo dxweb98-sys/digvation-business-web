@@ -99,10 +99,13 @@ export interface CatalogItem {
   serviceDefinition: ServiceDefinition | null;
   displayPrice?: CatalogDisplayPrice | null;
   image?: CatalogItemImage | null;
+  resolvedPrice?: ResolvedPrice | null;
+  variants?: CatalogVariant[];
 }
 
 export interface CatalogVariant extends NamedRecord {
   catalogItemId: string;
+  resolvedPrice?: ResolvedPrice | null;
 }
 
 export interface ResolvedPrice {
@@ -117,6 +120,11 @@ export interface ResolvedPrice {
     catalogVariantId: string | null;
     locationId: string | null;
   };
+}
+
+export interface OperationalCatalogProjection {
+  categories: CatalogCategory[];
+  items: CatalogItem[];
 }
 
 export interface SaleLineFulfillment {
