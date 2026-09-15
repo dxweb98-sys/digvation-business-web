@@ -1,13 +1,21 @@
-import { useConnectivity, useRuntime } from '@digvation/pos-runtime';
 import { useAuth } from '@digvation/pos-auth';
+import { useConnectivity, useRuntime } from '@digvation/pos-runtime';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 
+import {
+  operationalCopy,
+  resolveOperationalLocale,
+} from '../../app/localization/operational-localization';
 import { useCashierSession } from '../../app/providers/cashier-session-provider';
+import type { VariantPickerContext, VariantPickerState } from './components/variant-picker';
+import {
+  createCashierTransactionAdapter,
+  isLocalCashierDemoEnabled,
+} from './cashier-transaction-adapter-factory';
 import { cashierTransactionErrorMessage } from './cashier-transaction-errors';
 import { cashierTransactionKeys } from './cashier-transaction-keys';
-import { fetchResolvedPrice, fetchResolvedVariantPrices } from './resolved-price-query';
 import type {
   CatalogItem,
   CatalogVariant,
@@ -15,13 +23,9 @@ import type {
   Sale,
   SaleLine,
 } from './cashier-transaction.types';
-import {
-  createCashierTransactionAdapter,
-  isLocalCashierDemoEnabled,
-} from './cashier-transaction-adapter-factory';
-import type { VariantPickerContext, VariantPickerState } from './components/variant-picker';
-import { useEmployeeOptions } from './use-employee-options';
+import { fetchResolvedPrice, fetchResolvedVariantPrices } from './resolved-price-query';
 import { createSaleWorkspaceViewModel } from './sale-workspace-view-model';
+import { useEmployeeOptions } from './use-employee-options';
 import { useSaleCommandCoordinator } from './use-sale-command-coordinator';
 import { useSaleCoreController } from './use-sale-core-controller';
 import { useSaleWorkspaceController } from './use-sale-workspace-controller';
@@ -29,6 +33,8 @@ import { useSellingCatalog } from './use-selling-catalog';
 
 export function useCashierTransactionWorkspace(routeSaleId?: string) {
   const runtime = useRuntime();
+  const operationalLocale = resolveOperationalLocale(runtime.locale);
+  const copy = (value: string) => operationalCopy(value, operationalLocale);
   const { authPort } = useAuth();
   const queryClient = useQueryClient();
   const connectivity = useConnectivity();
@@ -64,6 +70,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     ...(activeSaleId === undefined ? {} : { routeSaleId: activeSaleId }),
     selectedLocationId,
     currency: runtime.currency,
+    locale: runtime.locale,
     connectivity: effectiveConnectivity,
     selectLocation,
     rememberSale,
@@ -102,12 +109,10 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     catalogVariant: CatalogVariant | null = null,
   ) => {
     if (context === 'CART' && resumedSaleId) {
-      throw new Error('Selesaikan penyesuaian transaksi sebelum menambahkan item ke cart.');
+      throw new Error(copy('Finish adjusting the transaction before adding items to the cart.'));
     }
     if (context === 'TRANSACTION_ADJUSTMENT' && (!targetSaleId || resumedSaleId !== targetSaleId)) {
-      throw new Error(
-        'Transaksi yang akan disesuaikan tidak lagi aktif. Buka kembali penyesuaian.',
-      );
+      throw new Error(copy('The transaction being adjusted is no longer active. Reopen the adjustment.'));
     }
     if (!selectedLocationId) {
       saleWorkspace.addItem(item.id, catalogVariantId);
@@ -133,9 +138,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
       const targetSaleId =
         context === 'TRANSACTION_ADJUSTMENT' ? (resumedSaleId ?? undefined) : undefined;
       if (context === 'TRANSACTION_ADJUSTMENT' && !targetSaleId) {
-        throw new Error(
-          'Transaksi yang akan disesuaikan tidak lagi aktif. Buka kembali penyesuaian.',
-        );
+        throw new Error(copy('The transaction being adjusted is no longer active. Reopen the adjustment.'));
       }
       const variants = await catalog.loadActiveVariants(item);
       if (variants.length > 0) {
@@ -189,7 +192,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
   const newSale = () => {
     if (saleWorkspace.sale?.status === 'OPEN') {
       const confirmed = window.confirm(
-        'Start a new Sale? The current Sale remains OPEN until it is finalized or voided.',
+        copy('Start a new transaction? The current transaction will remain open.'),
       );
       if (!confirmed) return;
     }
@@ -222,16 +225,21 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     setLineTaskId(null);
     command.clearAttention();
     const hydrated = await command.refetchSale(saleId);
-    if (!hydrated) throw new Error('The latest Sale could not be loaded.');
+    if (!hydrated) throw new Error(copy('The latest transaction could not be loaded.'));
     setResumedSaleId(saleId);
     return hydrated;
   };
 
   const hydrateQueuedPayment = async (saleId: string) => {
     const hydrated = await hydrateQueuedSale(saleId);
-    const readiness = createSaleWorkspaceViewModel(hydrated, effectiveConnectivity, 'CLEAN');
+    const readiness = createSaleWorkspaceViewModel(
+      hydrated,
+      effectiveConnectivity,
+      'CLEAN',
+      runtime.locale,
+    );
     if (readiness.paymentMutation.state !== 'AVAILABLE') {
-      throw new Error('The latest Sale is not ready to accept another payment.');
+      throw new Error(copy('The latest transaction cannot accept another payment.'));
     }
     return { sale: hydrated, availableToPay: readiness.availableToPay };
   };
@@ -289,7 +297,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
         ...waitingLineIds.filter((lineId) => lineId !== preferredLine.id),
       ].filter((lineId) => waitingLineIds.includes(lineId));
       if (!orderedLineIds.length) {
-        throw new Error('No queued work remains to start.');
+        throw new Error(copy('No queued work remains to start.'));
       }
       for (const lineId of orderedLineIds) {
         current = await command.runMutation(() =>
@@ -306,10 +314,12 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
       throw error;
     }
   };
+
   const queueSale = async (sale: Sale) =>
     command.runMutation(() =>
       transactionAdapter.queueSale(sale.id, sale.version, `cashier-queue-${crypto.randomUUID()}`),
     );
+
   const startSaleWork = async (sale: Sale) =>
     command.runMutation(() =>
       transactionAdapter.startSaleWork(
@@ -405,14 +415,12 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
         (line) => line.removedAt === null && line.fulfillmentBehaviorSnapshot === 'TRACKED',
       );
       if (trackedLines.some((line) => line.fulfillment?.status === 'WAITING')) {
-        throw new Error('Mulai semua pekerjaan sebelum menyelesaikan transaksi.');
+        throw new Error(copy('Start all work before completing the transaction.'));
       }
       if (
         trackedLines.some((line) => !line.fulfillment || line.fulfillment.status === 'CANCELED')
       ) {
-        throw new Error(
-          'Pekerjaan yang dibatalkan tidak dapat diselesaikan sebagai transaksi aktif.',
-        );
+        throw new Error(copy('Canceled work cannot be completed as an active transaction.'));
       }
       for (const trackedLine of trackedLines) {
         const liveLine = current.lines.find((line) => line.id === trackedLine.id);
@@ -450,9 +458,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     try {
       const authoritative = await transactionAdapter.getSale(targetSale.id);
       if (authoritative.payments.some((payment) => payment.status === 'PENDING'))
-        throw new Error(
-          'A payment attempt is still pending. Wait for its settlement before trying again.',
-        );
+        throw new Error(copy('A payment is still pending. Wait for it to settle before trying again.'));
       const updated = await command.runMutation(() =>
         transactionAdapter.createSalePayment(
           authoritative.id,
