@@ -10,7 +10,6 @@ import {
   type TableColumn,
 } from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
-import { UserRound } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
 
 import type {
@@ -166,48 +165,40 @@ export function EmployeeDetailDialog({
         </p>
       ) : (
         employee && (
-          <div className="space-y-5">
-            <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4 sm:p-5">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex min-w-0 items-start gap-3">
-                  <div className="grid size-12 shrink-0 place-items-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
-                    <UserRound
-                      aria-hidden="true"
-                      className="size-5 text-[var(--color-text-muted)]"
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
-                      {copy('Employee profile')}
-                    </p>
-                    <h2 className="mt-1 break-words text-xl font-semibold tracking-tight">
-                      {employee.displayName}
-                    </h2>
-                    <p className="mt-1 text-sm text-[var(--color-text-muted)]">{employee.code}</p>
-                  </div>
+          <div>
+            <section className="border-b border-[var(--color-border)] pb-5">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <h2 className="break-words text-2xl font-semibold tracking-tight text-[var(--color-text)]">
+                    {employee.displayName}
+                  </h2>
+                  <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+                    {employee.code} · {employee.position?.name ?? copy('Position not set')}
+                  </p>
                 </div>
                 <EmployeeStatusBadge status={employee.status} />
               </div>
-
-              <div className="mt-5 grid gap-4 border-t border-[var(--color-border)] pt-4 sm:grid-cols-3">
-                <SummaryFact
+              <dl className="mt-5 grid gap-x-6 gap-y-5 border-t border-[var(--color-border)] pt-4 sm:grid-cols-3">
+                <Field
                   label={copy('Position')}
                   value={employee.position?.name ?? copy('Not set')}
+                  emphasized
                 />
-                <SummaryFact
+                <Field
                   label={copy('Join date')}
                   value={formatJoinedOn(employee.joinedOn, formatDate, copy)}
                 />
-                <SummaryFact label={copy('Tenure')} value={formatTenure(employee.joinedOn, copy)} />
-              </div>
+                <Field label={copy('Tenure')} value={formatTenure(employee.joinedOn, copy)} />
+              </dl>
             </section>
 
-            <DetailCard
-              title={copy('Employment information')}
-              description={copy(
-                'Service eligibility is controlled by the employee position. Catalog service assignment mode still decides whether assignment is optional or required.',
-              )}
-            >
+            <section className="border-b border-[var(--color-border)] py-5">
+              <h3 className="text-base font-semibold text-[var(--color-text)]">
+                {copy('Employment information')}
+              </h3>
+              <p className="mt-1 max-w-3xl text-sm text-[var(--color-text-muted)]">
+                {copy('Service assignment eligibility is controlled by the employee position.')}
+              </p>
               <DetailGrid>
                 <Field label={copy('Employee code')} value={employee.code} />
                 <Field label={copy('Display name')} value={employee.displayName} />
@@ -248,16 +239,17 @@ export function EmployeeDetailDialog({
                   value={formatJoinedOn(employee.joinedOn, formatDate, copy)}
                 />
               </DetailGrid>
-            </DetailCard>
+            </section>
 
             {attendanceEnabled ? (
-              <DetailCard
-                title={copy('Attendance history')}
-                description={copy(
-                  'Review attendance history by day, month, or a custom date range.',
-                )}
-              >
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <section className="border-b border-[var(--color-border)] py-5">
+                <h3 className="text-base font-semibold text-[var(--color-text)]">
+                  {copy('Attendance history')}
+                </h3>
+                <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+                  {copy('Review attendance history by day, month, or a custom date range.')}
+                </p>
+                <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                   <DSelect
                     label={copy('Period')}
                     value={attendanceMode}
@@ -332,27 +324,29 @@ export function EmployeeDetailDialog({
                   />
                 </div>
 
-                <p className="mt-4 text-sm font-medium text-[var(--color-text)]">
-                  {attendanceCounts.isLoading ? '—' : totalRecords} {copy('attendance records')}
-                </p>
-                <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  <SummaryFact
+                <div className="mt-5 flex flex-wrap items-baseline justify-between gap-3">
+                  <p className="text-sm font-medium text-[var(--color-text)]">
+                    {attendanceCounts.isLoading ? '—' : totalRecords} {copy('attendance records')}
+                  </p>
+                </div>
+                <dl className="mt-3 grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <Field
                     label={copy('Present')}
                     value={attendanceCounts.isLoading ? '—' : String(counts.PRESENT)}
                   />
-                  <SummaryFact
+                  <Field
                     label={copy('Absent')}
                     value={attendanceCounts.isLoading ? '—' : String(counts.ABSENT)}
                   />
-                  <SummaryFact
+                  <Field
                     label={copy('Leave')}
                     value={attendanceCounts.isLoading ? '—' : String(counts.LEAVE)}
                   />
-                  <SummaryFact
+                  <Field
                     label={copy('Sick')}
                     value={attendanceCounts.isLoading ? '—' : String(counts.SICK)}
                   />
-                </div>
+                </dl>
                 <div className="mt-4">
                   {attendance.isError || attendanceCounts.isError ? (
                     <p className="mb-3 text-sm text-[var(--color-text-muted)]">
@@ -377,19 +371,27 @@ export function EmployeeDetailDialog({
                     }}
                   />
                 </div>
-              </DetailCard>
+              </section>
             ) : null}
 
-            <DetailCard
-              title={copy('Lifecycle history')}
-              description={copy(
-                'Status changes remain auditable and do not remove historical employee references.',
-              )}
-            >
-              <LifecycleHistory employee={employee} copy={copy} formatDate={formatDate} />
-            </DetailCard>
+            <section className="border-b border-[var(--color-border)] py-5">
+              <h3 className="text-base font-semibold text-[var(--color-text)]">
+                {copy('Lifecycle history')}
+              </h3>
+              <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+                {copy(
+                  'Status changes remain auditable and do not remove historical employee references.',
+                )}
+              </p>
+              <div className="mt-4">
+                <LifecycleHistory employee={employee} copy={copy} formatDate={formatDate} />
+              </div>
+            </section>
 
-            <DetailCard title={copy('System information')}>
+            <section className="pt-5">
+              <h3 className="text-base font-semibold text-[var(--color-text)]">
+                {copy('System information')}
+              </h3>
               <DetailGrid>
                 <Field
                   label={copy('Created')}
@@ -407,7 +409,7 @@ export function EmployeeDetailDialog({
                 />
                 <Field label={copy('Record version')} value={String(employee.version)} />
               </DetailGrid>
-            </DetailCard>
+            </section>
           </div>
         )
       )}
@@ -558,46 +560,31 @@ function historyEvent(entry: EmployeeStatusHistoryEntry): LifecycleEvent {
   };
 }
 
-function SummaryFact({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0 rounded-lg bg-[var(--color-surface-muted)] p-3">
-      <p className="text-xs font-medium text-[var(--color-text-muted)]">{label}</p>
-      <p className="mt-1 break-words font-medium">{value}</p>
-    </div>
-  );
+function DetailGrid({ children }: { children: ReactNode }) {
+  return <dl className="mt-4 grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">{children}</dl>;
 }
 
-function DetailCard({
-  title,
-  description,
-  children,
+function Field({
+  label,
+  value,
+  emphasized = false,
 }: {
-  title: string;
-  description?: string;
-  children: ReactNode;
+  label: string;
+  value: ReactNode;
+  emphasized?: boolean;
 }) {
   return (
-    <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:p-5">
-      <div>
-        <h3 className="text-sm font-semibold text-[var(--color-text)]">{title}</h3>
-        {description ? (
-          <p className="mt-1 max-w-3xl text-sm text-[var(--color-text-muted)]">{description}</p>
-        ) : null}
-      </div>
-      <div className="mt-4 min-w-0">{children}</div>
-    </section>
-  );
-}
-
-function DetailGrid({ children }: { children: ReactNode }) {
-  return <dl className="grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">{children}</dl>;
-}
-
-function Field({ label, value }: { label: string; value: ReactNode }) {
-  return (
     <div className="min-w-0">
-      <dt className="text-xs font-medium text-[var(--color-text-muted)]">{label}</dt>
-      <dd className="mt-1 break-words text-[var(--color-text)]">{value}</dd>
+      <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+        {label}
+      </dt>
+      <dd
+        className={`mt-1 break-words text-[var(--color-text)] ${
+          emphasized ? 'text-base font-semibold' : 'text-sm font-medium'
+        }`}
+      >
+        {value}
+      </dd>
     </div>
   );
 }

@@ -3,12 +3,14 @@ import { describe, expect, it } from 'vitest';
 import type { BackofficeSession } from '../../auth/auth-session';
 import { canAccessReport } from './report-availability';
 
-function session(input: {
-  permissions?: string[];
-  products?: Array<'POS'>;
-  capabilities?: BackofficeSession['effectiveEntitlements']['capabilities'];
-  foundations?: BackofficeSession['effectiveFoundations'];
-} = {}): BackofficeSession {
+function session(
+  input: {
+    permissions?: string[];
+    products?: Array<'POS'>;
+    capabilities?: BackofficeSession['effectiveEntitlements']['capabilities'];
+    foundations?: BackofficeSession['effectiveFoundations'];
+  } = {},
+): BackofficeSession {
   return {
     identity: {
       userId: 'user-1',
@@ -46,8 +48,8 @@ describe('Backoffice report composition', () => {
 
   it('keeps tax reports POS-scoped after TAX_FISCAL has made tax:read effective', () => {
     expect(canAccessReport(session({ permissions: ['tax:read'] }), 'tax')).toBe(false);
-    expect(
-      canAccessReport(session({ permissions: ['tax:read'], products: ['POS'] }), 'tax'),
-    ).toBe(true);
+    expect(canAccessReport(session({ permissions: ['tax:read'], products: ['POS'] }), 'tax')).toBe(
+      true,
+    );
   });
 });

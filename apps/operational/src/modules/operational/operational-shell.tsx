@@ -7,6 +7,7 @@ import { Building2, Check, ChevronDown, LogOut, MapPin, Menu, UserRound } from '
 import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 
+import { useOperationalLocalization } from '../../app/localization/operational-localization';
 import { getAppVersion } from '../../app/version/app-version';
 import { OperationalAccessApi, operationalAccessKeys } from './operational-access-api';
 import type { OperationalNavigationSection } from './operational-navigation';
@@ -41,6 +42,7 @@ interface OperationalShellProps {
 export function OperationalShell({ navigationSections }: OperationalShellProps) {
   const runtime = useRuntime();
   const connectivity = useConnectivity();
+  const { copy, label } = useOperationalLocalization();
   const { session, authPort, logout } = useAuth();
   const { showToast } = useToast();
   const [isLoggingOut, setLoggingOut] = useState(false);
@@ -78,7 +80,7 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
   );
   const selectedLocation = locations.find((location) => location.id === selectedLocationId) ?? null;
   const brandSubtitle =
-    runtime.branding.businessName ?? runtime.branding.companyName ?? runtime.workspace;
+    runtime.branding.businessName ?? runtime.branding.companyName ?? copy('Operational');
   const userInitials = identityInitials(session.identity.displayName, session.identity.initials);
 
   useEffect(() => {
@@ -94,12 +96,14 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
     return (
       <main className="grid min-h-screen place-items-center bg-[var(--color-background)] p-6 text-center">
         <section className="max-w-md rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
-          <h1 className="text-lg font-semibold">Akses lokasi operasional tidak tersedia</h1>
+          <h1 className="text-lg font-semibold">
+            {copy('Operational location access unavailable')}
+          </h1>
           <p className="mt-2 text-sm text-[var(--color-text-muted)]">
-            Akun ini belum memiliki lokasi operasional yang diizinkan.
+            {copy('This account has no authorized operational location.')}
           </p>
           <DButton className="mt-5" variant="secondary" onClick={() => void logout()}>
-            Keluar
+            {copy('Logout')}
           </DButton>
         </section>
       </main>
@@ -114,7 +118,9 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
 
     if (/^\/sell\/[^/]+$/.test(routerLocation.pathname)) {
       const confirmed = window.confirm(
-        'Changing Branch leaves the current Sale OPEN and returns you to a new Sale. Continue?',
+        copy(
+          'Changing branch leaves the current transaction open and starts a new transaction. Continue?',
+        ),
       );
       if (!confirmed) return;
       navigate('/sell');
@@ -132,8 +138,8 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
     } catch {
       setLoggingOut(false);
       showToast({
-        title: 'Logout gagal',
-        description: 'Sesi belum dapat diakhiri. Silakan coba lagi.',
+        title: copy('Logout failed'),
+        description: copy('Try again.'),
         variant: 'danger',
       });
     }
@@ -144,8 +150,8 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
     const email = session.identity.email;
     if (!email) {
       showToast({
-        title: 'Email tidak tersedia',
-        description: 'Hubungi administrator untuk meminta perubahan kata sandi.',
+        title: copy('Email unavailable'),
+        description: copy('Contact an administrator to change your password.'),
         variant: 'warning',
       });
       return;
@@ -155,14 +161,14 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
     try {
       await authPort.requestPasswordChange({ email });
       showToast({
-        title: 'Permintaan diterima',
-        description: 'Instruksi perubahan kata sandi akan dikirim ke email akun Anda.',
+        title: copy('Request received'),
+        description: copy('Instructions will be sent to the account email.'),
         variant: 'success',
       });
     } catch {
       showToast({
-        title: 'Permintaan belum dapat diproses',
-        description: 'Silakan coba lagi atau hubungi administrator.',
+        title: copy('Password change request failed'),
+        description: copy('Try again or contact an administrator.'),
         variant: 'danger',
       });
     } finally {
@@ -172,7 +178,7 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
 
   const branchLabel =
     selectedLocation?.name ??
-    (operationalAccessQuery.isLoading ? 'Loading branch' : 'Choose branch');
+    copy(operationalAccessQuery.isLoading ? 'Loading branch' : 'Choose branch');
 
   return (
     <div className="operational-shell flex h-screen w-full min-w-0 overflow-hidden bg-[var(--color-background)]">
@@ -219,7 +225,7 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
                 alt=""
                 name={session.identity.displayName}
                 fallback={
-                  userInitials ?? <UserRound className="size-4" aria-label="User account" />
+                  userInitials ?? <UserRound className="size-4" aria-label={copy('Account')} />
                 }
                 size="sm"
                 className="shrink-0 bg-[var(--color-brand)]/10 text-xs font-bold text-[var(--color-brand)]"
@@ -229,7 +235,7 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
                   {session.identity.displayName}
                 </span>
                 <span className="block truncate text-xs leading-4 text-[var(--color-text-muted)]">
-                  v{version.version} · {version.revision}
+                  {copy('Version')} {version.version}
                 </span>
               </span>
             </div>
@@ -243,7 +249,7 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
               onClick={() => void handleLogout()}
               className="flex h-9 w-full items-center justify-start gap-2.5 px-3 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)]"
             >
-              Logout
+              {copy('Logout')}
             </DButton>
           </div>
         </div>
@@ -260,7 +266,7 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
                 minWidth={0}
                 contentClassName="w-[min(320px,calc(100vw-24px))] max-h-[calc(100vh-88px)] overflow-y-auto"
                 trigger={() => (
-                  <DButton variant="ghost" size="icon" aria-label="Open navigation">
+                  <DButton variant="ghost" size="icon" aria-label={copy('Open navigation')}>
                     <Menu className="size-[18px]" />
                   </DButton>
                 )}
@@ -284,7 +290,7 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
                   : 'bg-[var(--color-accent-mint)]/55'
               }`}
             >
-              <span className="size-1.5 rounded-full bg-current" /> {connectivity.state}
+              <span className="size-1.5 rounded-full bg-current" /> {label(connectivity.state)}
             </span>
             <span className="operational-shell__header-date hidden text-xs text-[var(--color-text-muted)] md:inline">
               {formatCurrentDate(runtime.locale)}
@@ -294,7 +300,7 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
           <button
             type="button"
             onClick={() => setAccountDialogOpen(true)}
-            aria-label="Open account information"
+            aria-label={copy('Open account information')}
             aria-haspopup="dialog"
             aria-expanded={isAccountDialogOpen}
             className="flex h-[42px] min-w-0 max-w-[min(50vw,340px)] items-center gap-3 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface-muted)]/45 px-2.5 text-left transition-colors duration-150 hover:bg-[var(--color-surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/20"
@@ -304,14 +310,16 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
                 {session.identity.displayName}
               </span>
               <span className="truncate text-xs leading-4 text-[var(--color-text-muted)]">
-                {session.identity.email ?? runtime.deploymentProfile}
+                {session.identity.email ?? copy('Account')}
               </span>
             </span>
             <DAvatar
               {...(session.identity.avatarUrl ? { src: session.identity.avatarUrl } : {})}
               alt=""
               name={session.identity.displayName}
-              fallback={userInitials ?? <UserRound className="size-4" aria-label="User account" />}
+              fallback={
+                userInitials ?? <UserRound className="size-4" aria-label={copy('Account')} />
+              }
               size="sm"
               className="shrink-0 bg-[var(--color-brand)]/10 text-xs font-bold text-[var(--color-brand)]"
             />
@@ -326,7 +334,7 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
       <DDialog
         open={isBranchPickerOpen}
         onClose={closeBranchPicker}
-        ariaLabel="Choose active branch"
+        ariaLabel={copy('Choose active branch')}
         closeOnEscape
         closeOnOverlay
         showClose={false}
@@ -335,19 +343,21 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
       >
         <div className="border-b border-[var(--color-border)] px-5 py-4">
           <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-brand)]">
-            Workspace
+            {copy('Branch')}
           </p>
-          <h2 className="mt-1 text-lg font-bold">Choose active branch</h2>
+          <h2 className="mt-1 text-lg font-bold">{copy('Choose active branch')}</h2>
           <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-            Pilih lokasi yang digunakan untuk operasi aktif Anda.
+            {copy('Select the location used for your active operation.')}
           </p>
         </div>
         <div className="max-h-[min(420px,60vh)] overflow-y-auto p-3">
           {operationalAccessQuery.isLoading ? (
-            <p className="p-3 text-sm text-[var(--color-text-muted)]">Loading branches...</p>
+            <p className="p-3 text-sm text-[var(--color-text-muted)]">
+              {copy('Loading branches...')}
+            </p>
           ) : locations.length === 0 ? (
             <div className="p-3 text-sm text-[var(--color-text-muted)]">
-              No active branches are available for this workspace.
+              {copy('No active branches are available for this workspace.')}
             </div>
           ) : (
             <div className="space-y-1">
@@ -385,7 +395,7 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
         </div>
         <div className="border-t border-[var(--color-border)] px-5 py-3 text-right">
           <DButton variant="secondary" onClick={closeBranchPicker}>
-            Close
+            {copy('Close')}
           </DButton>
         </div>
       </DDialog>
@@ -393,22 +403,22 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
       <DDialog
         open={isAccountDialogOpen}
         onClose={() => setAccountDialogOpen(false)}
-        title="Account"
-        description="Informasi akun operasional yang sedang aktif."
-        ariaLabel="Account information"
+        title={copy('Account')}
+        description={copy('Operational account information for the active session.')}
+        ariaLabel={copy('Account information')}
         closeOnEscape
         closeOnOverlay
         className="w-full max-w-md rounded-[var(--radius-panel)] bg-[var(--color-surface)]"
         footer={
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <DButton variant="secondary" onClick={() => setAccountDialogOpen(false)}>
-              Close
+              {copy('Close')}
             </DButton>
             <DButton
               loading={isRequestingPasswordChange}
               onClick={() => void requestPasswordChange()}
             >
-              Request change password
+              {copy('Request password change')}
             </DButton>
           </div>
         }
@@ -419,7 +429,9 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
               {...(session.identity.avatarUrl ? { src: session.identity.avatarUrl } : {})}
               alt=""
               name={session.identity.displayName}
-              fallback={userInitials ?? <UserRound className="size-5" aria-label="User account" />}
+              fallback={
+                userInitials ?? <UserRound className="size-5" aria-label={copy('Account')} />
+              }
               size="lg"
               className="shrink-0 bg-[var(--color-brand)]/10 text-sm font-bold text-[var(--color-brand)]"
             />
@@ -428,14 +440,14 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
                 {session.identity.displayName}
               </p>
               <p className="mt-0.5 truncate text-sm text-[var(--color-text-muted)]">
-                {session.identity.email ?? session.identity.userId}
+                {session.identity.email ?? copy('Account')}
               </p>
             </div>
           </div>
           {selectedLocation ? (
             <div className="mt-5 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface-muted)]/45 p-3">
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">
-                Active branch
+                {copy('Active branch')}
               </p>
               <p className="mt-1 text-sm font-semibold text-[var(--color-text)]">
                 {selectedLocation.name}
@@ -457,18 +469,19 @@ function BranchButton({
   canChoose: boolean;
   onClick: () => void;
 }) {
+  const { copy } = useOperationalLocalization();
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={!canChoose}
-      aria-label={`Active branch ${branchLabel}`}
+      aria-label={`${copy('Active branch')} ${branchLabel}`}
       className="flex min-w-0 w-full items-center gap-2.5 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface-muted)]/55 px-3 py-2.5 text-left transition-[background-color,border-color,box-shadow] duration-150 enabled:hover:border-[var(--color-brand)]/30 enabled:hover:bg-[var(--color-surface-muted)] disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
     >
       <MapPin className="size-3.5 shrink-0 text-[var(--color-brand)]" />
       <span className="min-w-0 flex-1">
         <span className="block text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">
-          Active branch
+          {copy('Active branch')}
         </span>
         <span className="mt-0.5 block truncate text-sm font-semibold text-[var(--color-text)]">
           {branchLabel}

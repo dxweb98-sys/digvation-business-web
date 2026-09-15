@@ -22,10 +22,7 @@ import {
   useOperationalAvailability,
 } from '../../app/providers/operational-availability-context';
 import { useOperationalSession } from '../operational/operational-session-provider';
-import {
-  OperationalExpenseApi,
-  type OperationalExpense,
-} from './operational-expense-api';
+import { OperationalExpenseApi, type OperationalExpense } from './operational-expense-api';
 
 const PAGE_SIZE = 20;
 
@@ -34,7 +31,7 @@ export function OperationalExpensesPage() {
   const { authPort } = useAuth();
   const availability = useOperationalAvailability();
   const { selectedLocationId } = useOperationalSession();
-  const { copy, formatDate, formatMoney } = useOperationalLocalization();
+  const { copy, label, formatDate, formatMoney } = useOperationalLocalization();
   const { showToast } = useToast();
   const queryClient = useQueryClient();
   const [offset, setOffset] = useState(0);
@@ -49,6 +46,7 @@ export function OperationalExpensesPage() {
       new OperationalExpenseApi(
         new ApiClient({
           baseUrl: runtime.apiBaseUrl,
+          applicationSurface: 'operational',
           ...(authPort.getAccessToken
             ? { getAccessToken: authPort.getAccessToken.bind(authPort) }
             : {}),
@@ -94,8 +92,7 @@ export function OperationalExpensesPage() {
       setNote('');
       showToast({ variant: 'success', title: copy('Expense submitted.') });
     },
-    onError: () =>
-      showToast({ variant: 'danger', title: copy('Could not submit expense.') }),
+    onError: () => showToast({ variant: 'danger', title: copy('Could not submit expense.') }),
   });
 
   if (expenses.isError)
@@ -122,7 +119,7 @@ export function OperationalExpensesPage() {
     {
       key: 'category',
       label: copy('Category'),
-      render: (row) => row.categoryCode,
+      render: (row) => label(row.categoryCode),
     },
     {
       key: 'account',
@@ -139,7 +136,7 @@ export function OperationalExpensesPage() {
       label: copy('Status'),
       render: (row) => (
         <DBadge variant={row.status === 'APPROVED' ? 'success' : 'outline'}>
-          {row.status}
+          {label(row.status)}
         </DBadge>
       ),
     },
@@ -218,15 +215,11 @@ export function OperationalExpensesPage() {
             clearable={false}
             options={eligibleAccounts.map((account) => ({
               value: account.id,
-              label: `${account.name} · ${account.currency}`,
+              label: `${account.name} (${account.currency})`,
             }))}
-            onValueChange={setFinancialAccountId}
+            onValueChange={(value) => setFinancialAccountId(String(value ?? ''))}
           />
-          <DInput
-            label={copy('Category')}
-            value={categoryCode}
-            onChange={setCategoryCode}
-          />
+          <DInput label={copy('Category')} value={categoryCode} onChange={setCategoryCode} />
           <DInput label={copy('Amount')} value={amount} onChange={setAmount} />
           <DInput label={copy('Note')} value={note} onChange={setNote} />
         </div>

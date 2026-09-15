@@ -15,13 +15,8 @@ import {
   type RuntimeAvailabilityConfig,
   type RuntimeConfig,
 } from '@digvation/business-runtime';
-import {
-  DLocalizationProvider,
-  DToastProvider as ToastProvider,
-  useToast,
-} from '@digvation/ui';
+import { DLocalizationProvider, DToastProvider as ToastProvider, useToast } from '@digvation/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Building2 } from 'lucide-react';
 import type { RouterProviderProps } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 
@@ -34,12 +29,15 @@ import {
   type TransitionEvent,
 } from 'react';
 
+import { operationalCopy, type OperationalLocale } from '../localization/operational-localization';
 import { OperationalLoginPage } from '../../modules/operational/operational-login-page';
 import { OperationalSessionProvider } from '../../modules/operational/operational-session-provider';
 import { PosOperationalSessionProvider } from '../../modules/pos/pos-operational-session-provider';
 import { OperationalAvailabilityProvider } from './operational-availability-context';
 
-const SESSION_ENDED_MESSAGE = 'Sesi Anda telah berakhir. Silakan masuk kembali.';
+function runtimeLocale(locale: string): OperationalLocale {
+  return locale === 'en-US' ? 'en-US' : 'id-ID';
+}
 
 function hasImplementedOperationalSurface(availability: RuntimeAvailabilityConfig): boolean {
   const permissions = availability.effectivePermissions;
@@ -55,6 +53,8 @@ function hasImplementedOperationalSurface(availability: RuntimeAvailabilityConfi
 function AuthenticatedOperationalRuntime({ children }: { children: ReactNode }) {
   const { session, authPort } = useAuth();
   const bootstrapRuntime = useRuntime();
+  const locale = runtimeLocale(bootstrapRuntime.locale);
+  const copy = (value: string) => operationalCopy(value, locale);
   const [state, setState] = useState<'loading' | 'allowed' | 'denied' | 'unavailable'>('loading');
   const [effectiveRuntime, setEffectiveRuntime] = useState<RuntimeConfig | null>(null);
   const [availability, setAvailability] = useState<RuntimeAvailabilityConfig | null>(null);
@@ -104,9 +104,7 @@ function AuthenticatedOperationalRuntime({ children }: { children: ReactNode }) 
     return (
       <RuntimeProvider config={effectiveRuntime}>
         <OperationalAvailabilityProvider availability={availability}>
-          <DLocalizationProvider
-            locale={effectiveRuntime.locale === 'en-US' ? 'en-US' : 'id-ID'}
-          >
+          <DLocalizationProvider locale={runtimeLocale(effectiveRuntime.locale)}>
             {children}
           </DLocalizationProvider>
         </OperationalAvailabilityProvider>
@@ -114,18 +112,23 @@ function AuthenticatedOperationalRuntime({ children }: { children: ReactNode }) 
     );
 
   if (state === 'loading')
-    return <ApplicationSplash mark={<Building2 className="size-6" />} />;
+    return (
+      <ApplicationSplash
+        productName={bootstrapRuntime.branding.productName}
+        message={locale === 'id-ID' ? 'Memuat Operasional...' : 'Loading Operational...'}
+      />
+    );
 
   return (
     <main className="grid min-h-screen place-items-center bg-[var(--color-background)] p-6 text-center">
       <section className="max-w-md rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
         <h1 className="text-lg font-semibold">
           {state === 'denied'
-            ? 'Akses operasional tidak tersedia'
-            : 'Konteks operasional belum tersedia'}
+            ? copy('Operational access unavailable')
+            : copy('Operational context unavailable')}
         </h1>
         <p className="mt-2 text-sm text-[var(--color-text-muted)]">
-          Hubungi administrator jika akses ini seharusnya tersedia.
+          {copy('Contact an administrator if this access should be available.')}
         </p>
       </section>
     </main>
@@ -160,6 +163,8 @@ function OperationalAuthBoundary({
   authPort,
   router,
 }: OperationalAuthBoundaryProps) {
+  const locale = runtimeLocale(runtime.locale);
+  const copy = (value: string) => operationalCopy(value, locale);
   const [authenticatedSession, setAuthenticatedSession] = useState(session);
   const [isLoggingOut, setLoggingOut] = useState(false);
   const sessionEnded = useRef(false);
@@ -171,10 +176,13 @@ function OperationalAuthBoundary({
       sessionEnded.current = true;
       setLoggingOut(false);
       setAuthenticatedSession(null);
-      showToast({ variant: 'warning', title: SESSION_ENDED_MESSAGE });
+      showToast({
+        variant: 'warning',
+        title: copy('Your session has ended. Sign in again.'),
+      });
       void authPort.logout();
     },
-    [authPort, showToast],
+    [authPort, copy, showToast],
   );
 
   useEffect(() => {
@@ -204,14 +212,14 @@ function OperationalAuthBoundary({
       authPort={authPort}
       onLogout={() => setLoggingOut(true)}
     >
-      <AuthenticatedOperationalRuntime>
+      <AuthenticatedOperationalRuntime
+        key={`${authenticatedSession.identity.userId}:${runtime.apiBaseUrl}`}
+      >
         <OperationalSessionProvider>
           <PosOperationalSessionProvider>
             <div
               className={`min-h-screen transition-[opacity,transform] duration-150 ease-out ${
-                isLoggingOut
-                  ? 'pointer-events-none -translate-y-1 opacity-0'
-                  : 'opacity-100'
+                isLoggingOut ? 'pointer-events-none -translate-y-1 opacity-0' : 'opacity-100'
               }`}
               onTransitionEnd={completeLogoutTransition}
             >

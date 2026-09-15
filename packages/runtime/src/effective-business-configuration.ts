@@ -1,7 +1,4 @@
-import type {
-  EffectiveBusinessConfiguration,
-  RuntimeConfig,
-} from './runtime-config.types';
+import type { EffectiveBusinessConfiguration, RuntimeConfig } from './runtime-config.types';
 
 /**
  * Applies authenticated tenant configuration over deployment bootstrap values.
@@ -17,8 +14,7 @@ export function applyEffectiveBusinessConfiguration(
     locale: configuration.preferences.defaultLocale,
     branding: {
       ...runtime.branding,
-      businessName:
-        configuration.profile.name.trim() || runtime.branding.businessName,
+      businessName: configuration.profile.name.trim() || runtime.branding.businessName,
     },
     businessConfiguration: configuration,
   };

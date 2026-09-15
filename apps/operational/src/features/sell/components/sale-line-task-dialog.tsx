@@ -1,8 +1,13 @@
 import { createDecimal, formatMoney } from '@digvation/pos-money';
 import { DButton, DCheckbox, DDecimalInput, DDialog, DInput, DSelect } from '@digvation-labs/ui';
-import { CheckCircle2, CircleDot, Percent, Play, Square, UserRound, X } from 'lucide-react';
+import { CheckCircle2, Play, Square, UserRound, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
+import {
+  operationalCopy,
+  operationalLabel,
+  resolveOperationalLocale,
+} from '../../../app/localization/operational-localization';
 import type { DiscountInput } from '../cashier-transaction.adapter';
 import type {
   ContributionPreview,
@@ -87,15 +92,18 @@ export function SaleLineTaskDialog({
   onSetContributions,
   onTransitionFulfillment,
 }: SaleLineTaskDialogProps) {
+  const operationalLocale = resolveOperationalLocale(locale);
+  const copy = (value: string) => operationalCopy(value, operationalLocale);
+  const label = (value: string) => operationalLabel(value, operationalLocale);
   const [assignedIds, setAssignedIds] = useState<string[]>(() =>
     line.participations
       .filter((participation) => participation.assigned)
       .map((participation) => participation.employeeId),
   );
-  const [contributionShares, setContributionShares] = useState<Record<string, string>>(() =>
+  const [performerShares, setPerformerShares] = useState<Record<string, string>>(() =>
     Object.fromEntries(
       line.participations
-        .filter((participation) => participation.shareRate !== null)
+        .filter((participation) => participation.assigned)
         .map((participation) => [participation.employeeId, rateToPercent(participation.shareRate)]),
     ),
   );
@@ -120,56 +128,76 @@ export function SaleLineTaskDialog({
   const operationalDisabled = operationalAvailability.state !== 'AVAILABLE' || isBusy;
   const monetaryMessage =
     monetaryAvailability.state === 'DISABLED'
-      ? actionBlockMessage(monetaryAvailability.reason)
+      ? actionBlockMessage(monetaryAvailability.reason, locale)
       : null;
   const operationalMessage =
     operationalAvailability.state === 'DISABLED'
-      ? actionBlockMessage(operationalAvailability.reason)
+      ? actionBlockMessage(operationalAvailability.reason, locale)
       : null;
 
-  const toggleAssignment = (employeeId: string) => {
+  const togglePerformer = (employeeId: string) => {
+    const selected = assignedIds.includes(employeeId);
     setAssignedIds((current) =>
-      current.includes(employeeId)
-        ? current.filter((id) => id !== employeeId)
-        : [...current, employeeId],
+      selected ? current.filter((id) => id !== employeeId) : [...current, employeeId],
     );
-  };
-
-  const toggleContributor = (employeeId: string) => {
-    setContributionShares((current) => {
-      if (employeeId in current) {
-        const next = { ...current };
-        delete next[employeeId];
-        return next;
-      }
-      return { ...current, [employeeId]: '' };
+    setPerformerShares((current) => {
+      if (!selected) return { ...current, [employeeId]: current[employeeId] ?? '' };
+      const next = { ...current };
+      delete next[employeeId];
+      return next;
     });
   };
 
-  const saveContributions = () => {
+  const savePerformers = () => {
     setFormError(null);
-    const contributors: Array<{ employeeId: string; shareRate?: string }> = [];
-    for (const [employeeId, percent] of Object.entries(contributionShares)) {
-      const trimmed = percent.trim();
-      if (trimmed === '') {
-        contributors.push({ employeeId });
+    if (!assignedIds.length) {
+      setFormError(copy('Select at least one service worker.'));
+      return;
+    }
+
+    const performers: Array<{ employeeId: string; shareRate?: string }> = [];
+    let explicitTotal = createDecimal('0');
+    let explicitCount = 0;
+
+    for (const employeeId of assignedIds) {
+      const percent = performerShares[employeeId]?.trim() ?? '';
+      if (!percent) {
+        performers.push({ employeeId });
         continue;
       }
-      const shareRate = percentToRate(trimmed);
+      const shareRate = percentToRate(percent);
       if (!shareRate) {
-        setFormError('Contribution share must be greater than 0 and at most 100%.');
+        setFormError(copy('Worker share must be greater than 0% and at most 100%.'));
         return;
       }
-      contributors.push({ employeeId, shareRate });
+      explicitCount += 1;
+      explicitTotal = explicitTotal.plus(createDecimal(percent));
+      performers.push({ employeeId, shareRate });
     }
-    onSetContributions(line, contributors);
+
+    if (explicitCount === assignedIds.length && !explicitTotal.equals(createDecimal('100'))) {
+      setFormError(copy('When all shares are entered, the total must be exactly 100%.'));
+      return;
+    }
+    if (
+      explicitCount < assignedIds.length &&
+      explicitTotal.greaterThanOrEqualTo(createDecimal('100'))
+    ) {
+      setFormError(copy('Leave room for workers whose share is split automatically.'));
+      return;
+    }
+
+    onSetAssignments(line, assignedIds);
+    onSetContributions(line, performers);
   };
 
   const saveDiscount = () => {
     setFormError(null);
     const value = discountValueForApi(discountType, discountValue);
     if (!value || discountReason.trim() === '') {
-      setFormError('Discount value and reason are required. Percentage uses 0â€“100%.');
+      setFormError(
+        copy('Discount value and reason are required. Percentage must be between 0 and 100%.'),
+      );
       return;
     }
     onSetLineDiscount(line, { type: discountType, value, reason: discountReason.trim() });
@@ -178,32 +206,37 @@ export function SaleLineTaskDialog({
   const saveOverride = () => {
     setFormError(null);
     if (!/^\d+(?:\.\d{1,4})?$/.test(overrideAmount.trim()) || overrideReason.trim() === '') {
-      setFormError('Override amount and reason are required. Amount supports up to four decimals.');
+      setFormError(copy('Price and reason are required.'));
       return;
     }
     onSetPriceOverride(line, overrideAmount.trim(), overrideReason.trim());
   };
 
   const actions = fulfillmentActions(line.fulfillment?.status ?? null);
+  const isService = line.itemTypeSnapshot === 'SERVICE';
 
   return (
     <DDialog
       open
       onClose={onClose}
-      ariaLabel={`Manage ${line.itemNameSnapshot}`}
+      ariaLabel={`${copy('Transaction item')}: ${line.itemNameSnapshot}`}
       className="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-t-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl sm:rounded-[var(--radius-card)]"
     >
       <header className="flex items-start justify-between gap-4 border-b border-[var(--color-border)] p-4 sm:p-5">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-brand)]">
-            Line task
+          <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-brand)]">
+            {copy('Transaction item')}
           </p>
           <h2 className="mt-2 text-xl font-bold">{line.itemNameSnapshot}</h2>
           <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-            Assignment, contribution, fulfillment and monetary adjustments remain separate commands.
+            {copy(
+              isService
+                ? 'Configure service workers, work status, price, or item discount.'
+                : 'Configure price or item discount.',
+            )}
           </p>
         </div>
-        <DButton variant="ghost" aria-label="Close line task" onClick={onClose} className="px-3">
+        <DButton variant="ghost" aria-label={copy('Close')} onClick={onClose} className="px-3">
           <X className="size-5" />
         </DButton>
       </header>
@@ -216,93 +249,59 @@ export function SaleLineTaskDialog({
         ) : null}
 
         <div className="grid gap-4 lg:grid-cols-2">
-          {line.itemTypeSnapshot === 'SERVICE' && line.employeeAssignmentModeSnapshot !== 'NONE' ? (
-            <article className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm">
+          {isService ? (
+            <article className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm lg:col-span-2">
               <div className="flex items-center gap-2">
                 <UserRound className="size-4" />
-                <h3 className="font-bold">Employee assignment</h3>
+                <h3 className="font-bold">{copy('Service workers')}</h3>
               </div>
               <p className="mt-2 text-xs leading-5 text-[var(--color-text-muted)]">
-                Mode: {line.employeeAssignmentModeSnapshot}. Assignment is operational and does not
-                define contribution share.
+                {copy(
+                  'Select employees who perform this service. Leave shares blank to split evenly.',
+                )}
               </p>
-              <div className="mt-4 space-y-2">
-                {employees.map((employee) => (
-                  <label
-                    key={employee.id}
-                    className="flex cursor-pointer items-center gap-3 rounded-[var(--radius-control)] bg-[var(--color-surface-muted)] px-3 py-2.5 text-sm"
-                  >
-                    <DCheckbox
-                      checked={assignedIds.includes(employee.id)}
-                      disabled={operationalDisabled}
-                      onChange={() => toggleAssignment(employee.id)}
-                    />
-                    <span className="font-semibold">{employee.displayName}</span>
-                    <span className="ml-auto text-xs text-[var(--color-text-muted)]">
-                      {employee.code}
-                    </span>
-                  </label>
-                ))}
-                {employees.length === 0 ? (
-                  <p className="text-sm text-[var(--color-text-muted)]">
-                    No ACTIVE employees available.
-                  </p>
-                ) : null}
-              </div>
-              {operationalMessage ? (
-                <p className="mt-3 text-xs text-[var(--color-text-muted)]">{operationalMessage}</p>
-              ) : null}
-              <DButton
-                variant="secondary"
-                className="mt-4 w-full"
-                disabled={operationalDisabled}
-                onClick={() => onSetAssignments(line, assignedIds)}
-              >
-                Save assignment
-              </DButton>
-            </article>
-          ) : null}
 
-          {line.allowEmployeeContributionSnapshot ? (
-            <article className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm">
-              <div className="flex items-center gap-2">
-                <Percent className="size-4" />
-                <h3 className="font-bold">Employee contribution</h3>
-              </div>
-              <p className="mt-2 text-xs leading-5 text-[var(--color-text-muted)]">
-                Leave all shares blank for equal split. Partial shares are allowed; the backend
-                distributes the remaining share deterministically.
-              </p>
-              <div className="mt-4 space-y-2">
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
                 {employees.map((employee) => {
-                  const selected = employee.id in contributionShares;
+                  const selected = assignedIds.includes(employee.id);
                   return (
                     <div
                       key={employee.id}
-                      className="rounded-[var(--radius-control)] bg-[var(--color-surface-muted)] p-3"
+                      className={`rounded-[var(--radius-control)] border p-3 ${
+                        selected
+                          ? 'border-[var(--color-brand)]/35 bg-[var(--color-brand)]/5'
+                          : 'border-[var(--color-border)] bg-[var(--color-surface-muted)]/55'
+                      }`}
                     >
                       <label className="flex cursor-pointer items-center gap-3 text-sm">
                         <DCheckbox
                           checked={selected}
                           disabled={operationalDisabled}
-                          onChange={() => toggleContributor(employee.id)}
+                          onChange={() => togglePerformer(employee.id)}
                         />
-                        <span className="font-semibold">{employee.displayName}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-semibold">
+                            {employee.displayName}
+                          </span>
+                          <span className="block text-xs text-[var(--color-text-muted)]">
+                            {employee.code}
+                          </span>
+                        </span>
                       </label>
-                      {selected ? (
-                        <label className="mt-2 flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
-                          Share %
+                      {selected && assignedIds.length > 1 ? (
+                        <label className="mt-3 flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
+                          {copy('Share (%)')}
                           <DInput
-                            aria-label={`${employee.displayName} contribution share`}
-                            value={contributionShares[employee.id] ?? ''}
+                            aria-label={`${copy('Share (%)')} ${employee.displayName}`}
+                            value={performerShares[employee.id] ?? ''}
                             disabled={operationalDisabled}
                             onChange={(value) =>
-                              setContributionShares((current) => ({
+                              setPerformerShares((current) => ({
                                 ...current,
                                 [employee.id]: value,
                               }))
                             }
-                            placeholder="auto"
+                            placeholder={copy('Split evenly')}
                             inputMode="decimal"
                             className="ml-auto w-28 text-right"
                           />
@@ -312,28 +311,39 @@ export function SaleLineTaskDialog({
                   );
                 })}
               </div>
-              <DButton
-                variant="secondary"
-                className="mt-4 w-full"
-                disabled={operationalDisabled}
-                onClick={saveContributions}
-              >
-                Save contribution
-              </DButton>
 
-              {contributionPreview ? (
+              {employees.length === 0 ? (
+                <p className="mt-3 text-sm text-[var(--color-text-muted)]">
+                  {copy('No active employees can perform this service.')}
+                </p>
+              ) : null}
+              {operationalMessage ? (
+                <p className="mt-3 text-xs text-[var(--color-text-muted)]">{operationalMessage}</p>
+              ) : null}
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <DButton
+                  variant="secondary"
+                  disabled={operationalDisabled || !employees.length}
+                  onClick={savePerformers}
+                >
+                  {copy('Save workers')}
+                </DButton>
+                <span className="text-xs text-[var(--color-text-muted)]">
+                  {assignedIds.length
+                    ? `${assignedIds.length} ${copy('workers selected')}`
+                    : copy('No workers selected')}
+                </span>
+              </div>
+
+              {contributionPreview?.preview.length ? (
                 <div className="mt-4 rounded-[var(--radius-control)] border border-[var(--color-border)] p-3">
-                  <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">
-                    Backend preview
+                  <p className="text-xs font-semibold text-[var(--color-text-muted)]">
+                    {copy('Service value allocation')}
                   </p>
-                  <p className="mt-2 text-sm font-semibold">
-                    Base{' '}
-                    {formatMoney(contributionPreview.contributionBaseAmount, line.currency, locale)}
-                  </p>
-                  <div className="mt-2 space-y-1 text-xs">
+                  <div className="mt-2 grid gap-1.5 text-xs sm:grid-cols-2">
                     {contributionPreview.preview.map((entry) => (
                       <div key={entry.employeeId} className="flex justify-between gap-3">
-                        <span className="text-[var(--color-text-muted)]">
+                        <span className="truncate text-[var(--color-text-muted)]">
                           {employeeById.get(entry.employeeId)?.displayName ??
                             entry.employeeId.slice(0, 8)}
                         </span>
@@ -348,14 +358,11 @@ export function SaleLineTaskDialog({
             </article>
           ) : null}
 
-          {line.fulfillmentBehaviorSnapshot === 'TRACKED' && line.fulfillment ? (
+          {isService && line.fulfillment ? (
             <article className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm">
-              <div className="flex items-center gap-2">
-                <CircleDot className="size-4" />
-                <h3 className="font-bold">Tracked fulfillment</h3>
-              </div>
+              <h3 className="font-bold">{copy('Work status')}</h3>
               <p className="mt-2 text-sm">
-                Current status: <strong>{line.fulfillment.status}</strong>
+                {copy('Current status')}: <strong>{label(line.fulfillment.status)}</strong>
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 {actions.map((status) => (
@@ -368,12 +375,18 @@ export function SaleLineTaskDialog({
                     {status === 'IN_PROGRESS' ? <Play className="mr-2 size-4" /> : null}
                     {status === 'COMPLETED' ? <CheckCircle2 className="mr-2 size-4" /> : null}
                     {status === 'CANCELED' ? <Square className="mr-2 size-4" /> : null}
-                    {status.replace('_', ' ')}
+                    {copy(
+                      status === 'IN_PROGRESS'
+                        ? 'Start work'
+                        : status === 'COMPLETED'
+                          ? 'Mark complete'
+                          : 'Cancel work',
+                    )}
                   </DButton>
                 ))}
                 {actions.length === 0 ? (
                   <p className="text-xs text-[var(--color-text-muted)]">
-                    No further CP2 transition is available.
+                    {copy('No further status changes are available.')}
                   </p>
                 ) : null}
               </div>
@@ -381,14 +394,14 @@ export function SaleLineTaskDialog({
           ) : null}
 
           <article className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm">
-            <h3 className="font-bold">Price override</h3>
+            <h3 className="font-bold">{copy('Price adjustment')}</h3>
             <p className="mt-2 text-xs leading-5 text-[var(--color-text-muted)]">
-              Resolved price stays captured. Override stores a separate final unit price and reason.
+              {copy('Set a transaction-specific price without changing the catalog price.')}
             </p>
             <label className="mt-4 block text-xs font-semibold text-[var(--color-text-muted)]">
-              Unit amount
+              {copy('Unit price')}
               <DInput
-                aria-label="Price override amount"
+                aria-label={copy('Unit price')}
                 value={overrideAmount}
                 disabled={monetaryDisabled}
                 onChange={setOverrideAmount}
@@ -397,9 +410,9 @@ export function SaleLineTaskDialog({
               />
             </label>
             <label className="mt-3 block text-xs font-semibold text-[var(--color-text-muted)]">
-              Reason
+              {copy('Reason')}
               <DInput
-                aria-label="Price override reason"
+                aria-label={copy('Reason')}
                 value={overrideReason}
                 disabled={monetaryDisabled}
                 onChange={setOverrideReason}
@@ -408,7 +421,7 @@ export function SaleLineTaskDialog({
             </label>
             <div className="mt-4 flex gap-2">
               <DButton variant="secondary" disabled={monetaryDisabled} onClick={saveOverride}>
-                Apply override
+                {copy('Apply')}
               </DButton>
               {line.overrideAmount ? (
                 <DButton
@@ -416,7 +429,7 @@ export function SaleLineTaskDialog({
                   disabled={monetaryDisabled}
                   onClick={() => onClearPriceOverride(line)}
                 >
-                  Remove
+                  {copy('Remove')}
                 </DButton>
               ) : null}
             </div>
@@ -426,10 +439,10 @@ export function SaleLineTaskDialog({
           </article>
 
           <article className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm">
-            <h3 className="font-bold">Line discount</h3>
+            <h3 className="font-bold">{copy('Item discount')}</h3>
             <div className="mt-4 grid grid-cols-[140px_minmax(0,1fr)] gap-2">
               <DSelect
-                aria-label="Line discount type"
+                aria-label={copy('Item discount')}
                 value={discountType}
                 disabled={monetaryDisabled}
                 clearable={false}
@@ -440,11 +453,11 @@ export function SaleLineTaskDialog({
                   setDiscountValue('');
                 }}
               >
-                <option value="PERCENTAGE">Percentage</option>
-                <option value="FIXED_AMOUNT">Fixed amount</option>
+                <option value="PERCENTAGE">{copy('Percentage')}</option>
+                <option value="FIXED_AMOUNT">{copy('Fixed amount')}</option>
               </DSelect>
               <DDecimalInput
-                aria-label="Line discount value"
+                aria-label={copy('Item discount')}
                 value={discountValue}
                 disabled={monetaryDisabled}
                 onValueChange={setDiscountValue}
@@ -452,16 +465,16 @@ export function SaleLineTaskDialog({
               />
             </div>
             <DInput
-              aria-label="Line discount reason"
+              aria-label={copy('Discount reason')}
               value={discountReason}
               disabled={monetaryDisabled}
               onChange={setDiscountReason}
-              placeholder="Reason"
+              placeholder={copy('Discount reason')}
               className="mt-2"
             />
             <div className="mt-4 flex gap-2">
               <DButton variant="secondary" disabled={monetaryDisabled} onClick={saveDiscount}>
-                Apply discount
+                {copy('Apply discount')}
               </DButton>
               {line.discountType ? (
                 <DButton
@@ -469,7 +482,7 @@ export function SaleLineTaskDialog({
                   disabled={monetaryDisabled}
                   onClick={() => onClearLineDiscount(line)}
                 >
-                  Remove
+                  {copy('Remove')}
                 </DButton>
               ) : null}
             </div>

@@ -30,9 +30,7 @@ interface BackofficeAuthContextValue {
 }
 
 const BackofficeAuthContext = createContext<BackofficeAuthContextValue | null>(null);
-const BUSINESS_CONFIGURATION_CHANGED_EVENT =
-  'digvation:business-configuration-changed';
-const SESSION_ENDED_MESSAGE = 'Sesi Anda telah berakhir. Silakan masuk kembali.';
+const BUSINESS_CONFIGURATION_CHANGED_EVENT = 'digvation:business-configuration-changed';
 
 export function BackofficeAuthProvider({
   auth,
@@ -53,10 +51,10 @@ export function BackofficeAuthProvider({
       sessionExpired.current = true;
       setSession(null);
       setStatus('unauthenticated');
-      showToast({ variant: 'warning', title: SESSION_ENDED_MESSAGE });
+      showToast({ variant: 'warning', title: t('sessionExpired') });
       void auth.logout();
     },
-    [auth, showToast],
+    [auth, showToast, t],
   );
 
   useEffect(() => auth.subscribeSessionEnded(expireSession), [auth, expireSession]);
@@ -115,15 +113,9 @@ export function BackofficeAuthProvider({
     const handleConfigurationChanged = () => {
       void refresh();
     };
-    window.addEventListener(
-      BUSINESS_CONFIGURATION_CHANGED_EVENT,
-      handleConfigurationChanged,
-    );
+    window.addEventListener(BUSINESS_CONFIGURATION_CHANGED_EVENT, handleConfigurationChanged);
     return () =>
-      window.removeEventListener(
-        BUSINESS_CONFIGURATION_CHANGED_EVENT,
-        handleConfigurationChanged,
-      );
+      window.removeEventListener(BUSINESS_CONFIGURATION_CHANGED_EVENT, handleConfigurationChanged);
   }, [refresh]);
 
   const getAccessToken = useCallback(() => auth.getAccessToken(), [auth]);
@@ -132,6 +124,7 @@ export function BackofficeAuthProvider({
     (baseUrl: string) =>
       new ApiClient({
         baseUrl,
+        applicationSurface: 'backoffice',
         getAccessToken,
         refreshAccessToken,
         onSessionEnded: expireSession,

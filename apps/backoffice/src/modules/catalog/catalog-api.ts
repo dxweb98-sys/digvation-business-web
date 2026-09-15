@@ -56,8 +56,6 @@ export interface Item {
   version: number;
   serviceDefinition: {
     defaultDurationMinutes: number | null;
-    employeeAssignmentMode: 'NONE' | 'OPTIONAL' | 'REQUIRED';
-    allowEmployeeContribution: boolean;
   } | null;
 }
 export interface CatalogManagementItem extends Item {
@@ -221,9 +219,7 @@ export class CatalogApi {
     currency: string;
     effectiveAt: string;
   }) {
-    return this.client.get<ResolvedPrice>(
-      `/api/v1/pricing/resolve?${queryString(input)}`,
-    );
+    return this.client.get<ResolvedPrice>(`/api/v1/pricing/resolve?${queryString(input)}`);
   }
   createPrice(input: {
     catalogItemId: string;

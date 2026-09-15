@@ -32,10 +32,7 @@ export function useSellingCatalog({
     queryKey: cashierTransactionKeys.items(sellingLocationId, currency),
     queryFn: ({ signal }) => {
       if (query.listSellingCatalogItems && sellingLocationId && currency) {
-        return query.listSellingCatalogItems(
-          { sellingLocationId, currency },
-          signal,
-        );
+        return query.listSellingCatalogItems({ sellingLocationId, currency }, signal);
       }
       return query.listCatalogItems(signal);
     },

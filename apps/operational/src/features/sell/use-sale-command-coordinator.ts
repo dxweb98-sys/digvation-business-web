@@ -1,6 +1,11 @@
+import { useRuntime } from '@digvation/pos-runtime';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useState } from 'react';
 
+import {
+  operationalCopy,
+  resolveOperationalLocale,
+} from '../../app/localization/operational-localization';
 import type { SaleTransactionClient } from './cashier-transaction.adapter';
 import {
   cashierTransactionErrorMessage,
@@ -21,10 +26,16 @@ export function useSaleCommandCoordinator({
   client,
   rememberSale,
 }: UseSaleCommandCoordinatorOptions) {
+  const runtime = useRuntime();
+  const locale = runtime.locale;
   const queryClient = useQueryClient();
   const [notice, setNotice] = useState<string | null>(null);
   const [synchronization, setSynchronization] = useState<SynchronizationState>('CLEAN');
   const [activeMutationCount, setActiveMutationCount] = useState(0);
+  const copy = useCallback(
+    (value: string) => operationalCopy(value, resolveOperationalLocale(locale)),
+    [locale],
+  );
 
   const commitSale = useCallback(
     (sale: Sale) => {
@@ -60,11 +71,11 @@ export function useSaleCommandCoordinator({
         rememberSale(latest.id);
         return latest;
       } catch (error) {
-        setNotice(cashierTransactionErrorMessage(error));
+        setNotice(cashierTransactionErrorMessage(error, locale));
         return null;
       }
     },
-    [client, queryClient, rememberSale],
+    [client, locale, queryClient, rememberSale],
   );
 
   const recoverFailure = useCallback(
@@ -72,16 +83,14 @@ export function useSaleCommandCoordinator({
       if (isSaleVersionConflict(error)) {
         if (saleId) await refetchSale(saleId);
         setSynchronization('CONFLICT_REVIEW');
-        setNotice(
-          'This Sale changed on another terminal. Review the latest server state before continuing.',
-        );
+        setNotice(copy('Transaction changed. Review the latest data before continuing.'));
         return;
       }
 
       if (isApiErrorCode(error, 'SALE_PAYMENT_PENDING')) {
         if (saleId) await refetchSale(saleId);
         setSynchronization('CLEAN');
-        setNotice(cashierTransactionErrorMessage(error));
+        setNotice(cashierTransactionErrorMessage(error, locale));
         return;
       }
 
@@ -89,17 +98,19 @@ export function useSaleCommandCoordinator({
         if (saleId) await refetchSale(saleId);
         setSynchronization('UNCERTAIN_COMMAND');
         setNotice(
-          saleId
-            ? 'The command result is uncertain. The latest Sale was reloaded; review it before continuing.'
-            : 'The command result is uncertain. Retry only through the preserved idempotent action when available.',
+          copy(
+            saleId
+              ? 'The latest transaction could not be confirmed. Review it before continuing.'
+              : 'The result could not be confirmed. Try again from the current transaction.',
+          ),
         );
         return;
       }
 
       setSynchronization('CLEAN');
-      setNotice(cashierTransactionErrorMessage(error));
+      setNotice(cashierTransactionErrorMessage(error, locale));
     },
-    [refetchSale],
+    [copy, locale, refetchSale],
   );
 
   const runMutation = useCallback(async <T>(operation: () => Promise<T>): Promise<T> => {
@@ -125,7 +136,7 @@ export function useSaleCommandCoordinator({
     refetchSale,
     recoverFailure,
     runMutation,
-    reportError: (error: unknown) => setNotice(cashierTransactionErrorMessage(error)),
+    reportError: (error: unknown) => setNotice(cashierTransactionErrorMessage(error, locale)),
     clearNotice: () => setNotice(null),
     acknowledgeLatestState: () => {
       setSynchronization('CLEAN');
