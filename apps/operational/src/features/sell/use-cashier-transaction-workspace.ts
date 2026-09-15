@@ -46,7 +46,6 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
   const [queueContextSale, setQueueContextSale] = useState<Sale | null>(null);
   const [areEmployeeOptionsEnabled, setEmployeeOptionsEnabled] = useState(false);
   const pendingPerformerIntent = useRef<{ lineId: string; token: symbol } | null>(null);
-  const queuePaymentTargetId = useRef<string | null>(null);
   const transactionAdapter = useMemo(
     () => createCashierTransactionAdapter(runtime, authPort.getAccessToken?.bind(authPort)),
     [authPort, runtime],
@@ -151,7 +150,6 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
   };
 
   const openQueueContext = (saleId: string) => {
-    queuePaymentTargetId.current = null;
     setCompletionOpen(false);
     setLineTaskId(null);
     command.clearAttention();
@@ -274,7 +272,6 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
       if (!confirmed) return;
     }
     navigate('/sell');
-    queuePaymentTargetId.current = null;
     setQueueContextSale(null);
     setCompletionOpen(false);
     setLineTaskId(null);
@@ -283,7 +280,6 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
   };
 
   const clearProcessedDraft = () => {
-    queuePaymentTargetId.current = null;
     if (queueContextSale) {
       setQueueContextSale(null);
       setVariantPicker(null);
@@ -322,7 +318,6 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     if (readiness.paymentMutation.state !== 'AVAILABLE') {
       throw new Error(copy('The latest transaction cannot accept another payment.'));
     }
-    queuePaymentTargetId.current = saleId;
     return { sale: hydrated, availableToPay: readiness.availableToPay };
   };
 
@@ -605,30 +600,17 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     }
   };
 
-  const createPayment = async (
+  const createPayment = (
     method: PaymentMethod,
     appliedAmount: string,
     tenderedAmount?: string,
     providerReference?: string,
-  ) => {
-    const queueTarget = queuePaymentTargetId.current;
-    if (queueTarget && queueContextSale?.id === queueTarget) {
-      return createQueuedPayment(
-        queueContextSale,
-        method,
-        appliedAmount,
-        tenderedAmount,
-        providerReference,
-      );
-    }
-    return core.createPayment(method, appliedAmount, tenderedAmount, providerReference);
-  };
+  ) => core.createPayment(method, appliedAmount, tenderedAmount, providerReference);
 
-  const voidSale = async () => {
-    if (!queueContextSale) return core.voidSale();
+  const voidQueuedSale = async (targetSale: Sale) => {
     command.clearNotice();
     try {
-      const authoritative = await transactionAdapter.getSale(queueContextSale.id);
+      const authoritative = await transactionAdapter.getSale(targetSale.id);
       const updated = await command.runMutation(() =>
         transactionAdapter.voidSale(
           authoritative.id,
@@ -714,10 +696,10 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     createPayment,
     transitionPayment: core.transitionPayment,
     finalizeSale: core.finalizeSale,
-    voidSale,
+    voidSale: core.voidSale,
+    voidQueuedSale,
     newSale,
     clearProcessedDraft,
-    resumeSale: openQueueContext,
     openQueueContext,
     hydrateQueuedSale,
     hydrateQueuedPayment,
