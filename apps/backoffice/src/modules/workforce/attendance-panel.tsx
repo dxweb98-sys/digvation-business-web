@@ -6,7 +6,6 @@ import {
   DDatePicker,
   DDialog,
   DInput,
-  DRangeDatePicker,
   DSelect,
   DTextarea,
   DTimePicker,
@@ -14,7 +13,7 @@ import {
   type TableColumn,
 } from '@digvation/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Clock3, History as HistoryIcon, RotateCcw } from 'lucide-react';
+import { Clock3, History as HistoryIcon, RotateCcw, Users } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
@@ -263,7 +262,6 @@ export function AttendancePanel({ api, canManage }: { api: EmployeesApi; canMana
                 }
               }}
               variant="date"
-              placeholder={copy('Select attendance date')}
             />
           ) : null}
 
@@ -281,17 +279,30 @@ export function AttendancePanel({ api, canManage }: { api: EmployeesApi; canMana
           ) : null}
 
           {historyMode === 'RANGE' ? (
-            <DRangeDatePicker
-              label={copy('Date range')}
-              value={{ start: historyFrom, end: historyTo }}
-              onChange={(range) => {
-                const nextFrom = range.start ?? historyFrom;
-                const nextTo = range.end ?? historyTo;
-                setHistoryFrom(nextFrom <= nextTo ? nextFrom : nextTo);
-                setHistoryTo(nextFrom <= nextTo ? nextTo : nextFrom);
-                setHistoryOffset(0);
-              }}
-            />
+            <>
+              <DDatePicker
+                label={copy('From date')}
+                value={historyFrom}
+                onChange={(value) => {
+                  if (!value) return;
+                  setHistoryFrom(value);
+                  if (value > historyTo) setHistoryTo(value);
+                  setHistoryOffset(0);
+                }}
+                variant="date"
+              />
+              <DDatePicker
+                label={copy('To date')}
+                value={historyTo}
+                onChange={(value) => {
+                  if (!value) return;
+                  setHistoryTo(value);
+                  if (value < historyFrom) setHistoryFrom(value);
+                  setHistoryOffset(0);
+                }}
+                variant="date"
+              />
+            </>
           ) : null}
 
           <DSelect
@@ -522,20 +533,21 @@ function AttendanceAdjustmentDialog({
     <DDialog
       open
       onClose={onClose}
-      size="lg"
+      size="xl"
       title={copy('Adjust attendance')}
+      description={copy('Select one or more employees, then apply the same attendance adjustment.')}
       footer={
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <DButton variant="secondary" onClick={onClose}>
             {copy('Cancel')}
           </DButton>
           <DButton loading={saving} disabled={!selectedIds.size} onClick={() => void save()}>
-            {selectedIds.size ? `${copy('Save')} (${selectedIds.size})` : copy('Save')}
+            {`${copy('Save')} (${selectedIds.size})`}
           </DButton>
         </div>
       }
     >
-      <div className="space-y-4">
+      <div className="space-y-5">
         <div className="grid gap-3 sm:grid-cols-2">
           <DDatePicker
             label={copy('Attendance date')}
@@ -546,7 +558,6 @@ function AttendanceAdjustmentDialog({
               setSelectedIds(new Set());
             }}
             variant="date"
-            placeholder={copy('Select attendance date')}
           />
           <DSelect
             label={copy('Position')}
@@ -557,22 +568,17 @@ function AttendanceAdjustmentDialog({
           />
         </div>
 
-        <section>
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="text-sm font-semibold text-(--color-text)">{copy('Employee')}</h3>
-            <span className="text-xs text-(--color-text-muted)" aria-live="polite">
-              {selectedIds.size} {copy('employees selected')}
-            </span>
-          </div>
-
-          <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-            <DInput
-              label={copy('Search employee code or name')}
-              value={query}
-              onChange={setQuery}
-              placeholder={copy('Search employee code or name...')}
-            />
-            <div className="flex flex-wrap gap-2 sm:justify-end">
+        <div className="rounded-(--radius-card) border border-(--color-border) bg-(--color-surface-muted) p-3 sm:p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="min-w-0 flex-1">
+              <DInput
+                label={copy('Search employee code or name')}
+                value={query}
+                onChange={setQuery}
+                placeholder={copy('Search employee code or name...')}
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
               <DButton
                 variant="secondary"
                 disabled={!selectableEmployees.length}
@@ -588,7 +594,14 @@ function AttendanceAdjustmentDialog({
             </div>
           </div>
 
-          <div className="mt-2 max-h-60 overflow-y-auto pr-1">
+          <div className="mt-3 flex items-center gap-2 text-xs text-(--color-text-muted)">
+            <Users className="size-4" aria-hidden="true" />
+            <span>
+              {selectedIds.size} {copy('employees selected')}
+            </span>
+          </div>
+
+          <div className="mt-3 max-h-72 space-y-2 overflow-y-auto pr-1">
             {filteredEmployees.length ? (
               filteredEmployees.map((employee) => {
                 const existing = attendanceByEmployee.get(employee.id);
@@ -598,16 +611,16 @@ function AttendanceAdjustmentDialog({
                 return (
                   <label
                     key={employee.id}
-                    className={`flex items-start gap-3 border-b border-(--color-border) px-1 py-2.5 transition-colors last:border-b-0 ${
+                    className={`flex items-start gap-3 rounded-lg border p-3 transition-colors ${
                       selectionDisabled
-                        ? 'cursor-not-allowed opacity-60'
+                        ? 'cursor-not-allowed border-(--color-border) opacity-60'
                         : selected
-                          ? 'cursor-pointer bg-(--color-surface-muted)'
-                          : 'cursor-pointer hover:bg-(--color-surface-muted)'
+                          ? 'cursor-pointer border-(--color-brand) bg-(--color-surface)'
+                          : 'cursor-pointer border-(--color-border) bg-(--color-surface) hover:border-(--color-brand)'
                     }`}
                   >
                     <DCheckbox
-                      className="mt-0.5"
+                      className="mt-1"
                       checked={selected}
                       disabled={selectionDisabled}
                       onChange={() => toggleEmployee(employee.id)}
@@ -620,7 +633,7 @@ function AttendanceAdjustmentDialog({
                         {existing ? <AttendanceBadge status={existing.status} /> : null}
                         {readOnly ? <DBadge variant="secondary">HRIS</DBadge> : null}
                       </div>
-                      <p className="mt-0.5 text-xs text-(--color-text-muted)">
+                      <p className="mt-1 text-xs text-(--color-text-muted)">
                         {[employee.code, employee.position?.name].filter(Boolean).join(' · ')}
                       </p>
                     </div>
@@ -628,51 +641,60 @@ function AttendanceAdjustmentDialog({
                 );
               })
             ) : (
-              <p className="py-6 text-center text-sm text-(--color-text-muted)">
+              <p className="py-8 text-center text-sm text-(--color-text-muted)">
                 {copy('No matching employees found.')}
               </p>
             )}
           </div>
-        </section>
+        </div>
 
-        <section className="space-y-3">
-          <DSelect
-            label={copy('Attendance status')}
-            value={status}
-            clearable={false}
-            options={[
-              { value: 'PRESENT', label: copy('Present') },
-              { value: 'ABSENT', label: copy('Absent') },
-              { value: 'LEAVE', label: copy('Leave') },
-              { value: 'SICK', label: copy('Sick') },
-            ]}
-            onValueChange={(value) => setStatus(value as AttendanceStatus)}
-          />
+        <div className="border-t border-(--color-border) pt-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <DSelect
+              label={copy('Attendance status')}
+              value={status}
+              clearable={false}
+              options={[
+                { value: 'PRESENT', label: copy('Present') },
+                { value: 'ABSENT', label: copy('Absent') },
+                { value: 'LEAVE', label: copy('Leave') },
+                { value: 'SICK', label: copy('Sick') },
+              ]}
+              onValueChange={(value) => setStatus(value as AttendanceStatus)}
+            />
+          </div>
 
           {status === 'PRESENT' ? (
-            <div className="grid gap-3 sm:grid-cols-2">
-              <DTimePicker
-                label={copy('Check in')}
-                value={checkIn}
-                onChange={setCheckIn}
-                onClear={() => setCheckIn('')}
-              />
-              <DTimePicker
-                label={copy('Check out')}
-                value={checkOut}
-                onChange={setCheckOut}
-                onClear={() => setCheckOut('')}
-              />
+            <div className="mt-4 space-y-2">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <DTimePicker
+                  label={copy('Check in (optional)')}
+                  value={checkIn}
+                  onChange={setCheckIn}
+                  onClear={() => setCheckIn('')}
+                />
+                <DTimePicker
+                  label={copy('Check out (optional)')}
+                  value={checkOut}
+                  onChange={setCheckOut}
+                  onClear={() => setCheckOut('')}
+                />
+              </div>
+              <p className="text-xs leading-5 text-(--color-text-muted)">
+                {copy('Check-in and check-out times are optional for now.')}
+              </p>
             </div>
           ) : null}
 
-          <DTextarea
-            label={copy('Note')}
-            value={note}
-            onChange={setNote}
-            placeholder={copy('Optional reason or attendance note')}
-          />
-        </section>
+          <div className="mt-4">
+            <DTextarea
+              label={copy('Note')}
+              value={note}
+              onChange={setNote}
+              placeholder={copy('Not set')}
+            />
+          </div>
+        </div>
       </div>
     </DDialog>
   );

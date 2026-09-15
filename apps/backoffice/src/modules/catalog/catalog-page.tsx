@@ -1,14 +1,5 @@
 import { useRuntime } from '@digvation/business-runtime';
-import {
-  DButton,
-  DDataTable,
-  DSelectFilter,
-  DTabs,
-  DTabsContent,
-  DTabsList,
-  DTabsTrigger,
-  type TableColumn,
-} from '@digvation/ui';
+import { DButton, DDataTable, DSelectFilter, type TableColumn } from '@digvation/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Eye, Pencil, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -29,6 +20,7 @@ import { useCatalogLocalization } from './catalog-localization';
 import { CatalogNamedRecordDialog } from './catalog-record-dialog';
 import { PriceLabel, Status, humanize } from './catalog-shared';
 
+type Section = 'items' | 'categories';
 type ItemFilterState = {
   q: string;
   type: '' | Item['type'];
@@ -56,6 +48,7 @@ export function CatalogPage() {
     [apiBaseUrl, createApiClient],
   );
   const client = useQueryClient();
+  const [section, setSection] = useState<Section>('items');
   const [item, setItem] = useState<Item | null | undefined>();
   const [detailItem, setDetailItem] = useState<CatalogManagementItem | null>(null);
   const [category, setCategory] = useState<Category | null | undefined>();
@@ -209,13 +202,25 @@ export function CatalogPage() {
         )}
       />
 
-      <DTabs defaultValue="items" className="mt-6">
-        <DTabsList>
-          <DTabsTrigger value="items">{copy('Items')}</DTabsTrigger>
-          <DTabsTrigger value="categories">{copy('Categories')}</DTabsTrigger>
-        </DTabsList>
+      <div className="mt-6 flex gap-1 border-b border-[var(--color-border)]">
+        {(['items', 'categories'] as Section[]).map((candidate) => (
+          <button
+            key={candidate}
+            type="button"
+            onClick={() => setSection(candidate)}
+            className={`border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+              section === candidate
+                ? 'border-[var(--color-brand)] text-[var(--color-brand)]'
+                : 'border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
+            }`}
+          >
+            {candidate === 'items' ? copy('Items') : copy('Categories')}
+          </button>
+        ))}
+      </div>
 
-        <DTabsContent value="items" className="mt-4">
+      {section === 'items' ? (
+        <section className="mt-6">
           <DDataTable
             columns={itemColumns}
             data={itemRows}
@@ -226,7 +231,7 @@ export function CatalogPage() {
             searchValue={itemQuery.q}
             onSearchChange={(q) => changeItemFilter({ q })}
             filters={
-              <div className="flex flex-wrap gap-2">
+              <>
                 <DSelectFilter
                   label={copy('Type')}
                   value={itemQuery.type || null}
@@ -266,7 +271,7 @@ export function CatalogPage() {
                     value: record.id,
                   }))}
                 />
-              </div>
+              </>
             }
             headerActions={
               can('createCatalog') ? (
@@ -304,9 +309,9 @@ export function CatalogPage() {
               },
             ]}
           />
-        </DTabsContent>
-
-        <DTabsContent value="categories" className="mt-4">
+        </section>
+      ) : (
+        <section className="mt-6">
           <DDataTable
             columns={categoryColumns}
             data={categories.data?.items ?? []}
@@ -317,22 +322,20 @@ export function CatalogPage() {
             searchValue={categoryQuery.q}
             onSearchChange={(q) => changeCategoryFilter({ q })}
             filters={
-              <div className="flex flex-wrap gap-2">
-                <DSelectFilter
-                  label={copy('Status')}
-                  value={categoryQuery.status || null}
-                  onChange={(status) =>
-                    changeCategoryFilter({
-                      status: (status ?? '') as '' | Category['status'],
-                    })
-                  }
-                  clearable
-                  options={[
-                    { label: copy('Active'), value: 'ACTIVE' },
-                    { label: copy('Inactive'), value: 'INACTIVE' },
-                  ]}
-                />
-              </div>
+              <DSelectFilter
+                label={copy('Status')}
+                value={categoryQuery.status || null}
+                onChange={(status) =>
+                  changeCategoryFilter({
+                    status: (status ?? '') as '' | Category['status'],
+                  })
+                }
+                clearable
+                options={[
+                  { label: copy('Active'), value: 'ACTIVE' },
+                  { label: copy('Inactive'), value: 'INACTIVE' },
+                ]}
+              />
             }
             headerActions={
               can('createCatalog') ? (
@@ -365,8 +368,8 @@ export function CatalogPage() {
               },
             ]}
           />
-        </DTabsContent>
-      </DTabs>
+        </section>
+      )}
 
       <CatalogItemDialog
         key={item?.id ?? (item === null ? 'new' : 'closed')}

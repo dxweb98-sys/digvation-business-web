@@ -352,7 +352,7 @@ function AccountEditor({
           value={code}
           onChange={setCode}
           disabled={Boolean(account)}
-          placeholder={copy('For example, BANK-SETTLEMENT')}
+          placeholder={copy('Leave blank when no manual code is needed')}
           autoFocus
         />
         <DInput
@@ -374,7 +374,6 @@ function AccountEditor({
           onChange={(value) => setCurrency(value.toUpperCase())}
           disabled={Boolean(account)}
           maxLength={3}
-          placeholder="IDR"
         />
         {type !== 'CASH' ? (
           <>
@@ -382,19 +381,16 @@ function AccountEditor({
               label={copy(type === 'BANK' ? 'Bank / institution' : 'Wallet provider')}
               value={institutionName}
               onChange={setInstitutionName}
-              placeholder={copy(type === 'BANK' ? 'For example, BCA' : 'For example, GoPay')}
             />
             <DInput
               label={copy(type === 'BANK' ? 'Account number' : 'Wallet account')}
               value={accountReference}
               onChange={setAccountReference}
-              placeholder={copy(type === 'BANK' ? 'For example, 1234567890' : 'For example, 081234567890')}
             />
             <DInput
               label={copy('Account holder name')}
               value={accountHolderName}
               onChange={setAccountHolderName}
-              placeholder={copy('For example, PT Digvation Indonesia')}
               containerClassName="sm:col-span-2"
             />
           </>

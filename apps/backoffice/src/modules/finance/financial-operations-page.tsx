@@ -4,15 +4,14 @@ import {
   DButton,
   DBadge,
   DConnectionError,
-  DCurrencyInput,
   DDataTable,
   DDialog,
+  DInput,
   DSelect,
   DTabs,
   DTabsContent,
   DTabsList,
   DTabsTrigger,
-  DTextarea,
   useToast,
   type TableColumn,
 } from '@digvation/ui';
@@ -467,7 +466,6 @@ function MovementDialog({
         <DSelect
           label={copy('Selling location')}
           value={locationId}
-          placeholder={copy('Select selling location')}
           options={(locations.data?.items ?? [])
             .filter((x) => x.status === 'ACTIVE')
             .map((x) => ({ value: x.id, label: x.name }))}
@@ -476,7 +474,6 @@ function MovementDialog({
         <DSelect
           label={copy('Cash account')}
           value={accountId}
-          placeholder={copy('Select cash account')}
           options={(accounts.data?.items ?? [])
             .filter((x) => x.type === 'CASH')
             .map((x) => ({ value: x.id, label: x.name }))}
@@ -491,17 +488,11 @@ function MovementDialog({
           ]}
           onChange={(v) => setType(v as CashMovement['type'])}
         />
-        <DCurrencyInput
-          label={copy('Amount')}
-          value={amount}
-          onValueChange={setAmount}
-          placeholder={copy('For example, 100000')}
-        />
-        <DTextarea
+        <DInput label={copy('Amount')} value={amount} onChange={setAmount} />
+        <DInput
           label={copy('Note')}
           value={note}
           onChange={setNote}
-          placeholder={copy('For example, Petty cash adjustment')}
           containerClassName="sm:col-span-2"
         />
       </div>
@@ -574,7 +565,6 @@ function SettlementDialog({
         <DSelect
           label={copy('Selling location')}
           value={locationId}
-          placeholder={copy('Select selling location')}
           options={(locations.data?.items ?? [])
             .filter((x) => x.status === 'ACTIVE')
             .map((x) => ({ value: x.id, label: x.name }))}
@@ -589,7 +579,6 @@ function SettlementDialog({
         <DSelect
           label={copy('Settlement destination')}
           value={accountId}
-          placeholder={copy('Select settlement destination')}
           options={(accounts.data?.items ?? []).map((x) => ({ value: x.id, label: x.name }))}
           onChange={(v) => setAccountId(String(v))}
         />
@@ -731,24 +720,17 @@ function ReconciliationDialog({
         <DSelect
           label={copy('Settlement')}
           value={settlementId}
-          placeholder={copy('Select completed settlement')}
           options={settlements.map((x) => ({
             value: x.id,
             label: `${x.sellingLocationName} · ${format(x.expectedAmount, x.currency)}`,
           }))}
           onChange={(v) => setSettlementId(String(v))}
         />
-        <DCurrencyInput
-          label={copy('Actual amount')}
-          value={actualAmount}
-          onValueChange={setActualAmount}
-          placeholder={copy('For example, 100000')}
-        />
-        <DTextarea
+        <DInput label={copy('Actual amount')} value={actualAmount} onChange={setActualAmount} />
+        <DInput
           label={copy('Note')}
           value={note}
           onChange={setNote}
-          placeholder={copy('For example, Bank statement matched after adjustment')}
           containerClassName="sm:col-span-2"
         />
       </div>
@@ -760,7 +742,7 @@ function SettlementBadge({ status }: { status: Settlement['status'] }) {
   return (
     <DBadge
       variant={
-        status === 'COMPLETED' ? 'success' : status === 'CANCELLED' ? 'secondary' : 'warning'
+        status === 'COMPLETED' ? 'success' : status === 'CANCELLED' ? 'secondary' : 'outline'
       }
     >
       {copy(status === 'COMPLETED' ? 'Completed' : status === 'CANCELLED' ? 'Cancelled' : 'Draft')}

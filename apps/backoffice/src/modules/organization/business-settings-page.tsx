@@ -1,7 +1,6 @@
 import {
   DBadge,
   DButton,
-  DCheckbox,
   DConfirmDialog,
   DDialog,
   DDataTable,
@@ -293,7 +292,7 @@ function LocationsPanel({
       label: copy('Status'),
       render: (location) => (
         <DBadge
-          variant={location.status === 'ACTIVE' ? 'success' : 'secondary'}
+          variant={location.status === 'ACTIVE' ? 'outline' : 'secondary'}
         >
           {copy(location.status === 'ACTIVE' ? 'Active' : 'Inactive')}
         </DBadge>
@@ -551,11 +550,12 @@ function LocationEditor({
         </div>
 
         <label className="mt-5 flex items-start gap-3 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-4 py-3">
-          <DCheckbox
+          <input
+            type="checkbox"
             checked={setAsMain}
             disabled={isCurrentMain || firstLocation}
-            onChange={() => setSetAsMain((current) => !current)}
-            className="mt-0.5"
+            onChange={(event) => setSetAsMain(event.target.checked)}
+            className="mt-0.5 size-4 accent-[var(--color-brand)]"
           />
           <span className="min-w-0">
             <span className="block text-sm font-medium">
