@@ -153,11 +153,10 @@ const workforceCopy: Record<string, { id: string; en: string }> = {
     id: 'Riwayat absensi tidak dapat dimuat.',
     en: 'Could not load attendance history.',
   },
-  'Service eligibility is controlled by the employee position. Catalog service assignment mode still decides whether assignment is optional or required.':
-    {
-      id: 'Kelayakan mengerjakan jasa dikontrol oleh jabatan karyawan. Mode penugasan pada katalog jasa tetap menentukan apakah penugasan opsional atau wajib.',
-      en: 'Service eligibility is controlled by the employee position. Catalog service assignment mode still decides whether assignment is optional or required.',
-    },
+  'Service assignment eligibility is controlled by the employee position.': {
+    id: 'Kelayakan penugasan jasa ditentukan oleh jabatan karyawan.',
+    en: 'Service assignment eligibility is controlled by the employee position.',
+  },
 };
 
 export function useWorkforceLocalization() {
