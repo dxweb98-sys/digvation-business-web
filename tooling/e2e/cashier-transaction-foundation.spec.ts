@@ -49,6 +49,7 @@ function createEmptySale() {
     sellingLocationId: branch.id,
     currency: 'IDR',
     status: 'OPEN',
+    operationalState: 'UNSUBMITTED',
     version: 1,
     grossAmount: '0.0000',
     discountAmount: '0.0000',
@@ -202,6 +203,18 @@ async function installRoutes(page: Page, options: Partial<RouteState> = {}) {
       });
       return;
     }
+    if (method === 'GET' && url.pathname === '/api/v1/operational-access/context') {
+      await route.fulfill({
+        json: envelope({
+          organizationWide: true,
+          resolution: 'AUTO_RESOLVED',
+          selectedLocationId: branch.id,
+          mainLocationId: branch.id,
+          locations: [{ id: branch.id, code: branch.code, name: branch.name }],
+        }),
+      });
+      return;
+    }
     if (method === 'GET' && url.pathname === '/api/v1/locations') {
       await route.fulfill({ json: envelope({ items: [branch], limit: 100, offset: 0 }) });
       return;
@@ -320,16 +333,16 @@ async function installRoutes(page: Page, options: Partial<RouteState> = {}) {
 
 async function startSaleFromFirstItem(page: Page) {
   await page.goto('/sell');
-  await expect(page.getByRole('button', { name: /Active branch Main Branch/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Cabang aktif Main Branch/i })).toBeVisible();
   await expect(page.getByText(/Rp\s?125\.000/)).toBeVisible();
-  await page.getByRole('button', { name: 'Add Hair Cut', exact: true }).click();
+  await page.getByRole('button', { name: 'Tambah Hair Cut', exact: true }).click();
 }
 
 test('idle Sell does not poll the Sales list continuously', async ({ page }) => {
   const state = await installRoutes(page);
 
   await page.goto('/sell');
-  await expect(page.getByRole('button', { name: /Active branch Main Branch/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Cabang aktif Main Branch/i })).toBeVisible();
   await expect.poll(() => state.salesListRequests).toBeGreaterThan(0);
   const baseline = state.salesListRequests;
 
@@ -343,8 +356,8 @@ test('Operational keeps a fixed left sidebar below the old lg breakpoint', async
   await installRoutes(page);
 
   await page.goto('/sell');
-  await expect(page.getByRole('button', { name: /Active branch Main Branch/i })).toBeVisible();
-  await expect(page.getByText('Point of Sale', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Cabang aktif Main Branch/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Tambah Hair Cut', exact: true })).toBeVisible();
 
   const sidebarBox = await page.locator('aside').boundingBox();
   const contentBox = await page.locator('main').first().boundingBox();
@@ -360,18 +373,17 @@ test('lazy start creates the Sale only when the first item is added', async ({ p
 
   await page.goto('/sell');
   await expect(
-    page.locator('[role="dialog"][aria-label="Cart"]').first().getByText('Cart masih kosong'),
+    page.locator('[role="dialog"][aria-label="Keranjang"]').first().getByText('Keranjang kosong'),
   ).toBeVisible();
-  await expect(page.getByRole('button', { name: 'New Sale' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: /Active branch Main Branch/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Cabang aktif Main Branch/i })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Add Hair Cut', exact: true }).click();
+  await page.getByRole('button', { name: 'Tambah Hair Cut', exact: true }).click();
 
   await expect(page).toHaveURL(new RegExp(`/sell/${saleId}$`));
-  await page.getByRole('button', { name: 'Cart', exact: true }).click();
+  await page.getByRole('button', { name: 'Keranjang', exact: true }).click();
   await expect(
     page
-      .locator('[role="dialog"][aria-label="Cart"]')
+      .locator('[role="dialog"][aria-label="Keranjang"]')
       .first()
       .getByText('Hair Cut', { exact: true }),
   ).toBeVisible();
@@ -385,8 +397,10 @@ test('first-line failure preserves the created empty OPEN Sale', async ({ page }
   await startSaleFromFirstItem(page);
 
   await expect(page).toHaveURL(new RegExp(`/sell/${saleId}$`));
-  await expect(page.getByRole('alert')).toContainText('No effective price for this selection');
-  await expect(page.getByText('No effective price for this selection')).toBeVisible();
+  await expect(page.getByRole('alert')).toContainText(
+    'Harga item belum tersedia untuk pilihan ini.',
+  );
+  await expect(page.getByText('Harga item belum tersedia untuk pilihan ini.')).toBeVisible();
   expect(state.createRequests).toBe(1);
   expect(state.addRequests).toBe(1);
 });
@@ -395,14 +409,14 @@ test('quantity and remove use the latest authoritative Sale version', async ({ p
   const state = await installRoutes(page);
   await startSaleFromFirstItem(page);
 
-  await page.getByRole('button', { name: 'Cart', exact: true }).click();
-  const cart = page.locator('[role="dialog"][aria-label="Cart"]').first();
-  await cart.getByRole('button', { name: 'Increase Hair Cut quantity' }).click();
-  await expect(cart.getByLabel('Quantity for Hair Cut')).toHaveValue('2');
+  await page.getByRole('button', { name: 'Keranjang', exact: true }).click();
+  const cart = page.locator('[role="dialog"][aria-label="Keranjang"]').first();
+  await cart.getByRole('button', { name: 'Tambah jumlah Hair Cut' }).click();
+  await expect(cart.getByLabel('Jumlah Hair Cut')).toHaveText('2');
   expect(state.quantityExpectedVersions).toEqual([2]);
 
-  await cart.getByRole('button', { name: 'Remove Hair Cut' }).click();
-  await expect(cart.getByText('Cart masih kosong')).toBeVisible();
+  await cart.getByRole('button', { name: 'Hapus Hair Cut' }).click();
+  await expect(cart.getByText('Keranjang kosong')).toBeVisible();
   expect(state.removeExpectedVersions).toEqual([3]);
 });
 
@@ -412,46 +426,42 @@ test('version conflict reloads latest Sale and never auto-replays the command', 
   const state = await installRoutes(page, { conflictOnNextQuantity: true });
   await startSaleFromFirstItem(page);
 
-  await page.getByRole('button', { name: 'Cart', exact: true }).click();
+  await page.getByRole('button', { name: 'Keranjang', exact: true }).click();
   await page
-    .locator('[role="dialog"][aria-label="Cart"]')
+    .locator('[role="dialog"][aria-label="Keranjang"]')
     .first()
-    .getByRole('button', { name: 'Increase Hair Cut quantity' })
+    .getByRole('button', { name: 'Tambah jumlah Hair Cut' })
     .click();
 
-  await expect(page.getByText(/changed on another terminal/i)).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Reviewed' })).toBeVisible();
+  await expect(
+    page.getByText('Transaksi telah berubah. Tinjau data terbaru sebelum melanjutkan.'),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Sudah ditinjau' })).toBeVisible();
   expect(state.quantityExpectedVersions).toEqual([2]);
 
   await page.waitForTimeout(250);
   expect(state.quantityExpectedVersions).toEqual([2]);
-  await page.getByRole('button', { name: 'Close active cart' }).click();
-  await page.getByRole('button', { name: 'Reviewed' }).click();
-  await page.getByRole('button', { name: 'Cart', exact: true }).click();
+  await page.getByRole('button', { name: 'Tutup keranjang aktif' }).click();
+  await page.getByRole('button', { name: 'Sudah ditinjau' }).click();
+  await page.getByRole('button', { name: 'Keranjang', exact: true }).click();
   await expect(
     page
-      .locator('[role="dialog"][aria-label="Cart"]')
+      .locator('[role="dialog"][aria-label="Keranjang"]')
       .first()
-      .getByRole('button', { name: 'Increase Hair Cut quantity' }),
+      .getByRole('button', { name: 'Tambah jumlah Hair Cut' }),
   ).toBeEnabled();
 });
 
-test('Open Sales switches active Sale by navigation only', async ({ page }) => {
-  const state = await installRoutes(page, { currentSale: createSaleWithLine() });
+test('queued transactions render without creating or adding a Sale', async ({ page }) => {
+  const state = await installRoutes(page, {
+    currentSale: { ...createSaleWithLine(), operationalState: 'QUEUED' },
+  });
 
-  await page.goto('/open-sales');
-  await expect(page.getByRole('heading', { name: 'Open Sales' })).toBeVisible();
-  await expect(page.getByText(`Sale ${saleId.slice(0, 8)}`)).toBeVisible();
-
-  await page.getByText(`Sale ${saleId.slice(0, 8)}`).click();
-  await expect(page).toHaveURL(new RegExp(`/sell/${saleId}$`));
-  await page.getByRole('button', { name: 'Cart', exact: true }).click();
-  await expect(
-    page
-      .locator('[role="dialog"][aria-label="Cart"]')
-      .first()
-      .getByText('Hair Cut', { exact: true }),
-  ).toBeVisible();
+  await page.goto('/sell');
+  await expect(page.getByRole('button', { name: /Cabang aktif Main Branch/i })).toBeVisible();
+  await expect(page.getByText('Antrian transaksi', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: /Antrian transaksi/ }).click();
+  await expect(page.getByText(`Transaksi ${saleId.slice(0, 8)}`)).toBeVisible();
 
   expect(state.createRequests).toBe(0);
   expect(state.addRequests).toBe(0);

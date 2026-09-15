@@ -31,7 +31,7 @@ export function OperationalExpensesPage() {
   const { authPort } = useAuth();
   const availability = useOperationalAvailability();
   const { selectedLocationId } = useOperationalSession();
-  const { copy, formatDate, formatMoney } = useOperationalLocalization();
+  const { copy, label, formatDate, formatMoney } = useOperationalLocalization();
   const { showToast } = useToast();
   const queryClient = useQueryClient();
   const [offset, setOffset] = useState(0);
@@ -118,7 +118,7 @@ export function OperationalExpensesPage() {
     {
       key: 'category',
       label: copy('Category'),
-      render: (row) => row.categoryCode,
+      render: (row) => label(row.categoryCode),
     },
     {
       key: 'account',
@@ -134,7 +134,9 @@ export function OperationalExpensesPage() {
       key: 'status',
       label: copy('Status'),
       render: (row) => (
-        <DBadge variant={row.status === 'APPROVED' ? 'success' : 'outline'}>{row.status}</DBadge>
+        <DBadge variant={row.status === 'APPROVED' ? 'success' : 'outline'}>
+          {label(row.status)}
+        </DBadge>
       ),
     },
   ];
@@ -212,7 +214,7 @@ export function OperationalExpensesPage() {
             clearable={false}
             options={eligibleAccounts.map((account) => ({
               value: account.id,
-              label: `${account.name} · ${account.currency}`,
+              label: `${account.name} (${account.currency})`,
             }))}
             onValueChange={(value) => setFinancialAccountId(String(value ?? ''))}
           />

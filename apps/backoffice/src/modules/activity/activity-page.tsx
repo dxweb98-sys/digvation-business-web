@@ -1,3 +1,4 @@
+import { useRuntime } from '@digvation/business-runtime';
 import {
   DBadge,
   DButton,
@@ -10,223 +11,83 @@ import {
 } from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
-import { useRuntime } from '@digvation/business-runtime';
+
 import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
 import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
+import {
+  activityCategoryLabel,
+  activityEventLabel,
+  activityNamespaceLabel,
+  activityTargetLabel,
+  humanReadableLabel,
+} from '../../app/localization/human-readable-labels';
 import { useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import { ActivityApi, type ActivityEvent } from './activity-api';
 
 const defaultPageSize = 30;
-const categoryLabels: Record<string, string> = {
-  SECURITY: 'Security',
-  CONFIGURATION: 'Configuration',
-  FINANCE: 'Finance',
-  CATALOG: 'Catalog',
-  TAX: 'Tax',
-  PRICING: 'Pricing',
-  WORKFORCE: 'Workforce',
-  SALES: 'Sales',
-  PAYMENT: 'Payment',
-  FULFILLMENT: 'Fulfillment',
-};
-const eventLabels: Record<string, string> = {
-  LOGIN_SUCCEEDED: 'Login succeeded',
-  LOGOUT: 'Logout',
-  BUSINESS_NUMBERING_UPDATED: 'Numbering settings updated',
-  EXPENSE_APPROVED: 'Expense approved',
-  EXPENSE_REJECTED: 'Expense rejected',
-  EXPENSE_CREATED: 'Expense created',
-  EXPENSE_UPDATED: 'Expense updated',
-  BUSINESS_PROFILE_UPDATED: 'Business profile updated',
-  BUSINESS_LOCALIZATION_UPDATED: 'Localization settings updated',
-  LOCATION_CREATED: 'Location created',
-  LOCATION_UPDATED: 'Location updated',
-  CATALOG_CATEGORY_CREATED: 'Catalog category created',
-  CATALOG_CATEGORY_UPDATED: 'Catalog category updated',
-  CATALOG_ITEM_CREATED: 'Catalog item created',
-  CATALOG_ITEM_UPDATED: 'Catalog item updated',
-  CATALOG_VARIANT_CREATED: 'Catalog variant created',
-  CATALOG_VARIANT_UPDATED: 'Catalog variant updated',
-  TAX_PROFILE_UPDATED: 'Tax profile updated',
-  TAX_RULE_CREATED: 'Tax rule created',
-  TAX_RULE_CANCELLED: 'Tax rule cancelled',
-  TAX_CATEGORY_CREATED: 'Tax category created',
-  TAX_CATEGORY_UPDATED: 'Tax category updated',
-  PRICE_CREATED: 'Price created',
-  PRICE_CHANGED: 'Price changed',
-  PRICE_CANCELLED: 'Price cancelled',
-  EMPLOYEE_POSITION_CREATED: 'Employee position created',
-  EMPLOYEE_POSITION_UPDATED: 'Employee position updated',
-  ATTENDANCE_UPDATED: 'Attendance updated',
-  EMPLOYEE_CREATED: 'Employee created',
-  EMPLOYEE_UPDATED: 'Employee updated',
-  FINANCIAL_ACCOUNT_CREATED: 'Financial account added.',
-  FINANCIAL_ACCOUNT_UPDATED: 'Financial account updated.',
-  PAYMENT_ROUTE_CREATED: 'Payment route added.',
-  PAYMENT_ROUTE_UPDATED: 'Payment route updated.',
-  CASH_MOVEMENT_CREATED: 'Cash movement recorded.',
-  SETTLEMENT_CREATED: 'Settlement created.',
-  RECONCILIATION_CREATED: 'Reconciliation recorded.',
-  SALE_CREATED: 'Transaction created',
-  SALE_LINE_ADDED: 'Transaction item added',
-  SALE_LINE_QUANTITY_CHANGED: 'Transaction item quantity changed',
-  SALE_LINE_REMOVED: 'Transaction item removed',
-  SALE_LINE_PRICE_OVERRIDDEN: 'Transaction item price overridden',
-  SALE_LINE_PRICE_OVERRIDE_REMOVED: 'Transaction item price override removed',
-  SALE_LINE_DISCOUNT_APPLIED: 'Transaction item discount applied',
-  SALE_LINE_DISCOUNT_REMOVED: 'Transaction item discount removed',
-  SALE_DISCOUNT_APPLIED: 'Transaction discount applied',
-  SALE_DISCOUNT_REMOVED: 'Transaction discount removed',
-  SALE_LINE_ASSIGNMENTS_CHANGED: 'Transaction item assignment changed',
-  SALE_LINE_CONTRIBUTIONS_CHANGED: 'Transaction item contribution changed',
-  SALE_FINALIZED: 'Transaction finalized',
-  SALE_VOIDED: 'Transaction voided',
-  PAYMENT_CREATED: 'Payment created',
-  PAYMENT_SUCCEEDED: 'Payment succeeded',
-  PAYMENT_FAILED: 'Payment failed',
-  PAYMENT_CANCELLED: 'Payment cancelled',
-  PAYMENT_EXPIRED: 'Payment expired',
-  FULFILLMENT_STARTED: 'Fulfillment started',
-  FULFILLMENT_COMPLETED: 'Fulfillment completed',
-  FULFILLMENT_CANCELLED: 'Fulfillment cancelled',
-  OWNER_PROVISIONED: 'Owner provisioned',
-  OWNER_GRANTED: 'Owner role granted',
-  OWNER_REVOKED: 'Owner role revoked',
-  INVITATION_CREATED: 'User invitation created',
-  INVITATION_RESENT: 'User invitation resent',
-  INVITATION_REVOKED: 'User invitation revoked',
-  INVITATION_ACCEPTED: 'User invitation accepted',
-  USER_UPDATED: 'User updated',
-  USER_ENABLED: 'User enabled',
-  USER_DISABLED: 'User disabled',
-  USER_ROLES_CHANGED: 'User roles changed',
-  ROLE_CREATED: 'Role created',
-  ROLE_UPDATED: 'Role updated',
-  ROLE_STATUS_CHANGED: 'Role status changed',
-  ROLE_PERMISSIONS_CHANGED: 'Role permissions changed',
-  USER_SESSIONS_REVOKED: 'User sessions revoked',
-  PASSWORD_CHANGED: 'Password changed',
-  PASSWORD_RESET_COMPLETED: 'Password reset completed',
-  LOCATION_ACCESS_GRANTED: 'Location access granted',
-  LOCATION_ACCESS_REVOKED: 'Location access revoked',
-};
-const compositeEventLabels: Record<string, readonly string[]> = {
-  SETTLEMENT_COMPLETED: ['Settlement', 'COMPLETED'],
-  SETTLEMENT_CANCELLED: ['Settlement', 'CANCELLED'],
-  RECONCILIATION_UPDATED: ['Reconciliation', 'Updated'],
-};
-const targetTypeLabels: Record<string, string> = {
-  EXPENSE: 'Expense',
-  INVITATION: 'User invitation',
-  NUMBERING_PREFERENCE: 'Numbering',
-  BUSINESS_PREFERENCES: 'Localization and time settings',
-  ROLE: 'Role',
-  USER: 'User',
-  LOCATION: 'Location',
-  CATALOG_CATEGORY: 'Category',
-  TAX_PROFILE: 'Tax profile',
-  TAX_RULE: 'Tax rule',
-  TAX_CATEGORY: 'Tax category',
-  CATALOG_PRICE: 'Price',
-  EMPLOYEE: 'Employee',
-  EMPLOYEE_POSITION: 'Employee position',
-  FINANCIAL_ACCOUNT: 'Financial Account',
-  PAYMENT_ROUTE: 'Payment routing',
-  CASH_MOVEMENT: 'Cash movements',
-  SETTLEMENT: 'Settlement',
-  RECONCILIATION: 'Reconciliation',
-  SALE: 'Transaction',
-  SALE_LINE: 'Transaction item',
-  PAYMENT: 'Payment',
-  FULFILLMENT: 'Fulfillment',
-};
-const namespaceLabels: Record<string, string> = {
-  PRODUCT: 'Product',
-  SERVICE: 'Service',
-  CATEGORY: 'Category',
-  VARIANT: 'Variant',
-  EMPLOYEE: 'Employee',
-  EMPLOYEE_POSITION: 'Employee position',
-  SALE: 'Transaction',
-  INVOICE: 'Invoice',
-};
-const localizedActivityCopy: Record<string, { id: string; en: string }> = {
-  Workforce: { id: 'Tenaga kerja', en: 'Workforce' },
-  Sales: { id: 'Penjualan', en: 'Sales' },
-  Payment: { id: 'Pembayaran', en: 'Payment' },
-  Fulfillment: { id: 'Pemenuhan', en: 'Fulfillment' },
-  'Localization settings updated': {
-    id: 'Pengaturan regional diperbarui',
-    en: 'Localization settings updated',
+const categories = [
+  'SECURITY',
+  'CONFIGURATION',
+  'FINANCE',
+  'CATALOG',
+  'TAX',
+  'PRICING',
+  'WORKFORCE',
+  'SALES',
+  'PAYMENT',
+  'FULFILLMENT',
+] as const;
+
+const pageCopy = {
+  id: {
+    audit: 'Audit',
+    time: 'Waktu',
+    actor: 'Pelaku',
+    action: 'Tindakan',
+    target: 'Objek',
+    category: 'Kategori',
+    location: 'Lokasi',
+    user: 'Pengguna',
+    allUsers: 'Semua pengguna',
+    allLocations: 'Semua lokasi',
+    system: 'Sistem',
+    source: 'Aplikasi',
+    affectedItem: 'Objek',
+    activityDetails: 'Detail aktivitas',
+    loadFailed: 'Aktivitas tidak dapat dimuat.',
+    retry: 'Coba muat ulang aktivitas.',
+    empty: 'Belum ada aktivitas.',
+    emptyFiltered: 'Tidak ada aktivitas yang sesuai filter.',
+    close: 'Tutup',
   },
-  'Localization and time settings': {
-    id: 'Pengaturan bahasa, tanggal & waktu',
-    en: 'Localization and time settings',
+  en: {
+    audit: 'Audit',
+    time: 'Time',
+    actor: 'Actor',
+    action: 'Action',
+    target: 'Target',
+    category: 'Category',
+    location: 'Location',
+    user: 'User',
+    allUsers: 'All users',
+    allLocations: 'All locations',
+    system: 'System',
+    source: 'Application',
+    affectedItem: 'Target',
+    activityDetails: 'Activity details',
+    loadFailed: 'Could not load activity.',
+    retry: 'Try loading activity again.',
+    empty: 'No activity has been recorded yet.',
+    emptyFiltered: 'No activity matches the current filters.',
+    close: 'Close',
   },
-  'User invitation resent': {
-    id: 'Undangan pengguna dikirim ulang',
-    en: 'User invitation resent',
-  },
-  'User updated': {
-    id: 'Pengguna diperbarui',
-    en: 'User updated',
-  },
-  'Transaction item': { id: 'Item transaksi', en: 'Transaction item' },
-  'Transaction created': { id: 'Transaksi dibuat', en: 'Transaction created' },
-  'Transaction item added': { id: 'Item transaksi ditambahkan', en: 'Transaction item added' },
-  'Transaction item quantity changed': {
-    id: 'Jumlah item transaksi diubah',
-    en: 'Transaction item quantity changed',
-  },
-  'Transaction item removed': { id: 'Item transaksi dihapus', en: 'Transaction item removed' },
-  'Transaction item price overridden': {
-    id: 'Harga item transaksi dioverride',
-    en: 'Transaction item price overridden',
-  },
-  'Transaction item price override removed': {
-    id: 'Override harga item transaksi dihapus',
-    en: 'Transaction item price override removed',
-  },
-  'Transaction item discount applied': {
-    id: 'Diskon item transaksi diterapkan',
-    en: 'Transaction item discount applied',
-  },
-  'Transaction item discount removed': {
-    id: 'Diskon item transaksi dihapus',
-    en: 'Transaction item discount removed',
-  },
-  'Transaction discount applied': {
-    id: 'Diskon transaksi diterapkan',
-    en: 'Transaction discount applied',
-  },
-  'Transaction discount removed': {
-    id: 'Diskon transaksi dihapus',
-    en: 'Transaction discount removed',
-  },
-  'Transaction item assignment changed': {
-    id: 'Penugasan item transaksi diubah',
-    en: 'Transaction item assignment changed',
-  },
-  'Transaction item contribution changed': {
-    id: 'Kontribusi item transaksi diubah',
-    en: 'Transaction item contribution changed',
-  },
-  'Transaction finalized': { id: 'Transaksi diselesaikan', en: 'Transaction finalized' },
-  'Transaction voided': { id: 'Transaksi dibatalkan', en: 'Transaction voided' },
-  'Payment created': { id: 'Pembayaran dibuat', en: 'Payment created' },
-  'Payment succeeded': { id: 'Pembayaran berhasil', en: 'Payment succeeded' },
-  'Payment failed': { id: 'Pembayaran gagal', en: 'Payment failed' },
-  'Payment cancelled': { id: 'Pembayaran dibatalkan', en: 'Payment cancelled' },
-  'Payment expired': { id: 'Pembayaran kedaluwarsa', en: 'Payment expired' },
-  'Fulfillment started': { id: 'Pemenuhan dimulai', en: 'Fulfillment started' },
-  'Fulfillment completed': { id: 'Pemenuhan selesai', en: 'Fulfillment completed' },
-  'Fulfillment cancelled': { id: 'Pemenuhan dibatalkan', en: 'Fulfillment cancelled' },
-};
+} as const;
 
 export function ActivityPage() {
   const { createApiClient } = useBackofficeAuth();
   const runtime = useRuntime();
-  const { t, copy, formatDate, locale } = useBackofficeLocalization();
+  const { t, formatDate, locale } = useBackofficeLocalization();
+  const text = pageCopy[locale];
   const api = useMemo(
     () => new ActivityApi(createApiClient(runtime.apiBaseUrl)),
     [createApiClient, runtime.apiBaseUrl],
@@ -239,6 +100,7 @@ export function ActivityPage() {
   const [category, setCategory] = useState('');
   const [locationId, setLocationId] = useState('');
   const [detail, setDetail] = useState<ActivityEvent | null>(null);
+
   const list = useQuery({
     queryKey: ['activity', offset, pageSize, from, to, actorUserId, category, locationId],
     queryFn: () =>
@@ -249,6 +111,7 @@ export function ActivityPage() {
     queryFn: () => api.facets(),
     staleTime: 300_000,
   });
+
   const resetPage = () => setOffset(0);
   const actorOptions = (facets.data?.actors ?? []).map((actor) => ({
     value: actor.id,
@@ -256,60 +119,55 @@ export function ActivityPage() {
   }));
   const locationOptions = (facets.data?.locations ?? []).map((location) => ({
     value: location.id,
-    label: `${location.name} · ${location.code}`,
+    label: `${location.name} (${location.code})`,
   }));
-  const activityCopy = (value: string) => localizedActivityCopy[value]?.[locale] ?? copy(value);
   const columns: TableColumn<ActivityEvent>[] = [
     {
       key: 'occurredAt',
-      label: copy('Time'),
+      label: text.time,
       render: (item) =>
         formatDate(new Date(item.occurredAt), { dateStyle: 'medium', timeStyle: 'short' }),
     },
     {
       key: 'actor',
-      label: copy('Actor'),
-      render: (item) => item.actor?.displayName ?? copy('System'),
+      label: text.actor,
+      render: (item) => item.actor?.displayName ?? text.system,
     },
     {
       key: 'eventType',
-      label: copy('Action'),
-      render: (item) => eventLabel(item.eventType, activityCopy),
+      label: text.action,
+      render: (item) => activityEventLabel(item.eventType, locale),
     },
     {
       key: 'target',
-      label: copy('Target / reference'),
-      render: (item) => targetSummary(item, activityCopy) ?? '—',
+      label: text.target,
+      render: (item) => targetSummary(item, locale) ?? '-',
     },
     {
       key: 'category',
-      label: copy('Category'),
+      label: text.category,
       render: (item) => (
-        <DBadge variant="outline">
-          {activityCopy(categoryLabels[item.category] ?? item.category)}
-        </DBadge>
+        <DBadge variant="outline">{activityCategoryLabel(item.category, locale)}</DBadge>
       ),
     },
-    { key: 'location', label: copy('Location'), render: (item) => item.locationName ?? '—' },
+    { key: 'location', label: text.location, render: (item) => item.locationName ?? '-' },
   ];
+
   if (list.isError) {
     return (
       <DConnectionError
-        title={copy('Could not load activity.')}
-        message={copy('Try loading activity again.')}
+        title={text.loadFailed}
+        message={text.retry}
         onRetry={() => void list.refetch()}
         isRetrying={list.isFetching}
       />
     );
   }
+
   const filtered = Boolean(from || to || actorUserId || category || locationId);
   return (
     <BackofficePage>
-      <BackofficePageHeader
-        eyebrow={copy('Audit')}
-        title={t('activity')}
-        description={copy('Review important business and access actions safely.')}
-      />
+      <BackofficePageHeader eyebrow={text.audit} title={t('activity')} />
       <section className="mt-6">
         <DDataTable
           columns={columns}
@@ -337,8 +195,8 @@ export function ActivityPage() {
                 }}
               />
               <DSelectFilter
-                label={copy('User')}
-                placeholder={copy('All users')}
+                label={text.user}
+                placeholder={text.allUsers}
                 value={actorUserId || null}
                 clearable
                 options={actorOptions}
@@ -348,12 +206,12 @@ export function ActivityPage() {
                 }}
               />
               <DSelectFilter
-                label={copy('Category')}
+                label={text.category}
                 value={category || null}
                 clearable
-                options={Object.entries(categoryLabels).map(([value, label]) => ({
+                options={categories.map((value) => ({
                   value,
-                  label: activityCopy(label),
+                  label: activityCategoryLabel(value, locale),
                 }))}
                 onChange={(value) => {
                   setCategory(String(value ?? ''));
@@ -361,8 +219,8 @@ export function ActivityPage() {
                 }}
               />
               <DSelectFilter
-                label={copy('Location')}
-                placeholder={copy('All locations')}
+                label={text.location}
+                placeholder={text.allLocations}
                 value={locationId || null}
                 clearable
                 options={locationOptions}
@@ -383,11 +241,7 @@ export function ActivityPage() {
             setPageSize(size);
             resetPage();
           }}
-          emptyMessage={copy(
-            filtered
-              ? 'No activity matches the current filters.'
-              : 'No activity has been recorded yet.',
-          )}
+          emptyMessage={filtered ? text.emptyFiltered : text.empty}
         />
       </section>
       <ActivityDetail item={detail} onClose={() => setDetail(null)} />
@@ -396,15 +250,15 @@ export function ActivityPage() {
 }
 
 function ActivityDetail({ item, onClose }: { item: ActivityEvent | null; onClose: () => void }) {
-  const { copy, formatDate, locale } = useBackofficeLocalization();
-  const activityCopy = (value: string) => localizedActivityCopy[value]?.[locale] ?? copy(value);
-  const target = item ? targetSummary(item, activityCopy) : undefined;
-  const technical = item && ((hasBusinessTarget(item) && item.target?.id) || item.correlationId);
+  const { formatDate, locale } = useBackofficeLocalization();
+  const text = pageCopy[locale];
+  const target = item ? targetSummary(item, locale) : undefined;
+
   return (
     <DDialog
       open={Boolean(item)}
       onClose={onClose}
-      title={item ? eventLabel(item.eventType, activityCopy) : copy('Activity details')}
+      title={item ? activityEventLabel(item.eventType, locale) : text.activityDetails}
       description={
         item
           ? formatDate(new Date(item.occurredAt), { dateStyle: 'medium', timeStyle: 'short' })
@@ -413,7 +267,7 @@ function ActivityDetail({ item, onClose }: { item: ActivityEvent | null; onClose
       footer={
         <div className="flex justify-end">
           <DButton variant="secondary" onClick={onClose}>
-            {copy('Close')}
+            {text.close}
           </DButton>
         </div>
       }
@@ -421,69 +275,42 @@ function ActivityDetail({ item, onClose }: { item: ActivityEvent | null; onClose
       {item ? (
         <div className="space-y-5">
           <div className="flex flex-wrap items-center gap-2">
-            <DBadge variant="outline">
-              {activityCopy(categoryLabels[item.category] ?? item.category)}
-            </DBadge>
+            <DBadge variant="outline">{activityCategoryLabel(item.category, locale)}</DBadge>
             <DBadge variant={outcomeVariant(item.outcome)}>
-              {outcomeLabel(item.outcome, copy)}
+              {humanReadableLabel(item.outcome, locale)}
             </DBadge>
           </div>
           <dl className="grid gap-4 text-sm sm:grid-cols-2">
-            <Fact label={copy('Actor')} value={item.actor?.displayName ?? copy('System')} />
-            {target ? <Fact label={copy('Affected item')} value={target} /> : null}
-            {item.locationName ? <Fact label={copy('Location')} value={item.locationName} /> : null}
-            <Fact label={copy('Source')} value={sourceLabel(item.source, copy)} />
+            <Fact label={text.actor} value={item.actor?.displayName ?? text.system} />
+            {target ? <Fact label={text.affectedItem} value={target} /> : null}
+            {item.locationName ? <Fact label={text.location} value={item.locationName} /> : null}
+            <Fact label={text.source} value={sourceLabel(item.source, locale)} />
           </dl>
-          {technical ? (
-            <section className="border-t border-[var(--color-border)] pt-4">
-              <h3 className="text-sm font-semibold">{copy('Technical information')}</h3>
-              <dl className="mt-3 grid gap-4 text-sm sm:grid-cols-2">
-                {hasBusinessTarget(item) && item.target?.id ? (
-                  <Fact label={copy('Target ID')} value={item.target.id} technical />
-                ) : null}
-                {item.correlationId ? (
-                  <Fact label={copy('Request ID')} value={item.correlationId} technical />
-                ) : null}
-              </dl>
-            </section>
-          ) : null}
         </div>
       ) : null}
     </DDialog>
   );
 }
 
-function Fact({
-  label,
-  value,
-  technical = false,
-}: {
-  label: string;
-  value: string;
-  technical?: boolean;
-}) {
+function Fact({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
       <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
         {label}
       </dt>
-      <dd
-        className={`mt-1 break-words text-[var(--color-text)]${technical ? ' font-mono text-xs' : ' text-sm font-medium'}`}
-      >
-        {value}
-      </dd>
+      <dd className="mt-1 break-words text-sm font-medium text-[var(--color-text)]">{value}</dd>
     </div>
   );
 }
 
-function targetSummary(item: ActivityEvent, copy: (value: string) => string): string | undefined {
+function targetSummary(item: ActivityEvent, locale: 'id' | 'en'): string | undefined {
   if (!item.target || !hasBusinessTarget(item)) return undefined;
   const display = item.target.displayName;
   const reference = item.target.reference
-    ? copy(namespaceLabels[item.target.reference] ?? item.target.reference)
+    ? activityNamespaceLabel(item.target.reference, locale)
     : undefined;
-  const fallback = copy(targetTypeLabels[item.target.type] ?? item.target.type);
-  return [display ?? fallback, reference].filter(Boolean).join(' · ');
+  const fallback = activityTargetLabel(item.target.type, locale);
+  return [display ?? fallback, reference].filter(Boolean).join(' (') + (reference ? ')' : '');
 }
 
 function hasBusinessTarget(item: ActivityEvent) {
@@ -500,24 +327,8 @@ function outcomeVariant(value: string): 'success' | 'warning' | 'danger' | 'outl
         : 'outline';
 }
 
-function outcomeLabel(value: string, copy: (value: string) => string) {
-  return copy({ SUCCEEDED: 'Succeeded', REJECTED: 'Rejected', FAILED: 'Failed' }[value] ?? value);
-}
-
-function sourceLabel(value: ActivityEvent['source'], copy: (value: string) => string) {
-  return copy(
-    value === 'OPERATIONAL' ? 'Operational' : value === 'SYSTEM' ? 'System' : 'Backoffice',
-  );
-}
-
-function eventLabel(value: string, copy: (value: string) => string) {
-  const composite = compositeEventLabels[value];
-  if (composite) return composite.map(copy).join(' · ');
-  return copy(
-    eventLabels[value] ??
-      value
-        .split('_')
-        .map((part) => part[0] + part.slice(1).toLowerCase())
-        .join(' '),
-  );
+function sourceLabel(value: ActivityEvent['source'], locale: 'id' | 'en') {
+  if (value === 'SYSTEM') return locale === 'id' ? 'Sistem' : 'System';
+  if (value === 'OPERATIONAL') return 'Operational';
+  return 'Backoffice';
 }

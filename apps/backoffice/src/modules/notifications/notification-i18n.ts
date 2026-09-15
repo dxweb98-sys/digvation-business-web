@@ -27,8 +27,8 @@ type TextKey =
 const text: Record<TextKey, { id: string; en: string }> = {
   notifications: { id: 'Notifikasi', en: 'Notifications' },
   description: {
-    id: 'Informasi yang perlu Anda ketahui atau tindak lanjuti.',
-    en: 'Information that needs your awareness or action.',
+    id: 'Notifikasi terbaru.',
+    en: 'Latest notifications.',
   },
   markAllRead: { id: 'Tandai semua dibaca', en: 'Mark all read' },
   markRead: { id: 'Tandai dibaca', en: 'Mark read' },
@@ -39,8 +39,8 @@ const text: Record<TextKey, { id: string; en: string }> = {
   empty: { id: 'Belum ada notifikasi.', en: 'No notifications yet.' },
   loading: { id: 'Memuat notifikasi...', en: 'Loading notifications...' },
   loadFailed: {
-    id: 'Notifikasi tidak dapat dimuat.',
-    en: 'Notifications could not be loaded.',
+    id: 'Gagal memuat notifikasi.',
+    en: 'Could not load notifications.',
   },
   retry: { id: 'Coba lagi', en: 'Retry' },
   status: { id: 'Status', en: 'Status' },
@@ -51,12 +51,12 @@ const text: Record<TextKey, { id: string; en: string }> = {
   warning: { id: 'Perlu perhatian', en: 'Needs attention' },
   critical: { id: 'Kritis', en: 'Critical' },
   markReadFailed: {
-    id: 'Notifikasi tidak dapat ditandai sebagai dibaca.',
-    en: 'The notification could not be marked as read.',
+    id: 'Gagal menandai notifikasi sebagai dibaca.',
+    en: 'Could not mark the notification as read.',
   },
   markAllReadFailed: {
-    id: 'Semua notifikasi tidak dapat ditandai sebagai dibaca.',
-    en: 'Notifications could not be marked as read.',
+    id: 'Gagal menandai semua notifikasi sebagai dibaca.',
+    en: 'Could not mark all notifications as read.',
   },
 };
 

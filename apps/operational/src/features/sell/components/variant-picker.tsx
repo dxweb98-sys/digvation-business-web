@@ -3,6 +3,10 @@ import { DButton, DDialog } from '@digvation-labs/ui';
 import { Check, X } from 'lucide-react';
 import { useState } from 'react';
 
+import {
+  operationalCopy,
+  resolveOperationalLocale,
+} from '../../../app/localization/operational-localization';
 import type { CatalogItem, CatalogVariant } from '../cashier-transaction.types';
 
 export type VariantPickerContext = 'CART' | 'TRANSACTION_ADJUSTMENT';
@@ -36,6 +40,9 @@ export function VariantPicker({
 }: VariantPickerProps) {
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
   const isAdjustment = context === 'TRANSACTION_ADJUSTMENT';
+  const operationalLocale = resolveOperationalLocale(locale);
+  const copy = (value: string) => operationalCopy(value, operationalLocale);
+
   return (
     <DDialog
       open
@@ -51,21 +58,23 @@ export function VariantPicker({
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-brand)]">
-            Pilih varian
+            {copy('Select variant')}
           </p>
           <h2 id="variant-picker-title" className="mt-1 text-lg font-bold">
             {item.name}
           </h2>
           <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-            {isAdjustment
-              ? 'Pilih satu varian untuk ditambahkan ke transaksi.'
-              : 'Pilih satu varian untuk ditambahkan ke cart.'}
+            {copy(
+              isAdjustment
+                ? 'Select one variant to add to the transaction.'
+                : 'Select one variant to add to the cart.',
+            )}
           </p>
         </div>
         <DButton
           variant="ghost"
           type="button"
-          aria-label="Close variant picker"
+          aria-label={copy('Close')}
           onClick={onClose}
           className="grid size-9 place-items-center rounded-xl text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-muted)]"
         >
@@ -96,7 +105,7 @@ export function VariantPicker({
               <span className="flex shrink-0 items-center gap-3">
                 {isUnavailable ? (
                   <span className="text-xs font-semibold text-[var(--color-text-muted)]">
-                    Harga belum tersedia
+                    {copy('Price unavailable')}
                   </span>
                 ) : price ? (
                   <span className="text-sm font-semibold text-[var(--color-text)]">
@@ -116,7 +125,7 @@ export function VariantPicker({
       </div>
       <div className="mt-4 flex justify-end gap-2 border-t border-[var(--color-border)] pt-3">
         <DButton variant="ghost" type="button" onClick={onClose}>
-          Batal
+          {copy('Cancel')}
         </DButton>
         <DButton
           type="button"
@@ -125,7 +134,7 @@ export function VariantPicker({
             if (selectedVariantId) onSelect(selectedVariantId);
           }}
         >
-          {isAdjustment ? 'Tambahkan ke Transaksi' : 'Tambahkan ke Cart'}
+          {copy(isAdjustment ? 'Add to transaction' : 'Add to cart')}
         </DButton>
       </div>
     </DDialog>

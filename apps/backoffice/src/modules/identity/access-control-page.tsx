@@ -21,6 +21,7 @@ import { useMemo, useState } from 'react';
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
 import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
 import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
+import { permissionLabel } from '../../app/localization/human-readable-labels';
 import { canPerformBackofficeAction } from '../../auth/backoffice-access';
 import { isSessionExpiredError, useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import {
@@ -43,11 +44,26 @@ const keys = {
 const pageSize = 50;
 type Section = 'roles' | 'users' | 'invitations';
 
+const accessCopy = {
+  pageDescription: {
+    id: 'Kelola pengguna, peran, undangan, izin, dan akses lokasi.',
+    en: 'Manage users, roles, invitations, permissions, and location access.',
+  },
+  protectedRole: {
+    id: 'Peran sistem tidak dapat diubah.',
+    en: 'System roles cannot be changed.',
+  },
+  invitationDescription: {
+    id: 'Pengguna akan mengaktifkan akun melalui undangan yang dikirim.',
+    en: 'The user activates the account through the invitation.',
+  },
+} as const;
+
 export function AccessControlPage() {
   const { session, createApiClient } = useBackofficeAuth();
   const runtime = useRuntime();
   const queryClient = useQueryClient();
-  const { copy } = useBackofficeLocalization();
+  const { copy, locale } = useBackofficeLocalization();
   const api = useMemo(
     () => new AccessControlApi(createApiClient(runtime.apiBaseUrl)),
     [createApiClient, runtime.apiBaseUrl],
@@ -121,9 +137,7 @@ export function AccessControlPage() {
       <BackofficePageHeader
         eyebrow={copy('Configuration')}
         title={copy('Access Control')}
-        description={copy(
-          'Manage business users, roles, invitations, permissions, and operational location access.',
-        )}
+        description={accessCopy.pageDescription[locale]}
         actions={actions}
       />
 
@@ -331,14 +345,14 @@ function UsersTable({
       render: (user) => (
         <div>
           <p className="font-medium">{user.displayName}</p>
-          <p className="text-xs text-[var(--color-text-muted)]">{user.username ?? '—'}</p>
+          <p className="text-xs text-[var(--color-text-muted)]">{user.username ?? '-'}</p>
         </div>
       ),
     },
     {
       key: 'roles',
       label: copy('Roles'),
-      render: (user) => user.roles.map((role) => role.name).join(', ') || '—',
+      render: (user) => user.roles.map((role) => role.name).join(', ') || '-',
     },
     {
       key: 'status',
@@ -400,7 +414,7 @@ function InvitationsTable({
     {
       key: 'roles',
       label: copy('Roles'),
-      render: (invitation) => invitation.roles.map((role) => role.name).join(', ') || '—',
+      render: (invitation) => invitation.roles.map((role) => role.name).join(', ') || '-',
     },
     {
       key: 'expiresAt',
@@ -488,7 +502,7 @@ function RoleEditor({
   onClose: () => void;
   onChanged: () => void;
 }) {
-  const { copy } = useBackofficeLocalization();
+  const { copy, locale } = useBackofficeLocalization();
   const { showToast } = useToast();
   const isNew = role === null;
   const [code, setCode] = useState('');
@@ -562,7 +576,7 @@ function RoleEditor({
           </div>
         ) : (
           <p className="text-sm text-[var(--color-text-muted)]">
-            {copy('System roles are protected by the Business Runtime authorization policy.')}
+            {accessCopy.protectedRole[locale]}
           </p>
         )}
         <section className="border-t border-[var(--color-border)] pt-4">
@@ -581,7 +595,7 @@ function RoleEditor({
                   }
                   disabled={Boolean(role?.systemKey) || (!isNew && !canManagePermissions)}
                 />
-                <span className="min-w-0 break-words">{permission}</span>
+                <span className="min-w-0 break-words">{permissionLabel(permission, locale)}</span>
               </label>
             ))}
           </div>
@@ -694,7 +708,7 @@ function UserEditor({
               title={copy('Location Access')}
               items={locations.map((location) => ({
                 id: location.id,
-                label: `${location.code} — ${location.name}`,
+                label: `${location.code}, ${location.name}`,
               }))}
               selected={effectiveSelectedLocations}
               disabled={!canManageLocations}
@@ -725,7 +739,7 @@ function InvitationDialog({
   onClose: () => void;
   onChanged: () => void;
 }) {
-  const { copy } = useBackofficeLocalization();
+  const { copy, locale } = useBackofficeLocalization();
   const { showToast } = useToast();
   const [phone, setPhone] = useState('');
   const [username, setUsername] = useState('');
@@ -764,9 +778,7 @@ function InvitationDialog({
       open
       onClose={onClose}
       title={copy('Invite user')}
-      description={copy(
-        'Use the existing Runtime invitation contract. The user activates the account through the invitation flow.',
-      )}
+      description={accessCopy.invitationDescription[locale]}
       size="lg"
       footer={
         <div className="flex justify-end gap-2">

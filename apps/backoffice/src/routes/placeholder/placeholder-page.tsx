@@ -6,14 +6,16 @@ import {
 } from '../../app/localization/backoffice-localization';
 
 export function PlaceholderPage({ title }: { title: BackofficeMessageKey }) {
-  const { t } = useBackofficeLocalization();
+  const { t, locale } = useBackofficeLocalization();
   return (
     <BackofficePage>
       <BackofficePageHeader title={t(title)} />
       <DEmptyState
         className="mt-6"
-        title={t('notAvailableYet')}
-        description={t('notAvailableDescription')}
+        title={locale === 'id' ? 'Belum tersedia' : 'Not available yet'}
+        description={
+          locale === 'id' ? 'Halaman ini belum tersedia.' : 'This page is not available yet.'
+        }
       />
     </BackofficePage>
   );

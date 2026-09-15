@@ -136,7 +136,7 @@ export function AttendancePanel({ api, canManage }: { api: EmployeesApi; canMana
         .sort((left, right) => left.displayName.localeCompare(right.displayName))
         .map((employee) => ({
           value: employee.id,
-          label: `${employee.displayName} · ${employee.code}`,
+          label: `${employee.displayName} (${employee.code})`,
         })),
     ],
     [copy, employeeDirectory.data],
@@ -181,13 +181,13 @@ export function AttendancePanel({ api, canManage }: { api: EmployeesApi; canMana
       key: 'checkInAt',
       label: copy('Check in'),
       render: (record) =>
-        record.checkInAt ? formatDate(new Date(record.checkInAt), { timeStyle: 'short' }) : '—',
+        record.checkInAt ? formatDate(new Date(record.checkInAt), { timeStyle: 'short' }) : '-',
     },
     {
       key: 'checkOutAt',
       label: copy('Check out'),
       render: (record) =>
-        record.checkOutAt ? formatDate(new Date(record.checkOutAt), { timeStyle: 'short' }) : '—',
+        record.checkOutAt ? formatDate(new Date(record.checkOutAt), { timeStyle: 'short' }) : '-',
     },
     {
       key: 'source',
@@ -324,23 +324,19 @@ export function AttendancePanel({ api, canManage }: { api: EmployeesApi; canMana
         </div>
 
         <div className="mt-4 flex flex-col gap-3 border-t border-(--color-border) pt-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap items-center gap-2 text-xs text-(--color-text-muted)">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-(--color-text-muted)">
             <span className="font-semibold text-(--color-text)">
               {totalRecords} {copy('attendance records')}
             </span>
-            <span aria-hidden="true">·</span>
             <span>
               {copy('Present')} {counts.PRESENT}
             </span>
-            <span aria-hidden="true">·</span>
             <span>
               {copy('Absent')} {counts.ABSENT}
             </span>
-            <span aria-hidden="true">·</span>
             <span>
               {copy('Leave')} {counts.LEAVE}
             </span>
-            <span aria-hidden="true">·</span>
             <span>
               {copy('Sick')} {counts.SICK}
             </span>
@@ -621,7 +617,7 @@ function AttendanceAdjustmentDialog({
                         {readOnly ? <DBadge variant="secondary">HRIS</DBadge> : null}
                       </div>
                       <p className="mt-0.5 text-xs text-(--color-text-muted)">
-                        {[employee.code, employee.position?.name].filter(Boolean).join(' · ')}
+                        {[employee.code, employee.position?.name].filter(Boolean).join(', ')}
                       </p>
                     </div>
                   </label>
