@@ -292,7 +292,7 @@ function LocationsPanel({
       label: copy('Status'),
       render: (location) => (
         <DBadge
-          variant={location.status === 'ACTIVE' ? 'outline' : 'secondary'}
+          variant={location.status === 'ACTIVE' ? 'success' : 'secondary'}
         >
           {copy(location.status === 'ACTIVE' ? 'Active' : 'Inactive')}
         </DBadge>
