@@ -1,0 +1,11 @@
+packages:
+  - apps/*
+  - packages/*
+
+# pnpm 11 blocks dependency lifecycle scripts unless explicitly decided.
+# MSW's install script is not required for this browser/test setup, so keep it blocked.
+allowBuilds:
+  msw: false
+
+minimumReleaseAgeExclude:
+  - '@digvation/ui@1.1.0'

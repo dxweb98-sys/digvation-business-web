@@ -1,0 +1,64 @@
+@import 'tailwindcss';
+
+html,
+body,
+#root {
+  width: 100%;
+  min-width: 320px;
+  height: 100%;
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.operational-shell__sidebar {
+  display: none;
+}
+
+.operational-shell__mobile-navigation {
+  display: block;
+}
+
+.operational-shell__header-date {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .operational-shell__sidebar {
+    display: flex;
+    width: 232px;
+  }
+
+  .operational-shell__mobile-navigation {
+    display: none;
+  }
+
+  .operational-shell__header-date {
+    display: inline;
+  }
+}
+
+@media (min-width: 1024px) {
+  .operational-shell__sidebar {
+    width: 280px;
+  }
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}

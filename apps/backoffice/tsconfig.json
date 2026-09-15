@@ -1,0 +1,7 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.cache/backoffice.tsbuildinfo"
+  },
+  "include": ["src", "vite.config.ts"]
+}

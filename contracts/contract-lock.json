@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "backend": {
+    "repository": "https://github.com/dxweb98-sys/digvation-business-runtime",
+    "release": "v0.4.0",
+    "sha": "c402fa5e82acffd5ac07ee0448b2de83ec600347"
+  },
+  "auth": {
+    "status": "implementation-in-progress",
+    "specificationSha": "9008e605b96660b5183e937b1b15088d5f6faa27",
+    "targetRelease": "v0.4.0"
+  },
+  "transport": {
+    "apiPrefix": "/api/v1",
+    "openApiPath": "/openapi.json",
+    "credentials": false
+  },
+  "openApiSnapshot": {
+    "status": "pending-approved-runtime-export",
+    "reason": "Do not fabricate an OpenAPI snapshot. Export it from the approved backend runtime before generated transport becomes an acceptance gate."
+  }
+}

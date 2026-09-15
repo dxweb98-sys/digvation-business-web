@@ -1,0 +1,177 @@
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
+import type { SessionEndReason } from '@digvation/business-auth';
+import { useToast } from '@digvation/ui';
+import { ApiClient } from '@digvation/business-api';
+
+import { isBackofficeSessionExpired } from '../app/api/backoffice-api-error';
+import { useBackofficeLocalization } from '../app/localization/backoffice-localization';
+import type { BackofficeSession, LoginCredentials } from './auth-session';
+import type { HttpAuthAdapter } from './http-auth-adapter';
+
+type AuthenticationStatus = 'hydrating' | 'authenticated' | 'unauthenticated';
+
+interface BackofficeAuthContextValue {
+  status: AuthenticationStatus;
+  session: BackofficeSession | null;
+  login(input: LoginCredentials): Promise<void>;
+  logout(): Promise<void>;
+  refresh(): Promise<void>;
+  getAccessToken(): Promise<string | null>;
+  createApiClient(baseUrl: string): ApiClient;
+}
+
+const BackofficeAuthContext = createContext<BackofficeAuthContextValue | null>(null);
+const BUSINESS_CONFIGURATION_CHANGED_EVENT =
+  'digvation:business-configuration-changed';
+const SESSION_END_TRANSITION_MS = 5_000;
+const IDLE_SESSION_ENDED_MESSAGE =
+  'Sesi Anda telah berakhir karena tidak ada aktivitas. Silakan masuk kembali.';
+
+export function BackofficeAuthProvider({
+  auth,
+  children,
+}: {
+  auth: HttpAuthAdapter;
+  children: ReactNode;
+}) {
+  const [status, setStatus] = useState<AuthenticationStatus>('hydrating');
+  const [session, setSession] = useState<BackofficeSession | null>(null);
+  const { showToast } = useToast();
+  const { t } = useBackofficeLocalization();
+  const sessionExpired = useRef(false);
+  const sessionEndTimer = useRef<number | null>(null);
+
+  const clearSessionEndTimer = useCallback(() => {
+    if (sessionEndTimer.current === null) return;
+    window.clearTimeout(sessionEndTimer.current);
+    sessionEndTimer.current = null;
+  }, []);
+
+  const expireSession = useCallback(
+    (reason: SessionEndReason) => {
+      if (sessionExpired.current) return;
+      sessionExpired.current = true;
+      clearSessionEndTimer();
+      setSession(null);
+      setStatus('hydrating');
+      showToast({
+        variant: 'warning',
+        title: reason === 'idle' ? IDLE_SESSION_ENDED_MESSAGE : t('sessionExpired'),
+      });
+      void auth.logout();
+      sessionEndTimer.current = window.setTimeout(() => {
+        sessionEndTimer.current = null;
+        setStatus('unauthenticated');
+      }, SESSION_END_TRANSITION_MS);
+    },
+    [auth, clearSessionEndTimer, showToast, t],
+  );
+
+  useEffect(() => auth.subscribeSessionEnded(expireSession), [auth, expireSession]);
+
+  useEffect(() => {
+    let isMounted = true;
+    void auth.restore().then(
+      (restored) => {
+        if (!isMounted || sessionExpired.current) return;
+        setSession(restored);
+        setStatus(restored ? 'authenticated' : 'unauthenticated');
+      },
+      () => {
+        if (!isMounted || sessionExpired.current) return;
+        setSession(null);
+        setStatus('unauthenticated');
+      },
+    );
+    return () => {
+      isMounted = false;
+    };
+  }, [auth]);
+
+  useEffect(() => () => clearSessionEndTimer(), [clearSessionEndTimer]);
+
+  const login = useCallback(
+    async (input: LoginCredentials) => {
+      const authenticated = await auth.login(input);
+      clearSessionEndTimer();
+      sessionExpired.current = false;
+      setSession(authenticated);
+      setStatus('authenticated');
+    },
+    [auth, clearSessionEndTimer],
+  );
+
+  const logout = useCallback(async () => {
+    clearSessionEndTimer();
+    sessionExpired.current = false;
+    await auth.logout();
+    setSession(null);
+    setStatus('unauthenticated');
+    showToast({ variant: 'success', title: t('signedOut') });
+  }, [auth, clearSessionEndTimer, showToast, t]);
+
+  const refresh = useCallback(async () => {
+    const restored = await auth.restore();
+    if (!restored) {
+      setSession(null);
+      setStatus('unauthenticated');
+      return;
+    }
+    sessionExpired.current = false;
+    setSession(restored);
+    setStatus('authenticated');
+  }, [auth]);
+
+  useEffect(() => {
+    const handleConfigurationChanged = () => {
+      void refresh();
+    };
+    window.addEventListener(
+      BUSINESS_CONFIGURATION_CHANGED_EVENT,
+      handleConfigurationChanged,
+    );
+    return () =>
+      window.removeEventListener(
+        BUSINESS_CONFIGURATION_CHANGED_EVENT,
+        handleConfigurationChanged,
+      );
+  }, [refresh]);
+
+  const getAccessToken = useCallback(() => auth.getAccessToken(), [auth]);
+  const refreshAccessToken = useCallback(() => auth.refreshAccessToken(), [auth]);
+  const createApiClient = useCallback(
+    (baseUrl: string) =>
+      new ApiClient({
+        baseUrl,
+        getAccessToken,
+        refreshAccessToken,
+        onSessionEnded: expireSession,
+      }),
+    [expireSession, getAccessToken, refreshAccessToken],
+  );
+
+  const value = useMemo(
+    () => ({ status, session, login, logout, refresh, getAccessToken, createApiClient }),
+    [createApiClient, getAccessToken, login, logout, refresh, session, status],
+  );
+  return <BackofficeAuthContext.Provider value={value}>{children}</BackofficeAuthContext.Provider>;
+}
+
+export function useBackofficeAuth(): BackofficeAuthContextValue {
+  const context = useContext(BackofficeAuthContext);
+  if (!context) throw new Error('BackofficeAuthProvider is missing.');
+  return context;
+}
+
+export function isSessionExpiredError(error: unknown): boolean {
+  return isBackofficeSessionExpired(error);
+}
