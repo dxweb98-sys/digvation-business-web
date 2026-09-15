@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveBackofficeLocale } from './backoffice-localization';
+import { resolveBackofficeLocale } from './backoffice-locale';
 
 describe('resolveBackofficeLocale', () => {
   it('uses English when runtime configuration is en-US', () => {

@@ -12,6 +12,7 @@ import { RouterProvider } from 'react-router/dom';
 
 import { BackofficeAuthProvider, useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import type { HttpAuthAdapter } from '../../auth/http-auth-adapter';
+import { resolveBackofficeLocale } from '../localization/backoffice-locale';
 import {
   BackofficeLocalizationProvider,
   useBackofficeLocalization,
@@ -66,10 +67,11 @@ function AuthenticatedBackofficeProviders({ router }: Pick<BackofficeProvidersPr
     () => applyEffectiveBusinessConfiguration(bootstrapRuntime, session?.businessConfiguration),
     [bootstrapRuntime, session?.businessConfiguration],
   );
-  const configuredLocale = session?.businessConfiguration?.preferences.defaultLocale;
+  const configuredLocale =
+    session?.businessConfiguration?.preferences.defaultLocale ?? bootstrapRuntime.locale;
 
   useEffect(() => {
-    if (configuredLocale) setLocale(configuredLocale === 'en-US' ? 'en' : 'id');
+    setLocale(resolveBackofficeLocale(configuredLocale));
   }, [configuredLocale, setLocale]);
 
   return (
