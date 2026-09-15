@@ -46,7 +46,10 @@ export class TaxApi {
     return this.client.get<TaxProfile>('/api/v1/tax/profile');
   }
 
-  updateProfile(profile: TaxProfile, input: Pick<TaxProfile, 'itemTaxEnabled' | 'transactionTaxEnabled'>) {
+  updateProfile(
+    profile: TaxProfile,
+    input: Pick<TaxProfile, 'itemTaxEnabled' | 'transactionTaxEnabled'>,
+  ) {
     return this.client.patch<TaxProfile>('/api/v1/tax/profile', {
       expectedVersion: profile.version,
       ...input,

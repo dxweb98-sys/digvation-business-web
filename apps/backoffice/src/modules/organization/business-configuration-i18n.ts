@@ -4,10 +4,11 @@ import { useBackofficeLocalization } from '../../app/localization/backoffice-loc
 const configurationCopy: Record<string, { id: string; en: string }> = {
   Configuration: { id: 'Konfigurasi', en: 'Configuration' },
   Business: { id: 'Bisnis', en: 'Business' },
-  'Manage business identity, locations, localization, and automatic numbering from one authoritative configuration.': {
-    id: 'Kelola identitas bisnis, lokasi, lokalisasi, dan penomoran otomatis dari satu konfigurasi yang menjadi sumber utama.',
-    en: 'Manage business identity, locations, localization, and automatic numbering from one authoritative configuration.',
-  },
+  'Manage business identity, locations, localization, and automatic numbering from one authoritative configuration.':
+    {
+      id: 'Kelola identitas bisnis, lokasi, lokalisasi, dan penomoran otomatis dari satu konfigurasi yang menjadi sumber utama.',
+      en: 'Manage business identity, locations, localization, and automatic numbering from one authoritative configuration.',
+    },
   Profile: { id: 'Profil', en: 'Profile' },
   Locations: { id: 'Lokasi', en: 'Locations' },
   Localization: { id: 'Lokalisasi', en: 'Localization' },
@@ -27,7 +28,10 @@ const configurationCopy: Record<string, { id: string; en: string }> = {
   Cancel: { id: 'Batal', en: 'Cancel' },
   'Save profile': { id: 'Simpan profil', en: 'Save profile' },
   'Business profile updated.': { id: 'Profil bisnis diperbarui.', en: 'Business profile updated.' },
-  'Could not update business profile.': { id: 'Profil bisnis tidak dapat diperbarui.', en: 'Could not update business profile.' },
+  'Could not update business profile.': {
+    id: 'Profil bisnis tidak dapat diperbarui.',
+    en: 'Could not update business profile.',
+  },
   'Persisted values become the tenant default and are applied after save.': {
     id: 'Nilai yang disimpan menjadi default tenant dan diterapkan setelah disimpan.',
     en: 'Persisted values become the tenant default and are applied after save.',
@@ -43,7 +47,10 @@ const configurationCopy: Record<string, { id: string; en: string }> = {
   '12-hour (hh:mm a)': { id: '12 jam (hh:mm a)', en: '12-hour (hh:mm a)' },
   'Save localization': { id: 'Simpan lokalisasi', en: 'Save localization' },
   'Localization updated.': { id: 'Lokalisasi diperbarui.', en: 'Localization updated.' },
-  'Could not update localization.': { id: 'Lokalisasi tidak dapat diperbarui.', en: 'Could not update localization.' },
+  'Could not update localization.': {
+    id: 'Lokalisasi tidak dapat diperbarui.',
+    en: 'Could not update localization.',
+  },
   'Selling location': { id: 'Lokasi penjualan', en: 'Selling location' },
   Code: { id: 'Kode', en: 'Code' },
   Status: { id: 'Status', en: 'Status' },
@@ -52,9 +59,18 @@ const configurationCopy: Record<string, { id: string; en: string }> = {
   'Main Branch': { id: 'Cabang Utama', en: 'Main Branch' },
   'Add location': { id: 'Tambah lokasi', en: 'Add location' },
   'Edit selling location': { id: 'Ubah lokasi penjualan', en: 'Edit selling location' },
-  'Deactivate selling location': { id: 'Nonaktifkan lokasi penjualan', en: 'Deactivate selling location' },
-  'No selling locations have been created yet.': { id: 'Belum ada lokasi penjualan.', en: 'No selling locations have been created yet.' },
-  'Deactivate selling location?': { id: 'Nonaktifkan lokasi penjualan?', en: 'Deactivate selling location?' },
+  'Deactivate selling location': {
+    id: 'Nonaktifkan lokasi penjualan',
+    en: 'Deactivate selling location',
+  },
+  'No selling locations have been created yet.': {
+    id: 'Belum ada lokasi penjualan.',
+    en: 'No selling locations have been created yet.',
+  },
+  'Deactivate selling location?': {
+    id: 'Nonaktifkan lokasi penjualan?',
+    en: 'Deactivate selling location?',
+  },
   'This location remains in historical records but cannot be used for new operations.': {
     id: 'Lokasi tetap tersimpan pada riwayat, tetapi tidak dapat digunakan untuk operasi baru.',
     en: 'This location remains in historical records but cannot be used for new operations.',
@@ -65,14 +81,24 @@ const configurationCopy: Record<string, { id: string; en: string }> = {
   'Use as Main Branch': { id: 'Jadikan Cabang Utama', en: 'Use as Main Branch' },
   'Save location': { id: 'Simpan lokasi', en: 'Save location' },
   'Selling location added.': { id: 'Lokasi penjualan ditambahkan.', en: 'Selling location added.' },
-  'Selling location updated.': { id: 'Lokasi penjualan diperbarui.', en: 'Selling location updated.' },
-  'Selling location deactivated.': { id: 'Lokasi penjualan dinonaktifkan.', en: 'Selling location deactivated.' },
-  'Could not save selling location.': { id: 'Lokasi penjualan tidak dapat disimpan.', en: 'Could not save selling location.' },
-  'Automatic codes': { id: 'Kode otomatis', en: 'Automatic codes' },
-  'When a code is left empty, Runtime uses this prefix and the next tenant sequence. Existing codes never change and the sequence cannot be reset here.': {
-    id: 'Saat kode dikosongkan, Runtime menggunakan prefix ini dan sequence tenant berikutnya. Kode yang sudah ada tidak berubah dan sequence tidak dapat direset dari sini.',
-    en: 'When a code is left empty, Runtime uses this prefix and the next tenant sequence. Existing codes never change and the sequence cannot be reset here.',
+  'Selling location updated.': {
+    id: 'Lokasi penjualan diperbarui.',
+    en: 'Selling location updated.',
   },
+  'Selling location deactivated.': {
+    id: 'Lokasi penjualan dinonaktifkan.',
+    en: 'Selling location deactivated.',
+  },
+  'Could not save selling location.': {
+    id: 'Lokasi penjualan tidak dapat disimpan.',
+    en: 'Could not save selling location.',
+  },
+  'Automatic codes': { id: 'Kode otomatis', en: 'Automatic codes' },
+  'When a code is left empty, Runtime uses this prefix and the next tenant sequence. Existing codes never change and the sequence cannot be reset here.':
+    {
+      id: 'Saat kode dikosongkan, Runtime menggunakan prefix ini dan sequence tenant berikutnya. Kode yang sudah ada tidak berubah dan sequence tidak dapat direset dari sini.',
+      en: 'When a code is left empty, Runtime uses this prefix and the next tenant sequence. Existing codes never change and the sequence cannot be reset here.',
+    },
   Product: { id: 'Produk', en: 'Product' },
   Service: { id: 'Layanan', en: 'Service' },
   Category: { id: 'Kategori', en: 'Category' },
@@ -87,13 +113,17 @@ const configurationCopy: Record<string, { id: string; en: string }> = {
   'Next example': { id: 'Contoh berikutnya', en: 'Next example' },
   Edit: { id: 'Ubah', en: 'Edit' },
   'Edit numbering': { id: 'Ubah penomoran', en: 'Edit numbering' },
-  'Prefix and padding affect future automatically generated values only. Current sequence is read-only and is never reset by this change.': {
-    id: 'Prefix dan padding hanya memengaruhi nilai otomatis berikutnya. Sequence saat ini hanya dapat dibaca dan tidak pernah direset oleh perubahan ini.',
-    en: 'Prefix and padding affect future automatically generated values only. Current sequence is read-only and is never reset by this change.',
-  },
+  'Prefix and padding affect future automatically generated values only. Current sequence is read-only and is never reset by this change.':
+    {
+      id: 'Prefix dan padding hanya memengaruhi nilai otomatis berikutnya. Sequence saat ini hanya dapat dibaca dan tidak pernah direset oleh perubahan ini.',
+      en: 'Prefix and padding affect future automatically generated values only. Current sequence is read-only and is never reset by this change.',
+    },
   Save: { id: 'Simpan', en: 'Save' },
   'Numbering updated.': { id: 'Penomoran diperbarui.', en: 'Numbering updated.' },
-  'Could not update numbering.': { id: 'Penomoran tidak dapat diperbarui.', en: 'Could not update numbering.' },
+  'Could not update numbering.': {
+    id: 'Penomoran tidak dapat diperbarui.',
+    en: 'Could not update numbering.',
+  },
   'No automatic numbering is applicable to the enabled features.': {
     id: 'Tidak ada penomoran otomatis yang berlaku untuk fitur yang aktif.',
     en: 'No automatic numbering is applicable to the enabled features.',

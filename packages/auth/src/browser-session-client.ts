@@ -50,11 +50,7 @@ export class BrowserSessionClient {
     return window.sessionStorage.getItem(this.accessTokenKey);
   }
 
-  public async login(
-    workspace: string,
-    identifier: string,
-    password: string,
-  ): Promise<string> {
+  public async login(workspace: string, identifier: string, password: string): Promise<string> {
     const session = await this.request<BrowserSessionResponse>('/api/v1/auth/browser/login', {
       method: 'POST',
       body: { workspace, identifier, password },
@@ -142,7 +138,9 @@ export class BrowserSessionClient {
     if (!token) return false;
     const raw = window.sessionStorage.getItem(this.lastActivityKey);
     const lastActivity = raw ? Number(raw) : 0;
-    return !Number.isFinite(lastActivity) || lastActivity <= 0 || now - lastActivity >= IDLE_TIMEOUT_MS;
+    return (
+      !Number.isFinite(lastActivity) || lastActivity <= 0 || now - lastActivity >= IDLE_TIMEOUT_MS
+    );
   }
 
   private endSession(reason: SessionEndReason): void {
@@ -195,10 +193,7 @@ export class BrowserSessionClient {
     this.idleTimer = null;
   }
 
-  private async request<T>(
-    path: string,
-    options: { method: 'POST'; body?: unknown },
-  ): Promise<T> {
+  private async request<T>(path: string, options: { method: 'POST'; body?: unknown }): Promise<T> {
     const headers = new Headers();
     headers.set(SESSION_CHANNEL_HEADER, this.sessionChannel);
     if (options.body !== undefined) headers.set('content-type', 'application/json');

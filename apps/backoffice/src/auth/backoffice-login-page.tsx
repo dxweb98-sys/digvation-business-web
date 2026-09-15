@@ -33,10 +33,7 @@ export function BackofficeLoginPage() {
       setError(t('signInFailed'));
       showToast({
         variant: 'danger',
-        title: normalizeBackofficeApiError(
-          failure,
-          t('signInFailed'),
-        ).safeMessage,
+        title: normalizeBackofficeApiError(failure, t('signInFailed')).safeMessage,
       });
     } finally {
       setSubmitting(false);

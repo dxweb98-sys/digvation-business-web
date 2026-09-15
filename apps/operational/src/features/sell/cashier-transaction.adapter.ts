@@ -197,14 +197,24 @@ export interface SaleTransactionClient {
 }
 
 export interface SaleTransactionPort
-  extends SellingCatalogQuery, EmployeeQuery, PaymentRouteQuery, OpenSalesQuery, SaleTransactionClient {}
+  extends
+    SellingCatalogQuery,
+    EmployeeQuery,
+    PaymentRouteQuery,
+    OpenSalesQuery,
+    SaleTransactionClient {}
 
 function pagePath(path: string): string {
   return `${path}?limit=${PAGE_SIZE}&offset=0`;
 }
 
 export class HttpCashierTransactionAdapter
-  implements SellingCatalogQuery, EmployeeQuery, PaymentRouteQuery, OpenSalesQuery, SaleTransactionClient
+  implements
+    SellingCatalogQuery,
+    EmployeeQuery,
+    PaymentRouteQuery,
+    OpenSalesQuery,
+    SaleTransactionClient
 {
   public constructor(private readonly client: ApiClient) {}
 

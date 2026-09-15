@@ -12,7 +12,10 @@ import { RouterProvider } from 'react-router/dom';
 
 import { BackofficeAuthProvider, useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import type { HttpAuthAdapter } from '../../auth/http-auth-adapter';
-import { BackofficeLocalizationProvider, useBackofficeLocalization } from '../localization/backoffice-localization';
+import {
+  BackofficeLocalizationProvider,
+  useBackofficeLocalization,
+} from '../localization/backoffice-localization';
 import { BusinessLocationProvider } from './business-location-context';
 
 const queryClient = new QueryClient({
@@ -38,7 +41,10 @@ export function BackofficeProviders({ runtime, auth, router }: BackofficeProvide
   );
 }
 
-function BackofficeDesignSystemProviders({ auth, router }: Omit<BackofficeProvidersProps, 'runtime'>) {
+function BackofficeDesignSystemProviders({
+  auth,
+  router,
+}: Omit<BackofficeProvidersProps, 'runtime'>) {
   const { locale } = useBackofficeLocalization();
 
   return (
@@ -52,18 +58,12 @@ function BackofficeDesignSystemProviders({ auth, router }: Omit<BackofficeProvid
   );
 }
 
-function AuthenticatedBackofficeProviders({
-  router,
-}: Pick<BackofficeProvidersProps, 'router'>) {
+function AuthenticatedBackofficeProviders({ router }: Pick<BackofficeProvidersProps, 'router'>) {
   const bootstrapRuntime = useRuntime();
   const { session } = useBackofficeAuth();
   const { setLocale } = useBackofficeLocalization();
   const runtime = useMemo(
-    () =>
-      applyEffectiveBusinessConfiguration(
-        bootstrapRuntime,
-        session?.businessConfiguration,
-      ),
+    () => applyEffectiveBusinessConfiguration(bootstrapRuntime, session?.businessConfiguration),
     [bootstrapRuntime, session?.businessConfiguration],
   );
   const configuredLocale = session?.businessConfiguration?.preferences.defaultLocale;

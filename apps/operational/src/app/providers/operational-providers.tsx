@@ -14,11 +14,7 @@ import {
   type RuntimeAvailabilityConfig,
   type RuntimeConfig,
 } from '@digvation/business-runtime';
-import {
-  DLocalizationProvider,
-  DToastProvider as ToastProvider,
-  useToast,
-} from '@digvation/ui';
+import { DLocalizationProvider, DToastProvider as ToastProvider, useToast } from '@digvation/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { RouterProviderProps } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
@@ -105,9 +101,7 @@ function AuthenticatedOperationalRuntime({ children }: { children: ReactNode }) 
     return (
       <RuntimeProvider config={effectiveRuntime}>
         <OperationalAvailabilityProvider availability={availability}>
-          <DLocalizationProvider
-            locale={effectiveRuntime.locale === 'en-US' ? 'en-US' : 'id-ID'}
-          >
+          <DLocalizationProvider locale={effectiveRuntime.locale === 'en-US' ? 'en-US' : 'id-ID'}>
             {children}
           </DLocalizationProvider>
         </OperationalAvailabilityProvider>
@@ -185,8 +179,7 @@ function OperationalAuthBoundary({
       setSessionEndReason(reason);
       showToast({
         variant: 'warning',
-        title:
-          reason === 'idle' ? IDLE_SESSION_ENDED_MESSAGE : INVALID_SESSION_ENDED_MESSAGE,
+        title: reason === 'idle' ? IDLE_SESSION_ENDED_MESSAGE : INVALID_SESSION_ENDED_MESSAGE,
       });
       void authPort.logout();
       sessionEndTimer.current = window.setTimeout(() => {
@@ -249,9 +242,7 @@ function OperationalAuthBoundary({
           <PosOperationalSessionProvider>
             <div
               className={`min-h-screen transition-[opacity,transform] duration-150 ease-out ${
-                isLoggingOut
-                  ? 'pointer-events-none -translate-y-1 opacity-0'
-                  : 'opacity-100'
+                isLoggingOut ? 'pointer-events-none -translate-y-1 opacity-0' : 'opacity-100'
               }`}
               onTransitionEnd={completeLogoutTransition}
             >

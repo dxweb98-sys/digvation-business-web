@@ -110,10 +110,11 @@ const catalogCopy: Record<string, { id: string; en: string }> = {
   'Reactivate variant': { id: 'Aktifkan kembali varian', en: 'Reactivate variant' },
   'Deactivate variant?': { id: 'Nonaktifkan varian?', en: 'Deactivate variant?' },
   'Reactivate variant?': { id: 'Aktifkan kembali varian?', en: 'Reactivate variant?' },
-  'This variant will stop appearing in active selling choices. Existing transaction and price history will be preserved.': {
-    id: 'Varian ini tidak akan lagi muncul pada pilihan penjualan aktif. Riwayat transaksi dan harga yang sudah ada tetap dipertahankan.',
-    en: 'This variant will stop appearing in active selling choices. Existing transaction and price history will be preserved.',
-  },
+  'This variant will stop appearing in active selling choices. Existing transaction and price history will be preserved.':
+    {
+      id: 'Varian ini tidak akan lagi muncul pada pilihan penjualan aktif. Riwayat transaksi dan harga yang sudah ada tetap dipertahankan.',
+      en: 'This variant will stop appearing in active selling choices. Existing transaction and price history will be preserved.',
+    },
   'This variant will become available for active selling choices again.': {
     id: 'Varian ini akan kembali tersedia pada pilihan penjualan aktif.',
     en: 'This variant will become available for active selling choices again.',
@@ -131,7 +132,10 @@ const catalogCopy: Record<string, { id: string; en: string }> = {
   'Category updated.': { id: 'Kategori berhasil diperbarui.', en: 'Category updated.' },
   'Variant added.': { id: 'Varian berhasil ditambahkan.', en: 'Variant added.' },
   'Variant updated.': { id: 'Varian berhasil diperbarui.', en: 'Variant updated.' },
-  'Could not save category.': { id: 'Kategori tidak dapat disimpan.', en: 'Could not save category.' },
+  'Could not save category.': {
+    id: 'Kategori tidak dapat disimpan.',
+    en: 'Could not save category.',
+  },
   'Could not save variant.': { id: 'Varian tidak dapat disimpan.', en: 'Could not save variant.' },
   'Tax to set aside': { id: 'Pajak yang perlu disisihkan', en: 'Tax to set aside' },
   'Tax by item': { id: 'Pajak per item', en: 'Tax by item' },

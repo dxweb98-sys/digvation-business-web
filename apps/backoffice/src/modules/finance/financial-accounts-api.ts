@@ -94,7 +94,9 @@ export class FinancialAccountsApi {
   }
 
   listRoutes(query: Query) {
-    return this.client.get<FinancialAccountPage<PaymentRoute>>(`/api/v1/payment-routing?${queryString(query)}`);
+    return this.client.get<FinancialAccountPage<PaymentRoute>>(
+      `/api/v1/payment-routing?${queryString(query)}`,
+    );
   }
   getRoute(id: string) {
     return this.client.get<PaymentRoute>(`/api/v1/payment-routing/${id}`);

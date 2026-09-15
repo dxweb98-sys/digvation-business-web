@@ -105,21 +105,24 @@ export function CatalogItemDetailDialog({
   if (!item) return null;
 
   const categoryName = item.categoryId
-    ? categories.find((candidate) => candidate.id === item.categoryId)?.name ?? item.categoryId
+    ? (categories.find((candidate) => candidate.id === item.categoryId)?.name ?? item.categoryId)
     : 'Belum ditentukan';
   const taxCategoryName = item.taxCategoryId
-    ? taxCategories.find((candidate) => candidate.id === item.taxCategoryId)?.name ?? item.taxCategoryId
+    ? (taxCategories.find((candidate) => candidate.id === item.taxCategoryId)?.name ??
+      item.taxCategoryId)
     : 'Tidak ada pajak khusus item';
   const defaultHistory = (priceHistory.data?.items ?? []).filter(
     (price) => price.catalogVariantId === null && price.locationId === null,
   );
   const variantPriceById = new Map(
-    (variants.data?.items ?? []).map((variant, index) => [variant.id, resolvedVariantPrices[index]]),
+    (variants.data?.items ?? []).map((variant, index) => [
+      variant.id,
+      resolvedVariantPrices[index],
+    ]),
   );
   const variantCount = variants.data?.items.length ?? item.variantCount;
 
-  const refreshVariants = () =>
-    void client.invalidateQueries({ queryKey: keys.variants(item.id) });
+  const refreshVariants = () => void client.invalidateQueries({ queryKey: keys.variants(item.id) });
   const refreshVariantsAndCount = () => {
     refreshVariants();
     onVariantsChanged();
@@ -247,7 +250,10 @@ export function CatalogItemDetailDialog({
               <DBadge variant="secondary">{variantCount}</DBadge>
             </div>
             {canCreate ? (
-              <DButton leftIcon={<Plus className="size-4" />} onClick={() => setEditingVariant(null)}>
+              <DButton
+                leftIcon={<Plus className="size-4" />}
+                onClick={() => setEditingVariant(null)}
+              >
                 Tambah Varian
               </DButton>
             ) : null}
@@ -327,9 +333,7 @@ export function CatalogItemDetailDialog({
                 }
               />
             ) : null}
-            {canViewTax ? (
-              <DetailField label="Kategori Pajak" value={taxCategoryName} />
-            ) : null}
+            {canViewTax ? <DetailField label="Kategori Pajak" value={taxCategoryName} /> : null}
             <div className="sm:col-span-2 lg:col-span-4">
               <DetailField
                 label="Deskripsi"

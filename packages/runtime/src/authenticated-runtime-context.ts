@@ -101,22 +101,17 @@ export async function loadAuthenticatedRuntimeAvailability(
   if (!response.ok || !payload.success || !payload.data)
     throw new Error('RUNTIME_CONTEXT_UNAVAILABLE');
 
-  const businessConfiguration = normalizeBusinessConfiguration(
-    payload.data.businessConfiguration,
-  );
+  const businessConfiguration = normalizeBusinessConfiguration(payload.data.businessConfiguration);
   return {
     effectiveEntitlements: {
-      products: payload.data.effectiveProducts.filter(
-        (value): value is 'POS' => value === 'POS',
-      ),
+      products: payload.data.effectiveProducts.filter((value): value is 'POS' => value === 'POS'),
       capabilities: payload.data.effectiveCapabilities.filter(
         (value): value is BusinessCapability =>
           BUSINESS_CAPABILITIES.has(value as BusinessCapability),
       ),
     },
     effectiveFoundations: payload.data.effectiveFoundations.filter(
-      (value): value is BusinessFoundation =>
-        BUSINESS_FOUNDATIONS.has(value as BusinessFoundation),
+      (value): value is BusinessFoundation => BUSINESS_FOUNDATIONS.has(value as BusinessFoundation),
     ),
     effectivePermissions: [...new Set(payload.data.effectivePermissions)],
     ...(businessConfiguration ? { businessConfiguration } : {}),
@@ -128,7 +123,6 @@ export async function loadAuthenticatedEntitlements(
   apiBaseUrl: string,
   accessToken: string,
 ): Promise<EffectiveEntitlementConfig> {
-  return (
-    await loadAuthenticatedRuntimeAvailability(apiBaseUrl, accessToken)
-  ).effectiveEntitlements;
+  return (await loadAuthenticatedRuntimeAvailability(apiBaseUrl, accessToken))
+    .effectiveEntitlements;
 }

@@ -22,15 +22,9 @@ import { Ban, Pencil, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
-import {
-  BackofficePage,
-  BackofficePageHeader,
-} from '../../app/layout/backoffice-page';
+import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
 import { canPerformBackofficeAction } from '../../auth/backoffice-access';
-import {
-  isSessionExpiredError,
-  useBackofficeAuth,
-} from '../../auth/backoffice-auth-context';
+import { isSessionExpiredError, useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import { TaxApi, type TaxCategory, type TaxProfile, type TaxRule } from './tax-api';
 import { useTaxLocalization, type TaxMessageKey } from './tax-localization';
 
@@ -73,8 +67,7 @@ export function TaxPage() {
 
   if (!session) return null;
 
-  const refresh = (queryKey: readonly string[]) =>
-    void queryClient.invalidateQueries({ queryKey });
+  const refresh = (queryKey: readonly string[]) => void queryClient.invalidateQueries({ queryKey });
 
   return (
     <BackofficePage>
@@ -149,8 +142,8 @@ function TaxProfileSection({
 
   const changed = Boolean(
     profile &&
-      (itemTaxEnabled !== profile.itemTaxEnabled ||
-        transactionTaxEnabled !== profile.transactionTaxEnabled),
+    (itemTaxEnabled !== profile.itemTaxEnabled ||
+      transactionTaxEnabled !== profile.transactionTaxEnabled),
   );
 
   const save = async () => {
@@ -202,8 +195,12 @@ function TaxProfileSection({
           </div>
           <div className="flex items-center justify-between gap-5 py-4">
             <div className="min-w-0">
-              <p className="text-sm font-medium text-[var(--color-text)]">{tax('transactionTax')}</p>
-              <p className="mt-1 text-sm text-[var(--color-text-muted)]">{tax('transactionTaxHint')}</p>
+              <p className="text-sm font-medium text-[var(--color-text)]">
+                {tax('transactionTax')}
+              </p>
+              <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+                {tax('transactionTaxHint')}
+              </p>
             </div>
             <DToggle
               checked={transactionTaxEnabled}
@@ -322,8 +319,7 @@ function TaxCategoryDialog({
           code: code.trim().toUpperCase(),
           name: name.trim(),
         });
-      else if (category)
-        await api.updateCategory(category, { name: name.trim(), status });
+      else if (category) await api.updateCategory(category, { name: name.trim(), status });
       onChanged();
       onClose();
       showToast({ variant: 'success', title: tax('categorySaved') });
@@ -343,7 +339,9 @@ function TaxCategoryDialog({
       title={tax(isNew ? 'addCategory' : 'editCategory')}
       footer={
         <div className="flex justify-end gap-2">
-          <DButton variant="secondary" onClick={onClose}>{tax('cancel')}</DButton>
+          <DButton variant="secondary" onClick={onClose}>
+            {tax('cancel')}
+          </DButton>
           <DButton onClick={() => void save()} disabled={!name.trim() || (isNew && !code.trim())}>
             {tax('save')}
           </DButton>
@@ -359,7 +357,12 @@ function TaxCategoryDialog({
             placeholder="PPN"
           />
         ) : (
-          <DInput label={tax('code')} value={category?.code ?? ''} onChange={() => undefined} disabled />
+          <DInput
+            label={tax('code')}
+            value={category?.code ?? ''}
+            onChange={() => undefined}
+            disabled
+          />
         )}
         <DInput label={tax('name')} value={name} onChange={setName} placeholder="PPN" />
         {!isNew ? (
@@ -401,7 +404,9 @@ function TaxRulesSection({
   const [creating, setCreating] = useState(false);
   const [cancelling, setCancelling] = useState<TaxRule | null>(null);
   const categoryName = (id: string | null) =>
-    id ? categories.find((category) => category.id === id)?.name ?? tax('noCategory') : tax('noCategory');
+    id
+      ? (categories.find((category) => category.id === id)?.name ?? tax('noCategory'))
+      : tax('noCategory');
   const columns: TableColumn<TaxRule>[] = [
     { key: 'code', label: tax('code') },
     { key: 'name', label: tax('name') },
@@ -533,8 +538,8 @@ function TaxRuleDialog({
   const percent = Number(ratePercent);
   const periodInvalid = Boolean(
     effectiveFrom &&
-      effectiveUntil &&
-      new Date(effectiveUntil).getTime() <= new Date(effectiveFrom).getTime(),
+    effectiveUntil &&
+    new Date(effectiveUntil).getTime() <= new Date(effectiveFrom).getTime(),
   );
   const valid =
     code.trim().length > 0 &&
@@ -582,8 +587,12 @@ function TaxRuleDialog({
       size="lg"
       footer={
         <div className="flex justify-end gap-2">
-          <DButton variant="secondary" onClick={onClose}>{tax('cancel')}</DButton>
-          <DButton onClick={() => void save()} disabled={!valid || saving}>{tax('addRule')}</DButton>
+          <DButton variant="secondary" onClick={onClose}>
+            {tax('cancel')}
+          </DButton>
+          <DButton onClick={() => void save()} disabled={!valid || saving}>
+            {tax('addRule')}
+          </DButton>
         </div>
       }
     >

@@ -1,5 +1,12 @@
 import { createDecimal, formatMoney } from '@digvation/pos-money';
-import { DButton, DCurrencyInput, DDecimalInput, DDialog, DInput, DSelect } from '@digvation-labs/ui';
+import {
+  DButton,
+  DCurrencyInput,
+  DDecimalInput,
+  DDialog,
+  DInput,
+  DSelect,
+} from '@digvation-labs/ui';
 import {
   BadgeCheck,
   Banknote,

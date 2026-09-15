@@ -22,10 +22,7 @@ import {
   useOperationalAvailability,
 } from '../../app/providers/operational-availability-context';
 import { useOperationalSession } from '../operational/operational-session-provider';
-import {
-  OperationalExpenseApi,
-  type OperationalExpense,
-} from './operational-expense-api';
+import { OperationalExpenseApi, type OperationalExpense } from './operational-expense-api';
 
 const PAGE_SIZE = 20;
 
@@ -94,8 +91,7 @@ export function OperationalExpensesPage() {
       setNote('');
       showToast({ variant: 'success', title: copy('Expense submitted.') });
     },
-    onError: () =>
-      showToast({ variant: 'danger', title: copy('Could not submit expense.') }),
+    onError: () => showToast({ variant: 'danger', title: copy('Could not submit expense.') }),
   });
 
   if (expenses.isError)
@@ -138,9 +134,7 @@ export function OperationalExpensesPage() {
       key: 'status',
       label: copy('Status'),
       render: (row) => (
-        <DBadge variant={row.status === 'APPROVED' ? 'success' : 'outline'}>
-          {row.status}
-        </DBadge>
+        <DBadge variant={row.status === 'APPROVED' ? 'success' : 'outline'}>{row.status}</DBadge>
       ),
     },
   ];
@@ -222,11 +216,7 @@ export function OperationalExpensesPage() {
             }))}
             onValueChange={setFinancialAccountId}
           />
-          <DInput
-            label={copy('Category')}
-            value={categoryCode}
-            onChange={setCategoryCode}
-          />
+          <DInput label={copy('Category')} value={categoryCode} onChange={setCategoryCode} />
           <DInput label={copy('Amount')} value={amount} onChange={setAmount} />
           <DInput label={copy('Note')} value={note} onChange={setNote} />
         </div>

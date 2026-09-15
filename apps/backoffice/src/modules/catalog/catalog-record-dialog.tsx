@@ -49,10 +49,8 @@ export function CatalogNamedRecordDialog({
       if (!isSessionExpiredError(error))
         showToast({
           variant: 'danger',
-          title: normalizeBackofficeApiError(
-            error,
-            copy(`Could not save ${entity.toLowerCase()}.`),
-          ).safeMessage,
+          title: normalizeBackofficeApiError(error, copy(`Could not save ${entity.toLowerCase()}.`))
+            .safeMessage,
         });
     } finally {
       setSaving(false);

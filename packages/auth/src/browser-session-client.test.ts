@@ -20,10 +20,10 @@ function sessionResponse(accessToken = 'fresh-access'): Response {
 }
 
 function failureResponse(status: number): Response {
-  return new Response(
-    JSON.stringify({ success: false, error: { code: 'AUTH_SESSION_INVALID' } }),
-    { status, headers: { 'content-type': 'application/json' } },
-  );
+  return new Response(JSON.stringify({ success: false, error: { code: 'AUTH_SESSION_INVALID' } }), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  });
 }
 
 function seedActiveSession(): void {
