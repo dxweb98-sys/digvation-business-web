@@ -71,13 +71,18 @@ import type {
   Employee,
   Payment,
   PaymentMethod,
+  PaymentRoute,
   Sale,
   SaleLine,
 } from '../cashier-transaction.types';
 import type { CatalogItemTypeFilter } from '../use-selling-catalog';
 import type { useCashierTransactionWorkspace } from '../use-cashier-transaction-workspace';
 
-import { PosCurrencyInput, PosNumericInput } from './pos-controls';
+import {
+  normalizeCurrencyPresentationInput,
+  PosCurrencyInput,
+  PosNumericInput,
+} from './pos-controls';
 import { SaleLineTaskDialog } from './sale-line-task-dialog';
 import type { VariantPickerState } from './variant-picker';
 import './replatformed-pos-workspace.css';
@@ -373,6 +378,20 @@ function isPositiveDecimal(value: string) {
   }
 }
 
+function useCachedPaymentRoutes(): { routes: PaymentRoute[]; isPending: boolean } {
+  const runtime = useRuntime();
+  const { selectedLocationId } = useCashierSession();
+  const query = useQuery({
+    queryKey: cashierTransactionKeys.paymentRoutes(selectedLocationId ?? '', runtime.currency),
+    queryFn: async () => ({ items: [] as PaymentRoute[], limit: 0, offset: 0 }),
+    enabled: false,
+  });
+  return {
+    routes: (query.data?.items ?? []).filter((route) => route.status === 'ACTIVE'),
+    isPending: query.data === undefined,
+  };
+}
+
 function employeeAssignmentIssues(line: SaleLine, locale: string): string[] {
   const issues: string[] = [];
   if (
@@ -502,7 +521,7 @@ function successfulPayments(sale: Sale) {
 
 function financialSummary(sale: Sale) {
   const totalPaid = successfulPayments(sale).reduce(
-    (sum, payment) => sum.plus(createDecimal(payment.appliedAmount)),
+    (sum, payment) => total.plus(createDecimal(payment.appliedAmount)),
     createDecimal('0'),
   );
   const balance = createDecimal(sale.totalAmount).minus(totalPaid);
@@ -661,7 +680,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       }
     }
 
-    setTender(checkoutTotal);
+    setTender(normalizeCurrencyPresentationInput(checkoutTotal));
     setPayNow(true);
     setPaymentMethod('CASH');
     setProvider('');
@@ -850,7 +869,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       setQueueDetail(null);
       setPaymentMethod('CASH');
       setProvider('');
-      setTender(availableToPay);
+      setTender(normalizeCurrencyPresentationInput(availableToPay));
       setQueuePaymentTarget(hydrated);
       setQueuePaymentAmount(availableToPay);
     } catch {
@@ -1003,12 +1022,13 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   };
 
   const quickTender = ['50000', '100000', '150000', '200000', '500000'];
-  const effectiveTender = tender || total;
+  const normalizedTotal = normalizeCurrencyPresentationInput(total);
+  const effectiveTender = tender || normalizedTotal;
   const cashShort =
-    paymentMethod === 'CASH' && createDecimal(effectiveTender).lessThan(createDecimal(total));
+    paymentMethod === 'CASH' && createDecimal(effectiveTender).lessThan(createDecimal(normalizedTotal));
   const change = cashShort
-    ? '0.0000'
-    : createDecimal(effectiveTender).minus(createDecimal(total)).toFixed(4);
+    ? '0'
+    : createDecimal(effectiveTender).minus(createDecimal(normalizedTotal)).toFixed(0);
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden px-3 pb-3 pt-3 sm:px-4 sm:pb-4 lg:px-5 lg:pb-5">
@@ -2373,11 +2393,20 @@ function ReferencePaymentDialog({
   onQueue: () => void;
 }) {
   const { copy, label } = useOperationalLocalization();
+  const { routes: paymentRoutes, isPending: isPaymentRoutesPending } = useCachedPaymentRoutes();
+  const routeByMethod = new Map(
+    paymentRoutes.map((route) => [route.paymentMethod, route] as const),
+  );
+  const activeRoute = routeByMethod.get(method) ?? null;
   const isCash = method === 'CASH';
   const needsProvider = method === 'BANK_TRANSFER' || method === 'WALLET';
   const hasTax = !createDecimal(taxAmount).equals(createDecimal('0'));
   const canPay =
-    lines.length > 0 && !isCashShort && (!needsProvider || Boolean(provider)) && !isSubmitting;
+    lines.length > 0 &&
+    Boolean(activeRoute) &&
+    !isCashShort &&
+    (!needsProvider || Boolean(provider)) &&
+    !isSubmitting;
   const canConfirm = payNow ? canPay : lines.length > 0 && !isSubmitting;
   const methods: Array<{ value: PaymentMethod; icon: ReactNode }> = [
     { value: 'CASH', icon: <Banknote className="size-[15px]" /> },
@@ -2385,10 +2414,11 @@ function ReferencePaymentDialog({
     { value: 'QRIS', icon: <QrCode className="size-[15px]" /> },
     { value: 'WALLET', icon: <ShoppingBag className="size-[15px]" /> },
   ];
-  const providerOptions =
-    method === 'BANK_TRANSFER'
-      ? ['BCA', 'Mandiri', 'BRI', 'BNI']
-      : ['DANA', 'GoPay', 'OVO', 'ShopeePay'];
+  const providerOptions = needsProvider && activeRoute ? [activeRoute.financialAccountName] : [];
+  const normalizedQuickTender = [total, ...quickTender]
+    .map((amount) => normalizeCurrencyPresentationInput(amount))
+    .filter((amount, index, list) => list.indexOf(amount) === index)
+    .slice(0, 6);
 
   return (
     <DDialog
@@ -2534,30 +2564,35 @@ function ReferencePaymentDialog({
                 {copy('Payment method')}
               </p>
               <div className="grid grid-cols-4 gap-2">
-                {methods.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => onMethod(option.value)}
-                    className={`flex h-10 items-center justify-center gap-1.5 rounded-xl border text-xs font-semibold transition-all active:scale-[.98] ${method === option.value ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white shadow-sm' : 'border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)]'}`}
-                  >
-                    {option.icon}
-                    <span className="hidden sm:inline">{label(option.value)}</span>
-                  </button>
-                ))}
+                {methods.map((option) => {
+                  const routeAvailable = routeByMethod.has(option.value);
+                  const disabled = isPaymentRoutesPending || !routeAvailable;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => onMethod(option.value)}
+                      className={`flex h-10 items-center justify-center gap-1.5 rounded-xl border text-xs font-semibold transition-all active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-40 ${method === option.value ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white shadow-sm' : 'border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)]'}`}
+                    >
+                      {option.icon}
+                      <span className="hidden sm:inline">{label(option.value)}</span>
+                    </button>
+                  );
+                })}
               </div>
               {needsProvider ? (
                 <div className="mt-3">
                   <p className="mb-2 text-xs font-semibold text-[var(--color-text-muted)]">
                     {copy(method === 'BANK_TRANSFER' ? 'Select bank' : 'Select digital wallet')}
                   </p>
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     {providerOptions.map((option) => (
                       <button
                         key={option}
                         type="button"
                         onClick={() => onProvider(option)}
-                        className={`h-9 rounded-xl border text-xs font-semibold transition-all active:scale-[.98] ${provider === option ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]'}`}
+                        className={`h-9 rounded-xl border px-3 text-xs font-semibold transition-all active:scale-[.98] ${provider === option ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]'}`}
                       >
                         {option}
                       </button>
@@ -2568,6 +2603,11 @@ function ReferencePaymentDialog({
               {method === 'QRIS' ? (
                 <div className="mt-3 rounded-xl border border-[var(--color-brand)]/20 bg-[var(--color-brand)]/5 p-3">
                   <p className="text-sm font-bold text-[var(--color-brand)]">QRIS</p>
+                  {activeRoute ? (
+                    <p className="mt-1 text-xs font-semibold text-[var(--color-text)]">
+                      {activeRoute.financialAccountName}
+                    </p>
+                  ) : null}
                   <p className="mt-1 text-xs text-[var(--color-text-muted)]">
                     {copy('QRIS payment will be recorded for this transaction.')}
                   </p>
@@ -2589,19 +2629,16 @@ function ReferencePaymentDialog({
                   </div>
                 </label>
                 <div className="grid grid-cols-3 gap-2">
-                  {[total, ...quickTender]
-                    .filter((amount, index, list) => list.indexOf(amount) === index)
-                    .slice(0, 6)
-                    .map((amount) => (
-                      <button
-                        key={amount}
-                        type="button"
-                        onClick={() => onTender(amount)}
-                        className={`h-9 rounded-lg border text-[11px] font-semibold transition-all active:scale-[.98] ${tender === amount ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'border-[var(--color-border)] bg-[var(--color-background)] hover:bg-[var(--color-surface-muted)]'}`}
-                      >
-                        {money(amount, locale)}
-                      </button>
-                    ))}
+                  {normalizedQuickTender.map((amount) => (
+                    <button
+                      key={amount}
+                      type="button"
+                      onClick={() => onTender(amount)}
+                      className={`h-9 rounded-lg border text-[11px] font-semibold transition-all active:scale-[.98] ${normalizeCurrencyPresentationInput(tender) === amount ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'border-[var(--color-border)] bg-[var(--color-background)] hover:bg-[var(--color-surface-muted)]'}`}
+                    >
+                      {money(amount, locale)}
+                    </button>
+                  ))}
                 </div>
                 <div
                   className={`flex items-center justify-between rounded-xl px-3 py-2 ${isCashShort ? 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]' : 'bg-[var(--color-success)]/10 text-[var(--color-success)]'}`}
@@ -2612,9 +2649,9 @@ function ReferencePaymentDialog({
                   <span className="text-sm font-bold">
                     {isCashShort
                       ? money(
-                          createDecimal(total)
-                            .minus(createDecimal(tender || '0'))
-                            .toFixed(4),
+                          createDecimal(normalizeCurrencyPresentationInput(total))
+                            .minus(createDecimal(normalizeCurrencyPresentationInput(tender || '0')))
+                            .toFixed(0),
                           locale,
                         )
                       : money(change, locale)}
@@ -2626,6 +2663,11 @@ function ReferencePaymentDialog({
                 <p className="text-sm font-bold text-[var(--color-brand)]">
                   {copy('Payment')} {label(method)}
                 </p>
+                {activeRoute ? (
+                  <p className="mt-1 text-xs font-semibold text-[var(--color-text)]">
+                    {activeRoute.financialAccountName}
+                  </p>
+                ) : null}
                 <p className="mt-1 text-xs text-[var(--color-text-muted)]">
                   {copy('Select a provider if required, then record the payment.')}
                 </p>
@@ -3515,6 +3557,11 @@ function ReferenceBalancePaymentDialog({
   onPay: () => void;
 }) {
   const { copy, label } = useOperationalLocalization();
+  const { routes: paymentRoutes, isPending: isPaymentRoutesPending } = useCachedPaymentRoutes();
+  const routeByMethod = new Map(
+    paymentRoutes.map((route) => [route.paymentMethod, route] as const),
+  );
+  const activeRoute = routeByMethod.get(method) ?? null;
   if (!sale) return null;
   const { totalPaid } = financialSummary(sale);
   const balanceDue = availableToPay ?? '0.0000';
@@ -3524,6 +3571,7 @@ function ReferenceBalancePaymentDialog({
   const cashShort = isCash && createDecimal(applied).lessThan(createDecimal(balanceDue));
   const canPay =
     isPositiveDecimal(applied) &&
+    Boolean(activeRoute) &&
     !cashShort &&
     (!needsProvider || Boolean(provider)) &&
     !isMutating;
@@ -3533,10 +3581,7 @@ function ReferenceBalancePaymentDialog({
     { value: 'QRIS', icon: <QrCode className="size-4" /> },
     { value: 'WALLET', icon: <ShoppingBag className="size-4" /> },
   ];
-  const providerOptions =
-    method === 'BANK_TRANSFER'
-      ? ['BCA', 'Mandiri', 'BRI', 'BNI']
-      : ['DANA', 'GoPay', 'OVO', 'ShopeePay'];
+  const providerOptions = needsProvider && activeRoute ? [activeRoute.financialAccountName] : [];
 
   return (
     <Dialog
@@ -3571,26 +3616,31 @@ function ReferenceBalancePaymentDialog({
           </div>
         </div>
         <div className="grid grid-cols-4 gap-2">
-          {methods.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => onMethod(option.value)}
-              className={`flex h-10 items-center justify-center gap-1 rounded-xl border text-xs font-semibold ${method === option.value ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white' : 'border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]'}`}
-            >
-              {option.icon}
-              <span className="hidden sm:inline">{label(option.value)}</span>
-            </button>
-          ))}
+          {methods.map((option) => {
+            const routeAvailable = routeByMethod.has(option.value);
+            const disabled = isPaymentRoutesPending || !routeAvailable;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                disabled={disabled}
+                onClick={() => onMethod(option.value)}
+                className={`flex h-10 items-center justify-center gap-1 rounded-xl border text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${method === option.value ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white' : 'border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]'}`}
+              >
+                {option.icon}
+                <span className="hidden sm:inline">{label(option.value)}</span>
+              </button>
+            );
+          })}
         </div>
         {needsProvider ? (
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {providerOptions.map((option) => (
               <button
                 key={option}
                 type="button"
                 onClick={() => onProvider(option)}
-                className={`h-9 rounded-lg border text-xs font-semibold ${provider === option ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]'}`}
+                className={`h-9 rounded-lg border px-3 text-xs font-semibold ${provider === option ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]'}`}
               >
                 {option}
               </button>
@@ -3613,9 +3663,16 @@ function ReferenceBalancePaymentDialog({
             ) : null}
           </label>
         ) : (
-          <p className="rounded-xl border border-[var(--color-brand)]/20 bg-[var(--color-brand)]/5 p-3 text-xs text-[var(--color-text-muted)]">
-            {copy('Record payment')} {label(method)} {money(balanceDue, locale)}.
-          </p>
+          <div className="rounded-xl border border-[var(--color-brand)]/20 bg-[var(--color-brand)]/5 p-3 text-xs text-[var(--color-text-muted)]">
+            <p>
+              {copy('Record payment')} {label(method)} {money(balanceDue, locale)}.
+            </p>
+            {activeRoute ? (
+              <p className="mt-1 font-semibold text-[var(--color-text)]">
+                {activeRoute.financialAccountName}
+              </p>
+            ) : null}
+          </div>
         )}
       </div>
     </Dialog>
