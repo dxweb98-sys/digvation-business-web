@@ -1,5 +1,5 @@
 import { useRuntime } from '@digvation/business-runtime';
-import { DAvatar, DBadge, DButton, DDropdown } from '@digvation/ui';
+import { DAvatar, DButton, DDropdown } from '@digvation/ui';
 import {
   BadgePercent,
   BookOpen,
@@ -230,12 +230,6 @@ export function BackofficeShell() {
               className="backoffice-shell__header-metadata hidden h-5 w-px bg-[var(--color-border)] md:block"
               aria-hidden="true"
             />
-            <DBadge
-              variant="outline"
-              className="backoffice-shell__header-workspace hidden md:inline-flex"
-            >
-              {session.identity.workspace}
-            </DBadge>
             <span className="backoffice-shell__header-status hidden items-center gap-1.5 text-xs text-[var(--color-text-muted)] md:flex">
               <span
                 className="size-1.5 rounded-full bg-[var(--color-success)]"

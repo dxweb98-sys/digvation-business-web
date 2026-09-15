@@ -1,12 +1,7 @@
 import { useRuntime } from '@digvation/business-runtime';
 import { DCard } from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
-import {
-  CircleDollarSign,
-  Hash,
-  PackageCheck,
-  ReceiptText,
-} from 'lucide-react';
+import { CircleDollarSign, Hash, PackageCheck, ReceiptText } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { BackofficePage } from '../../app/layout/backoffice-page';
@@ -67,17 +62,12 @@ function recentRange(days: number, date = new Date()): DateRange {
   return { from: localDateKey(from), to };
 }
 
-function previousRange(
-  from: string,
-  to: string,
-): Pick<DashboardFilterState, 'from' | 'to'> {
+function previousRange(from: string, to: string): Pick<DashboardFilterState, 'from' | 'to'> {
   const start = Date.parse(`${from}T00:00:00Z`);
   const end = Date.parse(`${to}T00:00:00Z`);
   const spanDays = Math.max(1, Math.round((end - start) / DAY_MS) + 1);
   const previousEnd = new Date(start - DAY_MS);
-  const previousStart = new Date(
-    previousEnd.getTime() - (spanDays - 1) * DAY_MS,
-  );
+  const previousStart = new Date(previousEnd.getTime() - (spanDays - 1) * DAY_MS);
   return {
     from: previousStart.toISOString().slice(0, 10),
     to: previousEnd.toISOString().slice(0, 10),
@@ -122,8 +112,7 @@ function welcomeCopy(locale: 'id' | 'en', name: string, hour: number) {
     };
   }
 
-  const greeting =
-    hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
   return {
     greeting: `${greeting}, ${name}!`,
     title: "Here's your business overview",
@@ -156,10 +145,7 @@ export function DashboardPage() {
 
   const showTopItems = canShowDashboardWidget(session, 'TOP_ITEMS');
   const showPaymentMix = canShowDashboardWidget(session, 'PAYMENT_MIX');
-  const showRecentTransactions = canShowDashboardWidget(
-    session,
-    'RECENT_TRANSACTIONS',
-  );
+  const showRecentTransactions = canShowDashboardWidget(session, 'RECENT_TRANSACTIONS');
   const showTopEmployees = canShowDashboardWidget(session, 'TOP_EMPLOYEES');
   const showBusinessInsight = canShowDashboardWidget(session, 'BUSINESS_INSIGHT');
 
@@ -204,12 +190,7 @@ export function DashboardPage() {
     enabled: reportEnabled,
   });
   const previousActivityPerformance = useQuery({
-    queryKey: [
-      'dashboard',
-      'business-performance',
-      'previous-activity',
-      previousActivityFilters,
-    ],
+    queryKey: ['dashboard', 'business-performance', 'previous-activity', previousActivityFilters],
     queryFn: () => api.report('business-performance', previousActivityFilters),
     enabled: reportEnabled,
   });
@@ -224,12 +205,7 @@ export function DashboardPage() {
     enabled: Boolean(reportEnabled && (showPaymentMix || showBusinessInsight)),
   });
   const previousMonthPerformance = useQuery({
-    queryKey: [
-      'dashboard',
-      'business-performance',
-      'previous-month',
-      previousMonthFilters,
-    ],
+    queryKey: ['dashboard', 'business-performance', 'previous-month', previousMonthFilters],
     queryFn: () => api.report('business-performance', previousMonthFilters),
     enabled: Boolean(reportEnabled && showBusinessInsight),
   });
@@ -241,9 +217,7 @@ export function DashboardPage() {
   const employeePerformance = useQuery({
     queryKey: ['dashboard', 'employee-performance', monthFilters],
     queryFn: () => api.report('employee-performance', monthFilters, 5),
-    enabled: Boolean(
-      session && canReadEmployees && locationReady && showTopEmployees,
-    ),
+    enabled: Boolean(session && canReadEmployees && locationReady && showTopEmployees),
   });
 
   if (!session) return null;
@@ -262,8 +236,7 @@ export function DashboardPage() {
   };
   const money = (value: DashboardRow[string] | undefined) =>
     formatMoney(String(value ?? 0), runtime.currency);
-  const moneyNumber = (value: number) =>
-    formatMoney(String(value), runtime.currency);
+  const moneyNumber = (value: number) => formatMoney(String(value), runtime.currency);
 
   const todayData = todayPerformance.data;
   const yesterdayData = yesterdayPerformance.data;
@@ -282,40 +255,29 @@ export function DashboardPage() {
   const quantityToday = numberValue(todayData?.summary.quantitySold);
   const quantityYesterday = numberValue(yesterdayData?.summary.quantitySold);
   const activityRevenue = numberValue(activityData?.summary.finalRevenue);
-  const previousActivityRevenue = numberValue(
-    previousActivityData?.summary.finalRevenue,
-  );
+  const previousActivityRevenue = numberValue(previousActivityData?.summary.finalRevenue);
   const activityTransactions = numberValue(activityData?.summary.transactionCount);
-  const previousActivityTransactions = numberValue(
-    previousActivityData?.summary.transactionCount,
-  );
-  const transactionTotalToday = numberValue(
-    todayTransactionData?.summary.transactionCount,
-  );
+  const previousActivityTransactions = numberValue(previousActivityData?.summary.transactionCount);
+  const transactionTotalToday = numberValue(todayTransactionData?.summary.transactionCount);
   const finalizedToday = numberValue(todayTransactionData?.summary.finalizedCount);
   const voidedToday = numberValue(todayTransactionData?.summary.voidedCount);
 
   const paymentMix =
-    monthData?.analytics.breakdowns?.paymentMethod ??
-    monthData?.analytics.breakdown ??
-    [];
+    monthData?.analytics.breakdowns?.paymentMethod ?? monthData?.analytics.breakdown ?? [];
   const recentTransactions = lastTransactions.data?.items ?? [];
   const topItems = (catalogPerformance.data?.items ?? []).slice(0, 5).map((row) => ({
     label: String(row.itemName ?? '—'),
     secondary: `${formatInteger(numberValue(row.quantitySold))} ${text('sold')} · ${formatInteger(numberValue(row.transactionCount))} ${text('txShort')}`,
     value: money(row.finalRevenue),
   }));
-  const topEmployees = (employeePerformance.data?.items ?? [])
-    .slice(0, 5)
-    .map((row) => ({
-      label: String(row.employeeName ?? '—'),
-      secondary: `${formatInteger(numberValue(row.contributedTransactions))} ${text('txShort')} · ${String(row.topCatalogItem ?? '—')}`,
-      value: money(row.contributionRevenue),
-    }));
+  const topEmployees = (employeePerformance.data?.items ?? []).slice(0, 5).map((row) => ({
+    label: String(row.employeeName ?? '—'),
+    secondary: `${formatInteger(numberValue(row.contributedTransactions))} ${text('txShort')} · ${String(row.topCatalogItem ?? '—')}`,
+    value: money(row.contributionRevenue),
+  }));
 
   const firstName =
-    session.identity.displayName.trim().split(/\s+/)[0] ||
-    (locale === 'id' ? 'Pengguna' : 'there');
+    session.identity.displayName.trim().split(/\s+/)[0] || (locale === 'id' ? 'Pengguna' : 'there');
   const welcome = welcomeCopy(locale, firstName, new Date().getHours());
 
   const transactionReportHref = canAccessReport(session, 'transactions')
@@ -337,9 +299,7 @@ export function DashboardPage() {
   return (
     <BackofficePage>
       <section className="pt-2">
-        <p className="text-sm font-medium text-[var(--color-text-muted)]">
-          {welcome.greeting}
-        </p>
+        <p className="text-sm font-medium text-[var(--color-text-muted)]">{welcome.greeting}</p>
         <h1 className="mt-1 text-[clamp(1.65rem,2vw,2.15rem)] font-semibold tracking-[-0.035em] text-[var(--color-text)]">
           {welcome.title}
         </h1>
@@ -429,9 +389,7 @@ export function DashboardPage() {
                 { value: 'month', label: text('thisMonth') },
                 { value: 'year', label: text('thisYear') },
               ]}
-              onPeriodChange={(value) =>
-                setActivityPeriod(value as ActivityPeriod)
-              }
+              onPeriodChange={(value) => setActivityPeriod(value as ActivityPeriod)}
               revenue={activityRevenue}
               transactions={activityTransactions}
               previousRevenue={previousActivityRevenue}

@@ -7,24 +7,23 @@ import {
   DDataTable,
   DDialog,
   DInput,
+  DTabs,
+  DTabsContent,
+  DTabsList,
+  DTabsTrigger,
   useToast,
   type TableColumn,
 } from '@digvation/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ban, Pencil, Plus, RefreshCw, UserCog, UserPlus } from 'lucide-react';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState } from 'react';
 
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
-import {
-  BackofficePage,
-  BackofficePageHeader,
-} from '../../app/layout/backoffice-page';
+import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
 import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
+import { permissionLabel } from '../../app/localization/human-readable-labels';
 import { canPerformBackofficeAction } from '../../auth/backoffice-access';
-import {
-  isSessionExpiredError,
-  useBackofficeAuth,
-} from '../../auth/backoffice-auth-context';
+import { isSessionExpiredError, useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import {
   AccessControlApi,
   type AccessRole,
@@ -45,11 +44,26 @@ const keys = {
 const pageSize = 50;
 type Section = 'roles' | 'users' | 'invitations';
 
+const accessCopy = {
+  pageDescription: {
+    id: 'Kelola pengguna, peran, undangan, izin, dan akses lokasi.',
+    en: 'Manage users, roles, invitations, permissions, and location access.',
+  },
+  protectedRole: {
+    id: 'Peran sistem tidak dapat diubah.',
+    en: 'System roles cannot be changed.',
+  },
+  invitationDescription: {
+    id: 'Pengguna akan mengaktifkan akun melalui undangan yang dikirim.',
+    en: 'The user activates the account through the invitation.',
+  },
+} as const;
+
 export function AccessControlPage() {
   const { session, createApiClient } = useBackofficeAuth();
   const runtime = useRuntime();
   const queryClient = useQueryClient();
-  const { copy } = useBackofficeLocalization();
+  const { copy, locale } = useBackofficeLocalization();
   const api = useMemo(
     () => new AccessControlApi(createApiClient(runtime.apiBaseUrl)),
     [createApiClient, runtime.apiBaseUrl],
@@ -59,24 +73,14 @@ export function AccessControlPage() {
     [createApiClient, runtime.apiBaseUrl],
   );
 
-  const canViewUsers = Boolean(
-    session && canPerformBackofficeAction(session, 'viewUsers'),
-  );
-  const canInviteUsers = Boolean(
-    session && canPerformBackofficeAction(session, 'inviteUsers'),
-  );
-  const canCreateRole = Boolean(
-    session && canPerformBackofficeAction(session, 'createRole'),
-  );
-  const canUpdateRole = Boolean(
-    session && canPerformBackofficeAction(session, 'updateRole'),
-  );
+  const canViewUsers = Boolean(session && canPerformBackofficeAction(session, 'viewUsers'));
+  const canInviteUsers = Boolean(session && canPerformBackofficeAction(session, 'inviteUsers'));
+  const canCreateRole = Boolean(session && canPerformBackofficeAction(session, 'createRole'));
+  const canUpdateRole = Boolean(session && canPerformBackofficeAction(session, 'updateRole'));
   const canManagePermissions = Boolean(
     session && canPerformBackofficeAction(session, 'manageRolePermissions'),
   );
-  const canManageUsers = Boolean(
-    session && canPerformBackofficeAction(session, 'manageUserRoles'),
-  );
+  const canManageUsers = Boolean(session && canPerformBackofficeAction(session, 'manageUserRoles'));
   const canViewLocations = Boolean(
     session && canPerformBackofficeAction(session, 'viewOperationalAccess'),
   );
@@ -89,8 +93,7 @@ export function AccessControlPage() {
   const [deactivatingRole, setDeactivatingRole] = useState<AccessRole | null>(null);
   const [editingUser, setEditingUser] = useState<AccessUser | null>(null);
   const [inviting, setInviting] = useState(false);
-  const [revokingInvitation, setRevokingInvitation] =
-    useState<UserInvitation | null>(null);
+  const [revokingInvitation, setRevokingInvitation] = useState<UserInvitation | null>(null);
 
   const roles = useQuery({
     queryKey: keys.roles,
@@ -134,33 +137,25 @@ export function AccessControlPage() {
       <BackofficePageHeader
         eyebrow={copy('Configuration')}
         title={copy('Access Control')}
-        description={copy(
-          'Manage business users, roles, invitations, permissions, and operational location access.',
-        )}
+        description={accessCopy.pageDescription[locale]}
         actions={actions}
       />
 
-      <div className="mt-7 flex gap-1 border-b border-[var(--color-border)]">
-        <SectionButton active={section === 'roles'} onClick={() => setSection('roles')}>
-          {copy('Roles')}
-        </SectionButton>
-        {canViewUsers ? (
-          <SectionButton active={section === 'users'} onClick={() => setSection('users')}>
-            {copy('Users')}
-          </SectionButton>
-        ) : null}
-        {canViewUsers ? (
-          <SectionButton
-            active={section === 'invitations'}
-            onClick={() => setSection('invitations')}
-          >
-            {copy('Invitations')}
-          </SectionButton>
-        ) : null}
-      </div>
+      <DTabs
+        defaultValue="roles"
+        value={section}
+        onValueChange={(value) => setSection(value as Section)}
+        className="mt-6"
+      >
+        <DTabsList className="max-w-full overflow-x-auto">
+          <DTabsTrigger value="roles">{copy('Roles')}</DTabsTrigger>
+          {canViewUsers ? <DTabsTrigger value="users">{copy('Users')}</DTabsTrigger> : null}
+          {canViewUsers ? (
+            <DTabsTrigger value="invitations">{copy('Invitations')}</DTabsTrigger>
+          ) : null}
+        </DTabsList>
 
-      <div className="mt-5">
-        {section === 'roles' ? (
+        <DTabsContent value="roles" className="mt-4">
           <RolesTable
             roles={roles.data?.items ?? []}
             loading={roles.isLoading}
@@ -169,26 +164,30 @@ export function AccessControlPage() {
             onEdit={setEditingRole}
             onDeactivate={setDeactivatingRole}
           />
+        </DTabsContent>
+        {canViewUsers ? (
+          <DTabsContent value="users" className="mt-4">
+            <UsersTable
+              users={users.data?.items ?? []}
+              loading={users.isLoading}
+              canEdit={canManageUsers || canManageLocations}
+              onEdit={setEditingUser}
+            />
+          </DTabsContent>
         ) : null}
-        {section === 'users' && canViewUsers ? (
-          <UsersTable
-            users={users.data?.items ?? []}
-            loading={users.isLoading}
-            canEdit={canManageUsers || canManageLocations}
-            onEdit={setEditingUser}
-          />
+        {canViewUsers ? (
+          <DTabsContent value="invitations" className="mt-4">
+            <InvitationsTable
+              invitations={invitations.data?.items ?? []}
+              loading={invitations.isLoading}
+              canManage={canInviteUsers}
+              api={api}
+              onChanged={() => invalidate(keys.invitations)}
+              onRevoke={setRevokingInvitation}
+            />
+          </DTabsContent>
         ) : null}
-        {section === 'invitations' && canViewUsers ? (
-          <InvitationsTable
-            invitations={invitations.data?.items ?? []}
-            loading={invitations.isLoading}
-            canManage={canInviteUsers}
-            api={api}
-            onChanged={() => invalidate(keys.invitations)}
-            onRevoke={setRevokingInvitation}
-          />
-        ) : null}
-      </div>
+      </DTabs>
 
       {editingRole !== undefined ? (
         <RoleEditor
@@ -230,12 +229,10 @@ export function AccessControlPage() {
         onClose={() => setDeactivatingRole(null)}
         onConfirm={() => {
           if (!deactivatingRole) return;
-          void api
-            .deactivateRole(deactivatingRole)
-            .then(() => {
-              invalidate(keys.roles);
-              setDeactivatingRole(null);
-            });
+          void api.deactivateRole(deactivatingRole).then(() => {
+            invalidate(keys.roles);
+            setDeactivatingRole(null);
+          });
         }}
         title={copy('Deactivate role?')}
         message={copy("Users will no longer receive this role's permissions.")}
@@ -247,12 +244,10 @@ export function AccessControlPage() {
         onClose={() => setRevokingInvitation(null)}
         onConfirm={() => {
           if (!revokingInvitation) return;
-          void api
-            .revokeInvitation(revokingInvitation.id)
-            .then(() => {
-              invalidate(keys.invitations);
-              setRevokingInvitation(null);
-            });
+          void api.revokeInvitation(revokingInvitation.id).then(() => {
+            invalidate(keys.invitations);
+            setRevokingInvitation(null);
+          });
         }}
         title={copy('Revoke invitation?')}
         message={copy('The pending invitation can no longer be used to activate an account.')}
@@ -260,30 +255,6 @@ export function AccessControlPage() {
         variant="danger"
       />
     </BackofficePage>
-  );
-}
-
-function SectionButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
-        active
-          ? 'border-[var(--color-brand)] text-[var(--color-text)]'
-          : 'border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
-      }`}
-    >
-      {children}
-    </button>
   );
 }
 
@@ -318,7 +289,7 @@ function RolesTable({
       key: 'status',
       label: copy('Status'),
       render: (role) => (
-        <DBadge variant={role.status === 'ACTIVE' ? 'outline' : 'secondary'}>
+        <DBadge variant={role.status === 'ACTIVE' ? 'success' : 'secondary'}>
           {copy(role.status === 'ACTIVE' ? 'Active' : 'Inactive')}
         </DBadge>
       ),
@@ -374,21 +345,23 @@ function UsersTable({
       render: (user) => (
         <div>
           <p className="font-medium">{user.displayName}</p>
-          <p className="text-xs text-[var(--color-text-muted)]">
-            {user.username ?? '—'}
-          </p>
+          <p className="text-xs text-[var(--color-text-muted)]">{user.username ?? '-'}</p>
         </div>
       ),
     },
     {
       key: 'roles',
       label: copy('Roles'),
-      render: (user) => user.roles.map((role) => role.name).join(', ') || '—',
+      render: (user) => user.roles.map((role) => role.name).join(', ') || '-',
     },
     {
       key: 'status',
       label: copy('Status'),
-      render: (user) => <DBadge variant="outline">{copy(user.status)}</DBadge>,
+      render: (user) => (
+        <DBadge variant={user.status === 'ACTIVE' ? 'success' : 'secondary'}>
+          {copy(user.status === 'ACTIVE' ? 'Active' : 'Inactive')}
+        </DBadge>
+      ),
     },
   ];
   return (
@@ -425,7 +398,7 @@ function InvitationsTable({
   onChanged: () => void;
   onRevoke: (invitation: UserInvitation) => void;
 }) {
-  const { copy } = useBackofficeLocalization();
+  const { copy, formatDate } = useBackofficeLocalization();
   const { showToast } = useToast();
   const columns: TableColumn<UserInvitation>[] = [
     {
@@ -434,35 +407,34 @@ function InvitationsTable({
       render: (invitation) => (
         <div>
           <p className="font-medium">{invitation.displayName}</p>
-          <p className="text-xs text-[var(--color-text-muted)]">
-            {invitation.phoneE164}
-          </p>
+          <p className="text-xs text-[var(--color-text-muted)]">{invitation.phoneE164}</p>
         </div>
       ),
     },
     {
       key: 'roles',
       label: copy('Roles'),
-      render: (invitation) =>
-        invitation.roles.map((role) => role.name).join(', ') || '—',
+      render: (invitation) => invitation.roles.map((role) => role.name).join(', ') || '-',
     },
     {
       key: 'expiresAt',
       label: copy('Expires'),
-      render: (invitation) => new Date(invitation.expiresAt).toLocaleString(),
+      render: (invitation) =>
+        formatDate(new Date(invitation.expiresAt), {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        }),
     },
     {
       key: 'acceptedAt',
       label: copy('Status'),
       render: (invitation) => (
-        <DBadge variant={invitation.acceptedAt ? 'outline' : 'secondary'}>
-          {copy(
-            invitation.acceptedAt
-              ? 'Accepted'
-              : invitation.revokedAt
-                ? 'Revoked'
-                : 'Pending',
-          )}
+        <DBadge
+          variant={
+            invitation.acceptedAt ? 'success' : invitation.revokedAt ? 'secondary' : 'warning'
+          }
+        >
+          {copy(invitation.acceptedAt ? 'Accepted' : invitation.revokedAt ? 'Revoked' : 'Pending')}
         </DBadge>
       ),
     },
@@ -477,7 +449,8 @@ function InvitationsTable({
       if (!isSessionExpiredError(error))
         showToast({
           variant: 'danger',
-          title: normalizeBackofficeApiError(error, copy('Could not resend invitation.')).safeMessage,
+          title: normalizeBackofficeApiError(error, copy('Could not resend invitation.'))
+            .safeMessage,
         });
     }
   };
@@ -505,8 +478,7 @@ function InvitationsTable({
           icon: <Ban className="size-4" />,
           variant: 'danger',
           onClick: onRevoke,
-          show: (invitation) =>
-            canManage && !invitation.acceptedAt && !invitation.revokedAt,
+          show: (invitation) => canManage && !invitation.acceptedAt && !invitation.revokedAt,
         },
       ]}
     />
@@ -530,7 +502,7 @@ function RoleEditor({
   onClose: () => void;
   onChanged: () => void;
 }) {
-  const { copy } = useBackofficeLocalization();
+  const { copy, locale } = useBackofficeLocalization();
   const { showToast } = useToast();
   const isNew = role === null;
   const [code, setCode] = useState('');
@@ -550,8 +522,7 @@ function RoleEditor({
         let current = role;
         if (canUpdate && name.trim() !== role.name)
           current = await api.updateRole(role, name.trim());
-        if (canManagePermissions)
-          await api.replacePermissions(current, selected);
+        if (canManagePermissions) await api.replacePermissions(current, selected);
       }
       onChanged();
       onClose();
@@ -574,7 +545,9 @@ function RoleEditor({
       footer={
         !role?.systemKey && (isNew || canUpdate || canManagePermissions) ? (
           <div className="flex justify-end gap-2">
-            <DButton variant="secondary" onClick={onClose}>{copy('Cancel')}</DButton>
+            <DButton variant="secondary" onClick={onClose}>
+              {copy('Cancel')}
+            </DButton>
             <DButton onClick={() => void save()} disabled={!name.trim() || (isNew && !code.trim())}>
               {copy('Save role')}
             </DButton>
@@ -586,30 +559,47 @@ function RoleEditor({
         {!role?.systemKey ? (
           <div className="grid gap-4 sm:grid-cols-2">
             {isNew ? (
-              <DInput label={copy('Role code')} value={code} onChange={(value) => setCode(value.toUpperCase())} />
+              <DInput
+                label={copy('Role code')}
+                value={code}
+                onChange={(value) => setCode(value.toUpperCase())}
+                placeholder={copy('For example, MANAGER')}
+              />
             ) : null}
-            <DInput label={copy('Role name')} value={name} onChange={setName} disabled={!isNew && !canUpdate} />
+            <DInput
+              label={copy('Role name')}
+              value={name}
+              onChange={setName}
+              disabled={!isNew && !canUpdate}
+              placeholder={copy('For example, Store Manager')}
+            />
           </div>
         ) : (
           <p className="text-sm text-[var(--color-text-muted)]">
-            {copy('System roles are protected by the Business Runtime authorization policy.')}
+            {accessCopy.protectedRole[locale]}
           </p>
         )}
-        <div>
+        <section className="border-t border-[var(--color-border)] pt-4">
           <p className="text-sm font-semibold">{copy('Permissions')}</p>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <div className="mt-3 divide-y divide-[var(--color-border)] border-y border-[var(--color-border)]">
             {permissions.map((permission) => (
-              <label key={permission} className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm">
+              <label key={permission} className="flex items-center gap-3 py-2.5 text-sm">
                 <DCheckbox
                   checked={selected.includes(permission)}
-                  onChange={() => setSelected((values) => values.includes(permission) ? values.filter((item) => item !== permission) : [...values, permission])}
+                  onChange={() =>
+                    setSelected((values) =>
+                      values.includes(permission)
+                        ? values.filter((item) => item !== permission)
+                        : [...values, permission],
+                    )
+                  }
                   disabled={Boolean(role?.systemKey) || (!isNew && !canManagePermissions)}
                 />
-                {permission}
+                <span className="min-w-0 break-words">{permissionLabel(permission, locale)}</span>
               </label>
             ))}
           </div>
-        </div>
+        </section>
       </div>
     </DDialog>
   );
@@ -638,8 +628,8 @@ function UserEditor({
 }) {
   const { copy } = useBackofficeLocalization();
   const { showToast } = useToast();
-  const [selectedRoles, setSelectedRoles] = useState<string[]>(() =>
-    user?.roles.map((role) => role.id) ?? [],
+  const [selectedRoles, setSelectedRoles] = useState<string[]>(
+    () => user?.roles.map((role) => role.id) ?? [],
   );
   const [selectedLocations, setSelectedLocations] = useState<string[] | null>(null);
 
@@ -658,8 +648,7 @@ function UserEditor({
   const save = async () => {
     if (!user) return;
     try {
-      if (canManageRoles)
-        await api.replaceUserRoles(user, selectedRoles);
+      if (canManageRoles) await api.replaceUserRoles(user, selectedRoles);
       if (canManageLocations)
         await operationalAccess.replaceUserLocations(user.id, effectiveSelectedLocations);
       onChanged();
@@ -669,7 +658,8 @@ function UserEditor({
       if (!isSessionExpiredError(error))
         showToast({
           variant: 'danger',
-          title: normalizeBackofficeApiError(error, copy('Could not update user access.')).safeMessage,
+          title: normalizeBackofficeApiError(error, copy('Could not update user access.'))
+            .safeMessage,
         });
     }
   };
@@ -686,7 +676,9 @@ function UserEditor({
       footer={
         !isOwner && (canManageRoles || canManageLocations) ? (
           <div className="flex justify-end gap-2">
-            <DButton variant="secondary" onClick={onClose}>{copy('Cancel')}</DButton>
+            <DButton variant="secondary" onClick={onClose}>
+              {copy('Cancel')}
+            </DButton>
             <DButton onClick={() => void save()}>{copy('Save access')}</DButton>
           </div>
         ) : null
@@ -700,15 +692,24 @@ function UserEditor({
         <div className="space-y-6">
           <SelectionList
             title={copy('Roles')}
-            items={roles.filter((role) => role.status === 'ACTIVE').map((role) => ({ id: role.id, label: role.name }))}
+            items={roles
+              .filter((role) => role.status === 'ACTIVE')
+              .map((role) => ({ id: role.id, label: role.name }))}
             selected={selectedRoles}
             disabled={!canManageRoles}
-            onToggle={(id) => setSelectedRoles((values) => values.includes(id) ? values.filter((item) => item !== id) : [...values, id])}
+            onToggle={(id) =>
+              setSelectedRoles((values) =>
+                values.includes(id) ? values.filter((item) => item !== id) : [...values, id],
+              )
+            }
           />
           {canViewLocations ? (
             <SelectionList
               title={copy('Location Access')}
-              items={locations.map((location) => ({ id: location.id, label: `${location.code} — ${location.name}` }))}
+              items={locations.map((location) => ({
+                id: location.id,
+                label: `${location.code}, ${location.name}`,
+              }))}
               selected={effectiveSelectedLocations}
               disabled={!canManageLocations}
               onToggle={(id) =>
@@ -738,7 +739,7 @@ function InvitationDialog({
   onClose: () => void;
   onChanged: () => void;
 }) {
-  const { copy } = useBackofficeLocalization();
+  const { copy, locale } = useBackofficeLocalization();
   const { showToast } = useToast();
   const [phone, setPhone] = useState('');
   const [username, setUsername] = useState('');
@@ -764,7 +765,8 @@ function InvitationDialog({
       if (!isSessionExpiredError(error))
         showToast({
           variant: 'danger',
-          title: normalizeBackofficeApiError(error, copy('Could not create invitation.')).safeMessage,
+          title: normalizeBackofficeApiError(error, copy('Could not create invitation.'))
+            .safeMessage,
         });
     } finally {
       setSaving(false);
@@ -776,34 +778,59 @@ function InvitationDialog({
       open
       onClose={onClose}
       title={copy('Invite user')}
-      description={copy('Use the existing Runtime invitation contract. The user activates the account through the invitation flow.')}
+      description={accessCopy.invitationDescription[locale]}
       size="lg"
       footer={
         <div className="flex justify-end gap-2">
-          <DButton variant="secondary" onClick={onClose}>{copy('Cancel')}</DButton>
-          <DButton onClick={() => void save()} disabled={!valid || saving}>{copy('Send invitation')}</DButton>
+          <DButton variant="secondary" onClick={onClose}>
+            {copy('Cancel')}
+          </DButton>
+          <DButton onClick={() => void save()} disabled={!valid || saving}>
+            {copy('Send invitation')}
+          </DButton>
         </div>
       }
     >
       <div className="grid gap-4 sm:grid-cols-2">
-        <DInput label={copy('Phone (E.164)')} value={phone} onChange={setPhone} placeholder="+628111111111" />
-        <DInput label={copy('Username (optional)')} value={username} onChange={setUsername} />
-        <DInput label={copy('Display name')} value={displayName} onChange={setDisplayName} />
+        <DInput
+          label={copy('Phone (E.164)')}
+          value={phone}
+          onChange={setPhone}
+          placeholder="+628111111111"
+        />
+        <DInput
+          label={copy('Username (optional)')}
+          value={username}
+          onChange={setUsername}
+          placeholder={copy('For example, cashier.main')}
+        />
+        <DInput
+          label={copy('Display name')}
+          value={displayName}
+          onChange={setDisplayName}
+          placeholder={copy('For example, Siti Rahma')}
+        />
       </div>
-      <div className="mt-5">
+      <section className="mt-5 border-t border-[var(--color-border)] pt-4">
         <p className="text-sm font-semibold">{copy('Roles')}</p>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        <div className="mt-3 divide-y divide-[var(--color-border)] border-y border-[var(--color-border)]">
           {roles.map((role) => (
-            <label key={role.id} className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm">
+            <label key={role.id} className="flex items-center gap-3 py-2.5 text-sm">
               <DCheckbox
                 checked={roleIds.includes(role.id)}
-                onChange={() => setRoleIds((values) => values.includes(role.id) ? values.filter((item) => item !== role.id) : [...values, role.id])}
+                onChange={() =>
+                  setRoleIds((values) =>
+                    values.includes(role.id)
+                      ? values.filter((item) => item !== role.id)
+                      : [...values, role.id],
+                  )
+                }
               />
-              {role.name}
+              <span className="min-w-0 break-words">{role.name}</span>
             </label>
           ))}
         </div>
-      </div>
+      </section>
     </DDialog>
   );
 }
@@ -822,20 +849,20 @@ function SelectionList({
   onToggle: (id: string) => void;
 }) {
   return (
-    <div>
+    <section>
       <p className="text-sm font-semibold">{title}</p>
-      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+      <div className="mt-3 divide-y divide-[var(--color-border)] border-y border-[var(--color-border)]">
         {items.map((item) => (
-          <label key={item.id} className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm">
+          <label key={item.id} className="flex items-center gap-3 py-2.5 text-sm">
             <DCheckbox
               checked={selected.includes(item.id)}
               onChange={() => onToggle(item.id)}
               disabled={disabled}
             />
-            {item.label}
+            <span className="min-w-0 break-words">{item.label}</span>
           </label>
         ))}
       </div>
-    </div>
+    </section>
   );
 }

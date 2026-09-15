@@ -33,10 +33,7 @@ export function BackofficeLoginPage() {
       setError(t('signInFailed'));
       showToast({
         variant: 'danger',
-        title: normalizeBackofficeApiError(
-          failure,
-          t('signInFailed'),
-        ).safeMessage,
+        title: normalizeBackofficeApiError(failure, t('signInFailed')).safeMessage,
       });
     } finally {
       setSubmitting(false);
@@ -51,7 +48,7 @@ export function BackofficeLoginPage() {
         </p>
         <h1 className="mt-3 text-2xl font-bold">{t('signInToBackoffice')}</h1>
         <p className="mt-2 text-sm text-[var(--color-text-muted)]">
-          {runtime.branding.businessName ?? runtime.workspace}
+          {runtime.branding.businessName ?? 'Backoffice'}
         </p>
         <form className="mt-7 space-y-4" onSubmit={submit}>
           <DInput

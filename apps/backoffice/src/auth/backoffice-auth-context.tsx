@@ -30,8 +30,7 @@ interface BackofficeAuthContextValue {
 }
 
 const BackofficeAuthContext = createContext<BackofficeAuthContextValue | null>(null);
-const BUSINESS_CONFIGURATION_CHANGED_EVENT =
-  'digvation:business-configuration-changed';
+const BUSINESS_CONFIGURATION_CHANGED_EVENT = 'digvation:business-configuration-changed';
 const SESSION_END_TRANSITION_MS = 5_000;
 const IDLE_SESSION_ENDED_MESSAGE =
   'Sesi Anda telah berakhir karena tidak ada aktivitas. Silakan masuk kembali.';
@@ -135,15 +134,9 @@ export function BackofficeAuthProvider({
     const handleConfigurationChanged = () => {
       void refresh();
     };
-    window.addEventListener(
-      BUSINESS_CONFIGURATION_CHANGED_EVENT,
-      handleConfigurationChanged,
-    );
+    window.addEventListener(BUSINESS_CONFIGURATION_CHANGED_EVENT, handleConfigurationChanged);
     return () =>
-      window.removeEventListener(
-        BUSINESS_CONFIGURATION_CHANGED_EVENT,
-        handleConfigurationChanged,
-      );
+      window.removeEventListener(BUSINESS_CONFIGURATION_CHANGED_EVENT, handleConfigurationChanged);
   }, [refresh]);
 
   const getAccessToken = useCallback(() => auth.getAccessToken(), [auth]);

@@ -15,11 +15,7 @@ export type ReportType =
   | 'locations';
 
 export type DashboardWidget =
-  | 'TOP_ITEMS'
-  | 'PAYMENT_MIX'
-  | 'RECENT_TRANSACTIONS'
-  | 'TOP_EMPLOYEES'
-  | 'BUSINESS_INSIGHT';
+  'TOP_ITEMS' | 'PAYMENT_MIX' | 'RECENT_TRANSACTIONS' | 'TOP_EMPLOYEES' | 'BUSINESS_INSIGHT';
 
 const REPORT_PERMISSION: Record<ReportType, string> = {
   'business-performance': 'sales:read',
@@ -59,25 +55,16 @@ const DASHBOARD_REPORT: Record<DashboardWidget, ReportType> = {
  * Effective permissions have already been intersected with product,
  * capability, foundation and RBAC availability by Business Runtime.
  */
-export function isReportAvailable(
-  session: BackofficeSession | null,
-  type: ReportType,
-): boolean {
+export function isReportAvailable(session: BackofficeSession | null, type: ReportType): boolean {
   if (!session) return false;
   if (!session.identity.permissions.includes(REPORT_PERMISSION[type])) return false;
-  if (
-    POS_REPORTS.has(type) &&
-    !session.effectiveEntitlements.products.includes('POS')
-  )
+  if (POS_REPORTS.has(type) && !session.effectiveEntitlements.products.includes('POS'))
     return false;
   return true;
 }
 
 /** Compatibility name used by report routes and selectors. */
-export function canAccessReport(
-  session: BackofficeSession | null,
-  type: ReportType,
-): boolean {
+export function canAccessReport(session: BackofficeSession | null, type: ReportType): boolean {
   return isReportAvailable(session, type);
 }
 

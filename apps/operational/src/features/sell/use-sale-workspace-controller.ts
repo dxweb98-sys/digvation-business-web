@@ -4,6 +4,10 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 
+import {
+  operationalCopy,
+  resolveOperationalLocale,
+} from '../../app/localization/operational-localization';
 import type { SaleTransactionClient } from './cashier-transaction.adapter';
 import {
   addCartDraftSelection,
@@ -57,6 +61,7 @@ interface UseSaleWorkspaceControllerOptions {
   routeSaleId?: string;
   selectedLocationId: string | null;
   currency: string;
+  locale: string;
   connectivity: ConnectivityState;
   selectLocation: (locationId: string | null) => void;
   rememberSale: (saleId: string) => void;
@@ -106,11 +111,14 @@ export function useSaleWorkspaceController({
   routeSaleId,
   selectedLocationId,
   currency,
+  locale,
   connectivity,
   selectLocation,
   rememberSale,
 }: UseSaleWorkspaceControllerOptions) {
   const navigate = useNavigate();
+  const operationalLocale = resolveOperationalLocale(locale);
+  const copy = (value: string) => operationalCopy(value, operationalLocale);
   const [retryIntent, setRetryIntent] = useState<AddItemIntent | null>(null);
   const [draft, setDraft] = useState<CartDraft | null>(null);
   const [retryCommitIntent, setRetryCommitIntent] = useState<CommitDraftIntent | null>(null);
@@ -142,7 +150,8 @@ export function useSaleWorkspaceController({
   const addItemMutation = useMutation({
     mutationFn: (intent: AddItemIntent) =>
       command.runMutation(async () => {
-        if (connectivity === 'OFFLINE') throw new Error('Reconnect before changing this Sale.');
+        if (connectivity === 'OFFLINE')
+          throw new Error(copy('Reconnect before changing this transaction.'));
 
         return client.addSaleLine(
           intent.saleId,
@@ -168,7 +177,8 @@ export function useSaleWorkspaceController({
   const commitDraftMutation = useMutation({
     mutationFn: (intent: CommitDraftIntent) =>
       command.runMutation(async () => {
-        if (connectivity === 'OFFLINE') throw new Error('Reconnect before starting this Sale.');
+        if (connectivity === 'OFFLINE')
+          throw new Error(copy('Reconnect before starting a transaction.'));
         return client.startSale(cartDraftStartInput(intent.draft), intent.idempotencyKey);
       }),
     onSuccess: (sale) => {
@@ -192,7 +202,8 @@ export function useSaleWorkspaceController({
       quantity: string;
     }) =>
       command.runMutation(async () => {
-        if (connectivity === 'OFFLINE') throw new Error('Reconnect before changing this Sale.');
+        if (connectivity === 'OFFLINE')
+          throw new Error(copy('Reconnect before changing this transaction.'));
         return client.setSaleLineQuantity(intent.saleId, intent.saleLineId, {
           expectedVersion: intent.expectedVersion,
           quantity: intent.quantity,
@@ -205,7 +216,8 @@ export function useSaleWorkspaceController({
   const removeMutation = useMutation({
     mutationFn: (intent: { saleId: string; saleLineId: string; expectedVersion: number }) =>
       command.runMutation(async () => {
-        if (connectivity === 'OFFLINE') throw new Error('Reconnect before changing this Sale.');
+        if (connectivity === 'OFFLINE')
+          throw new Error(copy('Reconnect before changing this transaction.'));
         return client.removeSaleLine(intent.saleId, intent.saleLineId, intent.expectedVersion);
       }),
     onSuccess: command.commitSale,
@@ -216,6 +228,7 @@ export function useSaleWorkspaceController({
     saleQuery.data ?? null,
     connectivity,
     command.effectiveSynchronization,
+    locale,
   );
 
   const addItem = (
@@ -224,7 +237,7 @@ export function useSaleWorkspaceController({
     configuration?: AddItemConfiguration,
   ) => {
     if (!selectedLocationId) {
-      command.reportError(new Error('Select a Branch before starting a Sale.'));
+      command.reportError(new Error(copy('Select a branch before starting a transaction.')));
       return;
     }
     if (viewModel.monetaryMutation.state !== 'AVAILABLE') return;
@@ -232,7 +245,7 @@ export function useSaleWorkspaceController({
     const currentSale = saleQuery.data;
     if (!currentSale) {
       if (!configuration) {
-        command.reportError(new Error('Resolve the selected price before adding this item.'));
+        command.reportError(new Error(copy('Resolve the selected price before adding this item.')));
         return;
       }
       setRetryCommitIntent(null);
@@ -247,7 +260,7 @@ export function useSaleWorkspaceController({
       return;
     }
     const compatibleLine = configuration
-      ? currentSale?.lines.find((line) => isCompatibleLine(line, catalogVariantId, configuration))
+      ? currentSale.lines.find((line) => isCompatibleLine(line, catalogVariantId, configuration))
       : undefined;
     if (compatibleLine) {
       changeQuantity(compatibleLine, createDecimal(compatibleLine.quantity).plus('1').toFixed(4));
@@ -271,7 +284,7 @@ export function useSaleWorkspaceController({
     if (!sale || viewModel.monetaryMutation.state !== 'AVAILABLE') return;
     if (!isPositiveQuantity(quantity)) {
       command.reportError(
-        new Error('Quantity must be greater than zero with at most four decimal places.'),
+        new Error(copy('Quantity must be greater than zero with up to four decimal places.')),
       );
       return;
     }
@@ -290,7 +303,7 @@ export function useSaleWorkspaceController({
   };
 
   const commitDraft = async () => {
-    if (!draft?.lines.length) throw new Error('Add at least one item before checkout.');
+    if (!draft?.lines.length) throw new Error(copy('Add at least one item before payment.'));
     const intent =
       retryCommitIntent?.draft === draft
         ? retryCommitIntent

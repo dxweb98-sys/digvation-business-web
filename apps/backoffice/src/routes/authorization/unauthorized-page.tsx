@@ -6,5 +6,17 @@ import { useBackofficeLocalization } from '../../app/localization/backoffice-loc
 export function UnauthorizedPage() {
   const navigate = useNavigate();
   const { t } = useBackofficeLocalization();
-  return <BackofficePage><DEmptyState title={t('accessUnavailable')} description={t('accessUnavailableDescription')} action={<DButton variant="secondary" size="sm" onClick={() => navigate('/')}>{t('goToDashboard')}</DButton>} /></BackofficePage>;
+  return (
+    <BackofficePage>
+      <DEmptyState
+        title={t('accessUnavailable')}
+        description={t('accessUnavailableDescription')}
+        action={
+          <DButton variant="secondary" size="sm" onClick={() => navigate('/')}>
+            {t('goToDashboard')}
+          </DButton>
+        }
+      />
+    </BackofficePage>
+  );
 }

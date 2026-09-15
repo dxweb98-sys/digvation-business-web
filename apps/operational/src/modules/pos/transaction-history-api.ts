@@ -32,9 +32,7 @@ export class OperationalTransactionHistoryApi {
   constructor(private readonly client: ApiClient) {}
 
   list(query: Query) {
-    return this.client.get<Page<OperationalSale>>(
-      `/api/v1/sales?${queryString(query)}`,
-    );
+    return this.client.get<Page<OperationalSale>>(`/api/v1/sales?${queryString(query)}`);
   }
 
   get(id: string) {

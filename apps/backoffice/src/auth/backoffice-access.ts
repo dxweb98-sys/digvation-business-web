@@ -143,12 +143,9 @@ export function canAccessBackoffice(
 ): boolean {
   const requirement = capabilityPermissions[capability];
   const permissions = session.identity.permissions;
-  const hasAll = (requirement.allOf ?? []).every((permission) =>
-    permissions.includes(permission),
-  );
+  const hasAll = (requirement.allOf ?? []).every((permission) => permissions.includes(permission));
   const hasAny =
-    !requirement.anyOf ||
-    requirement.anyOf.some((permission) => permissions.includes(permission));
+    !requirement.anyOf || requirement.anyOf.some((permission) => permissions.includes(permission));
   return hasAll && hasAny;
 }
 

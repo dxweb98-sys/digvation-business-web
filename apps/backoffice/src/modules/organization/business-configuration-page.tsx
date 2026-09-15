@@ -21,16 +21,10 @@ import { CircleOff, MapPinPlus, Pencil } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
 
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
-import {
-  BackofficePage,
-  BackofficePageHeader,
-} from '../../app/layout/backoffice-page';
+import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
 import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
 import { canPerformBackofficeAction } from '../../auth/backoffice-access';
-import {
-  isSessionExpiredError,
-  useBackofficeAuth,
-} from '../../auth/backoffice-auth-context';
+import { isSessionExpiredError, useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import {
   BusinessSettingsApi,
   type BusinessPreferences,
@@ -105,16 +99,12 @@ export function BusinessConfigurationPage() {
 
       <DTabs defaultValue={firstTab} className="mt-6">
         <DTabsList>
-          {canViewProfile ? (
-            <DTabsTrigger value="profile">{copy('Profile')}</DTabsTrigger>
-          ) : null}
+          {canViewProfile ? <DTabsTrigger value="profile">{copy('Profile')}</DTabsTrigger> : null}
           {canViewLocations ? (
             <DTabsTrigger value="locations">{copy('Locations')}</DTabsTrigger>
           ) : null}
           {canViewProfile ? (
-            <DTabsTrigger value="localization">
-              {copy('Localization')}
-            </DTabsTrigger>
+            <DTabsTrigger value="localization">{copy('Localization')}</DTabsTrigger>
           ) : null}
           {canViewProfile ? (
             <DTabsTrigger value="numbering">{copy('Numbering')}</DTabsTrigger>
@@ -209,10 +199,8 @@ function ProfileSection({
       if (!isSessionExpiredError(error))
         showToast({
           variant: 'danger',
-          title: normalizeBackofficeApiError(
-            error,
-            copy('Could not update business profile.'),
-          ).safeMessage,
+          title: normalizeBackofficeApiError(error, copy('Could not update business profile.'))
+            .safeMessage,
         });
     }
   };
@@ -237,17 +225,13 @@ function ProfileSection({
       {loading ? (
         <DSkeleton className="mt-5 h-7 w-56" />
       ) : (
-        <p className="mt-5 text-lg font-semibold">
-          {profile?.name ?? copy('Not configured')}
-        </p>
+        <p className="mt-5 text-lg font-semibold">{profile?.name ?? copy('Not configured')}</p>
       )}
       <DDialog
         open={open}
         onClose={close}
         title={copy('Business profile')}
-        description={copy(
-          'Update the business identity consumed by authenticated applications.',
-        )}
+        description={copy('Update the business identity consumed by authenticated applications.')}
         footer={
           <div className="flex justify-end gap-2">
             <DButton variant="secondary" onClick={close}>
@@ -259,12 +243,7 @@ function ProfileSection({
           </div>
         }
       >
-        <DInput
-          label={copy('Business name')}
-          value={name}
-          onChange={setDraftName}
-          autoFocus
-        />
+        <DInput label={copy('Business name')} value={name} onChange={setDraftName} autoFocus />
       </DDialog>
     </Card>
   );
@@ -286,15 +265,16 @@ function LocalizationSection({
   const { copy } = useBackofficeLocalization();
   const { showToast } = useToast();
   const [open, setOpen] = useState(false);
-  const [draftLocale, setDraftLocale] =
-    useState<BusinessPreferences['defaultLocale'] | null>(null);
+  const [draftLocale, setDraftLocale] = useState<BusinessPreferences['defaultLocale'] | null>(null);
   const [draftTimezone, setDraftTimezone] = useState<string | null>(null);
-  const [draftDateFormat, setDraftDateFormat] =
-    useState<BusinessPreferences['dateFormat'] | null>(null);
-  const [draftTimeFormat, setDraftTimeFormat] =
-    useState<BusinessPreferences['timeFormat'] | null>(null);
+  const [draftDateFormat, setDraftDateFormat] = useState<BusinessPreferences['dateFormat'] | null>(
+    null,
+  );
+  const [draftTimeFormat, setDraftTimeFormat] = useState<BusinessPreferences['timeFormat'] | null>(
+    null,
+  );
   const locale = draftLocale ?? preferences?.defaultLocale ?? 'id-ID';
-  const timezone = draftTimezone ?? preferences?.timezone ?? '';
+  const timezone = draftTimezone ?? preferences?.timezone ?? 'Asia/Jakarta';
   const dateFormat = draftDateFormat ?? preferences?.dateFormat ?? 'DD/MM/YYYY';
   const timeFormat = draftTimeFormat ?? preferences?.timeFormat ?? 'HH:mm';
   const close = () => {
@@ -321,10 +301,8 @@ function LocalizationSection({
       if (!isSessionExpiredError(error))
         showToast({
           variant: 'danger',
-          title: normalizeBackofficeApiError(
-            error,
-            copy('Could not update localization.'),
-          ).safeMessage,
+          title: normalizeBackofficeApiError(error, copy('Could not update localization.'))
+            .safeMessage,
         });
     }
   };
@@ -386,7 +364,7 @@ function LocalizationSection({
             label={copy('Timezone')}
             value={timezone}
             onChange={setDraftTimezone}
-            placeholder="Region/City"
+            placeholder="Asia/Jakarta"
           />
           <DSelect
             label={copy('Date format')}
@@ -397,11 +375,7 @@ function LocalizationSection({
               label: value,
             }))}
             onValueChange={(value) => {
-              if (
-                value === 'DD/MM/YYYY' ||
-                value === 'MM/DD/YYYY' ||
-                value === 'YYYY-MM-DD'
-              )
+              if (value === 'DD/MM/YYYY' || value === 'MM/DD/YYYY' || value === 'YYYY-MM-DD')
                 setDraftDateFormat(value);
             }}
           />
@@ -459,9 +433,7 @@ function LocationsSection({
       render: (item) => (
         <div className="flex gap-2">
           <span className="font-medium">{item.name}</span>
-          {item.isMain ? (
-            <DBadge variant="secondary">{copy('Main Branch')}</DBadge>
-          ) : null}
+          {item.isMain ? <DBadge variant="secondary">{copy('Main Branch')}</DBadge> : null}
         </div>
       ),
     },
@@ -488,10 +460,8 @@ function LocationsSection({
       if (!isSessionExpiredError(error))
         showToast({
           variant: 'danger',
-          title: normalizeBackofficeApiError(
-            error,
-            copy('Could not save selling location.'),
-          ).safeMessage,
+          title: normalizeBackofficeApiError(error, copy('Could not save selling location.'))
+            .safeMessage,
         });
     }
   };
@@ -506,10 +476,7 @@ function LocationsSection({
         emptyMessage={copy('No selling locations have been created yet.')}
         headerActions={
           canCreate ? (
-            <DButton
-              leftIcon={<MapPinPlus className="size-4" />}
-              onClick={() => setEditing(null)}
-            >
+            <DButton leftIcon={<MapPinPlus className="size-4" />} onClick={() => setEditing(null)}>
               {copy('Add location')}
             </DButton>
           ) : null
@@ -604,10 +571,8 @@ function LocationDialog({
       if (!isSessionExpiredError(error))
         showToast({
           variant: 'danger',
-          title: normalizeBackofficeApiError(
-            error,
-            copy('Could not save selling location.'),
-          ).safeMessage,
+          title: normalizeBackofficeApiError(error, copy('Could not save selling location.'))
+            .safeMessage,
         });
     }
   };
@@ -622,10 +587,7 @@ function LocationDialog({
           <DButton variant="secondary" onClick={onClose}>
             {copy('Cancel')}
           </DButton>
-          <DButton
-            onClick={() => void save()}
-            disabled={!name.trim() || (isNew && !code.trim())}
-          >
+          <DButton onClick={() => void save()} disabled={!name.trim() || (isNew && !code.trim())}>
             {copy('Save location')}
           </DButton>
         </div>
@@ -674,9 +636,7 @@ function NumberingSection({
   const { copy } = useBackofficeLocalization();
   const { showToast } = useToast();
   const [editing, setEditing] = useState<NumberingPreference | null>(null);
-  const visible = preferences.filter(
-    (item) => item.namespace !== 'INVOICE' || invoiceApplicable,
-  );
+  const visible = preferences.filter((item) => item.namespace !== 'INVOICE' || invoiceApplicable);
   const labels: Record<NumberingPreference['namespace'], string> = {
     PRODUCT: copy('Product'),
     SERVICE: copy('Service'),
@@ -701,10 +661,7 @@ function NumberingSection({
       ) : (
         <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {visible.map((item) => (
-            <div
-              key={item.namespace}
-              className="rounded-lg border border-(--color-border) p-4"
-            >
+            <div key={item.namespace} className="rounded-lg border border-(--color-border) p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-semibold">{labels[item.namespace]}</p>
@@ -713,18 +670,12 @@ function NumberingSection({
                   </p>
                 </div>
                 {canUpdate ? (
-                  <DButton
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setEditing(item)}
-                  >
+                  <DButton variant="secondary" size="sm" onClick={() => setEditing(item)}>
                     {copy('Edit')}
                   </DButton>
                 ) : null}
               </div>
-              <p className="mt-4 text-xs text-(--color-text-muted)">
-                {copy('Current sequence')}
-              </p>
+              <p className="mt-4 text-xs text-(--color-text-muted)">{copy('Current sequence')}</p>
               <p className="mt-1 font-mono font-semibold">{item.currentSequence}</p>
             </div>
           ))}
@@ -781,10 +732,8 @@ function NumberingDialog({
       if (!isSessionExpiredError(error))
         showToast({
           variant: 'danger',
-          title: normalizeBackofficeApiError(
-            error,
-            copy('Could not update numbering.'),
-          ).safeMessage,
+          title: normalizeBackofficeApiError(error, copy('Could not update numbering.'))
+            .safeMessage,
         });
     }
   };

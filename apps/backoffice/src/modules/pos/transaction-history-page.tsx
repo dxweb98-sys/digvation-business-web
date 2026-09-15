@@ -3,7 +3,7 @@ import {
   DButton,
   DConnectionError,
   DDataTable,
-  DDatePicker,
+  DDateRangeFilter,
   DDialog,
   DSelectFilter,
   type TableColumn,
@@ -15,6 +15,7 @@ import { useRuntime } from '@digvation/business-runtime';
 import { useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
 import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
+import { humanReadableLabel } from '../../app/localization/human-readable-labels';
 import {
   TransactionHistoryApi,
   type FulfillmentStatus,
@@ -25,10 +26,50 @@ import {
 
 const defaultPageSize = 20;
 
+const transactionCopy = {
+  id: {
+    description: 'Lihat transaksi, pembayaran, dan status pengerjaan.',
+    saleStatus: 'Status transaksi',
+    payments: 'Pembayaran',
+    workStatus: 'Status pengerjaan',
+    work: 'Pengerjaan',
+    search: 'Cari referensi pembayaran atau lokasi...',
+    noPayments: 'Belum ada pembayaran.',
+    noWork: 'Belum ada pengerjaan yang dicatat.',
+    saleInformation: 'Informasi transaksi',
+    paymentInformation: 'Informasi pembayaran',
+    workInformation: 'Informasi pengerjaan',
+    tendered: 'Uang diterima',
+    change: 'Kembalian',
+    invoice: 'Nomor faktur',
+    currency: 'Mata uang',
+    quantity: 'Jumlah',
+  },
+  en: {
+    description: 'Review transactions, payments, and work status.',
+    saleStatus: 'Transaction status',
+    payments: 'Payments',
+    workStatus: 'Work status',
+    work: 'Work',
+    search: 'Search payment reference or location...',
+    noPayments: 'No payments recorded yet.',
+    noWork: 'No work has been recorded yet.',
+    saleInformation: 'Transaction information',
+    paymentInformation: 'Payment information',
+    workInformation: 'Work information',
+    tendered: 'Cash received',
+    change: 'Change',
+    invoice: 'Invoice number',
+    currency: 'Currency',
+    quantity: 'Quantity',
+  },
+} as const;
+
 export function TransactionHistoryPage() {
   const { createApiClient } = useBackofficeAuth();
   const runtime = useRuntime();
-  const { copy, formatDate, formatMoney } = useBackofficeLocalization();
+  const { copy, formatDate, formatMoney, locale } = useBackofficeLocalization();
+  const text = transactionCopy[locale];
   const api = useMemo(
     () => new TransactionHistoryApi(createApiClient(runtime.apiBaseUrl)),
     [createApiClient, runtime.apiBaseUrl],
@@ -107,12 +148,12 @@ export function TransactionHistoryPage() {
     },
     {
       key: 'saleStatus',
-      label: copy('Sale status'),
+      label: text.saleStatus,
       render: (row) => <StatusBadge status={row.status} />,
     },
     {
       key: 'payments',
-      label: copy('Payments'),
+      label: text.payments,
       render: (row) =>
         row.payments.length ? (
           <div className="flex flex-wrap gap-1">
@@ -121,12 +162,12 @@ export function TransactionHistoryPage() {
             ))}
           </div>
         ) : (
-          '—'
+          '-'
         ),
     },
     {
       key: 'fulfillment',
-      label: copy('Fulfillment'),
+      label: text.work,
       render: (row) => <FulfillmentSummary lines={row.lines} />,
     },
   ];
@@ -136,9 +177,7 @@ export function TransactionHistoryPage() {
       <BackofficePageHeader
         eyebrow={copy('Reporting')}
         title={copy('Transaction history')}
-        description={copy(
-          'Review sale, payment, and fulfillment facts without changing their lifecycle.',
-        )}
+        description={text.description}
       />
       <section className="mt-6">
         <DDataTable
@@ -147,7 +186,7 @@ export function TransactionHistoryPage() {
           loading={list.isLoading}
           rowKey="id"
           searchable
-          searchPlaceholder={copy('Search payment reference or location...')}
+          searchPlaceholder={text.search}
           searchValue={q}
           onSearchChange={(value) => {
             setQ(value);
@@ -156,14 +195,17 @@ export function TransactionHistoryPage() {
           filters={
             <div className="flex flex-wrap gap-2">
               <DSelectFilter
-                label={copy('Sale status')}
+                label={text.saleStatus}
                 value={saleStatus || null}
                 clearable
                 onChange={(value) => {
                   setSaleStatus(String(value ?? ''));
                   resetPage();
                 }}
-                options={saleStatuses.map((value) => ({ value, label: copy(value) }))}
+                options={saleStatuses.map((value) => ({
+                  value,
+                  label: humanReadableLabel(value, locale),
+                }))}
               />
               <DSelectFilter
                 label={copy('Payment status')}
@@ -173,31 +215,38 @@ export function TransactionHistoryPage() {
                   setPaymentStatus(String(value ?? ''));
                   resetPage();
                 }}
-                options={paymentStatuses.map((value) => ({ value, label: copy(value) }))}
+                options={paymentStatuses.map((value) => ({
+                  value,
+                  label: humanReadableLabel(value, locale),
+                }))}
               />
               <DSelectFilter
-                label={copy('Fulfillment status')}
+                label={text.workStatus}
                 value={fulfillmentStatus || null}
                 clearable
                 onChange={(value) => {
                   setFulfillmentStatus(String(value ?? ''));
                   resetPage();
                 }}
-                options={fulfillmentStatuses.map((value) => ({ value, label: copy(value) }))}
+                options={fulfillmentStatuses.map((value) => ({
+                  value,
+                  label: humanReadableLabel(value, locale),
+                }))}
               />
-              <DDatePicker
-                label={copy('From')}
-                value={createdFrom}
-                onChange={(value) => {
+              <DDateRangeFilter
+                from={createdFrom}
+                to={createdTo}
+                onFromChange={(value) => {
                   setCreatedFrom(value);
                   resetPage();
                 }}
-              />
-              <DDatePicker
-                label={copy('To')}
-                value={createdTo}
-                onChange={(value) => {
+                onToChange={(value) => {
                   setCreatedTo(value);
+                  resetPage();
+                }}
+                onClear={() => {
+                  setCreatedFrom('');
+                  setCreatedTo('');
                   resetPage();
                 }}
               />
@@ -244,7 +293,7 @@ const fulfillmentStatuses: FulfillmentStatus[] = [
 ];
 
 function StatusBadge({ status }: { status: SaleStatus | PaymentStatus | FulfillmentStatus }) {
-  const { copy } = useBackofficeLocalization();
+  const { locale } = useBackofficeLocalization();
   const variant = ['FINALIZED', 'SUCCEEDED', 'COMPLETED'].includes(status)
     ? 'success'
     : ['VOIDED', 'FAILED', 'CANCELLED', 'EXPIRED', 'CANCELED'].includes(status)
@@ -252,8 +301,9 @@ function StatusBadge({ status }: { status: SaleStatus | PaymentStatus | Fulfillm
       : status === 'PENDING' || status === 'IN_PROGRESS'
         ? 'warning'
         : 'outline';
-  return <DBadge variant={variant}>{copy(status)}</DBadge>;
+  return <DBadge variant={variant}>{humanReadableLabel(status, locale)}</DBadge>;
 }
+
 function FulfillmentSummary({ lines }: { lines: Sale['lines'] }) {
   const tracked = lines.filter((line) => line.fulfillment);
   return tracked.length ? (
@@ -263,9 +313,10 @@ function FulfillmentSummary({ lines }: { lines: Sale['lines'] }) {
       ))}
     </div>
   ) : (
-    '—'
+    '-'
   );
 }
+
 function TransactionDetail({
   open,
   item,
@@ -279,7 +330,8 @@ function TransactionDetail({
   error: boolean;
   onClose: () => void;
 }) {
-  const { copy, formatDate, formatMoney } = useBackofficeLocalization();
+  const { copy, formatDate, formatMoney, locale } = useBackofficeLocalization();
+  const text = transactionCopy[locale];
   return (
     <DDialog
       open={open}
@@ -305,132 +357,159 @@ function TransactionDetail({
           onRetry={onClose}
         />
       ) : (
-        <div className="space-y-6">
-          <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4 sm:p-5">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <section className="border-b border-[var(--color-border)] pb-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="min-w-0">
-                <p className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
-                  {copy('Transaction number')}
-                </p>
-                <h3 className="mt-1 break-words font-mono text-xl font-semibold tracking-tight">
+                <h3 className="break-words font-mono text-2xl font-semibold tracking-tight text-[var(--color-text)]">
                   {item.saleNumber}
                 </h3>
-                {item.invoiceNumber ? (
-                  <p className="mt-1 break-words font-mono text-sm text-[var(--color-text-muted)]">
-                    {copy('Invoice number')}: {item.invoiceNumber}
-                  </p>
-                ) : null}
-              </div>
-              <div className="flex flex-col items-start gap-2 sm:items-end">
-                <StatusBadge status={item.status} />
-                <p className="text-xl font-semibold text-[var(--color-text)]">
-                  {formatMoney(item.totalAmount, item.currency)}
-                </p>
-                <p className="text-sm text-[var(--color-text-muted)]">
+                <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+                  {item.invoiceNumber ? `${text.invoice}: ${item.invoiceNumber}, ` : ''}
                   {formatDate(new Date(item.createdAt), {
                     dateStyle: 'medium',
                     timeStyle: 'short',
                   })}
                 </p>
               </div>
+              <StatusBadge status={item.status} />
             </div>
-            <h3 className="mt-5 border-t border-[var(--color-border)] pt-4 text-sm font-semibold">
-              {copy('Sale information')}
-            </h3>
-            <dl className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mt-5 border-t border-[var(--color-border)] pt-4">
+              <p className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+                {copy('Total')}
+              </p>
+              <p className="mt-1 text-3xl font-semibold tracking-tight text-[var(--color-text)]">
+                {formatMoney(item.totalAmount, item.currency)}
+              </p>
+            </div>
+          </section>
+
+          <section className="border-b border-[var(--color-border)] py-5">
+            <h3 className="text-base font-semibold">{text.saleInformation}</h3>
+            <dl className="mt-4 grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
               <Fact
                 label={copy('Discount')}
                 value={formatMoney(item.discountAmount, item.currency)}
               />
               <Fact label={copy('Tax')} value={formatMoney(item.taxAmount, item.currency)} />
-              <Fact label={copy('Total')} value={formatMoney(item.totalAmount, item.currency)} />
-              <Fact label={copy('Currency')} value={item.currency} />
+              <Fact
+                label={copy('Total')}
+                value={formatMoney(item.totalAmount, item.currency)}
+                emphasized
+              />
+              <Fact label={text.currency} value={item.currency} />
             </dl>
           </section>
-          <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] p-4 sm:p-5">
-            <h3 className="text-sm font-semibold">{copy('Payment information')}</h3>
-            <div className="mt-3 space-y-2">
-              {item.payments.length ? (
-                item.payments.map((payment) => (
+
+          <section className="border-b border-[var(--color-border)] py-5">
+            <div className="flex items-center gap-2">
+              <h3 className="text-base font-semibold">{text.paymentInformation}</h3>
+              <DBadge variant="secondary">{item.payments.length}</DBadge>
+            </div>
+            {item.payments.length ? (
+              <div className="mt-4 divide-y divide-[var(--color-border)] border-y border-[var(--color-border)]">
+                {item.payments.map((payment) => (
                   <div
                     key={payment.id}
-                    className="rounded-[var(--radius-control)] border border-[var(--color-border)] p-3 text-sm"
+                    className="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:justify-between"
                   >
-                    <div className="flex items-center justify-between gap-3">
-                      <span>{copy(payment.method)}</span>
-                      <StatusBadge status={payment.status} />
+                    <div className="min-w-0">
+                      <p className="font-medium text-[var(--color-text)]">
+                        {humanReadableLabel(payment.method, locale)}
+                      </p>
+                      {payment.providerReference ? (
+                        <p className="mt-1 break-words font-mono text-xs text-[var(--color-text-muted)]">
+                          {payment.providerReference}
+                        </p>
+                      ) : null}
+                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--color-text-muted)]">
+                        {payment.tenderedAmount ? (
+                          <span>
+                            {text.tendered}: {formatMoney(payment.tenderedAmount, payment.currency)}
+                          </span>
+                        ) : null}
+                        {payment.changeAmount ? (
+                          <span>
+                            {text.change}: {formatMoney(payment.changeAmount, payment.currency)}
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
-                    <p className="mt-1 font-semibold">
-                      {formatMoney(payment.appliedAmount, payment.currency)}
-                    </p>
-                    {payment.tenderedAmount ? (
-                      <p className="mt-2 text-xs text-[var(--color-text-muted)]">
-                        {copy('Tendered Amount')}:{' '}
-                        {formatMoney(payment.tenderedAmount, payment.currency)}
+                    <div className="flex flex-col items-start gap-2 sm:items-end">
+                      <StatusBadge status={payment.status} />
+                      <p className="font-semibold text-[var(--color-text)]">
+                        {formatMoney(payment.appliedAmount, payment.currency)}
                       </p>
-                    ) : null}
-                    {payment.changeAmount ? (
-                      <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                        {copy('Change Amount')}:{' '}
-                        {formatMoney(payment.changeAmount, payment.currency)}
-                      </p>
-                    ) : null}
-                    {payment.providerReference ? (
-                      <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                        {payment.providerReference}
-                      </p>
-                    ) : null}
+                    </div>
                   </div>
-                ))
-              ) : (
-                <p className="text-sm text-[var(--color-text-muted)]">
-                  {copy('No payment attempts are recorded.')}
-                </p>
-              )}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-4 text-sm text-[var(--color-text-muted)]">{text.noPayments}</p>
+            )}
           </section>
-          <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] p-4 sm:p-5">
-            <h3 className="text-sm font-semibold">{copy('Fulfillment information')}</h3>
-            <div className="mt-3 space-y-2">
-              {item.lines.filter((line) => line.fulfillment).length ? (
-                item.lines
+
+          <section className="pt-5">
+            <div className="flex items-center gap-2">
+              <h3 className="text-base font-semibold">{text.workInformation}</h3>
+              <DBadge variant="secondary">
+                {item.lines.filter((line) => line.fulfillment).length}
+              </DBadge>
+            </div>
+            {item.lines.filter((line) => line.fulfillment).length ? (
+              <div className="mt-4 divide-y divide-[var(--color-border)] border-y border-[var(--color-border)]">
+                {item.lines
                   .filter((line) => line.fulfillment)
                   .map((line) => (
-                    <div
-                      key={line.id}
-                      className="flex items-center justify-between gap-3 rounded-[var(--radius-control)] border border-[var(--color-border)] p-3 text-sm"
-                    >
-                      <div>
-                        <p className="font-medium">{line.itemNameSnapshot}</p>
+                    <div key={line.id} className="flex items-start justify-between gap-4 py-4">
+                      <div className="min-w-0">
+                        <p className="font-medium text-[var(--color-text)]">
+                          {line.itemNameSnapshot}
+                        </p>
                         {line.variantNameSnapshot ? (
                           <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
                             {line.variantNameSnapshot}
                           </p>
                         ) : null}
                         <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                          {copy('Quantity')}: {line.quantity}
+                          {text.quantity}: {line.quantity}
                         </p>
                       </div>
                       <StatusBadge status={line.fulfillment!.status} />
                     </div>
-                  ))
-              ) : (
-                <p className="text-sm text-[var(--color-text-muted)]">
-                  {copy('No tracked fulfillment is recorded.')}
-                </p>
-              )}
-            </div>
+                  ))}
+              </div>
+            ) : (
+              <p className="mt-4 text-sm text-[var(--color-text-muted)]">{text.noWork}</p>
+            )}
           </section>
         </div>
       )}
     </DDialog>
   );
 }
-function Fact({ label, value }: { label: string; value: ReactNode }) {
+
+function Fact({
+  label,
+  value,
+  emphasized = false,
+}: {
+  label: string;
+  value: ReactNode;
+  emphasized?: boolean;
+}) {
   return (
-    <div>
-      <dt className="text-xs font-medium text-[var(--color-text-muted)]">{label}</dt>
-      <dd className="mt-1 text-sm">{value}</dd>
+    <div className="min-w-0">
+      <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+        {label}
+      </dt>
+      <dd
+        className={`mt-1 break-words text-[var(--color-text)] ${
+          emphasized ? 'text-base font-semibold' : 'text-sm font-medium'
+        }`}
+      >
+        {value}
+      </dd>
     </div>
   );
 }

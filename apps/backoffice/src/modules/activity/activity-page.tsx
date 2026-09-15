@@ -1,3 +1,4 @@
+import { useRuntime } from '@digvation/business-runtime';
 import {
   DBadge,
   DButton,
@@ -10,9 +11,16 @@ import {
 } from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
-import { useRuntime } from '@digvation/business-runtime';
+
 import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
 import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
+import {
+  activityCategoryLabel,
+  activityEventLabel,
+  activityNamespaceLabel,
+  activityTargetLabel,
+  humanReadableLabel,
+} from '../../app/localization/human-readable-labels';
 import { useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import {
   ActivityApi,
@@ -22,142 +30,79 @@ import {
 } from './activity-api';
 
 const defaultPageSize = 30;
+const categories = [
+  'SECURITY',
+  'CONFIGURATION',
+  'FINANCE',
+  'CATALOG',
+  'TAX',
+  'PRICING',
+  'WORKFORCE',
+  'SALES',
+  'PAYMENT',
+  'FULFILLMENT',
+] as const;
 
-type LocalizedLabel = { id: string; en: string };
-
-const categoryLabels: Record<string, LocalizedLabel> = {
-  SECURITY: { id: 'Keamanan', en: 'Security' },
-  CONFIGURATION: { id: 'Konfigurasi', en: 'Configuration' },
-  FINANCE: { id: 'Keuangan', en: 'Finance' },
-  CATALOG: { id: 'Katalog', en: 'Catalog' },
-  TAX: { id: 'Pajak', en: 'Tax' },
-  PRICING: { id: 'Harga', en: 'Pricing' },
-  WORKFORCE: { id: 'Tenaga kerja', en: 'Workforce' },
-  SALES: { id: 'Penjualan', en: 'Sales' },
-  PAYMENT: { id: 'Pembayaran', en: 'Payment' },
-  FULFILLMENT: { id: 'Pengerjaan', en: 'Fulfillment' },
-};
-
-const eventLabels: Record<string, LocalizedLabel> = {
-  LOGIN_SUCCEEDED: { id: 'Masuk ke aplikasi', en: 'Signed in to application' },
-  LOGOUT: { id: 'Keluar dari aplikasi', en: 'Signed out of application' },
-  BUSINESS_NUMBERING_UPDATED: { id: 'Pengaturan penomoran diperbarui', en: 'Numbering settings updated' },
-  EXPENSE_APPROVED: { id: 'Pengeluaran disetujui', en: 'Expense approved' },
-  EXPENSE_REJECTED: { id: 'Pengeluaran ditolak', en: 'Expense rejected' },
-  EXPENSE_CREATED: { id: 'Pengeluaran dibuat', en: 'Expense created' },
-  EXPENSE_UPDATED: { id: 'Pengeluaran diperbarui', en: 'Expense updated' },
-  BUSINESS_PROFILE_UPDATED: { id: 'Profil bisnis diperbarui', en: 'Business profile updated' },
-  BUSINESS_LOCALIZATION_UPDATED: { id: 'Pengaturan bahasa dan waktu diperbarui', en: 'Localization and time settings updated' },
-  LOCATION_CREATED: { id: 'Lokasi dibuat', en: 'Location created' },
-  LOCATION_UPDATED: { id: 'Lokasi diperbarui', en: 'Location updated' },
-  CATALOG_CATEGORY_CREATED: { id: 'Kategori katalog dibuat', en: 'Catalog category created' },
-  CATALOG_CATEGORY_UPDATED: { id: 'Kategori katalog diperbarui', en: 'Catalog category updated' },
-  CATALOG_ITEM_CREATED: { id: 'Item katalog dibuat', en: 'Catalog item created' },
-  CATALOG_ITEM_UPDATED: { id: 'Item katalog diperbarui', en: 'Catalog item updated' },
-  CATALOG_VARIANT_CREATED: { id: 'Varian katalog dibuat', en: 'Catalog variant created' },
-  CATALOG_VARIANT_UPDATED: { id: 'Varian katalog diperbarui', en: 'Catalog variant updated' },
-  EMPLOYEE_POSITION_CREATED: { id: 'Jabatan karyawan dibuat', en: 'Employee position created' },
-  EMPLOYEE_POSITION_UPDATED: { id: 'Jabatan karyawan diperbarui', en: 'Employee position updated' },
-  ATTENDANCE_UPDATED: { id: 'Absensi diperbarui', en: 'Attendance updated' },
-  EMPLOYEE_CREATED: { id: 'Karyawan dibuat', en: 'Employee created' },
-  EMPLOYEE_UPDATED: { id: 'Karyawan diperbarui', en: 'Employee updated' },
-  LOCATION_ACCESS_REPLACED: { id: 'Akses lokasi pengguna diperbarui', en: 'User location access updated' },
-  TAX_PROFILE_UPDATED: { id: 'Profil pajak diperbarui', en: 'Tax profile updated' },
-  TAX_RULE_CREATED: { id: 'Aturan pajak dibuat', en: 'Tax rule created' },
-  TAX_RULE_CANCELLED: { id: 'Aturan pajak dibatalkan', en: 'Tax rule cancelled' },
-  TAX_CATEGORY_CREATED: { id: 'Kategori pajak dibuat', en: 'Tax category created' },
-  TAX_CATEGORY_UPDATED: { id: 'Kategori pajak diperbarui', en: 'Tax category updated' },
-  PRICE_CREATED: { id: 'Harga dibuat', en: 'Price created' },
-  PRICE_CHANGED: { id: 'Harga diubah', en: 'Price changed' },
-  PRICE_CANCELLED: { id: 'Harga dibatalkan', en: 'Price cancelled' },
-  FINANCIAL_ACCOUNT_CREATED: { id: 'Akun keuangan dibuat', en: 'Financial account created' },
-  FINANCIAL_ACCOUNT_UPDATED: { id: 'Akun keuangan diperbarui', en: 'Financial account updated' },
-  PAYMENT_ROUTE_CREATED: { id: 'Rute pembayaran dibuat', en: 'Payment route created' },
-  PAYMENT_ROUTE_UPDATED: { id: 'Rute pembayaran diperbarui', en: 'Payment route updated' },
-  CASH_MOVEMENT_CREATED: { id: 'Pergerakan kas dicatat', en: 'Cash movement recorded' },
-  SETTLEMENT_CREATED: { id: 'Settlement dibuat', en: 'Settlement created' },
-  SETTLEMENT_COMPLETED: { id: 'Settlement diselesaikan', en: 'Settlement completed' },
-  SETTLEMENT_CANCELLED: { id: 'Settlement dibatalkan', en: 'Settlement cancelled' },
-  RECONCILIATION_CREATED: { id: 'Rekonsiliasi dibuat', en: 'Reconciliation created' },
-  RECONCILIATION_UPDATED: { id: 'Rekonsiliasi diperbarui', en: 'Reconciliation updated' },
-  SALE_CREATED: { id: 'Transaksi dibuat', en: 'Transaction created' },
-  SALE_LINE_ADDED: { id: 'Item transaksi ditambahkan', en: 'Transaction item added' },
-  SALE_LINE_QUANTITY_CHANGED: { id: 'Jumlah item transaksi diubah', en: 'Transaction item quantity changed' },
-  SALE_LINE_REMOVED: { id: 'Item transaksi dihapus', en: 'Transaction item removed' },
-  SALE_LINE_PRICE_OVERRIDDEN: { id: 'Harga item transaksi dioverride', en: 'Transaction item price overridden' },
-  SALE_LINE_PRICE_OVERRIDE_REMOVED: { id: 'Override harga item transaksi dihapus', en: 'Transaction item price override removed' },
-  SALE_LINE_DISCOUNT_APPLIED: { id: 'Diskon item transaksi diterapkan', en: 'Transaction item discount applied' },
-  SALE_LINE_DISCOUNT_REMOVED: { id: 'Diskon item transaksi dihapus', en: 'Transaction item discount removed' },
-  SALE_DISCOUNT_APPLIED: { id: 'Diskon transaksi diterapkan', en: 'Transaction discount applied' },
-  SALE_DISCOUNT_REMOVED: { id: 'Diskon transaksi dihapus', en: 'Transaction discount removed' },
-  SALE_LINE_ASSIGNMENTS_CHANGED: { id: 'Penugasan item transaksi diubah', en: 'Transaction item assignment changed' },
-  SALE_LINE_CONTRIBUTIONS_CHANGED: { id: 'Kontribusi item transaksi diubah', en: 'Transaction item contribution changed' },
-  SALE_FINALIZED: { id: 'Transaksi diselesaikan', en: 'Transaction finalized' },
-  SALE_VOIDED: { id: 'Transaksi dibatalkan', en: 'Transaction voided' },
-  SALE_QUEUED: { id: 'Transaksi masuk antrian', en: 'Transaction queued' },
-  SALE_WORK_STARTED: { id: 'Pengerjaan transaksi dimulai', en: 'Transaction work started' },
-  PAYMENT_CREATED: { id: 'Pembayaran dibuat', en: 'Payment created' },
-  PAYMENT_SUCCEEDED: { id: 'Pembayaran berhasil', en: 'Payment succeeded' },
-  PAYMENT_FAILED: { id: 'Pembayaran gagal', en: 'Payment failed' },
-  PAYMENT_CANCELLED: { id: 'Pembayaran dibatalkan', en: 'Payment cancelled' },
-  PAYMENT_EXPIRED: { id: 'Pembayaran kedaluwarsa', en: 'Payment expired' },
-  FULFILLMENT_STARTED: { id: 'Pengerjaan item dimulai', en: 'Fulfillment started' },
-  FULFILLMENT_COMPLETED: { id: 'Pengerjaan item selesai', en: 'Fulfillment completed' },
-  FULFILLMENT_CANCELLED: { id: 'Pengerjaan item dibatalkan', en: 'Fulfillment cancelled' },
-  OWNER_PROVISIONED: { id: 'Owner disiapkan', en: 'Owner provisioned' },
-  OWNER_GRANTED: { id: 'Peran Owner diberikan', en: 'Owner role granted' },
-  OWNER_REVOKED: { id: 'Peran Owner dicabut', en: 'Owner role revoked' },
-  INVITATION_CREATED: { id: 'Undangan pengguna dibuat', en: 'User invitation created' },
-  INVITATION_RESENT: { id: 'Undangan pengguna dikirim ulang', en: 'User invitation resent' },
-  INVITATION_REVOKED: { id: 'Undangan pengguna dibatalkan', en: 'User invitation revoked' },
-  INVITATION_ACCEPTED: { id: 'Undangan pengguna diterima', en: 'User invitation accepted' },
-  USER_UPDATED: { id: 'Pengguna diperbarui', en: 'User updated' },
-  USER_ENABLED: { id: 'Pengguna diaktifkan', en: 'User enabled' },
-  USER_DISABLED: { id: 'Pengguna dinonaktifkan', en: 'User disabled' },
-  USER_ROLES_CHANGED: { id: 'Peran pengguna diubah', en: 'User roles changed' },
-  ROLE_CREATED: { id: 'Peran dibuat', en: 'Role created' },
-  ROLE_UPDATED: { id: 'Peran diperbarui', en: 'Role updated' },
-  ROLE_STATUS_CHANGED: { id: 'Status peran diubah', en: 'Role status changed' },
-  ROLE_PERMISSIONS_CHANGED: { id: 'Izin peran diubah', en: 'Role permissions changed' },
-  USER_SESSIONS_REVOKED: { id: 'Sesi pengguna dicabut', en: 'User sessions revoked' },
-  PASSWORD_CHANGED: { id: 'Kata sandi diubah', en: 'Password changed' },
-  PASSWORD_RESET_COMPLETED: { id: 'Reset kata sandi selesai', en: 'Password reset completed' },
-  LOCATION_ACCESS_GRANTED: { id: 'Akses lokasi diberikan', en: 'Location access granted' },
-  LOCATION_ACCESS_REVOKED: { id: 'Akses lokasi dicabut', en: 'Location access revoked' },
-};
-
-const targetTypeLabels: Record<string, LocalizedLabel> = {
-  EXPENSE: { id: 'Pengeluaran', en: 'Expense' },
-  INVITATION: { id: 'Undangan pengguna', en: 'User invitation' },
-  NUMBERING_PREFERENCE: { id: 'Penomoran', en: 'Numbering' },
-  BUSINESS_PREFERENCES: { id: 'Pengaturan bahasa, tanggal & waktu', en: 'Localization and time settings' },
-  ROLE: { id: 'Peran', en: 'Role' },
-  USER: { id: 'Pengguna', en: 'User' },
-  LOCATION: { id: 'Lokasi', en: 'Location' },
-  CATALOG_CATEGORY: { id: 'Kategori', en: 'Category' },
-  CATALOG_ITEM: { id: 'Item katalog', en: 'Catalog item' },
-  CATALOG_VARIANT: { id: 'Varian katalog', en: 'Catalog variant' },
-  TAX_PROFILE: { id: 'Profil pajak', en: 'Tax profile' },
-  TAX_RULE: { id: 'Aturan pajak', en: 'Tax rule' },
-  TAX_CATEGORY: { id: 'Kategori pajak', en: 'Tax category' },
-  CATALOG_PRICE: { id: 'Harga', en: 'Price' },
-  EMPLOYEE: { id: 'Karyawan', en: 'Employee' },
-  EMPLOYEE_POSITION: { id: 'Jabatan karyawan', en: 'Employee position' },
-  FINANCIAL_ACCOUNT: { id: 'Akun keuangan', en: 'Financial account' },
-  PAYMENT_ROUTE: { id: 'Rute pembayaran', en: 'Payment routing' },
-  CASH_MOVEMENT: { id: 'Pergerakan kas', en: 'Cash movement' },
-  SETTLEMENT: { id: 'Settlement', en: 'Settlement' },
-  RECONCILIATION: { id: 'Rekonsiliasi', en: 'Reconciliation' },
-  SALE: { id: 'Transaksi', en: 'Transaction' },
-  SALE_LINE: { id: 'Item transaksi', en: 'Transaction item' },
-  PAYMENT: { id: 'Pembayaran', en: 'Payment' },
-  FULFILLMENT: { id: 'Pengerjaan', en: 'Fulfillment' },
-};
+const pageCopy = {
+  id: {
+    audit: 'Audit',
+    time: 'Waktu',
+    actor: 'Pelaku',
+    action: 'Tindakan',
+    target: 'Objek',
+    category: 'Kategori',
+    location: 'Lokasi',
+    user: 'Pengguna',
+    allUsers: 'Semua pengguna',
+    allLocations: 'Semua lokasi',
+    system: 'Sistem',
+    unknown: 'Tidak diketahui',
+    source: 'Aplikasi',
+    allApplications: 'Semua aplikasi',
+    outcome: 'Hasil',
+    affectedItem: 'Objek',
+    activityDetails: 'Detail aktivitas',
+    technicalInformation: 'Informasi teknis',
+    requestId: 'ID permintaan',
+    loadFailed: 'Aktivitas tidak dapat dimuat.',
+    retry: 'Coba muat ulang aktivitas.',
+    empty: 'Belum ada aktivitas.',
+    emptyFiltered: 'Tidak ada aktivitas yang sesuai filter.',
+    close: 'Tutup',
+  },
+  en: {
+    audit: 'Audit',
+    time: 'Time',
+    actor: 'Actor',
+    action: 'Action',
+    target: 'Target',
+    category: 'Category',
+    location: 'Location',
+    user: 'User',
+    allUsers: 'All users',
+    allLocations: 'All locations',
+    system: 'System',
+    unknown: 'Unknown',
+    source: 'Application',
+    allApplications: 'All applications',
+    outcome: 'Outcome',
+    affectedItem: 'Target',
+    activityDetails: 'Activity details',
+    technicalInformation: 'Technical information',
+    requestId: 'Request ID',
+    loadFailed: 'Could not load activity.',
+    retry: 'Try loading activity again.',
+    empty: 'No activity has been recorded yet.',
+    emptyFiltered: 'No activity matches the current filters.',
+    close: 'Close',
+  },
+} as const;
 
 export function ActivityPage() {
   const { createApiClient } = useBackofficeAuth();
   const runtime = useRuntime();
-  const { t, copy, formatDateTime, locale } = useBackofficeLocalization();
+  const { t, formatDateTime, locale } = useBackofficeLocalization();
+  const text = pageCopy[locale];
   const api = useMemo(
     () => new ActivityApi(createApiClient(runtime.apiBaseUrl)),
     [createApiClient, runtime.apiBaseUrl],
@@ -171,6 +116,7 @@ export function ActivityPage() {
   const [locationId, setLocationId] = useState('');
   const [source, setSource] = useState<ActivitySource | ''>('');
   const [detail, setDetail] = useState<ActivityEvent | null>(null);
+
   const list = useQuery({
     queryKey: [
       'activity',
@@ -200,6 +146,7 @@ export function ActivityPage() {
     queryFn: () => api.facets(),
     staleTime: 300_000,
   });
+
   const resetPage = () => setOffset(0);
   const actorOptions = (facets.data?.actors ?? []).map((actor) => ({
     value: actor.id,
@@ -207,50 +154,46 @@ export function ActivityPage() {
   }));
   const locationOptions = (facets.data?.locations ?? []).map((location) => ({
     value: location.id,
-    label: `${location.name} · ${location.code}`,
+    label: `${location.name} (${location.code})`,
   }));
-  const localized = (label: LocalizedLabel | undefined, fallback: string) =>
-    label?.[locale] ?? fallback;
   const columns: TableColumn<ActivityEvent>[] = [
     {
       key: 'occurredAt',
-      label: copy('Time'),
+      label: text.time,
       render: (item) => formatDateTime(item.occurredAt),
     },
     {
       key: 'actor',
-      label: copy('Actor'),
+      label: text.actor,
       render: (item) => (
         <ActorIdentity
           actor={item.actor}
           source={item.source}
-          systemLabel={locale === 'id' ? 'Sistem' : 'System'}
-          unknownLabel={locale === 'id' ? 'Tidak diketahui' : 'Unknown'}
+          systemLabel={text.system}
+          unknownLabel={text.unknown}
         />
       ),
     },
     {
       key: 'eventType',
-      label: copy('Action'),
-      render: (item) => eventLabel(item.eventType, locale),
+      label: text.action,
+      render: (item) => actionLabel(item.eventType, locale),
     },
     {
       key: 'target',
-      label: copy('Target / reference'),
-      render: (item) => targetSummary(item, locale) ?? '—',
+      label: text.target,
+      render: (item) => targetSummary(item, locale) ?? '-',
     },
     {
       key: 'category',
-      label: copy('Category'),
+      label: text.category,
       render: (item) => (
-        <DBadge variant="outline">
-          {localized(categoryLabels[item.category], humanize(item.category))}
-        </DBadge>
+        <DBadge variant="outline">{activityCategoryLabel(item.category, locale)}</DBadge>
       ),
     },
     {
       key: 'location',
-      label: `${locale === 'id' ? 'Aplikasi' : 'Application'} / ${copy('Location')}`,
+      label: `${text.source} / ${text.location}`,
       render: (item) => (
         <div className="flex flex-wrap items-center gap-2">
           <DBadge variant="outline">{sourceLabel(item.source, locale)}</DBadge>
@@ -262,28 +205,30 @@ export function ActivityPage() {
     },
     {
       key: 'outcome',
-      label: copy('Outcome'),
-      render: (item) => <DBadge variant="outline">{outcomeLabel(item.outcome, locale)}</DBadge>,
+      label: text.outcome,
+      render: (item) => (
+        <DBadge variant={outcomeVariant(item.outcome)}>
+          {humanReadableLabel(item.outcome, locale)}
+        </DBadge>
+      ),
     },
   ];
+
   if (list.isError) {
     return (
       <DConnectionError
-        title={copy('Could not load activity.')}
-        message={copy('Try loading activity again.')}
+        title={text.loadFailed}
+        message={text.retry}
         onRetry={() => void list.refetch()}
         isRetrying={list.isFetching}
       />
     );
   }
+
   const filtered = Boolean(from || to || actorUserId || category || locationId || source);
   return (
     <BackofficePage>
-      <BackofficePageHeader
-        eyebrow={copy('Audit')}
-        title={t('activity')}
-        description={copy('Review important business and access actions safely.')}
-      />
+      <BackofficePageHeader eyebrow={text.audit} title={t('activity')} />
       <section className="mt-6">
         <DDataTable
           columns={columns}
@@ -311,8 +256,8 @@ export function ActivityPage() {
                 }}
               />
               <DSelectFilter
-                label={copy('User')}
-                placeholder={copy('All users')}
+                label={text.user}
+                placeholder={text.allUsers}
                 value={actorUserId || null}
                 clearable
                 options={actorOptions}
@@ -322,14 +267,14 @@ export function ActivityPage() {
                 }}
               />
               <DSelectFilter
-                label={locale === 'id' ? 'Aplikasi' : 'Application'}
-                placeholder={locale === 'id' ? 'Semua aplikasi' : 'All applications'}
+                label={text.source}
+                placeholder={text.allApplications}
                 value={source || null}
                 clearable
                 options={([
                   ['BACKOFFICE', 'Backoffice'],
                   ['OPERATIONAL', 'Operational'],
-                  ['SYSTEM', locale === 'id' ? 'Sistem' : 'System'],
+                  ['SYSTEM', text.system],
                 ] as const).map(([value, label]) => ({ value, label }))}
                 onChange={(value) => {
                   setSource((value ?? '') as ActivitySource | '');
@@ -337,12 +282,12 @@ export function ActivityPage() {
                 }}
               />
               <DSelectFilter
-                label={copy('Category')}
+                label={text.category}
                 value={category || null}
                 clearable
-                options={Object.entries(categoryLabels).map(([value, label]) => ({
+                options={categories.map((value) => ({
                   value,
-                  label: label[locale],
+                  label: activityCategoryLabel(value, locale),
                 }))}
                 onChange={(value) => {
                   setCategory(String(value ?? ''));
@@ -350,8 +295,8 @@ export function ActivityPage() {
                 }}
               />
               <DSelectFilter
-                label={copy('Location')}
-                placeholder={copy('All locations')}
+                label={text.location}
+                placeholder={text.allLocations}
                 value={locationId || null}
                 clearable
                 options={locationOptions}
@@ -372,11 +317,7 @@ export function ActivityPage() {
             setPageSize(size);
             resetPage();
           }}
-          emptyMessage={copy(
-            filtered
-              ? 'No activity matches the current filters.'
-              : 'No activity has been recorded yet.',
-          )}
+          emptyMessage={filtered ? text.emptyFiltered : text.empty}
         />
       </section>
       <ActivityDetail item={detail} onClose={() => setDetail(null)} />
@@ -385,18 +326,20 @@ export function ActivityPage() {
 }
 
 function ActivityDetail({ item, onClose }: { item: ActivityEvent | null; onClose: () => void }) {
-  const { copy, formatDateTime, locale } = useBackofficeLocalization();
+  const { formatDateTime, locale } = useBackofficeLocalization();
+  const text = pageCopy[locale];
   const target = item ? targetSummary(item, locale) : undefined;
+
   return (
     <DDialog
       open={Boolean(item)}
       onClose={onClose}
-      title={item ? eventLabel(item.eventType, locale) : copy('Activity details')}
+      title={item ? actionLabel(item.eventType, locale) : text.activityDetails}
       description={item ? formatDateTime(item.occurredAt) : undefined}
       footer={
         <div className="flex justify-end">
           <DButton variant="secondary" onClick={onClose}>
-            {copy('Close')}
+            {text.close}
           </DButton>
         </div>
       }
@@ -404,38 +347,29 @@ function ActivityDetail({ item, onClose }: { item: ActivityEvent | null; onClose
       {item ? (
         <div className="space-y-5">
           <div className="flex flex-wrap items-center gap-2">
-            <DBadge variant="outline">
-              {categoryLabels[item.category]?.[locale] ?? humanize(item.category)}
-            </DBadge>
+            <DBadge variant="outline">{activityCategoryLabel(item.category, locale)}</DBadge>
             <DBadge variant="outline">{sourceLabel(item.source, locale)}</DBadge>
-            <DBadge variant="outline">{outcomeLabel(item.outcome, locale)}</DBadge>
+            <DBadge variant={outcomeVariant(item.outcome)}>
+              {humanReadableLabel(item.outcome, locale)}
+            </DBadge>
           </div>
           <dl className="grid gap-4 text-sm sm:grid-cols-2">
             <Fact
-              label={copy('Actor')}
+              label={text.actor}
               value={
                 actorCompactLabel(item.actor) ||
-                (item.source === 'SYSTEM'
-                  ? locale === 'id'
-                    ? 'Sistem'
-                    : 'System'
-                  : locale === 'id'
-                    ? 'Tidak diketahui'
-                    : 'Unknown')
+                (item.source === 'SYSTEM' ? text.system : text.unknown)
               }
             />
-            {target ? <Fact label={copy('Affected item')} value={target} /> : null}
-            {item.locationName ? <Fact label={copy('Location')} value={item.locationName} /> : null}
-            <Fact
-              label={locale === 'id' ? 'Aplikasi' : 'Application'}
-              value={sourceLabel(item.source, locale)}
-            />
+            {target ? <Fact label={text.affectedItem} value={target} /> : null}
+            {item.locationName ? <Fact label={text.location} value={item.locationName} /> : null}
+            <Fact label={text.source} value={sourceLabel(item.source, locale)} />
           </dl>
           {item.correlationId ? (
             <section className="border-t border-[var(--color-border)] pt-4">
-              <h3 className="text-sm font-semibold">{copy('Technical information')}</h3>
+              <h3 className="text-sm font-semibold">{text.technicalInformation}</h3>
               <dl className="mt-3 grid gap-4 text-sm sm:grid-cols-2">
-                <Fact label={copy('Request ID')} value={item.correlationId} technical />
+                <Fact label={text.requestId} value={item.correlationId} technical />
               </dl>
             </section>
           ) : null}
@@ -493,10 +427,12 @@ function Fact({
   technical?: boolean;
 }) {
   return (
-    <div>
-      <dt className="text-xs font-medium text-[var(--color-text-muted)]">{label}</dt>
+    <div className="min-w-0">
+      <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+        {label}
+      </dt>
       <dd
-        className={`mt-1 break-words text-[var(--color-text)]${technical ? ' font-mono text-xs' : ''}`}
+        className={`mt-1 break-words text-sm font-medium text-[var(--color-text)]${technical ? ' font-mono text-xs' : ''}`}
       >
         {value}
       </dd>
@@ -505,41 +441,40 @@ function Fact({
 }
 
 function targetSummary(item: ActivityEvent, locale: 'id' | 'en'): string | undefined {
-  if (!item.target || item.eventType === 'LOGIN_SUCCEEDED' || item.eventType === 'LOGOUT')
-    return undefined;
-  const fallback = targetTypeLabels[item.target.type]?.[locale] ?? humanize(item.target.type);
-  return [item.target.displayName ?? fallback, item.target.reference]
-    .filter(Boolean)
-    .join(' · ');
+  if (!item.target || !hasBusinessTarget(item)) return undefined;
+  const display = item.target.displayName;
+  const reference = item.target.reference
+    ? activityNamespaceLabel(item.target.reference, locale)
+    : undefined;
+  const fallback = activityTargetLabel(item.target.type, locale);
+  return [display ?? fallback, reference].filter(Boolean).join(' · ');
 }
 
-function outcomeLabel(value: string, locale: 'id' | 'en') {
-  const labels: Record<string, LocalizedLabel> = {
-    SUCCEEDED: { id: 'Berhasil', en: 'Succeeded' },
-    REJECTED: { id: 'Ditolak', en: 'Rejected' },
-    FAILED: { id: 'Gagal', en: 'Failed' },
-  };
-  return labels[value]?.[locale] ?? humanize(value);
+function hasBusinessTarget(item: ActivityEvent) {
+  return item.eventType !== 'LOGIN_SUCCEEDED' && item.eventType !== 'LOGOUT';
+}
+
+function outcomeVariant(value: string): 'success' | 'warning' | 'danger' | 'outline' {
+  return value === 'SUCCEEDED'
+    ? 'success'
+    : value === 'REJECTED'
+      ? 'warning'
+      : value === 'FAILED'
+        ? 'danger'
+        : 'outline';
 }
 
 function sourceLabel(value: ActivityEvent['source'], locale: 'id' | 'en') {
   if (!value) return locale === 'id' ? 'Tidak diketahui' : 'Unknown';
-  const labels: Record<ActivitySource, LocalizedLabel> = {
-    BACKOFFICE: { id: 'Backoffice', en: 'Backoffice' },
-    OPERATIONAL: { id: 'Operational', en: 'Operational' },
-    SYSTEM: { id: 'Sistem', en: 'System' },
-  };
-  return labels[value][locale];
+  if (value === 'SYSTEM') return locale === 'id' ? 'Sistem' : 'System';
+  if (value === 'OPERATIONAL') return 'Operational';
+  return 'Backoffice';
 }
 
-function eventLabel(value: string, locale: 'id' | 'en') {
-  return eventLabels[value]?.[locale] ?? humanize(value);
-}
-
-function humanize(value: string) {
-  return value
-    .split('_')
-    .filter(Boolean)
-    .map((part) => part[0] + part.slice(1).toLowerCase())
-    .join(' ');
+function actionLabel(value: string, locale: 'id' | 'en') {
+  if (value === 'LOGIN_SUCCEEDED')
+    return locale === 'id' ? 'Masuk ke aplikasi' : 'Signed in to application';
+  if (value === 'LOGOUT')
+    return locale === 'id' ? 'Keluar dari aplikasi' : 'Signed out of application';
+  return activityEventLabel(value, locale);
 }

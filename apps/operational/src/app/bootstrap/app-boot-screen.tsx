@@ -7,7 +7,7 @@ interface AppBootScreenProps {
 
 export function AppBootScreen({
   productName = 'Digvation Business',
-  message = 'Preparing your workspace',
+  message = 'Memuat Operasional...',
 }: AppBootScreenProps) {
   return (
     <main
