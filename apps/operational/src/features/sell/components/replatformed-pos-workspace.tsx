@@ -854,11 +854,19 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     }
   };
 
-  const openAdjustment = (transaction: Sale) => {
+  const openAdjustment = async (transaction: Sale) => {
     if (transaction.status !== 'OPEN') return;
     setQueueDetail(null);
-    setAdjustmentTarget(transaction);
-    workspace.openQueueContext(transaction.id);
+    try {
+      const hydrated = await workspace.hydrateQueuedSale(transaction.id);
+      setAdjustmentTarget(hydrated);
+    } catch {
+      showToast({
+        title: copy('Could not load transaction'),
+        description: copy('Reload the transaction before accepting payment.'),
+        variant: 'danger',
+      });
+    }
   };
 
   const openQueuePayment = async (transaction: Sale) => {
@@ -3350,6 +3358,9 @@ function ReferenceOrderAdjustmentDialog({
   if (!sale) return null;
 
   const paid = hasSuccessfulPayment(sale);
+  const { totalPaid } = financialSummary(sale);
+  const paidAmount = createDecimal(totalPaid);
+  const saleTotal = createDecimal(sale.totalAmount);
   const activeLines = sale.lines.filter((line) => line.removedAt === null);
   const options = items
     .filter((item) => {
@@ -3400,8 +3411,17 @@ function ReferenceOrderAdjustmentDialog({
         )}
         <div className="divide-y divide-[var(--color-border)] overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-background)]">
           {activeLines.map((line) => {
+            const lineMutable =
+              !line.fulfillment || line.fulfillment.status === 'WAITING';
             const canDecrease =
-              !paid && createDecimal(line.quantity).greaterThan(createDecimal('1'));
+              !paid &&
+              lineMutable &&
+              createDecimal(line.quantity).greaterThan(createDecimal('1'));
+            const canRemove = !paid && lineMutable;
+            const projectedTotalAfterRemoval = saleTotal.minus(createDecimal(line.totalAmount));
+            const removalRefund = paidAmount.greaterThan(projectedTotalAfterRemoval)
+              ? paidAmount.minus(projectedTotalAfterRemoval)
+              : createDecimal('0');
             return (
               <div key={line.id} className="flex items-center justify-between gap-3 p-3">
                 <div className="min-w-0">
@@ -3414,6 +3434,11 @@ function ReferenceOrderAdjustmentDialog({
                   <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
                     {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
                   </p>
+                  {paid && removalRefund.greaterThan(createDecimal('0')) ? (
+                    <p className="mt-1 text-[11px] font-semibold text-[var(--color-warning)]">
+                      {copy('Refund required')}: {money(removalRefund.toFixed(4), locale)}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
                   <button
@@ -3436,7 +3461,7 @@ function ReferenceOrderAdjustmentDialog({
                   <button
                     type="button"
                     aria-label={`${copy('Increase quantity')} ${line.itemNameSnapshot}`}
-                    disabled={isMutating}
+                    disabled={!lineMutable || isMutating}
                     onClick={() =>
                       onQuantity(
                         line,
@@ -3450,7 +3475,7 @@ function ReferenceOrderAdjustmentDialog({
                   <button
                     type="button"
                     aria-label={`${copy('Remove')} ${line.itemNameSnapshot}`}
-                    disabled={paid || isMutating}
+                    disabled={!canRemove || isMutating}
                     onClick={() => onRemove(line)}
                     className="ml-1 flex size-8 items-center justify-center rounded-lg text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 disabled:cursor-not-allowed disabled:opacity-40"
                   >

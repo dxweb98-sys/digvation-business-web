@@ -434,10 +434,11 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
   };
 
   const startSaleWork = async (sale: Sale) => {
+    const authoritative = await transactionAdapter.getSale(sale.id);
     const updated = await command.runMutation(() =>
       transactionAdapter.startSaleWork(
-        sale.id,
-        sale.version,
+        authoritative.id,
+        authoritative.version,
         `cashier-start-work-${crypto.randomUUID()}`,
       ),
     );
@@ -507,12 +508,17 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
   ) => {
     command.clearNotice();
     try {
+      const authoritative = await transactionAdapter.getSale(sale.id);
+      const liveLine = authoritative.lines.find(
+        (candidate) => candidate.id === line.id && candidate.removedAt === null,
+      );
+      if (!liveLine) throw new Error(copy('The service line is no longer available.'));
       const performers = contributors.length
         ? contributors
         : employeeIds.map((employeeId) => ({ employeeId }));
       const updated = await command.runMutation(() =>
-        transactionAdapter.setSaleLinePerformers(sale.id, line.id, {
-          expectedVersion: sale.version,
+        transactionAdapter.setSaleLinePerformers(authoritative.id, liveLine.id, {
+          expectedVersion: authoritative.version,
           performers,
         }),
       );
