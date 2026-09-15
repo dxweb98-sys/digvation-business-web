@@ -1,0 +1,49 @@
+name: Temporary Stale Prop Fix
+
+on:
+  push:
+    branches:
+      - fix/ci-formatting
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: ${{ !contains(github.event.head_commit.message, '[stale-prop-bot]') && !contains(github.event.head_commit.message, '[remove-stale-prop-workflow]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref_name }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - run: corepack enable
+      - run: corepack prepare pnpm@11.22.0 --activate
+      - run: pnpm install --frozen-lockfile
+      - name: Remove stale detail prop
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('apps/operational/src/features/sell/components/replatformed-pos-workspace.tsx')
+          text = path.read_text()
+          patterns = [
+              '        isLocalDemo={isLocalDemo}\n',
+              '  isLocalDemo,\n',
+              '  isLocalDemo: boolean;\n',
+          ]
+          for pattern in patterns:
+              if pattern not in text:
+                  raise SystemExit(f'pattern not found: {pattern!r}')
+              text = text.replace(pattern, '', 1)
+          path.write_text(text)
+          PY
+          pnpm exec prettier --write apps/operational/src/features/sell/components/replatformed-pos-workspace.tsx
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/operational/src/features/sell/components/replatformed-pos-workspace.tsx
+          git commit -m "fix(operational): remove stale detail prop [stale-prop-bot]"
+          git push origin HEAD:${{ github.ref_name }}
