@@ -1,6 +1,7 @@
 import {
   DBadge,
   DButton,
+  DCheckbox,
   DConfirmDialog,
   DDialog,
   DDataTable,
@@ -292,7 +293,7 @@ function LocationsPanel({
       label: copy('Status'),
       render: (location) => (
         <DBadge
-          variant={location.status === 'ACTIVE' ? 'outline' : 'secondary'}
+          variant={location.status === 'ACTIVE' ? 'success' : 'secondary'}
         >
           {copy(location.status === 'ACTIVE' ? 'Active' : 'Inactive')}
         </DBadge>
@@ -549,31 +550,32 @@ function LocationEditor({
           />
         </div>
 
-        <label className="mt-5 flex items-start gap-3 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-4 py-3">
-          <input
-            type="checkbox"
-            checked={setAsMain}
-            disabled={isCurrentMain || firstLocation}
-            onChange={(event) => setSetAsMain(event.target.checked)}
-            className="mt-0.5 size-4 accent-[var(--color-brand)]"
-          />
-          <span className="min-w-0">
-            <span className="block text-sm font-medium">
-              {copy('Set as Main Branch')}
+        <section className="mt-5 border-t border-[var(--color-border)] pt-4">
+          <label className="flex items-start gap-3">
+            <DCheckbox
+              checked={setAsMain}
+              disabled={isCurrentMain || firstLocation}
+              onChange={() => setSetAsMain((current) => !current)}
+              className="mt-0.5"
+            />
+            <span className="min-w-0">
+              <span className="block text-sm font-medium">
+                {copy('Set as Main Branch')}
+              </span>
+              <span className="mt-0.5 block text-xs leading-5 text-[var(--color-text-muted)]">
+                {isCurrentMain
+                  ? copy(
+                      'This is the current Main Branch. Choose another active location to move the Main Branch.',
+                    )
+                  : firstLocation
+                    ? copy('The first active location becomes Main Branch automatically.')
+                    : copy(
+                        'Main Branch is used as the default location for Dashboard and other business workflows.',
+                      )}
+              </span>
             </span>
-            <span className="mt-0.5 block text-xs leading-5 text-[var(--color-text-muted)]">
-              {isCurrentMain
-                ? copy(
-                    'This is the current Main Branch. Choose another active location to move the Main Branch.',
-                  )
-                : firstLocation
-                  ? copy('The first active location becomes Main Branch automatically.')
-                  : copy(
-                      'Main Branch is used as the default location for Dashboard and other business workflows.',
-                    )}
-            </span>
-          </span>
-        </label>
+          </label>
+        </section>
       </DDialog>
 
       <DConfirmDialog

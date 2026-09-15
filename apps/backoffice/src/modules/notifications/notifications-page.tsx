@@ -1,5 +1,12 @@
 import { useRuntime } from '@digvation/business-runtime';
-import { DBadge, DButton, DDataTable, useToast, type TableColumn } from '@digvation/ui';
+import {
+  DBadge,
+  DButton,
+  DConnectionError,
+  DDataTable,
+  useToast,
+  type TableColumn,
+} from '@digvation/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, Eye } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -121,7 +128,15 @@ export function NotificationsPage() {
       key: 'severity',
       label: notificationText(locale, 'severity'),
       render: (notification) => (
-        <DBadge variant="outline">
+        <DBadge
+          variant={
+            notification.severity === 'CRITICAL'
+              ? 'danger'
+              : notification.severity === 'WARNING'
+                ? 'warning'
+                : 'outline'
+          }
+        >
           {notificationSeverityLabel(locale, notification.severity)}
         </DBadge>
       ),
@@ -153,19 +168,12 @@ export function NotificationsPage() {
       />
       <section className="mt-6">
         {list.isError ? (
-          <div className="rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface)] px-5 py-8 text-center">
-            <p className="text-sm text-[var(--color-text-muted)]">
-              {notificationText(locale, 'loadFailed')}
-            </p>
-            <DButton
-              variant="secondary"
-              size="sm"
-              className="mt-3"
-              onClick={() => void list.refetch()}
-            >
-              {notificationText(locale, 'retry')}
-            </DButton>
-          </div>
+          <DConnectionError
+            title={notificationText(locale, 'loadFailed')}
+            message={notificationText(locale, 'loadFailed')}
+            onRetry={() => void list.refetch()}
+            isRetrying={list.isFetching}
+          />
         ) : (
           <DDataTable
             columns={columns}

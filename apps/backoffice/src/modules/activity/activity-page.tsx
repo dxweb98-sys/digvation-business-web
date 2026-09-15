@@ -297,7 +297,7 @@ function ActivityDetail({ item, onClose }: { item: ActivityEvent | null; onClose
         <div className="space-y-5">
           <div className="flex flex-wrap items-center gap-2">
             <DBadge variant="outline">{activityCopy(categoryLabels[item.category] ?? item.category)}</DBadge>
-            <DBadge variant="outline">{outcomeLabel(item.outcome, copy)}</DBadge>
+            <DBadge variant={outcomeVariant(item.outcome)}>{outcomeLabel(item.outcome, copy)}</DBadge>
           </div>
           <dl className="grid gap-4 text-sm sm:grid-cols-2">
             <Fact label={copy('Actor')} value={item.actor?.displayName ?? copy('System')} />
@@ -321,7 +321,12 @@ function ActivityDetail({ item, onClose }: { item: ActivityEvent | null; onClose
 }
 
 function Fact({ label, value, technical = false }: { label: string; value: string; technical?: boolean }) {
-  return <div><dt className="text-xs font-medium text-[var(--color-text-muted)]">{label}</dt><dd className={`mt-1 break-words text-[var(--color-text)]${technical ? ' font-mono text-xs' : ''}`}>{value}</dd></div>;
+  return (
+    <div className="min-w-0">
+      <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">{label}</dt>
+      <dd className={`mt-1 break-words text-[var(--color-text)]${technical ? ' font-mono text-xs' : ' text-sm font-medium'}`}>{value}</dd>
+    </div>
+  );
 }
 
 function targetSummary(item: ActivityEvent, copy: (value: string) => string): string | undefined {
@@ -336,6 +341,16 @@ function targetSummary(item: ActivityEvent, copy: (value: string) => string): st
 
 function hasBusinessTarget(item: ActivityEvent) {
   return item.eventType !== 'LOGIN_SUCCEEDED' && item.eventType !== 'LOGOUT';
+}
+
+function outcomeVariant(value: string): 'success' | 'warning' | 'danger' | 'outline' {
+  return value === 'SUCCEEDED'
+    ? 'success'
+    : value === 'REJECTED'
+      ? 'warning'
+      : value === 'FAILED'
+        ? 'danger'
+        : 'outline';
 }
 
 function outcomeLabel(value: string, copy: (value: string) => string) {

@@ -68,6 +68,11 @@ export interface ContributionInput {
   contributors: Array<{ employeeId: string; shareRate?: string }>;
 }
 
+export interface ServicePerformersInput {
+  expectedVersion: number;
+  performers: Array<{ employeeId: string; shareRate?: string }>;
+}
+
 export interface FulfillmentInput {
   expectedVersion: number;
   status: Exclude<FulfillmentStatus, 'WAITING'>;
@@ -119,7 +124,10 @@ export interface EmployeeQuery {
   listEmployees(signal?: AbortSignal): Promise<ApiPage<Employee>>;
 }
 export interface PaymentRouteQuery {
-  listPaymentRoutes(input: { sellingLocationId: string; currency: string }, signal?: AbortSignal): Promise<ApiPage<PaymentRoute>>;
+  listPaymentRoutes(
+    input: { sellingLocationId: string; currency: string },
+    signal?: AbortSignal,
+  ): Promise<ApiPage<PaymentRoute>>;
 }
 
 export interface OpenSalesQuery {
@@ -151,6 +159,11 @@ export interface SaleTransactionClient {
   clearSaleLineDiscount(saleId: string, saleLineId: string, expectedVersion: number): Promise<Sale>;
   setSaleDiscount(saleId: string, input: DiscountInput): Promise<Sale>;
   clearSaleDiscount(saleId: string, expectedVersion: number): Promise<Sale>;
+  setSaleLinePerformers?(
+    saleId: string,
+    saleLineId: string,
+    input: ServicePerformersInput,
+  ): Promise<Sale>;
   setSaleLineAssignments(saleId: string, saleLineId: string, input: AssignmentInput): Promise<Sale>;
   setSaleLineContributions(
     saleId: string,
@@ -206,9 +219,20 @@ export class HttpCashierTransactionAdapter
       signal,
     });
   }
-  public listPaymentRoutes(input: { sellingLocationId: string; currency: string }, signal?: AbortSignal): Promise<ApiPage<PaymentRoute>> {
-    const query = new URLSearchParams({ sellingLocationId: input.sellingLocationId, currency: input.currency, status: 'ACTIVE', limit: String(PAGE_SIZE), offset: '0' });
-    return this.client.get<ApiPage<PaymentRoute>>(`${API_PREFIX}/payment-routing?${query}`, { signal });
+  public listPaymentRoutes(
+    input: { sellingLocationId: string; currency: string },
+    signal?: AbortSignal,
+  ): Promise<ApiPage<PaymentRoute>> {
+    const query = new URLSearchParams({
+      sellingLocationId: input.sellingLocationId,
+      currency: input.currency,
+      status: 'ACTIVE',
+      limit: String(PAGE_SIZE),
+      offset: '0',
+    });
+    return this.client.get<ApiPage<PaymentRoute>>(`${API_PREFIX}/payment-routing?${query}`, {
+      signal,
+    });
   }
 
   public listCatalogItems(signal?: AbortSignal): Promise<ApiPage<CatalogItem>> {
@@ -372,6 +396,17 @@ export class HttpCashierTransactionAdapter
     return this.client.post<Sale>(`${API_PREFIX}/sales/${saleId}/discount/remove`, {
       expectedVersion,
     });
+  }
+
+  public setSaleLinePerformers(
+    saleId: string,
+    saleLineId: string,
+    input: ServicePerformersInput,
+  ): Promise<Sale> {
+    return this.client.post<Sale>(
+      `${API_PREFIX}/sales/${saleId}/lines/${saleLineId}/performers`,
+      input,
+    );
   }
 
   public setSaleLineAssignments(

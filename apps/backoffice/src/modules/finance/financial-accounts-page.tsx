@@ -66,14 +66,14 @@ export function FinancialAccountsPage() {
         )}
       />
       <DTabs defaultValue="accounts" className="mt-6">
-        <DTabsList>
+        <DTabsList className="max-w-full overflow-x-auto">
           <DTabsTrigger value="accounts">{copy('Accounts')}</DTabsTrigger>
           <DTabsTrigger value="routing">{copy('Payment routing')}</DTabsTrigger>
         </DTabsList>
-        <DTabsContent value="accounts">
+        <DTabsContent value="accounts" className="mt-4">
           <AccountsPanel api={api} />
         </DTabsContent>
-        <DTabsContent value="routing">
+        <DTabsContent value="routing" className="mt-4">
           <RoutingPanel api={api} />
         </DTabsContent>
       </DTabs>
@@ -160,7 +160,7 @@ function AccountsPanel({ api }: { api: FinancialAccountsApi }) {
       </div>
     );
   return (
-    <section className="mt-5">
+    <section>
       <DDataTable
         columns={columns}
         data={accounts.data?.items ?? []}
@@ -352,7 +352,7 @@ function AccountEditor({
           value={code}
           onChange={setCode}
           disabled={Boolean(account)}
-          placeholder={copy('Leave blank when no manual code is needed')}
+          placeholder={copy('For example, BANK-SETTLEMENT')}
           autoFocus
         />
         <DInput
@@ -374,6 +374,7 @@ function AccountEditor({
           onChange={(value) => setCurrency(value.toUpperCase())}
           disabled={Boolean(account)}
           maxLength={3}
+          placeholder="IDR"
         />
         {type !== 'CASH' ? (
           <>
@@ -381,16 +382,21 @@ function AccountEditor({
               label={copy(type === 'BANK' ? 'Bank / institution' : 'Wallet provider')}
               value={institutionName}
               onChange={setInstitutionName}
+              placeholder={copy(type === 'BANK' ? 'For example, BCA' : 'For example, GoPay')}
             />
             <DInput
               label={copy(type === 'BANK' ? 'Account number' : 'Wallet account')}
               value={accountReference}
               onChange={setAccountReference}
+              placeholder={copy(
+                type === 'BANK' ? 'For example, 1234567890' : 'For example, 081234567890',
+              )}
             />
             <DInput
               label={copy('Account holder name')}
               value={accountHolderName}
               onChange={setAccountHolderName}
+              placeholder={copy('For example, PT Digvation Indonesia')}
               containerClassName="sm:col-span-2"
             />
           </>
@@ -412,7 +418,8 @@ function AccountDetail({
     <DDialog
       open={Boolean(account)}
       onClose={onClose}
-      title={copy('Financial account details')}
+      title={account?.name ?? copy('Financial account details')}
+      description={account ? `${account.code} · ${copy(accountTypeLabel(account.type))}` : undefined}
       footer={
         <div className="flex justify-end">
           <DButton variant="secondary" onClick={onClose}>
@@ -422,36 +429,66 @@ function AccountDetail({
       }
     >
       {account ? (
-        <dl className="grid gap-4 sm:grid-cols-2">
-          <Fact label={copy('Account code')} value={account.code} />
-          <Fact label={copy('Account name')} value={account.name} />
-          <Fact label={copy('Account type')} value={copy(accountTypeLabel(account.type))} />
-          <Fact label={copy('Currency')} value={account.currency} />
-          <Fact label={copy('Status')} value={<StatusBadge status={account.status} />} />
-          {account.type !== 'CASH' ? (
-            <>
+        <div>
+          <section className="border-b border-[var(--color-border)] pb-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="min-w-0">
+                <h2 className="break-words text-2xl font-semibold tracking-tight text-[var(--color-text)]">
+                  {account.name}
+                </h2>
+                <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+                  {account.code} · {copy(accountTypeLabel(account.type))}
+                </p>
+              </div>
+              <StatusBadge status={account.status} />
+            </div>
+            <dl className="mt-5 grid gap-x-6 gap-y-5 border-t border-[var(--color-border)] pt-4 sm:grid-cols-3">
+              <Fact label={copy('Currency')} value={account.currency} emphasized />
+              <Fact label={copy('Account type')} value={copy(accountTypeLabel(account.type))} />
               <Fact
-                label={copy(account.type === 'BANK' ? 'Bank / institution' : 'Wallet provider')}
-                value={account.institutionName ?? copy('Not set')}
+                label={copy('Destination')}
+                value={
+                  account.type === 'CASH'
+                    ? copy('On-site cash')
+                    : `${account.institutionName ?? copy('Not set')} · ${account.accountReference ?? copy('Not set')}`
+                }
               />
+            </dl>
+          </section>
+
+          <section className="pt-5">
+            <h3 className="text-base font-semibold text-[var(--color-text)]">
+              {copy('Account information')}
+            </h3>
+            <dl className="mt-4 grid gap-x-6 gap-y-5 sm:grid-cols-2">
+              <Fact label={copy('Account code')} value={account.code} />
+              <Fact label={copy('Status')} value={<StatusBadge status={account.status} />} />
+              {account.type !== 'CASH' ? (
+                <>
+                  <Fact
+                    label={copy(account.type === 'BANK' ? 'Bank / institution' : 'Wallet provider')}
+                    value={account.institutionName ?? copy('Not set')}
+                  />
+                  <Fact
+                    label={copy(account.type === 'BANK' ? 'Account number' : 'Wallet account')}
+                    value={account.accountReference ?? copy('Not set')}
+                  />
+                  <Fact
+                    label={copy('Account holder name')}
+                    value={account.accountHolderName ?? copy('Not set')}
+                  />
+                </>
+              ) : null}
               <Fact
-                label={copy(account.type === 'BANK' ? 'Account number' : 'Wallet account')}
-                value={account.accountReference ?? copy('Not set')}
+                label={copy('Updated')}
+                value={formatDate(new Date(account.updatedAt), {
+                  dateStyle: 'medium',
+                  timeStyle: 'short',
+                })}
               />
-              <Fact
-                label={copy('Account holder name')}
-                value={account.accountHolderName ?? copy('Not set')}
-              />
-            </>
-          ) : null}
-          <Fact
-            label={copy('Updated')}
-            value={formatDate(new Date(account.updatedAt), {
-              dateStyle: 'medium',
-              timeStyle: 'short',
-            })}
-          />
-        </dl>
+            </dl>
+          </section>
+        </div>
       ) : null}
     </DDialog>
   );
@@ -512,7 +549,7 @@ function RoutingPanel({ api }: { api: FinancialAccountsApi }) {
       </div>
     );
   return (
-    <section className="mt-5">
+    <section>
       <DDataTable
         columns={columns}
         data={routes.data?.items ?? []}
@@ -642,10 +679,21 @@ function RouteEditor({
       if (route) await api.updateRoute(route, { financialAccountId: accountId, status });
       else {
         const account = (accounts.data?.items ?? []).find((item) => item.id === accountId);
-        const existing = await api.listRoutes({ sellingLocationId: locationId, paymentMethod: method, limit: 100, offset: 0 });
+        const existing = await api.listRoutes({
+          sellingLocationId: locationId,
+          paymentMethod: method,
+          limit: 100,
+          offset: 0,
+        });
         const sameScope = existing.items.find((item) => item.currency === account?.currency);
-        if (sameScope) await api.updateRoute(sameScope, { financialAccountId: accountId, status: 'ACTIVE' });
-        else await api.createRoute({ sellingLocationId: locationId, paymentMethod: method, financialAccountId: accountId });
+        if (sameScope)
+          await api.updateRoute(sameScope, { financialAccountId: accountId, status: 'ACTIVE' });
+        else
+          await api.createRoute({
+            sellingLocationId: locationId,
+            paymentMethod: method,
+            financialAccountId: accountId,
+          });
       }
       onSaved();
       onClose();
@@ -830,11 +878,27 @@ function StatusBadge({ status }: { status: RecordStatus }) {
     </DBadge>
   );
 }
-function Fact({ label, value }: { label: string; value: ReactNode }) {
+function Fact({
+  label,
+  value,
+  emphasized = false,
+}: {
+  label: string;
+  value: ReactNode;
+  emphasized?: boolean;
+}) {
   return (
-    <div>
-      <dt className="text-xs font-medium text-[var(--color-text-muted)]">{label}</dt>
-      <dd className="mt-1 break-words">{value}</dd>
+    <div className="min-w-0">
+      <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+        {label}
+      </dt>
+      <dd
+        className={`mt-1 break-words text-[var(--color-text)] ${
+          emphasized ? 'text-base font-semibold' : 'text-sm font-medium'
+        }`}
+      >
+        {value}
+      </dd>
     </div>
   );
 }

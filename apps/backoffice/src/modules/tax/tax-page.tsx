@@ -85,12 +85,12 @@ export function TaxPage() {
       />
 
       <DTabs defaultValue="profile" className="mt-6">
-        <DTabsList>
+        <DTabsList className="max-w-full overflow-x-auto">
           <DTabsTrigger value="profile">{tax('profile')}</DTabsTrigger>
           <DTabsTrigger value="categories">{tax('categories')}</DTabsTrigger>
           <DTabsTrigger value="rules">{tax('rules')}</DTabsTrigger>
         </DTabsList>
-        <DTabsContent value="profile" className="mt-5">
+        <DTabsContent value="profile" className="mt-4">
           <TaxProfileSection
             key={profile.data?.updatedAt ?? 'unavailable'}
             profile={profile.data}
@@ -100,7 +100,7 @@ export function TaxPage() {
             onChanged={() => refresh(keys.profile)}
           />
         </DTabsContent>
-        <DTabsContent value="categories" className="mt-5">
+        <DTabsContent value="categories" className="mt-4">
           <TaxCategoriesSection
             categories={categories.data?.items ?? []}
             loading={categories.isLoading}
@@ -110,7 +110,7 @@ export function TaxPage() {
             onChanged={() => refresh(keys.categories)}
           />
         </DTabsContent>
-        <DTabsContent value="rules" className="mt-5">
+        <DTabsContent value="rules" className="mt-4">
           <TaxRulesSection
             rules={rules.data?.items ?? []}
             categories={categories.data?.items ?? []}
@@ -180,14 +180,14 @@ function TaxProfileSection({
     );
 
   return (
-    <section className="max-w-3xl rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 sm:p-6">
+    <section className="max-w-3xl">
       <form
         onSubmit={(event) => {
           event.preventDefault();
           void save();
         }}
       >
-        <div className="divide-y divide-[var(--color-border)]">
+        <div className="divide-y divide-[var(--color-border)] border-y border-[var(--color-border)]">
           <div className="flex items-center justify-between gap-5 py-4">
             <div className="min-w-0">
               <p className="text-sm font-medium text-[var(--color-text)]">{tax('itemTax')}</p>
@@ -214,7 +214,7 @@ function TaxProfileSection({
           </div>
         </div>
         {canUpdate && profile ? (
-          <div className="mt-5 flex justify-end border-t border-[var(--color-border)] pt-4">
+          <div className="mt-4 flex justify-end">
             <DButton type="submit" loading={saving} disabled={!changed}>
               {tax('saveProfile')}
             </DButton>
@@ -249,7 +249,7 @@ function TaxCategoriesSection({
       key: 'status',
       label: tax('status'),
       render: (row) => (
-        <DBadge variant={row.status === 'ACTIVE' ? 'outline' : 'secondary'}>
+        <DBadge variant={row.status === 'ACTIVE' ? 'success' : 'secondary'}>
           {tax(row.status === 'ACTIVE' ? 'active' : 'inactive')}
         </DBadge>
       ),
@@ -352,11 +352,16 @@ function TaxCategoryDialog({
     >
       <div className="grid gap-4 sm:grid-cols-2">
         {isNew ? (
-          <DInput label={tax('code')} value={code} onChange={(value) => setCode(value.toUpperCase())} />
+          <DInput
+            label={tax('code')}
+            value={code}
+            onChange={(value) => setCode(value.toUpperCase())}
+            placeholder="PPN"
+          />
         ) : (
           <DInput label={tax('code')} value={category?.code ?? ''} onChange={() => undefined} disabled />
         )}
-        <DInput label={tax('name')} value={name} onChange={setName} />
+        <DInput label={tax('name')} value={name} onChange={setName} placeholder="PPN" />
         {!isNew ? (
           <DSelect
             label={tax('status')}
@@ -429,7 +434,7 @@ function TaxRulesSection({
       key: 'cancelledAt',
       label: tax('status'),
       render: (row) => (
-        <DBadge variant={row.cancelledAt ? 'secondary' : 'outline'}>
+        <DBadge variant={row.cancelledAt ? 'secondary' : 'success'}>
           {tax(row.cancelledAt ? 'cancelled' : 'active')}
         </DBadge>
       ),
@@ -601,6 +606,7 @@ function TaxRuleDialog({
             label={tax('category')}
             value={categoryId}
             clearable={false}
+            placeholder={tax('category')}
             options={categories.map((category) => ({
               value: category.id,
               label: `${category.code} — ${category.name}`,
@@ -608,9 +614,20 @@ function TaxRuleDialog({
             onValueChange={(value) => setCategoryId(value == null ? '' : String(value))}
           />
         ) : null}
-        <DInput label={tax('code')} value={code} onChange={(value) => setCode(value.toUpperCase())} />
-        <DInput label={tax('name')} value={name} onChange={setName} />
-        <DInput label={tax('rate')} inputMode="decimal" value={ratePercent} onChange={setRatePercent} />
+        <DInput
+          label={tax('code')}
+          value={code}
+          onChange={(value) => setCode(value.toUpperCase())}
+          placeholder="PPN-11"
+        />
+        <DInput label={tax('name')} value={name} onChange={setName} placeholder="PPN 11%" />
+        <DInput
+          label={tax('rate')}
+          inputMode="decimal"
+          value={ratePercent}
+          onChange={setRatePercent}
+          placeholder="11"
+        />
         <DSelect
           label={tax('treatment')}
           value={priceTreatment}

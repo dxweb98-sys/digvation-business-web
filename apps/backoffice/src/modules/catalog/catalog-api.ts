@@ -56,8 +56,6 @@ export interface Item {
   version: number;
   serviceDefinition: {
     defaultDurationMinutes: number | null;
-    employeeAssignmentMode: 'NONE' | 'OPTIONAL' | 'REQUIRED';
-    allowEmployeeContribution: boolean;
   } | null;
 }
 export interface CatalogManagementItem extends Item {
