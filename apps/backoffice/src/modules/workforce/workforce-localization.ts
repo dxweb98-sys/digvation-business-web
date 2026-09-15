@@ -38,7 +38,10 @@ const workforceCopy: Record<string, { id: string; en: string }> = {
   'Not set': { id: 'Belum diatur', en: 'Not set' },
   'Service assignment': { id: 'Penugasan layanan', en: 'Service assignment' },
   'Can perform services': { id: 'Dapat mengerjakan layanan', en: 'Can perform services' },
-  'Cannot perform services': { id: 'Tidak dapat mengerjakan layanan', en: 'Cannot perform services' },
+  'Cannot perform services': {
+    id: 'Tidak dapat mengerjakan layanan',
+    en: 'Cannot perform services',
+  },
   'Allow employees in this position to be assigned to service work.': {
     id: 'Izinkan karyawan dengan jabatan ini mengerjakan layanan.',
     en: 'Allow employees in this position to perform services.',

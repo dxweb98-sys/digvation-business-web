@@ -256,7 +256,9 @@ export function SaleLineTaskDialog({
                 <h3 className="font-bold">{copy('Service workers')}</h3>
               </div>
               <p className="mt-2 text-xs leading-5 text-[var(--color-text-muted)]">
-                {copy('Select employees who perform this service. Leave shares blank to split evenly.')}
+                {copy(
+                  'Select employees who perform this service. Leave shares blank to split evenly.',
+                )}
               </p>
 
               <div className="mt-4 grid gap-2 sm:grid-cols-2">

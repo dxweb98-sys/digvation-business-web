@@ -112,7 +112,9 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
       throw new Error(copy('Finish adjusting the transaction before adding items to the cart.'));
     }
     if (context === 'TRANSACTION_ADJUSTMENT' && (!targetSaleId || resumedSaleId !== targetSaleId)) {
-      throw new Error(copy('The transaction being adjusted is no longer active. Reopen the adjustment.'));
+      throw new Error(
+        copy('The transaction being adjusted is no longer active. Reopen the adjustment.'),
+      );
     }
     if (!selectedLocationId) {
       saleWorkspace.addItem(item.id, catalogVariantId);
@@ -138,7 +140,9 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
       const targetSaleId =
         context === 'TRANSACTION_ADJUSTMENT' ? (resumedSaleId ?? undefined) : undefined;
       if (context === 'TRANSACTION_ADJUSTMENT' && !targetSaleId) {
-        throw new Error(copy('The transaction being adjusted is no longer active. Reopen the adjustment.'));
+        throw new Error(
+          copy('The transaction being adjusted is no longer active. Reopen the adjustment.'),
+        );
       }
       const variants = await catalog.loadActiveVariants(item);
       if (variants.length > 0) {
@@ -458,7 +462,9 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     try {
       const authoritative = await transactionAdapter.getSale(targetSale.id);
       if (authoritative.payments.some((payment) => payment.status === 'PENDING'))
-        throw new Error(copy('A payment is still pending. Wait for it to settle before trying again.'));
+        throw new Error(
+          copy('A payment is still pending. Wait for it to settle before trying again.'),
+        );
       const updated = await command.runMutation(() =>
         transactionAdapter.createSalePayment(
           authoritative.id,

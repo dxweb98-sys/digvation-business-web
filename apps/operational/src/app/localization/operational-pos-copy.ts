@@ -138,7 +138,10 @@ const posCopy: Record<string, LocalizedCopy> = {
     'id-ID': 'Pembayaran belum selesai. Keranjang tetap tersedia.',
     'en-US': 'Payment was not completed. The cart remains available.',
   },
-  'The cart was not changed.': { 'id-ID': 'Keranjang tidak berubah.', 'en-US': 'The cart was not changed.' },
+  'The cart was not changed.': {
+    'id-ID': 'Keranjang tidak berubah.',
+    'en-US': 'The cart was not changed.',
+  },
   'Transaction status was not changed.': {
     'id-ID': 'Status transaksi tidak berubah.',
     'en-US': 'Transaction status was not changed.',
@@ -216,15 +219,22 @@ const posCopy: Record<string, LocalizedCopy> = {
     'en-US': 'Previous payment remains recorded',
   },
   'You can add items. Reducing or removing paid items requires a refund.': {
-    'id-ID': 'Anda dapat menambah item. Pengurangan atau penghapusan item berbayar memerlukan pengembalian dana.',
+    'id-ID':
+      'Anda dapat menambah item. Pengurangan atau penghapusan item berbayar memerlukan pengembalian dana.',
     'en-US': 'You can add items. Reducing or removing paid items requires a refund.',
   },
   'Change quantity or remove items that have not started, then confirm.': {
     'id-ID': 'Ubah jumlah atau hapus item yang belum dimulai, lalu simpan penyesuaian.',
     'en-US': 'Change quantity or remove items that have not started, then confirm.',
   },
-  'Add item from catalog': { 'id-ID': 'Tambah item dari katalog', 'en-US': 'Add item from catalog' },
-  'Search product or service': { 'id-ID': 'Cari produk atau layanan', 'en-US': 'Search product or service' },
+  'Add item from catalog': {
+    'id-ID': 'Tambah item dari katalog',
+    'en-US': 'Add item from catalog',
+  },
+  'Search product or service': {
+    'id-ID': 'Cari produk atau layanan',
+    'en-US': 'Search product or service',
+  },
   'Search by item name or code.': {
     'id-ID': 'Cari berdasarkan nama atau kode item.',
     'en-US': 'Search by item name or code.',
@@ -236,7 +246,10 @@ const posCopy: Record<string, LocalizedCopy> = {
     'en-US': 'Payment amount is insufficient.',
   },
   'Record payment': { 'id-ID': 'Catat pembayaran', 'en-US': 'Record payment' },
-  'Cancel this transaction?': { 'id-ID': 'Batalkan transaksi ini?', 'en-US': 'Cancel this transaction?' },
+  'Cancel this transaction?': {
+    'id-ID': 'Batalkan transaksi ini?',
+    'en-US': 'Cancel this transaction?',
+  },
   'The transaction remains recorded in today queue.': {
     'id-ID': 'Transaksi tetap tercatat di antrian hari ini.',
     'en-US': "The transaction remains recorded in today's queue.",
@@ -284,9 +297,6 @@ const posCopy: Record<string, LocalizedCopy> = {
   'Work unit': { 'id-ID': 'Pengerjaan', 'en-US': 'Work unit' },
 };
 
-export function operationalPosCopy(
-  value: string,
-  locale: OperationalLocale,
-): string | undefined {
+export function operationalPosCopy(value: string, locale: OperationalLocale): string | undefined {
   return posCopy[value]?.[locale];
 }

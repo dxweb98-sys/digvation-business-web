@@ -46,7 +46,10 @@ const configurationCopy: Record<string, { id: string; en: string }> = {
   '24-hour (HH:mm)': { id: '24 jam (HH:mm)', en: '24-hour (HH:mm)' },
   '12-hour (hh:mm a)': { id: '12 jam (hh:mm a)', en: '12-hour (hh:mm a)' },
   'Save localization': { id: 'Simpan pengaturan', en: 'Save settings' },
-  'Localization updated.': { id: 'Pengaturan bahasa diperbarui.', en: 'Language settings updated.' },
+  'Localization updated.': {
+    id: 'Pengaturan bahasa diperbarui.',
+    en: 'Language settings updated.',
+  },
   'Could not update localization.': {
     id: 'Pengaturan bahasa tidak dapat diperbarui.',
     en: 'Could not update language settings.',

@@ -97,7 +97,10 @@ const copy: Record<string, LocalizedLabel> = {
     'en-US': 'Change branch? The current transaction stays open and a new transaction will start.',
   },
   'Open navigation': { 'id-ID': 'Buka navigasi', 'en-US': 'Open navigation' },
-  'Open account information': { 'id-ID': 'Buka informasi akun', 'en-US': 'Open account information' },
+  'Open account information': {
+    'id-ID': 'Buka informasi akun',
+    'en-US': 'Open account information',
+  },
   'Account information': { 'id-ID': 'Informasi akun', 'en-US': 'Account information' },
   'Operational account information for the active session.': {
     'id-ID': 'Akun yang digunakan pada sesi ini.',
@@ -109,7 +112,10 @@ const copy: Record<string, LocalizedLabel> = {
   'User ID': { 'id-ID': 'ID pengguna', 'en-US': 'User ID' },
   'Username or email': { 'id-ID': 'Nama pengguna atau email', 'en-US': 'Username or email' },
   Password: { 'id-ID': 'Kata sandi', 'en-US': 'Password' },
-  'Complete account details': { 'id-ID': 'Lengkapi data akun', 'en-US': 'Complete account details' },
+  'Complete account details': {
+    'id-ID': 'Lengkapi data akun',
+    'en-US': 'Complete account details',
+  },
   'Enter user ID and password.': {
     'id-ID': 'Isi ID pengguna dan kata sandi.',
     'en-US': 'Enter your user ID and password.',
@@ -124,7 +130,10 @@ const copy: Record<string, LocalizedLabel> = {
   },
   'Sign in failed': { 'id-ID': 'Gagal masuk', 'en-US': 'Sign in failed' },
   'Signed in': { 'id-ID': 'Berhasil masuk', 'en-US': 'Signed in' },
-  'Opening Operational...': { 'id-ID': 'Membuka Operational...', 'en-US': 'Opening Operational...' },
+  'Opening Operational...': {
+    'id-ID': 'Membuka Operational...',
+    'en-US': 'Opening Operational...',
+  },
   'Signing in...': { 'id-ID': 'Masuk...', 'en-US': 'Signing in...' },
   'Sign in': { 'id-ID': 'Masuk', 'en-US': 'Sign in' },
   'Verifying operational access': {
@@ -279,17 +288,26 @@ const copy: Record<string, LocalizedLabel> = {
   Unpaid: { 'id-ID': 'Belum dibayar', 'en-US': 'Unpaid' },
   'Order details': { 'id-ID': 'Detail pesanan', 'en-US': 'Order details' },
   Order: { 'id-ID': 'Pesanan', 'en-US': 'Order' },
-  'Complete before starting': { 'id-ID': 'Lengkapi sebelum mulai', 'en-US': 'Complete before starting' },
+  'Complete before starting': {
+    'id-ID': 'Lengkapi sebelum mulai',
+    'en-US': 'Complete before starting',
+  },
   'Quantity must be greater than zero.': {
     'id-ID': 'Jumlah harus lebih dari nol.',
     'en-US': 'Quantity must be greater than zero.',
   },
-  'Price is not available.': { 'id-ID': 'Harga belum tersedia.', 'en-US': 'Price is not available.' },
+  'Price is not available.': {
+    'id-ID': 'Harga belum tersedia.',
+    'en-US': 'Price is not available.',
+  },
   'Only active transactions can be processed.': {
     'id-ID': 'Hanya transaksi aktif yang dapat diproses.',
     'en-US': 'Only active transactions can be processed.',
   },
-  'Add at least one item.': { 'id-ID': 'Tambahkan setidaknya satu item.', 'en-US': 'Add at least one item.' },
+  'Add at least one item.': {
+    'id-ID': 'Tambahkan setidaknya satu item.',
+    'en-US': 'Add at least one item.',
+  },
   'Resolve pending payments.': {
     'id-ID': 'Selesaikan pembayaran yang masih menunggu.',
     'en-US': 'Resolve pending payments.',
@@ -342,7 +360,10 @@ const copy: Record<string, LocalizedLabel> = {
   'Save workers': { 'id-ID': 'Simpan pelaksana', 'en-US': 'Save workers' },
   'No workers selected': { 'id-ID': 'Belum ada pelaksana dipilih', 'en-US': 'No workers selected' },
   'workers selected': { 'id-ID': 'pelaksana dipilih', 'en-US': 'workers selected' },
-  'Service value allocation': { 'id-ID': 'Pembagian nilai jasa', 'en-US': 'Service value allocation' },
+  'Service value allocation': {
+    'id-ID': 'Pembagian nilai jasa',
+    'en-US': 'Service value allocation',
+  },
   'Work status': { 'id-ID': 'Status pekerjaan', 'en-US': 'Work status' },
   'Current status': { 'id-ID': 'Saat ini', 'en-US': 'Current status' },
   'Mark complete': { 'id-ID': 'Tandai selesai', 'en-US': 'Mark complete' },

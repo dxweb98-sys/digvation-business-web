@@ -190,7 +190,10 @@ function writeCancellationReason(saleId: string, reason: string): void {
   }
 }
 
-const statusMeta: Record<QueueStatus, { value: string; icon: ReactNode; tone: string; soft: string }> = {
+const statusMeta: Record<
+  QueueStatus,
+  { value: string; icon: ReactNode; tone: string; soft: string }
+> = {
   QUEUED: {
     value: 'QUEUED',
     icon: <Clock className="size-[15px]" />,
@@ -327,8 +330,7 @@ function serviceWorkAssignmentSummary(
   if (!firstAssignment || assignments.some((assignment) => !assignment))
     return copyFor('No employees assigned', locale);
   const configurationCount = new Set(assignments).size;
-  if (configurationCount > 1)
-    return `${configurationCount} ${copyFor('configurations', locale)}`;
+  if (configurationCount > 1) return `${configurationCount} ${copyFor('configurations', locale)}`;
 
   const names = (units[0]?.contributors ?? [])
     .filter((contributor) => contributor.employeeId)
@@ -340,7 +342,11 @@ function serviceWorkAssignmentSummary(
   return `${names.join(', ')} ${copyFor('for all work units', locale)}`;
 }
 
-function employeeWorkSummary(line: SaleLine, employees: readonly Employee[], locale: string): string {
+function employeeWorkSummary(
+  line: SaleLine,
+  employees: readonly Employee[],
+  locale: string,
+): string {
   const assigned = line.participations.filter((participation) => participation.assigned);
   if (!assigned.length) return copyFor('Not assigned', locale);
   return assigned
@@ -389,17 +395,15 @@ function employeeAssignmentIssues(line: SaleLine, locale: string): string[] {
       createDecimal('0'),
     );
     if (!shares.length || !total.equals(createDecimal('1'))) {
-      issues.push(`${line.itemNameSnapshot}: ${copyFor('Employee contribution must total 100%.', locale)}`);
+      issues.push(
+        `${line.itemNameSnapshot}: ${copyFor('Employee contribution must total 100%.', locale)}`,
+      );
     }
   }
   return issues;
 }
 
-function workflowIssues(
-  sale: Sale,
-  serviceWorkUnits: ServiceWorkUnitsByLine = {},
-  locale: string,
-) {
+function workflowIssues(sale: Sale, serviceWorkUnits: ServiceWorkUnitsByLine = {}, locale: string) {
   const issues: string[] = [];
   const active = sale.lines.filter((line) => line.removedAt === null);
   if (!active.length) issues.push(copyFor('Add at least one item.', locale));
@@ -416,7 +420,9 @@ function workflowIssues(
 
   for (const line of active) {
     if (!isPositiveDecimal(line.quantity))
-      issues.push(`${line.itemNameSnapshot}: ${copyFor('Quantity must be greater than zero.', locale)}`);
+      issues.push(
+        `${line.itemNameSnapshot}: ${copyFor('Quantity must be greater than zero.', locale)}`,
+      );
     if (!isPositiveDecimal(line.effectiveUnitPrice))
       issues.push(`${line.itemNameSnapshot}: ${copyFor('Price is not available.', locale)}`);
     const requiresTrackedServiceAssignment =
@@ -473,11 +479,14 @@ function processIssues(
   locale: string,
 ): string[] {
   if (!lines.length) return [copyFor('Add at least one item.', locale)];
-  if (sale && sale.status !== 'OPEN') return [copyFor('Only active transactions can be processed.', locale)];
+  if (sale && sale.status !== 'OPEN')
+    return [copyFor('Only active transactions can be processed.', locale)];
 
   return lines.flatMap((line) => {
     if (!isPositiveDecimal(line.quantity))
-      return [`${line.itemNameSnapshot}: ${copyFor('Quantity must be greater than zero.', locale)}`];
+      return [
+        `${line.itemNameSnapshot}: ${copyFor('Quantity must be greater than zero.', locale)}`,
+      ];
     if (!isPositiveDecimal(line.effectiveUnitPrice))
       return [`${line.itemNameSnapshot}: ${copyFor('Price is not available.', locale)}`];
     return [];
@@ -983,7 +992,9 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       setReceiptSaleId(updatedSale.id);
       workspace.clearProcessedDraft();
       showToast({
-        title: hasSuccessfulCheckout(updatedSale) ? copy('Payment complete') : copy('Payment recorded'),
+        title: hasSuccessfulCheckout(updatedSale)
+          ? copy('Payment complete')
+          : copy('Payment recorded'),
         description: copy('Transaction status was not changed.'),
         variant: 'success',
       });
@@ -1536,7 +1547,9 @@ function ReferenceQueueBoard({
                 </span>
               </div>
               <p className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">
-                {count ? copy('Click to view active transactions.') : copy('No queued transactions.')}
+                {count
+                  ? copy('Click to view active transactions.')
+                  : copy('No queued transactions.')}
               </p>
             </div>
           </div>
@@ -1606,7 +1619,9 @@ function ReferenceQueueBoard({
                         </div>
                       ) : (
                         <div className="rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)]/20 py-7 text-center">
-                          <p className="text-sm font-semibold">{copy('No transactions in this status.')}</p>
+                          <p className="text-sm font-semibold">
+                            {copy('No transactions in this status.')}
+                          </p>
                           <p className="mt-1 text-xs text-[var(--color-text-muted)]">
                             {copy('Transactions appear here after they are created.')}
                           </p>
@@ -1655,7 +1670,11 @@ function ReferenceQueueCard({
   const customer = saleCustomer(sale.id, locale);
   const canStartWork = hasStartableQueuedWork(sale);
   const actionItems = [
-    { label: copy('Preview details'), icon: <Eye className="size-3.5" />, onSelect: () => onView(sale) },
+    {
+      label: copy('Preview details'),
+      icon: <Eye className="size-3.5" />,
+      onSelect: () => onView(sale),
+    },
     ...(hasPayment
       ? [
           {
@@ -1800,7 +1819,9 @@ function ReferenceQueueCard({
       </div>
       {issues.length ? (
         <div className="mt-3 rounded-xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 px-3 py-2 text-xs">
-          <p className="font-semibold text-[var(--color-warning)]">{copy('Complete before starting')}</p>
+          <p className="font-semibold text-[var(--color-warning)]">
+            {copy('Complete before starting')}
+          </p>
           <p className="mt-0.5 text-[var(--color-text-muted)]">{issues[0]}</p>
         </div>
       ) : null}
@@ -1856,7 +1877,9 @@ function ReferenceFloatingCart({
       onCheckout={onCheckout}
     />
   );
-  const countLabel = lines.length ? `${lines.length} ${copy('items selected')}` : copy('No items selected');
+  const countLabel = lines.length
+    ? `${lines.length} ${copy('items selected')}`
+    : copy('No items selected');
   return (
     <>
       <button
@@ -2098,7 +2121,9 @@ function ReferenceCartPanel({
             </div>
           ) : null}
           <div className="flex items-center justify-between border-t border-[var(--color-border)] pt-2">
-            <span className="text-sm font-bold">{copy(isEstimate ? 'Estimated total' : 'Total')}</span>
+            <span className="text-sm font-bold">
+              {copy(isEstimate ? 'Estimated total' : 'Total')}
+            </span>
             <span className="text-lg font-bold text-[var(--color-brand)]">
               {money(total, locale)}
             </span>
@@ -2755,7 +2780,13 @@ function ReferenceTransactionDetail({
                     <span
                       className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${hasSuccessfulCheckout(sale) ? 'bg-[var(--color-success)]/10 text-[var(--color-success)]' : receiptAvailable ? 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]' : 'bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]'}`}
                     >
-                      {copy(hasSuccessfulCheckout(sale) ? 'Paid' : receiptAvailable ? 'Partially paid' : 'Unpaid')}
+                      {copy(
+                        hasSuccessfulCheckout(sale)
+                          ? 'Paid'
+                          : receiptAvailable
+                            ? 'Partially paid'
+                            : 'Unpaid',
+                      )}
                     </span>
                   </div>
                   <p className="mt-3 text-xs text-[var(--color-text-muted)]">{transactionDate}</p>
@@ -2780,14 +2811,18 @@ function ReferenceTransactionDetail({
 
               {sale.status === 'VOIDED' && cancellationReason ? (
                 <div className="rounded-xl border border-[var(--color-danger)]/25 bg-[var(--color-danger)]/10 px-3 py-2 text-xs">
-                  <p className="font-semibold text-[var(--color-danger)]">{copy('Cancellation reason')}</p>
+                  <p className="font-semibold text-[var(--color-danger)]">
+                    {copy('Cancellation reason')}
+                  </p>
                   <p className="mt-1 text-[var(--color-text-muted)]">{cancellationReason}</p>
                 </div>
               ) : null}
 
               {completionIssues.length ? (
                 <div className="rounded-xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 px-3 py-2 text-xs">
-                  <p className="font-semibold text-[var(--color-warning)]">{copy('Not ready to complete')}</p>
+                  <p className="font-semibold text-[var(--color-warning)]">
+                    {copy('Not ready to complete')}
+                  </p>
                   <div className="mt-2 space-y-2 text-[var(--color-text-muted)]">
                     {completionIssueGroups.map((group) => (
                       <div key={group.id}>
@@ -2961,7 +2996,9 @@ function ReceiptContent({
         <div className="my-4 border-t border-dashed border-slate-300" />
         <p className="font-mono text-xs font-semibold">{transactionNumber(sale.id, locale)}</p>
         <p className="mt-1 text-[11px] text-slate-500">{transactionDate}</p>
-        <p className="mt-1 text-[11px] text-slate-500">{copy('Cashier')}: {cashierName}</p>
+        <p className="mt-1 text-[11px] text-slate-500">
+          {copy('Cashier')}: {cashierName}
+        </p>
       </header>
 
       <section className="mt-4 text-xs">
@@ -3042,7 +3079,9 @@ function ReceiptContent({
       </section>
 
       <div className="my-4 border-t border-dashed border-slate-300" />
-      <p className="text-center text-[11px] text-slate-500">{copy('Thank you for your purchase.')}</p>
+      <p className="text-center text-[11px] text-slate-500">
+        {copy('Thank you for your purchase.')}
+      </p>
       <div className="pos-receipt-tear" aria-hidden="true" />
     </>
   );
@@ -3590,7 +3629,8 @@ function ReferenceCancelDialog({
             </p>
             <h2 className="mt-1 text-lg font-semibold">{copy('Cancel this transaction?')}</h2>
             <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-              {sale ? transactionNumber(sale.id, locale) : ''}. {copy('The transaction remains recorded in today queue.')}
+              {sale ? transactionNumber(sale.id, locale) : ''}.{' '}
+              {copy('The transaction remains recorded in today queue.')}
             </p>
           </div>
           <button

@@ -575,7 +575,9 @@ function RoleEditor({
             />
           </div>
         ) : (
-          <p className="text-sm text-[var(--color-text-muted)]">{accessCopy.protectedRole[locale]}</p>
+          <p className="text-sm text-[var(--color-text-muted)]">
+            {accessCopy.protectedRole[locale]}
+          </p>
         )}
         <section className="border-t border-[var(--color-border)] pt-4">
           <p className="text-sm font-semibold">{copy('Permissions')}</p>

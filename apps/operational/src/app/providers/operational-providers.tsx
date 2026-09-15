@@ -28,10 +28,7 @@ import {
   type TransitionEvent,
 } from 'react';
 
-import {
-  operationalCopy,
-  type OperationalLocale,
-} from '../localization/operational-localization';
+import { operationalCopy, type OperationalLocale } from '../localization/operational-localization';
 import { OperationalLoginPage } from '../../modules/operational/operational-login-page';
 import { OperationalSessionProvider } from '../../modules/operational/operational-session-provider';
 import { PosOperationalSessionProvider } from '../../modules/pos/pos-operational-session-provider';

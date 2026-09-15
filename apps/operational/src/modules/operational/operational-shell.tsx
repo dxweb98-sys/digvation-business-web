@@ -118,7 +118,9 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
 
     if (/^\/sell\/[^/]+$/.test(routerLocation.pathname)) {
       const confirmed = window.confirm(
-        copy('Changing branch leaves the current transaction open and starts a new transaction. Continue?'),
+        copy(
+          'Changing branch leaves the current transaction open and starts a new transaction. Continue?',
+        ),
       );
       if (!confirmed) return;
       navigate('/sell');
@@ -315,7 +317,9 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
               {...(session.identity.avatarUrl ? { src: session.identity.avatarUrl } : {})}
               alt=""
               name={session.identity.displayName}
-              fallback={userInitials ?? <UserRound className="size-4" aria-label={copy('Account')} />}
+              fallback={
+                userInitials ?? <UserRound className="size-4" aria-label={copy('Account')} />
+              }
               size="sm"
               className="shrink-0 bg-[var(--color-brand)]/10 text-xs font-bold text-[var(--color-brand)]"
             />
@@ -425,7 +429,9 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
               {...(session.identity.avatarUrl ? { src: session.identity.avatarUrl } : {})}
               alt=""
               name={session.identity.displayName}
-              fallback={userInitials ?? <UserRound className="size-5" aria-label={copy('Account')} />}
+              fallback={
+                userInitials ?? <UserRound className="size-5" aria-label={copy('Account')} />
+              }
               size="lg"
               className="shrink-0 bg-[var(--color-brand)]/10 text-sm font-bold text-[var(--color-brand)]"
             />

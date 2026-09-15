@@ -111,7 +111,10 @@ function domainReadiness(sale: Sale | null, activeLines: SaleLine[], locale?: st
   }
 
   if (sale.payments.some((payment) => payment.status === 'PENDING')) {
-    blockers.push({ code: 'PAYMENT_PENDING', message: copyForLocale('Resolve pending payments.', locale) });
+    blockers.push({
+      code: 'PAYMENT_PENDING',
+      message: copyForLocale('Resolve pending payments.', locale),
+    });
   }
 
   const succeeded = createDecimal(sumPayments(sale, 'SUCCEEDED'));
