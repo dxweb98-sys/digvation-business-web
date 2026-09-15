@@ -23,6 +23,7 @@ export const runtimeConfigSchema = z.object({
         'MEMBERSHIP',
         'LOYALTY_POINTS',
         'TAX_FISCAL',
+        'PROMOTIONS',
       ]),
     ),
   }),
