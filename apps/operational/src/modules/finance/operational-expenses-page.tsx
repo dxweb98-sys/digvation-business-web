@@ -214,7 +214,7 @@ export function OperationalExpensesPage() {
             clearable={false}
             options={eligibleAccounts.map((account) => ({
               value: account.id,
-              label: `${account.name} · ${account.currency}`,
+              label: `${account.name} (${account.currency})`,
             }))}
             onValueChange={(value) => setFinancialAccountId(String(value ?? ''))}
           />
