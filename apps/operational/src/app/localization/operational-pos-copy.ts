@@ -5,6 +5,26 @@ type LocalizedCopy = Record<OperationalLocale, string>;
 const posCopy: Record<string, LocalizedCopy> = {
   Transaction: { 'id-ID': 'Transaksi', 'en-US': 'Transaction' },
   Add: { 'id-ID': 'Tambah', 'en-US': 'Add' },
+  'Item price is unavailable for this selection.': {
+    'id-ID': 'Harga item belum tersedia untuk pilihan ini.',
+    'en-US': 'Item price is unavailable for this selection.',
+  },
+  'Transaction changed. Review the latest data before continuing.': {
+    'id-ID': 'Transaksi telah berubah. Tinjau data terbaru sebelum melanjutkan.',
+    'en-US': 'Transaction changed. Review the latest data before continuing.',
+  },
+  'Transaction could not be processed. Try again.': {
+    'id-ID': 'Transaksi tidak dapat diproses. Coba lagi.',
+    'en-US': 'Transaction could not be processed. Try again.',
+  },
+  'The latest transaction could not be confirmed. Review it before continuing.': {
+    'id-ID': 'Data transaksi terbaru belum dapat dipastikan. Tinjau transaksi sebelum melanjutkan.',
+    'en-US': 'The latest transaction could not be confirmed. Review it before continuing.',
+  },
+  'The result could not be confirmed. Try again from the current transaction.': {
+    'id-ID': 'Hasil tindakan belum dapat dipastikan. Coba lagi dari transaksi saat ini.',
+    'en-US': 'The result could not be confirmed. Try again from the current transaction.',
+  },
   'Main branch': { 'id-ID': 'Cabang utama', 'en-US': 'Main branch' },
   items: { 'id-ID': 'item', 'en-US': 'items' },
   Quantity: { 'id-ID': 'Jumlah', 'en-US': 'Quantity' },

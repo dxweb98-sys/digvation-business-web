@@ -519,9 +519,9 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     notice:
       command.notice ??
       (saleWorkspace.saleQueryError
-        ? cashierTransactionErrorMessage(saleWorkspace.saleQueryError)
+        ? cashierTransactionErrorMessage(saleWorkspace.saleQueryError, runtime.locale)
         : catalog.error
-          ? cashierTransactionErrorMessage(catalog.error)
+          ? cashierTransactionErrorMessage(catalog.error, runtime.locale)
           : null),
     variantPicker,
     lineTask,
