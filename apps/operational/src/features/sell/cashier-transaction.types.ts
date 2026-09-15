@@ -264,8 +264,8 @@ export interface Sale {
   orderDiscountValue: string | null;
   orderDiscountReason: string | null;
   orderDiscountAmount: string;
-  promotionCode: string | null;
-  adjustments: SaleAdjustment[];
+  promotionCode?: string | null;
+  adjustments?: SaleAdjustment[];
   finalizedAt: string | null;
   voidedAt: string | null;
   createdAt: string;
