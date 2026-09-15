@@ -6,12 +6,17 @@ import {
   type SaleTransactionPort,
 } from './cashier-transaction.adapter';
 import { LocalCashierTransactionAdapter } from './local-cashier-transaction.adapter';
+import {
+  attachOperationalProjection,
+  type OperationalProjectionQuery,
+} from './operational-projection-client';
 
 let localDemoAdapter: LocalCashierTransactionAdapter | null = null;
 
 type PerformerCapableTransactionPort = SaleTransactionPort & {
   setSaleLinePerformers: NonNullable<SaleTransactionPort['setSaleLinePerformers']>;
 };
+type OperationalCashierTransactionPort = PerformerCapableTransactionPort & OperationalProjectionQuery;
 
 function withServicePerformers(adapter: SaleTransactionPort): PerformerCapableTransactionPort {
   if (!adapter.setSaleLinePerformers) {
@@ -37,18 +42,17 @@ export function isLocalCashierDemoEnabled(): boolean {
 export function createCashierTransactionAdapter(
   runtime: RuntimeConfig,
   getAccessToken?: () => Promise<string | null>,
-): PerformerCapableTransactionPort {
+): OperationalCashierTransactionPort {
   if (isLocalCashierDemoEnabled()) {
     localDemoAdapter ??= new LocalCashierTransactionAdapter();
-    return withServicePerformers(localDemoAdapter);
+    return withServicePerformers(localDemoAdapter) as OperationalCashierTransactionPort;
   }
-  return withServicePerformers(
-    new HttpCashierTransactionAdapter(
-      new ApiClient({
-        baseUrl: runtime.apiBaseUrl,
-        applicationSurface: 'operational',
-        ...(getAccessToken ? { getAccessToken } : {}),
-      }),
-    ),
-  );
+
+  const client = new ApiClient({
+    baseUrl: runtime.apiBaseUrl,
+    applicationSurface: 'operational',
+    ...(getAccessToken ? { getAccessToken } : {}),
+  });
+  const adapter = attachOperationalProjection(client, new HttpCashierTransactionAdapter(client));
+  return withServicePerformers(adapter) as OperationalCashierTransactionPort;
 }
