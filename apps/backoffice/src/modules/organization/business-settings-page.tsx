@@ -1,6 +1,7 @@
 import {
   DBadge,
   DButton,
+  DCheckbox,
   DConfirmDialog,
   DDialog,
   DDataTable,
@@ -550,12 +551,11 @@ function LocationEditor({
         </div>
 
         <label className="mt-5 flex items-start gap-3 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-4 py-3">
-          <input
-            type="checkbox"
+          <DCheckbox
             checked={setAsMain}
             disabled={isCurrentMain || firstLocation}
-            onChange={(event) => setSetAsMain(event.target.checked)}
-            className="mt-0.5 size-4 accent-[var(--color-brand)]"
+            onChange={() => setSetAsMain((current) => !current)}
+            className="mt-0.5"
           />
           <span className="min-w-0">
             <span className="block text-sm font-medium">
