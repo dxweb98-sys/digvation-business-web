@@ -27,6 +27,7 @@ export interface Promotion {
   audience: 'ALL';
   discountType: PromotionDiscountType;
   discountValue: string;
+  currency: string | null;
   maximumDiscount: string | null;
   minimumPurchase: string | null;
   effectiveFrom: string | null;
@@ -48,6 +49,7 @@ export interface PromotionWriteInput {
   scope: PromotionScope;
   discountType: PromotionDiscountType;
   discountValue: string;
+  currency: string | null;
   maximumDiscount: string | null;
   minimumPurchase: string | null;
   effectiveFrom: string | null;
