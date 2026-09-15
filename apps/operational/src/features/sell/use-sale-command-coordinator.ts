@@ -41,7 +41,14 @@ export function useSaleCommandCoordinator({
     (sale: Sale) => {
       queryClient.setQueryData(cashierTransactionKeys.sale(sale.id), sale);
       queryClient.setQueryData<ApiPage<Sale>>(cashierTransactionKeys.sales(), (page) => {
-        if (!page) return page;
+        if (!page) {
+          if (sale.operationalState === 'UNSUBMITTED') return page;
+          return {
+            items: [sale],
+            limit: 100,
+            offset: 0,
+          };
+        }
 
         const existingIndex = page.items.findIndex((item) => item.id === sale.id);
         if (existingIndex === -1) {
