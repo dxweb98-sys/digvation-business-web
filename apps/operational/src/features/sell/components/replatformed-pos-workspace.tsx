@@ -1186,7 +1186,6 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         businessName={runtime.branding.businessName ?? runtime.branding.productName}
         branchName="Main Branch"
         cashierName={session.identity.displayName}
-        isLocalDemo={isLocalDemo}
         {...(displayedQueueDetail && cancellationReasons[displayedQueueDetail.id]
           ? { cancellationReason: cancellationReasons[displayedQueueDetail.id] }
           : {})}
@@ -2566,7 +2565,6 @@ function ReferenceTransactionDetail({
   businessName,
   branchName,
   cashierName,
-  isLocalDemo,
   cancellationReason,
   showPaymentReceipt,
   onClose,
@@ -2583,7 +2581,6 @@ function ReferenceTransactionDetail({
   businessName: string;
   branchName: string;
   cashierName: string;
-  isLocalDemo: boolean;
   cancellationReason?: string;
   showPaymentReceipt: boolean;
   onClose: () => void;
