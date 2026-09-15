@@ -128,6 +128,7 @@ export function AccessControlPage() {
       />
 
       <DTabs
+        defaultValue="roles"
         value={section}
         onValueChange={(value) => setSection(value as Section)}
         className="mt-6"

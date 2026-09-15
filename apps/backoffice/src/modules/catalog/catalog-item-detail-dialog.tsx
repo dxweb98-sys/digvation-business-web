@@ -390,7 +390,7 @@ export function CatalogItemDetailDialog({
             : 'Varian akan tersedia kembali untuk penggunaan baru.'
         }
         confirmLabel={statusTarget?.status === 'ACTIVE' ? 'Nonaktifkan' : 'Aktifkan'}
-        variant={statusTarget?.status === 'ACTIVE' ? 'danger' : 'default'}
+        variant={statusTarget?.status === 'ACTIVE' ? 'danger' : 'primary'}
       />
     </DDialog>
   );
