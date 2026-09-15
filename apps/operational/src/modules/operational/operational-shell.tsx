@@ -9,6 +9,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 
 import { useOperationalLocalization } from '../../app/localization/operational-localization';
 import { getAppVersion } from '../../app/version/app-version';
+import { OperationalNotificationBell } from '../notifications/operational-notification-bell';
 import { OperationalAccessApi, operationalAccessKeys } from './operational-access-api';
 import type { OperationalNavigationSection } from './operational-navigation';
 import { resolveOperationalLocationSelection } from './operational-location-selection';
@@ -82,6 +83,12 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
   const brandSubtitle =
     runtime.branding.businessName ?? runtime.branding.companyName ?? copy('Operational');
   const userInitials = identityInitials(session.identity.displayName, session.identity.initials);
+  const primaryRole = session.identity.roles?.[0] ?? null;
+  const usernameLabel = session.identity.username?.trim()
+    ? `@${session.identity.username.trim()}`
+    : null;
+  const userContextLabel = [usernameLabel, primaryRole?.name ?? null].filter(Boolean).join(' · ');
+  const headerIdentityContext = userContextLabel || session.identity.email || copy('Account');
 
   useEffect(() => {
     const resolved = resolveOperationalLocationSelection(
@@ -235,7 +242,7 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
                   {session.identity.displayName}
                 </span>
                 <span className="block truncate text-xs leading-4 text-[var(--color-text-muted)]">
-                  {copy('Version')} {version.version}
+                  {primaryRole?.name ?? `${copy('Version')} ${version.version}`}
                 </span>
               </span>
             </div>
@@ -297,33 +304,36 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
             </span>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setAccountDialogOpen(true)}
-            aria-label={copy('Open account information')}
-            aria-haspopup="dialog"
-            aria-expanded={isAccountDialogOpen}
-            className="flex h-[42px] min-w-0 max-w-[min(50vw,340px)] items-center gap-3 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface-muted)]/45 px-2.5 text-left transition-colors duration-150 hover:bg-[var(--color-surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/20"
-          >
-            <span className="hidden min-w-0 flex-1 flex-col justify-center sm:flex">
-              <span className="truncate text-sm font-semibold leading-5 text-[var(--color-text)]">
-                {session.identity.displayName}
+          <div className="flex min-w-0 items-center gap-1.5">
+            <OperationalNotificationBell />
+            <button
+              type="button"
+              onClick={() => setAccountDialogOpen(true)}
+              aria-label={copy('Open account information')}
+              aria-haspopup="dialog"
+              aria-expanded={isAccountDialogOpen}
+              className="flex h-[42px] min-w-0 max-w-[min(50vw,340px)] items-center gap-3 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface-muted)]/45 px-2.5 text-left transition-colors duration-150 hover:bg-[var(--color-surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/20"
+            >
+              <span className="hidden min-w-0 flex-1 flex-col justify-center sm:flex">
+                <span className="truncate text-sm font-semibold leading-5 text-[var(--color-text)]">
+                  {session.identity.displayName}
+                </span>
+                <span className="truncate text-xs leading-4 text-[var(--color-text-muted)]">
+                  {headerIdentityContext}
+                </span>
               </span>
-              <span className="truncate text-xs leading-4 text-[var(--color-text-muted)]">
-                {session.identity.email ?? copy('Account')}
-              </span>
-            </span>
-            <DAvatar
-              {...(session.identity.avatarUrl ? { src: session.identity.avatarUrl } : {})}
-              alt=""
-              name={session.identity.displayName}
-              fallback={
-                userInitials ?? <UserRound className="size-4" aria-label={copy('Account')} />
-              }
-              size="sm"
-              className="shrink-0 bg-[var(--color-brand)]/10 text-xs font-bold text-[var(--color-brand)]"
-            />
-          </button>
+              <DAvatar
+                {...(session.identity.avatarUrl ? { src: session.identity.avatarUrl } : {})}
+                alt=""
+                name={session.identity.displayName}
+                fallback={
+                  userInitials ?? <UserRound className="size-4" aria-label={copy('Account')} />
+                }
+                size="sm"
+                className="shrink-0 bg-[var(--color-brand)]/10 text-xs font-bold text-[var(--color-brand)]"
+              />
+            </button>
+          </div>
         </header>
 
         <div className="min-h-0 min-w-0 w-full flex-1 overflow-y-auto overscroll-contain">
@@ -411,6 +421,14 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
         className="w-full max-w-md rounded-[var(--radius-panel)] bg-[var(--color-surface)]"
         footer={
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <DButton
+              variant="ghost"
+              leftIcon={<LogOut className="size-4" />}
+              loading={isLoggingOut}
+              onClick={() => void handleLogout()}
+            >
+              {copy('Logout')}
+            </DButton>
             <DButton variant="secondary" onClick={() => setAccountDialogOpen(false)}>
               {copy('Close')}
             </DButton>
@@ -440,8 +458,13 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
                 {session.identity.displayName}
               </p>
               <p className="mt-0.5 truncate text-sm text-[var(--color-text-muted)]">
-                {session.identity.email ?? copy('Account')}
+                {headerIdentityContext}
               </p>
+              {session.identity.email ? (
+                <p className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">
+                  {session.identity.email}
+                </p>
+              ) : null}
             </div>
           </div>
           {selectedLocation ? (
