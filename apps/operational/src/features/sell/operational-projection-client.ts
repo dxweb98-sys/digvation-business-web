@@ -1,8 +1,10 @@
 import type { ApiClient } from '@digvation/business-api';
 
 import type {
+  AddSaleLineInput,
   CreatePaymentInput,
   SaleTransactionPort,
+  SetSaleLineQuantityInput,
   SellingCatalogDisplayInput,
   StartSaleInput,
 } from './cashier-transaction.adapter';
@@ -66,6 +68,31 @@ export function attachOperationalProjection(
 
   operational.getSale = (saleId, signal) =>
     client.get<Sale>(`${OPERATIONAL_PREFIX}/transactions/${saleId}`, { signal });
+
+  operational.addSaleLine = (
+    saleId: string,
+    input: AddSaleLineInput,
+    idempotencyKey: string,
+  ) =>
+    client.post<Sale>(`${OPERATIONAL_PREFIX}/transactions/${saleId}/lines`, input, {
+      headers: { 'Idempotency-Key': idempotencyKey },
+    });
+
+  operational.setSaleLineQuantity = (
+    saleId: string,
+    saleLineId: string,
+    input: SetSaleLineQuantityInput,
+  ) =>
+    client.post<Sale>(
+      `${OPERATIONAL_PREFIX}/transactions/${saleId}/lines/${saleLineId}/quantity`,
+      input,
+    );
+
+  operational.removeSaleLine = (saleId, saleLineId, expectedVersion) =>
+    client.post<Sale>(
+      `${OPERATIONAL_PREFIX}/transactions/${saleId}/lines/${saleLineId}/remove`,
+      { expectedVersion },
+    );
 
   operational.createSalePayment = (
     saleId: string,
