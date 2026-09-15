@@ -23,7 +23,17 @@ jobs:
       - run: corepack enable
       - run: corepack prepare pnpm@11.22.0 --activate
       - run: pnpm install --frozen-lockfile
-      - name: Verify foundation
+      - name: Contract check
+        run: pnpm contract:check
+      - name: Format check
+        run: pnpm format:check
+      - name: Lint
+        run: pnpm lint
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Tests
+        run: pnpm test
+      - name: Build
         env:
           VITE_BUILD_REVISION: ${{ github.sha }}
-        run: pnpm verify
+        run: pnpm build
