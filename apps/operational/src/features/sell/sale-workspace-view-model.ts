@@ -1,6 +1,10 @@
 import { createDecimal } from '@digvation/pos-money';
 import type { ConnectivityState } from '@digvation/pos-runtime';
 
+import {
+  operationalCopy,
+  resolveOperationalLocale,
+} from '../../app/localization/operational-localization';
 import type { Sale, SaleLine } from './cashier-transaction.types';
 
 export type SaleWorkspacePrimaryMode =
@@ -63,6 +67,10 @@ export interface SaleWorkspaceViewModel {
   voidMutation: ActionAvailability;
 }
 
+function copyForLocale(value: string, locale?: string): string {
+  return operationalCopy(value, resolveOperationalLocale(locale));
+}
+
 function executionBlock(
   connectivity: ConnectivityState,
   synchronization: SynchronizationState,
@@ -94,23 +102,23 @@ function hasValidContribution(line: SaleLine): boolean {
   return total.equals(1);
 }
 
-function domainReadiness(sale: Sale | null, activeLines: SaleLine[]) {
+function domainReadiness(sale: Sale | null, activeLines: SaleLine[], locale?: string) {
   const blockers: DomainReadinessBlocker[] = [];
   if (!sale) return { ready: false, blockers };
 
   if (activeLines.length === 0) {
-    blockers.push({ code: 'NO_LINES', message: 'Tambahkan setidaknya satu item.' });
+    blockers.push({ code: 'NO_LINES', message: copyForLocale('Add at least one item.', locale) });
   }
 
   if (sale.payments.some((payment) => payment.status === 'PENDING')) {
-    blockers.push({ code: 'PAYMENT_PENDING', message: 'Selesaikan pembayaran yang masih menunggu.' });
+    blockers.push({ code: 'PAYMENT_PENDING', message: copyForLocale('Resolve pending payments.', locale) });
   }
 
   const succeeded = createDecimal(sumPayments(sale, 'SUCCEEDED'));
   if (!succeeded.equals(createDecimal(sale.totalAmount))) {
     blockers.push({
       code: 'NOT_SETTLED',
-      message: 'Jumlah pembayaran harus sama dengan total transaksi.',
+      message: copyForLocale('Payments must match the transaction total.', locale),
     });
   }
 
@@ -122,7 +130,7 @@ function domainReadiness(sale: Sale | null, activeLines: SaleLine[]) {
       blockers.push({
         code: 'FULFILLMENT_INCOMPLETE',
         saleLineId: line.id,
-        message: `${line.itemNameSnapshot}: pengerjaan belum selesai.`,
+        message: `${line.itemNameSnapshot}: ${copyForLocale('Complete all work before finishing the transaction.', locale)}`,
       });
     }
 
@@ -133,7 +141,7 @@ function domainReadiness(sale: Sale | null, activeLines: SaleLine[]) {
       blockers.push({
         code: 'ASSIGNMENT_REQUIRED',
         saleLineId: line.id,
-        message: `${line.itemNameSnapshot}: pilih karyawan.`,
+        message: `${line.itemNameSnapshot}: ${copyForLocale('Select an employee.', locale)}`,
       });
     }
 
@@ -141,7 +149,7 @@ function domainReadiness(sale: Sale | null, activeLines: SaleLine[]) {
       blockers.push({
         code: 'CONTRIBUTION_REQUIRED',
         saleLineId: line.id,
-        message: `${line.itemNameSnapshot}: total kontribusi karyawan harus 100%.`,
+        message: `${line.itemNameSnapshot}: ${copyForLocale('Employee contribution must total 100%.', locale)}`,
       });
     }
   }
@@ -153,6 +161,7 @@ export function createSaleWorkspaceViewModel(
   sale: Sale | null,
   connectivity: ConnectivityState,
   synchronization: SynchronizationState,
+  locale?: string,
 ): SaleWorkspaceViewModel {
   const activeLines = sale?.lines.filter((line) => line.removedAt === null) ?? [];
   const paidAmount = sumPayments(sale, 'SUCCEEDED');
@@ -164,7 +173,7 @@ export function createSaleWorkspaceViewModel(
         .toFixed(4)
     : '0.0000';
   const hasPendingPayment = createDecimal(pendingAmount).greaterThan(0);
-  const readiness = domainReadiness(sale, activeLines);
+  const readiness = domainReadiness(sale, activeLines, locale);
   const execution = executionBlock(connectivity, synchronization);
 
   const terminalBlock: ActionAvailability | null =
@@ -234,23 +243,23 @@ export function createSaleWorkspaceViewModel(
   };
 }
 
-export function actionBlockMessage(reason: ActionBlockReason): string {
+export function actionBlockMessage(reason: ActionBlockReason, locale?: string): string {
   switch (reason) {
     case 'SALE_TERMINAL':
-      return 'Transaksi ini sudah ditutup.';
+      return copyForLocale('This transaction is already closed.', locale);
     case 'PAYMENT_PENDING':
-      return 'Selesaikan pembayaran yang masih menunggu.';
+      return copyForLocale('Resolve pending payments.', locale);
     case 'OFFLINE':
-      return 'Sambungkan kembali perangkat sebelum mengubah transaksi.';
+      return copyForLocale('Reconnect before changing this transaction.', locale);
     case 'CONFLICT_REVIEW':
-      return 'Periksa perubahan terbaru sebelum melanjutkan.';
+      return copyForLocale('Review the latest changes before continuing.', locale);
     case 'MUTATION_IN_PROGRESS':
-      return 'Tunggu perubahan saat ini selesai.';
+      return copyForLocale('Wait for the current change to finish.', locale);
     case 'DOMAIN_NOT_READY':
-      return 'Lengkapi transaksi sebelum melanjutkan.';
+      return copyForLocale('Complete the transaction before continuing.', locale);
     case 'NOTHING_TO_PAY':
-      return 'Tidak ada sisa pembayaran.';
+      return copyForLocale('There is no remaining amount to pay.', locale);
     case 'NOT_VOIDABLE':
-      return 'Transaksi dengan pembayaran tidak dapat dibatalkan.';
+      return copyForLocale('Transactions with payments cannot be canceled.', locale);
   }
 }
