@@ -10,6 +10,7 @@ import type {
 } from './cashier-transaction.adapter';
 import type {
   ApiPage,
+  Employee,
   OperationalCatalogProjection,
   PaymentRoute,
   Sale,
@@ -42,6 +43,9 @@ export function attachOperationalProjection(
       { signal },
     );
   };
+
+  operational.listEmployees = (signal) =>
+    client.get<ApiPage<Employee>>(`${OPERATIONAL_PREFIX}/employees`, { signal });
 
   operational.listPaymentRoutes = (input, signal) => {
     const query = new URLSearchParams({
