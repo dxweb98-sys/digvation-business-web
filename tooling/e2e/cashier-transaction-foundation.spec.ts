@@ -40,6 +40,15 @@ const catalogItem = {
   },
 };
 
+const sellingCatalogItem = {
+  ...catalogItem,
+  displayPrice: {
+    amount: '125000.0000',
+    currency: 'IDR',
+    kind: 'EXACT',
+  },
+};
+
 const saleId = '33333333-3333-4333-8333-333333333333';
 const lineId = '44444444-4444-4444-8444-444444444444';
 
@@ -225,6 +234,14 @@ async function installRoutes(page: Page, options: Partial<RouteState> = {}) {
     }
     if (method === 'GET' && url.pathname === '/api/v1/catalog/categories') {
       await route.fulfill({ json: envelope({ items: [category], limit: 100, offset: 0 }) });
+      return;
+    }
+    if (method === 'GET' && url.pathname === '/api/v1/catalog/items/selling') {
+      expect(url.searchParams.get('locationId')).toBe(branch.id);
+      expect(url.searchParams.get('currency')).toBe('IDR');
+      await route.fulfill({
+        json: envelope({ items: [sellingCatalogItem], limit: 100, offset: 0 }),
+      });
       return;
     }
     if (method === 'GET' && url.pathname === '/api/v1/catalog/items') {
