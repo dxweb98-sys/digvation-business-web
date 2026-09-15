@@ -135,6 +135,14 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     return sale;
   };
 
+  const closeQueueContext = () => {
+    setQueueContextSale(null);
+    setVariantPicker(null);
+    setCompletionOpen(false);
+    setLineTaskId(null);
+    command.clearAttention();
+  };
+
   const findCachedQueueSale = (saleId: string): Sale | null => {
     const direct = queryClient.getQueryData<Sale>(cashierTransactionKeys.sale(saleId));
     if (direct) return direct;
@@ -272,20 +280,13 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
       if (!confirmed) return;
     }
     navigate('/sell');
-    setQueueContextSale(null);
-    setCompletionOpen(false);
-    setLineTaskId(null);
-    command.clearAttention();
+    closeQueueContext();
     saleWorkspace.clearDraft();
   };
 
   const clearProcessedDraft = () => {
     if (queueContextSale) {
-      setQueueContextSale(null);
-      setVariantPicker(null);
-      setCompletionOpen(false);
-      setLineTaskId(null);
-      command.clearAttention();
+      closeQueueContext();
       return;
     }
     navigate('/sell');
@@ -701,6 +702,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     newSale,
     clearProcessedDraft,
     openQueueContext,
+    closeQueueContext,
     hydrateQueuedSale,
     hydrateQueuedPayment,
     acknowledgeLatestState: command.acknowledgeLatestState,
