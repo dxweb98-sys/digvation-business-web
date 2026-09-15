@@ -5,17 +5,15 @@ on:
     branches: [feat/discount-promotion]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  format-feature:
+  verify-feature:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v7
@@ -31,9 +29,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Format discount promotion files only
+      - name: Check discount promotion formatting
         run: >-
-          pnpm exec prettier --write
+          pnpm exec prettier --check
           apps/backoffice/src/app/router/backoffice-router.tsx
           apps/backoffice/src/app/shell/backoffice-shell.tsx
           apps/backoffice/src/auth/backoffice-access.test.ts
@@ -52,31 +50,5 @@ jobs:
           packages/runtime/src/runtime-config.schema.ts
           packages/runtime/src/runtime-config.types.ts
 
-      - name: Commit targeted formatting
-        run: |
-          git config user.name "digvation-ci"
-          git config user.email "actions@users.noreply.github.com"
-          git add \
-            apps/backoffice/src/app/router/backoffice-router.tsx \
-            apps/backoffice/src/app/shell/backoffice-shell.tsx \
-            apps/backoffice/src/auth/backoffice-access.test.ts \
-            apps/backoffice/src/auth/backoffice-access.ts \
-            apps/backoffice/src/modules/promotions/index.ts \
-            apps/backoffice/src/modules/promotions/promotions-api.ts \
-            apps/backoffice/src/modules/promotions/promotions-localization.ts \
-            apps/backoffice/src/modules/promotions/promotions-page.tsx \
-            apps/operational/src/features/sell/cashier-transaction-adapter-factory.ts \
-            apps/operational/src/features/sell/cashier-transaction.types.ts \
-            apps/operational/src/features/sell/components/sale-adjustment-controls.tsx \
-            apps/operational/src/features/sell/operational-projection-client.ts \
-            apps/operational/src/routes/sell/sell-page.tsx \
-            packages/runtime/src/authenticated-runtime-context.test.ts \
-            packages/runtime/src/authenticated-runtime-context.ts \
-            packages/runtime/src/runtime-config.schema.ts \
-            packages/runtime/src/runtime-config.types.ts
-          if git diff --cached --quiet; then
-            echo "No formatting changes required."
-          else
-            git commit -m "style: format discount promotion changes [skip ci]"
-            git push origin HEAD:feat/discount-promotion
-          fi
+      - name: Unit tests
+        run: pnpm test
