@@ -2,25 +2,6 @@ export type HumanLabelLocale = 'id' | 'en';
 
 type LocalizedLabel = Record<HumanLabelLocale, string>;
 
-type PermissionGroupKey =
-  | 'account-access'
-  | 'activity'
-  | 'business-location'
-  | 'employees'
-  | 'attendance'
-  | 'catalog'
-  | 'sales'
-  | 'payments'
-  | 'finance'
-  | 'system'
-  | 'other';
-
-export interface PermissionGroup {
-  key: PermissionGroupKey;
-  label: string;
-  permissions: string[];
-}
-
 const technicalLabels: Record<string, LocalizedLabel> = {
   ACTIVE: { id: 'Aktif', en: 'Active' },
   INACTIVE: { id: 'Nonaktif', en: 'Inactive' },
@@ -62,82 +43,6 @@ const technicalLabels: Record<string, LocalizedLabel> = {
   CASH_IN: { id: 'Kas masuk', en: 'Cash in' },
   CASH_OUT: { id: 'Kas keluar', en: 'Cash out' },
 };
-
-const permissionResourceLabels: Record<string, LocalizedLabel> = {
-  auth: { id: 'akun sendiri', en: 'own account' },
-  runtime: { id: 'informasi sistem', en: 'system information' },
-  activity: { id: 'aktivitas', en: 'activity' },
-  users: { id: 'pengguna', en: 'users' },
-  roles: { id: 'peran', en: 'roles' },
-  'operational-access': { id: 'akses operasional', en: 'operational access' },
-  'business-profile': { id: 'profil bisnis', en: 'business profile' },
-  locations: { id: 'lokasi', en: 'locations' },
-  catalog: { id: 'katalog', en: 'catalog' },
-  pricing: { id: 'harga', en: 'pricing' },
-  tax: { id: 'pajak', en: 'tax' },
-  employees: { id: 'karyawan', en: 'employees' },
-  attendance: { id: 'absensi', en: 'attendance' },
-  sales: { id: 'transaksi', en: 'transactions' },
-  payments: { id: 'pembayaran', en: 'payments' },
-  'financial-accounts': { id: 'akun keuangan', en: 'financial accounts' },
-  'payment-routing': { id: 'rute pembayaran', en: 'payment routes' },
-  cash: { id: 'kas', en: 'cash' },
-  expenses: { id: 'pengeluaran', en: 'expenses' },
-  settlements: { id: 'penyelesaian dana', en: 'settlements' },
-  reconciliations: { id: 'rekonsiliasi', en: 'reconciliation' },
-};
-
-const permissionGroupByResource: Record<string, PermissionGroupKey> = {
-  auth: 'account-access',
-  users: 'account-access',
-  roles: 'account-access',
-  'operational-access': 'account-access',
-  activity: 'activity',
-  'business-profile': 'business-location',
-  locations: 'business-location',
-  employees: 'employees',
-  attendance: 'attendance',
-  catalog: 'catalog',
-  pricing: 'catalog',
-  tax: 'catalog',
-  sales: 'sales',
-  payments: 'payments',
-  'payment-routing': 'payments',
-  'financial-accounts': 'finance',
-  cash: 'finance',
-  expenses: 'finance',
-  settlements: 'finance',
-  reconciliations: 'finance',
-  runtime: 'system',
-};
-
-const permissionGroupLabels: Record<PermissionGroupKey, LocalizedLabel> = {
-  'account-access': { id: 'Akun & Akses', en: 'Account & Access' },
-  activity: { id: 'Aktivitas', en: 'Activity' },
-  'business-location': { id: 'Bisnis & Lokasi', en: 'Business & Locations' },
-  employees: { id: 'Karyawan', en: 'Employees' },
-  attendance: { id: 'Absensi', en: 'Attendance' },
-  catalog: { id: 'Katalog & Harga', en: 'Catalog & Pricing' },
-  sales: { id: 'Penjualan', en: 'Sales' },
-  payments: { id: 'Pembayaran', en: 'Payments' },
-  finance: { id: 'Keuangan', en: 'Finance' },
-  system: { id: 'Sistem', en: 'System' },
-  other: { id: 'Lainnya', en: 'Other' },
-};
-
-const permissionGroupOrder: PermissionGroupKey[] = [
-  'account-access',
-  'activity',
-  'business-location',
-  'employees',
-  'attendance',
-  'catalog',
-  'sales',
-  'payments',
-  'finance',
-  'system',
-  'other',
-];
 
 const eventLabels: Record<string, LocalizedLabel> = {
   LOGIN_SUCCEEDED: { id: 'Berhasil masuk', en: 'Login succeeded' },
@@ -313,76 +218,8 @@ function words(value: string): string {
     .join(' ');
 }
 
-function lowerWords(value: string): string {
-  const human = words(value);
-  return human ? human.charAt(0).toLowerCase() + human.slice(1) : human;
-}
-
 export function humanReadableLabel(value: string, locale: HumanLabelLocale): string {
   return technicalLabels[value]?.[locale] ?? words(value);
-}
-
-export function permissionLabel(permission: string, locale: HumanLabelLocale): string {
-  const [resource = permission, action = 'access'] = permission.split(':', 2);
-  const resourceLabel = permissionResourceLabels[resource]?.[locale] ?? lowerWords(resource);
-
-  if (resource === 'auth' && action === 'self') {
-    return locale === 'id' ? 'Akses akun sendiri' : 'Access own account';
-  }
-  if (resource === 'runtime' && action === 'read') {
-    return locale === 'id' ? 'Lihat informasi sistem' : 'View system information';
-  }
-  if (resource === 'roles' && action === 'permissions') {
-    return locale === 'id' ? 'Kelola izin peran' : 'Manage role permissions';
-  }
-  if (resource === 'users' && action === 'invite') {
-    return locale === 'id' ? 'Undang pengguna' : 'Invite users';
-  }
-  if (resource === 'users' && action === 'roles') {
-    return locale === 'id' ? 'Kelola peran pengguna' : 'Manage user roles';
-  }
-  if (resource === 'attendance' && action === 'manage') {
-    return locale === 'id' ? 'Kelola absensi' : 'Manage attendance';
-  }
-  if (resource === 'cash' && action === 'move') {
-    return locale === 'id' ? 'Catat pergerakan kas' : 'Record cash movement';
-  }
-
-  const actionVerb: Record<string, LocalizedLabel> = {
-    read: { id: 'Lihat', en: 'View' },
-    create: { id: 'Tambah', en: 'Create' },
-    update: { id: 'Ubah', en: 'Update' },
-    cancel: { id: 'Batalkan', en: 'Cancel' },
-    approve: { id: 'Setujui', en: 'Approve' },
-    reject: { id: 'Tolak', en: 'Reject' },
-    manage: { id: 'Kelola', en: 'Manage' },
-    access: { id: 'Akses', en: 'Access' },
-  };
-  const verb = actionVerb[action]?.[locale] ?? (locale === 'id' ? 'Kelola' : 'Manage');
-  return `${verb} ${resourceLabel}`;
-}
-
-export function groupPermissionKeys(
-  permissions: readonly string[],
-  locale: HumanLabelLocale,
-): PermissionGroup[] {
-  const grouped = new Map<PermissionGroupKey, string[]>();
-  for (const permission of permissions) {
-    const resource = permission.split(':', 1)[0] ?? permission;
-    const group = permissionGroupByResource[resource] ?? 'other';
-    const values = grouped.get(group) ?? [];
-    values.push(permission);
-    grouped.set(group, values);
-  }
-  return permissionGroupOrder
-    .filter((key) => grouped.has(key))
-    .map((key) => ({
-      key,
-      label: permissionGroupLabels[key][locale],
-      permissions: (grouped.get(key) ?? []).sort((a, b) =>
-        permissionLabel(a, locale).localeCompare(permissionLabel(b, locale), locale),
-      ),
-    }));
 }
 
 export function activityEventLabel(eventType: string, locale: HumanLabelLocale): string {

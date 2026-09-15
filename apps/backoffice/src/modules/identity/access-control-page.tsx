@@ -25,15 +25,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
 import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
 import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
-import { groupPermissionKeys, permissionLabel } from '../../app/localization/human-readable-labels';
 import { canPerformBackofficeAction } from '../../auth/backoffice-access';
 import { isSessionExpiredError, useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import {
   AccessControlApi,
+  type AccessPermission,
   type AccessRole,
   type AccessUser,
   type UserInvitation,
 } from './access-control-api';
+import { groupAccessPermissions } from './permission-catalog';
 import {
   OperationalAccessApi,
   type OperationalLocation,
@@ -54,8 +55,8 @@ const accessCopy = {
     en: 'Manage users, roles, invitations, permissions, and location access.',
   },
   protectedRole: {
-    id: 'Peran sistem tidak dapat diubah.',
-    en: 'System roles cannot be changed.',
+    id: 'Peran sistem memiliki izin bawaan.',
+    en: 'System roles have built-in permissions.',
   },
   invitationDescription: {
     id: 'Pengguna akan mengaktifkan akun melalui undangan yang dikirim.',
@@ -197,7 +198,7 @@ export function AccessControlPage() {
         <RoleEditor
           key={editingRole?.id ?? 'new'}
           role={editingRole}
-          permissions={permissions.data?.items.map((item) => item.key) ?? []}
+          permissions={permissions.data?.items ?? []}
           api={api}
           canUpdate={canUpdateRole}
           canManagePermissions={canManagePermissions}
@@ -499,7 +500,7 @@ function RoleEditor({
   onChanged,
 }: {
   role: AccessRole | null | undefined;
-  permissions: string[];
+  permissions: AccessPermission[];
   api: AccessControlApi;
   canUpdate: boolean;
   canManagePermissions: boolean;
@@ -510,6 +511,7 @@ function RoleEditor({
   const { showToast } = useToast();
 
   const isNew = role === null;
+  const isSystemRole = Boolean(role?.systemKey);
 
   const [code, setCode] = useState('');
   const [name, setName] = useState(role?.name ?? '');
@@ -517,62 +519,32 @@ function RoleEditor({
   const [permissionSearch, setPermissionSearch] = useState('');
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
 
-  const canEditName = isNew || canUpdate;
-  const canEditPermissions = isNew || canManagePermissions;
-  const canSave = isNew || canUpdate || canManagePermissions;
+  const canEditName = !isSystemRole && (isNew || canUpdate);
+  const canEditPermissions = !isSystemRole && (isNew || canManagePermissions);
+  const canSave = isNew || (!isSystemRole && (canUpdate || canManagePermissions));
 
-  /**
-   * Gunakan canonical permission grouping yang sudah ada
-   * di human-readable-labels.
-   *
-   * Tidak ada parsing label permission manual di sini.
-   */
-  const permissionGroups = useMemo(
-    () => groupPermissionKeys(permissions, locale),
-    [permissions, locale],
+  const filteredPermissionSections = useMemo(
+    () => groupAccessPermissions(permissions, locale, permissionSearch),
+    [permissions, locale, permissionSearch],
   );
-
-  /**
-   * Search bisa match:
-   * - nama group
-   * - nama permission
-   */
-  const filteredPermissionGroups = useMemo(() => {
-    const keyword = permissionSearch.trim().toLocaleLowerCase(locale);
-
-    if (!keyword) {
-      return permissionGroups.map((group) => ({
-        ...group,
-        visiblePermissions: group.permissions,
-      }));
-    }
-
-    return permissionGroups.flatMap((group) => {
-      const groupMatches = group.label.toLocaleLowerCase(locale).includes(keyword);
-
-      const visiblePermissions = groupMatches
-        ? group.permissions
-        : group.permissions.filter((permission) =>
-            permissionLabel(permission, locale).toLocaleLowerCase(locale).includes(keyword),
-          );
-
-      if (visiblePermissions.length === 0) {
-        return [];
-      }
-
-      return [
-        {
-          ...group,
-          visiblePermissions,
-        },
-      ];
-    });
-  }, [permissionGroups, permissionSearch, locale]);
 
   const filteredPermissionCount = useMemo(
     () =>
-      filteredPermissionGroups.reduce((total, group) => total + group.visiblePermissions.length, 0),
-    [filteredPermissionGroups],
+      filteredPermissionSections.reduce(
+        (sectionTotal, currentSection) =>
+          sectionTotal +
+          currentSection.areas.reduce(
+            (areaTotal, currentArea) => areaTotal + currentArea.permissions.length,
+            0,
+          ),
+        0,
+      ),
+    [filteredPermissionSections],
+  );
+
+  const selectedVisibleCount = useMemo(
+    () => permissions.filter((permission) => selected.includes(permission.key)).length,
+    [permissions, selected],
   );
 
   const togglePermission = (permission: string) => {
@@ -584,7 +556,7 @@ function RoleEditor({
   };
 
   const save = async () => {
-    if (!name.trim() || (isNew && !code.trim())) {
+    if (!name.trim() || (isNew && !code.trim()) || isSystemRole) {
       return;
     }
 
@@ -598,15 +570,6 @@ function RoleEditor({
       } else if (role) {
         let current = role;
 
-        /**
-         * System role tidak lagi dikunci oleh frontend.
-         *
-         * Yang menentukan boleh/tidaknya edit tetap:
-         * - canUpdate
-         * - canManagePermissions
-         *
-         * systemKey sendiri tidak pernah diubah.
-         */
         if (canUpdate && name.trim() !== role.name) {
           current = await api.updateRole(role, name.trim());
         }
@@ -654,12 +617,16 @@ function RoleEditor({
       }
     >
       <div className="space-y-6">
-        {/* Role information */}
         <div className="space-y-3">
-          {!isNew && role?.systemKey ? (
-            <p className="text-xs font-medium text-[var(--color-text-muted)]">
-              {copy('System role')}
-            </p>
+          {!isNew && isSystemRole ? (
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-[var(--color-text-muted)]">
+                {copy('System role')}
+              </p>
+              <p className="text-sm text-[var(--color-text-muted)]">
+                {accessCopy.protectedRole[locale]}
+              </p>
+            </div>
           ) : null}
 
           <div className={isNew ? 'grid gap-4 sm:grid-cols-2' : ''}>
@@ -682,9 +649,7 @@ function RoleEditor({
           </div>
         </div>
 
-        {/* Permissions */}
         <section className="border-t border-[var(--color-border)] pt-5">
-          {/* Header */}
           <div className="mb-4 flex items-center justify-between gap-4">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
@@ -695,7 +660,7 @@ function RoleEditor({
                 <span className="text-xs tabular-nums text-[var(--color-text-muted)]">
                   {permissionSearch.trim()
                     ? `${filteredPermissionCount} ${copy('results')}`
-                    : `${selected.length}/${permissions.length}`}
+                    : `${selectedVisibleCount}/${permissions.length}`}
                 </span>
               </div>
             </div>
@@ -709,73 +674,94 @@ function RoleEditor({
             />
           </div>
 
-          {/* Permission groups */}
-          {filteredPermissionGroups.length > 0 ? (
-            <div className="max-h-[440px] overflow-y-auto pr-1">
-              <DAccordion
-                type="multiple"
-                variant="card"
-                value={expandedGroups}
-                onValueChange={setExpandedGroups}
-              >
-                {filteredPermissionGroups.map((group) => {
-                  const selectedCount = group.permissions.filter((permission) =>
-                    selected.includes(permission),
-                  ).length;
+          {filteredPermissionSections.length > 0 ? (
+            <div className="max-h-[440px] space-y-5 overflow-y-auto pr-1">
+              {filteredPermissionSections.map((permissionSection) => {
+                const sectionPermissions = permissionSection.areas.flatMap(
+                  (permissionArea) => permissionArea.permissions,
+                );
+                const sectionSelectedCount = sectionPermissions.filter((permission) =>
+                  selected.includes(permission.key),
+                ).length;
 
-                  return (
-                    <DAccordionItem
-                      key={group.key}
-                      value={group.key}
-                      title={
-                        <span className="flex items-center gap-2">
-                          <span>{group.label}</span>
+                return (
+                  <div key={permissionSection.key} className="space-y-2">
+                    <div className="flex items-center justify-between gap-3 px-1">
+                      <p className="text-sm font-semibold text-[var(--color-text)]">
+                        {permissionSection.label}
+                      </p>
+                      <span className="text-xs tabular-nums text-[var(--color-text-muted)]">
+                        {sectionSelectedCount}/{sectionPermissions.length}
+                      </span>
+                    </div>
 
-                          <span className="text-xs font-normal tabular-nums text-[var(--color-text-muted)]">
-                            {selectedCount}/{group.permissions.length}
-                          </span>
-                        </span>
-                      }
+                    <DAccordion
+                      type="multiple"
+                      variant="card"
+                      value={expandedGroups}
+                      onValueChange={setExpandedGroups}
                     >
-                      <div className="grid gap-x-4 gap-y-1 sm:grid-cols-2">
-                        {group.visiblePermissions.map((permission) => {
-                          const checked = selected.includes(permission);
+                      {permissionSection.areas.map((permissionArea) => {
+                        const selectedCount = permissionArea.permissions.filter((permission) =>
+                          selected.includes(permission.key),
+                        ).length;
+                        const groupKey = `${permissionSection.key}:${permissionArea.key}`;
 
-                          return (
-                            <label
-                              key={permission}
-                              className={[
-                                'flex min-h-10 items-center gap-3 rounded-md px-2 py-2',
-                                'transition-colors',
-                                canEditPermissions
-                                  ? 'cursor-pointer hover:bg-[var(--color-surface-subtle)]'
-                                  : 'cursor-default',
-                              ].join(' ')}
-                            >
-                              <DCheckbox
-                                checked={checked}
-                                onChange={() => togglePermission(permission)}
-                                disabled={!canEditPermissions}
-                              />
-
-                              <span
-                                className={[
-                                  'min-w-0 flex-1 break-words text-sm leading-5',
-                                  checked
-                                    ? 'font-medium text-[var(--color-text)]'
-                                    : 'text-[var(--color-text-muted)]',
-                                ].join(' ')}
-                              >
-                                {permissionLabel(permission, locale)}
+                        return (
+                          <DAccordionItem
+                            key={groupKey}
+                            value={groupKey}
+                            title={
+                              <span className="flex items-center gap-2">
+                                <span>{permissionArea.label}</span>
+                                <span className="text-xs font-normal tabular-nums text-[var(--color-text-muted)]">
+                                  {selectedCount}/{permissionArea.permissions.length}
+                                </span>
                               </span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </DAccordionItem>
-                  );
-                })}
-              </DAccordion>
+                            }
+                          >
+                            <div className="grid gap-x-4 gap-y-1 sm:grid-cols-2">
+                              {permissionArea.permissions.map((permission) => {
+                                const checked = selected.includes(permission.key);
+
+                                return (
+                                  <label
+                                    key={permission.key}
+                                    className={[
+                                      'flex min-h-10 items-center gap-3 rounded-md px-2 py-2',
+                                      'transition-colors',
+                                      canEditPermissions
+                                        ? 'cursor-pointer hover:bg-[var(--color-surface-subtle)]'
+                                        : 'cursor-default',
+                                    ].join(' ')}
+                                  >
+                                    <DCheckbox
+                                      checked={checked}
+                                      onChange={() => togglePermission(permission.key)}
+                                      disabled={!canEditPermissions}
+                                    />
+
+                                    <span
+                                      className={[
+                                        'min-w-0 flex-1 break-words text-sm leading-5',
+                                        checked
+                                          ? 'font-medium text-[var(--color-text)]'
+                                          : 'text-[var(--color-text-muted)]',
+                                      ].join(' ')}
+                                    >
+                                      {permission.label[locale]}
+                                    </span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </DAccordionItem>
+                        );
+                      })}
+                    </DAccordion>
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <div className="flex min-h-32 items-center justify-center rounded-[var(--radius-card)] border border-[var(--color-border)] px-6 py-8">
