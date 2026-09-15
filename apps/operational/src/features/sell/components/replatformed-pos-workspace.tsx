@@ -50,7 +50,6 @@ import { createPortal } from 'react-dom';
 
 import {
   operationalCopy,
-  operationalLabel,
   resolveOperationalLocale,
   useOperationalLocalization,
 } from '../../../app/localization/operational-localization';
@@ -112,10 +111,6 @@ const saleCustomerKey = (saleId: string) => `digvation-pos-demo-customer:${saleI
 
 function copyFor(value: string, locale: string): string {
   return operationalCopy(value, resolveOperationalLocale(locale));
-}
-
-function labelFor(value: string, locale: string): string {
-  return operationalLabel(value, resolveOperationalLocale(locale));
 }
 
 function readStoredCustomer(key: string): PosCustomer | null {
