@@ -368,7 +368,6 @@ export function CatalogPage() {
         currency={currency}
         api={api}
         canViewTax={canViewTax}
-        canViewPricing={can('viewPricing')}
         canCreatePricing={can('createPricing')}
         canCreateVariants={can('createCatalog')}
         canManageImage={can('updateCatalog')}
