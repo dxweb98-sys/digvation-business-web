@@ -8,7 +8,7 @@ import {
   operationalLabel,
   resolveOperationalLocale,
   type OperationalLocale,
-} from './operational-localization.legacy';
+} from './operational-localization-core';
 
 export {
   operationalCopy,
