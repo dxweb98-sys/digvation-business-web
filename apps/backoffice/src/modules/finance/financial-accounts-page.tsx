@@ -66,14 +66,14 @@ export function FinancialAccountsPage() {
         )}
       />
       <DTabs defaultValue="accounts" className="mt-6">
-        <DTabsList>
+        <DTabsList className="max-w-full overflow-x-auto">
           <DTabsTrigger value="accounts">{copy('Accounts')}</DTabsTrigger>
           <DTabsTrigger value="routing">{copy('Payment routing')}</DTabsTrigger>
         </DTabsList>
-        <DTabsContent value="accounts">
+        <DTabsContent value="accounts" className="mt-4">
           <AccountsPanel api={api} />
         </DTabsContent>
-        <DTabsContent value="routing">
+        <DTabsContent value="routing" className="mt-4">
           <RoutingPanel api={api} />
         </DTabsContent>
       </DTabs>
@@ -160,7 +160,7 @@ function AccountsPanel({ api }: { api: FinancialAccountsApi }) {
       </div>
     );
   return (
-    <section className="mt-5">
+    <section>
       <DDataTable
         columns={columns}
         data={accounts.data?.items ?? []}
@@ -549,7 +549,7 @@ function RoutingPanel({ api }: { api: FinancialAccountsApi }) {
       </div>
     );
   return (
-    <section className="mt-5">
+    <section>
       <DDataTable
         columns={columns}
         data={routes.data?.items ?? []}
@@ -679,10 +679,21 @@ function RouteEditor({
       if (route) await api.updateRoute(route, { financialAccountId: accountId, status });
       else {
         const account = (accounts.data?.items ?? []).find((item) => item.id === accountId);
-        const existing = await api.listRoutes({ sellingLocationId: locationId, paymentMethod: method, limit: 100, offset: 0 });
+        const existing = await api.listRoutes({
+          sellingLocationId: locationId,
+          paymentMethod: method,
+          limit: 100,
+          offset: 0,
+        });
         const sameScope = existing.items.find((item) => item.currency === account?.currency);
-        if (sameScope) await api.updateRoute(sameScope, { financialAccountId: accountId, status: 'ACTIVE' });
-        else await api.createRoute({ sellingLocationId: locationId, paymentMethod: method, financialAccountId: accountId });
+        if (sameScope)
+          await api.updateRoute(sameScope, { financialAccountId: accountId, status: 'ACTIVE' });
+        else
+          await api.createRoute({
+            sellingLocationId: locationId,
+            paymentMethod: method,
+            financialAccountId: accountId,
+          });
       }
       onSaved();
       onClose();
