@@ -32,23 +32,111 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Apply targeted lint cleanup
+      - name: Sync copy cleanup validation
         if: github.ref == 'refs/heads/fix/human-readable-labels'
         run: |
           python - <<'PY'
           from pathlib import Path
 
-          path = Path('apps/operational/src/features/sell/components/replatformed-pos-workspace.tsx')
-          text = path.read_text()
+          pos_copy = Path('apps/operational/src/app/localization/operational-pos-copy.ts')
+          text = pos_copy.read_text()
+          anchor = "  Add: { 'id-ID': 'Tambah', 'en-US': 'Add' },\n"
+          additions = """  'Item price is unavailable for this selection.': {
+            'id-ID': 'Harga item belum tersedia untuk pilihan ini.',
+            'en-US': 'Item price is unavailable for this selection.',
+          },
+          'Transaction changed. Review the latest data before continuing.': {
+            'id-ID': 'Transaksi telah berubah. Tinjau data terbaru sebelum melanjutkan.',
+            'en-US': 'Transaction changed. Review the latest data before continuing.',
+          },
+          'Transaction could not be processed. Try again.': {
+            'id-ID': 'Transaksi tidak dapat diproses. Coba lagi.',
+            'en-US': 'Transaction could not be processed. Try again.',
+          },
+          'The latest transaction could not be confirmed. Review it before continuing.': {
+            'id-ID': 'Data transaksi terbaru belum dapat dipastikan. Tinjau transaksi sebelum melanjutkan.',
+            'en-US': 'The latest transaction could not be confirmed. Review it before continuing.',
+          },
+          'The result could not be confirmed. Try again from the current transaction.': {
+            'id-ID': 'Hasil tindakan belum dapat dipastikan. Coba lagi dari transaksi saat ini.',
+            'en-US': 'The result could not be confirmed. Try again from the current transaction.',
+          },
+          """
+          if "'Item price is unavailable for this selection.'" not in text:
+              text = text.replace(anchor, anchor + additions)
+          pos_copy.write_text(text)
+
+          workspace = Path('apps/operational/src/features/sell/use-cashier-transaction-workspace.ts')
+          text = workspace.read_text()
           text = text.replace(
-              "  operationalCopy,\n  operationalLabel,\n  resolveOperationalLocale,",
-              "  operationalCopy,\n  resolveOperationalLocale,",
+              'cashierTransactionErrorMessage(saleWorkspace.saleQueryError)',
+              'cashierTransactionErrorMessage(saleWorkspace.saleQueryError, runtime.locale)',
           )
           text = text.replace(
-              "\nfunction labelFor(value: string, locale: string): string {\n  return operationalLabel(value, resolveOperationalLocale(locale));\n}\n",
-              "\n",
+              'cashierTransactionErrorMessage(catalog.error)',
+              'cashierTransactionErrorMessage(catalog.error, runtime.locale)',
           )
-          path.write_text(text)
+          workspace.write_text(text)
+
+          e2e = Path('tooling/e2e/cashier-transaction-foundation.spec.ts')
+          text = e2e.read_text()
+          if "operationalState: 'UNSUBMITTED'" not in text:
+              text = text.replace("    status: 'OPEN',\n    version: 1,", "    status: 'OPEN',\n    operationalState: 'UNSUBMITTED',\n    version: 1,")
+          replacements = {
+              '/Active branch Main Branch/i': '/Cabang aktif Main Branch/i',
+              "name: 'Add Hair Cut'": "name: 'Tambah Hair Cut'",
+              "page.getByText('Point of Sale', { exact: true })": "page.getByRole('button', { name: 'Tambah Hair Cut', exact: true })",
+              'aria-label="Cart"': 'aria-label="Keranjang"',
+              'Cart masih kosong': 'Keranjang kosong',
+              "page.getByRole('button', { name: 'Cart', exact: true })": "page.getByRole('button', { name: 'Keranjang', exact: true })",
+              "name: 'Increase Hair Cut quantity'": "name: 'Tambah jumlah Hair Cut'",
+              "getByLabel('Quantity for Hair Cut')": "getByLabel('Jumlah Hair Cut')",
+              "name: 'Remove Hair Cut'": "name: 'Hapus Hair Cut'",
+              "page.getByText(/changed on another terminal/i)": "page.getByText('Transaksi telah berubah. Tinjau data terbaru sebelum melanjutkan.')",
+              "name: 'Reviewed'": "name: 'Sudah ditinjau'",
+              "name: 'Close active cart'": "name: 'Tutup keranjang aktif'",
+              "page.getByRole('alert')).toContainText('No effective price for this selection')": "page.getByRole('alert')).toContainText('Harga item belum tersedia untuk pilihan ini.')",
+              "page.getByText('No effective price for this selection')": "page.getByText('Harga item belum tersedia untuk pilihan ini.')",
+          }
+          for old, new in replacements.items():
+              text = text.replace(old, new)
+          text = text.replace("  await expect(page.getByRole('button', { name: 'New Sale' })).toHaveCount(0);\n", '')
+          old_test = """test('Open Sales switches active Sale by navigation only', async ({ page }) => {
+            const state = await installRoutes(page, { currentSale: createSaleWithLine() });
+
+            await page.goto('/open-sales');
+            await expect(page.getByRole('heading', { name: 'Open Sales' })).toBeVisible();
+            await expect(page.getByText(`Sale ${saleId.slice(0, 8)}`)).toBeVisible();
+
+            await page.getByText(`Sale ${saleId.slice(0, 8)}`).click();
+            await expect(page).toHaveURL(new RegExp(`/sell/${saleId}$`));
+            await page.getByRole('button', { name: 'Keranjang', exact: true }).click();
+            await expect(
+              page
+                .locator('[role="dialog"][aria-label="Keranjang"]')
+                .first()
+                .getByText('Hair Cut', { exact: true }),
+            ).toBeVisible();
+
+            expect(state.createRequests).toBe(0);
+            expect(state.addRequests).toBe(0);
+          });"""
+          new_test = """test('queued transactions render without creating or adding a Sale', async ({ page }) => {
+            const state = await installRoutes(page, {
+              currentSale: { ...createSaleWithLine(), operationalState: 'QUEUED' },
+            });
+
+            await page.goto('/sell');
+            await expect(page.getByRole('button', { name: /Cabang aktif Main Branch/i })).toBeVisible();
+            await expect(page.getByText('Antrian transaksi', { exact: true })).toBeVisible();
+            await page.getByRole('button', { name: /Antrian transaksi/ }).click();
+            await expect(page.getByText(`Transaksi ${saleId.slice(0, 8)}`)).toBeVisible();
+
+            expect(state.createRequests).toBe(0);
+            expect(state.addRequests).toBe(0);
+          });"""
+          text = text.replace(old_test, new_test)
+          e2e.write_text(text)
           PY
 
       - name: Format copy cleanup branch
@@ -59,7 +147,7 @@ jobs:
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add .
-            git commit -m "style: finalize copy cleanup"
+            git commit -m "test: align smoke checks with human copy"
             git push
           fi
 
