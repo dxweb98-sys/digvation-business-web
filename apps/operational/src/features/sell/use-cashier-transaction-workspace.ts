@@ -1,7 +1,7 @@
 import { useAuth } from '@digvation/pos-auth';
 import { useConnectivity, useRuntime } from '@digvation/pos-runtime';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 
 import {
@@ -51,6 +51,23 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     [authPort, runtime],
   );
   const effectiveConnectivity = isLocalCashierDemoEnabled() ? 'ONLINE' : connectivity.state;
+
+  useEffect(() => {
+    if (
+      isLocalCashierDemoEnabled() ||
+      !selectedLocationId ||
+      effectiveConnectivity !== 'ONLINE'
+    ) {
+      return undefined;
+    }
+    const timer = window.setInterval(() => {
+      void queryClient.invalidateQueries({
+        queryKey: cashierTransactionKeys.sales(),
+        refetchType: 'active',
+      });
+    }, 5_000);
+    return () => window.clearInterval(timer);
+  }, [effectiveConnectivity, queryClient, selectedLocationId]);
 
   const command = useSaleCommandCoordinator({ client: transactionAdapter, rememberSale });
 
@@ -331,19 +348,25 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     }
   };
 
-  const queueSale = async (sale: Sale) =>
-    command.runMutation(() =>
+  const queueSale = async (sale: Sale) => {
+    const updated = await command.runMutation(() =>
       transactionAdapter.queueSale(sale.id, sale.version, `cashier-queue-${crypto.randomUUID()}`),
     );
+    command.commitSale(updated);
+    return updated;
+  };
 
-  const startSaleWork = async (sale: Sale) =>
-    command.runMutation(() =>
+  const startSaleWork = async (sale: Sale) => {
+    const updated = await command.runMutation(() =>
       transactionAdapter.startSaleWork(
         sale.id,
         sale.version,
         `cashier-start-work-${crypto.randomUUID()}`,
       ),
     );
+    command.commitSale(updated);
+    return updated;
+  };
 
   const setCurrentPerformers = async (
     line: SaleLine,
