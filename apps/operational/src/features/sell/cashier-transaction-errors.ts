@@ -1,12 +1,16 @@
 import { ApiError } from '@digvation/pos-api';
 
 export function cashierTransactionErrorMessage(error: unknown): string {
-  if (isApiErrorCode(error, 'PRICE_NOT_FOUND'))
-    return 'Harga aktif untuk item, varian, cabang, mata uang, dan waktu saat ini belum dikonfigurasi.';
-  if (error instanceof ApiError) {
-    return error.requestId ? `${error.message} · Request ${error.requestId}` : error.message;
+  if (
+    isApiErrorCode(error, 'PRICE_NOT_FOUND') ||
+    isApiErrorCode(error, 'CATALOG_PRICE_NOT_FOUND')
+  ) {
+    return 'Harga item belum tersedia untuk pilihan ini.';
   }
-  return error instanceof Error ? error.message : 'Unexpected transaction error.';
+  if (isApiErrorCode(error, 'SALE_VERSION_CONFLICT')) {
+    return 'Transaksi telah berubah. Tinjau data terbaru sebelum melanjutkan.';
+  }
+  return 'Transaksi tidak dapat diproses. Coba lagi.';
 }
 
 export function isApiErrorCode(error: unknown, code: string): boolean {
