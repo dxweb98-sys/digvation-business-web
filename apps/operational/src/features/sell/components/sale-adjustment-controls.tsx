@@ -4,7 +4,8 @@ import { useRuntime } from '@digvation/pos-runtime';
 import { DButton, DDialog, DInput, DSelect, useToast } from '@digvation-labs/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { BadgePercent, Tag, X } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import { useOperationalLocalization } from '../../../app/localization/operational-localization';
 import { createCashierTransactionAdapter } from '../cashier-transaction-adapter-factory';
@@ -16,6 +17,7 @@ import { actionBlockMessage } from '../sale-workspace-view-model';
 
 interface SaleAdjustmentControlsProps {
   workspace: ReturnType<typeof useCashierTransactionWorkspace>;
+  placement?: 'inline' | 'payment';
 }
 
 const localCopy: Record<string, { 'id-ID': string; 'en-US': string }> = {
@@ -105,7 +107,22 @@ function commitSaleToCache(queryClient: ReturnType<typeof useQueryClient>, sale:
   });
 }
 
-export function SaleAdjustmentControls({ workspace }: SaleAdjustmentControlsProps) {
+function findPaymentPromotionCard(labels: readonly string[]): HTMLElement | null {
+  const dialogs = Array.from(document.querySelectorAll<HTMLElement>('.pos-reference-dialog'));
+  for (const dialog of dialogs.reverse()) {
+    const paragraph = Array.from(dialog.querySelectorAll<HTMLParagraphElement>('p')).find((node) =>
+      labels.includes(node.textContent?.trim() ?? ''),
+    );
+    const card = paragraph?.parentElement?.parentElement;
+    if (card instanceof HTMLElement) return card;
+  }
+  return null;
+}
+
+export function SaleAdjustmentControls({
+  workspace,
+  placement = 'inline',
+}: SaleAdjustmentControlsProps) {
   const runtime = useRuntime();
   const { authPort } = useAuth();
   const { copy, locale } = useOperationalLocalization();
@@ -119,6 +136,7 @@ export function SaleAdjustmentControls({ workspace }: SaleAdjustmentControlsProp
   const [discountReason, setDiscountReason] = useState('');
   const [promoCode, setPromoCode] = useState('');
   const [promoBusy, setPromoBusy] = useState(false);
+  const [paymentPromoTarget, setPaymentPromoTarget] = useState<HTMLElement | null>(null);
 
   const adapter = useMemo(
     () => createCashierTransactionAdapter(runtime, authPort.getAccessToken?.bind(authPort)),
@@ -131,6 +149,37 @@ export function SaleAdjustmentControls({ workspace }: SaleAdjustmentControlsProp
     workspace.viewModel.monetaryMutation.state === 'DISABLED'
       ? actionBlockMessage(workspace.viewModel.monetaryMutation.reason, runtime.locale)
       : null;
+
+  useEffect(() => {
+    if (placement !== 'payment') {
+      setPaymentPromoTarget(null);
+      return undefined;
+    }
+
+    let hiddenStatus: HTMLElement | null = null;
+    const syncTarget = () => {
+      if (hiddenStatus) hiddenStatus.hidden = false;
+      hiddenStatus = null;
+      const card = findPaymentPromotionCard([copy('Promotion'), 'Promo', 'Promotion']);
+      if (card) {
+        const row = card.firstElementChild;
+        const status = row?.querySelector('span');
+        if (status instanceof HTMLElement) {
+          status.hidden = true;
+          hiddenStatus = status;
+        }
+      }
+      setPaymentPromoTarget((current) => (current === card ? current : card));
+    };
+
+    syncTarget();
+    const observer = new MutationObserver(syncTarget);
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => {
+      observer.disconnect();
+      if (hiddenStatus) hiddenStatus.hidden = false;
+    };
+  }, [copy, placement]);
 
   if ((!sale && workspace.cart.lines.length === 0) || (sale && sale.status !== 'OPEN')) return null;
 
@@ -253,18 +302,27 @@ export function SaleAdjustmentControls({ workspace }: SaleAdjustmentControlsProp
     });
   };
 
+  const trigger = (
+    <DButton
+      size="sm"
+      variant="secondary"
+      fullWidth={placement === 'payment'}
+      disabled={preparing}
+      loading={preparing}
+      onClick={() => void prepareAndOpen()}
+    >
+      <BadgePercent className="mr-1.5 size-4" />
+      {text('Discounts & promotions')}
+    </DButton>
+  );
+
   return (
     <>
-      <DButton
-        size="sm"
-        variant="secondary"
-        disabled={preparing}
-        loading={preparing}
-        onClick={() => void prepareAndOpen()}
-      >
-        <BadgePercent className="mr-1.5 size-4" />
-        {text('Discounts & promotions')}
-      </DButton>
+      {placement === 'payment'
+        ? paymentPromoTarget
+          ? createPortal(<div className="mt-3">{trigger}</div>, paymentPromoTarget)
+          : null
+        : trigger}
 
       {sale ? (
         <DDialog
