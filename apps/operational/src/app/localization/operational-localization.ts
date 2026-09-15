@@ -1,5 +1,7 @@
 import { useRuntime } from '@digvation/business-runtime';
 
+import { operationalPosCopy } from './operational-pos-copy';
+
 export type OperationalLocale = 'id-ID' | 'en-US';
 type LocalizedLabel = Record<OperationalLocale, string>;
 
@@ -103,7 +105,6 @@ const copy: Record<string, LocalizedLabel> = {
   },
   'Request password change': { 'id-ID': 'Ubah kata sandi', 'en-US': 'Change password' },
   Branch: { 'id-ID': 'Cabang', 'en-US': 'Branch' },
-
   'Sign in to Operational': { 'id-ID': 'Masuk ke Operational', 'en-US': 'Sign in to Operational' },
   'User ID': { 'id-ID': 'ID pengguna', 'en-US': 'User ID' },
   'Username or email': { 'id-ID': 'Nama pengguna atau email', 'en-US': 'Username or email' },
@@ -126,7 +127,6 @@ const copy: Record<string, LocalizedLabel> = {
   'Opening Operational...': { 'id-ID': 'Membuka Operational...', 'en-US': 'Opening Operational...' },
   'Signing in...': { 'id-ID': 'Masuk...', 'en-US': 'Signing in...' },
   'Sign in': { 'id-ID': 'Masuk', 'en-US': 'Sign in' },
-
   'Verifying operational access': {
     'id-ID': 'Memverifikasi akses operasional',
     'en-US': 'Verifying operational access',
@@ -185,7 +185,6 @@ const copy: Record<string, LocalizedLabel> = {
     'id-ID': 'Coba lagi atau hubungi administrator.',
     'en-US': 'Try again or contact an administrator.',
   },
-
   Cart: { 'id-ID': 'Keranjang', 'en-US': 'Cart' },
   Checkout: { 'id-ID': 'Pembayaran', 'en-US': 'Checkout' },
   Product: { 'id-ID': 'Produk', 'en-US': 'Product' },
@@ -511,7 +510,7 @@ export function resolveOperationalLocale(locale: string | undefined): Operationa
 }
 
 export function operationalCopy(value: string, locale: OperationalLocale): string {
-  return copy[value]?.[locale] ?? value;
+  return copy[value]?.[locale] ?? operationalPosCopy(value, locale) ?? value;
 }
 
 export function operationalLabel(value: string, locale: OperationalLocale): string {
