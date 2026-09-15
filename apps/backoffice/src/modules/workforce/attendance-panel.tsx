@@ -235,7 +235,7 @@ export function AttendancePanel({ api, canManage }: { api: EmployeesApi; canMana
         ) : null}
       </div>
 
-      <div className="rounded-(--radius-card) border border-(--color-border) bg-(--color-surface) p-4 sm:p-5">
+      <section className="border-y border-(--color-border) py-4">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <DSelect
             label={copy('Period')}
@@ -353,7 +353,7 @@ export function AttendancePanel({ api, canManage }: { api: EmployeesApi; canMana
             {copy('Reset filters')}
           </DButton>
         </div>
-      </div>
+      </section>
 
       <DDataTable
         columns={historyColumns}
