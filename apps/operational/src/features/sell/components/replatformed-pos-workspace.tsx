@@ -533,7 +533,7 @@ function financialSummary(sale: Sale) {
 }
 
 function hasSuccessfulPayment(sale: Sale): boolean {
-  return successfulPayments(sale).length > 0;
+  return successfulPayments(sale).some((payment) => createDecimal(payment.appliedAmount).greaterThan(0));
 }
 
 export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }) {
@@ -890,28 +890,13 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   };
 
   const requestCancel = (transaction: Sale) => {
-    if (hasSuccessfulPayment(transaction)) {
-      showToast({
-        title: copy('Refund required'),
-        description: copy('A paid transaction must be refunded before it can be canceled.'),
-        variant: 'warning',
-      });
-      return;
-    }
     setCancelTarget(transaction);
     setCancelReason('');
   };
 
   const confirmCancel = async () => {
     if (!cancelTarget || !cancelReason.trim()) return;
-    if (hasSuccessfulPayment(cancelTarget)) {
-      showToast({
-        title: copy('Refund required'),
-        description: copy('Refund the payment before canceling the transaction.'),
-        variant: 'warning',
-      });
-      return;
-    }
+    const refundAmount = financialSummary(cancelTarget).totalPaid;
     try {
       const canceledSale = await workspace.voidQueuedSale(cancelTarget);
       if (isLocalDemo) {
@@ -922,18 +907,22 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         }));
       }
       setQueueDetail(canceledSale);
+      setQueueTab('CANCELED');
+      setReceiptSaleId(null);
       setCancelTarget(null);
       setCancelReason('');
       workspace.closeQueueContext();
       showToast({
         title: copy('Transaction canceled'),
-        description: copy('Cancellation reason saved.'),
+        description: isPositiveDecimal(refundAmount)
+          ? `${copy('Refund required')}: ${money(refundAmount, workspace.locale)}. ${copy('Cancellation reason saved.')}`
+          : copy('Cancellation reason saved.'),
         variant: 'success',
       });
-    } catch {
+    } catch (error) {
       showToast({
         title: copy('Cancellation failed'),
-        description: copy('The transaction was not changed. Check payment status.'),
+        description: cashierTransactionErrorMessage(error),
         variant: 'danger',
       });
     }
@@ -1356,6 +1345,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       <ReferenceCancelDialog
         sale={cancelTarget}
         reason={cancelReason}
+        isMutating={workspace.isCoreMutating}
         onReasonChange={setCancelReason}
         onClose={() => {
           setCancelTarget(null);
@@ -1511,12 +1501,7 @@ function ReferenceCatalogCard({
         className={`mb-2 flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl ${isService ? 'bg-cyan-500/10 text-cyan-600' : 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]'}`}
       >
         {item.image?.url ? (
-          <img
-            src={item.image.url}
-            alt=""
-            loading="lazy"
-            className="size-full object-cover"
-          />
+          <img src={item.image.url} alt="" loading="lazy" className="size-full object-cover" />
         ) : isService ? (
           <Wrench className="size-7" />
         ) : (
@@ -1600,9 +1585,7 @@ function ReferenceQueueBoard({
                 </span>
               </div>
               <p className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">
-                {count
-                  ? copy('Click to view active transactions.')
-                  : copy('No queued transactions.')}
+                {count ? copy('Click to view active transactions.') : copy('No queued transactions.')}
               </p>
             </div>
           </div>
@@ -1625,9 +1608,7 @@ function ReferenceQueueBoard({
             className={`size-[18px] text-[var(--color-text-muted)] transition-transform md:hidden ${open ? 'rotate-180' : ''}`}
           />
         </button>
-        <div
-          className={`grid transition-all duration-300 ease-out ${open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
-        >
+        <div className={`grid transition-all duration-300 ease-out ${open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
           <div className="overflow-hidden">
             <DTabs
               value={active}
@@ -1644,9 +1625,7 @@ function ReferenceQueueBoard({
               </DTabsList>
               {statuses.map((status) => {
                 const list = groups[status];
-                const contentKey = `${status}:${list
-                  .map((sale) => `${sale.id}:${sale.version}`)
-                  .join('|')}`;
+                const contentKey = `${status}:${list.map((sale) => `${sale.id}:${sale.version}`).join('|')}`;
                 return (
                   <DTabsContent key={status} value={status} className="mt-3">
                     <div key={contentKey} className="pos-queue-content-enter space-y-3">
@@ -1672,9 +1651,7 @@ function ReferenceQueueBoard({
                         </div>
                       ) : (
                         <div className="rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)]/20 py-7 text-center">
-                          <p className="text-sm font-semibold">
-                            {copy('No transactions in this status.')}
-                          </p>
+                          <p className="text-sm font-semibold">{copy('No transactions in this status.')}</p>
                           <p className="mt-1 text-xs text-[var(--color-text-muted)]">
                             {copy('Transactions appear here after they are created.')}
                           </p>
@@ -1797,25 +1774,17 @@ function ReferenceQueueCard({
   ];
 
   return (
-    <article
-      className={`w-[360px] shrink-0 rounded-2xl border border-[var(--color-border)] p-4 transition-shadow hover:shadow-sm ${meta.soft}`}
-    >
+    <article className={`w-[360px] shrink-0 rounded-2xl border border-[var(--color-border)] p-4 transition-shadow hover:shadow-sm ${meta.soft}`}>
       <div className="mb-2 flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="font-mono text-[11px] text-[var(--color-text-muted)]">
-            {transactionNumber(sale.id, locale)}
-          </p>
+          <p className="font-mono text-[11px] text-[var(--color-text-muted)]">{transactionNumber(sale.id, locale)}</p>
           <p className="mt-0.5 truncate text-sm font-bold">{customer.name}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          <span
-            className={`inline-flex items-center rounded-full px-2 py-1 text-[10px] font-bold ${paid ? 'bg-[var(--color-success)]/10 text-[var(--color-success)]' : 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]'}`}
-          >
+          <span className={`inline-flex items-center rounded-full px-2 py-1 text-[10px] font-bold ${paid ? 'bg-[var(--color-success)]/10 text-[var(--color-success)]' : 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]'}`}>
             {copy(paid ? 'Paid' : hasPayment ? 'Partially paid' : 'Unpaid')}
           </span>
-          <span
-            className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold ${meta.tone}`}
-          >
+          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold ${meta.tone}`}>
             {meta.icon}
             {label(meta.value)}
           </span>
@@ -1825,22 +1794,13 @@ function ReferenceQueueCard({
         <div>
           <p className="text-xs text-[var(--color-text-muted)]">
             {sale.lines.filter((line) => !line.removedAt).length} {copy('items')},{' '}
-            {new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(
-              new Date(sale.createdAt),
-            )}
+            {new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(new Date(sale.createdAt))}
           </p>
-          <p className="mt-1 text-sm font-bold text-[var(--color-brand)]">
-            {money(sale.totalAmount, locale)}
-          </p>
+          <p className="mt-1 text-sm font-bold text-[var(--color-brand)]">{money(sale.totalAmount, locale)}</p>
         </div>
         <div className="flex items-center gap-2">
           {canStartWork ? (
-            <DButton
-              size="sm"
-              className="h-8 px-3 text-[11px]"
-              leftIcon={<PlayCircle className="size-3.5" />}
-              onClick={() => onStartWork(sale)}
-            >
+            <DButton size="sm" className="h-8 px-3 text-[11px]" leftIcon={<PlayCircle className="size-3.5" />} onClick={() => onStartWork(sale)}>
               {copy('Start work')}
             </DButton>
           ) : null}
@@ -1877,9 +1837,7 @@ function ReferenceQueueCard({
       </div>
       {issues.length ? (
         <div className="mt-3 rounded-xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 px-3 py-2 text-xs">
-          <p className="font-semibold text-[var(--color-warning)]">
-            {copy('Complete before starting')}
-          </p>
+          <p className="font-semibold text-[var(--color-warning)]">{copy('Complete before starting')}</p>
           <p className="mt-0.5 text-[var(--color-text-muted)]">{issues[0]}</p>
         </div>
       ) : null}
@@ -1935,9 +1893,7 @@ function ReferenceFloatingCart({
       onCheckout={onCheckout}
     />
   );
-  const countLabel = lines.length
-    ? `${lines.length} ${copy('items selected')}`
-    : copy('No items selected');
+  const countLabel = lines.length ? `${lines.length} ${copy('items selected')}` : copy('No items selected');
   return (
     <>
       <button
@@ -1955,9 +1911,7 @@ function ReferenceFloatingCart({
         <div className="relative">
           <ShoppingBag className="size-5" />
           {lines.length ? (
-            <span className="absolute -right-2 -top-2 flex size-5 items-center justify-center rounded-full bg-white text-[10px] font-bold text-[var(--color-brand)] shadow">
-              {lines.length}
-            </span>
+            <span className="absolute -right-2 -top-2 flex size-5 items-center justify-center rounded-full bg-white text-[10px] font-bold text-[var(--color-brand)] shadow">{lines.length}</span>
           ) : null}
         </div>
         <div className="hidden text-left sm:block">
@@ -1976,22 +1930,14 @@ function ReferenceFloatingCart({
               <h2 className="text-base font-bold">{copy('Cart')}</h2>
               <p className="text-xs text-[var(--color-text-muted)]">{countLabel}</p>
             </div>
-            <button
-              type="button"
-              aria-label={copy('Close')}
-              onClick={() => onOpenChange(false)}
-              className="rounded-xl p-2 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]"
-            >
+            <button type="button" aria-label={copy('Close')} onClick={() => onOpenChange(false)} className="rounded-xl p-2 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]">
               <X className="size-[18px]" />
             </button>
           </div>
         </div>
         {panel}
       </div>
-      <div
-        onClick={() => onOpenChange(false)}
-        className={`fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px] transition-opacity duration-200 md:hidden ${open ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'}`}
-      />
+      <div onClick={() => onOpenChange(false)} className={`fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px] transition-opacity duration-200 md:hidden ${open ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'}`} />
       <div
         role="dialog"
         aria-label={copy('Cart')}
@@ -2004,12 +1950,7 @@ function ReferenceFloatingCart({
                 <h2 className="text-base font-bold">{copy('Cart')}</h2>
                 <p className="text-xs text-[var(--color-text-muted)]">{countLabel}</p>
               </div>
-              <button
-                type="button"
-                aria-label={copy('Close')}
-                onClick={() => onOpenChange(false)}
-                className="rounded-xl p-2 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]"
-              >
+              <button type="button" aria-label={copy('Close')} onClick={() => onOpenChange(false)} className="rounded-xl p-2 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]">
                 <X className="size-[18px]" />
               </button>
             </div>
@@ -2052,148 +1993,68 @@ function ReferenceCartPanel({
   const status = customerStatus(customer);
   const hasTax = !createDecimal(taxAmount).equals(createDecimal('0'));
   const increment = (line: CartDisplayLine, direction: 'up' | 'down') => {
-    const next =
-      direction === 'up'
-        ? createDecimal(line.quantity).plus(createDecimal('1'))
-        : createDecimal(line.quantity).minus(createDecimal('1'));
+    const next = direction === 'up' ? createDecimal(line.quantity).plus(createDecimal('1')) : createDecimal(line.quantity).minus(createDecimal('1'));
     if (next.lessThan(createDecimal('1'))) return;
     onQuantity(line, next.toFixed(4));
   };
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-[var(--color-background)]">
       <div className="shrink-0 space-y-2.5 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3">
-        <button
-          type="button"
-          aria-label={copy('Choose customer')}
-          onClick={onChooseCustomer}
-          className="flex w-full items-center gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-muted)]/45 px-3 py-2.5 text-left transition-colors hover:border-[var(--color-brand)]/35 hover:bg-[var(--color-brand)]/5"
-        >
-          <div className="grid size-8 place-items-center rounded-xl bg-[var(--color-background)] text-[var(--color-text-muted)]">
-            <User className="size-4" />
-          </div>
+        <button type="button" aria-label={copy('Choose customer')} onClick={onChooseCustomer} className="flex w-full items-center gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-muted)]/45 px-3 py-2.5 text-left transition-colors hover:border-[var(--color-brand)]/35 hover:bg-[var(--color-brand)]/5">
+          <div className="grid size-8 place-items-center rounded-xl bg-[var(--color-background)] text-[var(--color-text-muted)]"><User className="size-4" /></div>
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-1.5">
-              <p className="truncate text-xs font-semibold">
-                {customer?.name ?? copy('General customer')}
-              </p>
-              <Badge variant={status.variant} className="shrink-0 px-2 py-0 text-[10px]">
-                {copy(status.label)}
-              </Badge>
+              <p className="truncate text-xs font-semibold">{customer?.name ?? copy('General customer')}</p>
+              <Badge variant={status.variant} className="shrink-0 px-2 py-0 text-[10px]">{copy(status.label)}</Badge>
             </div>
-            <p className="mt-0.5 truncate text-[11px] text-[var(--color-text-muted)]">
-              {customer?.phone ?? copy('Choose customer')}
-            </p>
+            <p className="mt-0.5 truncate text-[11px] text-[var(--color-text-muted)]">{customer?.phone ?? copy('Choose customer')}</p>
           </div>
           <ChevronDown className="size-4 shrink-0 text-[var(--color-text-muted)]" />
         </button>
       </div>
-      <div
-        className={`min-h-0 border-y border-[var(--color-border)] bg-[var(--color-surface-muted)]/20 ${lines.length ? 'flex-1 overflow-y-auto' : 'shrink-0'}`}
-      >
+      <div className={`min-h-0 border-y border-[var(--color-border)] bg-[var(--color-surface-muted)]/20 ${lines.length ? 'flex-1 overflow-y-auto' : 'shrink-0'}`}>
         {lines.length ? (
           <div className="space-y-2 overflow-y-auto p-3">
             {lines.map((line) => (
-              <div
-                key={line.id}
-                className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 shadow-sm"
-              >
+              <div key={line.id} className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 shadow-sm">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold leading-tight">
-                      {line.itemNameSnapshot}
-                    </p>
+                    <p className="truncate text-sm font-semibold leading-tight">{line.itemNameSnapshot}</p>
                     <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
                       {money(line.effectiveUnitPrice, locale)}
                       {line.variantNameSnapshot ? `, ${line.variantNameSnapshot}` : ''}
-                      {line.itemTypeSnapshot === 'SERVICE' ? (
-                        <span className="ml-1 font-semibold text-cyan-700">{copy('Service')}</span>
-                      ) : null}
+                      {line.itemTypeSnapshot === 'SERVICE' ? <span className="ml-1 font-semibold text-cyan-700">{copy('Service')}</span> : null}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    aria-label={`${copy('Remove')} ${line.itemNameSnapshot}`}
-                    onClick={() => onRemove(line)}
-                    className="shrink-0 rounded-lg p-1.5 text-[var(--color-text-muted)] hover:bg-[var(--color-danger)]/10 hover:text-[var(--color-danger)]"
-                  >
+                  <button type="button" aria-label={`${copy('Remove')} ${line.itemNameSnapshot}`} onClick={() => onRemove(line)} className="shrink-0 rounded-lg p-1.5 text-[var(--color-text-muted)] hover:bg-[var(--color-danger)]/10 hover:text-[var(--color-danger)]">
                     <Trash2 className="size-3.5" />
                   </button>
                 </div>
                 <div className="mt-3 flex items-center justify-between gap-3">
                   <div className="inline-grid grid-cols-[36px_48px_36px] items-center overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] shadow-[inset_0_1px_0_rgb(15_23_42_/_0.02)]">
-                    <button
-                      type="button"
-                      aria-label={`${copy('Decrease quantity')} ${line.itemNameSnapshot}`}
-                      onClick={() => increment(line, 'down')}
-                      disabled={createDecimal(line.quantity).lessThanOrEqualTo(createDecimal('1'))}
-                      className="flex h-9 items-center justify-center border-r border-[var(--color-border)] text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)] active:bg-[var(--color-surface-muted)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[var(--color-text-muted)]"
-                    >
-                      <Minus className="size-3.5" />
-                    </button>
-                    <output
-                      aria-label={`${copy('Quantity')} ${line.itemNameSnapshot}`}
-                      className="flex h-9 w-12 items-center justify-center text-xs font-bold tabular-nums text-[var(--color-text)]"
-                    >
-                      {quantity(line.quantity)}
-                    </output>
-                    <button
-                      type="button"
-                      aria-label={`${copy('Increase quantity')} ${line.itemNameSnapshot}`}
-                      onClick={() => increment(line, 'up')}
-                      className="flex h-9 items-center justify-center border-l border-[var(--color-border)] text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)] active:bg-[var(--color-surface-muted)]"
-                    >
-                      <Plus className="size-3.5" />
-                    </button>
+                    <button type="button" aria-label={`${copy('Decrease quantity')} ${line.itemNameSnapshot}`} onClick={() => increment(line, 'down')} disabled={createDecimal(line.quantity).lessThanOrEqualTo(createDecimal('1'))} className="flex h-9 items-center justify-center border-r border-[var(--color-border)] text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)] active:bg-[var(--color-surface-muted)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[var(--color-text-muted)]"><Minus className="size-3.5" /></button>
+                    <output aria-label={`${copy('Quantity')} ${line.itemNameSnapshot}`} className="flex h-9 w-12 items-center justify-center text-xs font-bold tabular-nums text-[var(--color-text)]">{quantity(line.quantity)}</output>
+                    <button type="button" aria-label={`${copy('Increase quantity')} ${line.itemNameSnapshot}`} onClick={() => increment(line, 'up')} className="flex h-9 items-center justify-center border-l border-[var(--color-border)] text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)] active:bg-[var(--color-surface-muted)]"><Plus className="size-3.5" /></button>
                   </div>
-                  <p className="text-sm font-bold text-[var(--color-brand)]">
-                    {money(line.totalAmount, locale)}
-                  </p>
+                  <p className="text-sm font-bold text-[var(--color-brand)]">{money(line.totalAmount, locale)}</p>
                 </div>
               </div>
             ))}
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center px-4 py-10 text-center">
-            <div className="mb-3 flex size-12 items-center justify-center rounded-2xl bg-[var(--color-brand)]/10 text-[var(--color-brand)]">
-              <ShoppingBag className="size-[22px]" />
-            </div>
+            <div className="mb-3 flex size-12 items-center justify-center rounded-2xl bg-[var(--color-brand)]/10 text-[var(--color-brand)]"><ShoppingBag className="size-[22px]" /></div>
             <p className="text-sm font-semibold">{copy('Cart is empty')}</p>
-            <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-              {copy('Select products or services from the catalog.')}
-            </p>
+            <p className="mt-1 text-xs text-[var(--color-text-muted)]">{copy('Select products or services from the catalog.')}</p>
           </div>
         )}
       </div>
       <div className="shrink-0 bg-[var(--color-background)] p-4">
         <div className="space-y-2 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-[var(--color-text-muted)]">
-              {copy(isEstimate ? 'Estimated subtotal' : 'Subtotal')}
-            </span>
-            <span className="font-medium">{money(gross, locale)}</span>
-          </div>
-          {hasTax ? (
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-[var(--color-text-muted)]">{taxLabel}</span>
-              <span className="font-medium">{money(taxAmount, locale)}</span>
-            </div>
-          ) : null}
-          <div className="flex items-center justify-between border-t border-[var(--color-border)] pt-2">
-            <span className="text-sm font-bold">
-              {copy(isEstimate ? 'Estimated total' : 'Total')}
-            </span>
-            <span className="text-lg font-bold text-[var(--color-brand)]">
-              {money(total, locale)}
-            </span>
-          </div>
-          <Button
-            fullWidth
-            disabled={!lines.length}
-            onClick={onCheckout}
-            leftIcon={<CreditCard className="size-3.5" />}
-          >
-            {copy('Checkout')}
-          </Button>
+          <div className="flex items-center justify-between text-xs"><span className="text-[var(--color-text-muted)]">{copy(isEstimate ? 'Estimated subtotal' : 'Subtotal')}</span><span className="font-medium">{money(gross, locale)}</span></div>
+          {hasTax ? <div className="flex items-center justify-between text-xs"><span className="text-[var(--color-text-muted)]">{taxLabel}</span><span className="font-medium">{money(taxAmount, locale)}</span></div> : null}
+          <div className="flex items-center justify-between border-t border-[var(--color-border)] pt-2"><span className="text-sm font-bold">{copy(isEstimate ? 'Estimated total' : 'Total')}</span><span className="text-lg font-bold text-[var(--color-brand)]">{money(total, locale)}</span></div>
+          <Button fullWidth disabled={!lines.length} onClick={onCheckout} leftIcon={<CreditCard className="size-3.5" />}>{copy('Checkout')}</Button>
         </div>
       </div>
     </div>
@@ -2219,10 +2080,7 @@ function ReferenceCustomerDialog({
   const [selectedMember, setSelectedMember] = useState<MemberCustomerLookupResult | null>(null);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const memberResults = useMemo(
-    () => customerMemberLookup.searchMembers(memberSearch),
-    [memberSearch],
-  );
+  const memberResults = useMemo(() => customerMemberLookup.searchMembers(memberSearch), [memberSearch]);
   const chooseNonMember = () => {
     const normalizedName = name.trim();
     const normalizedPhone = phone.trim();
@@ -2238,117 +2096,42 @@ function ReferenceCustomerDialog({
   };
 
   return (
-    <DDialog
-      title={copy('Choose customer')}
-      open={open}
-      onClose={onClose}
-      ariaLabel={copy('Choose customer')}
-      closeOnEscape
-      closeOnOverlay
-      className="pos-reference-dialog w-full max-w-md overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
-    >
+    <DDialog title={copy('Choose customer')} open={open} onClose={onClose} ariaLabel={copy('Choose customer')} closeOnEscape closeOnOverlay className="pos-reference-dialog w-full max-w-md overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl">
       <div className="min-h-0 space-y-3 overflow-y-auto">
-        <button
-          type="button"
-          onClick={onUseGeneralCustomer}
-          className={`flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left transition-colors ${customer === null ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/5' : 'border-[var(--color-border)] hover:bg-[var(--color-surface-muted)]'}`}
-        >
-          <div className="grid size-8 place-items-center rounded-lg bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]">
-            <User className="size-4" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">{copy('Use general customer')}</p>
-            <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
-              {copy('Continue without selecting a customer.')}
-            </p>
-          </div>
+        <button type="button" onClick={onUseGeneralCustomer} className={`flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left transition-colors ${customer === null ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/5' : 'border-[var(--color-border)] hover:bg-[var(--color-surface-muted)]'}`}>
+          <div className="grid size-8 place-items-center rounded-lg bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]"><User className="size-4" /></div>
+          <div className="min-w-0 flex-1"><p className="text-sm font-semibold">{copy('Use general customer')}</p><p className="mt-0.5 text-xs text-[var(--color-text-muted)]">{copy('Continue without selecting a customer.')}</p></div>
           {customer === null ? <CheckCircle2 className="size-4 text-[var(--color-brand)]" /> : null}
         </button>
         <div className="border-t border-[var(--color-border)] pt-3">
           <div className="flex gap-2" aria-label={copy('Customer')}>
-            <Button
-              size="sm"
-              variant={mode === 'MEMBER' ? 'primary' : 'secondary'}
-              onClick={() => changeMode('MEMBER')}
-            >
-              {copy('Member')}
-            </Button>
-            <Button
-              size="sm"
-              variant={mode === 'NON_MEMBER' ? 'primary' : 'secondary'}
-              onClick={() => changeMode('NON_MEMBER')}
-            >
-              {copy('Non-member')}
-            </Button>
+            <Button size="sm" variant={mode === 'MEMBER' ? 'primary' : 'secondary'} onClick={() => changeMode('MEMBER')}>{copy('Member')}</Button>
+            <Button size="sm" variant={mode === 'NON_MEMBER' ? 'primary' : 'secondary'} onClick={() => changeMode('NON_MEMBER')}>{copy('Non-member')}</Button>
           </div>
-
           {mode === 'MEMBER' ? (
             <div className="mt-3 space-y-3">
               <DCombobox
                 key="member-search"
                 ariaLabel={copy('Search name or phone number')}
                 value={selectedMember?.customerId ?? ''}
-                options={memberResults.map((member) => ({
-                  value: member.customerId,
-                  label: member.name,
-                  detail: `${member.phone}, ${member.membership.memberCode}`,
-                }))}
-                onChange={(customerId) => {
-                  setSelectedMember(
-                    memberResults.find((member) => member.customerId === customerId) ?? null,
-                  );
-                }}
-                onSearchChange={(query) => {
-                  setMemberSearch(query);
-                  setSelectedMember(null);
-                }}
+                options={memberResults.map((member) => ({ value: member.customerId, label: member.name, detail: `${member.phone}, ${member.membership.memberCode}` }))}
+                onChange={(customerId) => { setSelectedMember(memberResults.find((member) => member.customerId === customerId) ?? null); }}
+                onSearchChange={(query) => { setMemberSearch(query); setSelectedMember(null); }}
                 placeholder={copy('Search name or phone number')}
                 idleMessage={copy('Search by name, phone number, or member code.')}
                 renderEmpty={() => copy('Member not found.')}
                 renderOption={(option) => {
-                  const member = memberResults.find(
-                    (result) => result.customerId === String(option.value),
-                  );
-                  return (
-                    <span className="min-w-0">
-                      <span className="block truncate">{option.label}</span>
-                      {member ? (
-                        <span className="mt-0.5 block truncate text-xs font-normal text-[var(--color-text-muted)]">
-                          {member.phone}, {member.membership.memberCode}
-                        </span>
-                      ) : null}
-                    </span>
-                  );
+                  const member = memberResults.find((result) => result.customerId === String(option.value));
+                  return <span className="min-w-0"><span className="block truncate">{option.label}</span>{member ? <span className="mt-0.5 block truncate text-xs font-normal text-[var(--color-text-muted)]">{member.phone}, {member.membership.memberCode}</span> : null}</span>;
                 }}
               />
-              <Button
-                fullWidth
-                disabled={!selectedMember}
-                onClick={() => selectedMember && onChoose(selectedMember)}
-              >
-                {copy('Use customer')}
-              </Button>
+              <Button fullWidth disabled={!selectedMember} onClick={() => selectedMember && onChoose(selectedMember)}>{copy('Use customer')}</Button>
             </div>
           ) : (
             <div className="mt-3 space-y-3">
-              <DInput
-                aria-label={copy('Customer name')}
-                label={copy('Name')}
-                value={name}
-                onChange={setName}
-                placeholder={copy('Customer name')}
-              />
-              <DInput
-                aria-label={copy('Phone number')}
-                label={copy('Phone number')}
-                value={phone}
-                onChange={setPhone}
-                placeholder={copy('Phone number')}
-                inputMode="tel"
-              />
-              <Button fullWidth disabled={!name.trim() || !phone.trim()} onClick={chooseNonMember}>
-                {copy('Use customer')}
-              </Button>
+              <DInput aria-label={copy('Customer name')} label={copy('Name')} value={name} onChange={setName} placeholder={copy('Customer name')} />
+              <DInput aria-label={copy('Phone number')} label={copy('Phone number')} value={phone} onChange={setPhone} placeholder={copy('Phone number')} inputMode="tel" />
+              <Button fullWidth disabled={!name.trim() || !phone.trim()} onClick={chooseNonMember}>{copy('Use customer')}</Button>
             </div>
           )}
         </div>
@@ -2408,19 +2191,12 @@ function ReferencePaymentDialog({
 }) {
   const { copy, label } = useOperationalLocalization();
   const { routes: paymentRoutes, isPending: isPaymentRoutesPending } = useCachedPaymentRoutes();
-  const routeByMethod = new Map(
-    paymentRoutes.map((route) => [route.paymentMethod, route] as const),
-  );
+  const routeByMethod = new Map(paymentRoutes.map((route) => [route.paymentMethod, route] as const));
   const activeRoute = routeByMethod.get(method) ?? null;
   const isCash = method === 'CASH';
   const needsProvider = method === 'BANK_TRANSFER' || method === 'WALLET';
   const hasTax = !createDecimal(taxAmount).equals(createDecimal('0'));
-  const canPay =
-    lines.length > 0 &&
-    Boolean(activeRoute) &&
-    !isCashShort &&
-    (!needsProvider || Boolean(provider)) &&
-    !isSubmitting;
+  const canPay = lines.length > 0 && Boolean(activeRoute) && !isCashShort && (!needsProvider || Boolean(provider)) && !isSubmitting;
   const canConfirm = payNow ? canPay : lines.length > 0 && !isSubmitting;
   const methods: Array<{ value: PaymentMethod; icon: ReactNode }> = [
     { value: 'CASH', icon: <Banknote className="size-[15px]" /> },
@@ -2429,10 +2205,7 @@ function ReferencePaymentDialog({
     { value: 'WALLET', icon: <ShoppingBag className="size-[15px]" /> },
   ];
   const providerOptions = needsProvider && activeRoute ? [activeRoute.financialAccountName] : [];
-  const normalizedQuickTender = [total, ...quickTender]
-    .map((amount) => normalizeCurrencyPresentationInput(amount))
-    .filter((amount, index, list) => list.indexOf(amount) === index)
-    .slice(0, 6);
+  const normalizedQuickTender = [total, ...quickTender].map((amount) => normalizeCurrencyPresentationInput(amount)).filter((amount, index, list) => list.indexOf(amount) === index).slice(0, 6);
 
   return (
     <DDialog
@@ -2443,249 +2216,60 @@ function ReferencePaymentDialog({
       closeOnEscape
       closeOnOverlay
       className="pos-reference-dialog w-full max-w-lg overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
-      footer={
-        <div className="flex shrink-0 flex-col-reverse justify-end gap-2 sm:flex-row">
-          <DButton variant="ghost" onClick={onClose}>
-            {copy('Cancel')}
-          </DButton>
-          <DButton disabled={!canConfirm} loading={isSubmitting} onClick={onQueue}>
-            {copy('Add to queue')}
-          </DButton>
-        </div>
-      }
+      footer={<div className="flex shrink-0 flex-col-reverse justify-end gap-2 sm:flex-row"><DButton variant="ghost" onClick={onClose}>{copy('Cancel')}</DButton><DButton disabled={!canConfirm} loading={isSubmitting} onClick={onQueue}>{copy('Add to queue')}</DButton></div>}
     >
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto">
         <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
           <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-xs text-[var(--color-text-muted)]">{copy('Payment total')}</p>
-              <h3 className="mt-0.5 text-2xl font-bold leading-tight text-[var(--color-brand)]">
-                {money(total, locale)}
-              </h3>
-            </div>
-            <div className="min-w-0 text-right">
-              <p className="text-xs text-[var(--color-text-muted)]">{copy('Customer')}</p>
-              <p className="max-w-[170px] truncate text-sm font-semibold">
-                {customer?.name ?? copy('General customer')}
-              </p>
-              <Badge
-                variant={customerStatus(customer).variant}
-                className="mt-1 px-2 py-0 text-[10px]"
-              >
-                {copy(customerStatus(customer).label)}
-              </Badge>
-              <p className="text-[11px] text-[var(--color-text-muted)]">
-                {lines.length} {copy('items')}
-              </p>
-            </div>
+            <div><p className="text-xs text-[var(--color-text-muted)]">{copy('Payment total')}</p><h3 className="mt-0.5 text-2xl font-bold leading-tight text-[var(--color-brand)]">{money(total, locale)}</h3></div>
+            <div className="min-w-0 text-right"><p className="text-xs text-[var(--color-text-muted)]">{copy('Customer')}</p><p className="max-w-[170px] truncate text-sm font-semibold">{customer?.name ?? copy('General customer')}</p><Badge variant={customerStatus(customer).variant} className="mt-1 px-2 py-0 text-[10px]">{copy(customerStatus(customer).label)}</Badge><p className="text-[11px] text-[var(--color-text-muted)]">{lines.length} {copy('items')}</p></div>
           </div>
           <div className="mt-3 rounded-xl bg-[var(--color-surface-muted)]/60 px-3 py-2 text-xs">
-            <div className="flex justify-between">
-              <span className="text-[var(--color-text-muted)]">{copy('Subtotal')}</span>
-              <span className="font-semibold">{money(gross, locale)}</span>
-            </div>
-            <div className="mt-1 flex justify-between">
-              <span className="text-[var(--color-text-muted)]">{copy('Transaction discount')}</span>
-              <span className="font-semibold">{money(discountAmount, locale)}</span>
-            </div>
-            {hasTax ? (
-              <div className="mt-1 flex justify-between">
-                <span className="text-[var(--color-text-muted)]">{taxLabel}</span>
-                <span className="font-semibold">{money(taxAmount, locale)}</span>
-              </div>
-            ) : null}
-            <div className="mt-2 flex justify-between border-t border-[var(--color-border)] pt-2 text-sm">
-              <span className="font-bold">{copy('Total')}</span>
-              <span className="font-bold text-[var(--color-brand)]">{money(total, locale)}</span>
-            </div>
+            <div className="flex justify-between"><span className="text-[var(--color-text-muted)]">{copy('Subtotal')}</span><span className="font-semibold">{money(gross, locale)}</span></div>
+            <div className="mt-1 flex justify-between"><span className="text-[var(--color-text-muted)]">{copy('Transaction discount')}</span><span className="font-semibold">{money(discountAmount, locale)}</span></div>
+            {hasTax ? <div className="mt-1 flex justify-between"><span className="text-[var(--color-text-muted)]">{taxLabel}</span><span className="font-semibold">{money(taxAmount, locale)}</span></div> : null}
+            <div className="mt-2 flex justify-between border-t border-[var(--color-border)] pt-2 text-sm"><span className="font-bold">{copy('Total')}</span><span className="font-bold text-[var(--color-brand)]">{money(total, locale)}</span></div>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
-          <div className="flex items-start justify-between gap-3">
-            <p className="text-sm font-semibold">{copy('Promotion')}</p>
-            <span className="shrink-0 rounded-full bg-[var(--color-surface-muted)] px-2 py-1 text-[10px] font-semibold text-[var(--color-text-muted)]">
-              {copy('Not available')}
-            </span>
-          </div>
-        </div>
+        <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4"><div className="flex items-start justify-between gap-3"><p className="text-sm font-semibold">{copy('Promotion')}</p><span className="shrink-0 rounded-full bg-[var(--color-surface-muted)] px-2 py-1 text-[10px] font-semibold text-[var(--color-text-muted)]">{copy('Not available')}</span></div></div>
 
-        {customer?.membership ? (
-          <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
-            <div className="flex items-start justify-between gap-3">
-              <p className="text-sm font-semibold">{copy('Use member points')}</p>
-              <span className="shrink-0 rounded-full bg-[var(--color-surface-muted)] px-2 py-1 text-[10px] font-semibold text-[var(--color-text-muted)]">
-                {label('OPTIONAL')}
-              </span>
-            </div>
-          </div>
-        ) : null}
+        {customer?.membership ? <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4"><div className="flex items-start justify-between gap-3"><p className="text-sm font-semibold">{copy('Use member points')}</p><span className="shrink-0 rounded-full bg-[var(--color-surface-muted)] px-2 py-1 text-[10px] font-semibold text-[var(--color-text-muted)]">{label('OPTIONAL')}</span></div></div> : null}
 
         <div className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)]">
-          <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-2.5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
-              {copy('Order details')}
-            </p>
-            <span className="text-xs text-[var(--color-text-muted)]">
-              {lines.length} {copy('items')}
-            </span>
-          </div>
+          <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-2.5"><p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">{copy('Order details')}</p><span className="text-xs text-[var(--color-text-muted)]">{lines.length} {copy('items')}</span></div>
           <div className="max-h-[120px] divide-y divide-[var(--color-border)] overflow-y-auto">
             {lines.map((line) => (
-              <div key={line.id} className="px-4 py-2.5">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold">{line.itemNameSnapshot}</p>
-                    <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
-                      {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
-                      {line.itemTypeSnapshot === 'SERVICE' ? (
-                        <span className="ml-1 font-semibold text-[var(--color-brand)]">
-                          {copy('Service')}
-                        </span>
-                      ) : null}
-                    </p>
-                  </div>
-                  <p className="shrink-0 text-sm font-bold">{money(line.totalAmount, locale)}</p>
-                </div>
-              </div>
+              <div key={line.id} className="px-4 py-2.5"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-semibold">{line.itemNameSnapshot}</p><p className="mt-0.5 text-xs text-[var(--color-text-muted)]">{quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}{line.itemTypeSnapshot === 'SERVICE' ? <span className="ml-1 font-semibold text-[var(--color-brand)]">{copy('Service')}</span> : null}</p></div><p className="shrink-0 text-sm font-bold">{money(line.totalAmount, locale)}</p></div></div>
             ))}
           </div>
         </div>
 
-        <label className="flex cursor-pointer items-start gap-2.5 px-1 py-1.5">
-          <span className="mt-0.5 shrink-0">
-            <DCheckbox
-              checked={payNow}
-              onChange={(event) => onPayNowChange(event.target.checked)}
-            />
-          </span>
-          <span className="min-w-0">
-            <span className="block text-sm font-semibold">{copy('Pay now')}</span>
-            <span className="mt-0.5 block text-xs leading-4 text-[var(--color-text-muted)]">
-              {copy(
-                payNow
-                  ? 'Choose a payment method before continuing.'
-                  : 'Payment can be recorded after transaction creation.',
-              )}
-            </span>
-          </span>
-        </label>
+        <label className="flex cursor-pointer items-start gap-2.5 px-1 py-1.5"><span className="mt-0.5 shrink-0"><DCheckbox checked={payNow} onChange={(event) => onPayNowChange(event.target.checked)} /></span><span className="min-w-0"><span className="block text-sm font-semibold">{copy('Pay now')}</span><span className="mt-0.5 block text-xs leading-4 text-[var(--color-text-muted)]">{copy(payNow ? 'Choose a payment method before continuing.' : 'Payment can be recorded after transaction creation.')}</span></span></label>
 
         {payNow ? (
           <>
             <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
-                {copy('Payment method')}
-              </p>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">{copy('Payment method')}</p>
               <div className="grid grid-cols-4 gap-2">
                 {methods.map((option) => {
                   const routeAvailable = routeByMethod.has(option.value);
                   const disabled = isPaymentRoutesPending || !routeAvailable;
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      disabled={disabled}
-                      onClick={() => onMethod(option.value)}
-                      className={`flex h-10 items-center justify-center gap-1.5 rounded-xl border text-xs font-semibold transition-all active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-40 ${method === option.value ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white shadow-sm' : 'border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)]'}`}
-                    >
-                      {option.icon}
-                      <span className="hidden sm:inline">{label(option.value)}</span>
-                    </button>
-                  );
+                  return <button key={option.value} type="button" disabled={disabled} onClick={() => onMethod(option.value)} className={`flex h-10 items-center justify-center gap-1.5 rounded-xl border text-xs font-semibold transition-all active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-40 ${method === option.value ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white shadow-sm' : 'border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)]'}`}>{option.icon}<span className="hidden sm:inline">{label(option.value)}</span></button>;
                 })}
               </div>
-              {needsProvider ? (
-                <div className="mt-3">
-                  <p className="mb-2 text-xs font-semibold text-[var(--color-text-muted)]">
-                    {copy(method === 'BANK_TRANSFER' ? 'Select bank' : 'Select digital wallet')}
-                  </p>
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    {providerOptions.map((option) => (
-                      <button
-                        key={option}
-                        type="button"
-                        onClick={() => onProvider(option)}
-                        className={`h-9 rounded-xl border px-3 text-xs font-semibold transition-all active:scale-[.98] ${provider === option ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]'}`}
-                      >
-                        {option}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-              {method === 'QRIS' ? (
-                <div className="mt-3 rounded-xl border border-[var(--color-brand)]/20 bg-[var(--color-brand)]/5 p-3">
-                  <p className="text-sm font-bold text-[var(--color-brand)]">QRIS</p>
-                  {activeRoute ? (
-                    <p className="mt-1 text-xs font-semibold text-[var(--color-text)]">
-                      {activeRoute.financialAccountName}
-                    </p>
-                  ) : null}
-                  <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                    {copy('QRIS payment will be recorded for this transaction.')}
-                  </p>
-                </div>
-              ) : null}
+              {needsProvider ? <div className="mt-3"><p className="mb-2 text-xs font-semibold text-[var(--color-text-muted)]">{copy(method === 'BANK_TRANSFER' ? 'Select bank' : 'Select digital wallet')}</p><div className="grid grid-cols-1 gap-2 sm:grid-cols-2">{providerOptions.map((option) => <button key={option} type="button" onClick={() => onProvider(option)} className={`h-9 rounded-xl border px-3 text-xs font-semibold transition-all active:scale-[.98] ${provider === option ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]'}`}>{option}</button>)}</div></div> : null}
+              {method === 'QRIS' ? <div className="mt-3 rounded-xl border border-[var(--color-brand)]/20 bg-[var(--color-brand)]/5 p-3"><p className="text-sm font-bold text-[var(--color-brand)]">QRIS</p>{activeRoute ? <p className="mt-1 text-xs font-semibold text-[var(--color-text)]">{activeRoute.financialAccountName}</p> : null}<p className="mt-1 text-xs text-[var(--color-text-muted)]">{copy('QRIS payment will be recorded for this transaction.')}</p></div> : null}
             </div>
 
             {isCash ? (
               <div className="space-y-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
-                <label className="block text-sm font-medium">
-                  {copy('Amount paid')}
-                  <div className="relative mt-1.5">
-                    <PosCurrencyInput
-                      aria-label={copy('Amount paid')}
-                      className="h-10 rounded-lg bg-[var(--color-surface)] text-right text-lg font-bold"
-                      value={tender}
-                      onChange={onTender}
-                    />
-                  </div>
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {normalizedQuickTender.map((amount) => (
-                    <button
-                      key={amount}
-                      type="button"
-                      onClick={() => onTender(amount)}
-                      className={`h-9 rounded-lg border text-[11px] font-semibold transition-all active:scale-[.98] ${normalizeCurrencyPresentationInput(tender) === amount ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'border-[var(--color-border)] bg-[var(--color-background)] hover:bg-[var(--color-surface-muted)]'}`}
-                    >
-                      {money(amount, locale)}
-                    </button>
-                  ))}
-                </div>
-                <div
-                  className={`flex items-center justify-between rounded-xl px-3 py-2 ${isCashShort ? 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]' : 'bg-[var(--color-success)]/10 text-[var(--color-success)]'}`}
-                >
-                  <span className="text-sm font-bold">
-                    {copy(isCashShort ? 'Payment short' : 'Change')}
-                  </span>
-                  <span className="text-sm font-bold">
-                    {isCashShort
-                      ? money(
-                          createDecimal(normalizeCurrencyPresentationInput(total))
-                            .minus(createDecimal(normalizeCurrencyPresentationInput(tender || '0')))
-                            .toFixed(0),
-                          locale,
-                        )
-                      : money(change, locale)}
-                  </span>
-                </div>
+                <label className="block text-sm font-medium">{copy('Amount paid')}<div className="relative mt-1.5"><PosCurrencyInput aria-label={copy('Amount paid')} className="h-10 rounded-lg bg-[var(--color-surface)] text-right text-lg font-bold" value={tender} onChange={onTender} /></div></label>
+                <div className="grid grid-cols-3 gap-2">{normalizedQuickTender.map((amount) => <button key={amount} type="button" onClick={() => onTender(amount)} className={`h-9 rounded-lg border text-[11px] font-semibold transition-all active:scale-[.98] ${normalizeCurrencyPresentationInput(tender) === amount ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'border-[var(--color-border)] bg-[var(--color-background)] hover:bg-[var(--color-surface-muted)]'}`}>{money(amount, locale)}</button>)}</div>
+                <div className={`flex items-center justify-between rounded-xl px-3 py-2 ${isCashShort ? 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]' : 'bg-[var(--color-success)]/10 text-[var(--color-success)]'}`}><span className="text-sm font-bold">{copy(isCashShort ? 'Payment short' : 'Change')}</span><span className="text-sm font-bold">{isCashShort ? money(createDecimal(normalizeCurrencyPresentationInput(total)).minus(createDecimal(normalizeCurrencyPresentationInput(tender || '0'))).toFixed(0), locale) : money(change, locale)}</span></div>
               </div>
             ) : (
-              <div className="rounded-2xl border border-[var(--color-brand)]/20 bg-[var(--color-brand)]/5 p-3">
-                <p className="text-sm font-bold text-[var(--color-brand)]">
-                  {copy('Payment')} {label(method)}
-                </p>
-                {activeRoute ? (
-                  <p className="mt-1 text-xs font-semibold text-[var(--color-text)]">
-                    {activeRoute.financialAccountName}
-                  </p>
-                ) : null}
-                <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                  {copy('Select a provider if required, then record the payment.')}
-                </p>
-              </div>
+              <div className="rounded-2xl border border-[var(--color-brand)]/20 bg-[var(--color-brand)]/5 p-3"><p className="text-sm font-bold text-[var(--color-brand)]">{copy('Payment')} {label(method)}</p>{activeRoute ? <p className="mt-1 text-xs font-semibold text-[var(--color-text)]">{activeRoute.financialAccountName}</p> : null}<p className="mt-1 text-xs text-[var(--color-text-muted)]">{copy('Select a provider if required, then record the payment.')}</p></div>
             )}
           </>
         ) : null}
@@ -2735,20 +2319,16 @@ function ReferenceTransactionDetail({
   const customerContext = readStoredCustomer(saleCustomerKey(sale.id));
   const customer = customerContext ?? saleCustomer(sale.id, locale);
   const activeLines = sale.lines.filter((line) => !line.removedAt);
-  const payments = successfulPayments(sale);
+  const payments = successfulPayments(sale).filter((payment) => createDecimal(payment.appliedAmount).greaterThan(0));
   const payment = payments[payments.length - 1] ?? null;
   const receiptAvailable = payments.length > 0;
   const showReceipt = showPaymentReceipt && receiptAvailable;
   const { totalPaid } = financialSummary(sale);
   const hasDiscount = !createDecimal(sale.discountAmount).equals(createDecimal('0'));
   const hasTax = !createDecimal(sale.taxAmount).equals(createDecimal('0'));
-  const completionIssues =
-    status === 'PROGRESS' ? workflowIssues(sale, serviceWorkUnits, locale) : [];
+  const completionIssues = status === 'PROGRESS' ? workflowIssues(sale, serviceWorkUnits, locale) : [];
   const completionIssueGroups = groupWorkflowIssues(sale, completionIssues, locale);
-  const transactionDate = new Intl.DateTimeFormat(locale, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(sale.finalizedAt ?? sale.updatedAt));
+  const transactionDate = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(sale.finalizedAt ?? sale.updatedAt));
 
   return (
     <>
@@ -2763,84 +2343,19 @@ function ReferenceTransactionDetail({
         noPadding
         className={`pos-reference-dialog max-h-[92dvh] w-full overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl ${showReceipt ? 'max-w-md' : 'max-w-lg'}`}
         footer={
-          <div
-            className={`flex shrink-0 flex-col-reverse justify-end gap-2 sm:flex-row ${showReceipt ? 'pos-receipt-actions' : ''}`}
-          >
-            <DButton variant="ghost" onClick={onClose}>
-              {copy('Close')}
-            </DButton>
-            {!showReceipt && receiptAvailable ? (
-              <DButton
-                rightIcon={<Printer className="size-3.5" />}
-                variant="outline"
-                onClick={() => onViewReceipt(sale)}
-              >
-                {copy('View receipt')}
-              </DButton>
-            ) : null}
-            {!showReceipt && status === 'PROGRESS' ? (
-              <DButton
-                variant="primary"
-                disabled={completionIssues.length > 0}
-                loading={isMutating}
-                leftIcon={<CheckCircle2 className="size-3.5" />}
-                onClick={onComplete}
-              >
-                {copy('Complete transaction')}
-              </DButton>
-            ) : null}
-            {showReceipt ? (
-              <DButton
-                rightIcon={<Printer className="size-3.5" />}
-                variant="outline"
-                onClick={() => window.print()}
-              >
-                {copy('Print')}
-              </DButton>
-            ) : null}
+          <div className={`flex shrink-0 flex-col-reverse justify-end gap-2 sm:flex-row ${showReceipt ? 'pos-receipt-actions' : ''}`}>
+            <DButton variant="ghost" onClick={onClose}>{copy('Close')}</DButton>
+            {!showReceipt && receiptAvailable ? <DButton rightIcon={<Printer className="size-3.5" />} variant="outline" onClick={() => onViewReceipt(sale)}>{copy('View receipt')}</DButton> : null}
+            {!showReceipt && status === 'PROGRESS' ? <DButton variant="primary" disabled={completionIssues.length > 0} loading={isMutating} leftIcon={<CheckCircle2 className="size-3.5" />} onClick={onComplete}>{copy('Complete transaction')}</DButton> : null}
+            {showReceipt ? <DButton rightIcon={<Printer className="size-3.5" />} variant="outline" onClick={() => window.print()}>{copy('Print')}</DButton> : null}
           </div>
         }
       >
         {showReceipt ? (
           <div className="flex max-h-[92dvh] min-h-0 flex-col px-5 py-4 sm:px-6">
-            <div className="pos-receipt-preview-toolbar mb-3 flex items-center justify-between gap-3">
-              <span className="text-xs font-medium text-[var(--color-text-muted)]">
-                {copy('Paper size')}
-              </span>
-              <div className="flex items-center gap-1.5" aria-label={copy('Paper size')}>
-                <DButton
-                  size="sm"
-                  variant={receiptPaper === '58' ? 'primary' : 'secondary'}
-                  onClick={() => setReceiptPaper('58')}
-                >
-                  58 mm
-                </DButton>
-                <DButton
-                  size="sm"
-                  variant={receiptPaper === '80' ? 'primary' : 'secondary'}
-                  onClick={() => setReceiptPaper('80')}
-                >
-                  80 mm
-                </DButton>
-              </div>
-            </div>
-            <div
-              className={`pos-receipt-preview pos-receipt-print--${receiptPaper} min-h-0 flex-1 overflow-y-auto bg-white text-slate-950`}
-            >
-              <ReceiptContent
-                sale={sale}
-                activeLines={activeLines}
-                customer={customer}
-                locale={locale}
-                businessName={businessName}
-                branchName={branchName}
-                cashierName={cashierName}
-                transactionDate={transactionDate}
-                totalPaid={totalPaid}
-                payment={payment}
-                hasDiscount={hasDiscount}
-                hasTax={hasTax}
-              />
+            <div className="pos-receipt-preview-toolbar mb-3 flex items-center justify-between gap-3"><span className="text-xs font-medium text-[var(--color-text-muted)]">{copy('Paper size')}</span><div className="flex items-center gap-1.5" aria-label={copy('Paper size')}><DButton size="sm" variant={receiptPaper === '58' ? 'primary' : 'secondary'} onClick={() => setReceiptPaper('58')}>58 mm</DButton><DButton size="sm" variant={receiptPaper === '80' ? 'primary' : 'secondary'} onClick={() => setReceiptPaper('80')}>80 mm</DButton></div></div>
+            <div className={`pos-receipt-preview pos-receipt-print--${receiptPaper} min-h-0 flex-1 overflow-y-auto bg-white text-slate-950`}>
+              <ReceiptContent sale={sale} activeLines={activeLines} customer={customer} locale={locale} businessName={businessName} branchName={branchName} cashierName={cashierName} transactionDate={transactionDate} totalPaid={totalPaid} payment={payment} hasDiscount={hasDiscount} hasTax={hasTax} />
             </div>
           </div>
         ) : (
@@ -2848,163 +2363,37 @@ function ReferenceTransactionDetail({
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4 sm:px-6">
               <div className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)]">
                 <div className="bg-gradient-to-br from-[var(--color-brand)]/5 to-transparent px-5 py-4">
-                  <p className="font-mono text-xs text-[var(--color-text-muted)]">
-                    {transactionNumber(sale.id, locale)}
-                  </p>
+                  <p className="font-mono text-xs text-[var(--color-text-muted)]">{transactionNumber(sale.id, locale)}</p>
                   <div className="mt-3 flex flex-wrap gap-1">
-                    <span
-                      className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${status ? statusMeta[status].tone : 'bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]'}`}
-                    >
-                      {status ? label(statusMeta[status].value) : label('OPEN')}
-                    </span>
-                    <span
-                      className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${hasSuccessfulCheckout(sale) ? 'bg-[var(--color-success)]/10 text-[var(--color-success)]' : receiptAvailable ? 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]' : 'bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]'}`}
-                    >
-                      {copy(
-                        hasSuccessfulCheckout(sale)
-                          ? 'Paid'
-                          : receiptAvailable
-                            ? 'Partially paid'
-                            : 'Unpaid',
-                      )}
+                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${status ? statusMeta[status].tone : 'bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]'}`}>{status ? label(statusMeta[status].value) : label('OPEN')}</span>
+                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${hasSuccessfulCheckout(sale) ? 'bg-[var(--color-success)]/10 text-[var(--color-success)]' : receiptAvailable ? 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]' : 'bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]'}`}>
+                      {copy(hasSuccessfulCheckout(sale) ? 'Paid' : receiptAvailable ? 'Partially paid' : 'Unpaid')}
                     </span>
                   </div>
                   <p className="mt-3 text-xs text-[var(--color-text-muted)]">{transactionDate}</p>
-                  <div className="mt-3 flex items-center gap-2 text-sm">
-                    <span className="truncate font-semibold">{customer.name}</span>
-                    <Badge
-                      variant={customerStatus(customerContext).variant}
-                      className="shrink-0 text-[10px]"
-                    >
-                      {copy(customerStatus(customerContext).label)}
-                    </Badge>
-                  </div>
-                  {customer.membership ? (
-                    <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                      {customer.membership.memberCode}, {label(customer.membership.status)}
-                    </p>
-                  ) : customer.phone ? (
-                    <p className="mt-1 text-xs text-[var(--color-text-muted)]">{customer.phone}</p>
-                  ) : null}
+                  <div className="mt-3 flex items-center gap-2 text-sm"><span className="truncate font-semibold">{customer.name}</span><Badge variant={customerStatus(customerContext).variant} className="shrink-0 text-[10px]">{copy(customerStatus(customerContext).label)}</Badge></div>
+                  {customer.membership ? <p className="mt-1 text-xs text-[var(--color-text-muted)]">{customer.membership.memberCode}, {label(customer.membership.status)}</p> : customer.phone ? <p className="mt-1 text-xs text-[var(--color-text-muted)]">{customer.phone}</p> : null}
                 </div>
               </div>
 
-              {sale.status === 'VOIDED' && cancellationReason ? (
-                <div className="rounded-xl border border-[var(--color-danger)]/25 bg-[var(--color-danger)]/10 px-3 py-2 text-xs">
-                  <p className="font-semibold text-[var(--color-danger)]">
-                    {copy('Cancellation reason')}
-                  </p>
-                  <p className="mt-1 text-[var(--color-text-muted)]">{cancellationReason}</p>
-                </div>
-              ) : null}
+              {sale.status === 'VOIDED' && cancellationReason ? <div className="rounded-xl border border-[var(--color-danger)]/25 bg-[var(--color-danger)]/10 px-3 py-2 text-xs"><p className="font-semibold text-[var(--color-danger)]">{copy('Cancellation reason')}</p><p className="mt-1 text-[var(--color-text-muted)]">{cancellationReason}</p></div> : null}
 
-              {completionIssues.length ? (
-                <div className="rounded-xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 px-3 py-2 text-xs">
-                  <p className="font-semibold text-[var(--color-warning)]">
-                    {copy('Not ready to complete')}
-                  </p>
-                  <div className="mt-2 space-y-2 text-[var(--color-text-muted)]">
-                    {completionIssueGroups.map((group) => (
-                      <div key={group.id}>
-                        <p className="font-semibold text-[var(--color-text)]">{group.label}</p>
-                        <ul className="mt-0.5 list-disc space-y-0.5 pl-4">
-                          {group.issues.map((issue) => (
-                            <li key={issue}>{issue}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
+              {completionIssues.length ? <div className="rounded-xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 px-3 py-2 text-xs"><p className="font-semibold text-[var(--color-warning)]">{copy('Not ready to complete')}</p><div className="mt-2 space-y-2 text-[var(--color-text-muted)]">{completionIssueGroups.map((group) => <div key={group.id}><p className="font-semibold text-[var(--color-text)]">{group.label}</p><ul className="mt-0.5 list-disc space-y-0.5 pl-4">{group.issues.map((issue) => <li key={issue}>{issue}</li>)}</ul></div>)}</div></div> : null}
 
               <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)]">
-                <header className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-3">
-                  <h3 className="text-sm font-semibold">{copy('Order')}</h3>
-                  <span className="text-xs text-[var(--color-text-muted)]">
-                    {activeLines.length} {copy('items')}
-                  </span>
-                </header>
+                <header className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-3"><h3 className="text-sm font-semibold">{copy('Order')}</h3><span className="text-xs text-[var(--color-text-muted)]">{activeLines.length} {copy('items')}</span></header>
                 <div className="min-h-[144px] max-h-[min(38dvh,360px)] flex-1 divide-y divide-[var(--color-border)] overflow-y-auto overscroll-contain">
                   {activeLines.map((line) => {
-                    const isMultiUnitService =
-                      line.itemTypeSnapshot === 'SERVICE' &&
-                      line.fulfillmentBehaviorSnapshot === 'TRACKED' &&
-                      serviceWorkUnitCount(line) > 1;
-                    const isTrackedService =
-                      line.itemTypeSnapshot === 'SERVICE' &&
-                      line.fulfillmentBehaviorSnapshot === 'TRACKED' &&
-                      line.fulfillment !== null;
+                    const isMultiUnitService = line.itemTypeSnapshot === 'SERVICE' && line.fulfillmentBehaviorSnapshot === 'TRACKED' && serviceWorkUnitCount(line) > 1;
+                    const isTrackedService = line.itemTypeSnapshot === 'SERVICE' && line.fulfillmentBehaviorSnapshot === 'TRACKED' && line.fulfillment !== null;
                     const canEditServiceWork = isTrackedService && status === 'PROGRESS';
-                    const requiresEmployeeAttribution =
-                      line.employeeAssignmentModeSnapshot !== 'NONE' ||
-                      line.allowEmployeeContributionSnapshot;
+                    const requiresEmployeeAttribution = line.employeeAssignmentModeSnapshot !== 'NONE' || line.allowEmployeeContributionSnapshot;
                     const employeeIssues = employeeAssignmentIssues(line, locale);
                     if (isMultiUnitService) {
-                      return (
-                        <ReferenceServiceWorkLine
-                          key={line.id}
-                          line={line}
-                          employees={employees}
-                          locale={locale}
-                          units={serviceWorkUnitsFor(line, serviceWorkUnits[serviceWorkKey(line)])}
-                          active={status === 'PROGRESS'}
-                          isMutating={isMutating}
-                          onManage={() => onManageServiceWork(line)}
-                        />
-                      );
+                      return <ReferenceServiceWorkLine key={line.id} line={line} employees={employees} locale={locale} units={serviceWorkUnitsFor(line, serviceWorkUnits[serviceWorkKey(line)])} active={status === 'PROGRESS'} isMutating={isMutating} onManage={() => onManageServiceWork(line)} />;
                     }
                     return (
-                      <div key={line.id} className="p-4">
-                        <div className="flex justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-semibold">{line.itemNameSnapshot}</p>
-                            <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                              {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
-                              {line.variantNameSnapshot ? `, ${line.variantNameSnapshot}` : ''}
-                            </p>
-                            {line.fulfillment ? (
-                              <p className="mt-1 text-[11px] font-medium text-[var(--color-text-muted)]">
-                                {label(line.fulfillment.status)}
-                              </p>
-                            ) : null}
-                            {isTrackedService && requiresEmployeeAttribution ? (
-                              <div className="mt-2 flex min-w-0 items-center gap-2 text-xs">
-                                <span className="shrink-0 font-medium text-[var(--color-text-muted)]">
-                                  {copy('Work')}
-                                </span>
-                                <span className="min-w-0 flex-1 truncate text-[var(--color-text-muted)]">
-                                  {employeeWorkSummary(line, employees, locale)}
-                                </span>
-                                {canEditServiceWork ? (
-                                  employeeIssues.length > 0 ? (
-                                    <DButton
-                                      size="sm"
-                                      variant="outline"
-                                      disabled={isMutating}
-                                      className="h-7 px-2 text-[11px]"
-                                      onClick={() => onAssign(line)}
-                                    >
-                                      {copy('Configure')}
-                                    </DButton>
-                                  ) : (
-                                    <DButton
-                                      size="icon"
-                                      variant="ghost"
-                                      disabled={isMutating}
-                                      aria-label={`${copy('Configure')} ${line.itemNameSnapshot}`}
-                                      onClick={() => onAssign(line)}
-                                    >
-                                      <Pencil className="size-3.5" />
-                                    </DButton>
-                                  )
-                                ) : null}
-                              </div>
-                            ) : null}
-                          </div>
-                          <p className="text-sm font-bold">{money(line.totalAmount, locale)}</p>
-                        </div>
-                      </div>
+                      <div key={line.id} className="p-4"><div className="flex justify-between gap-3"><div><p className="text-sm font-semibold">{line.itemNameSnapshot}</p><p className="mt-1 text-xs text-[var(--color-text-muted)]">{quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}{line.variantNameSnapshot ? `, ${line.variantNameSnapshot}` : ''}</p>{line.fulfillment ? <p className="mt-1 text-[11px] font-medium text-[var(--color-text-muted)]">{label(line.fulfillment.status)}</p> : null}{isTrackedService && requiresEmployeeAttribution ? <div className="mt-2 flex min-w-0 items-center gap-2 text-xs"><span className="shrink-0 font-medium text-[var(--color-text-muted)]">{copy('Work')}</span><span className="min-w-0 flex-1 truncate text-[var(--color-text-muted)]">{employeeWorkSummary(line, employees, locale)}</span>{canEditServiceWork ? employeeIssues.length > 0 ? <DButton size="sm" variant="outline" disabled={isMutating} className="h-7 px-2 text-[11px]" onClick={() => onAssign(line)}>{copy('Configure')}</DButton> : <DButton size="icon" variant="ghost" disabled={isMutating} aria-label={`${copy('Configure')} ${line.itemNameSnapshot}`} onClick={() => onAssign(line)}><Pencil className="size-3.5" /></DButton> : null}</div> : null}</div><p className="text-sm font-bold">{money(line.totalAmount, locale)}</p></div></div>
                     );
                   })}
                 </div>
@@ -3015,27 +2404,7 @@ function ReferenceTransactionDetail({
         )}
       </Dialog>
 
-      {showReceipt
-        ? createPortal(
-            <div className={`pos-receipt-print pos-receipt-print--${receiptPaper}`}>
-              <ReceiptContent
-                sale={sale}
-                activeLines={activeLines}
-                customer={customer}
-                locale={locale}
-                businessName={businessName}
-                branchName={branchName}
-                cashierName={cashierName}
-                transactionDate={transactionDate}
-                totalPaid={totalPaid}
-                payment={payment}
-                hasDiscount={hasDiscount}
-                hasTax={hasTax}
-              />
-            </div>,
-            document.body,
-          )
-        : null}
+      {showReceipt ? createPortal(<div className={`pos-receipt-print pos-receipt-print--${receiptPaper}`}><ReceiptContent sale={sale} activeLines={activeLines} customer={customer} locale={locale} businessName={businessName} branchName={branchName} cashierName={cashierName} transactionDate={transactionDate} totalPaid={totalPaid} payment={payment} hasDiscount={hasDiscount} hasTax={hasTax} /></div>, document.body) : null}
     </>
   );
 }
@@ -3070,99 +2439,16 @@ function ReceiptContent({
   const { copy } = useOperationalLocalization();
   return (
     <>
-      <header className="text-center">
-        <h2 className="text-lg font-black tracking-tight">{businessName}</h2>
-        <p className="mt-1 text-xs text-slate-500">{branchName}</p>
-        <div className="my-4 border-t border-dashed border-slate-300" />
-        <p className="font-mono text-xs font-semibold">{transactionNumber(sale.id, locale)}</p>
-        <p className="mt-1 text-[11px] text-slate-500">{transactionDate}</p>
-        <p className="mt-1 text-[11px] text-slate-500">
-          {copy('Cashier')}: {cashierName}
-        </p>
-      </header>
-
-      <section className="mt-4 text-xs">
-        <p className="font-semibold">{copy('Customer')}</p>
-        <p className="mt-1">{customer.name}</p>
-        {customer.phone ? <p className="text-slate-500">{customer.phone}</p> : null}
-      </section>
-
+      <header className="text-center"><h2 className="text-lg font-black tracking-tight">{businessName}</h2><p className="mt-1 text-xs text-slate-500">{branchName}</p><div className="my-4 border-t border-dashed border-slate-300" /><p className="font-mono text-xs font-semibold">{transactionNumber(sale.id, locale)}</p><p className="mt-1 text-[11px] text-slate-500">{transactionDate}</p><p className="mt-1 text-[11px] text-slate-500">{copy('Cashier')}: {cashierName}</p></header>
+      <section className="mt-4 text-xs"><p className="font-semibold">{copy('Customer')}</p><p className="mt-1">{customer.name}</p>{customer.phone ? <p className="text-slate-500">{customer.phone}</p> : null}</section>
       <div className="my-4 border-t border-dashed border-slate-300" />
-
-      <section className="space-y-2.5">
-        {activeLines.map((line) => (
-          <div key={line.id} className="text-xs leading-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="font-bold">{line.itemNameSnapshot}</p>
-                {line.variantNameSnapshot ? (
-                  <p className="mt-0.5 text-slate-500">{line.variantNameSnapshot}</p>
-                ) : null}
-              </div>
-              <p className="shrink-0 font-bold">{money(line.totalAmount, locale)}</p>
-            </div>
-            <p className="mt-1 text-slate-500">
-              {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
-            </p>
-          </div>
-        ))}
-      </section>
-
+      <section className="space-y-2.5">{activeLines.map((line) => <div key={line.id} className="text-xs leading-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="font-bold">{line.itemNameSnapshot}</p>{line.variantNameSnapshot ? <p className="mt-0.5 text-slate-500">{line.variantNameSnapshot}</p> : null}</div><p className="shrink-0 font-bold">{money(line.totalAmount, locale)}</p></div><p className="mt-1 text-slate-500">{quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}</p></div>)}</section>
       <div className="my-4 border-t border-dashed border-slate-300" />
-
-      <dl className="space-y-1.5 text-xs">
-        <div className="flex justify-between gap-3">
-          <dt className="text-slate-500">{copy('Subtotal')}</dt>
-          <dd>{money(sale.grossAmount, locale)}</dd>
-        </div>
-        {hasDiscount ? (
-          <div className="flex justify-between gap-3">
-            <dt className="text-slate-500">{copy('Discount')}</dt>
-            <dd>−{money(sale.discountAmount, locale)}</dd>
-          </div>
-        ) : null}
-        {hasTax ? (
-          <div className="flex justify-between gap-3">
-            <dt className="text-slate-500">{copy('Tax')}</dt>
-            <dd>{money(sale.taxAmount, locale)}</dd>
-          </div>
-        ) : null}
-        <div className="mt-2 flex justify-between gap-3 border-t border-slate-200 pt-2 text-sm font-black">
-          <dt>{copy('Total').toUpperCase()}</dt>
-          <dd>{money(sale.totalAmount, locale)}</dd>
-        </div>
-      </dl>
-
+      <dl className="space-y-1.5 text-xs"><div className="flex justify-between gap-3"><dt className="text-slate-500">{copy('Subtotal')}</dt><dd>{money(sale.grossAmount, locale)}</dd></div>{hasDiscount ? <div className="flex justify-between gap-3"><dt className="text-slate-500">{copy('Discount')}</dt><dd>−{money(sale.discountAmount, locale)}</dd></div> : null}{hasTax ? <div className="flex justify-between gap-3"><dt className="text-slate-500">{copy('Tax')}</dt><dd>{money(sale.taxAmount, locale)}</dd></div> : null}<div className="mt-2 flex justify-between gap-3 border-t border-slate-200 pt-2 text-sm font-black"><dt>{copy('Total').toUpperCase()}</dt><dd>{money(sale.totalAmount, locale)}</dd></div></dl>
       <div className="my-4 border-t border-dashed border-slate-300" />
-
-      <section className="space-y-1.5 text-xs">
-        <div className="flex justify-between gap-3">
-          <span className="text-slate-500">{copy('Paid amount')}</span>
-          <span>{money(totalPaid, locale)}</span>
-        </div>
-        {payment?.method === 'CASH' ? (
-          <>
-            {payment.tenderedAmount ? (
-              <div className="flex justify-between gap-3">
-                <span className="text-slate-500">{copy('Cash received')}</span>
-                <span>{money(payment.tenderedAmount, locale)}</span>
-              </div>
-            ) : null}
-            {isPositiveDecimal(payment.changeAmount ?? '0') ? (
-              <div className="flex justify-between gap-3">
-                <span className="text-slate-500">{copy('Change')}</span>
-                <span>{money(payment.changeAmount ?? '0.0000', locale)}</span>
-              </div>
-            ) : null}
-          </>
-        ) : null}
-      </section>
-
+      <section className="space-y-1.5 text-xs"><div className="flex justify-between gap-3"><span className="text-slate-500">{copy('Paid amount')}</span><span>{money(totalPaid, locale)}</span></div>{payment?.method === 'CASH' ? <>{payment.tenderedAmount ? <div className="flex justify-between gap-3"><span className="text-slate-500">{copy('Cash received')}</span><span>{money(payment.tenderedAmount, locale)}</span></div> : null}{isPositiveDecimal(payment.changeAmount ?? '0') ? <div className="flex justify-between gap-3"><span className="text-slate-500">{copy('Change')}</span><span>{money(payment.changeAmount ?? '0.0000', locale)}</span></div> : null}</> : null}</section>
       <div className="my-4 border-t border-dashed border-slate-300" />
-      <p className="text-center text-[11px] text-slate-500">
-        {copy('Thank you for your purchase.')}
-      </p>
-      <div className="pos-receipt-tear" aria-hidden="true" />
+      <p className="text-center text-[11px] text-slate-500">{copy('Thank you for your purchase.')}</p><div className="pos-receipt-tear" aria-hidden="true" />
     </>
   );
 }
@@ -3186,37 +2472,7 @@ function ReferenceServiceWorkLine({
 }) {
   const { copy } = useOperationalLocalization();
   const workSummary = serviceWorkAssignmentSummary(units, employees, locale);
-
-  return (
-    <div className="p-4">
-      <div className="flex justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold">{line.itemNameSnapshot}</p>
-          <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-            {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
-            {line.variantNameSnapshot ? `, ${line.variantNameSnapshot}` : ''}
-          </p>
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
-            <span className="min-w-0 flex-1 truncate text-[var(--color-text-muted)]">
-              {units.length} {copy('work units')}, {workSummary}
-            </span>
-            {active ? (
-              <DButton
-                size="icon"
-                variant="ghost"
-                disabled={isMutating}
-                aria-label={`${copy('Configure')} ${line.itemNameSnapshot}`}
-                onClick={onManage}
-              >
-                <Pencil className="size-3.5" />
-              </DButton>
-            ) : null}
-          </div>
-        </div>
-        <p className="shrink-0 text-sm font-bold">{money(line.totalAmount, locale)}</p>
-      </div>
-    </div>
-  );
+  return <div className="p-4"><div className="flex justify-between gap-3"><div className="min-w-0 flex-1"><p className="text-sm font-semibold">{line.itemNameSnapshot}</p><p className="mt-1 text-xs text-[var(--color-text-muted)]">{quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}{line.variantNameSnapshot ? `, ${line.variantNameSnapshot}` : ''}</p><div className="mt-1 flex flex-wrap items-center gap-2 text-xs"><span className="min-w-0 flex-1 truncate text-[var(--color-text-muted)]">{units.length} {copy('work units')}, {workSummary}</span>{active ? <DButton size="icon" variant="ghost" disabled={isMutating} aria-label={`${copy('Configure')} ${line.itemNameSnapshot}`} onClick={onManage}><Pencil className="size-3.5" /></DButton> : null}</div></div><p className="shrink-0 text-sm font-bold">{money(line.totalAmount, locale)}</p></div></div>;
 }
 
 function ReferenceFinancialSummary({ sale, locale }: { sale: Sale; locale: string }) {
@@ -3226,97 +2482,14 @@ function ReferenceFinancialSummary({ sale, locale }: { sale: Sale; locale: strin
   const hasDiscount = !createDecimal(sale.discountAmount).equals(createDecimal('0'));
   const hasTax = !createDecimal(sale.taxAmount).equals(createDecimal('0'));
   const cashPayments = successfulPayments(sale).filter((payment) => payment.method === 'CASH');
-  const cashTendered = cashPayments.reduce(
-    (total, payment) => total.plus(createDecimal(payment.tenderedAmount ?? '0')),
-    createDecimal('0'),
-  );
-  const cashChange = cashPayments.reduce(
-    (total, payment) => total.plus(createDecimal(payment.changeAmount ?? '0')),
-    createDecimal('0'),
-  );
+  const cashTendered = cashPayments.reduce((total, payment) => total.plus(createDecimal(payment.tenderedAmount ?? '0')), createDecimal('0'));
+  const cashChange = cashPayments.reduce((total, payment) => total.plus(createDecimal(payment.changeAmount ?? '0')), createDecimal('0'));
   const hasCashTendered = cashPayments.some((payment) => payment.tenderedAmount !== null);
   const hasCashChange = !cashChange.equals(createDecimal('0'));
-
   return (
     <section className="sticky bottom-0 z-10 flex shrink-0 flex-col border-t border-[var(--color-border)] bg-[var(--color-surface)]">
-      <div
-        className={`order-2 grid transition-[grid-template-rows] duration-200 ease-out ${expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
-      >
-        <div className="overflow-hidden">
-          <dl className="space-y-1.5 border-b border-[var(--color-border)] px-5 py-3 text-xs">
-            <div className="flex justify-between gap-3">
-              <dt className="text-[var(--color-text-muted)]">{copy('Subtotal')}</dt>
-              <dd>{money(sale.grossAmount, locale)}</dd>
-            </div>
-            {hasDiscount ? (
-              <div className="flex justify-between gap-3">
-                <dt className="text-[var(--color-text-muted)]">{copy('Promotion discount')}</dt>
-                <dd>−{money(sale.discountAmount, locale)}</dd>
-              </div>
-            ) : null}
-            {hasTax ? (
-              <div className="flex justify-between gap-3">
-                <dt className="text-[var(--color-text-muted)]">{copy('Tax')}</dt>
-                <dd>{money(sale.taxAmount, locale)}</dd>
-              </div>
-            ) : null}
-            <div className="flex justify-between gap-3 border-t border-[var(--color-border)] pt-2 font-semibold">
-              <dt>{copy('Total')}</dt>
-              <dd>{money(sale.totalAmount, locale)}</dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt className="text-[var(--color-text-muted)]">{copy('Paid amount')}</dt>
-              <dd>{money(totalPaid, locale)}</dd>
-            </div>
-            <div className="flex justify-between gap-3 font-semibold text-[var(--color-brand)]">
-              <dt>{copy('Balance')}</dt>
-              <dd>{money(balanceDue, locale)}</dd>
-            </div>
-            {hasCashTendered ? (
-              <div className="flex justify-between gap-3">
-                <dt className="text-[var(--color-text-muted)]">{copy('Cash received')}</dt>
-                <dd>{money(cashTendered.toFixed(4), locale)}</dd>
-              </div>
-            ) : null}
-            {hasCashChange ? (
-              <div className="flex justify-between gap-3">
-                <dt className="text-[var(--color-text-muted)]">{copy('Change')}</dt>
-                <dd>{money(cashChange.toFixed(4), locale)}</dd>
-              </div>
-            ) : null}
-          </dl>
-        </div>
-      </div>
-      <button
-        type="button"
-        aria-expanded={expanded}
-        onClick={() => setExpanded((current) => !current)}
-        className="order-1 grid w-full grid-cols-[1fr_1fr_1fr_auto] items-center gap-3 px-5 py-3 text-left text-xs transition-colors duration-200 hover:bg-[var(--color-surface-muted)]"
-      >
-        <span>
-          <span className="block text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]">
-            {copy('Total')}
-          </span>
-          <span className="mt-0.5 block font-semibold">{money(sale.totalAmount, locale)}</span>
-        </span>
-        <span>
-          <span className="block text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]">
-            {copy('Paid amount')}
-          </span>
-          <span className="mt-0.5 block font-semibold">{money(totalPaid, locale)}</span>
-        </span>
-        <span className="text-right">
-          <span className="block text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]">
-            {copy('Balance')}
-          </span>
-          <span className="mt-0.5 block font-semibold text-[var(--color-brand)]">
-            {money(balanceDue, locale)}
-          </span>
-        </span>
-        <ChevronDown
-          className={`size-4 text-[var(--color-text-muted)] transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
-        />
-      </button>
+      <div className={`order-2 grid transition-[grid-template-rows] duration-200 ease-out ${expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}><div className="overflow-hidden"><dl className="space-y-1.5 border-b border-[var(--color-border)] px-5 py-3 text-xs"><div className="flex justify-between gap-3"><dt className="text-[var(--color-text-muted)]">{copy('Subtotal')}</dt><dd>{money(sale.grossAmount, locale)}</dd></div>{hasDiscount ? <div className="flex justify-between gap-3"><dt className="text-[var(--color-text-muted)]">{copy('Promotion discount')}</dt><dd>−{money(sale.discountAmount, locale)}</dd></div> : null}{hasTax ? <div className="flex justify-between gap-3"><dt className="text-[var(--color-text-muted)]">{copy('Tax')}</dt><dd>{money(sale.taxAmount, locale)}</dd></div> : null}<div className="flex justify-between gap-3 border-t border-[var(--color-border)] pt-2 font-semibold"><dt>{copy('Total')}</dt><dd>{money(sale.totalAmount, locale)}</dd></div><div className="flex justify-between gap-3"><dt className="text-[var(--color-text-muted)]">{copy('Paid amount')}</dt><dd>{money(totalPaid, locale)}</dd></div><div className="flex justify-between gap-3 font-semibold text-[var(--color-brand)]"><dt>{copy('Balance')}</dt><dd>{money(balanceDue, locale)}</dd></div>{hasCashTendered ? <div className="flex justify-between gap-3"><dt className="text-[var(--color-text-muted)]">{copy('Cash received')}</dt><dd>{money(cashTendered.toFixed(4), locale)}</dd></div> : null}{hasCashChange ? <div className="flex justify-between gap-3"><dt className="text-[var(--color-text-muted)]">{copy('Change')}</dt><dd>{money(cashChange.toFixed(4), locale)}</dd></div> : null}</dl></div></div>
+      <button type="button" aria-expanded={expanded} onClick={() => setExpanded((current) => !current)} className="order-1 grid w-full grid-cols-[1fr_1fr_1fr_auto] items-center gap-3 px-5 py-3 text-left text-xs transition-colors duration-200 hover:bg-[var(--color-surface-muted)]"><span><span className="block text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]">{copy('Total')}</span><span className="mt-0.5 block font-semibold">{money(sale.totalAmount, locale)}</span></span><span><span className="block text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]">{copy('Paid amount')}</span><span className="mt-0.5 block font-semibold">{money(totalPaid, locale)}</span></span><span className="text-right"><span className="block text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]">{copy('Balance')}</span><span className="mt-0.5 block font-semibold text-[var(--color-brand)]">{money(balanceDue, locale)}</span></span><ChevronDown className={`size-4 text-[var(--color-text-muted)] transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} /></button>
     </section>
   );
 }
@@ -3346,15 +2519,8 @@ function ReferenceOrderAdjustmentDialog({
 }) {
   const { copy } = useOperationalLocalization();
   const [catalogSearch, setCatalogSearch] = useState('');
-  const [variantSelection, setVariantSelection] = useState<{
-    itemId: string;
-    variantId: string;
-  } | null>(null);
-  const selectedVariantId =
-    variantSelection && variantSelection.itemId === variantPicker?.item.id
-      ? variantSelection.variantId
-      : null;
-
+  const [variantSelection, setVariantSelection] = useState<{ itemId: string; variantId: string } | null>(null);
+  const selectedVariantId = variantSelection && variantSelection.itemId === variantPicker?.item.id ? variantSelection.variantId : null;
   if (!sale) return null;
 
   const paid = hasSuccessfulPayment(sale);
@@ -3362,199 +2528,29 @@ function ReferenceOrderAdjustmentDialog({
   const paidAmount = createDecimal(totalPaid);
   const saleTotal = createDecimal(sale.totalAmount);
   const activeLines = sale.lines.filter((line) => line.removedAt === null);
-  const options = items
-    .filter((item) => {
-      const query = catalogSearch.trim().toLocaleLowerCase();
-      return !query || `${item.name} ${item.code}`.toLocaleLowerCase().includes(query);
-    })
-    .slice(0, 12)
-    .map((item) => ({
-      value: item.id,
-      label: `${item.name} (${item.code})`,
-    }));
+  const options = items.filter((item) => { const query = catalogSearch.trim().toLocaleLowerCase(); return !query || `${item.name} ${item.code}`.toLocaleLowerCase().includes(query); }).slice(0, 12).map((item) => ({ value: item.id, label: `${item.name} (${item.code})` }));
 
   return (
-    <Dialog
-      open
-      onClose={onClose}
-      title={copy('Adjust order')}
-      description={`${transactionNumber(sale.id, locale)}. ${copy('Changes apply to this transaction.')}`}
-      ariaLabel={copy('Adjust order')}
-      closeOnEscape
-      closeOnOverlay
-      className="pos-reference-dialog w-full max-w-xl overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
-      footer={
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={onClose}>
-            {copy('Cancel')}
-          </Button>
-          <Button disabled={isMutating} onClick={onClose}>
-            {copy('Confirm adjustment')}
-          </Button>
-        </div>
-      }
-    >
+    <Dialog open onClose={onClose} title={copy('Adjust order')} description={`${transactionNumber(sale.id, locale)}. ${copy('Changes apply to this transaction.')}`} ariaLabel={copy('Adjust order')} closeOnEscape closeOnOverlay className="pos-reference-dialog w-full max-w-xl overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl" footer={<div className="flex justify-end gap-2"><Button variant="ghost" onClick={onClose}>{copy('Cancel')}</Button><Button disabled={isMutating} onClick={onClose}>{copy('Confirm adjustment')}</Button></div>}>
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
-        {paid ? (
-          <div className="rounded-xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 px-3 py-2 text-xs">
-            <p className="font-semibold text-[var(--color-warning)]">
-              {copy('Previous payment remains recorded')}
-            </p>
-            <p className="mt-1 text-[var(--color-text-muted)]">
-              {copy('You can add items. Reducing or removing paid items requires a refund.')}
-            </p>
-          </div>
-        ) : (
-          <p className="text-xs text-[var(--color-text-muted)]">
-            {copy('Change quantity or remove items that have not started, then confirm.')}
-          </p>
-        )}
+        {paid ? <div className="rounded-xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 px-3 py-2 text-xs"><p className="font-semibold text-[var(--color-warning)]">{copy('Previous payment remains recorded')}</p><p className="mt-1 text-[var(--color-text-muted)]">{copy('You can add items. Reducing or removing paid items requires a refund.')}</p></div> : <p className="text-xs text-[var(--color-text-muted)]">{copy('Change quantity or remove items that have not started, then confirm.')}</p>}
         <div className="divide-y divide-[var(--color-border)] overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-background)]">
           {activeLines.map((line) => {
-            const lineMutable =
-              !line.fulfillment || line.fulfillment.status === 'WAITING';
-            const canDecrease =
-              !paid &&
-              lineMutable &&
-              createDecimal(line.quantity).greaterThan(createDecimal('1'));
-            const canRemove = !paid && lineMutable;
+            const lineMutable = !line.fulfillment || line.fulfillment.status === 'WAITING';
+            const canDecrease = lineMutable && createDecimal(line.quantity).greaterThan(createDecimal('1'));
+            const canRemove = lineMutable;
             const projectedTotalAfterRemoval = saleTotal.minus(createDecimal(line.totalAmount));
-            const removalRefund = paidAmount.greaterThan(projectedTotalAfterRemoval)
-              ? paidAmount.minus(projectedTotalAfterRemoval)
-              : createDecimal('0');
+            const removalRefund = paidAmount.greaterThan(projectedTotalAfterRemoval) ? paidAmount.minus(projectedTotalAfterRemoval) : createDecimal('0');
             return (
               <div key={line.id} className="flex items-center justify-between gap-3 p-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold">{line.itemNameSnapshot}</p>
-                  {line.variantNameSnapshot ? (
-                    <p className="mt-0.5 truncate text-xs font-medium text-[var(--color-text-muted)]">
-                      {line.variantNameSnapshot}
-                    </p>
-                  ) : null}
-                  <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
-                    {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
-                  </p>
-                  {paid && removalRefund.greaterThan(createDecimal('0')) ? (
-                    <p className="mt-1 text-[11px] font-semibold text-[var(--color-warning)]">
-                      {copy('Refund required')}: {money(removalRefund.toFixed(4), locale)}
-                    </p>
-                  ) : null}
-                </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  <button
-                    type="button"
-                    aria-label={`${copy('Decrease quantity')} ${line.itemNameSnapshot}`}
-                    disabled={!canDecrease || isMutating}
-                    onClick={() =>
-                      onQuantity(
-                        line,
-                        createDecimal(line.quantity).minus(createDecimal('1')).toFixed(4),
-                      )
-                    }
-                    className="flex size-8 items-center justify-center rounded-lg border border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <Minus className="size-3.5" />
-                  </button>
-                  <span className="w-8 text-center text-xs font-semibold">
-                    {quantity(line.quantity)}
-                  </span>
-                  <button
-                    type="button"
-                    aria-label={`${copy('Increase quantity')} ${line.itemNameSnapshot}`}
-                    disabled={!lineMutable || isMutating}
-                    onClick={() =>
-                      onQuantity(
-                        line,
-                        createDecimal(line.quantity).plus(createDecimal('1')).toFixed(4),
-                      )
-                    }
-                    className="flex size-8 items-center justify-center rounded-lg border border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <Plus className="size-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`${copy('Remove')} ${line.itemNameSnapshot}`}
-                    disabled={!canRemove || isMutating}
-                    onClick={() => onRemove(line)}
-                    className="ml-1 flex size-8 items-center justify-center rounded-lg text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <Trash2 className="size-3.5" />
-                  </button>
-                </div>
+                <div className="min-w-0"><p className="truncate text-sm font-semibold">{line.itemNameSnapshot}</p>{line.variantNameSnapshot ? <p className="mt-0.5 truncate text-xs font-medium text-[var(--color-text-muted)]">{line.variantNameSnapshot}</p> : null}<p className="mt-0.5 text-xs text-[var(--color-text-muted)]">{quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}</p>{paid && removalRefund.greaterThan(createDecimal('0')) ? <p className="mt-1 text-[11px] font-semibold text-[var(--color-warning)]">{copy('Refund required')}: {money(removalRefund.toFixed(4), locale)}</p> : null}</div>
+                <div className="flex shrink-0 items-center gap-1"><button type="button" aria-label={`${copy('Decrease quantity')} ${line.itemNameSnapshot}`} disabled={!canDecrease || isMutating} onClick={() => onQuantity(line, createDecimal(line.quantity).minus(createDecimal('1')).toFixed(4))} className="flex size-8 items-center justify-center rounded-lg border border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] disabled:cursor-not-allowed disabled:opacity-40"><Minus className="size-3.5" /></button><span className="w-8 text-center text-xs font-semibold">{quantity(line.quantity)}</span><button type="button" aria-label={`${copy('Increase quantity')} ${line.itemNameSnapshot}`} disabled={!lineMutable || isMutating} onClick={() => onQuantity(line, createDecimal(line.quantity).plus(createDecimal('1')).toFixed(4))} className="flex size-8 items-center justify-center rounded-lg border border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] disabled:cursor-not-allowed disabled:opacity-40"><Plus className="size-3.5" /></button><button type="button" aria-label={`${copy('Remove')} ${line.itemNameSnapshot}`} disabled={!canRemove || isMutating} onClick={() => onRemove(line)} className="ml-1 flex size-8 items-center justify-center rounded-lg text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 disabled:cursor-not-allowed disabled:opacity-40"><Trash2 className="size-3.5" /></button></div>
               </div>
             );
           })}
         </div>
-
-        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] p-3">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
-            {copy('Add item from catalog')}
-          </p>
-          <Combobox
-            ariaLabel={copy('Add item from catalog')}
-            value={null}
-            placeholder={copy('Search product or service')}
-            options={options}
-            onSearchChange={setCatalogSearch}
-            onChange={(itemId) => {
-              const item = items.find((candidate) => candidate.id === itemId);
-              if (item) onAdd(item);
-            }}
-            disabled={isMutating}
-            idleMessage={copy('Search by item name or code.')}
-          />
-        </div>
-
-        {variantPicker ? (
-          <section className="border-t border-[var(--color-border)] pt-3">
-            <div className="space-y-3">
-              <p className="text-sm font-semibold text-[var(--color-text)]">
-                {variantPicker.item.name}
-              </p>
-              <Select
-                label={copy('Variant')}
-                value={selectedVariantId}
-                placeholder={copy('Select variant')}
-                options={variantPicker.variants.map((variant) => {
-                  const price = variantPicker.pricesByVariantId?.[variant.id];
-                  const isUnavailable =
-                    variantPicker.unavailableVariantIds?.includes(variant.id) ?? false;
-                  return {
-                    value: variant.id,
-                    label: isUnavailable
-                      ? `${variant.name} (${copy('Price unavailable')})`
-                      : price
-                        ? `${variant.name} (${money(price, locale)})`
-                        : variant.name,
-                    disabled: isUnavailable,
-                  };
-                })}
-                onChange={(value) =>
-                  setVariantSelection(
-                    typeof value === 'string'
-                      ? { itemId: variantPicker.item.id, variantId: value }
-                      : null,
-                  )
-                }
-                disabled={isMutating}
-                className="w-full"
-              />
-              <div className="flex justify-end">
-                <Button
-                  size="sm"
-                  leftIcon={<Plus className="size-3.5" />}
-                  disabled={selectedVariantId === null || isMutating}
-                  onClick={() => {
-                    if (selectedVariantId) onAddVariant(selectedVariantId);
-                  }}
-                >
-                  {copy('Add item')}
-                </Button>
-              </div>
-            </div>
-          </section>
-        ) : null}
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] p-3"><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">{copy('Add item from catalog')}</p><Combobox ariaLabel={copy('Add item from catalog')} value={null} placeholder={copy('Search product or service')} options={options} onSearchChange={setCatalogSearch} onChange={(itemId) => { const item = items.find((candidate) => candidate.id === itemId); if (item) onAdd(item); }} disabled={isMutating} idleMessage={copy('Search by item name or code.')} /></div>
+        {variantPicker ? <section className="border-t border-[var(--color-border)] pt-3"><div className="space-y-3"><p className="text-sm font-semibold text-[var(--color-text)]">{variantPicker.item.name}</p><Select label={copy('Variant')} value={selectedVariantId} placeholder={copy('Select variant')} options={variantPicker.variants.map((variant) => { const price = variantPicker.pricesByVariantId?.[variant.id]; const isUnavailable = variantPicker.unavailableVariantIds?.includes(variant.id) ?? false; return { value: variant.id, label: isUnavailable ? `${variant.name} (${copy('Price unavailable')})` : price ? `${variant.name} (${money(price, locale)})` : variant.name, disabled: isUnavailable }; })} onChange={(value) => setVariantSelection(typeof value === 'string' ? { itemId: variantPicker.item.id, variantId: value } : null)} disabled={isMutating} className="w-full" /><div className="flex justify-end"><Button size="sm" leftIcon={<Plus className="size-3.5" />} disabled={selectedVariantId === null || isMutating} onClick={() => { if (selectedVariantId) onAddVariant(selectedVariantId); }}>{copy('Add item')}</Button></div></div></section> : null}
       </div>
     </Dialog>
   );
@@ -3589,9 +2585,7 @@ function ReferenceBalancePaymentDialog({
 }) {
   const { copy, label } = useOperationalLocalization();
   const { routes: paymentRoutes, isPending: isPaymentRoutesPending } = useCachedPaymentRoutes();
-  const routeByMethod = new Map(
-    paymentRoutes.map((route) => [route.paymentMethod, route] as const),
-  );
+  const routeByMethod = new Map(paymentRoutes.map((route) => [route.paymentMethod, route] as const));
   const activeRoute = routeByMethod.get(method) ?? null;
   if (!sale) return null;
   const { totalPaid } = financialSummary(sale);
@@ -3600,12 +2594,7 @@ function ReferenceBalancePaymentDialog({
   const needsProvider = method === 'BANK_TRANSFER' || method === 'WALLET';
   const applied = isCash ? tender || balanceDue : balanceDue;
   const cashShort = isCash && createDecimal(applied).lessThan(createDecimal(balanceDue));
-  const canPay =
-    isPositiveDecimal(applied) &&
-    Boolean(activeRoute) &&
-    !cashShort &&
-    (!needsProvider || Boolean(provider)) &&
-    !isMutating;
+  const canPay = isPositiveDecimal(applied) && Boolean(activeRoute) && !cashShort && (!needsProvider || Boolean(provider)) && !isMutating;
   const methods: Array<{ value: PaymentMethod; icon: ReactNode }> = [
     { value: 'CASH', icon: <Banknote className="size-4" /> },
     { value: 'BANK_TRANSFER', icon: <CreditCard className="size-4" /> },
@@ -3613,98 +2602,13 @@ function ReferenceBalancePaymentDialog({
     { value: 'WALLET', icon: <ShoppingBag className="size-4" /> },
   ];
   const providerOptions = needsProvider && activeRoute ? [activeRoute.financialAccountName] : [];
-
   return (
-    <Dialog
-      open
-      onClose={onClose}
-      title={copy(hasSuccessfulPayment(sale) ? 'Pay balance' : 'Pay')}
-      description={transactionNumber(sale.id, locale)}
-      ariaLabel={copy('Payment')}
-      closeOnEscape
-      closeOnOverlay
-      className="pos-reference-dialog w-full max-w-md overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
-      footer={
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={onClose}>
-            {copy('Cancel')}
-          </Button>
-          <Button disabled={!canPay} loading={isMutating} onClick={onPay}>
-            {copy('Pay')} {money(balanceDue, locale)}
-          </Button>
-        </div>
-      }
-    >
+    <Dialog open onClose={onClose} title={copy(hasSuccessfulPayment(sale) ? 'Pay balance' : 'Pay')} description={transactionNumber(sale.id, locale)} ariaLabel={copy('Payment')} closeOnEscape closeOnOverlay className="pos-reference-dialog w-full max-w-md overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl" footer={<div className="flex justify-end gap-2"><Button variant="ghost" onClick={onClose}>{copy('Cancel')}</Button><Button disabled={!canPay} loading={isMutating} onClick={onPay}>{copy('Pay')} {money(balanceDue, locale)}</Button></div>}>
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
-        <div className="grid grid-cols-2 gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] p-3 text-sm">
-          <div>
-            <p className="text-xs text-[var(--color-text-muted)]">{copy('Paid amount')}</p>
-            <p className="mt-1 font-semibold">{money(totalPaid, locale)}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-xs text-[var(--color-text-muted)]">{copy('Balance')}</p>
-            <p className="mt-1 font-bold text-[var(--color-brand)]">{money(balanceDue, locale)}</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-4 gap-2">
-          {methods.map((option) => {
-            const routeAvailable = routeByMethod.has(option.value);
-            const disabled = isPaymentRoutesPending || !routeAvailable;
-            return (
-              <button
-                key={option.value}
-                type="button"
-                disabled={disabled}
-                onClick={() => onMethod(option.value)}
-                className={`flex h-10 items-center justify-center gap-1 rounded-xl border text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${method === option.value ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white' : 'border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]'}`}
-              >
-                {option.icon}
-                <span className="hidden sm:inline">{label(option.value)}</span>
-              </button>
-            );
-          })}
-        </div>
-        {needsProvider ? (
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {providerOptions.map((option) => (
-              <button
-                key={option}
-                type="button"
-                onClick={() => onProvider(option)}
-                className={`h-9 rounded-lg border px-3 text-xs font-semibold ${provider === option ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]'}`}
-              >
-                {option}
-              </button>
-            ))}
-          </div>
-        ) : null}
-        {isCash ? (
-          <label className="block text-sm font-medium">
-            {copy('Amount paid')}
-            <PosCurrencyInput
-              aria-label={copy('Amount paid')}
-              className="mt-1.5 h-10 rounded-lg text-right text-lg font-bold"
-              value={tender}
-              onChange={onTender}
-            />
-            {cashShort ? (
-              <span className="mt-1 block text-xs text-[var(--color-warning)]">
-                {copy('Payment amount is insufficient.')}
-              </span>
-            ) : null}
-          </label>
-        ) : (
-          <div className="rounded-xl border border-[var(--color-brand)]/20 bg-[var(--color-brand)]/5 p-3 text-xs text-[var(--color-text-muted)]">
-            <p>
-              {copy('Record payment')} {label(method)} {money(balanceDue, locale)}.
-            </p>
-            {activeRoute ? (
-              <p className="mt-1 font-semibold text-[var(--color-text)]">
-                {activeRoute.financialAccountName}
-              </p>
-            ) : null}
-          </div>
-        )}
+        <div className="grid grid-cols-2 gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] p-3 text-sm"><div><p className="text-xs text-[var(--color-text-muted)]">{copy('Paid amount')}</p><p className="mt-1 font-semibold">{money(totalPaid, locale)}</p></div><div className="text-right"><p className="text-xs text-[var(--color-text-muted)]">{copy('Balance')}</p><p className="mt-1 font-bold text-[var(--color-brand)]">{money(balanceDue, locale)}</p></div></div>
+        <div className="grid grid-cols-4 gap-2">{methods.map((option) => { const routeAvailable = routeByMethod.has(option.value); const disabled = isPaymentRoutesPending || !routeAvailable; return <button key={option.value} type="button" disabled={disabled} onClick={() => onMethod(option.value)} className={`flex h-10 items-center justify-center gap-1 rounded-xl border text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${method === option.value ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white' : 'border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]'}`}>{option.icon}<span className="hidden sm:inline">{label(option.value)}</span></button>; })}</div>
+        {needsProvider ? <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">{providerOptions.map((option) => <button key={option} type="button" onClick={() => onProvider(option)} className={`h-9 rounded-lg border px-3 text-xs font-semibold ${provider === option ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]'}`}>{option}</button>)}</div> : null}
+        {isCash ? <label className="block text-sm font-medium">{copy('Amount paid')}<PosCurrencyInput aria-label={copy('Amount paid')} className="mt-1.5 h-10 rounded-lg text-right text-lg font-bold" value={tender} onChange={onTender} />{cashShort ? <span className="mt-1 block text-xs text-[var(--color-warning)]">{copy('Payment amount is insufficient.')}</span> : null}</label> : <div className="rounded-xl border border-[var(--color-brand)]/20 bg-[var(--color-brand)]/5 p-3 text-xs text-[var(--color-text-muted)]"><p>{copy('Record payment')} {label(method)} {money(balanceDue, locale)}.</p>{activeRoute ? <p className="mt-1 font-semibold text-[var(--color-text)]">{activeRoute.financialAccountName}</p> : null}</div>}
       </div>
     </Dialog>
   );
@@ -3713,65 +2617,36 @@ function ReferenceBalancePaymentDialog({
 function ReferenceCancelDialog({
   sale,
   reason,
+  isMutating,
   onReasonChange,
   onClose,
   onConfirm,
 }: {
   sale: Sale | null;
   reason: string;
+  isMutating: boolean;
   onReasonChange: (reason: string) => void;
   onClose: () => void;
   onConfirm: () => void;
 }) {
   const { copy, locale } = useOperationalLocalization();
+  const refundAmount = sale ? financialSummary(sale).totalPaid : '0.0000';
+  const hasRefund = isPositiveDecimal(refundAmount);
   return (
-    <Dialog
-      open={Boolean(sale)}
-      onClose={onClose}
-      ariaLabel={copy('Cancel transaction')}
-      closeOnEscape
-      closeOnOverlay
-      className="pos-reference-dialog w-full max-w-md rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
-    >
+    <Dialog open={Boolean(sale)} onClose={onClose} ariaLabel={copy('Cancel transaction')} closeOnEscape={!isMutating} closeOnOverlay={!isMutating} className="pos-reference-dialog w-full max-w-md rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl">
       <div className="p-5">
         <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-danger)]">
-              {copy('Cancel transaction')}
-            </p>
-            <h2 className="mt-1 text-lg font-semibold">{copy('Cancel this transaction?')}</h2>
-            <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-              {sale ? transactionNumber(sale.id, locale) : ''}.{' '}
-              {copy('The transaction remains recorded in today queue.')}
-            </p>
+          <div><p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-danger)]">{copy('Cancel transaction')}</p><h2 className="mt-1 text-lg font-semibold">{copy('Cancel this transaction?')}</h2><p className="mt-1 text-sm text-[var(--color-text-muted)]">{sale ? transactionNumber(sale.id, locale) : ''}. {copy('The transaction remains recorded in today queue.')}</p></div>
+          <button type="button" aria-label={copy('Close')} disabled={isMutating} onClick={onClose} className="rounded-lg p-2 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] disabled:opacity-40"><X className="size-[18px]" /></button>
+        </div>
+        {hasRefund ? (
+          <div className="mt-4 rounded-xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 px-3 py-3">
+            <div className="flex items-center justify-between gap-3"><span className="text-sm font-semibold text-[var(--color-warning)]">{copy('Refund required')}</span><span className="text-sm font-bold text-[var(--color-warning)]">{money(refundAmount, locale)}</span></div>
+            <p className="mt-1 text-xs text-[var(--color-text-muted)]">{copy('Previous payment remains recorded')}</p>
           </div>
-          <button
-            type="button"
-            aria-label={copy('Close')}
-            onClick={onClose}
-            className="rounded-lg p-2 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]"
-          >
-            <X className="size-[18px]" />
-          </button>
-        </div>
-        <label className="mt-5 block text-sm font-medium">
-          {copy('Cancellation reason')}
-          <Input
-            className="mt-1.5 h-10 rounded-lg"
-            autoFocus
-            value={reason}
-            onChange={onReasonChange}
-            placeholder={copy('Example: Customer request')}
-          />
-        </label>
-        <div className="mt-5 flex justify-end gap-2">
-          <Button variant="outline" onClick={onClose}>
-            {copy('Back')}
-          </Button>
-          <Button variant="danger" disabled={!reason.trim()} onClick={onConfirm}>
-            {copy('Confirm cancellation')}
-          </Button>
-        </div>
+        ) : null}
+        <label className="mt-5 block text-sm font-medium">{copy('Cancellation reason')}<Input className="mt-1.5 h-10 rounded-lg" autoFocus value={reason} disabled={isMutating} onChange={onReasonChange} placeholder={copy('Example: Customer request')} /></label>
+        <div className="mt-5 flex justify-end gap-2"><Button variant="outline" disabled={isMutating} onClick={onClose}>{copy('Back')}</Button><Button variant="danger" disabled={!reason.trim() || isMutating} loading={isMutating} onClick={onConfirm}>{copy('Confirm cancellation')}</Button></div>
       </div>
     </Dialog>
   );
@@ -3788,230 +2663,39 @@ function ReferenceEmployeeDialog({
   employees: readonly Employee[];
   locale: string;
   onClose: () => void;
-  onSave: (
-    employeeIds: string[],
-    contributors: Array<{ employeeId: string; shareRate: string }>,
-  ) => void;
+  onSave: (employeeIds: string[], contributors: Array<{ employeeId: string; shareRate: string }>) => void;
 }) {
   const { copy } = useOperationalLocalization();
-  const initialRows =
-    line?.participations
-      .filter((participation) => participation.assigned)
-      .map((participation) => ({
-        employeeId: participation.employeeId,
-        shareRate: participation.shareRate
-          ? createDecimal(participation.shareRate).times(100).toFixed(0)
-          : '100',
-        locked: true,
-      })) ?? [];
-  const [rows, setRows] = useState<
-    Array<{ employeeId: string; shareRate: string; locked: boolean }>
-  >([]);
+  const initialRows = line?.participations.filter((participation) => participation.assigned).map((participation) => ({ employeeId: participation.employeeId, shareRate: participation.shareRate ? createDecimal(participation.shareRate).times(100).toFixed(0) : '100', locked: true })) ?? [];
+  const [rows, setRows] = useState<Array<{ employeeId: string; shareRate: string; locked: boolean }>>([]);
   const isOpen = Boolean(line);
-  const activeRows = rows.length
-    ? rows
-    : initialRows.length
-      ? initialRows
-      : [{ employeeId: '', shareRate: '100', locked: false }];
-  const distribute = (
-    source: Array<{ employeeId: string; shareRate: string; locked: boolean }>,
-  ) => {
-    const locked = source
-      .filter((row) => row.locked)
-      .reduce((sum, row) => sum.plus(createDecimal(row.shareRate || '0')), createDecimal('0'));
+  const activeRows = rows.length ? rows : initialRows.length ? initialRows : [{ employeeId: '', shareRate: '100', locked: false }];
+  const distribute = (source: Array<{ employeeId: string; shareRate: string; locked: boolean }>) => {
+    const locked = source.filter((row) => row.locked).reduce((sum, row) => sum.plus(createDecimal(row.shareRate || '0')), createDecimal('0'));
     const openRows = source.filter((row) => !row.locked);
     if (!openRows.length) return source;
-    const remaining = createDecimal('100').minus(locked).greaterThan(createDecimal('0'))
-      ? createDecimal('100').minus(locked)
-      : createDecimal('0');
+    const remaining = createDecimal('100').minus(locked).greaterThan(createDecimal('0')) ? createDecimal('100').minus(locked) : createDecimal('0');
     const base = remaining.dividedBy(openRows.length).toFixed(0);
     let placed = createDecimal('0');
-    return source.map((row) => {
-      if (row.locked) return row;
-      placed = placed.plus(createDecimal(base));
-      const isLast = openRows.indexOf(row) === openRows.length - 1;
-      return {
-        ...row,
-        shareRate: isLast ? remaining.minus(placed.minus(createDecimal(base))).toFixed(0) : base,
-      };
-    });
+    return source.map((row) => { if (row.locked) return row; placed = placed.plus(createDecimal(base)); const isLast = openRows.indexOf(row) === openRows.length - 1; return { ...row, shareRate: isLast ? remaining.minus(placed.minus(createDecimal(base))).toFixed(0) : base }; });
   };
-  const total = activeRows.reduce(
-    (sum, row) => sum.plus(createDecimal(row.shareRate || '0')),
-    createDecimal('0'),
-  );
-  const valid =
-    activeRows.length > 0 &&
-    activeRows.every((row) => row.employeeId) &&
-    total.equals(createDecimal('100'));
+  const total = activeRows.reduce((sum, row) => sum.plus(createDecimal(row.shareRate || '0')), createDecimal('0'));
+  const valid = activeRows.length > 0 && activeRows.every((row) => row.employeeId) && total.equals(createDecimal('100'));
   if (!line) return null;
-
   return (
-    <Dialog
-      open={isOpen}
-      title={copy('Employees for service')}
-      description={copy('Set employees and contribution shares before completing the transaction.')}
-      onClose={() => {
-        setRows([]);
-        onClose();
-      }}
-      ariaLabel={copy('Employees for service')}
-      closeOnEscape
-      closeOnOverlay
-      className="pos-reference-dialog w-full max-w-2xl overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
-      footer={
-        <footer className="flex shrink-0 items-center justify-between gap-2">
-          <span className="text-[11px] text-[var(--color-text-muted)]">
-            {copy(valid ? 'All shares total 100%' : 'Complete employee shares')}
-          </span>
-          <div className="flex gap-2">
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setRows([]);
-                onClose();
-              }}
-            >
-              {copy('Cancel')}
-            </Button>
-            <Button
-              disabled={!valid}
-              onClick={() =>
-                onSave(
-                  activeRows.map((row) => row.employeeId),
-                  activeRows.map((row) => ({
-                    employeeId: row.employeeId,
-                    shareRate: createDecimal(row.shareRate).dividedBy(100).toFixed(4),
-                  })),
-                )
-              }
-            >
-              {copy('Save')}
-            </Button>
-          </div>
-        </footer>
-      }
-    >
+    <Dialog open={isOpen} title={copy('Employees for service')} description={copy('Set employees and contribution shares before completing the transaction.')} onClose={() => { setRows([]); onClose(); }} ariaLabel={copy('Employees for service')} closeOnEscape closeOnOverlay className="pos-reference-dialog w-full max-w-2xl overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl" footer={<footer className="flex shrink-0 items-center justify-between gap-2"><span className="text-[11px] text-[var(--color-text-muted)]">{copy(valid ? 'All shares total 100%' : 'Complete employee shares')}</span><div className="flex gap-2"><Button variant="ghost" onClick={() => { setRows([]); onClose(); }}>{copy('Cancel')}</Button><Button disabled={!valid} onClick={() => onSave(activeRows.map((row) => row.employeeId), activeRows.map((row) => ({ employeeId: row.employeeId, shareRate: createDecimal(row.shareRate).dividedBy(100).toFixed(4) })))}>{copy('Save')}</Button></div></footer>}>
       <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)]/20 p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <div>
-            <p className="text-sm font-semibold">{line.itemNameSnapshot}</p>
-            <p className="text-xs text-[var(--color-text-muted)]">
-              {copy('Quantity')} {quantity(line.quantity)}, {money(line.totalAmount, locale)}
-            </p>
-          </div>
-          <span
-            className={`rounded-full px-2.5 py-1 text-xs font-semibold ${valid ? 'bg-[var(--color-success)]/10 text-[var(--color-success)]' : 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]'}`}
-          >
-            {copy('Total')} {total.toFixed(0)}%
-          </span>
-        </div>
-        <div className="space-y-2">
-          {activeRows.map((row, index) => (
-            <div key={`${row.employeeId}-${index}`} className="grid grid-cols-12 items-end gap-2">
-              <label className="col-span-6 text-xs font-medium">
-                {copy('Employee')}
-                <div className="mt-1">
-                  <Combobox
-                    ariaLabel={`${copy('Employee')} ${index + 1}`}
-                    value={row.employeeId}
-                    placeholder={copy('Select an employee.')}
-                    options={employees.map((employee) => ({
-                      value: employee.id,
-                      label: employee.displayName,
-                    }))}
-                    onChange={(employeeId) => {
-                      if (typeof employeeId !== 'string') return;
-                      const next = [...activeRows];
-                      next[index] = { ...next[index]!, employeeId };
-                      setRows(next);
-                    }}
-                  />
-                </div>
-              </label>
-              <label className="col-span-3 text-xs font-medium">
-                {copy('Share')}
-                <div className="mt-1">
-                  <PosNumericInput
-                    aria-label={`${copy('Share')} ${index + 1}`}
-                    className="h-9 rounded-lg text-sm"
-                    disabled={activeRows.length === 1}
-                    value={row.shareRate}
-                    integer
-                    min="0"
-                    max="100"
-                    suffix="%"
-                    onChange={(shareRate) => {
-                      const next = [...activeRows];
-                      next[index] = {
-                        ...next[index]!,
-                        shareRate,
-                        locked: true,
-                      };
-                      setRows(distribute(next));
-                    }}
-                  />
-                </div>
-              </label>
-              <div className="col-span-3 flex h-9 items-center justify-end gap-1">
-                <button
-                  type="button"
-                  title={copy('Split evenly')}
-                  disabled={activeRows.length === 1}
-                  onClick={() => {
-                    const next = [...activeRows];
-                    next[index] = { ...next[index]!, locked: !next[index]!.locked };
-                    setRows(distribute(next));
-                  }}
-                  className={`rounded-lg p-2 transition-colors ${row.locked ? 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]'}`}
-                >
-                  %
-                </button>
-                <button
-                  type="button"
-                  aria-label={`${copy('Remove')} ${copy('Employee')} ${index + 1}`}
-                  disabled={activeRows.length === 1}
-                  onClick={() =>
-                    setRows(
-                      distribute(
-                        activeRows.filter((row, rowIndex) => Boolean(row) && rowIndex !== index),
-                      ),
-                    )
-                  }
-                  className="rounded-lg p-2 text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10"
-                >
-                  <Trash2 className="size-3.5" />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={() =>
-            setRows(distribute([...activeRows, { employeeId: '', shareRate: '0', locked: false }]))
-          }
-          className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-[var(--color-brand)] hover:underline"
-        >
-          <UserPlus className="size-3" />
-          {copy('Add employee')}
-        </button>
-        {!valid ? (
-          <p className="mt-2 text-xs text-[var(--color-warning)]">
-            {copy('Complete employees and make sure total share is 100%.')}
-          </p>
-        ) : null}
+        <div className="mb-3 flex items-center justify-between"><div><p className="text-sm font-semibold">{line.itemNameSnapshot}</p><p className="text-xs text-[var(--color-text-muted)]">{copy('Quantity')} {quantity(line.quantity)}, {money(line.totalAmount, locale)}</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${valid ? 'bg-[var(--color-success)]/10 text-[var(--color-success)]' : 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]'}`}>{copy('Total')} {total.toFixed(0)}%</span></div>
+        <div className="space-y-2">{activeRows.map((row, index) => <div key={`${row.employeeId}-${index}`} className="grid grid-cols-12 items-end gap-2"><label className="col-span-6 text-xs font-medium">{copy('Employee')}<div className="mt-1"><Combobox ariaLabel={`${copy('Employee')} ${index + 1}`} value={row.employeeId} placeholder={copy('Select an employee.')} options={employees.map((employee) => ({ value: employee.id, label: employee.displayName }))} onChange={(employeeId) => { if (typeof employeeId !== 'string') return; const next = [...activeRows]; next[index] = { ...next[index]!, employeeId }; setRows(next); }} /></div></label><label className="col-span-3 text-xs font-medium">{copy('Share')}<div className="mt-1"><PosNumericInput aria-label={`${copy('Share')} ${index + 1}`} className="h-9 rounded-lg text-sm" disabled={activeRows.length === 1} value={row.shareRate} integer min="0" max="100" suffix="%" onChange={(shareRate) => { const next = [...activeRows]; next[index] = { ...next[index]!, shareRate, locked: true }; setRows(distribute(next)); }} /></div></label><div className="col-span-3 flex h-9 items-center justify-end gap-1"><button type="button" title={copy('Split evenly')} disabled={activeRows.length === 1} onClick={() => { const next = [...activeRows]; next[index] = { ...next[index]!, locked: !next[index]!.locked }; setRows(distribute(next)); }} className={`rounded-lg p-2 transition-colors ${row.locked ? 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]'}`}>%</button><button type="button" aria-label={`${copy('Remove')} ${copy('Employee')} ${index + 1}`} disabled={activeRows.length === 1} onClick={() => setRows(distribute(activeRows.filter((row, rowIndex) => Boolean(row) && rowIndex !== index)))} className="rounded-lg p-2 text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10"><Trash2 className="size-3.5" /></button></div></div>)}</div>
+        <button type="button" onClick={() => setRows(distribute([...activeRows, { employeeId: '', shareRate: '0', locked: false }]))} className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-[var(--color-brand)] hover:underline"><UserPlus className="size-3" />{copy('Add employee')}</button>
+        {!valid ? <p className="mt-2 text-xs text-[var(--color-warning)]">{copy('Complete employees and make sure total share is 100%.')}</p> : null}
       </div>
     </Dialog>
   );
 }
 
-function editableWorkContributors(
-  contributors: readonly ServiceWorkContributor[],
-): ServiceWorkContributor[] {
-  return contributors.length
-    ? contributors.map((contributor) => ({ ...contributor }))
-    : [{ employeeId: '', shareRate: '1.0000' }];
+function editableWorkContributors(contributors: readonly ServiceWorkContributor[]): ServiceWorkContributor[] {
+  return contributors.length ? contributors.map((contributor) => ({ ...contributor })) : [{ employeeId: '', shareRate: '1.0000' }];
 }
 
 function ServiceWorkContributorEditor({
@@ -4026,80 +2710,10 @@ function ServiceWorkContributorEditor({
   const { copy } = useOperationalLocalization();
   const rows = editableWorkContributors(contributors);
   const total = contributionTotal(rows).times(100).toFixed(0);
-
   return (
     <div className="space-y-2">
-      {rows.map((row, index) => (
-        <div
-          key={`${row.employeeId}-${index}`}
-          className="grid grid-cols-[minmax(0,1fr)_74px_28px] items-end gap-2"
-        >
-          <label className="text-[11px] font-medium text-[var(--color-text-muted)]">
-            {copy('Employee')}
-            <Combobox
-              ariaLabel={`${copy('Employee')} ${index + 1}`}
-              value={row.employeeId}
-              placeholder={copy('Select an employee.')}
-              options={employees.map((employee) => ({
-                value: employee.id,
-                label: employee.displayName,
-              }))}
-              onChange={(employeeId) => {
-                if (typeof employeeId !== 'string') return;
-                const next = [...rows];
-                next[index] = { ...next[index]!, employeeId };
-                onChange(next);
-              }}
-            />
-          </label>
-          <label className="text-[11px] font-medium text-[var(--color-text-muted)]">
-            {copy('Share')}
-            <PosNumericInput
-              aria-label={`${copy('Share')} ${index + 1}`}
-              className="h-9 rounded-lg text-sm"
-              value={createDecimal(row.shareRate).times(100).toFixed(0)}
-              integer
-              min="0"
-              max="100"
-              suffix="%"
-              onChange={(shareRate) => {
-                const next = [...rows];
-                next[index] = {
-                  ...next[index]!,
-                  shareRate: createDecimal(shareRate || '0')
-                    .dividedBy(100)
-                    .toFixed(4),
-                };
-                onChange(next);
-              }}
-            />
-          </label>
-          <button
-            type="button"
-            disabled={rows.length === 1}
-            aria-label={`${copy('Remove')} ${copy('Employee')} ${index + 1}`}
-            onClick={() => onChange([...rows.slice(0, index), ...rows.slice(index + 1)])}
-            className="mb-0.5 rounded-lg p-2 text-[var(--color-danger)] transition-colors hover:bg-[var(--color-danger)]/10 disabled:opacity-40"
-          >
-            <Trash2 className="size-3.5" />
-          </button>
-        </div>
-      ))}
-      <div className="flex items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={() => onChange([...rows, { employeeId: '', shareRate: '0.0000' }])}
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--color-brand)] hover:underline"
-        >
-          <UserPlus className="size-3" />
-          {copy('Add employee')}
-        </button>
-        <span
-          className={`text-xs font-semibold ${total === '100' ? 'text-[var(--color-success)]' : 'text-[var(--color-warning)]'}`}
-        >
-          {copy('Total')} {total}%
-        </span>
-      </div>
+      {rows.map((row, index) => <div key={`${row.employeeId}-${index}`} className="grid grid-cols-[minmax(0,1fr)_74px_28px] items-end gap-2"><label className="text-[11px] font-medium text-[var(--color-text-muted)]">{copy('Employee')}<Combobox ariaLabel={`${copy('Employee')} ${index + 1}`} value={row.employeeId} placeholder={copy('Select an employee.')} options={employees.map((employee) => ({ value: employee.id, label: employee.displayName }))} onChange={(employeeId) => { if (typeof employeeId !== 'string') return; const next = [...rows]; next[index] = { ...next[index]!, employeeId }; onChange(next); }} /></label><label className="text-[11px] font-medium text-[var(--color-text-muted)]">{copy('Share')}<PosNumericInput aria-label={`${copy('Share')} ${index + 1}`} className="h-9 rounded-lg text-sm" value={createDecimal(row.shareRate).times(100).toFixed(0)} integer min="0" max="100" suffix="%" onChange={(shareRate) => { const next = [...rows]; next[index] = { ...next[index]!, shareRate: createDecimal(shareRate || '0').dividedBy(100).toFixed(4) }; onChange(next); }} /></label><button type="button" disabled={rows.length === 1} aria-label={`${copy('Remove')} ${copy('Employee')} ${index + 1}`} onClick={() => onChange([...rows.slice(0, index), ...rows.slice(index + 1)])} className="mb-0.5 rounded-lg p-2 text-[var(--color-danger)] transition-colors hover:bg-[var(--color-danger)]/10 disabled:opacity-40"><Trash2 className="size-3.5" /></button></div>)}
+      <div className="flex items-center justify-between gap-3"><button type="button" onClick={() => onChange([...rows, { employeeId: '', shareRate: '0.0000' }])} className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--color-brand)] hover:underline"><UserPlus className="size-3" />{copy('Add employee')}</button><span className={`text-xs font-semibold ${total === '100' ? 'text-[var(--color-success)]' : 'text-[var(--color-warning)]'}`}>{copy('Total')} {total}%</span></div>
     </div>
   );
 }
@@ -4121,107 +2735,17 @@ function ReferenceServiceWorkDialog({
 }) {
   const { copy } = useOperationalLocalization();
   const [mode, setMode] = useState<'SAME' | 'PER_UNIT'>('SAME');
-  const [sharedContributors, setSharedContributors] = useState<ServiceWorkContributor[]>(() =>
-    editableWorkContributors(units[0]?.contributors ?? []),
-  );
-  const [unitPlans, setUnitPlans] = useState<ServiceWorkUnit[]>(() =>
-    units.map((unit) => ({
-      ...unit,
-      contributors: editableWorkContributors(unit.contributors),
-    })),
-  );
-
+  const [sharedContributors, setSharedContributors] = useState<ServiceWorkContributor[]>(() => editableWorkContributors(units[0]?.contributors ?? []));
+  const [unitPlans, setUnitPlans] = useState<ServiceWorkUnit[]>(() => units.map((unit) => ({ ...unit, contributors: editableWorkContributors(unit.contributors) })));
   if (!line) return null;
-  const plannedUnits =
-    mode === 'SAME'
-      ? units.map((unit) => ({ ...unit, contributors: sharedContributors }))
-      : unitPlans;
+  const plannedUnits = mode === 'SAME' ? units.map((unit) => ({ ...unit, contributors: sharedContributors })) : unitPlans;
   const valid = plannedUnits.every((unit) => hasValidWorkAssignment(line, unit));
-
   return (
-    <Dialog
-      open
-      title={copy('Manage work')}
-      description={`${line.itemNameSnapshot}, ${quantity(line.quantity)} ${copy('work units')}`}
-      onClose={onClose}
-      ariaLabel={copy('Manage work')}
-      closeOnEscape
-      closeOnOverlay
-      className="pos-reference-dialog w-full max-w-2xl overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
-      footer={
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-[11px] text-[var(--color-text-muted)]">
-            {copy(valid ? 'Each work unit totals 100%' : 'Each work unit must total 100%')}
-          </span>
-          <div className="flex gap-2">
-            <Button variant="ghost" onClick={onClose}>
-              {copy('Cancel')}
-            </Button>
-            <Button disabled={!valid} onClick={() => onSave(plannedUnits)}>
-              {copy('Save work')}
-            </Button>
-          </div>
-        </div>
-      }
-    >
+    <Dialog open title={copy('Manage work')} description={`${line.itemNameSnapshot}, ${quantity(line.quantity)} ${copy('work units')}`} onClose={onClose} ariaLabel={copy('Manage work')} closeOnEscape closeOnOverlay className="pos-reference-dialog w-full max-w-2xl overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl" footer={<div className="flex items-center justify-between gap-3"><span className="text-[11px] text-[var(--color-text-muted)]">{copy(valid ? 'Each work unit totals 100%' : 'Each work unit must total 100%')}</span><div className="flex gap-2"><Button variant="ghost" onClick={onClose}>{copy('Cancel')}</Button><Button disabled={!valid} onClick={() => onSave(plannedUnits)}>{copy('Save work')}</Button></div></div>}>
       <div className="space-y-4">
-        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)]/20 p-3">
-          <p className="text-sm font-semibold">{line.itemNameSnapshot}</p>
-          <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-            {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
-          </p>
-        </div>
-        <div className="flex gap-2" aria-label={copy('Work mode')}>
-          <DButton
-            size="sm"
-            variant={mode === 'SAME' ? 'primary' : 'secondary'}
-            onClick={() => setMode('SAME')}
-          >
-            {copy('Same for all')}
-          </DButton>
-          <DButton
-            size="sm"
-            variant={mode === 'PER_UNIT' ? 'primary' : 'secondary'}
-            onClick={() => setMode('PER_UNIT')}
-          >
-            {copy('Set per work unit')}
-          </DButton>
-        </div>
-        {mode === 'SAME' ? (
-          <div className="rounded-xl border border-[var(--color-border)] p-3">
-            <p className="mb-3 text-xs text-[var(--color-text-muted)]">
-              {copy('Apply this configuration to all work units.')}
-            </p>
-            <ServiceWorkContributorEditor
-              contributors={sharedContributors}
-              employees={employees}
-              onChange={setSharedContributors}
-            />
-          </div>
-        ) : (
-          <div className="max-h-[52dvh] space-y-2 overflow-y-auto pr-1">
-            {unitPlans.map((unit) => (
-              <div key={unit.index} className="rounded-xl border border-[var(--color-border)] p-3">
-                <div className="mb-3">
-                  <p className="text-sm font-semibold">
-                    {copy('Work unit')} #{unit.index + 1}
-                  </p>
-                </div>
-                <ServiceWorkContributorEditor
-                  contributors={unit.contributors}
-                  employees={employees}
-                  onChange={(contributors) =>
-                    setUnitPlans((current) =>
-                      current.map((candidate) =>
-                        candidate.index === unit.index ? { ...candidate, contributors } : candidate,
-                      ),
-                    )
-                  }
-                />
-              </div>
-            ))}
-          </div>
-        )}
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)]/20 p-3"><p className="text-sm font-semibold">{line.itemNameSnapshot}</p><p className="mt-1 text-xs text-[var(--color-text-muted)]">{quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}</p></div>
+        <div className="flex gap-2" aria-label={copy('Work mode')}><DButton size="sm" variant={mode === 'SAME' ? 'primary' : 'secondary'} onClick={() => setMode('SAME')}>{copy('Same for all')}</DButton><DButton size="sm" variant={mode === 'PER_UNIT' ? 'primary' : 'secondary'} onClick={() => setMode('PER_UNIT')}>{copy('Set per work unit')}</DButton></div>
+        {mode === 'SAME' ? <div className="rounded-xl border border-[var(--color-border)] p-3"><p className="mb-3 text-xs text-[var(--color-text-muted)]">{copy('Apply this configuration to all work units.')}</p><ServiceWorkContributorEditor contributors={sharedContributors} employees={employees} onChange={setSharedContributors} /></div> : <div className="max-h-[52dvh] space-y-2 overflow-y-auto pr-1">{unitPlans.map((unit) => <div key={unit.index} className="rounded-xl border border-[var(--color-border)] p-3"><div className="mb-3"><p className="text-sm font-semibold">{copy('Work unit')} #{unit.index + 1}</p></div><ServiceWorkContributorEditor contributors={unit.contributors} employees={employees} onChange={(contributors) => setUnitPlans((current) => current.map((candidate) => candidate.index === unit.index ? { ...candidate, contributors } : candidate))} /></div>)}</div>}
       </div>
     </Dialog>
   );
