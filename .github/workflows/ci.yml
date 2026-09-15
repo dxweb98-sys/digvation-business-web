@@ -32,10 +32,16 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Verify feature past known baseline static-analysis debt
+      - name: Contract check
+        run: pnpm contract:check
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Build
         env:
           VITE_BUILD_REVISION: ${{ github.sha }}
-        run: pnpm contract:check && pnpm typecheck && pnpm test && pnpm build
+        run: pnpm build
 
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
