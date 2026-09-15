@@ -1,6 +1,7 @@
 import type { ApiClient } from '@digvation/business-api';
 
 import type {
+  CreatePaymentInput,
   SaleTransactionPort,
   SellingCatalogDisplayInput,
   StartSaleInput,
@@ -39,17 +40,40 @@ export function attachOperationalProjection(
     );
   };
 
-  operational.listSales = (signal) =>
-    client.get<ApiPage<Sale>>(`${OPERATIONAL_PREFIX}/queue`, { signal });
+  operational.listSales = (signal, sellingLocationId?: string) => {
+    const query = new URLSearchParams();
+    if (sellingLocationId) query.set('sellingLocationId', sellingLocationId);
+    const suffix = query.size ? `?${query.toString()}` : '';
+    return client.get<ApiPage<Sale>>(`${OPERATIONAL_PREFIX}/queue${suffix}`, { signal });
+  };
 
   operational.startSale = (input: StartSaleInput, idempotencyKey: string) =>
     client.post<Sale>(`${OPERATIONAL_PREFIX}/transactions`, input, {
       headers: { 'Idempotency-Key': idempotencyKey },
     });
 
+  operational.getSale = (saleId, signal) =>
+    client.get<Sale>(`${OPERATIONAL_PREFIX}/transactions/${saleId}`, { signal });
+
+  operational.createSalePayment = (
+    saleId: string,
+    input: CreatePaymentInput,
+    idempotencyKey: string,
+  ) =>
+    client.post<Sale>(`${OPERATIONAL_PREFIX}/transactions/${saleId}/payments`, input, {
+      headers: { 'Idempotency-Key': idempotencyKey },
+    });
+
   operational.queueSale = (saleId, expectedVersion, idempotencyKey) =>
     client.post<Sale>(
       `${OPERATIONAL_PREFIX}/transactions/${saleId}/queue`,
+      { expectedVersion },
+      { headers: { 'Idempotency-Key': idempotencyKey } },
+    );
+
+  operational.startSaleWork = (saleId, expectedVersion, idempotencyKey) =>
+    client.post<Sale>(
+      `${OPERATIONAL_PREFIX}/transactions/${saleId}/start-work`,
       { expectedVersion },
       { headers: { 'Idempotency-Key': idempotencyKey } },
     );
