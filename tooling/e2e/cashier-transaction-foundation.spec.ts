@@ -174,6 +174,17 @@ async function installRoutes(page: Page, options: Partial<RouteState> = {}) {
     const url = new URL(request.url());
     const method = request.method();
 
+    if (method === 'GET' && url.pathname === '/api/v1/runtime/context') {
+      await route.fulfill({
+        json: envelope({
+          effectiveProducts: ['POS'],
+          effectiveCapabilities: [],
+          effectiveFoundations: ['OPERATIONAL_ACCESS', 'ORGANIZATION_LOCATION', 'CATALOG'],
+          effectivePermissions: ['sales:create', 'sales:read'],
+        }),
+      });
+      return;
+    }
     if (method === 'GET' && url.pathname === '/api/v1/locations') {
       await route.fulfill({ json: envelope({ items: [branch], limit: 100, offset: 0 }) });
       return;
