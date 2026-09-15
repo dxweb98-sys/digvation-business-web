@@ -53,6 +53,7 @@ import {
   resolveOperationalLocale,
   useOperationalLocalization,
 } from '../../../app/localization/operational-localization';
+import { useCashierSession } from '../../../app/providers/cashier-session-provider';
 import { cashierTransactionKeys } from '../cashier-transaction-keys';
 import { cashierTransactionErrorMessage } from '../cashier-transaction-errors';
 import type { CartDisplayLine } from '../cart-draft';
@@ -521,7 +522,7 @@ function successfulPayments(sale: Sale) {
 
 function financialSummary(sale: Sale) {
   const totalPaid = successfulPayments(sale).reduce(
-    (sum, payment) => total.plus(createDecimal(payment.appliedAmount)),
+    (sum, payment) => sum.plus(createDecimal(payment.appliedAmount)),
     createDecimal('0'),
   );
   const balance = createDecimal(sale.totalAmount).minus(totalPaid);
