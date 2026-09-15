@@ -1,7 +1,7 @@
 import { useAuth } from '@digvation/pos-auth';
 import { useConnectivity, useRuntime } from '@digvation/pos-runtime';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 
 import {
@@ -43,7 +43,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
   const [variantPicker, setVariantPicker] = useState<VariantPickerState | null>(null);
   const [lineTaskId, setLineTaskId] = useState<string | null>(null);
   const [isCompletionOpen, setCompletionOpen] = useState(false);
-  const [resumedSaleId, setResumedSaleId] = useState<string | null>(null);
+  const [queueContextSale, setQueueContextSale] = useState<Sale | null>(null);
   const [areEmployeeOptionsEnabled, setEmployeeOptionsEnabled] = useState(false);
   const pendingPerformerIntent = useRef<{ lineId: string; token: symbol } | null>(null);
   const transactionAdapter = useMemo(
@@ -51,6 +51,23 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     [authPort, runtime],
   );
   const effectiveConnectivity = isLocalCashierDemoEnabled() ? 'ONLINE' : connectivity.state;
+
+  useEffect(() => {
+    if (
+      isLocalCashierDemoEnabled() ||
+      !selectedLocationId ||
+      effectiveConnectivity !== 'ONLINE'
+    ) {
+      return undefined;
+    }
+    const timer = window.setInterval(() => {
+      void queryClient.invalidateQueries({
+        queryKey: cashierTransactionKeys.sales(),
+        refetchType: 'active',
+      });
+    }, 5_000);
+    return () => window.clearInterval(timer);
+  }, [effectiveConnectivity, queryClient, selectedLocationId]);
 
   const command = useSaleCommandCoordinator({ client: transactionAdapter, rememberSale });
 
@@ -74,7 +91,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     refetchOnMount: 'always',
   });
 
-  const activeSaleId = routeSaleId ?? resumedSaleId ?? undefined;
+  const activeSaleId = routeSaleId ?? undefined;
   const saleWorkspace = useSaleWorkspaceController({
     client: transactionAdapter,
     command,
@@ -112,6 +129,43 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     enabled: Boolean(saleWorkspace.sale && lineTask?.allowEmployeeContributionSnapshot),
   });
 
+  const cacheQueueContext = (sale: Sale) => {
+    command.commitSale(sale);
+    setQueueContextSale(sale);
+    return sale;
+  };
+
+  const closeQueueContext = () => {
+    setQueueContextSale(null);
+    setVariantPicker(null);
+    setCompletionOpen(false);
+    setLineTaskId(null);
+    command.clearAttention();
+  };
+
+  const findCachedQueueSale = (saleId: string): Sale | null => {
+    const direct = queryClient.getQueryData<Sale>(cashierTransactionKeys.sale(saleId));
+    if (direct) return direct;
+    const queue = queryClient.getQueryData<{ items: Sale[] }>(cashierTransactionKeys.sales());
+    return queue?.items.find((candidate) => candidate.id === saleId) ?? null;
+  };
+
+  const loadQueueContext = async (saleId: string) => {
+    const cached = findCachedQueueSale(saleId);
+    if (cached) setQueueContextSale(cached);
+    const authoritative = await transactionAdapter.getSale(saleId);
+    return cacheQueueContext(authoritative);
+  };
+
+  const openQueueContext = (saleId: string) => {
+    setCompletionOpen(false);
+    setLineTaskId(null);
+    command.clearAttention();
+    const cached = findCachedQueueSale(saleId);
+    if (cached) setQueueContextSale(cached);
+    void loadQueueContext(saleId).catch((error) => command.reportError(error));
+  };
+
   const addCatalogItem = async (
     item: CatalogItem,
     catalogVariantId: string | undefined,
@@ -119,14 +173,30 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     targetSaleId?: string,
     catalogVariant: CatalogVariant | null = null,
   ) => {
-    if (context === 'CART' && resumedSaleId) {
-      throw new Error(copy('Finish adjusting the transaction before adding items to the cart.'));
-    }
-    if (context === 'TRANSACTION_ADJUSTMENT' && (!targetSaleId || resumedSaleId !== targetSaleId)) {
-      throw new Error(
-        copy('The transaction being adjusted is no longer active. Reopen the adjustment.'),
+    if (context === 'TRANSACTION_ADJUSTMENT') {
+      if (!targetSaleId) {
+        throw new Error(copy('The transaction being adjusted is no longer active. Reopen the adjustment.'));
+      }
+      const target =
+        queueContextSale?.id === targetSaleId
+          ? queueContextSale
+          : (findCachedQueueSale(targetSaleId) ?? (await loadQueueContext(targetSaleId)));
+      const updated = await command.runMutation(() =>
+        transactionAdapter.addSaleLine(
+          target.id,
+          {
+            expectedVersion: target.version,
+            catalogItemId: item.id,
+            ...(catalogVariantId ? { catalogVariantId } : {}),
+            quantity: '1',
+          },
+          `cashier-adjust-add-line-${crypto.randomUUID()}`,
+        ),
       );
+      cacheQueueContext(updated);
+      return;
     }
+
     if (!selectedLocationId) {
       saleWorkspace.addItem(item.id, catalogVariantId);
       return;
@@ -149,11 +219,9 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     command.clearNotice();
     try {
       const targetSaleId =
-        context === 'TRANSACTION_ADJUSTMENT' ? (resumedSaleId ?? undefined) : undefined;
+        context === 'TRANSACTION_ADJUSTMENT' ? (queueContextSale?.id ?? undefined) : undefined;
       if (context === 'TRANSACTION_ADJUSTMENT' && !targetSaleId) {
-        throw new Error(
-          copy('The transaction being adjusted is no longer active. Reopen the adjustment.'),
-        );
+        throw new Error(copy('The transaction being adjusted is no longer active. Reopen the adjustment.'));
       }
       const variants = await catalog.loadActiveVariants(item);
       if (variants.length > 0) {
@@ -212,37 +280,32 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
       if (!confirmed) return;
     }
     navigate('/sell');
-    setResumedSaleId(null);
-    setCompletionOpen(false);
-    setLineTaskId(null);
-    command.clearAttention();
+    closeQueueContext();
     saleWorkspace.clearDraft();
   };
 
   const clearProcessedDraft = () => {
+    if (queueContextSale) {
+      closeQueueContext();
+      return;
+    }
     navigate('/sell');
-    setResumedSaleId(null);
     setCompletionOpen(false);
     setLineTaskId(null);
     command.clearAttention();
     saleWorkspace.clearDraft();
-  };
-
-  const resumeSale = (saleId: string) => {
-    setResumedSaleId(saleId);
-    setCompletionOpen(false);
-    setLineTaskId(null);
-    command.clearAttention();
   };
 
   const hydrateQueuedSale = async (saleId: string) => {
     setCompletionOpen(false);
     setLineTaskId(null);
     command.clearAttention();
-    const hydrated = await command.refetchSale(saleId);
-    if (!hydrated) throw new Error(copy('The latest transaction could not be loaded.'));
-    setResumedSaleId(saleId);
-    return hydrated;
+    try {
+      return await loadQueueContext(saleId);
+    } catch (error) {
+      command.reportError(error);
+      throw new Error(copy('The latest transaction could not be loaded.'));
+    }
   };
 
   const hydrateQueuedPayment = async (saleId: string) => {
@@ -275,6 +338,35 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     setLineTaskId(line.id);
   };
 
+  const changeQuantity = (line: SaleLine, quantity: string) => {
+    if (!queueContextSale || queueContextSale.id !== line.saleId) {
+      saleWorkspace.changeQuantity(line, quantity);
+      return;
+    }
+    const target = queueContextSale;
+    void command
+      .runMutation(() =>
+        transactionAdapter.setSaleLineQuantity(target.id, line.id, {
+          expectedVersion: target.version,
+          quantity,
+        }),
+      )
+      .then(cacheQueueContext)
+      .catch((error) => command.reportError(error));
+  };
+
+  const removeLine = (line: SaleLine) => {
+    if (!queueContextSale || queueContextSale.id !== line.saleId) {
+      saleWorkspace.removeLine(line);
+      return;
+    }
+    const target = queueContextSale;
+    void command
+      .runMutation(() => transactionAdapter.removeSaleLine(target.id, line.id, target.version))
+      .then(cacheQueueContext)
+      .catch((error) => command.reportError(error));
+  };
+
   const transitionQueuedFulfillment = async (
     sale: Sale,
     line: SaleLine,
@@ -289,6 +381,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
         }),
       );
       command.commitSale(updated);
+      if (queueContextSale?.id === updated.id) setQueueContextSale(updated);
       return updated;
     } catch (error) {
       command.reportError(error);
@@ -324,6 +417,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
         );
       }
       command.commitSale(current);
+      if (queueContextSale?.id === current.id) setQueueContextSale(current);
       return current;
     } catch (error) {
       command.reportError(error);
@@ -331,19 +425,27 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     }
   };
 
-  const queueSale = async (sale: Sale) =>
-    command.runMutation(() =>
+  const queueSale = async (sale: Sale) => {
+    const updated = await command.runMutation(() =>
       transactionAdapter.queueSale(sale.id, sale.version, `cashier-queue-${crypto.randomUUID()}`),
     );
+    command.commitSale(updated);
+    return updated;
+  };
 
-  const startSaleWork = async (sale: Sale) =>
-    command.runMutation(() =>
+  const startSaleWork = async (sale: Sale) => {
+    const authoritative = await transactionAdapter.getSale(sale.id);
+    const updated = await command.runMutation(() =>
       transactionAdapter.startSaleWork(
-        sale.id,
-        sale.version,
+        authoritative.id,
+        authoritative.version,
         `cashier-start-work-${crypto.randomUUID()}`,
       ),
     );
+    command.commitSale(updated);
+    if (queueContextSale?.id === updated.id) setQueueContextSale(updated);
+    return updated;
+  };
 
   const setCurrentPerformers = async (
     line: SaleLine,
@@ -406,16 +508,22 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
   ) => {
     command.clearNotice();
     try {
+      const authoritative = await transactionAdapter.getSale(sale.id);
+      const liveLine = authoritative.lines.find(
+        (candidate) => candidate.id === line.id && candidate.removedAt === null,
+      );
+      if (!liveLine) throw new Error(copy('The service line is no longer available.'));
       const performers = contributors.length
         ? contributors
         : employeeIds.map((employeeId) => ({ employeeId }));
       const updated = await command.runMutation(() =>
-        transactionAdapter.setSaleLinePerformers(sale.id, line.id, {
-          expectedVersion: sale.version,
+        transactionAdapter.setSaleLinePerformers(authoritative.id, liveLine.id, {
+          expectedVersion: authoritative.version,
           performers,
         }),
       );
       command.commitSale(updated);
+      if (queueContextSale?.id === updated.id) setQueueContextSale(updated);
       return updated;
     } catch (error) {
       command.reportError(error);
@@ -456,6 +564,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
         ),
       );
       command.commitSale(updated);
+      if (queueContextSale?.id === updated.id) setQueueContextSale(updated);
       return updated;
     } catch (error) {
       command.reportError(error);
@@ -490,7 +599,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
           `cashier-payment-${crypto.randomUUID()}`,
         ),
       );
-      command.commitSale(updated);
+      cacheQueueContext(updated);
       return updated;
     } catch (error) {
       command.reportError(error);
@@ -498,26 +607,35 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     }
   };
 
-  const createPayment = async (
+  const createPayment = (
     method: PaymentMethod,
     appliedAmount: string,
     tenderedAmount?: string,
     providerReference?: string,
-  ) => {
-    if (resumedSaleId) {
-      const targetSale = queryClient.getQueryData<Sale>(cashierTransactionKeys.sale(resumedSaleId));
-      if (targetSale) {
-        return createQueuedPayment(
-          targetSale,
-          method,
-          appliedAmount,
-          tenderedAmount,
-          providerReference,
-        );
-      }
+  ) => core.createPayment(method, appliedAmount, tenderedAmount, providerReference);
+
+  const voidQueuedSale = async (targetSale: Sale) => {
+    command.clearNotice();
+    try {
+      const authoritative = await transactionAdapter.getSale(targetSale.id);
+      const updated = await command.runMutation(() =>
+        transactionAdapter.voidSale(
+          authoritative.id,
+          authoritative.version,
+          `cashier-void-${crypto.randomUUID()}`,
+        ),
+      );
+      cacheQueueContext(updated);
+      return updated;
+    } catch (error) {
+      command.reportError(error);
+      throw error;
     }
-    return core.createPayment(method, appliedAmount, tenderedAmount, providerReference);
   };
+
+  const contextViewModel = queueContextSale
+    ? createSaleWorkspaceViewModel(queueContextSale, effectiveConnectivity, 'CLEAN', runtime.locale)
+    : saleWorkspace.viewModel;
 
   return {
     locale: runtime.locale,
@@ -541,7 +659,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     contributionPreview: contributionPreviewQuery.data ?? null,
     isContributionPreviewLoading: contributionPreviewQuery.isLoading,
     isCompletionOpen,
-    viewModel: saleWorkspace.viewModel,
+    viewModel: contextViewModel,
     isLoadingCatalog: catalog.isLoading,
     isLoadingEmployees: employeeOptions.isLoading,
     isLoadingPaymentRoutes: paymentRoutesQuery.isLoading,
@@ -556,8 +674,8 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     cachedCardPrice,
     requestEmployeeOptions: () => setEmployeeOptionsEnabled(true),
     closeVariantPicker: () => setVariantPicker(null),
-    changeQuantity: saleWorkspace.changeQuantity,
-    removeLine: saleWorkspace.removeLine,
+    changeQuantity,
+    removeLine,
     changeDraftQuantity: saleWorkspace.changeDraftQuantity,
     removeDraftLine: saleWorkspace.removeDraftLine,
     commitDraft: saleWorkspace.commitDraft,
@@ -586,9 +704,11 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     transitionPayment: core.transitionPayment,
     finalizeSale: core.finalizeSale,
     voidSale: core.voidSale,
+    voidQueuedSale,
     newSale,
     clearProcessedDraft,
-    resumeSale,
+    openQueueContext,
+    closeQueueContext,
     hydrateQueuedSale,
     hydrateQueuedPayment,
     acknowledgeLatestState: command.acknowledgeLatestState,

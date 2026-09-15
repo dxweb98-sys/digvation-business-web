@@ -43,7 +43,26 @@ function clampNumericText(value: string, min: string, max: string | undefined, i
   return normalized;
 }
 
+function canonicalIntegerCurrency(value: string): string | null {
+  const trimmed = value.trim();
+  const match = /^(-?)(\d+)\.(\d+)$/.exec(trimmed);
+  if (!match) return null;
+
+  const sign = match[1] ?? '';
+  const whole = match[2] ?? '0';
+  const fraction = match[3] ?? '';
+  if (!fraction || !/^0+$/.test(fraction)) return null;
+
+  const normalizedWhole = whole.replace(/^0+(?=\d)/, '') || '0';
+  return `${sign}${normalizedWhole}`;
+}
+
 export function normalizeCurrencyPresentationInput(value: string, fractionDigits = 0) {
+  if (!value) return '';
+  if (fractionDigits === 0) {
+    const canonical = canonicalIntegerCurrency(value);
+    if (canonical !== null) return canonical;
+  }
   return normalizeDecimalInput(value, { integer: fractionDigits === 0 });
 }
 
@@ -114,10 +133,11 @@ export function PosCurrencyInput({
   onChange: (value: string) => void;
   fractionDigits?: number;
 }) {
+  const normalizedValue = normalizeCurrencyPresentationInput(value, fractionDigits);
   return (
     <DCurrencyInput
       {...props}
-      value={value}
+      value={normalizedValue}
       onValueChange={(nextValue) =>
         onChange(normalizeCurrencyPresentationInput(nextValue, fractionDigits))
       }

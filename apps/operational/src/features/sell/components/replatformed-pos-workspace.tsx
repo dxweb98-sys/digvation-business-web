@@ -53,6 +53,7 @@ import {
   resolveOperationalLocale,
   useOperationalLocalization,
 } from '../../../app/localization/operational-localization';
+import { useCashierSession } from '../../../app/providers/cashier-session-provider';
 import { cashierTransactionKeys } from '../cashier-transaction-keys';
 import { cashierTransactionErrorMessage } from '../cashier-transaction-errors';
 import type { CartDisplayLine } from '../cart-draft';
@@ -71,13 +72,18 @@ import type {
   Employee,
   Payment,
   PaymentMethod,
+  PaymentRoute,
   Sale,
   SaleLine,
 } from '../cashier-transaction.types';
 import type { CatalogItemTypeFilter } from '../use-selling-catalog';
 import type { useCashierTransactionWorkspace } from '../use-cashier-transaction-workspace';
 
-import { PosCurrencyInput, PosNumericInput } from './pos-controls';
+import {
+  normalizeCurrencyPresentationInput,
+  PosCurrencyInput,
+  PosNumericInput,
+} from './pos-controls';
 import { SaleLineTaskDialog } from './sale-line-task-dialog';
 import type { VariantPickerState } from './variant-picker';
 import './replatformed-pos-workspace.css';
@@ -191,25 +197,25 @@ const statusMeta: Record<
 > = {
   QUEUED: {
     value: 'QUEUED',
-    icon: <Clock className="size-[15px]" />,
+    icon: <Clock className="size-3.75" />,
     tone: 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]',
     soft: 'bg-[var(--color-warning)]/[.045]',
   },
   PROGRESS: {
     value: 'IN_PROGRESS',
-    icon: <PlayCircle className="size-[15px]" />,
+    icon: <PlayCircle className="size-3.75" />,
     tone: 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]',
     soft: 'bg-[var(--color-brand)]/[.045]',
   },
   COMPLETED: {
     value: 'COMPLETED',
-    icon: <CheckCircle2 className="size-[15px]" />,
+    icon: <CheckCircle2 className="size-3.75" />,
     tone: 'bg-[var(--color-success)]/10 text-[var(--color-success)]',
     soft: 'bg-[var(--color-success)]/[.045]',
   },
   CANCELED: {
     value: 'CANCELED',
-    icon: <XCircle className="size-[15px]" />,
+    icon: <XCircle className="size-3.75" />,
     tone: 'bg-[var(--color-danger)]/10 text-[var(--color-danger)]',
     soft: 'bg-[var(--color-danger)]/[.045]',
   },
@@ -373,6 +379,20 @@ function isPositiveDecimal(value: string) {
   }
 }
 
+function useCachedPaymentRoutes(): { routes: PaymentRoute[]; isPending: boolean } {
+  const runtime = useRuntime();
+  const { selectedLocationId } = useCashierSession();
+  const query = useQuery({
+    queryKey: cashierTransactionKeys.paymentRoutes(selectedLocationId ?? '', runtime.currency),
+    queryFn: async () => ({ items: [] as PaymentRoute[], limit: 0, offset: 0 }),
+    enabled: false,
+  });
+  return {
+    routes: (query.data?.items ?? []).filter((route) => route.status === 'ACTIVE'),
+    isPending: query.data === undefined,
+  };
+}
+
 function employeeAssignmentIssues(line: SaleLine, locale: string): string[] {
   const issues: string[] = [];
   if (
@@ -513,7 +533,9 @@ function financialSummary(sale: Sale) {
 }
 
 function hasSuccessfulPayment(sale: Sale): boolean {
-  return successfulPayments(sale).length > 0;
+  return successfulPayments(sale).some((payment) =>
+    createDecimal(payment.appliedAmount).greaterThan(createDecimal('0')),
+  );
 }
 
 export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }) {
@@ -578,8 +600,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
 
   useEffect(() => {
     writeStoredCustomer(CURRENT_CUSTOMER_KEY, cartCustomer);
-    if (sale?.id) writeStoredCustomer(saleCustomerKey(sale.id), cartCustomer);
-  }, [cartCustomer, sale?.id]);
+  }, [cartCustomer]);
 
   const displayedQueueDetail =
     receiptSaleId && sale?.id === receiptSaleId && hasSuccessfulPayment(sale) ? sale : queueDetail;
@@ -661,7 +682,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       }
     }
 
-    setTender(checkoutTotal);
+    setTender(normalizeCurrencyPresentationInput(checkoutTotal));
     setPayNow(true);
     setPaymentMethod('CASH');
     setProvider('');
@@ -835,11 +856,19 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     }
   };
 
-  const openAdjustment = (transaction: Sale) => {
+  const openAdjustment = async (transaction: Sale) => {
     if (transaction.status !== 'OPEN') return;
     setQueueDetail(null);
-    setAdjustmentTarget(transaction);
-    workspace.resumeSale(transaction.id);
+    try {
+      const hydrated = await workspace.hydrateQueuedSale(transaction.id);
+      setAdjustmentTarget(hydrated);
+    } catch {
+      showToast({
+        title: copy('Could not load transaction'),
+        description: copy('Reload the transaction before accepting payment.'),
+        variant: 'danger',
+      });
+    }
   };
 
   const openQueuePayment = async (transaction: Sale) => {
@@ -850,7 +879,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       setQueueDetail(null);
       setPaymentMethod('CASH');
       setProvider('');
-      setTender(availableToPay);
+      setTender(normalizeCurrencyPresentationInput(availableToPay));
       setQueuePaymentTarget(hydrated);
       setQueuePaymentAmount(availableToPay);
     } catch {
@@ -863,35 +892,15 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   };
 
   const requestCancel = (transaction: Sale) => {
-    if (hasSuccessfulPayment(transaction)) {
-      showToast({
-        title: copy('Refund required'),
-        description: copy('A paid transaction must be refunded before it can be canceled.'),
-        variant: 'warning',
-      });
-      return;
-    }
     setCancelTarget(transaction);
     setCancelReason('');
-    workspace.resumeSale(transaction.id);
   };
 
   const confirmCancel = async () => {
     if (!cancelTarget || !cancelReason.trim()) return;
-    if (hasSuccessfulPayment(cancelTarget)) {
-      showToast({
-        title: copy('Refund required'),
-        description: copy('Refund the payment before canceling the transaction.'),
-        variant: 'warning',
-      });
-      return;
-    }
-    if (sale?.id !== cancelTarget.id) {
-      workspace.resumeSale(cancelTarget.id);
-      return;
-    }
+    const refundAmount = financialSummary(cancelTarget).totalPaid;
     try {
-      const canceledSale = await workspace.voidSale();
+      const canceledSale = await workspace.voidQueuedSale(cancelTarget);
       if (isLocalDemo) {
         writeCancellationReason(canceledSale.id, cancelReason.trim());
         setCancellationReasons((current) => ({
@@ -900,18 +909,22 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         }));
       }
       setQueueDetail(canceledSale);
+      setQueueTab('CANCELED');
+      setReceiptSaleId(null);
       setCancelTarget(null);
       setCancelReason('');
-      workspace.clearProcessedDraft();
+      workspace.closeQueueContext();
       showToast({
         title: copy('Transaction canceled'),
-        description: copy('Cancellation reason saved.'),
+        description: isPositiveDecimal(refundAmount)
+          ? `${copy('Refund required')}: ${money(refundAmount, workspace.locale)}. ${copy('Cancellation reason saved.')}`
+          : copy('Cancellation reason saved.'),
         variant: 'success',
       });
-    } catch {
+    } catch (error) {
       showToast({
         title: copy('Cancellation failed'),
-        description: copy('The transaction was not changed. Check payment status.'),
+        description: cashierTransactionErrorMessage(error),
         variant: 'danger',
       });
     }
@@ -968,14 +981,15 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
 
   const payQueueBalance = async () => {
     const transaction = displayedQueuePaymentTarget;
-    if (!transaction || sale?.id !== transaction.id || !queuePaymentAmount) return;
+    if (!transaction || !queuePaymentAmount) return;
     const due = queuePaymentAmount;
     const applied = paymentMethod === 'CASH' ? tender || due : due;
     if (!isPositiveDecimal(applied)) return;
     if (paymentMethod === 'CASH' && createDecimal(applied).lessThan(createDecimal(due))) return;
     if ((paymentMethod === 'BANK_TRANSFER' || paymentMethod === 'WALLET') && !provider) return;
     try {
-      const updatedSale = await workspace.createPayment(
+      const updatedSale = await workspace.createQueuedPayment(
+        transaction,
         paymentMethod,
         due,
         paymentMethod === 'CASH' ? applied : undefined,
@@ -985,7 +999,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       setQueuePaymentAmount(null);
       setQueueDetail(updatedSale);
       setReceiptSaleId(updatedSale.id);
-      workspace.clearProcessedDraft();
+      workspace.closeQueueContext();
       showToast({
         title: hasSuccessfulCheckout(updatedSale)
           ? copy('Payment complete')
@@ -1003,25 +1017,27 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   };
 
   const quickTender = ['50000', '100000', '150000', '200000', '500000'];
-  const effectiveTender = tender || total;
+  const normalizedTotal = normalizeCurrencyPresentationInput(total);
+  const effectiveTender = tender || normalizedTotal;
   const cashShort =
-    paymentMethod === 'CASH' && createDecimal(effectiveTender).lessThan(createDecimal(total));
+    paymentMethod === 'CASH' &&
+    createDecimal(effectiveTender).lessThan(createDecimal(normalizedTotal));
   const change = cashShort
-    ? '0.0000'
-    : createDecimal(effectiveTender).minus(createDecimal(total)).toFixed(4);
+    ? '0'
+    : createDecimal(effectiveTender).minus(createDecimal(normalizedTotal)).toFixed(0);
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden px-3 pb-3 pt-3 sm:px-4 sm:pb-4 lg:px-5 lg:pb-5">
       {workspace.notice ? (
         <div
           role="alert"
-          className="mb-3 flex shrink-0 flex-col gap-3 rounded-2xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 p-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+          className="mb-3 flex shrink-0 flex-col gap-3 rounded-2xl border border-(--color-warning)/30 bg-(--color-warning)/10 p-3 text-sm sm:flex-row sm:items-center sm:justify-between"
         >
           <div className="flex min-w-0 gap-2.5">
-            <AlertCircle className="mt-0.5 size-4 shrink-0 text-[var(--color-warning)]" />
+            <AlertCircle className="mt-0.5 size-4 shrink-0 text-(--color-warning)" />
             <div>
               <p className="font-semibold">{copy('Transaction needs attention')}</p>
-              <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">{workspace.notice}</p>
+              <p className="mt-0.5 text-xs text-(--color-text-muted)">{workspace.notice}</p>
             </div>
           </div>
           <div className="flex shrink-0 gap-2">
@@ -1039,29 +1055,42 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         </div>
       ) : null}
 
-      <ReferenceQueueBoard
-        open={queueOpen}
-        onOpenChange={setQueueOpen}
-        active={queueTab}
-        onChangeTab={setQueueTab}
-        groups={groups}
-        issues={queueIssues}
-        locale={workspace.locale}
-        onStartWork={(transaction) => void startQueuedWork(transaction)}
-        onAdjust={openAdjustment}
-        onPay={(transaction) => void openQueuePayment(transaction)}
-        onCancel={requestCancel}
-        onView={setQueueDetail}
-        onViewReceipt={(transaction) => {
-          setQueueDetail(transaction);
-          setReceiptSaleId(transaction.id);
-        }}
-      />
+      {transactionsQuery.isLoading ? (
+        <div className="mb-4 shrink-0 rounded-2xl border border-(--color-border) bg-(--color-surface) p-4 shadow-sm">
+          <div className="flex items-center gap-3">
+            <Skeleton className="size-10 shrink-0 rounded-2xl" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <Skeleton className="h-4 w-40 rounded-lg" />
+              <Skeleton className="h-3 w-56 max-w-full rounded-lg" />
+            </div>
+            <Skeleton className="hidden h-8 w-56 rounded-xl md:block" />
+          </div>
+        </div>
+      ) : (
+        <ReferenceQueueBoard
+          open={queueOpen}
+          onOpenChange={setQueueOpen}
+          active={queueTab}
+          onChangeTab={setQueueTab}
+          groups={groups}
+          issues={queueIssues}
+          locale={workspace.locale}
+          onStartWork={(transaction) => void startQueuedWork(transaction)}
+          onAdjust={openAdjustment}
+          onPay={(transaction) => void openQueuePayment(transaction)}
+          onCancel={requestCancel}
+          onView={setQueueDetail}
+          onViewReceipt={(transaction) => {
+            setQueueDetail(transaction);
+            setReceiptSaleId(transaction.id);
+          }}
+        />
+      )}
 
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="shrink-0 pb-2">
-          <div className="flex flex-wrap items-center gap-2 border-b border-[var(--color-border)] pb-2 lg:flex-nowrap">
-            <div className="grid shrink-0 grid-cols-2 rounded-xl bg-[var(--color-surface-muted)]/75 p-1 sm:inline-flex sm:items-center">
+          <div className="flex flex-wrap items-center gap-2 border-b border-(--color-border) pb-2 lg:flex-nowrap">
+            <div className="grid shrink-0 grid-cols-2 rounded-xl bg-(--color-surface-muted)/75 p-1 sm:inline-flex sm:items-center">
               <ReferenceTypeButton
                 active={workspace.itemType === 'PRODUCT'}
                 icon={<ShoppingBag className="size-3.5" />}
@@ -1084,13 +1113,13 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
                 expandedWidth="min(280px, calc(100vw - 140px))"
               />
             </div>
-            <div className="hidden h-6 w-px bg-[var(--color-border)] lg:block" aria-hidden="true" />
-            <div className="order-3 min-w-0 flex-1 basis-full lg:order-none lg:basis-0">
-              <div className="no-scrollbar flex h-9 items-center gap-1.5 overflow-x-auto border-l border-[var(--color-border)]/70 pl-2 lg:border-l-0 lg:pl-0">
+            <div className="hidden h-6 w-px bg-(--color-border) lg:block" aria-hidden="true" />
+            <div className="order-3 min-w-0 flex-1 basis-full lg:order-0 lg:basis-0">
+              <div className="no-scrollbar flex h-9 items-center gap-1.5 overflow-x-auto border-l border-(--color-border)/70 pl-2 lg:border-l-0 lg:pl-0">
                 <button
                   type="button"
                   onClick={() => setSelectedCategory('')}
-                  className={`inline-flex h-9 shrink-0 items-center rounded-lg px-2.5 text-xs font-semibold transition-colors ${selectedCategory ? 'bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]' : 'bg-[var(--color-brand)] text-white'}`}
+                  className={`inline-flex h-9 shrink-0 items-center rounded-lg px-2.5 text-xs font-semibold transition-colors ${selectedCategory ? 'bg-(--color-surface-muted) text-(--color-text-muted)' : 'bg-[var(--color-brand)] text-white'}`}
                 >
                   {copy('All')}
                 </button>
@@ -1099,7 +1128,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
                     key={category.id}
                     type="button"
                     onClick={() => setSelectedCategory(category.id)}
-                    className={`inline-flex h-9 shrink-0 items-center rounded-lg px-2.5 text-xs font-semibold transition-colors ${selectedCategory === category.id ? 'bg-[var(--color-brand)] text-white' : 'bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]'}`}
+                    className={`inline-flex h-9 shrink-0 items-center rounded-lg px-2.5 text-xs font-semibold transition-colors ${selectedCategory === category.id ? 'bg-(--color-brand) text-white' : 'bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]'}`}
                   >
                     {category.name}
                   </button>
@@ -1171,10 +1200,12 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         onClose={() => setCustomerPickerOpen(false)}
         onChoose={(customer) => {
           setCartCustomer(customer);
+          if (sale?.id) writeStoredCustomer(saleCustomerKey(sale.id), customer);
           setCustomerPickerOpen(false);
         }}
         onUseGeneralCustomer={() => {
           setCartCustomer(null);
+          if (sale?.id) writeStoredCustomer(saleCustomerKey(sale.id), null);
           setCustomerPickerOpen(false);
         }}
       />
@@ -1268,7 +1299,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         onClose={() => {
           workspace.closeVariantPicker();
           setAdjustmentTarget(null);
-          workspace.clearProcessedDraft();
+          workspace.closeQueueContext();
         }}
         onAdd={(item) => void workspace.selectItem(item, 'TRANSACTION_ADJUSTMENT')}
         onAddVariant={(variantId) => void workspace.selectVariant(variantId)}
@@ -1287,7 +1318,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         onClose={() => {
           setQueuePaymentTarget(null);
           setQueuePaymentAmount(null);
-          workspace.clearProcessedDraft();
+          workspace.closeQueueContext();
         }}
         onMethod={(next) => {
           setPaymentMethod(next);
@@ -1317,8 +1348,12 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       <ReferenceCancelDialog
         sale={cancelTarget}
         reason={cancelReason}
+        isMutating={workspace.isCoreMutating}
         onReasonChange={setCancelReason}
-        onClose={() => setCancelTarget(null)}
+        onClose={() => {
+          setCancelTarget(null);
+          workspace.closeQueueContext();
+        }}
         onConfirm={confirmCancel}
       />
 
@@ -1456,6 +1491,7 @@ function ReferenceCatalogCard({
 }) {
   const { copy } = useOperationalLocalization();
   const isService = item.type === 'SERVICE';
+  const displayPrice = item.displayPrice;
   return (
     <button
       type="button"
@@ -1465,15 +1501,25 @@ function ReferenceCatalogCard({
       className="group rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-left transition-all hover:border-[var(--color-brand)]/40 hover:shadow-md active:scale-[.98] disabled:opacity-50"
     >
       <div
-        className={`mb-2 flex aspect-square w-full items-center justify-center rounded-xl ${isService ? 'bg-cyan-500/10 text-cyan-600' : 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]'}`}
+        className={`mb-2 flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl ${isService ? 'bg-cyan-500/10 text-cyan-600' : 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]'}`}
       >
-        {isService ? <Wrench className="size-7" /> : <ShoppingBag className="size-7" />}
+        {item.image?.url ? (
+          <img src={item.image.url} alt="" loading="lazy" className="size-full object-cover" />
+        ) : isService ? (
+          <Wrench className="size-7" />
+        ) : (
+          <ShoppingBag className="size-7" />
+        )}
       </div>
       <p className="truncate font-mono text-[10px] text-[var(--color-text-muted)]">{item.code}</p>
       <p className="mt-1 line-clamp-2 min-h-10 text-sm font-semibold leading-tight">{item.name}</p>
       <div className="mt-2 flex items-center justify-between gap-2">
         <p className="text-xs font-semibold text-[var(--color-text-muted)]">
-          {price ? money(price, locale) : copy('Price available when selected')}
+          {price
+            ? displayPrice?.kind === 'FROM'
+              ? `${copy('From')} ${money(price, locale)}`
+              : money(price, locale)
+            : copy('Price available when selected')}
         </p>
         <span
           className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${isService ? 'bg-cyan-500/10 text-cyan-700' : 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]'}`}
@@ -1714,6 +1760,11 @@ function ReferenceQueueCard({
       : []),
     ...(status === 'PROGRESS'
       ? [
+          {
+            label: copy('Adjust order'),
+            icon: <ShoppingBag className="size-3.5" />,
+            onSelect: () => onAdjust(sale),
+          },
           ...(isPositiveDecimal(balanceDue)
             ? [
                 {
@@ -2344,11 +2395,20 @@ function ReferencePaymentDialog({
   onQueue: () => void;
 }) {
   const { copy, label } = useOperationalLocalization();
+  const { routes: paymentRoutes, isPending: isPaymentRoutesPending } = useCachedPaymentRoutes();
+  const routeByMethod = new Map(
+    paymentRoutes.map((route) => [route.paymentMethod, route] as const),
+  );
+  const activeRoute = routeByMethod.get(method) ?? null;
   const isCash = method === 'CASH';
   const needsProvider = method === 'BANK_TRANSFER' || method === 'WALLET';
   const hasTax = !createDecimal(taxAmount).equals(createDecimal('0'));
   const canPay =
-    lines.length > 0 && !isCashShort && (!needsProvider || Boolean(provider)) && !isSubmitting;
+    lines.length > 0 &&
+    Boolean(activeRoute) &&
+    !isCashShort &&
+    (!needsProvider || Boolean(provider)) &&
+    !isSubmitting;
   const canConfirm = payNow ? canPay : lines.length > 0 && !isSubmitting;
   const methods: Array<{ value: PaymentMethod; icon: ReactNode }> = [
     { value: 'CASH', icon: <Banknote className="size-[15px]" /> },
@@ -2356,10 +2416,11 @@ function ReferencePaymentDialog({
     { value: 'QRIS', icon: <QrCode className="size-[15px]" /> },
     { value: 'WALLET', icon: <ShoppingBag className="size-[15px]" /> },
   ];
-  const providerOptions =
-    method === 'BANK_TRANSFER'
-      ? ['BCA', 'Mandiri', 'BRI', 'BNI']
-      : ['DANA', 'GoPay', 'OVO', 'ShopeePay'];
+  const providerOptions = needsProvider && activeRoute ? [activeRoute.financialAccountName] : [];
+  const normalizedQuickTender = [total, ...quickTender]
+    .map((amount) => normalizeCurrencyPresentationInput(amount))
+    .filter((amount, index, list) => list.indexOf(amount) === index)
+    .slice(0, 6);
 
   return (
     <DDialog
@@ -2505,30 +2566,35 @@ function ReferencePaymentDialog({
                 {copy('Payment method')}
               </p>
               <div className="grid grid-cols-4 gap-2">
-                {methods.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => onMethod(option.value)}
-                    className={`flex h-10 items-center justify-center gap-1.5 rounded-xl border text-xs font-semibold transition-all active:scale-[.98] ${method === option.value ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white shadow-sm' : 'border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)]'}`}
-                  >
-                    {option.icon}
-                    <span className="hidden sm:inline">{label(option.value)}</span>
-                  </button>
-                ))}
+                {methods.map((option) => {
+                  const routeAvailable = routeByMethod.has(option.value);
+                  const disabled = isPaymentRoutesPending || !routeAvailable;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => onMethod(option.value)}
+                      className={`flex h-10 items-center justify-center gap-1.5 rounded-xl border text-xs font-semibold transition-all active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-40 ${method === option.value ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white shadow-sm' : 'border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)]'}`}
+                    >
+                      {option.icon}
+                      <span className="hidden sm:inline">{label(option.value)}</span>
+                    </button>
+                  );
+                })}
               </div>
               {needsProvider ? (
                 <div className="mt-3">
                   <p className="mb-2 text-xs font-semibold text-[var(--color-text-muted)]">
                     {copy(method === 'BANK_TRANSFER' ? 'Select bank' : 'Select digital wallet')}
                   </p>
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     {providerOptions.map((option) => (
                       <button
                         key={option}
                         type="button"
                         onClick={() => onProvider(option)}
-                        className={`h-9 rounded-xl border text-xs font-semibold transition-all active:scale-[.98] ${provider === option ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]'}`}
+                        className={`h-9 rounded-xl border px-3 text-xs font-semibold transition-all active:scale-[.98] ${provider === option ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]'}`}
                       >
                         {option}
                       </button>
@@ -2539,6 +2605,11 @@ function ReferencePaymentDialog({
               {method === 'QRIS' ? (
                 <div className="mt-3 rounded-xl border border-[var(--color-brand)]/20 bg-[var(--color-brand)]/5 p-3">
                   <p className="text-sm font-bold text-[var(--color-brand)]">QRIS</p>
+                  {activeRoute ? (
+                    <p className="mt-1 text-xs font-semibold text-[var(--color-text)]">
+                      {activeRoute.financialAccountName}
+                    </p>
+                  ) : null}
                   <p className="mt-1 text-xs text-[var(--color-text-muted)]">
                     {copy('QRIS payment will be recorded for this transaction.')}
                   </p>
@@ -2560,19 +2631,16 @@ function ReferencePaymentDialog({
                   </div>
                 </label>
                 <div className="grid grid-cols-3 gap-2">
-                  {[total, ...quickTender]
-                    .filter((amount, index, list) => list.indexOf(amount) === index)
-                    .slice(0, 6)
-                    .map((amount) => (
-                      <button
-                        key={amount}
-                        type="button"
-                        onClick={() => onTender(amount)}
-                        className={`h-9 rounded-lg border text-[11px] font-semibold transition-all active:scale-[.98] ${tender === amount ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'border-[var(--color-border)] bg-[var(--color-background)] hover:bg-[var(--color-surface-muted)]'}`}
-                      >
-                        {money(amount, locale)}
-                      </button>
-                    ))}
+                  {normalizedQuickTender.map((amount) => (
+                    <button
+                      key={amount}
+                      type="button"
+                      onClick={() => onTender(amount)}
+                      className={`h-9 rounded-lg border text-[11px] font-semibold transition-all active:scale-[.98] ${normalizeCurrencyPresentationInput(tender) === amount ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'border-[var(--color-border)] bg-[var(--color-background)] hover:bg-[var(--color-surface-muted)]'}`}
+                    >
+                      {money(amount, locale)}
+                    </button>
+                  ))}
                 </div>
                 <div
                   className={`flex items-center justify-between rounded-xl px-3 py-2 ${isCashShort ? 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]' : 'bg-[var(--color-success)]/10 text-[var(--color-success)]'}`}
@@ -2583,9 +2651,9 @@ function ReferencePaymentDialog({
                   <span className="text-sm font-bold">
                     {isCashShort
                       ? money(
-                          createDecimal(total)
-                            .minus(createDecimal(tender || '0'))
-                            .toFixed(4),
+                          createDecimal(normalizeCurrencyPresentationInput(total))
+                            .minus(createDecimal(normalizeCurrencyPresentationInput(tender || '0')))
+                            .toFixed(0),
                           locale,
                         )
                       : money(change, locale)}
@@ -2597,6 +2665,11 @@ function ReferencePaymentDialog({
                 <p className="text-sm font-bold text-[var(--color-brand)]">
                   {copy('Payment')} {label(method)}
                 </p>
+                {activeRoute ? (
+                  <p className="mt-1 text-xs font-semibold text-[var(--color-text)]">
+                    {activeRoute.financialAccountName}
+                  </p>
+                ) : null}
                 <p className="mt-1 text-xs text-[var(--color-text-muted)]">
                   {copy('Select a provider if required, then record the payment.')}
                 </p>
@@ -2650,7 +2723,9 @@ function ReferenceTransactionDetail({
   const customerContext = readStoredCustomer(saleCustomerKey(sale.id));
   const customer = customerContext ?? saleCustomer(sale.id, locale);
   const activeLines = sale.lines.filter((line) => !line.removedAt);
-  const payments = successfulPayments(sale);
+  const payments = successfulPayments(sale).filter((payment) =>
+    createDecimal(payment.appliedAmount).greaterThan(createDecimal('0')),
+  );
   const payment = payments[payments.length - 1] ?? null;
   const receiptAvailable = payments.length > 0;
   const showReceipt = showPaymentReceipt && receiptAvailable;
@@ -2676,69 +2751,71 @@ function ReferenceTransactionDetail({
         closeOnEscape
         closeOnOverlay
         noPadding
-        className={`pos-reference-dialog max-h-[92dvh] w-full overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl ${showReceipt ? 'max-w-md' : 'max-w-lg'}`}
+        className={`pos-reference-dialog max-h-[92dvh] w-full overflow-hidden rounded-t-2xl bg-(--color-surface) shadow-xl sm:rounded-xl ${showReceipt ? 'max-w-md' : 'max-w-lg'}`}
         footer={
-          <div
-            className={`flex shrink-0 flex-col-reverse justify-end gap-2 sm:flex-row ${showReceipt ? 'pos-receipt-actions' : ''}`}
-          >
-            <DButton variant="ghost" onClick={onClose}>
-              {copy('Close')}
-            </DButton>
-            {!showReceipt && receiptAvailable ? (
-              <DButton
-                rightIcon={<Printer className="size-3.5" />}
-                variant="outline"
-                onClick={() => onViewReceipt(sale)}
-              >
-                {copy('View receipt')}
-              </DButton>
-            ) : null}
-            {!showReceipt && status === 'PROGRESS' ? (
-              <DButton
-                variant="primary"
-                disabled={completionIssues.length > 0}
-                loading={isMutating}
-                leftIcon={<CheckCircle2 className="size-3.5" />}
-                onClick={onComplete}
-              >
-                {copy('Complete transaction')}
-              </DButton>
-            ) : null}
+          <div className="flex shrink-0 flex-col-reverse justify-between items-center gap-2 sm:flex-row">
             {showReceipt ? (
-              <DButton
-                rightIcon={<Printer className="size-3.5" />}
-                variant="outline"
-                onClick={() => window.print()}
-              >
-                {copy('Print')}
-              </DButton>
+              <div className="pos-receipt-preview-toolbar flex items-center justify-between gap-3">
+                <div className="flex items-center gap-1.5" aria-label={copy('Paper size')}>
+                  <DButton
+                    size="sm"
+                    variant={receiptPaper === '58' ? 'primary' : 'secondary'}
+                    onClick={() => setReceiptPaper('58')}
+                  >
+                    58 mm
+                  </DButton>
+                  <DButton
+                    size="sm"
+                    variant={receiptPaper === '80' ? 'primary' : 'secondary'}
+                    onClick={() => setReceiptPaper('80')}
+                  >
+                    80 mm
+                  </DButton>
+                </div>
+              </div>
             ) : null}
+
+            <div
+              className={`flex shrink-0 flex-col-reverse justify-end items-center gap-2 sm:flex-row ${showReceipt ? 'pos-receipt-actions' : ''}`}
+            >
+              <DButton variant="ghost" onClick={onClose}>
+                {copy('Close')}
+              </DButton>
+              {!showReceipt && receiptAvailable ? (
+                <DButton
+                  rightIcon={<Printer className="size-3.5" />}
+                  variant="outline"
+                  onClick={() => onViewReceipt(sale)}
+                >
+                  {copy('View receipt')}
+                </DButton>
+              ) : null}
+              {!showReceipt && status === 'PROGRESS' ? (
+                <DButton
+                  variant="primary"
+                  disabled={completionIssues.length > 0}
+                  loading={isMutating}
+                  leftIcon={<CheckCircle2 className="size-3.5" />}
+                  onClick={onComplete}
+                >
+                  {copy('Complete transaction')}
+                </DButton>
+              ) : null}
+              {showReceipt ? (
+                <DButton
+                  rightIcon={<Printer className="size-3.5" />}
+                  variant="outline"
+                  onClick={() => window.print()}
+                >
+                  {copy('Print')}
+                </DButton>
+              ) : null}
+            </div>
           </div>
         }
       >
         {showReceipt ? (
           <div className="flex max-h-[92dvh] min-h-0 flex-col px-5 py-4 sm:px-6">
-            <div className="pos-receipt-preview-toolbar mb-3 flex items-center justify-between gap-3">
-              <span className="text-xs font-medium text-[var(--color-text-muted)]">
-                {copy('Paper size')}
-              </span>
-              <div className="flex items-center gap-1.5" aria-label={copy('Paper size')}>
-                <DButton
-                  size="sm"
-                  variant={receiptPaper === '58' ? 'primary' : 'secondary'}
-                  onClick={() => setReceiptPaper('58')}
-                >
-                  58 mm
-                </DButton>
-                <DButton
-                  size="sm"
-                  variant={receiptPaper === '80' ? 'primary' : 'secondary'}
-                  onClick={() => setReceiptPaper('80')}
-                >
-                  80 mm
-                </DButton>
-              </div>
-            </div>
             <div
               className={`pos-receipt-preview pos-receipt-print--${receiptPaper} min-h-0 flex-1 overflow-y-auto bg-white text-slate-950`}
             >
@@ -3039,7 +3116,14 @@ function ReceiptContent({
         {hasTax ? (
           <div className="flex justify-between gap-3">
             <dt className="text-slate-500">{copy('Tax')}</dt>
-            <dd>{money(sale.taxAmount, locale)}</dd>
+
+            <dd>
+              (
+              {sale.totalAmount > sale.taxAmount
+                ? ((sale.taxAmount / (sale.totalAmount - sale.taxAmount)) * 100).toFixed(0)
+                : 0}
+              %) {money(sale.taxAmount, locale)}
+            </dd>
           </div>
         ) : null}
         <div className="mt-2 flex justify-between gap-3 border-t border-slate-200 pt-2 text-sm font-black">
@@ -3273,6 +3357,9 @@ function ReferenceOrderAdjustmentDialog({
   if (!sale) return null;
 
   const paid = hasSuccessfulPayment(sale);
+  const { totalPaid } = financialSummary(sale);
+  const paidAmount = createDecimal(totalPaid);
+  const saleTotal = createDecimal(sale.totalAmount);
   const activeLines = sale.lines.filter((line) => line.removedAt === null);
   const options = items
     .filter((item) => {
@@ -3323,8 +3410,15 @@ function ReferenceOrderAdjustmentDialog({
         )}
         <div className="divide-y divide-[var(--color-border)] overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-background)]">
           {activeLines.map((line) => {
+            const lineMutable = !line.fulfillment || line.fulfillment.status === 'WAITING';
             const canDecrease =
-              !paid && createDecimal(line.quantity).greaterThan(createDecimal('1'));
+              lineMutable &&
+              createDecimal(line.quantity).greaterThan(createDecimal('1'));
+            const canRemove = lineMutable;
+            const projectedTotalAfterRemoval = saleTotal.minus(createDecimal(line.totalAmount));
+            const removalRefund = paidAmount.greaterThan(projectedTotalAfterRemoval)
+              ? paidAmount.minus(projectedTotalAfterRemoval)
+              : createDecimal('0');
             return (
               <div key={line.id} className="flex items-center justify-between gap-3 p-3">
                 <div className="min-w-0">
@@ -3337,6 +3431,11 @@ function ReferenceOrderAdjustmentDialog({
                   <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
                     {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
                   </p>
+                  {paid && removalRefund.greaterThan(createDecimal('0')) ? (
+                    <p className="mt-1 text-[11px] font-semibold text-[var(--color-warning)]">
+                      {copy('Refund required')}: {money(removalRefund.toFixed(4), locale)}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
                   <button
@@ -3359,7 +3458,7 @@ function ReferenceOrderAdjustmentDialog({
                   <button
                     type="button"
                     aria-label={`${copy('Increase quantity')} ${line.itemNameSnapshot}`}
-                    disabled={isMutating}
+                    disabled={!lineMutable || isMutating}
                     onClick={() =>
                       onQuantity(
                         line,
@@ -3373,7 +3472,7 @@ function ReferenceOrderAdjustmentDialog({
                   <button
                     type="button"
                     aria-label={`${copy('Remove')} ${line.itemNameSnapshot}`}
-                    disabled={paid || isMutating}
+                    disabled={!canRemove || isMutating}
                     onClick={() => onRemove(line)}
                     className="ml-1 flex size-8 items-center justify-center rounded-lg text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 disabled:cursor-not-allowed disabled:opacity-40"
                   >
@@ -3486,6 +3585,11 @@ function ReferenceBalancePaymentDialog({
   onPay: () => void;
 }) {
   const { copy, label } = useOperationalLocalization();
+  const { routes: paymentRoutes, isPending: isPaymentRoutesPending } = useCachedPaymentRoutes();
+  const routeByMethod = new Map(
+    paymentRoutes.map((route) => [route.paymentMethod, route] as const),
+  );
+  const activeRoute = routeByMethod.get(method) ?? null;
   if (!sale) return null;
   const { totalPaid } = financialSummary(sale);
   const balanceDue = availableToPay ?? '0.0000';
@@ -3495,6 +3599,7 @@ function ReferenceBalancePaymentDialog({
   const cashShort = isCash && createDecimal(applied).lessThan(createDecimal(balanceDue));
   const canPay =
     isPositiveDecimal(applied) &&
+    Boolean(activeRoute) &&
     !cashShort &&
     (!needsProvider || Boolean(provider)) &&
     !isMutating;
@@ -3504,10 +3609,7 @@ function ReferenceBalancePaymentDialog({
     { value: 'QRIS', icon: <QrCode className="size-4" /> },
     { value: 'WALLET', icon: <ShoppingBag className="size-4" /> },
   ];
-  const providerOptions =
-    method === 'BANK_TRANSFER'
-      ? ['BCA', 'Mandiri', 'BRI', 'BNI']
-      : ['DANA', 'GoPay', 'OVO', 'ShopeePay'];
+  const providerOptions = needsProvider && activeRoute ? [activeRoute.financialAccountName] : [];
 
   return (
     <Dialog
@@ -3542,26 +3644,31 @@ function ReferenceBalancePaymentDialog({
           </div>
         </div>
         <div className="grid grid-cols-4 gap-2">
-          {methods.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => onMethod(option.value)}
-              className={`flex h-10 items-center justify-center gap-1 rounded-xl border text-xs font-semibold ${method === option.value ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white' : 'border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]'}`}
-            >
-              {option.icon}
-              <span className="hidden sm:inline">{label(option.value)}</span>
-            </button>
-          ))}
+          {methods.map((option) => {
+            const routeAvailable = routeByMethod.has(option.value);
+            const disabled = isPaymentRoutesPending || !routeAvailable;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                disabled={disabled}
+                onClick={() => onMethod(option.value)}
+                className={`flex h-10 items-center justify-center gap-1 rounded-xl border text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${method === option.value ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white' : 'border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]'}`}
+              >
+                {option.icon}
+                <span className="hidden sm:inline">{label(option.value)}</span>
+              </button>
+            );
+          })}
         </div>
         {needsProvider ? (
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {providerOptions.map((option) => (
               <button
                 key={option}
                 type="button"
                 onClick={() => onProvider(option)}
-                className={`h-9 rounded-lg border text-xs font-semibold ${provider === option ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]'}`}
+                className={`h-9 rounded-lg border px-3 text-xs font-semibold ${provider === option ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]'}`}
               >
                 {option}
               </button>
@@ -3584,9 +3691,16 @@ function ReferenceBalancePaymentDialog({
             ) : null}
           </label>
         ) : (
-          <p className="rounded-xl border border-[var(--color-brand)]/20 bg-[var(--color-brand)]/5 p-3 text-xs text-[var(--color-text-muted)]">
-            {copy('Record payment')} {label(method)} {money(balanceDue, locale)}.
-          </p>
+          <div className="rounded-xl border border-[var(--color-brand)]/20 bg-[var(--color-brand)]/5 p-3 text-xs text-[var(--color-text-muted)]">
+            <p>
+              {copy('Record payment')} {label(method)} {money(balanceDue, locale)}.
+            </p>
+            {activeRoute ? (
+              <p className="mt-1 font-semibold text-[var(--color-text)]">
+                {activeRoute.financialAccountName}
+              </p>
+            ) : null}
+          </div>
         )}
       </div>
     </Dialog>
@@ -3596,24 +3710,28 @@ function ReferenceBalancePaymentDialog({
 function ReferenceCancelDialog({
   sale,
   reason,
+  isMutating,
   onReasonChange,
   onClose,
   onConfirm,
 }: {
   sale: Sale | null;
   reason: string;
+  isMutating: boolean;
   onReasonChange: (reason: string) => void;
   onClose: () => void;
   onConfirm: () => void;
 }) {
   const { copy, locale } = useOperationalLocalization();
+  const refundAmount = sale ? financialSummary(sale).totalPaid : '0.0000';
+  const hasRefund = isPositiveDecimal(refundAmount);
   return (
     <Dialog
       open={Boolean(sale)}
       onClose={onClose}
       ariaLabel={copy('Cancel transaction')}
-      closeOnEscape
-      closeOnOverlay
+      closeOnEscape={!isMutating}
+      closeOnOverlay={!isMutating}
       className="pos-reference-dialog w-full max-w-md rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
     >
       <div className="p-5">
@@ -3631,27 +3749,49 @@ function ReferenceCancelDialog({
           <button
             type="button"
             aria-label={copy('Close')}
+            disabled={isMutating}
             onClick={onClose}
-            className="rounded-lg p-2 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]"
+            className="rounded-lg p-2 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] disabled:opacity-40"
           >
             <X className="size-[18px]" />
           </button>
         </div>
+        {hasRefund ? (
+          <div className="mt-4 rounded-xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 px-3 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm font-semibold text-[var(--color-warning)]">
+                {copy('Refund required')}
+              </span>
+              <span className="text-sm font-bold text-[var(--color-warning)]">
+                {money(refundAmount, locale)}
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+              {copy('Previous payment remains recorded')}
+            </p>
+          </div>
+        ) : null}
         <label className="mt-5 block text-sm font-medium">
           {copy('Cancellation reason')}
           <Input
             className="mt-1.5 h-10 rounded-lg"
             autoFocus
             value={reason}
+            disabled={isMutating}
             onChange={onReasonChange}
             placeholder={copy('Example: Customer request')}
           />
         </label>
         <div className="mt-5 flex justify-end gap-2">
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" disabled={isMutating} onClick={onClose}>
             {copy('Back')}
           </Button>
-          <Button variant="danger" disabled={!reason.trim()} onClick={onConfirm}>
+          <Button
+            variant="danger"
+            disabled={!reason.trim() || isMutating}
+            loading={isMutating}
+            onClick={onConfirm}
+          >
             {copy('Confirm cancellation')}
           </Button>
         </div>

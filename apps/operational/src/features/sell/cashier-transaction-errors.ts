@@ -19,6 +19,18 @@ export function cashierTransactionErrorMessage(error: unknown, locale?: string):
   if (isApiErrorCode(error, 'SALE_VERSION_CONFLICT')) {
     return copyForLocale('Transaction changed. Review the latest data before continuing.', locale);
   }
+  if (isApiErrorCode(error, 'PAYMENT_AMOUNT_EXCEEDS_OUTSTANDING')) {
+    return copyForLocale('Payment amount exceeds the remaining balance.', locale);
+  }
+  if (isApiErrorCode(error, 'SALE_PAYMENT_OVERAPPLIED')) {
+    return copyForLocale('Refund required', locale);
+  }
+  if (isApiErrorCode(error, 'SALE_NOT_SETTLED')) {
+    return copyForLocale('Complete the remaining payment before finishing this transaction.', locale);
+  }
+  if (isApiErrorCode(error, 'SALE_LINE_NOT_MUTABLE')) {
+    return copyForLocale('This item can no longer be reduced or removed because work has already started.', locale);
+  }
   return copyForLocale('Transaction could not be processed. Try again.', locale);
 }
 

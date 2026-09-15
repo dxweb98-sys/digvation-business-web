@@ -7,21 +7,25 @@ import {
   DDataTable,
   DDialog,
   DInput,
+  DSearchInput,
   DTabs,
   DTabsContent,
   DTabsList,
   DTabsTrigger,
+  DAccordion,
+  DAccordionItem,
   useToast,
   type TableColumn,
 } from '@digvation/ui';
+
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ban, Pencil, Plus, RefreshCw, UserCog, UserPlus } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
 import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
 import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
-import { permissionLabel } from '../../app/localization/human-readable-labels';
+import { groupPermissionKeys, permissionLabel } from '../../app/localization/human-readable-labels';
 import { canPerformBackofficeAction } from '../../auth/backoffice-access';
 import { isSessionExpiredError, useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import {
@@ -504,13 +508,86 @@ function RoleEditor({
 }) {
   const { copy, locale } = useBackofficeLocalization();
   const { showToast } = useToast();
+
   const isNew = role === null;
+
   const [code, setCode] = useState('');
   const [name, setName] = useState(role?.name ?? '');
   const [selected, setSelected] = useState<string[]>(role?.permissions ?? []);
+  const [permissionSearch, setPermissionSearch] = useState('');
+  const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
+
+  const canEditName = isNew || canUpdate;
+  const canEditPermissions = isNew || canManagePermissions;
+  const canSave = isNew || canUpdate || canManagePermissions;
+
+  /**
+   * Gunakan canonical permission grouping yang sudah ada
+   * di human-readable-labels.
+   *
+   * Tidak ada parsing label permission manual di sini.
+   */
+  const permissionGroups = useMemo(
+    () => groupPermissionKeys(permissions, locale),
+    [permissions, locale],
+  );
+
+  /**
+   * Search bisa match:
+   * - nama group
+   * - nama permission
+   */
+  const filteredPermissionGroups = useMemo(() => {
+    const keyword = permissionSearch.trim().toLocaleLowerCase(locale);
+
+    if (!keyword) {
+      return permissionGroups.map((group) => ({
+        ...group,
+        visiblePermissions: group.permissions,
+      }));
+    }
+
+    return permissionGroups.flatMap((group) => {
+      const groupMatches = group.label.toLocaleLowerCase(locale).includes(keyword);
+
+      const visiblePermissions = groupMatches
+        ? group.permissions
+        : group.permissions.filter((permission) =>
+            permissionLabel(permission, locale).toLocaleLowerCase(locale).includes(keyword),
+          );
+
+      if (visiblePermissions.length === 0) {
+        return [];
+      }
+
+      return [
+        {
+          ...group,
+          visiblePermissions,
+        },
+      ];
+    });
+  }, [permissionGroups, permissionSearch, locale]);
+
+  const filteredPermissionCount = useMemo(
+    () =>
+      filteredPermissionGroups.reduce((total, group) => total + group.visiblePermissions.length, 0),
+    [filteredPermissionGroups],
+  );
+
+  const togglePermission = (permission: string) => {
+    setSelected((values) =>
+      values.includes(permission)
+        ? values.filter((item) => item !== permission)
+        : [...values, permission],
+    );
+  };
 
   const save = async () => {
-    if (!name.trim() || (isNew && !code.trim())) return;
+    if (!name.trim() || (isNew && !code.trim())) {
+      return;
+    }
+
     try {
       if (isNew) {
         await api.createRole({
@@ -518,21 +595,41 @@ function RoleEditor({
           name: name.trim(),
           permissions: selected,
         });
-      } else if (role && !role.systemKey) {
+      } else if (role) {
         let current = role;
-        if (canUpdate && name.trim() !== role.name)
+
+        /**
+         * System role tidak lagi dikunci oleh frontend.
+         *
+         * Yang menentukan boleh/tidaknya edit tetap:
+         * - canUpdate
+         * - canManagePermissions
+         *
+         * systemKey sendiri tidak pernah diubah.
+         */
+        if (canUpdate && name.trim() !== role.name) {
           current = await api.updateRole(role, name.trim());
-        if (canManagePermissions) await api.replacePermissions(current, selected);
+        }
+
+        if (canManagePermissions) {
+          await api.replacePermissions(current, selected);
+        }
       }
+
       onChanged();
       onClose();
-      showToast({ variant: 'success', title: copy('Role updated.') });
+
+      showToast({
+        variant: 'success',
+        title: copy('Role updated.'),
+      });
     } catch (error) {
-      if (!isSessionExpiredError(error))
+      if (!isSessionExpiredError(error)) {
         showToast({
           variant: 'danger',
           title: normalizeBackofficeApiError(error, copy('Could not save role.')).safeMessage,
         });
+      }
     }
   };
 
@@ -543,11 +640,12 @@ function RoleEditor({
       title={copy(isNew ? 'Create role' : 'Manage role')}
       size="lg"
       footer={
-        !role?.systemKey && (isNew || canUpdate || canManagePermissions) ? (
+        canSave ? (
           <div className="flex justify-end gap-2">
             <DButton variant="secondary" onClick={onClose}>
               {copy('Cancel')}
             </DButton>
+
             <DButton onClick={() => void save()} disabled={!name.trim() || (isNew && !code.trim())}>
               {copy('Save role')}
             </DButton>
@@ -555,9 +653,16 @@ function RoleEditor({
         ) : null
       }
     >
-      <div className="space-y-5">
-        {!role?.systemKey ? (
-          <div className="grid gap-4 sm:grid-cols-2">
+      <div className="space-y-6">
+        {/* Role information */}
+        <div className="space-y-3">
+          {!isNew && role?.systemKey ? (
+            <p className="text-xs font-medium text-[var(--color-text-muted)]">
+              {copy('System role')}
+            </p>
+          ) : null}
+
+          <div className={isNew ? 'grid gap-4 sm:grid-cols-2' : ''}>
             {isNew ? (
               <DInput
                 label={copy('Role code')}
@@ -566,39 +671,119 @@ function RoleEditor({
                 placeholder={copy('For example, MANAGER')}
               />
             ) : null}
+
             <DInput
               label={copy('Role name')}
               value={name}
               onChange={setName}
-              disabled={!isNew && !canUpdate}
+              disabled={!canEditName}
               placeholder={copy('For example, Store Manager')}
             />
           </div>
-        ) : (
-          <p className="text-sm text-[var(--color-text-muted)]">
-            {accessCopy.protectedRole[locale]}
-          </p>
-        )}
-        <section className="border-t border-[var(--color-border)] pt-4">
-          <p className="text-sm font-semibold">{copy('Permissions')}</p>
-          <div className="mt-3 divide-y divide-[var(--color-border)] border-y border-[var(--color-border)]">
-            {permissions.map((permission) => (
-              <label key={permission} className="flex items-center gap-3 py-2.5 text-sm">
-                <DCheckbox
-                  checked={selected.includes(permission)}
-                  onChange={() =>
-                    setSelected((values) =>
-                      values.includes(permission)
-                        ? values.filter((item) => item !== permission)
-                        : [...values, permission],
-                    )
-                  }
-                  disabled={Boolean(role?.systemKey) || (!isNew && !canManagePermissions)}
-                />
-                <span className="min-w-0 break-words">{permissionLabel(permission, locale)}</span>
-              </label>
-            ))}
+        </div>
+
+        {/* Permissions */}
+        <section className="border-t border-[var(--color-border)] pt-5">
+          {/* Header */}
+          <div className="mb-4 flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-[var(--color-text)]">
+                  {copy('Permissions')}
+                </h3>
+
+                <span className="text-xs tabular-nums text-[var(--color-text-muted)]">
+                  {permissionSearch.trim()
+                    ? `${filteredPermissionCount} ${copy('results')}`
+                    : `${selected.length}/${permissions.length}`}
+                </span>
+              </div>
+            </div>
+
+            <DSearchInput
+              value={permissionSearch}
+              onChange={setPermissionSearch}
+              placeholder={copy('Search permissions...')}
+              debounceMs={0}
+              expandedWidth="min(280px, calc(100vw - 140px))"
+            />
           </div>
+
+          {/* Permission groups */}
+          {filteredPermissionGroups.length > 0 ? (
+            <div className="max-h-[440px] overflow-y-auto pr-1">
+              <DAccordion
+                type="multiple"
+                variant="card"
+                value={expandedGroups}
+                onValueChange={setExpandedGroups}
+              >
+                {filteredPermissionGroups.map((group) => {
+                  const selectedCount = group.permissions.filter((permission) =>
+                    selected.includes(permission),
+                  ).length;
+
+                  return (
+                    <DAccordionItem
+                      key={group.key}
+                      value={group.key}
+                      title={
+                        <span className="flex items-center gap-2">
+                          <span>{group.label}</span>
+
+                          <span className="text-xs font-normal tabular-nums text-[var(--color-text-muted)]">
+                            {selectedCount}/{group.permissions.length}
+                          </span>
+                        </span>
+                      }
+                    >
+                      <div className="grid gap-x-4 gap-y-1 sm:grid-cols-2">
+                        {group.visiblePermissions.map((permission) => {
+                          const checked = selected.includes(permission);
+
+                          return (
+                            <label
+                              key={permission}
+                              className={[
+                                'flex min-h-10 items-center gap-3 rounded-md px-2 py-2',
+                                'transition-colors',
+                                canEditPermissions
+                                  ? 'cursor-pointer hover:bg-[var(--color-surface-subtle)]'
+                                  : 'cursor-default',
+                              ].join(' ')}
+                            >
+                              <DCheckbox
+                                checked={checked}
+                                onChange={() => togglePermission(permission)}
+                                disabled={!canEditPermissions}
+                              />
+
+                              <span
+                                className={[
+                                  'min-w-0 flex-1 break-words text-sm leading-5',
+                                  checked
+                                    ? 'font-medium text-[var(--color-text)]'
+                                    : 'text-[var(--color-text-muted)]',
+                                ].join(' ')}
+                              >
+                                {permissionLabel(permission, locale)}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </DAccordionItem>
+                  );
+                })}
+              </DAccordion>
+            </div>
+          ) : (
+            <div className="flex min-h-32 items-center justify-center rounded-[var(--radius-card)] border border-[var(--color-border)] px-6 py-8">
+              <p className="text-sm text-[var(--color-text-muted)]">
+                {copy('No permissions found')}
+              </p>
+            </div>
+          )}
         </section>
       </div>
     </DDialog>

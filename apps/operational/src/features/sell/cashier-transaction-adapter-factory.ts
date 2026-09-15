@@ -5,13 +5,15 @@ import {
   HttpCashierTransactionAdapter,
   type SaleTransactionPort,
 } from './cashier-transaction.adapter';
-import { LocalCashierTransactionAdapter } from './local-cashier-transaction.adapter';
-
-let localDemoAdapter: LocalCashierTransactionAdapter | null = null;
+import {
+  attachOperationalProjection,
+  type OperationalProjectionQuery,
+} from './operational-projection-client';
 
 type PerformerCapableTransactionPort = SaleTransactionPort & {
   setSaleLinePerformers: NonNullable<SaleTransactionPort['setSaleLinePerformers']>;
 };
+type OperationalCashierTransactionPort = PerformerCapableTransactionPort & OperationalProjectionQuery;
 
 function withServicePerformers(adapter: SaleTransactionPort): PerformerCapableTransactionPort {
   if (!adapter.setSaleLinePerformers) {
@@ -29,26 +31,21 @@ function withServicePerformers(adapter: SaleTransactionPort): PerformerCapableTr
   return adapter as PerformerCapableTransactionPort;
 }
 
+/** Operational integration never falls back to the legacy in-memory cashier demo. */
 export function isLocalCashierDemoEnabled(): boolean {
-  return import.meta.env.DEV && import.meta.env.VITE_CASHIER_DEMO === 'true';
+  return false;
 }
 
-/** Selects the transaction boundary once; Cashier presentation never selects a transport. */
+/** Selects the Runtime-backed Operational transaction boundary once. */
 export function createCashierTransactionAdapter(
   runtime: RuntimeConfig,
   getAccessToken?: () => Promise<string | null>,
-): PerformerCapableTransactionPort {
-  if (isLocalCashierDemoEnabled()) {
-    localDemoAdapter ??= new LocalCashierTransactionAdapter();
-    return withServicePerformers(localDemoAdapter);
-  }
-  return withServicePerformers(
-    new HttpCashierTransactionAdapter(
-      new ApiClient({
-        baseUrl: runtime.apiBaseUrl,
-        applicationSurface: 'operational',
-        ...(getAccessToken ? { getAccessToken } : {}),
-      }),
-    ),
-  );
+): OperationalCashierTransactionPort {
+  const client = new ApiClient({
+    baseUrl: runtime.apiBaseUrl,
+    applicationSurface: 'operational',
+    ...(getAccessToken ? { getAccessToken } : {}),
+  });
+  const adapter = attachOperationalProjection(client, new HttpCashierTransactionAdapter(client));
+  return withServicePerformers(adapter) as OperationalCashierTransactionPort;
 }
