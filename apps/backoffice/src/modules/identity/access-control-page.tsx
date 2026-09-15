@@ -318,7 +318,7 @@ function RolesTable({
       key: 'status',
       label: copy('Status'),
       render: (role) => (
-        <DBadge variant={role.status === 'ACTIVE' ? 'outline' : 'secondary'}>
+        <DBadge variant={role.status === 'ACTIVE' ? 'success' : 'secondary'}>
           {copy(role.status === 'ACTIVE' ? 'Active' : 'Inactive')}
         </DBadge>
       ),
@@ -388,7 +388,25 @@ function UsersTable({
     {
       key: 'status',
       label: copy('Status'),
-      render: (user) => <DBadge variant="outline">{copy(user.status)}</DBadge>,
+      render: (user) => (
+        <DBadge
+          variant={
+            user.status === 'ACTIVE'
+              ? 'success'
+              : user.status === 'PENDING_ACTIVATION'
+                ? 'warning'
+                : 'secondary'
+          }
+        >
+          {copy(
+            user.status === 'ACTIVE'
+              ? 'Active'
+              : user.status === 'PENDING_ACTIVATION'
+                ? 'Pending activation'
+                : 'Disabled',
+          )}
+        </DBadge>
+      ),
     },
   ];
   return (
@@ -425,7 +443,7 @@ function InvitationsTable({
   onChanged: () => void;
   onRevoke: (invitation: UserInvitation) => void;
 }) {
-  const { copy } = useBackofficeLocalization();
+  const { copy, formatDate } = useBackofficeLocalization();
   const { showToast } = useToast();
   const columns: TableColumn<UserInvitation>[] = [
     {
@@ -449,22 +467,31 @@ function InvitationsTable({
     {
       key: 'expiresAt',
       label: copy('Expires'),
-      render: (invitation) => new Date(invitation.expiresAt).toLocaleString(),
+      render: (invitation) =>
+        formatDate(new Date(invitation.expiresAt), {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        }),
     },
     {
       key: 'acceptedAt',
       label: copy('Status'),
-      render: (invitation) => (
-        <DBadge variant={invitation.acceptedAt ? 'outline' : 'secondary'}>
-          {copy(
-            invitation.acceptedAt
-              ? 'Accepted'
-              : invitation.revokedAt
-                ? 'Revoked'
-                : 'Pending',
-          )}
-        </DBadge>
-      ),
+      render: (invitation) => {
+        const status = invitation.acceptedAt
+          ? 'ACCEPTED'
+          : invitation.revokedAt
+            ? 'REVOKED'
+            : 'PENDING';
+        return (
+          <DBadge
+            variant={
+              status === 'ACCEPTED' ? 'success' : status === 'PENDING' ? 'warning' : 'secondary'
+            }
+          >
+            {copy(status === 'ACCEPTED' ? 'Accepted' : status === 'REVOKED' ? 'Revoked' : 'Pending')}
+          </DBadge>
+        );
+      },
     },
   ];
 
