@@ -197,9 +197,7 @@ export function EmployeeDetailDialog({
                 {copy('Employment information')}
               </h3>
               <p className="mt-1 max-w-3xl text-sm text-[var(--color-text-muted)]">
-                {copy(
-                  'Service eligibility is controlled by the employee position. Catalog service assignment mode still decides whether assignment is optional or required.',
-                )}
+                {copy('Service assignment eligibility is controlled by the employee position.')}
               </p>
               <DetailGrid>
                 <Field label={copy('Employee code')} value={employee.code} />
