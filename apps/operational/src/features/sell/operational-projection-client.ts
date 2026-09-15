@@ -20,11 +20,25 @@ import type {
 
 const OPERATIONAL_PREFIX = '/api/v1/operational';
 
+function idempotencyHeaders(operation: string) {
+  return { headers: { 'Idempotency-Key': `cashier-${operation}-${crypto.randomUUID()}` } };
+}
+
 export interface OperationalProjectionQuery {
   getOperationalCatalog?(
     input: SellingCatalogDisplayInput,
     signal?: AbortSignal,
   ): Promise<OperationalCatalogProjection>;
+  setPromotionCode(
+    saleId: string,
+    input: { expectedVersion: number; code: string },
+    idempotencyKey: string,
+  ): Promise<Sale>;
+  clearPromotionCode(
+    saleId: string,
+    expectedVersion: number,
+    idempotencyKey: string,
+  ): Promise<Sale>;
 }
 
 export type OperationalAwareTransactionPort = SaleTransactionPort & OperationalProjectionQuery;
@@ -121,21 +135,43 @@ export function attachOperationalProjection(
     client.post<Sale>(
       `${OPERATIONAL_PREFIX}/transactions/${saleId}/lines/${saleLineId}/discount`,
       input,
+      idempotencyHeaders('line-discount'),
     );
 
   operational.clearSaleLineDiscount = (saleId, saleLineId, expectedVersion) =>
     client.post<Sale>(
       `${OPERATIONAL_PREFIX}/transactions/${saleId}/lines/${saleLineId}/discount/remove`,
       { expectedVersion },
+      idempotencyHeaders('line-discount-remove'),
     );
 
   operational.setSaleDiscount = (saleId, input) =>
-    client.post<Sale>(`${OPERATIONAL_PREFIX}/transactions/${saleId}/discount`, input);
+    client.post<Sale>(
+      `${OPERATIONAL_PREFIX}/transactions/${saleId}/discount`,
+      input,
+      idempotencyHeaders('order-discount'),
+    );
 
   operational.clearSaleDiscount = (saleId, expectedVersion) =>
-    client.post<Sale>(`${OPERATIONAL_PREFIX}/transactions/${saleId}/discount/remove`, {
-      expectedVersion,
-    });
+    client.post<Sale>(
+      `${OPERATIONAL_PREFIX}/transactions/${saleId}/discount/remove`,
+      { expectedVersion },
+      idempotencyHeaders('order-discount-remove'),
+    );
+
+  operational.setPromotionCode = (saleId, input, idempotencyKey) =>
+    client.post<Sale>(
+      `${OPERATIONAL_PREFIX}/transactions/${saleId}/promo-code`,
+      input,
+      { headers: { 'Idempotency-Key': idempotencyKey } },
+    );
+
+  operational.clearPromotionCode = (saleId, expectedVersion, idempotencyKey) =>
+    client.post<Sale>(
+      `${OPERATIONAL_PREFIX}/transactions/${saleId}/promo-code/remove`,
+      { expectedVersion },
+      { headers: { 'Idempotency-Key': idempotencyKey } },
+    );
 
   operational.setSaleLinePerformers = (saleId, saleLineId, input) =>
     client.post<Sale>(
