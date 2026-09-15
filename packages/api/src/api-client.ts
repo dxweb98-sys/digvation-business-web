@@ -2,6 +2,7 @@ import { ApiError } from './api-error';
 import type { ApiEnvelope, ApiFailureEnvelope } from './api.types';
 
 export type SessionEndReason = 'idle' | 'invalid';
+export type ApplicationSurface = 'backoffice' | 'operational';
 export type AccessTokenRefreshResult =
   | { kind: 'refreshed'; accessToken: string }
   | { kind: 'deferred' }
@@ -9,6 +10,7 @@ export type AccessTokenRefreshResult =
 
 export interface ApiClientOptions {
   baseUrl: string;
+  applicationSurface?: ApplicationSurface;
   getAccessToken?: (forceRefresh?: boolean) => Promise<string | null>;
   refreshAccessToken?: () => Promise<AccessTokenRefreshResult>;
   onSessionEnded?: (reason: SessionEndReason) => void;
@@ -88,6 +90,8 @@ export class ApiClient {
     const token = await this.options.getAccessToken?.();
     const headers = new Headers(init.headers);
 
+    if (this.options.applicationSurface)
+      headers.set('X-Digvation-Session-Channel', this.options.applicationSurface);
     if (token) headers.set('authorization', `Bearer ${token}`);
     else headers.delete('authorization');
 
@@ -110,7 +114,8 @@ export class ApiClient {
           if (refreshed.kind === 'ended') this.options.onSessionEnded?.(refreshed.reason);
         } else if (this.options.getAccessToken) {
           const refreshedToken = await this.options.getAccessToken(true);
-          if (refreshedToken && refreshedToken !== token) return this.request<T>(path, init, false);
+          if (refreshedToken && refreshedToken !== token)
+            return this.request<T>(path, init, false);
           this.options.onUnauthorized?.();
         } else {
           this.options.onUnauthorized?.();

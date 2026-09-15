@@ -37,11 +37,14 @@ describe('ApiClient', () => {
     vi.unstubAllGlobals();
   });
 
-  it('preserves command headers while applying JSON transport headers', async () => {
+  it('preserves command headers and sends canonical application provenance', async () => {
     const fetchMock = vi.fn().mockResolvedValue(successResponse({ id: 'sale-1' }));
     vi.stubGlobal('fetch', fetchMock);
 
-    const client = new ApiClient({ baseUrl: 'https://pos.example.test' });
+    const client = new ApiClient({
+      baseUrl: 'https://pos.example.test',
+      applicationSurface: 'operational',
+    });
     await client.post(
       '/api/v1/sales',
       { sellingLocationId: 'branch-1', currency: 'IDR' },
@@ -54,6 +57,7 @@ describe('ApiClient', () => {
 
     expect(headers.get('idempotency-key')).toBe('cashier-create-sale-1');
     expect(headers.get('content-type')).toBe('application/json');
+    expect(headers.get('x-digvation-session-channel')).toBe('operational');
   });
 
   it('sends binary bodies without JSON serialization', async () => {
@@ -62,6 +66,7 @@ describe('ApiClient', () => {
 
     const client = new ApiClient({
       baseUrl: 'https://pos.example.test',
+      applicationSurface: 'backoffice',
       getAccessToken: async () => 'session-token',
     });
     const body = new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], {
@@ -79,6 +84,7 @@ describe('ApiClient', () => {
     expect(init.body).toBe(body);
     expect(headers.get('content-type')).toBe('image/png');
     expect(headers.get('authorization')).toBe('Bearer session-token');
+    expect(headers.get('x-digvation-session-channel')).toBe('backoffice');
   });
 
   it('refreshes once and retries the original request after a 401', async () => {

@@ -46,6 +46,7 @@ export function OperationalExpensesPage() {
       new OperationalExpenseApi(
         new ApiClient({
           baseUrl: runtime.apiBaseUrl,
+          applicationSurface: 'operational',
           ...(authPort.getAccessToken
             ? { getAccessToken: authPort.getAccessToken.bind(authPort) }
             : {}),
