@@ -3,7 +3,6 @@ import {
   useAuth,
   type AuthPort,
   type AuthSession,
-  type SessionEndReason,
 } from '@digvation/business-auth';
 import {
   ApplicationSplash,
@@ -61,9 +60,6 @@ function AuthenticatedOperationalRuntime({ children }: { children: ReactNode }) 
 
   useEffect(() => {
     let active = true;
-    setState('loading');
-    setEffectiveRuntime(null);
-    setAvailability(null);
     void (async () => {
       const token = await authPort.getAccessToken?.();
       if (!token) {
@@ -164,26 +160,23 @@ function OperationalAuthBoundary({
   router,
 }: OperationalAuthBoundaryProps) {
   const locale = runtimeLocale(runtime.locale);
-  const copy = (value: string) => operationalCopy(value, locale);
+  const copy = useCallback((value: string) => operationalCopy(value, locale), [locale]);
   const [authenticatedSession, setAuthenticatedSession] = useState(session);
   const [isLoggingOut, setLoggingOut] = useState(false);
   const sessionEnded = useRef(false);
   const { showToast } = useToast();
 
-  const handleSessionEnded = useCallback(
-    (_reason: SessionEndReason) => {
-      if (sessionEnded.current) return;
-      sessionEnded.current = true;
-      setLoggingOut(false);
-      setAuthenticatedSession(null);
-      showToast({
-        variant: 'warning',
-        title: copy('Your session has ended. Sign in again.'),
-      });
-      void authPort.logout();
-    },
-    [authPort, copy, showToast],
-  );
+  const handleSessionEnded = useCallback(() => {
+    if (sessionEnded.current) return;
+    sessionEnded.current = true;
+    setLoggingOut(false);
+    setAuthenticatedSession(null);
+    showToast({
+      variant: 'warning',
+      title: copy('Your session has ended. Sign in again.'),
+    });
+    void authPort.logout();
+  }, [authPort, copy, showToast]);
 
   useEffect(() => {
     if (!authPort.subscribeSessionEnded) return undefined;
