@@ -4,7 +4,7 @@ import { useRuntime } from '@digvation/pos-runtime';
 import { DButton, DDialog, DInput, DSelect, useToast } from '@digvation-labs/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { BadgePercent, Tag, X } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { useOperationalLocalization } from '../../../app/localization/operational-localization';
 import { createCashierTransactionAdapter } from '../cashier-transaction-adapter-factory';
@@ -135,15 +135,6 @@ export function SaleAdjustmentControls({ workspace }: SaleAdjustmentControlsProp
       ? actionBlockMessage(workspace.viewModel.monetaryMutation.reason, runtime.locale)
       : null;
 
-  useEffect(() => {
-    if (!sale) return;
-    const nextType = sale.orderDiscountType ?? 'PERCENTAGE';
-    setDiscountType(nextType);
-    setDiscountValue(discountValueForForm(nextType, sale.orderDiscountValue));
-    setDiscountReason(sale.orderDiscountReason ?? '');
-    setPromoCode(sale.promotionCode ?? '');
-  }, [sale?.id, sale?.version]);
-
   if ((!sale && workspace.cart.lines.length === 0) || (sale && sale.status !== 'OPEN')) return null;
 
   const adjustments = sale?.adjustments ?? [];
@@ -156,15 +147,25 @@ export function SaleAdjustmentControls({ workspace }: SaleAdjustmentControlsProp
     !workspace.isCoreMutating &&
     Boolean(discountApiValue && discountReason.trim());
 
+  const populateForm = (currentSale: Sale) => {
+    const nextType = currentSale.orderDiscountType ?? 'PERCENTAGE';
+    setDiscountType(nextType);
+    setDiscountValue(discountValueForForm(nextType, currentSale.orderDiscountValue));
+    setDiscountReason(currentSale.orderDiscountReason ?? '');
+    setPromoCode(currentSale.promotionCode ?? '');
+  };
+
   const prepareAndOpen = async () => {
     if (sale) {
+      populateForm(sale);
       setOpen(true);
       return;
     }
     if (!workspace.cart.isLocalDraft || preparing) return;
     setPreparing(true);
     try {
-      await workspace.commitDraft();
+      const committed = await workspace.commitDraft();
+      populateForm(committed);
       setOpen(true);
     } catch (error) {
       showToast({
@@ -322,7 +323,9 @@ export function SaleAdjustmentControls({ workspace }: SaleAdjustmentControlsProp
                   onValueChange={(value) => setDiscountType(value as DiscountType)}
                 />
                 <DInput
-                  label={text(discountType === 'PERCENTAGE' ? 'Discount (%)' : 'Discount amount')}
+                  label={text(
+                    discountType === 'PERCENTAGE' ? 'Discount (%)' : 'Discount amount',
+                  )}
                   value={discountValue}
                   inputMode="decimal"
                   disabled={!monetaryAvailable || workspace.isCoreMutating}
@@ -410,7 +413,11 @@ export function SaleAdjustmentControls({ workspace }: SaleAdjustmentControlsProp
                       <div className="min-w-0">
                         <p className="truncate text-xs font-semibold">{adjustment.label}</p>
                         <p className="mt-0.5 text-[11px] text-[var(--color-text-muted)]">
-                          {text(adjustment.source === 'PROMOTION' ? 'Promotion' : 'Manual discount')}
+                          {text(
+                            adjustment.source === 'PROMOTION'
+                              ? 'Promotion'
+                              : 'Manual discount',
+                          )}
                           {adjustment.reason ? ` · ${adjustment.reason}` : ''}
                         </p>
                       </div>
