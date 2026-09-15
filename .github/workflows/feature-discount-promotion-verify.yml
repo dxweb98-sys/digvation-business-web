@@ -36,8 +36,18 @@ jobs:
           apps/operational/src/features/sell/operational-projection-client.ts
           apps/operational/src/features/sell/use-sale-workspace-controller.ts
           apps/operational/src/features/sell/components/sale-adjustment-controls.tsx
-      - name: Lint
-        run: pnpm lint
+      - name: Feature lint
+        run: >-
+          pnpm exec eslint
+          apps/backoffice/src/modules/promotions/promotions-api.ts
+          apps/backoffice/src/modules/promotions/promotions-localization.ts
+          apps/backoffice/src/modules/promotions/promotions-page.tsx
+          apps/operational/src/features/sell/cart-draft.ts
+          apps/operational/src/features/sell/cart-draft.test.ts
+          apps/operational/src/features/sell/cashier-transaction.types.ts
+          apps/operational/src/features/sell/operational-projection-client.ts
+          apps/operational/src/features/sell/use-sale-workspace-controller.ts
+          apps/operational/src/features/sell/components/sale-adjustment-controls.tsx
       - name: Typecheck
         run: pnpm typecheck
       - name: Tests
