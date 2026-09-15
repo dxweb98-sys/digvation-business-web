@@ -2,7 +2,7 @@ import { useBackofficeLocalization } from '../../app/localization/backoffice-loc
 
 const dashboardCopy = {
   activeBranch: { id: 'Cabang aktif', en: 'Active branch' },
-  mainBranch: { id: 'Cabang Utama', en: 'Main Branch' },
+  mainBranch: { id: 'Cabang utama', en: 'Main branch' },
   seeAll: { id: 'Lihat semua', en: 'See all' },
   revenueToday: { id: 'Pendapatan hari ini', en: 'Revenue today' },
   transactionsToday: { id: 'Transaksi hari ini', en: 'Transactions today' },
@@ -27,11 +27,11 @@ const dashboardCopy = {
     en: 'No activity has been recorded for this period yet.',
   },
   transactionCompletion: { id: 'Penyelesaian transaksi', en: 'Transaction completion' },
-  finalizedSalesToday: { id: 'Transaksi final hari ini', en: 'Finalized sales today' },
-  finalized: { id: 'Final', en: 'Finalized' },
-  inProgress: { id: 'Berjalan', en: 'In progress' },
+  finalizedSalesToday: { id: 'Transaksi selesai hari ini', en: 'Completed sales today' },
+  finalized: { id: 'Selesai', en: 'Completed' },
+  inProgress: { id: 'Dikerjakan', en: 'In progress' },
   voided: { id: 'Dibatalkan', en: 'Voided' },
-  finalizedOf: { id: 'difinalisasi', en: 'finalized' },
+  finalizedOf: { id: 'selesai', en: 'completed' },
   topItems: { id: '5 item teratas', en: 'Top 5 items' },
   topEmployees: { id: '5 karyawan teratas', en: 'Top 5 employees' },
   paymentMix: { id: 'Komposisi pembayaran', en: 'Payment mix' },
@@ -39,14 +39,14 @@ const dashboardCopy = {
   totalValue: { id: 'total nilai', en: 'total value' },
   lastTransactions: { id: 'Transaksi terakhir', en: 'Last transactions' },
   latest: { id: 'Terbaru', en: 'Latest' },
-  businessInsight: { id: 'Insight bisnis', en: 'Business insight' },
+  businessInsight: { id: 'Ringkasan bisnis', en: 'Business summary' },
   insightComparison: {
     id: 'Bulan ini dibanding bulan sebelumnya',
     en: 'This month compared with the previous month',
   },
   insightSource: {
-    id: 'Dihasilkan dari agregat laporan tanpa biaya model AI eksternal.',
-    en: 'Generated from report aggregates only. No external AI request or model cost is used.',
+    id: 'Berdasarkan ringkasan laporan bulan ini.',
+    en: 'Based on this month reporting summary.',
   },
   noSummary: {
     id: 'Belum ada data ringkasan untuk bulan ini.',
@@ -58,13 +58,13 @@ const dashboardCopy = {
   },
   salesUnavailable: { id: 'Ringkasan penjualan tidak tersedia', en: 'Sales reporting unavailable' },
   salesUnavailableDescription: {
-    id: 'Peran Anda tidak memiliki izin untuk membaca ringkasan penjualan.',
-    en: 'Your role does not include permission to read sales summary data.',
+    id: 'Anda tidak memiliki akses ke ringkasan penjualan.',
+    en: 'You do not have access to sales summary data.',
   },
-  selectLocation: { id: 'Pilih cabang', en: 'Select a location' },
+  selectLocation: { id: 'Pilih cabang', en: 'Select a branch' },
   selectLocationDescription: {
-    id: 'Pilih satu cabang yang diizinkan sebelum memuat ringkasan dasbor.',
-    en: 'Choose one authorized branch before loading dashboard summaries.',
+    id: 'Pilih cabang sebelum memuat ringkasan dasbor.',
+    en: 'Choose a branch before loading dashboard summaries.',
   },
   revenueHigher: { id: 'Pendapatan lebih tinggi', en: 'Revenue is higher' },
   revenueLower: { id: 'Pendapatan lebih rendah', en: 'Revenue is lower' },
@@ -77,11 +77,11 @@ const dashboardCopy = {
     en: 'is the leading payment method this month.',
   },
   noRevenueMonth: {
-    id: 'Belum ada pendapatan yang tercatat bulan ini.',
-    en: 'No revenue activity was recorded this month.',
+    id: 'Belum ada pendapatan bulan ini.',
+    en: 'No revenue was recorded this month.',
   },
   noTransactionsMonth: {
-    id: 'Belum ada transaksi yang tercatat bulan ini.',
+    id: 'Belum ada transaksi bulan ini.',
     en: 'No transactions were recorded this month.',
   },
 } as const;
