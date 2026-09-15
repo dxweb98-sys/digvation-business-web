@@ -46,6 +46,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
   const [queueContextSale, setQueueContextSale] = useState<Sale | null>(null);
   const [areEmployeeOptionsEnabled, setEmployeeOptionsEnabled] = useState(false);
   const pendingPerformerIntent = useRef<{ lineId: string; token: symbol } | null>(null);
+  const queuePaymentTargetId = useRef<string | null>(null);
   const transactionAdapter = useMemo(
     () => createCashierTransactionAdapter(runtime, authPort.getAccessToken?.bind(authPort)),
     [authPort, runtime],
@@ -150,6 +151,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
   };
 
   const openQueueContext = (saleId: string) => {
+    queuePaymentTargetId.current = null;
     setCompletionOpen(false);
     setLineTaskId(null);
     command.clearAttention();
@@ -272,6 +274,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
       if (!confirmed) return;
     }
     navigate('/sell');
+    queuePaymentTargetId.current = null;
     setQueueContextSale(null);
     setCompletionOpen(false);
     setLineTaskId(null);
@@ -280,6 +283,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
   };
 
   const clearProcessedDraft = () => {
+    queuePaymentTargetId.current = null;
     if (queueContextSale) {
       setQueueContextSale(null);
       setVariantPicker(null);
@@ -318,6 +322,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     if (readiness.paymentMutation.state !== 'AVAILABLE') {
       throw new Error(copy('The latest transaction cannot accept another payment.'));
     }
+    queuePaymentTargetId.current = saleId;
     return { sale: hydrated, availableToPay: readiness.availableToPay };
   };
 
@@ -606,7 +611,8 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     tenderedAmount?: string,
     providerReference?: string,
   ) => {
-    if (queueContextSale) {
+    const queueTarget = queuePaymentTargetId.current;
+    if (queueTarget && queueContextSale?.id === queueTarget) {
       return createQueuedPayment(
         queueContextSale,
         method,
