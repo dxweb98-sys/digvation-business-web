@@ -62,6 +62,17 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
   });
 
   const employeeOptions = useEmployeeOptions(transactionAdapter, areEmployeeOptionsEnabled);
+  const paymentRoutesQuery = useQuery({
+    queryKey: cashierTransactionKeys.paymentRoutes(selectedLocationId ?? '', runtime.currency),
+    queryFn: ({ signal }) =>
+      transactionAdapter.listPaymentRoutes(
+        { sellingLocationId: selectedLocationId!, currency: runtime.currency },
+        signal,
+      ),
+    enabled: Boolean(selectedLocationId && runtime.currency),
+    staleTime: 0,
+    refetchOnMount: 'always',
+  });
 
   const activeSaleId = routeSaleId ?? resumedSaleId ?? undefined;
   const saleWorkspace = useSaleWorkspaceController({
@@ -248,10 +259,11 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     return { sale: hydrated, availableToPay: readiness.availableToPay };
   };
 
-  const cachedCardPrice = (itemId: string): string | null => {
-    const item = catalog.items.find((candidate) => candidate.id === itemId);
-    return item?.displayPrice?.kind === 'EXACT' ? item.displayPrice.amount : null;
-  };
+  const cachedCardDisplayPrice = (itemId: string) =>
+    catalog.items.find((candidate) => candidate.id === itemId)?.displayPrice ?? null;
+
+  const cachedCardPrice = (itemId: string): string | null =>
+    cachedCardDisplayPrice(itemId)?.amount ?? null;
 
   const retryLastCommand = () => {
     if (core.canRetryLastCoreCommand) core.retryLastCoreCommand();
@@ -513,6 +525,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     items: catalog.items,
     categories: catalog.categories,
     employees: employeeOptions.employees,
+    paymentRoutes: (paymentRoutesQuery.data?.items ?? []).filter((route) => route.status === 'ACTIVE'),
     selectedLocationId: selectedLocationId ?? '',
     search: catalog.search,
     itemType: catalog.itemType,
@@ -531,6 +544,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     viewModel: saleWorkspace.viewModel,
     isLoadingCatalog: catalog.isLoading,
     isLoadingEmployees: employeeOptions.isLoading,
+    isLoadingPaymentRoutes: paymentRoutesQuery.isLoading,
     isLoadingSale: saleWorkspace.isLoading,
     isCoreMutating: core.isPending || command.isMutating,
     canRetryLastCommand: core.canRetryLastCoreCommand || saleWorkspace.canRetryLastAdd,
@@ -538,6 +552,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     setItemType: catalog.setItemType,
     selectItem,
     selectVariant,
+    cachedCardDisplayPrice,
     cachedCardPrice,
     requestEmployeeOptions: () => setEmployeeOptionsEnabled(true),
     closeVariantPicker: () => setVariantPicker(null),

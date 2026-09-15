@@ -1,11 +1,19 @@
+export interface AuthRoleIdentity {
+  code: string;
+  name: string;
+  systemKey?: string | null;
+}
+
 export interface AuthIdentity {
   userId: string;
   displayName: string;
+  username?: string | null;
   email?: string;
   initials?: string;
   avatarUrl?: string;
   workspace: string;
   permissions: readonly string[];
+  roles?: readonly AuthRoleIdentity[];
 }
 
 export interface AuthSession {
