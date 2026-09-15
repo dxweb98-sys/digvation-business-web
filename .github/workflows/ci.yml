@@ -4,10 +4,10 @@ on:
   pull_request:
     branches: [dev, main]
   push:
-    branches: [dev, main, fix/human-readable-labels]
+    branches: [dev, main]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   verify:
@@ -31,50 +31,6 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Align current Operational smoke fixture
-        if: github.ref == 'refs/heads/fix/human-readable-labels'
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          path = Path('tooling/e2e/cashier-transaction-foundation.spec.ts')
-          text = path.read_text()
-          marker = """    if (method === 'GET' && url.pathname === '/api/v1/locations') {
-          """
-          access_route = """    if (method === 'GET' && url.pathname === '/api/v1/operational-access/context') {
-            await route.fulfill({
-              json: envelope({
-                organizationWide: true,
-                resolution: 'AUTO_RESOLVED',
-                selectedLocationId: branch.id,
-                mainLocationId: branch.id,
-                locations: [{ id: branch.id, code: branch.code, name: branch.name }],
-              }),
-            });
-            return;
-          }
-          """
-          if "url.pathname === '/api/v1/operational-access/context'" not in text:
-              text = text.replace(marker, access_route + marker)
-          text = text.replace(
-              "await expect(cart.getByLabel('Jumlah Hair Cut')).toHaveValue('2');",
-              "await expect(cart.getByLabel('Jumlah Hair Cut')).toHaveText('2');",
-          )
-          path.write_text(text)
-          PY
-
-      - name: Format validation changes
-        if: github.ref == 'refs/heads/fix/human-readable-labels'
-        run: |
-          pnpm format
-          if ! git diff --quiet; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add .
-            git commit -m "test: align operational access smoke fixture"
-            git push
-          fi
 
       - name: Verify foundation
         env:
