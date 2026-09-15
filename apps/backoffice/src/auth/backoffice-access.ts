@@ -3,6 +3,7 @@ import type { BackofficeSession } from './auth-session';
 export type BackofficeCapability =
   | 'dashboard'
   | 'catalog'
+  | 'promotions'
   | 'employees'
   | 'attendance'
   | 'finance'
@@ -36,6 +37,8 @@ export type BackofficeAction =
   | 'viewPricing'
   | 'createPricing'
   | 'cancelPricing'
+  | 'createPromotion'
+  | 'updatePromotion'
   | 'viewTax'
   | 'createTax'
   | 'updateTax'
@@ -64,6 +67,7 @@ interface PermissionRequirement {
 const capabilityPermissions: Record<BackofficeCapability, PermissionRequirement> = {
   dashboard: { allOf: ['auth:self'] },
   catalog: { allOf: ['catalog:read'] },
+  promotions: { allOf: ['promotions:read'] },
   employees: { allOf: ['employees:read'] },
   attendance: { allOf: ['attendance:read'] },
   finance: { allOf: ['payments:read'] },
@@ -116,6 +120,8 @@ const actionPermissions: Record<BackofficeAction, readonly string[]> = {
   viewPricing: ['pricing:read'],
   createPricing: ['pricing:create'],
   cancelPricing: ['pricing:cancel'],
+  createPromotion: ['promotions:create'],
+  updatePromotion: ['promotions:update'],
   viewTax: ['tax:read'],
   createTax: ['tax:create'],
   updateTax: ['tax:update'],

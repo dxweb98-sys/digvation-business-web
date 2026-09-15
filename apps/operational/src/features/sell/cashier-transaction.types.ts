@@ -176,6 +176,23 @@ export interface Payment {
   updatedAt: string;
 }
 
+export interface SaleAdjustment {
+  id: string;
+  source: 'PROMOTION' | 'MANUAL_DISCOUNT';
+  scope: 'ITEM' | 'CATEGORY' | 'TRANSACTION';
+  type: DiscountType;
+  configuredValue: string;
+  requestedValue: string | null;
+  actualAmount: string;
+  promotionId: string | null;
+  label: string;
+  saleLineId: string | null;
+  actorId: string | null;
+  actorKind: string | null;
+  reason: string | null;
+  createdAt: string;
+}
+
 export interface ContributionPreviewAmount {
   employeeId: string;
   contributionAmount: string;
@@ -247,6 +264,8 @@ export interface Sale {
   orderDiscountValue: string | null;
   orderDiscountReason: string | null;
   orderDiscountAmount: string;
+  promotionCode?: string | null;
+  adjustments?: SaleAdjustment[];
   finalizedAt: string | null;
   voidedAt: string | null;
   createdAt: string;

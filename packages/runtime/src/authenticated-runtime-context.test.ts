@@ -22,6 +22,7 @@ function runtimeResponse(overrides: Record<string, unknown> = {}) {
           'MEMBERSHIP',
           'LOYALTY_POINTS',
           'TAX_FISCAL',
+          'PROMOTIONS',
         ],
         effectiveFoundations: [
           'IDENTITY_ACCESS',
@@ -62,6 +63,7 @@ describe('authenticated runtime context', () => {
           'MEMBERSHIP',
           'LOYALTY_POINTS',
           'TAX_FISCAL',
+          'PROMOTIONS',
         ],
       },
       effectiveFoundations: [
@@ -88,7 +90,7 @@ describe('authenticated runtime context', () => {
       'fetch',
       vi.fn().mockResolvedValue(
         runtimeResponse({
-          effectiveCapabilities: ['WORKFORCE_ATTENDANCE', 'UNKNOWN_FEATURE'],
+          effectiveCapabilities: ['PROMOTIONS', 'WORKFORCE_ATTENDANCE', 'UNKNOWN_FEATURE'],
           effectiveFoundations: ['WORKFORCE', 'UNKNOWN_FOUNDATION'],
           effectivePermissions: ['attendance:read', 'future-domain:read'],
         }),
@@ -100,7 +102,7 @@ describe('authenticated runtime context', () => {
     ).resolves.toEqual({
       effectiveEntitlements: {
         products: ['POS'],
-        capabilities: ['WORKFORCE_ATTENDANCE'],
+        capabilities: ['PROMOTIONS', 'WORKFORCE_ATTENDANCE'],
       },
       effectiveFoundations: ['WORKFORCE'],
       effectivePermissions: ['attendance:read', 'future-domain:read'],
@@ -121,6 +123,7 @@ describe('authenticated runtime context', () => {
         'MEMBERSHIP',
         'LOYALTY_POINTS',
         'TAX_FISCAL',
+        'PROMOTIONS',
       ],
     });
   });

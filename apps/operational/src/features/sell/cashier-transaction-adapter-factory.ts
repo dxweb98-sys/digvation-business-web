@@ -8,12 +8,15 @@ import {
 import {
   attachOperationalProjection,
   type OperationalProjectionQuery,
+  type OperationalPromotionCommands,
 } from './operational-projection-client';
 
 type PerformerCapableTransactionPort = SaleTransactionPort & {
   setSaleLinePerformers: NonNullable<SaleTransactionPort['setSaleLinePerformers']>;
 };
-type OperationalCashierTransactionPort = PerformerCapableTransactionPort & OperationalProjectionQuery;
+type OperationalCashierTransactionPort = PerformerCapableTransactionPort &
+  OperationalProjectionQuery &
+  OperationalPromotionCommands;
 
 function withServicePerformers(adapter: SaleTransactionPort): PerformerCapableTransactionPort {
   if (!adapter.setSaleLinePerformers) {

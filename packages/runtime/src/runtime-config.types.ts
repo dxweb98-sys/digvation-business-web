@@ -10,7 +10,8 @@ export type BusinessCapability =
   | 'WORKFORCE_ATTENDANCE'
   | 'MEMBERSHIP'
   | 'LOYALTY_POINTS'
-  | 'TAX_FISCAL';
+  | 'TAX_FISCAL'
+  | 'PROMOTIONS';
 export type BusinessFoundation =
   | 'IDENTITY_ACCESS'
   | 'AUDIT_ACTIVITY'

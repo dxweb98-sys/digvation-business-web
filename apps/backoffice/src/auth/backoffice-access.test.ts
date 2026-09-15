@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { BackofficeSession } from './auth-session';
-import { canAccessBackoffice } from './backoffice-access';
+import { canAccessBackoffice, canPerformBackofficeAction } from './backoffice-access';
 
 function sessionWith(...permissions: string[]): BackofficeSession {
   return {
@@ -31,6 +31,19 @@ describe('Backoffice effective permission access', () => {
   it('uses projected Attendance permission as the visibility authority', () => {
     expect(canAccessBackoffice(sessionWith('attendance:read'), 'attendance')).toBe(true);
     expect(canAccessBackoffice(sessionWith(), 'attendance')).toBe(false);
+  });
+
+  it('uses projected Promotion permission and keeps mutation grants granular', () => {
+    const reader = sessionWith('promotions:read');
+    const creator = sessionWith('promotions:read', 'promotions:create');
+    const editor = sessionWith('promotions:read', 'promotions:update');
+
+    expect(canAccessBackoffice(reader, 'promotions')).toBe(true);
+    expect(canAccessBackoffice(sessionWith(), 'promotions')).toBe(false);
+    expect(canPerformBackofficeAction(reader, 'createPromotion')).toBe(false);
+    expect(canPerformBackofficeAction(creator, 'createPromotion')).toBe(true);
+    expect(canPerformBackofficeAction(reader, 'updatePromotion')).toBe(false);
+    expect(canPerformBackofficeAction(editor, 'updatePromotion')).toBe(true);
   });
 
   it('allows shared reporting for any readable authoritative projection', () => {

@@ -314,7 +314,9 @@ export function useSaleWorkspaceController({
 
   const activeSaleLines = viewModel.activeLines;
   const draftLines = cartDraftDisplayLines(draft);
-  const cartLines = saleQuery.data ? saleDisplayLines(activeSaleLines) : draftLines;
+  const cartLines = saleQuery.data
+    ? saleDisplayLines(activeSaleLines, saleQuery.data.adjustments ?? [])
+    : draftLines;
   const cartTotal = saleQuery.data?.totalAmount ?? cartDraftEstimatedTotal(draft);
 
   return {

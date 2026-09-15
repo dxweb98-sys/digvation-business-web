@@ -33,6 +33,7 @@ import { ActiveBranchHeaderSelector } from './active-branch-header-selector';
 
 interface NavigationItem {
   label: BackofficeMessageKey;
+  localizedLabel?: { id: string; en: string };
   to: string;
   icon: LucideIcon;
   capability: BackofficeCapability;
@@ -60,6 +61,13 @@ const navigationSections: ReadonlyArray<{
     label: 'masterData',
     items: [
       { label: 'catalog', to: '/catalog', icon: Tags, capability: 'catalog' },
+      {
+        label: 'catalog',
+        localizedLabel: { id: 'Diskon & promo', en: 'Discounts & promotions' },
+        to: '/promotions',
+        icon: BadgePercent,
+        capability: 'promotions',
+      },
       { label: 'employees', to: '/employees', icon: UsersRound, capability: 'employees' },
     ],
   },
@@ -329,7 +337,7 @@ function NavigationGroups({ session }: { session: BackofficeSession }) {
             </p>
             <div className="space-y-0.5 pl-3">
               {items.map((item) => (
-                <NavigationLink key={item.label} item={item} nested />
+                <NavigationLink key={item.to} item={item} nested />
               ))}
             </div>
           </div>
@@ -345,8 +353,9 @@ function NavigationGroups({ session }: { session: BackofficeSession }) {
 }
 
 function NavigationLink({ item, nested = false }: { item: NavigationItem; nested?: boolean }) {
-  const { t } = useBackofficeLocalization();
+  const { t, locale } = useBackofficeLocalization();
   const Icon = item.icon;
+  const label = item.localizedLabel?.[locale] ?? t(item.label);
   return (
     <NavLink
       to={item.to}
@@ -361,7 +370,7 @@ function NavigationLink({ item, nested = false }: { item: NavigationItem; nested
       }
     >
       <Icon className="size-[18px] shrink-0" />
-      {t(item.label)}
+      {label}
     </NavLink>
   );
 }
