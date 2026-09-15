@@ -23,7 +23,7 @@ export function cashierTransactionErrorMessage(error: unknown, locale?: string):
     return copyForLocale('Payment amount exceeds the remaining balance.', locale);
   }
   if (isApiErrorCode(error, 'SALE_PAYMENT_OVERAPPLIED')) {
-    return copyForLocale('Refund is required before reducing the transaction below the amount already paid.', locale);
+    return copyForLocale('Refund required', locale);
   }
   if (isApiErrorCode(error, 'SALE_NOT_SETTLED')) {
     return copyForLocale('Complete the remaining payment before finishing this transaction.', locale);

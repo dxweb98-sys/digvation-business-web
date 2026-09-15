@@ -533,7 +533,9 @@ function financialSummary(sale: Sale) {
 }
 
 function hasSuccessfulPayment(sale: Sale): boolean {
-  return successfulPayments(sale).length > 0;
+  return successfulPayments(sale).some((payment) =>
+    createDecimal(payment.appliedAmount).greaterThan(createDecimal('0')),
+  );
 }
 
 export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }) {
@@ -890,28 +892,13 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   };
 
   const requestCancel = (transaction: Sale) => {
-    if (hasSuccessfulPayment(transaction)) {
-      showToast({
-        title: copy('Refund required'),
-        description: copy('A paid transaction must be refunded before it can be canceled.'),
-        variant: 'warning',
-      });
-      return;
-    }
     setCancelTarget(transaction);
     setCancelReason('');
   };
 
   const confirmCancel = async () => {
     if (!cancelTarget || !cancelReason.trim()) return;
-    if (hasSuccessfulPayment(cancelTarget)) {
-      showToast({
-        title: copy('Refund required'),
-        description: copy('Refund the payment before canceling the transaction.'),
-        variant: 'warning',
-      });
-      return;
-    }
+    const refundAmount = financialSummary(cancelTarget).totalPaid;
     try {
       const canceledSale = await workspace.voidQueuedSale(cancelTarget);
       if (isLocalDemo) {
@@ -922,18 +909,22 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         }));
       }
       setQueueDetail(canceledSale);
+      setQueueTab('CANCELED');
+      setReceiptSaleId(null);
       setCancelTarget(null);
       setCancelReason('');
       workspace.closeQueueContext();
       showToast({
         title: copy('Transaction canceled'),
-        description: copy('Cancellation reason saved.'),
+        description: isPositiveDecimal(refundAmount)
+          ? `${copy('Refund required')}: ${money(refundAmount, workspace.locale)}. ${copy('Cancellation reason saved.')}`
+          : copy('Cancellation reason saved.'),
         variant: 'success',
       });
-    } catch {
+    } catch (error) {
       showToast({
         title: copy('Cancellation failed'),
-        description: copy('The transaction was not changed. Check payment status.'),
+        description: cashierTransactionErrorMessage(error),
         variant: 'danger',
       });
     }
@@ -1357,6 +1348,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       <ReferenceCancelDialog
         sale={cancelTarget}
         reason={cancelReason}
+        isMutating={workspace.isCoreMutating}
         onReasonChange={setCancelReason}
         onClose={() => {
           setCancelTarget(null);
@@ -2731,7 +2723,9 @@ function ReferenceTransactionDetail({
   const customerContext = readStoredCustomer(saleCustomerKey(sale.id));
   const customer = customerContext ?? saleCustomer(sale.id, locale);
   const activeLines = sale.lines.filter((line) => !line.removedAt);
-  const payments = successfulPayments(sale);
+  const payments = successfulPayments(sale).filter((payment) =>
+    createDecimal(payment.appliedAmount).greaterThan(createDecimal('0')),
+  );
   const payment = payments[payments.length - 1] ?? null;
   const receiptAvailable = payments.length > 0;
   const showReceipt = showPaymentReceipt && receiptAvailable;
@@ -3418,8 +3412,9 @@ function ReferenceOrderAdjustmentDialog({
           {activeLines.map((line) => {
             const lineMutable = !line.fulfillment || line.fulfillment.status === 'WAITING';
             const canDecrease =
-              !paid && lineMutable && createDecimal(line.quantity).greaterThan(createDecimal('1'));
-            const canRemove = !paid && lineMutable;
+              lineMutable &&
+              createDecimal(line.quantity).greaterThan(createDecimal('1'));
+            const canRemove = lineMutable;
             const projectedTotalAfterRemoval = saleTotal.minus(createDecimal(line.totalAmount));
             const removalRefund = paidAmount.greaterThan(projectedTotalAfterRemoval)
               ? paidAmount.minus(projectedTotalAfterRemoval)
@@ -3715,24 +3710,28 @@ function ReferenceBalancePaymentDialog({
 function ReferenceCancelDialog({
   sale,
   reason,
+  isMutating,
   onReasonChange,
   onClose,
   onConfirm,
 }: {
   sale: Sale | null;
   reason: string;
+  isMutating: boolean;
   onReasonChange: (reason: string) => void;
   onClose: () => void;
   onConfirm: () => void;
 }) {
   const { copy, locale } = useOperationalLocalization();
+  const refundAmount = sale ? financialSummary(sale).totalPaid : '0.0000';
+  const hasRefund = isPositiveDecimal(refundAmount);
   return (
     <Dialog
       open={Boolean(sale)}
       onClose={onClose}
       ariaLabel={copy('Cancel transaction')}
-      closeOnEscape
-      closeOnOverlay
+      closeOnEscape={!isMutating}
+      closeOnOverlay={!isMutating}
       className="pos-reference-dialog w-full max-w-md rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
     >
       <div className="p-5">
@@ -3750,27 +3749,49 @@ function ReferenceCancelDialog({
           <button
             type="button"
             aria-label={copy('Close')}
+            disabled={isMutating}
             onClick={onClose}
-            className="rounded-lg p-2 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]"
+            className="rounded-lg p-2 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] disabled:opacity-40"
           >
             <X className="size-[18px]" />
           </button>
         </div>
+        {hasRefund ? (
+          <div className="mt-4 rounded-xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 px-3 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm font-semibold text-[var(--color-warning)]">
+                {copy('Refund required')}
+              </span>
+              <span className="text-sm font-bold text-[var(--color-warning)]">
+                {money(refundAmount, locale)}
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+              {copy('Previous payment remains recorded')}
+            </p>
+          </div>
+        ) : null}
         <label className="mt-5 block text-sm font-medium">
           {copy('Cancellation reason')}
           <Input
             className="mt-1.5 h-10 rounded-lg"
             autoFocus
             value={reason}
+            disabled={isMutating}
             onChange={onReasonChange}
             placeholder={copy('Example: Customer request')}
           />
         </label>
         <div className="mt-5 flex justify-end gap-2">
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" disabled={isMutating} onClick={onClose}>
             {copy('Back')}
           </Button>
-          <Button variant="danger" disabled={!reason.trim()} onClick={onConfirm}>
+          <Button
+            variant="danger"
+            disabled={!reason.trim() || isMutating}
+            loading={isMutating}
+            onClick={onConfirm}
+          >
             {copy('Confirm cancellation')}
           </Button>
         </div>

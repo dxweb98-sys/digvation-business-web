@@ -3,6 +3,7 @@ import type { ApiClient } from '@digvation/business-api';
 import type {
   AddSaleLineInput,
   CreatePaymentInput,
+  CreateSaleInput,
   SaleTransactionPort,
   SetSaleLineQuantityInput,
   SellingCatalogDisplayInput,
@@ -10,6 +11,7 @@ import type {
 } from './cashier-transaction.adapter';
 import type {
   ApiPage,
+  ContributionPreview,
   Employee,
   OperationalCatalogProjection,
   PaymentRoute,
@@ -65,6 +67,11 @@ export function attachOperationalProjection(
     return client.get<ApiPage<Sale>>(`${OPERATIONAL_PREFIX}/queue${suffix}`, { signal });
   };
 
+  operational.createSale = (input: CreateSaleInput, idempotencyKey: string) =>
+    client.post<Sale>(`${OPERATIONAL_PREFIX}/transactions/empty`, input, {
+      headers: { 'Idempotency-Key': idempotencyKey },
+    });
+
   operational.startSale = (input: StartSaleInput, idempotencyKey: string) =>
     client.post<Sale>(`${OPERATIONAL_PREFIX}/transactions`, input, {
       headers: { 'Idempotency-Key': idempotencyKey },
@@ -98,10 +105,60 @@ export function attachOperationalProjection(
       { expectedVersion },
     );
 
+  operational.setSaleLinePriceOverride = (saleId, saleLineId, input) =>
+    client.post<Sale>(
+      `${OPERATIONAL_PREFIX}/transactions/${saleId}/lines/${saleLineId}/price-override`,
+      input,
+    );
+
+  operational.clearSaleLinePriceOverride = (saleId, saleLineId, expectedVersion) =>
+    client.post<Sale>(
+      `${OPERATIONAL_PREFIX}/transactions/${saleId}/lines/${saleLineId}/price-override/remove`,
+      { expectedVersion },
+    );
+
+  operational.setSaleLineDiscount = (saleId, saleLineId, input) =>
+    client.post<Sale>(
+      `${OPERATIONAL_PREFIX}/transactions/${saleId}/lines/${saleLineId}/discount`,
+      input,
+    );
+
+  operational.clearSaleLineDiscount = (saleId, saleLineId, expectedVersion) =>
+    client.post<Sale>(
+      `${OPERATIONAL_PREFIX}/transactions/${saleId}/lines/${saleLineId}/discount/remove`,
+      { expectedVersion },
+    );
+
+  operational.setSaleDiscount = (saleId, input) =>
+    client.post<Sale>(`${OPERATIONAL_PREFIX}/transactions/${saleId}/discount`, input);
+
+  operational.clearSaleDiscount = (saleId, expectedVersion) =>
+    client.post<Sale>(`${OPERATIONAL_PREFIX}/transactions/${saleId}/discount/remove`, {
+      expectedVersion,
+    });
+
   operational.setSaleLinePerformers = (saleId, saleLineId, input) =>
     client.post<Sale>(
       `${OPERATIONAL_PREFIX}/transactions/${saleId}/lines/${saleLineId}/performers`,
       input,
+    );
+
+  operational.setSaleLineAssignments = (saleId, saleLineId, input) =>
+    client.post<Sale>(
+      `${OPERATIONAL_PREFIX}/transactions/${saleId}/lines/${saleLineId}/assignments`,
+      input,
+    );
+
+  operational.setSaleLineContributions = (saleId, saleLineId, input) =>
+    client.post<Sale>(
+      `${OPERATIONAL_PREFIX}/transactions/${saleId}/lines/${saleLineId}/contributions`,
+      input,
+    );
+
+  operational.getSaleLineContributionPreview = (saleId, saleLineId, signal) =>
+    client.get<ContributionPreview>(
+      `${OPERATIONAL_PREFIX}/transactions/${saleId}/lines/${saleLineId}/contributions`,
+      { signal },
     );
 
   operational.transitionSaleLineFulfillment = (saleId, saleLineId, input) =>
@@ -118,6 +175,12 @@ export function attachOperationalProjection(
     client.post<Sale>(`${OPERATIONAL_PREFIX}/transactions/${saleId}/payments`, input, {
       headers: { 'Idempotency-Key': idempotencyKey },
     });
+
+  operational.transitionSalePayment = (saleId, paymentId, input) =>
+    client.post<Sale>(
+      `${OPERATIONAL_PREFIX}/transactions/${saleId}/payments/${paymentId}/status`,
+      input,
+    );
 
   operational.queueSale = (saleId, expectedVersion, idempotencyKey) =>
     client.post<Sale>(
