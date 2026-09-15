@@ -628,7 +628,8 @@ function SettlementDetail({
     <DDialog
       open={Boolean(item)}
       onClose={onClose}
-      title={copy('Settlement details')}
+      title={item?.sellingLocationName ?? copy('Settlement details')}
+      description={item ? `${copy(label(item.paymentMethod))} · ${item.financialAccountName}` : undefined}
       footer={
         <div className="flex gap-2">
           <DButton variant="secondary" onClick={onClose}>
@@ -648,34 +649,69 @@ function SettlementDetail({
       }
     >
       {item ? (
-        <dl className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <dt className="text-xs font-medium text-[var(--color-text-muted)]">
-              {copy('Expected amount')}
-            </dt>
-            <dd className="mt-1 text-sm font-semibold">
-              {format(item.expectedAmount, item.currency)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium text-[var(--color-text-muted)]">{copy('Status')}</dt>
-            <dd className="mt-1">
+        <div>
+          <section className="border-b border-[var(--color-border)] pb-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="min-w-0">
+                <h2 className="break-words text-2xl font-semibold tracking-tight text-[var(--color-text)]">
+                  {item.sellingLocationName}
+                </h2>
+                <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+                  {copy(label(item.paymentMethod))} · {item.financialAccountName}
+                </p>
+              </div>
               <SettlementBadge status={item.status} />
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium text-[var(--color-text-muted)]">
-              {copy('Settlement destination')}
-            </dt>
-            <dd className="mt-1 text-sm">{item.financialAccountName}</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium text-[var(--color-text-muted)]">
-              {copy('Payments')}
-            </dt>
-            <dd className="mt-1 text-sm">{item.payments.length}</dd>
-          </div>
-        </dl>
+            </div>
+            <div className="mt-5 border-t border-[var(--color-border)] pt-4">
+              <p className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+                {copy('Expected amount')}
+              </p>
+              <p className="mt-1 text-3xl font-semibold tracking-tight text-[var(--color-text)]">
+                {format(item.expectedAmount, item.currency)}
+              </p>
+            </div>
+          </section>
+
+          <section className="pt-5">
+            <h3 className="text-base font-semibold text-[var(--color-text)]">
+              {copy('Settlement information')}
+            </h3>
+            <dl className="mt-4 grid gap-x-6 gap-y-5 sm:grid-cols-2">
+              <div>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+                  {copy('Settlement destination')}
+                </dt>
+                <dd className="mt-1 text-sm font-medium text-[var(--color-text)]">
+                  {item.financialAccountName}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+                  {copy('Payment method')}
+                </dt>
+                <dd className="mt-1 text-sm font-medium text-[var(--color-text)]">
+                  {copy(label(item.paymentMethod))}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+                  {copy('Payments')}
+                </dt>
+                <dd className="mt-1 text-sm font-medium text-[var(--color-text)]">
+                  {item.payments.length}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+                  {copy('Status')}
+                </dt>
+                <dd className="mt-1">
+                  <SettlementBadge status={item.status} />
+                </dd>
+              </div>
+            </dl>
+          </section>
+        </div>
       ) : null}
     </DDialog>
   );
