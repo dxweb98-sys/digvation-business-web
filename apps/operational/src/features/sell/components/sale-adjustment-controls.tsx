@@ -255,15 +255,16 @@ export function SaleAdjustmentControls({ workspace }: SaleAdjustmentControlsProp
 
   return (
     <>
-      <button
-        type="button"
+      <DButton
+        size="sm"
+        variant="secondary"
         disabled={preparing}
+        loading={preparing}
         onClick={() => void prepareAndOpen()}
-        className="fixed bottom-6 left-6 z-30 inline-flex h-11 items-center gap-2 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3.5 text-xs font-bold text-[var(--color-text)] shadow-[0_12px_32px_rgb(15_23_42_/_0.14)] transition-all hover:border-[var(--color-brand)]/35 hover:text-[var(--color-brand)] active:scale-[.98] disabled:cursor-wait disabled:opacity-60"
       >
-        <BadgePercent className="size-4" />
+        <BadgePercent className="mr-1.5 size-4" />
         {text('Discounts & promotions')}
-      </button>
+      </DButton>
 
       {sale ? (
         <DDialog
