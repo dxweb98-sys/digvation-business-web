@@ -5,6 +5,7 @@ type LocalizedCopy = Record<OperationalLocale, string>;
 const posCopy: Record<string, LocalizedCopy> = {
   Transaction: { 'id-ID': 'Transaksi', 'en-US': 'Transaction' },
   Add: { 'id-ID': 'Tambah', 'en-US': 'Add' },
+  From: { 'id-ID': 'Mulai', 'en-US': 'From' },
   'Item price is unavailable for this selection.': {
     'id-ID': 'Harga item belum tersedia untuk pilihan ini.',
     'en-US': 'Item price is unavailable for this selection.',
