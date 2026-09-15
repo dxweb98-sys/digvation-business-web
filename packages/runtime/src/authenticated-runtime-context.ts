@@ -44,6 +44,7 @@ const BUSINESS_CAPABILITIES = new Set<BusinessCapability>([
   'MEMBERSHIP',
   'LOYALTY_POINTS',
   'TAX_FISCAL',
+  'PROMOTIONS',
 ]);
 
 const BUSINESS_FOUNDATIONS = new Set<BusinessFoundation>([
