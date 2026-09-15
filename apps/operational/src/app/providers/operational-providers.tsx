@@ -1,9 +1,4 @@
-import {
-  AuthProvider,
-  useAuth,
-  type AuthPort,
-  type AuthSession,
-} from '@digvation/business-auth';
+import { AuthProvider, useAuth, type AuthPort, type AuthSession } from '@digvation/business-auth';
 import {
   ApplicationSplash,
   applyEffectiveBusinessConfiguration,
@@ -14,11 +9,7 @@ import {
   type RuntimeAvailabilityConfig,
   type RuntimeConfig,
 } from '@digvation/business-runtime';
-import {
-  DLocalizationProvider,
-  DToastProvider as ToastProvider,
-  useToast,
-} from '@digvation/ui';
+import { DLocalizationProvider, DToastProvider as ToastProvider, useToast } from '@digvation/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { RouterProviderProps } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
@@ -32,10 +23,7 @@ import {
   type TransitionEvent,
 } from 'react';
 
-import {
-  operationalCopy,
-  type OperationalLocale,
-} from '../localization/operational-localization';
+import { operationalCopy, type OperationalLocale } from '../localization/operational-localization';
 import { OperationalLoginPage } from '../../modules/operational/operational-login-page';
 import { OperationalSessionProvider } from '../../modules/operational/operational-session-provider';
 import { PosOperationalSessionProvider } from '../../modules/pos/pos-operational-session-provider';
@@ -61,9 +49,7 @@ function AuthenticatedOperationalRuntime({ children }: { children: ReactNode }) 
   const bootstrapRuntime = useRuntime();
   const locale = runtimeLocale(bootstrapRuntime.locale);
   const copy = (value: string) => operationalCopy(value, locale);
-  const [state, setState] = useState<'loading' | 'allowed' | 'denied' | 'unavailable'>(
-    'loading',
-  );
+  const [state, setState] = useState<'loading' | 'allowed' | 'denied' | 'unavailable'>('loading');
   const [effectiveRuntime, setEffectiveRuntime] = useState<RuntimeConfig | null>(null);
   const [availability, setAvailability] = useState<RuntimeAvailabilityConfig | null>(null);
 
@@ -169,10 +155,7 @@ function OperationalAuthBoundary({
   router,
 }: OperationalAuthBoundaryProps) {
   const locale = runtimeLocale(runtime.locale);
-  const copy = useCallback(
-    (value: string) => operationalCopy(value, locale),
-    [locale],
-  );
+  const copy = useCallback((value: string) => operationalCopy(value, locale), [locale]);
   const [authenticatedSession, setAuthenticatedSession] = useState(session);
   const [isLoggingOut, setLoggingOut] = useState(false);
   const sessionEnded = useRef(false);
