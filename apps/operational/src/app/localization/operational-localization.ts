@@ -56,6 +56,8 @@ const copy: Record<string, LocalizedLabel> = {
   Save: { 'id-ID': 'Simpan', 'en-US': 'Save' },
   Cancel: { 'id-ID': 'Batal', 'en-US': 'Cancel' },
   Close: { 'id-ID': 'Tutup', 'en-US': 'Close' },
+  Remove: { 'id-ID': 'Hapus', 'en-US': 'Remove' },
+  Apply: { 'id-ID': 'Terapkan', 'en-US': 'Apply' },
   Logout: { 'id-ID': 'Keluar', 'en-US': 'Logout' },
   'Not available': { 'id-ID': 'Tidak tersedia', 'en-US': 'Not available' },
   'No operational expenses yet.': {
@@ -202,6 +204,14 @@ const copy: Record<string, LocalizedLabel> = {
     'id-ID': 'Belum ada transaksi dalam antrian.',
     'en-US': 'No queued transactions.',
   },
+  'Click to view active transactions.': {
+    'id-ID': 'Buka untuk melihat transaksi yang sedang berjalan.',
+    'en-US': 'Open to view active transactions.',
+  },
+  'Transactions appear here after they are created.': {
+    'id-ID': 'Transaksi akan muncul di sini setelah dibuat.',
+    'en-US': 'Transactions appear here after they are created.',
+  },
   'Select products or services from the catalog.': {
     'id-ID': 'Pilih produk atau layanan dari katalog.',
     'en-US': 'Select products or services from the catalog.',
@@ -211,6 +221,31 @@ const copy: Record<string, LocalizedLabel> = {
   Guest: { 'id-ID': 'Umum', 'en-US': 'Guest' },
   Member: { 'id-ID': 'Member', 'en-US': 'Member' },
   'Non-member': { 'id-ID': 'Non-member', 'en-US': 'Non-member' },
+  Customer: { 'id-ID': 'Pelanggan', 'en-US': 'Customer' },
+  'Choose customer': { 'id-ID': 'Pilih pelanggan', 'en-US': 'Choose customer' },
+  'Use general customer': { 'id-ID': 'Gunakan pelanggan umum', 'en-US': 'Use general customer' },
+  'Continue without selecting a customer.': {
+    'id-ID': 'Lanjutkan tanpa memilih pelanggan.',
+    'en-US': 'Continue without selecting a customer.',
+  },
+  'Search name or phone number': {
+    'id-ID': 'Cari nama atau nomor telepon',
+    'en-US': 'Search name or phone number',
+  },
+  'Search by name, phone number, or member code.': {
+    'id-ID': 'Cari berdasarkan nama, nomor telepon, atau kode member.',
+    'en-US': 'Search by name, phone number, or member code.',
+  },
+  'Member not found.': { 'id-ID': 'Member tidak ditemukan.', 'en-US': 'Member not found.' },
+  'Use customer': { 'id-ID': 'Gunakan pelanggan', 'en-US': 'Use customer' },
+  'Customer name': { 'id-ID': 'Nama pelanggan', 'en-US': 'Customer name' },
+  'Phone number': { 'id-ID': 'Nomor telepon', 'en-US': 'Phone number' },
+  'No items selected': { 'id-ID': 'Belum ada item dipilih', 'en-US': 'No items selected' },
+  'items selected': { 'id-ID': 'item dipilih', 'en-US': 'items selected' },
+  'Price available when selected': {
+    'id-ID': 'Harga tersedia saat dipilih',
+    'en-US': 'Price available when selected',
+  },
   Subtotal: { 'id-ID': 'Subtotal', 'en-US': 'Subtotal' },
   'Estimated subtotal': { 'id-ID': 'Estimasi subtotal', 'en-US': 'Estimated subtotal' },
   'Estimated total': { 'id-ID': 'Estimasi total', 'en-US': 'Estimated total' },
@@ -222,20 +257,200 @@ const copy: Record<string, LocalizedLabel> = {
   'Pay now': { 'id-ID': 'Bayar sekarang', 'en-US': 'Pay now' },
   'Payment successful': { 'id-ID': 'Pembayaran berhasil', 'en-US': 'Payment successful' },
   'Payment failed': { 'id-ID': 'Pembayaran gagal', 'en-US': 'Payment failed' },
+  'Payment complete': { 'id-ID': 'Pembayaran lunas', 'en-US': 'Payment complete' },
+  'Payment recorded': { 'id-ID': 'Pembayaran dicatat', 'en-US': 'Payment recorded' },
+  'Payment incomplete': { 'id-ID': 'Pembayaran belum selesai', 'en-US': 'Payment incomplete' },
   'Transaction completed': { 'id-ID': 'Transaksi selesai', 'en-US': 'Transaction completed' },
   'Transaction canceled': { 'id-ID': 'Transaksi dibatalkan', 'en-US': 'Transaction canceled' },
   'Complete transaction': { 'id-ID': 'Selesaikan transaksi', 'en-US': 'Complete transaction' },
   'Cancel transaction': { 'id-ID': 'Batalkan transaksi', 'en-US': 'Cancel transaction' },
   'Transaction details': { 'id-ID': 'Detail transaksi', 'en-US': 'Transaction details' },
+  'Preview receipt': { 'id-ID': 'Pratinjau struk', 'en-US': 'Receipt preview' },
   Receipt: { 'id-ID': 'Struk', 'en-US': 'Receipt' },
   'View receipt': { 'id-ID': 'Lihat struk', 'en-US': 'View receipt' },
+  Print: { 'id-ID': 'Cetak', 'en-US': 'Print' },
+  'Paper size': { 'id-ID': 'Ukuran kertas', 'en-US': 'Paper size' },
   'Start work': { 'id-ID': 'Mulai pengerjaan', 'en-US': 'Start work' },
   'Work started': { 'id-ID': 'Pengerjaan dimulai', 'en-US': 'Work started' },
   'Adjust order': { 'id-ID': 'Sesuaikan pesanan', 'en-US': 'Adjust order' },
   'Pay balance': { 'id-ID': 'Bayar sisa', 'en-US': 'Pay balance' },
+  Pay: { 'id-ID': 'Bayar', 'en-US': 'Pay' },
+  Paid: { 'id-ID': 'Lunas', 'en-US': 'Paid' },
+  'Partially paid': { 'id-ID': 'Bayar sebagian', 'en-US': 'Partially paid' },
+  Unpaid: { 'id-ID': 'Belum dibayar', 'en-US': 'Unpaid' },
+  'Order details': { 'id-ID': 'Detail pesanan', 'en-US': 'Order details' },
+  Order: { 'id-ID': 'Pesanan', 'en-US': 'Order' },
+  'Complete before starting': { 'id-ID': 'Lengkapi sebelum mulai', 'en-US': 'Complete before starting' },
   'Quantity must be greater than zero.': {
     'id-ID': 'Jumlah harus lebih dari nol.',
     'en-US': 'Quantity must be greater than zero.',
+  },
+  'Price is not available.': { 'id-ID': 'Harga belum tersedia.', 'en-US': 'Price is not available.' },
+  'Only active transactions can be processed.': {
+    'id-ID': 'Hanya transaksi aktif yang dapat diproses.',
+    'en-US': 'Only active transactions can be processed.',
+  },
+  'Add at least one item.': { 'id-ID': 'Tambahkan setidaknya satu item.', 'en-US': 'Add at least one item.' },
+  'Resolve pending payments.': {
+    'id-ID': 'Selesaikan pembayaran yang masih menunggu.',
+    'en-US': 'Resolve pending payments.',
+  },
+  'Payments must match the transaction total.': {
+    'id-ID': 'Jumlah pembayaran harus sama dengan total transaksi.',
+    'en-US': 'Payments must match the transaction total.',
+  },
+  'Complete all work before finishing the transaction.': {
+    'id-ID': 'Selesaikan semua pengerjaan sebelum menutup transaksi.',
+    'en-US': 'Complete all work before finishing the transaction.',
+  },
+  'Select an employee.': { 'id-ID': 'Pilih karyawan.', 'en-US': 'Select an employee.' },
+  'Employee contribution must total 100%.': {
+    'id-ID': 'Total kontribusi karyawan harus 100%.',
+    'en-US': 'Employee contribution must total 100%.',
+  },
+  'Select variant': { 'id-ID': 'Pilih varian', 'en-US': 'Select variant' },
+  'Select one variant to add to the transaction.': {
+    'id-ID': 'Pilih satu varian untuk ditambahkan ke transaksi.',
+    'en-US': 'Select one variant to add to the transaction.',
+  },
+  'Select one variant to add to the cart.': {
+    'id-ID': 'Pilih satu varian untuk ditambahkan ke keranjang.',
+    'en-US': 'Select one variant to add to the cart.',
+  },
+  'Price unavailable': { 'id-ID': 'Harga belum tersedia', 'en-US': 'Price unavailable' },
+  'Add to transaction': { 'id-ID': 'Tambahkan ke transaksi', 'en-US': 'Add to transaction' },
+  'Add to cart': { 'id-ID': 'Tambahkan ke keranjang', 'en-US': 'Add to cart' },
+  'Transaction item': { 'id-ID': 'Item transaksi', 'en-US': 'Transaction item' },
+  'Configure service workers, work status, price, or item discount.': {
+    'id-ID': 'Atur pelaksana, status pekerjaan, harga, atau diskon item ini.',
+    'en-US': 'Configure service workers, work status, price, or item discount.',
+  },
+  'Configure price or item discount.': {
+    'id-ID': 'Atur harga atau diskon item ini.',
+    'en-US': 'Configure price or item discount.',
+  },
+  'Service workers': { 'id-ID': 'Pelaksana jasa', 'en-US': 'Service workers' },
+  'Select employees who perform this service. Leave shares blank to split evenly.': {
+    'id-ID': 'Pilih karyawan yang mengerjakan jasa ini. Kosongkan porsi untuk membagi rata.',
+    'en-US': 'Select employees who perform this service. Leave shares blank to split evenly.',
+  },
+  'Share (%)': { 'id-ID': 'Porsi (%)', 'en-US': 'Share (%)' },
+  'Split evenly': { 'id-ID': 'Bagi rata', 'en-US': 'Split evenly' },
+  'No active employees can perform this service.': {
+    'id-ID': 'Belum ada karyawan aktif yang dapat mengerjakan jasa.',
+    'en-US': 'No active employees can perform this service.',
+  },
+  'Save workers': { 'id-ID': 'Simpan pelaksana', 'en-US': 'Save workers' },
+  'No workers selected': { 'id-ID': 'Belum ada pelaksana dipilih', 'en-US': 'No workers selected' },
+  'workers selected': { 'id-ID': 'pelaksana dipilih', 'en-US': 'workers selected' },
+  'Service value allocation': { 'id-ID': 'Pembagian nilai jasa', 'en-US': 'Service value allocation' },
+  'Work status': { 'id-ID': 'Status pekerjaan', 'en-US': 'Work status' },
+  'Current status': { 'id-ID': 'Saat ini', 'en-US': 'Current status' },
+  'Mark complete': { 'id-ID': 'Tandai selesai', 'en-US': 'Mark complete' },
+  'Cancel work': { 'id-ID': 'Batalkan pekerjaan', 'en-US': 'Cancel work' },
+  'No further status changes are available.': {
+    'id-ID': 'Tidak ada perubahan status berikutnya untuk pekerjaan ini.',
+    'en-US': 'No further status changes are available.',
+  },
+  'Price adjustment': { 'id-ID': 'Penyesuaian harga', 'en-US': 'Price adjustment' },
+  'Set a transaction-specific price without changing the catalog price.': {
+    'id-ID': 'Ubah harga untuk transaksi ini tanpa mengubah harga katalog.',
+    'en-US': 'Set a transaction-specific price without changing the catalog price.',
+  },
+  'Unit price': { 'id-ID': 'Harga per unit', 'en-US': 'Unit price' },
+  Reason: { 'id-ID': 'Alasan', 'en-US': 'Reason' },
+  'Item discount': { 'id-ID': 'Diskon item', 'en-US': 'Item discount' },
+  Percentage: { 'id-ID': 'Persentase', 'en-US': 'Percentage' },
+  'Fixed amount': { 'id-ID': 'Nominal', 'en-US': 'Fixed amount' },
+  'Discount reason': { 'id-ID': 'Alasan diskon', 'en-US': 'Discount reason' },
+  'Apply discount': { 'id-ID': 'Terapkan diskon', 'en-US': 'Apply discount' },
+  'Select at least one service worker.': {
+    'id-ID': 'Pilih minimal satu pelaksana untuk jasa ini.',
+    'en-US': 'Select at least one service worker.',
+  },
+  'Worker share must be greater than 0% and at most 100%.': {
+    'id-ID': 'Porsi pelaksana harus lebih dari 0% dan tidak lebih dari 100%.',
+    'en-US': 'Worker share must be greater than 0% and at most 100%.',
+  },
+  'When all shares are entered, the total must be exactly 100%.': {
+    'id-ID': 'Jika semua porsi diisi, total porsi harus tepat 100%.',
+    'en-US': 'When all shares are entered, the total must be exactly 100%.',
+  },
+  'Leave room for workers whose share is split automatically.': {
+    'id-ID': 'Sisakan porsi untuk pelaksana yang dibagi otomatis.',
+    'en-US': 'Leave room for workers whose share is split automatically.',
+  },
+  'Discount value and reason are required. Percentage must be between 0 and 100%.': {
+    'id-ID': 'Nilai diskon dan alasan wajib diisi. Persentase harus antara 0 dan 100%.',
+    'en-US': 'Discount value and reason are required. Percentage must be between 0 and 100%.',
+  },
+  'Price and reason are required.': {
+    'id-ID': 'Harga dan alasan penyesuaian wajib diisi.',
+    'en-US': 'Price and reason are required.',
+  },
+  'This transaction is already closed.': {
+    'id-ID': 'Transaksi ini sudah ditutup.',
+    'en-US': 'This transaction is already closed.',
+  },
+  'Reconnect before changing this transaction.': {
+    'id-ID': 'Sambungkan kembali perangkat sebelum mengubah transaksi.',
+    'en-US': 'Reconnect before changing this transaction.',
+  },
+  'Review the latest changes before continuing.': {
+    'id-ID': 'Periksa perubahan terbaru sebelum melanjutkan.',
+    'en-US': 'Review the latest changes before continuing.',
+  },
+  'Wait for the current change to finish.': {
+    'id-ID': 'Tunggu perubahan saat ini selesai.',
+    'en-US': 'Wait for the current change to finish.',
+  },
+  'Complete the transaction before continuing.': {
+    'id-ID': 'Lengkapi transaksi sebelum melanjutkan.',
+    'en-US': 'Complete the transaction before continuing.',
+  },
+  'There is no remaining amount to pay.': {
+    'id-ID': 'Tidak ada sisa pembayaran.',
+    'en-US': 'There is no remaining amount to pay.',
+  },
+  'Transactions with payments cannot be canceled.': {
+    'id-ID': 'Transaksi dengan pembayaran tidak dapat dibatalkan.',
+    'en-US': 'Transactions with payments cannot be canceled.',
+  },
+  'Start a new transaction? The current transaction will remain open.': {
+    'id-ID': 'Mulai transaksi baru? Transaksi saat ini tetap berjalan.',
+    'en-US': 'Start a new transaction? The current transaction will remain open.',
+  },
+  'Finish adjusting the transaction before adding items to the cart.': {
+    'id-ID': 'Selesaikan penyesuaian transaksi sebelum menambahkan item ke keranjang.',
+    'en-US': 'Finish adjusting the transaction before adding items to the cart.',
+  },
+  'The transaction being adjusted is no longer active. Reopen the adjustment.': {
+    'id-ID': 'Transaksi yang akan disesuaikan tidak lagi aktif. Buka kembali penyesuaian.',
+    'en-US': 'The transaction being adjusted is no longer active. Reopen the adjustment.',
+  },
+  'The latest transaction could not be loaded.': {
+    'id-ID': 'Transaksi terbaru tidak dapat dimuat.',
+    'en-US': 'The latest transaction could not be loaded.',
+  },
+  'The latest transaction cannot accept another payment.': {
+    'id-ID': 'Transaksi ini belum dapat menerima pembayaran berikutnya.',
+    'en-US': 'The latest transaction cannot accept another payment.',
+  },
+  'No queued work remains to start.': {
+    'id-ID': 'Tidak ada pekerjaan dalam antrian yang dapat dimulai.',
+    'en-US': 'No queued work remains to start.',
+  },
+  'Start all work before completing the transaction.': {
+    'id-ID': 'Mulai semua pekerjaan sebelum menyelesaikan transaksi.',
+    'en-US': 'Start all work before completing the transaction.',
+  },
+  'Canceled work cannot be completed as an active transaction.': {
+    'id-ID': 'Pekerjaan yang dibatalkan tidak dapat diselesaikan sebagai transaksi aktif.',
+    'en-US': 'Canceled work cannot be completed as an active transaction.',
+  },
+  'A payment is still pending. Wait for it to settle before trying again.': {
+    'id-ID': 'Pembayaran masih menunggu. Tunggu hingga selesai sebelum mencoba lagi.',
+    'en-US': 'A payment is still pending. Wait for it to settle before trying again.',
   },
 };
 
@@ -291,6 +506,10 @@ function humanizeTechnicalValue(value: string): string {
     .join(' ');
 }
 
+export function resolveOperationalLocale(locale: string | undefined): OperationalLocale {
+  return locale === 'en-US' ? 'en-US' : 'id-ID';
+}
+
 export function operationalCopy(value: string, locale: OperationalLocale): string {
   return copy[value]?.[locale] ?? value;
 }
@@ -301,7 +520,7 @@ export function operationalLabel(value: string, locale: OperationalLocale): stri
 
 export function useOperationalLocalization() {
   const runtime = useRuntime();
-  const locale: OperationalLocale = runtime.locale === 'en-US' ? 'en-US' : 'id-ID';
+  const locale = resolveOperationalLocale(runtime.locale);
   return {
     locale,
     copy: (value: string) => operationalCopy(value, locale),
