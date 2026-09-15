@@ -5,6 +5,7 @@ import type {
   CatalogItem,
   CatalogVariant,
   ResolvedPrice,
+  SaleAdjustment,
   SaleLine,
 } from './cashier-transaction.types';
 
@@ -120,16 +121,25 @@ export function cartDraftDisplayLines(draft: CartDraft | null): CartDisplayLine[
   }));
 }
 
-export function saleDisplayLines(lines: readonly SaleLine[]): CartDisplayLine[] {
-  return lines.map((line) => ({
-    id: line.id,
-    itemNameSnapshot: line.itemNameSnapshot,
-    itemTypeSnapshot: line.itemTypeSnapshot,
-    variantNameSnapshot: line.variantNameSnapshot,
-    quantity: line.quantity,
-    effectiveUnitPrice: line.effectiveUnitPrice,
-    totalAmount: line.totalAmount,
-  }));
+export function saleDisplayLines(
+  lines: readonly SaleLine[],
+  adjustments: readonly SaleAdjustment[] = [],
+): CartDisplayLine[] {
+  return lines.map((line) => {
+    const promotion = adjustments.find(
+      (adjustment) => adjustment.source === 'PROMOTION' && adjustment.saleLineId === line.id,
+    );
+    const promotionLabel = promotion ? `Promo: ${promotion.label}` : null;
+    return {
+      id: line.id,
+      itemNameSnapshot: line.itemNameSnapshot,
+      itemTypeSnapshot: line.itemTypeSnapshot,
+      variantNameSnapshot: [line.variantNameSnapshot, promotionLabel].filter(Boolean).join(' · ') || null,
+      quantity: line.quantity,
+      effectiveUnitPrice: line.effectiveUnitPrice,
+      totalAmount: line.totalAmount,
+    };
+  });
 }
 
 export function cartDraftEstimatedTotal(draft: CartDraft | null): string {
