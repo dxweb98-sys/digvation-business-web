@@ -149,6 +149,15 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     return cacheQueueContext(authoritative);
   };
 
+  const openQueueContext = (saleId: string) => {
+    setCompletionOpen(false);
+    setLineTaskId(null);
+    command.clearAttention();
+    const cached = findCachedQueueSale(saleId);
+    if (cached) setQueueContextSale(cached);
+    void loadQueueContext(saleId).catch((error) => command.reportError(error));
+  };
+
   const addCatalogItem = async (
     item: CatalogItem,
     catalogVariantId: string | undefined,
@@ -284,15 +293,6 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     setLineTaskId(null);
     command.clearAttention();
     saleWorkspace.clearDraft();
-  };
-
-  const resumeSale = (saleId: string) => {
-    setCompletionOpen(false);
-    setLineTaskId(null);
-    command.clearAttention();
-    const cached = findCachedQueueSale(saleId);
-    if (cached) setQueueContextSale(cached);
-    void loadQueueContext(saleId).catch((error) => command.reportError(error));
   };
 
   const hydrateQueuedSale = async (saleId: string) => {
@@ -618,6 +618,26 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     return core.createPayment(method, appliedAmount, tenderedAmount, providerReference);
   };
 
+  const voidSale = async () => {
+    if (!queueContextSale) return core.voidSale();
+    command.clearNotice();
+    try {
+      const authoritative = await transactionAdapter.getSale(queueContextSale.id);
+      const updated = await command.runMutation(() =>
+        transactionAdapter.voidSale(
+          authoritative.id,
+          authoritative.version,
+          `cashier-void-${crypto.randomUUID()}`,
+        ),
+      );
+      cacheQueueContext(updated);
+      return updated;
+    } catch (error) {
+      command.reportError(error);
+      throw error;
+    }
+  };
+
   const contextViewModel = queueContextSale
     ? createSaleWorkspaceViewModel(queueContextSale, effectiveConnectivity, 'CLEAN', runtime.locale)
     : saleWorkspace.viewModel;
@@ -688,10 +708,10 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     createPayment,
     transitionPayment: core.transitionPayment,
     finalizeSale: core.finalizeSale,
-    voidSale: core.voidSale,
+    voidSale,
     newSale,
     clearProcessedDraft,
-    resumeSale,
+    openQueueContext,
     hydrateQueuedSale,
     hydrateQueuedPayment,
     acknowledgeLatestState: command.acknowledgeLatestState,
