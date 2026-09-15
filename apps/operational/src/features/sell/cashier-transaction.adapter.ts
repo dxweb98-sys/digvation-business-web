@@ -229,6 +229,7 @@ export class HttpCashierTransactionAdapter
       signal,
     });
   }
+
   public listPaymentRoutes(
     input: { sellingLocationId: string; currency: string },
     signal?: AbortSignal,
@@ -236,13 +237,11 @@ export class HttpCashierTransactionAdapter
     const query = new URLSearchParams({
       sellingLocationId: input.sellingLocationId,
       currency: input.currency,
-      status: 'ACTIVE',
-      limit: String(PAGE_SIZE),
-      offset: '0',
     });
-    return this.client.get<ApiPage<PaymentRoute>>(`${API_PREFIX}/payment-routing?${query}`, {
-      signal,
-    });
+    return this.client.get<ApiPage<PaymentRoute>>(
+      `${API_PREFIX}/sales/payment-routes?${query.toString()}`,
+      { signal },
+    );
   }
 
   public listCatalogItems(signal?: AbortSignal): Promise<ApiPage<CatalogItem>> {
@@ -462,6 +461,7 @@ export class HttpCashierTransactionAdapter
       input,
     );
   }
+
   public queueSale(saleId: string, expectedVersion: number, idempotencyKey: string): Promise<Sale> {
     return this.client.post<Sale>(
       `${API_PREFIX}/sales/${saleId}/queue`,
@@ -469,6 +469,7 @@ export class HttpCashierTransactionAdapter
       { headers: { 'Idempotency-Key': idempotencyKey } },
     );
   }
+
   public startSaleWork(
     saleId: string,
     expectedVersion: number,
