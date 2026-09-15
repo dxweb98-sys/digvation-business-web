@@ -29,6 +29,9 @@ export interface OperationalProjectionQuery {
     input: SellingCatalogDisplayInput,
     signal?: AbortSignal,
   ): Promise<OperationalCatalogProjection>;
+}
+
+export interface OperationalPromotionCommands {
   setPromotionCode(
     saleId: string,
     input: { expectedVersion: number; code: string },
@@ -41,7 +44,9 @@ export interface OperationalProjectionQuery {
   ): Promise<Sale>;
 }
 
-export type OperationalAwareTransactionPort = SaleTransactionPort & OperationalProjectionQuery;
+export type OperationalAwareTransactionPort = SaleTransactionPort &
+  OperationalProjectionQuery &
+  OperationalPromotionCommands;
 
 export function attachOperationalProjection(
   client: ApiClient,
