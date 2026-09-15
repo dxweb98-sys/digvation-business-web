@@ -267,17 +267,23 @@ function PositionEditor({
             placeholder="Therapist"
           />
         </div>
-        <div className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4">
-          <DToggle
-            fullWidth
-            checked={serviceAssignmentEnabled}
-            onChange={setServiceAssignmentEnabled}
-            label={copy('Can perform services')}
-          />
-          <p className="mt-2 text-sm text-[var(--color-text-muted)]">
-            {copy('Allow employees in this position to be assigned to service work.')}
-          </p>
-        </div>
+        <section className="border-t border-[var(--color-border)] pt-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-[var(--color-text)]">
+                {copy('Can perform services')}
+              </p>
+              <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+                {copy('Allow employees in this position to be assigned to service work.')}
+              </p>
+            </div>
+            <DToggle
+              checked={serviceAssignmentEnabled}
+              onChange={setServiceAssignmentEnabled}
+              ariaLabel={copy('Can perform services')}
+            />
+          </div>
+        </section>
       </div>
     </DDialog>
   );
