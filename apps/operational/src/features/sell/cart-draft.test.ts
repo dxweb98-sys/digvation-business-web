@@ -6,9 +6,15 @@ import {
   cartDraftStartInput,
   emptyCartDraft,
   removeCartDraftLine,
+  saleDisplayLines,
   setCartDraftQuantity,
 } from './cart-draft';
-import type { CatalogItem, ResolvedPrice } from './cashier-transaction.types';
+import type {
+  CatalogItem,
+  ResolvedPrice,
+  SaleAdjustment,
+  SaleLine,
+} from './cashier-transaction.types';
 
 const item: CatalogItem = {
   id: 'item-1',
@@ -58,5 +64,37 @@ describe('CartDraft local mutations', () => {
       lines: [{ catalogItemId: 'item-1', quantity: '1.5000' }],
     });
     expect(removeCartDraftLine(changed, changed.lines[0]!.id).lines).toEqual([]);
+  });
+
+  it('shows the Runtime promotion snapshot on the matching sale line', () => {
+    const line = {
+      id: 'line-1',
+      itemNameSnapshot: 'Item one',
+      itemTypeSnapshot: 'PRODUCT',
+      variantNameSnapshot: 'Regular',
+      quantity: '1.0000',
+      effectiveUnitPrice: '12500.0000',
+      totalAmount: '11250.0000',
+    } as SaleLine;
+    const adjustment = {
+      id: 'adjustment-1',
+      source: 'PROMOTION',
+      scope: 'ITEM',
+      type: 'PERCENTAGE',
+      configuredValue: '0.1',
+      requestedValue: null,
+      actualAmount: '1250.0000',
+      promotionId: 'promotion-1',
+      label: 'Promo September',
+      saleLineId: 'line-1',
+      actorId: null,
+      actorKind: null,
+      reason: null,
+      createdAt: '2026-09-16T00:00:00.000Z',
+    } satisfies SaleAdjustment;
+
+    expect(saleDisplayLines([line], [adjustment])[0]?.variantNameSnapshot).toBe(
+      'Regular · Promo: Promo September',
+    );
   });
 });
