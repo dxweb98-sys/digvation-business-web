@@ -1,16 +1,19 @@
 name: Frontend CI
 
 on:
+  pull_request:
+    branches: [dev, main]
   push:
-    branches: [feat/discount-promotion]
+    branches: [dev, main]
 
 permissions:
   contents: read
 
 jobs:
-  verify-feature:
+  verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
+
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -29,26 +32,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Check discount promotion formatting
-        run: >-
-          pnpm exec prettier --check
-          apps/backoffice/src/app/router/backoffice-router.tsx
-          apps/backoffice/src/app/shell/backoffice-shell.tsx
-          apps/backoffice/src/auth/backoffice-access.test.ts
-          apps/backoffice/src/auth/backoffice-access.ts
-          apps/backoffice/src/modules/promotions/index.ts
-          apps/backoffice/src/modules/promotions/promotions-api.ts
-          apps/backoffice/src/modules/promotions/promotions-localization.ts
-          apps/backoffice/src/modules/promotions/promotions-page.tsx
-          apps/operational/src/features/sell/cashier-transaction-adapter-factory.ts
-          apps/operational/src/features/sell/cashier-transaction.types.ts
-          apps/operational/src/features/sell/components/sale-adjustment-controls.tsx
-          apps/operational/src/features/sell/operational-projection-client.ts
-          apps/operational/src/routes/sell/sell-page.tsx
-          packages/runtime/src/authenticated-runtime-context.test.ts
-          packages/runtime/src/authenticated-runtime-context.ts
-          packages/runtime/src/runtime-config.schema.ts
-          packages/runtime/src/runtime-config.types.ts
+      - name: Verify foundation
+        env:
+          VITE_BUILD_REVISION: ${{ github.sha }}
+        run: pnpm verify
 
-      - name: Unit tests
-        run: pnpm test
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Smoke test
+        env:
+          VITE_BUILD_REVISION: ${{ github.sha }}
+        run: pnpm test:e2e
