@@ -1,0 +1,47 @@
+name: Temporary E2E Runtime Fixture Fix
+
+on:
+  push:
+    branches:
+      - fix/ci-formatting
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: ${{ !contains(github.event.head_commit.message, '[e2e-runtime-bot]') && !contains(github.event.head_commit.message, '[remove-e2e-runtime-workflow]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref_name }}
+      - name: Patch authenticated runtime fixture
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('tooling/e2e/cashier-transaction-foundation.spec.ts')
+          text = path.read_text()
+          marker = """    if (method === 'GET' && url.pathname === '/api/v1/locations') {\n"""
+          block = """    if (method === 'GET' && url.pathname === '/api/v1/runtime/context') {\n      await route.fulfill({\n        json: envelope({\n          effectiveProducts: ['POS'],\n          effectiveCapabilities: [],\n          effectiveFoundations: ['OPERATIONAL_ACCESS', 'ORGANIZATION_LOCATION', 'CATALOG'],\n          effectivePermissions: ['sales:create', 'sales:read'],\n        }),\n      });\n      return;\n    }\n"""
+          if marker not in text:
+              raise SystemExit('runtime fixture insertion marker not found')
+          if "url.pathname === '/api/v1/runtime/context'" not in text:
+              text = text.replace(marker, block + marker, 1)
+          path.write_text(text)
+          PY
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - run: corepack enable
+      - run: corepack prepare pnpm@11.22.0 --activate
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec prettier --write tooling/e2e/cashier-transaction-foundation.spec.ts
+      - name: Commit fixture fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tooling/e2e/cashier-transaction-foundation.spec.ts
+          git commit -m "test(operational): mock authenticated runtime context [e2e-runtime-bot]"
+          git push origin HEAD:${{ github.ref_name }}
