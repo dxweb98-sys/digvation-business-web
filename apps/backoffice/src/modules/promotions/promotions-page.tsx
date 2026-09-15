@@ -38,6 +38,8 @@ const keys = {
   options: ['promotions', 'options'] as const,
 };
 
+type CategoryItemScope = 'ALL' | 'SELECTED';
+
 function percentageDisplay(value: string) {
   const amount = Number(value) * 100;
   return Number.isFinite(amount) ? `${amount.toLocaleString()}%` : value;
@@ -101,6 +103,9 @@ export function PromotionsPage() {
       label: promotionCopy('targetSummary'),
       render: (row) => {
         if (row.scope === 'TRANSACTION') return promotionCopy('transaction');
+        if (row.scope === 'CATEGORY' && row.itemIds.length > 0) {
+          return `${row.categoryIds.length} ${promotionCopy('category')} · ${row.itemIds.length} ${promotionCopy('item')}`;
+        }
         const count = row.scope === 'ITEM' ? row.itemIds.length : row.categoryIds.length;
         return `${count} ${promotionCopy('selected')}`;
       },
@@ -233,8 +238,18 @@ function PromotionDialog({
   const [effectiveUntil, setEffectiveUntil] = useState(promotion?.effectiveUntil ?? '');
   const [itemIds, setItemIds] = useState<string[]>(promotion?.itemIds ?? []);
   const [categoryIds, setCategoryIds] = useState<string[]>(promotion?.categoryIds ?? []);
+  const [categoryItemScope, setCategoryItemScope] = useState<CategoryItemScope>(
+    promotion?.scope === 'CATEGORY' && promotion.itemIds.length > 0 ? 'SELECTED' : 'ALL',
+  );
   const [locationIds, setLocationIds] = useState<string[]>(promotion?.locationIds ?? []);
   const [saving, setSaving] = useState(false);
+
+  const categoryItemOptions = useMemo(() => {
+    const selectedCategories = new Set(categoryIds);
+    return options.items.filter(
+      (option) => option.categoryId && selectedCategories.has(option.categoryId),
+    );
+  }, [categoryIds, options.items]);
 
   const numericValue = Number(discountValue);
   const numericMaximum = maximumDiscount ? Number(maximumDiscount) : null;
@@ -243,7 +258,11 @@ function PromotionDialog({
     discountType === 'FIXED_AMOUNT' || maximumDiscount !== '' || minimumPurchase !== '';
   const currencyValid = !needsCurrency || /^[A-Z]{3}$/.test(currency.trim().toUpperCase());
   const targetValid =
-    scope === 'TRANSACTION' || (scope === 'ITEM' ? itemIds.length > 0 : categoryIds.length > 0);
+    scope === 'TRANSACTION' ||
+    (scope === 'ITEM' && itemIds.length > 0) ||
+    (scope === 'CATEGORY' &&
+      categoryIds.length > 0 &&
+      (categoryItemScope === 'ALL' || itemIds.length > 0));
   const valueValid =
     Number.isFinite(numericValue) &&
     numericValue > 0 &&
@@ -267,6 +286,37 @@ function PromotionDialog({
     targetValid &&
     periodValid;
 
+  const changeScope = (value: PromotionScope) => {
+    setScope(value);
+    if (value === 'TRANSACTION') {
+      setItemIds([]);
+      setCategoryIds([]);
+      setCategoryItemScope('ALL');
+    } else if (value === 'ITEM') {
+      setCategoryIds([]);
+      setCategoryItemScope('ALL');
+    } else {
+      setItemIds([]);
+      setCategoryItemScope('ALL');
+    }
+  };
+
+  const changeCategories = (ids: string[]) => {
+    setCategoryIds(ids);
+    const selectedCategories = new Set(ids);
+    setItemIds((current) =>
+      current.filter((itemId) => {
+        const option = options.items.find((item) => item.id === itemId);
+        return Boolean(option?.categoryId && selectedCategories.has(option.categoryId));
+      }),
+    );
+  };
+
+  const changeCategoryItemScope = (value: CategoryItemScope) => {
+    setCategoryItemScope(value);
+    if (value === 'ALL') setItemIds([]);
+  };
+
   const save = async () => {
     if (!valid || saving) return;
     setSaving(true);
@@ -284,7 +334,10 @@ function PromotionDialog({
       minimumPurchase: minimumPurchase.trim() || null,
       effectiveFrom: effectiveFrom ? new Date(effectiveFrom).toISOString() : null,
       effectiveUntil: effectiveUntil ? new Date(effectiveUntil).toISOString() : null,
-      itemIds: scope === 'ITEM' ? itemIds : [],
+      itemIds:
+        scope === 'ITEM' || (scope === 'CATEGORY' && categoryItemScope === 'SELECTED')
+          ? itemIds
+          : [],
       categoryIds: scope === 'CATEGORY' ? categoryIds : [],
       locationIds,
     };
@@ -374,7 +427,7 @@ function PromotionDialog({
             { value: 'ITEM', label: copy('item') },
             { value: 'CATEGORY', label: copy('category') },
           ]}
-          onValueChange={(value) => setScope(value as PromotionScope)}
+          onValueChange={(value) => changeScope(value as PromotionScope)}
         />
         <DSelect
           label={copy('discountType')}
@@ -457,15 +510,38 @@ function PromotionDialog({
           emptyLabel={copy('noOptions')}
         />
       ) : null}
+
       {scope === 'CATEGORY' ? (
-        <TargetSelector
-          className="mt-5"
-          label={copy('targets')}
-          options={options.categories}
-          selected={categoryIds}
-          onChange={setCategoryIds}
-          emptyLabel={copy('noOptions')}
-        />
+        <div className="mt-5 space-y-4">
+          <TargetSelector
+            label={copy('targets')}
+            options={options.categories}
+            selected={categoryIds}
+            onChange={changeCategories}
+            emptyLabel={copy('noOptions')}
+          />
+
+          <DSelect
+            label={copy('categoryItemScope')}
+            value={categoryItemScope}
+            clearable={false}
+            options={[
+              { value: 'ALL', label: copy('allCategoryItems') },
+              { value: 'SELECTED', label: copy('selectedCategoryItems') },
+            ]}
+            onValueChange={(value) => changeCategoryItemScope(value as CategoryItemScope)}
+          />
+
+          {categoryItemScope === 'SELECTED' ? (
+            <TargetSelector
+              label={copy('selectCategoryItems')}
+              options={categoryItemOptions}
+              selected={itemIds}
+              onChange={setItemIds}
+              emptyLabel={copy('noCategoryItems')}
+            />
+          ) : null}
+        </div>
       ) : null}
 
       <TargetSelector
