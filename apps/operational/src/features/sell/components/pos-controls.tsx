@@ -114,10 +114,11 @@ export function PosCurrencyInput({
   onChange: (value: string) => void;
   fractionDigits?: number;
 }) {
+  const normalizedValue = normalizeCurrencyPresentationInput(value, fractionDigits);
   return (
     <DCurrencyInput
       {...props}
-      value={value}
+      value={normalizedValue}
       onValueChange={(nextValue) =>
         onChange(normalizeCurrencyPresentationInput(nextValue, fractionDigits))
       }
