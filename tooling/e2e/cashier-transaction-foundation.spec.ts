@@ -153,6 +153,13 @@ interface RouteState {
 }
 
 async function installRoutes(page: Page, options: Partial<RouteState> = {}) {
+  await page.addInitScript(() => {
+    const prefix = 'digvation.operational.auth-session.v2';
+    window.sessionStorage.setItem(`${prefix}.access-token`, 'e2e-access-token');
+    window.sessionStorage.setItem(`${prefix}.access-expires-at`, '2099-01-01T00:00:00.000Z');
+    window.sessionStorage.setItem(`${prefix}.last-activity`, String(Date.now()));
+  });
+
   const state: RouteState = {
     currentSale: createEmptySale(),
     createRequests: 0,
@@ -174,6 +181,16 @@ async function installRoutes(page: Page, options: Partial<RouteState> = {}) {
     const url = new URL(request.url());
     const method = request.method();
 
+    if (method === 'GET' && url.pathname === '/api/v1/auth/me') {
+      await route.fulfill({
+        json: envelope({
+          id: 'e2e-operational-user',
+          displayName: 'E2E Operational User',
+          roles: [{ permissions: ['sales:create', 'sales:read'] }],
+        }),
+      });
+      return;
+    }
     if (method === 'GET' && url.pathname === '/api/v1/runtime/context') {
       await route.fulfill({
         json: envelope({
