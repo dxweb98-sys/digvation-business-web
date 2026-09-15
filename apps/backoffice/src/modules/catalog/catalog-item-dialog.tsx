@@ -260,8 +260,25 @@ export function CatalogItemDialog({
       }
       footer={<DialogFooter onClose={onClose} onSave={() => void save()} disabled={disabled} />}
     >
-      <div className="space-y-5">
-        <section className="rounded-(--radius-card) border border-(--color-border) p-4">
+      <div>
+        {canManageImage ? (
+          <div className="border-b border-(--color-border) pb-5">
+            <CatalogItemImageField
+              itemName={name}
+              existingImage={existingImage.data}
+              selectedFile={selectedImage}
+              removeRequested={removeImageRequested}
+              disabled={saving}
+              onFileChange={(file) => {
+                setSelectedImage(file);
+                if (file) setRemoveImageRequested(false);
+              }}
+              onRemove={() => setRemoveImageRequested(true)}
+            />
+          </div>
+        ) : null}
+
+        <section className={`${canManageImage ? 'py-5' : 'pb-5'} border-b border-(--color-border)`}>
           <h2 className="text-sm font-semibold">{copy('Basic information')}</h2>
           <p className="mt-1 text-xs leading-5 text-(--color-text-muted)">
             {copy('Identity and selling behavior for this catalog item.')}
@@ -336,23 +353,8 @@ export function CatalogItemDialog({
           </div>
         </section>
 
-        {canManageImage ? (
-          <CatalogItemImageField
-            itemName={name}
-            existingImage={existingImage.data}
-            selectedFile={selectedImage}
-            removeRequested={removeImageRequested}
-            disabled={saving}
-            onFileChange={(file) => {
-              setSelectedImage(file);
-              if (file) setRemoveImageRequested(false);
-            }}
-            onRemove={() => setRemoveImageRequested(true)}
-          />
-        ) : null}
-
         {canViewTax || (fresh && canCreatePricing) ? (
-          <section className="rounded-(--radius-card) border border-(--color-border) p-4">
+          <section className="border-b border-(--color-border) py-5">
             <h2 className="text-sm font-semibold">{copy('Pricing & tax')}</h2>
             <p className="mt-1 text-xs leading-5 text-(--color-text-muted)">
               {copy(
@@ -411,7 +413,7 @@ export function CatalogItemDialog({
         ) : null}
 
         {type === 'SERVICE' ? (
-          <section className="rounded-(--radius-card) border border-(--color-border) p-4">
+          <section className="border-b border-(--color-border) py-5">
             <h2 className="text-sm font-semibold">{copy('Service configuration')}</h2>
             <p className="mt-1 text-xs leading-5 text-(--color-text-muted)">
               {copy('Define how this service is staffed and fulfilled.')}
@@ -457,7 +459,7 @@ export function CatalogItemDialog({
         ) : null}
 
         {fresh && canCreateVariants ? (
-          <section className="rounded-(--radius-card) border border-(--color-border) p-4">
+          <section className="pt-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="text-sm font-semibold">{copy('Initial variants')}</h2>
@@ -523,7 +525,7 @@ export function CatalogItemDialog({
                 ))}
               </div>
             ) : (
-              <p className="mt-4 rounded-xl bg-(--color-surface-muted) px-4 py-3 text-xs text-(--color-text-muted)">
+              <p className="mt-4 text-xs text-(--color-text-muted)">
                 {copy('No initial variants. The item will use its default price directly.')}
               </p>
             )}

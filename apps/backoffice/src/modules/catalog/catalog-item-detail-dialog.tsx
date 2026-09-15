@@ -1,6 +1,4 @@
 import {
-  DAccordion,
-  DAccordionItem,
   DBadge,
   DButton,
   DConfirmDialog,
@@ -119,6 +117,7 @@ export function CatalogItemDetailDialog({
   const variantPriceById = new Map(
     (variants.data?.items ?? []).map((variant, index) => [variant.id, resolvedVariantPrices[index]]),
   );
+  const variantCount = variants.data?.items.length ?? item.variantCount;
   const refreshVariants = () =>
     void client.invalidateQueries({ queryKey: keys.variants(item.id) });
   const refreshVariantsAndCount = () => {
@@ -193,74 +192,57 @@ export function CatalogItemDetailDialog({
         </div>
       }
     >
-      <div className="space-y-4">
-        <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4">
+      <div>
+        <section className="border-b border-[var(--color-border)] pb-5">
           <div className="grid gap-5 md:grid-cols-[auto_minmax(0,1fr)]">
             <CatalogItemThumbnail api={api} itemId={item.id} itemName={item.name} size="detail" />
             <div className="min-w-0">
-              <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <p className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
-                    {copy('Item overview')}
+                  <h2 className="break-words text-2xl font-semibold tracking-tight text-[var(--color-text)]">
+                    {item.name}
+                  </h2>
+                  <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+                    {item.code} · {copy(humanize(item.type))} · {categoryName}
                   </p>
-                  <h2 className="mt-1 break-words text-xl font-semibold tracking-tight">{item.name}</h2>
-                  <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">{item.code}</p>
                 </div>
                 <Status value={item.lifecycle} />
               </div>
-              <dl className="mt-4 grid gap-x-5 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
-                <DetailField
-                  label={copy('Default Price')}
-                  value={
+
+              <div className="mt-5 flex flex-wrap items-end justify-between gap-4 border-t border-[var(--color-border)] pt-4">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+                    {copy('Default Price')}
+                  </p>
+                  <div className="mt-1 text-3xl font-semibold tracking-tight text-[var(--color-text)]">
                     <PriceLabel
                       price={defaultPrice}
                       loading={defaultPriceLoading}
                       available={canViewPricing}
                       emptyLabel={copy('Not set')}
                     />
-                  }
-                  emphasized
-                />
-                <DetailField label={copy('Tax')} value={canViewTax ? taxCategoryName : '—'} />
-                <DetailField label={copy('Category')} value={categoryName} />
-                <DetailField label={copy('Variants')} value={item.variantCount} />
-              </dl>
+                  </div>
+                </div>
+                {canCreatePricing ? (
+                  <DButton
+                    leftIcon={<BadgeDollarSign className="size-4" />}
+                    onClick={() => setPricingTarget('default')}
+                  >
+                    {defaultPrice ? copy('Change price') : copy('Set price')}
+                  </DButton>
+                ) : null}
+              </div>
             </div>
           </div>
-
-          <dl className="mt-5 grid gap-4 border-t border-[var(--color-border)] pt-4 sm:grid-cols-2 lg:grid-cols-4">
-            <DetailField label={copy('Type')} value={copy(humanize(item.type))} />
-            <DetailField
-              label={copy('Fulfillment')}
-              value={copy(humanize(item.fulfillmentBehavior))}
-            />
-            <div className="sm:col-span-2">
-              <DetailField
-                label={copy('Description')}
-                value={item.description?.trim() || copy('No description')}
-              />
-            </div>
-          </dl>
-          {canViewTax ? (
-            <p className="mt-4 border-t border-[var(--color-border)] pt-3 text-xs leading-5 text-[var(--color-text-muted)]">
-              {item.taxCategoryId
-                ? copy(
-                    'This item uses its assigned item tax category. Transaction tax may also apply when enabled.',
-                  )
-                : copy(
-                    'No item-specific tax is assigned. Transaction tax may still apply when enabled.',
-                  )}
-            </p>
-          ) : null}
         </section>
 
         {item.type === 'SERVICE' ? (
-          <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] p-4">
-            <h2 className="text-sm font-semibold">{copy('Service configuration')}</h2>
-            <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+          <section className="border-b border-[var(--color-border)] py-5">
+            <h2 className="text-base font-semibold">{copy('Service configuration')}</h2>
+            <p className="mt-1 text-sm text-[var(--color-text-muted)]">
               {copy('Operational defaults used when this service is sold and fulfilled.')}
             </p>
-            <dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <dl className="mt-4 grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
               <DetailField
                 label={copy('Default duration')}
                 value={
@@ -293,32 +275,19 @@ export function CatalogItemDetailDialog({
           </section>
         ) : null}
 
-        <DAccordion type="multiple" variant="separated">
-          <DAccordionItem
-            value="variants"
-            title={
-              <span className="flex min-w-0 flex-col gap-0.5">
-                <span className="flex items-center gap-2">
-                  <span className="font-semibold">{copy('Variants')}</span>
-                  <DBadge variant="secondary">
-                    {variants.data?.items.length ?? item.variantCount}
-                  </DBadge>
-                </span>
-                <span className="text-xs font-normal text-[var(--color-text-muted)]">
-                  {copy(
-                    'Open only when you need to review or maintain variant-specific configuration.',
-                  )}
-                </span>
-              </span>
-            }
-          >
-            <div className="mb-3 flex justify-end">
-              {canCreate ? (
-                <DButton leftIcon={<Plus className="size-4" />} onClick={() => setEditingVariant(null)}>
-                  {copy('Add variant')}
-                </DButton>
-              ) : null}
+        <section className="border-b border-[var(--color-border)] py-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-semibold">{copy('Variants')}</h2>
+              <DBadge variant="secondary">{variantCount}</DBadge>
             </div>
+            {canCreate ? (
+              <DButton leftIcon={<Plus className="size-4" />} onClick={() => setEditingVariant(null)}>
+                {copy('Add variant')}
+              </DButton>
+            ) : null}
+          </div>
+          <div className="mt-4">
             <DDataTable
               columns={variantColumns}
               data={variants.data?.items ?? []}
@@ -352,44 +321,19 @@ export function CatalogItemDetailDialog({
                 },
               ]}
             />
-          </DAccordionItem>
+          </div>
+        </section>
 
-          {canViewPricing ? (
-            <DAccordionItem
-              value="price-history"
-              title={
-                <span className="flex min-w-0 flex-col gap-0.5">
-                  <span className="flex items-center gap-2">
-                    <span className="font-semibold">{copy('Price history')}</span>
-                    <DBadge variant="secondary">{defaultHistory.length}</DBadge>
-                  </span>
-                  <span className="text-xs font-normal text-[var(--color-text-muted)]">
-                    {copy(
-                      'Historical default prices stay immutable so past sales remain auditable.',
-                    )}
-                  </span>
-                </span>
-              }
-            >
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[var(--color-surface-muted)] p-3">
-                <div>
-                  <p className="text-xs text-[var(--color-text-muted)]">
-                    {copy('Current default price')}
-                  </p>
-                  <p className="mt-1 text-lg font-semibold">
-                    <PriceLabel
-                      price={defaultPrice}
-                      loading={defaultPriceLoading}
-                      emptyLabel={copy('Not set')}
-                    />
-                  </p>
-                </div>
-                {canCreatePricing ? (
-                  <DButton onClick={() => setPricingTarget('default')}>
-                    {defaultPrice ? copy('Change price') : copy('Set price')}
-                  </DButton>
-                ) : null}
-              </div>
+        {canViewPricing ? (
+          <section className="border-b border-[var(--color-border)] py-5">
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-semibold">{copy('Price history')}</h2>
+              <DBadge variant="secondary">{defaultHistory.length}</DBadge>
+            </div>
+            <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+              {copy('Historical default prices stay immutable so past sales remain auditable.')}
+            </p>
+            <div className="mt-4">
               <PriceHistoryTable
                 prices={defaultHistory}
                 currency={currency}
@@ -401,9 +345,40 @@ export function CatalogItemDetailDialog({
                 }}
                 emptyMessage={copy('No default price history.')}
               />
-            </DAccordionItem>
+            </div>
+          </section>
+        ) : null}
+
+        <section className="pt-5">
+          <h2 className="text-base font-semibold">{copy('Item overview')}</h2>
+          <dl className="mt-4 grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
+            <DetailField label={copy('Type')} value={copy(humanize(item.type))} />
+            <DetailField label={copy('Category')} value={categoryName} />
+            <DetailField label={copy('Status')} value={<Status value={item.lifecycle} />} />
+            <DetailField
+              label={copy('Fulfillment')}
+              value={copy(humanize(item.fulfillmentBehavior))}
+            />
+            {canViewTax ? <DetailField label={copy('Tax')} value={taxCategoryName} /> : null}
+            <div className="sm:col-span-2 lg:col-span-4">
+              <DetailField
+                label={copy('Description')}
+                value={item.description?.trim() || copy('No description')}
+              />
+            </div>
+          </dl>
+          {canViewTax ? (
+            <p className="mt-4 border-t border-[var(--color-border)] pt-3 text-xs leading-5 text-[var(--color-text-muted)]">
+              {item.taxCategoryId
+                ? copy(
+                    'This item uses its assigned item tax category. Transaction tax may also apply when enabled.',
+                  )
+                : copy(
+                    'No item-specific tax is assigned. Transaction tax may still apply when enabled.',
+                  )}
+            </p>
           ) : null}
-        </DAccordion>
+        </section>
       </div>
 
       <CatalogNamedRecordDialog
@@ -453,7 +428,9 @@ export function CatalogItemDetailDialog({
         }
         message={
           statusTarget?.status === 'ACTIVE'
-            ? copy('This variant will stop appearing in active selling choices. Existing transaction and price history will be preserved.')
+            ? copy(
+                'This variant will stop appearing in active selling choices. Existing transaction and price history will be preserved.',
+              )
             : copy('This variant will become available for active selling choices again.')
         }
         confirmLabel={
