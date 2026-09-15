@@ -7,7 +7,7 @@ on:
     branches: [dev, main, fix/human-readable-labels]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   verify:
@@ -31,6 +31,18 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Format copy cleanup branch
+        if: github.ref == 'refs/heads/fix/human-readable-labels'
+        run: |
+          pnpm format
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add .
+            git commit -m "style: format copy cleanup"
+            git push
+          fi
 
       - name: Verify foundation
         env:
