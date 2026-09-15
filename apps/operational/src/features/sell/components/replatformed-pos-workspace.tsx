@@ -1039,24 +1039,37 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         </div>
       ) : null}
 
-      <ReferenceQueueBoard
-        open={queueOpen}
-        onOpenChange={setQueueOpen}
-        active={queueTab}
-        onChangeTab={setQueueTab}
-        groups={groups}
-        issues={queueIssues}
-        locale={workspace.locale}
-        onStartWork={(transaction) => void startQueuedWork(transaction)}
-        onAdjust={openAdjustment}
-        onPay={(transaction) => void openQueuePayment(transaction)}
-        onCancel={requestCancel}
-        onView={setQueueDetail}
-        onViewReceipt={(transaction) => {
-          setQueueDetail(transaction);
-          setReceiptSaleId(transaction.id);
-        }}
-      />
+      {transactionsQuery.isLoading ? (
+        <div className="mb-4 shrink-0 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm">
+          <div className="flex items-center gap-3">
+            <Skeleton className="size-10 shrink-0 rounded-2xl" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <Skeleton className="h-4 w-40 rounded-lg" />
+              <Skeleton className="h-3 w-56 max-w-full rounded-lg" />
+            </div>
+            <Skeleton className="hidden h-8 w-56 rounded-xl md:block" />
+          </div>
+        </div>
+      ) : (
+        <ReferenceQueueBoard
+          open={queueOpen}
+          onOpenChange={setQueueOpen}
+          active={queueTab}
+          onChangeTab={setQueueTab}
+          groups={groups}
+          issues={queueIssues}
+          locale={workspace.locale}
+          onStartWork={(transaction) => void startQueuedWork(transaction)}
+          onAdjust={openAdjustment}
+          onPay={(transaction) => void openQueuePayment(transaction)}
+          onCancel={requestCancel}
+          onView={setQueueDetail}
+          onViewReceipt={(transaction) => {
+            setQueueDetail(transaction);
+            setReceiptSaleId(transaction.id);
+          }}
+        />
+      )}
 
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="shrink-0 pb-2">
@@ -1456,6 +1469,7 @@ function ReferenceCatalogCard({
 }) {
   const { copy } = useOperationalLocalization();
   const isService = item.type === 'SERVICE';
+  const displayPrice = item.displayPrice;
   return (
     <button
       type="button"
@@ -1465,15 +1479,30 @@ function ReferenceCatalogCard({
       className="group rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-left transition-all hover:border-[var(--color-brand)]/40 hover:shadow-md active:scale-[.98] disabled:opacity-50"
     >
       <div
-        className={`mb-2 flex aspect-square w-full items-center justify-center rounded-xl ${isService ? 'bg-cyan-500/10 text-cyan-600' : 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]'}`}
+        className={`mb-2 flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl ${isService ? 'bg-cyan-500/10 text-cyan-600' : 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]'}`}
       >
-        {isService ? <Wrench className="size-7" /> : <ShoppingBag className="size-7" />}
+        {item.image?.url ? (
+          <img
+            src={item.image.url}
+            alt=""
+            loading="lazy"
+            className="size-full object-cover"
+          />
+        ) : isService ? (
+          <Wrench className="size-7" />
+        ) : (
+          <ShoppingBag className="size-7" />
+        )}
       </div>
       <p className="truncate font-mono text-[10px] text-[var(--color-text-muted)]">{item.code}</p>
       <p className="mt-1 line-clamp-2 min-h-10 text-sm font-semibold leading-tight">{item.name}</p>
       <div className="mt-2 flex items-center justify-between gap-2">
         <p className="text-xs font-semibold text-[var(--color-text-muted)]">
-          {price ? money(price, locale) : copy('Price available when selected')}
+          {price
+            ? displayPrice?.kind === 'FROM'
+              ? `${copy('From')} ${money(price, locale)}`
+              : money(price, locale)
+            : copy('Price available when selected')}
         </p>
         <span
           className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${isService ? 'bg-cyan-500/10 text-cyan-700' : 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]'}`}
