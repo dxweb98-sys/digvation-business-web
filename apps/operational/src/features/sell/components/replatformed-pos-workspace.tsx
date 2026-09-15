@@ -508,7 +508,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const { copy } = useOperationalLocalization();
   const isLocalDemo = isLocalCashierDemoEnabled();
   const adapter = useMemo(
-    () => createCashierTransactionAdapter(runtime, authPort.getAccessToken.bind(authPort)),
+    () => createCashierTransactionAdapter(runtime, authPort.getAccessToken?.bind(authPort)),
     [authPort, runtime],
   );
   const transactionsQuery = useQuery({
@@ -2597,7 +2597,7 @@ function ReferenceTransactionDetail({
 }) {
   const [receiptPaper, setReceiptPaper] = useState<'58' | '80'>('80');
   if (!sale) return null;
-  const status = queueStatus(sale, isLocalDemo);
+  const status = queueStatus(sale);
   const customerContext = readStoredCustomer(saleCustomerKey(sale.id));
   const customer = customerContext ?? saleCustomer(sale.id);
   const activeLines = sale.lines.filter((line) => !line.removedAt);

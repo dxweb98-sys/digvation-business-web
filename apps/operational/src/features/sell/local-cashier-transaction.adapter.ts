@@ -22,6 +22,7 @@ import type {
   ContributionPreview,
   Employee,
   Payment,
+  PaymentRoute,
   ResolvedPrice,
   Sale,
   SaleLine,
@@ -90,6 +91,29 @@ export class LocalCashierTransactionAdapter implements SaleTransactionPort {
 
   public async listSellingLocations(): Promise<ApiPage<SellingLocation>> {
     return page([this.location]);
+  }
+
+  public async listPaymentRoutes(input: {
+    sellingLocationId: string;
+    currency: string;
+  }): Promise<ApiPage<PaymentRoute>> {
+    if (input.sellingLocationId !== this.location.id) return page([]);
+    const time = timestamp();
+    return page([
+      {
+        id: 'demo-payment-route-cash',
+        sellingLocationId: this.location.id,
+        paymentMethod: 'CASH',
+        currency: input.currency,
+        financialAccountId: 'demo-cash-account',
+        financialAccountCode: 'CASH',
+        financialAccountName: 'Demo Cash',
+        status: 'ACTIVE',
+        version: 1,
+        createdAt: time,
+        updatedAt: time,
+      },
+    ]);
   }
 
   public async listCatalogCategories(): Promise<ApiPage<CatalogCategory>> {

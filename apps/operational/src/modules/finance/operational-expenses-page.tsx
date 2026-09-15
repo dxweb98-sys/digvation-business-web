@@ -214,7 +214,7 @@ export function OperationalExpensesPage() {
               value: account.id,
               label: `${account.name} · ${account.currency}`,
             }))}
-            onValueChange={setFinancialAccountId}
+            onValueChange={(value) => setFinancialAccountId(String(value ?? ''))}
           />
           <DInput label={copy('Category')} value={categoryCode} onChange={setCategoryCode} />
           <DInput label={copy('Amount')} value={amount} onChange={setAmount} />
