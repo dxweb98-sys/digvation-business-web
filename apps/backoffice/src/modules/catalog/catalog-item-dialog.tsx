@@ -249,10 +249,6 @@ export function CatalogItemDialog({
         variant: 'success',
         title: fresh ? 'Item berhasil ditambahkan.' : 'Item berhasil diperbarui.',
       });
-      showToast({
-        variant: 'success',
-        title: fresh ? 'Item berhasil ditambahkan.' : 'Item berhasil diperbarui.',
-      });
       onClose();
     } catch (error) {
       if (persistedItem) {
