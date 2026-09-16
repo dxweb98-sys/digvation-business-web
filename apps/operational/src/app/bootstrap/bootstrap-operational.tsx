@@ -1,22 +1,30 @@
 import { HttpAuthAdapter } from '@digvation/business-auth';
-import { assertApplicationEnabled, HttpRuntimeConfigAdapter } from '@digvation/business-runtime';
+import {
+  assertApplicationEnabled,
+  HttpDeploymentBootstrapAdapter,
+  resolveBootstrapWorkspace,
+} from '@digvation/business-runtime';
 
 import { OperationalProviders } from '../providers/operational-providers';
 import { operationalRouter } from '../router/operational-router';
 
 export async function bootstrapOperational() {
-  const runtimePort = new HttpRuntimeConfigAdapter();
-  const runtime = await runtimePort.load();
-  document.title = `${runtime.branding.productName} - Operational`;
-  const authPort = new HttpAuthAdapter(runtime.apiBaseUrl, runtime.workspace, 'operational');
+  const bootstrapPort = new HttpDeploymentBootstrapAdapter();
+  const bootstrap = await bootstrapPort.load();
+  document.title = `${bootstrap.branding.productName} - Operational`;
+  const authPort = new HttpAuthAdapter(
+    bootstrap.apiBaseUrl,
+    resolveBootstrapWorkspace(bootstrap),
+    'operational',
+  );
 
-  assertApplicationEnabled(runtime, 'cashier');
+  assertApplicationEnabled(bootstrap, 'operational');
 
   const session = await authPort.me();
 
   return (
     <OperationalProviders
-      runtime={runtime}
+      bootstrap={bootstrap}
       session={session}
       authPort={authPort}
       router={operationalRouter}
