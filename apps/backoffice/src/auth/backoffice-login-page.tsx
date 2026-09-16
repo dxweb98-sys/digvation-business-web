@@ -2,16 +2,16 @@ import { DButton, DInput, useToast } from '@digvation/ui';
 import { useState, type FormEvent } from 'react';
 import { Navigate, useLocation } from 'react-router';
 
-import { useRuntime } from '@digvation/business-runtime';
+import { useDeploymentBootstrap } from '@digvation/business-runtime';
 import { normalizeBackofficeApiError } from '../app/api/backoffice-api-error';
 import { useBackofficeLocalization } from '../app/localization/backoffice-localization';
 import { AuthenticationLoading } from './authentication-loading';
 import { useBackofficeAuth } from './backoffice-auth-context';
 
 export function BackofficeLoginPage() {
-  const runtime = useRuntime();
+  const bootstrap = useDeploymentBootstrap();
   const location = useLocation();
-  const { status, login } = useBackofficeAuth();
+  const { status, login, refreshSessionContext } = useBackofficeAuth();
   const { showToast } = useToast();
   const { copy, t } = useBackofficeLocalization();
   const [identifier, setIdentifier] = useState('');
@@ -22,13 +22,28 @@ export function BackofficeLoginPage() {
   if (status === 'hydrating') return <AuthenticationLoading />;
   if (status === 'authenticated')
     return <Navigate to={(location.state as { from?: string } | null)?.from ?? '/'} replace />;
+  if (status === 'unavailable') {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[var(--color-background)] p-5">
+        <section className="w-full max-w-md rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-6 text-center shadow-sm sm:p-8">
+          <h1 className="text-lg font-semibold">{copy('Service unavailable')}</h1>
+          <p className="mt-2 text-sm text-[var(--color-text-muted)]">
+            {copy('Unable to load your current session. Please try again.')}
+          </p>
+          <DButton className="mt-5" onClick={() => void refreshSessionContext()}>
+            {copy('Try again')}
+          </DButton>
+        </section>
+      </main>
+    );
+  }
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
     setSubmitting(true);
     try {
-      await login({ workspace: runtime.workspace, identifier, password });
+      await login({ identifier, password });
     } catch (failure) {
       setError(t('signInFailed'));
       showToast({
@@ -44,12 +59,10 @@ export function BackofficeLoginPage() {
     <main className="grid min-h-screen place-items-center bg-[var(--color-background)] p-5">
       <section className="w-full max-w-md rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-sm sm:p-8">
         <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-brand)]">
-          {runtime.branding.productName}
+          {bootstrap.branding.productName}
         </p>
         <h1 className="mt-3 text-2xl font-bold">{t('signInToBackoffice')}</h1>
-        <p className="mt-2 text-sm text-[var(--color-text-muted)]">
-          {runtime.branding.businessName ?? 'Backoffice'}
-        </p>
+        <p className="mt-2 text-sm text-[var(--color-text-muted)]">Backoffice</p>
         <form className="mt-7 space-y-4" onSubmit={submit}>
           <DInput
             label={t('usernameOrPhone')}
