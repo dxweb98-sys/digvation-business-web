@@ -1,29 +1,42 @@
+import type { AuthSession } from '@digvation/business-auth';
 import { describe, expect, it } from 'vitest';
 
-import type { BackofficeSession } from '../../auth/auth-session';
 import { canAccessReport } from './report-availability';
 
 function session(
   input: {
     permissions?: string[];
     products?: Array<'POS'>;
-    capabilities?: BackofficeSession['effectiveEntitlements']['capabilities'];
-    foundations?: BackofficeSession['effectiveFoundations'];
+    capabilities?: string[];
+    foundations?: string[];
   } = {},
-): BackofficeSession {
+): AuthSession {
   return {
     identity: {
       userId: 'user-1',
       displayName: 'Test User',
-      workspace: 'test',
-      permissions: input.permissions ?? [],
+      username: 'test-user',
       roles: [],
     },
-    effectiveEntitlements: {
+    business: {
+      tenantId: 'tenant-1',
+      name: 'Test Business',
+      currency: 'IDR',
+    },
+    access: {
       products: input.products ?? [],
       capabilities: input.capabilities ?? [],
+      foundations: input.foundations ?? ['IDENTITY_ACCESS', 'AUDIT_ACTIVITY'],
+      permissions: input.permissions ?? [],
     },
-    effectiveFoundations: input.foundations ?? ['IDENTITY_ACCESS', 'AUDIT_ACTIVITY'],
+    preferences: {
+      locale: 'id-ID',
+      timezone: 'Asia/Jakarta',
+      dateFormat: 'DD/MM/YYYY',
+      timeFormat: 'HH:mm',
+    },
+    deployment: { profile: 'SHARED' },
+    contextVersion: 'test-context',
   };
 }
 
