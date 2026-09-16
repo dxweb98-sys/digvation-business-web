@@ -9,8 +9,10 @@ export {
 export { ConnectivityProvider, useConnectivity } from './connectivity-context';
 export type { ConnectivityState } from './connectivity-context';
 export {
+  AuthenticatedRuntimeProjectionProvider,
   DeploymentBootstrapProvider,
   useDeploymentBootstrap,
+  useRuntime,
 } from './runtime-context';
 export { HttpDeploymentBootstrapAdapter } from './runtime-config.adapter';
 export { runtimeConfigSchema } from './runtime-config.schema';
@@ -18,6 +20,7 @@ export { resolveBootstrapWorkspace } from './workspace-resolution';
 export type {
   ApplicationAvailabilityConfig,
   ApplicationId,
+  AuthenticatedRuntimeProjection,
   BrandingConfig,
   BrandingMode,
   BusinessCapability,
