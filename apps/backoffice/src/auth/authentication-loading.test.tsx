@@ -45,7 +45,7 @@ describe('AuthenticationLoading', () => {
       </DeploymentBootstrapProvider>,
     );
 
-    expect(screen.getByText('Menyiapkan Backoffice')).toBeInTheDocument();
-    expect(screen.getByText('Digvation Business')).toBeInTheDocument();
+    expect(screen.queryByText('Menyiapkan Backoffice')).not.toBeNull();
+    expect(screen.queryByText('Digvation Business')).not.toBeNull();
   });
 });
