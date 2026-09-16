@@ -1,6 +1,6 @@
-export { AuthProvider, useAuth } from './auth-context';
+export { AuthProvider, useAuth, useOptionalAuth } from './auth-context';
 export { BrowserSessionClient, BrowserSessionRequestError } from './browser-session-client';
-export { HttpAuthAdapter } from './http-auth.adapter';
+export { AuthenticationError, HttpAuthAdapter } from './http-auth.adapter';
 export { MockAuthAdapter } from './mock-auth.adapter';
 export type {
   AuthIdentity,
@@ -8,6 +8,11 @@ export type {
   AuthPasswordChangeRequestInput,
   AuthPort,
   AuthRefreshResult,
+  AuthRoleIdentity,
   AuthSession,
+  SessionAccess,
+  SessionBusiness,
+  SessionDeployment,
   SessionEndReason,
+  SessionPreferences,
 } from './auth.types';
