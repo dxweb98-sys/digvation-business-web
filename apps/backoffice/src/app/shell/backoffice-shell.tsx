@@ -1,6 +1,6 @@
 import type { AuthSession } from '@digvation/business-auth';
 import { useDeploymentBootstrap } from '@digvation/business-runtime';
-import { DAvatar, DButton, DDropdown } from '@digvation/ui';
+import { DAvatar, DButton, DDropdown, useToast } from '@digvation/ui';
 import {
   BadgePercent,
   BookOpen,
@@ -20,10 +20,11 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { NavLink, Outlet, useLocation } from 'react-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { canAccessBackoffice, type BackofficeCapability } from '../../auth/backoffice-access';
 import { useBackofficeAuth } from '../../auth/backoffice-auth-context';
+import { PublicAuthApi } from '../../auth/public-auth-api';
 import { NotificationBell } from '../../modules/notifications';
 import {
   type BackofficeMessageKey,
@@ -113,11 +114,17 @@ const navigationSections: ReadonlyArray<{
 export function BackofficeShell() {
   const bootstrap = useDeploymentBootstrap();
   const { t, formatDate } = useBackofficeLocalization();
-  const { session, logout } = useBackofficeAuth();
+  const { session, logout, createApiClient } = useBackofficeAuth();
+  const { showToast } = useToast();
+  const passwordApi = useMemo(
+    () => new PublicAuthApi(createApiClient(bootstrap.apiBaseUrl)),
+    [bootstrap.apiBaseUrl, createApiClient],
+  );
   const location = useLocation();
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [activeBranchSelectorOpen, setActiveBranchSelectorOpen] = useState(false);
+  const [passwordResetRequesting, setPasswordResetRequesting] = useState(false);
 
   const [previousLocationKey, setPreviousLocationKey] = useState(location.key);
   if (previousLocationKey !== location.key) {
@@ -138,6 +145,26 @@ export function BackofficeShell() {
     day: 'numeric',
     month: 'long',
   });
+
+  const requestPasswordReset = async () => {
+    if (passwordResetRequesting) return;
+    setPasswordResetRequesting(true);
+    try {
+      await passwordApi.requestSelfPasswordReset();
+      setAccountMenuOpen(false);
+      showToast({
+        variant: 'success',
+        title: 'Tautan perubahan kata sandi dikirim ke WhatsApp terdaftar.',
+      });
+    } catch {
+      showToast({
+        variant: 'danger',
+        title: 'Tautan perubahan kata sandi belum dapat dikirim.',
+      });
+    } finally {
+      setPasswordResetRequesting(false);
+    }
+  };
 
   return (
     <div className="backoffice-shell flex h-screen w-full min-w-0 overflow-hidden bg-[var(--color-background)]">
@@ -292,11 +319,12 @@ export function BackofficeShell() {
                 </button>
                 <button
                   type="button"
-                  disabled
-                  className="flex h-9 w-full items-center gap-2 rounded-[var(--radius-control)] px-2.5 text-left text-sm text-[var(--color-text-muted)] disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={passwordResetRequesting}
+                  onClick={() => void requestPasswordReset()}
+                  className="flex h-9 w-full items-center gap-2 rounded-[var(--radius-control)] px-2.5 text-left text-sm font-medium text-[var(--color-text)] hover:bg-[var(--color-surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <KeyRound className="size-4" />
-                  {t('changePassword')}
+                  {passwordResetRequesting ? 'Mengirim tautan...' : t('changePassword')}
                 </button>
                 <div className="my-1 border-t border-[var(--color-border)]" />
                 <button
