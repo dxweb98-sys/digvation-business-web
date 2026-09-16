@@ -11,13 +11,13 @@ interface OperationalSessionContextValue {
 
 const OperationalSessionContext = createContext<OperationalSessionContextValue | null>(null);
 
-function storageKey(userId: string) {
-  return `digvation.operational.location.v1:${userId}`;
+function storageKey(tenantId: string, userId: string) {
+  return `digvation.operational.location.v1:${tenantId}:${userId}`;
 }
 
-function readStoredLocation(userId: string): string | null {
+function readStoredLocation(tenantId: string, userId: string): string | null {
   try {
-    return window.sessionStorage.getItem(storageKey(userId));
+    return window.sessionStorage.getItem(storageKey(tenantId, userId));
   } catch {
     return null;
   }
@@ -25,9 +25,10 @@ function readStoredLocation(userId: string): string | null {
 
 export function OperationalSessionProvider({ children }: { children: ReactNode }) {
   const { session } = useAuth();
+  const tenantId = session.business.tenantId;
   const userId = session.identity.userId;
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(() =>
-    readStoredLocation(userId),
+    readStoredLocation(tenantId, userId),
   );
   const [isBranchPickerOpen, setBranchPickerOpen] = useState(false);
 
@@ -35,13 +36,13 @@ export function OperationalSessionProvider({ children }: { children: ReactNode }
     (locationId: string | null) => {
       setSelectedLocationId(locationId);
       try {
-        if (locationId) window.sessionStorage.setItem(storageKey(userId), locationId);
-        else window.sessionStorage.removeItem(storageKey(userId));
+        if (locationId) window.sessionStorage.setItem(storageKey(tenantId, userId), locationId);
+        else window.sessionStorage.removeItem(storageKey(tenantId, userId));
       } catch {
         // Selection persistence is convenience state only. Runtime authorization remains authoritative.
       }
     },
-    [userId],
+    [tenantId, userId],
   );
 
   const openBranchPicker = useCallback(() => {
