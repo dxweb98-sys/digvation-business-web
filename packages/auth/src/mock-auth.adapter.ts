@@ -18,6 +18,7 @@ const DEVELOPMENT_SESSION: AuthSession = {
   business: {
     tenantId: '00000000-0000-4000-8000-000000000001',
     name: 'Local Development',
+    currency: 'IDR',
   },
   access: {
     products: ['POS'],
