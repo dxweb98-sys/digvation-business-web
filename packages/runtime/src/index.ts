@@ -1,20 +1,20 @@
 export { assertApplicationEnabled } from './application-availability';
 export { ApplicationSplash } from './application-splash';
 export {
-  loadAuthenticatedEntitlements,
-  loadAuthenticatedRuntimeAvailability,
-} from './authenticated-runtime-context';
-export {
   createBusinessDateTimeFormatter,
   type BusinessDateTimeFormatter,
+  type BusinessDateTimePreferences,
   type BusinessDateTimeValue,
 } from './business-date-time';
 export { ConnectivityProvider, useConnectivity } from './connectivity-context';
 export type { ConnectivityState } from './connectivity-context';
-export { applyEffectiveBusinessConfiguration } from './effective-business-configuration';
-export { RuntimeProvider, useRuntime } from './runtime-context';
-export { HttpRuntimeConfigAdapter } from './runtime-config.adapter';
+export {
+  DeploymentBootstrapProvider,
+  useDeploymentBootstrap,
+} from './runtime-context';
+export { HttpDeploymentBootstrapAdapter } from './runtime-config.adapter';
 export { runtimeConfigSchema } from './runtime-config.schema';
+export { resolveBootstrapWorkspace } from './workspace-resolution';
 export type {
   ApplicationAvailabilityConfig,
   ApplicationId,
@@ -26,17 +26,17 @@ export type {
   BusinessLocale,
   BusinessProduct,
   BusinessTimeFormat,
-  CapabilityConfig,
+  DeploymentBootstrapConfig,
+  DeploymentBootstrapConfigPort,
+  DeploymentBootstrapDefaults,
   DeploymentProfile,
   EffectiveBusinessConfiguration,
   EffectiveBusinessPreferences,
   EffectiveBusinessProfileConfiguration,
   EffectiveEntitlementConfig,
-  RuntimeAvailabilityConfig,
-  RuntimeConfig,
-  RuntimeConfigPort,
   ThemeColorConfig,
   ThemeConfig,
   ThemePreset,
   ThemeRadius,
+  WorkspaceResolutionConfig,
 } from './runtime-config.types';
