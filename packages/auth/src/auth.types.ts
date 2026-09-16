@@ -1,26 +1,51 @@
 export interface AuthRoleIdentity {
+  id: string;
   code: string;
   name: string;
-  systemKey?: string | null;
+  systemKey: string | null;
 }
 
 export interface AuthIdentity {
   userId: string;
   displayName: string;
-  username?: string | null;
-  email?: string;
-  initials?: string;
-  avatarUrl?: string;
-  workspace: string;
-  permissions: readonly string[];
-  roles?: readonly AuthRoleIdentity[];
+  username: string | null;
+  roles: readonly AuthRoleIdentity[];
+}
+
+export interface SessionBusiness {
+  tenantId: string;
+  name: string;
+}
+
+export interface SessionAccess {
+  readonly products: readonly string[];
+  readonly capabilities: readonly string[];
+  readonly foundations: readonly string[];
+  readonly permissions: readonly string[];
+}
+
+export interface SessionPreferences {
+  locale: string;
+  timezone: string;
+  dateFormat: string;
+  timeFormat: string;
+}
+
+export interface SessionDeployment {
+  profile: string;
 }
 
 export interface AuthSession {
   identity: AuthIdentity;
+  business: SessionBusiness;
+  access: SessionAccess;
+  preferences: SessionPreferences;
+  deployment: SessionDeployment;
+  contextVersion: string;
 }
 
 export interface AuthLoginInput {
+  workspace?: string;
   identifier: string;
   password: string;
   rememberMe?: boolean;
@@ -41,6 +66,7 @@ export interface AuthPort {
   me(): Promise<AuthSession | null>;
   login(input: AuthLoginInput): Promise<AuthSession>;
   logout(): Promise<void>;
+  refreshSessionContext(): Promise<AuthSession | null>;
   requestPasswordChange(input: AuthPasswordChangeRequestInput): Promise<void>;
   getAccessToken?(forceRefresh?: boolean): Promise<string | null>;
   refreshAccessToken?(): Promise<AuthRefreshResult>;
