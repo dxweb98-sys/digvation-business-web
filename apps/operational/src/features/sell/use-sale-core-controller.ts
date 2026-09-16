@@ -272,7 +272,7 @@ export function useSaleCoreController({
       }));
       if (intent) mutate(intent);
     },
-    setOrderDiscount: (input: Omit<DiscountInput, 'expectedVersion'>) => {
+    setOrderDiscount: async (input: Omit<DiscountInput, 'expectedVersion'>) => {
       const intent = withSale((currentSale) => ({
         kind: 'orderDiscount' as const,
         saleId: currentSale.id,
@@ -281,7 +281,12 @@ export function useSaleCoreController({
         value: input.value,
         reason: input.reason,
       }));
-      if (intent) mutate(intent);
+
+      if (!intent) {
+        throw new Error('No active Sale is available for discount update.');
+      }
+
+      return mutateAsync(intent);
     },
     clearOrderDiscount: () => {
       const intent = withSale((currentSale) => ({

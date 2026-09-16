@@ -136,7 +136,10 @@ export function SaleAdjustmentControls({
   const [discountReason, setDiscountReason] = useState('');
   const [promoCode, setPromoCode] = useState('');
   const [promoBusy, setPromoBusy] = useState(false);
+
   const [paymentPromoTarget, setPaymentPromoTarget] = useState<HTMLElement | null>(null);
+
+  const [paymentPromoCard, setPaymentPromoCard] = useState<HTMLElement | null>(null);
 
   const adapter = useMemo(
     () => createCashierTransactionAdapter(runtime, authPort.getAccessToken?.bind(authPort)),
@@ -152,8 +155,6 @@ export function SaleAdjustmentControls({
 
   useEffect(() => {
     if (placement !== 'payment') {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setPaymentPromoTarget(null);
       return undefined;
     }
 
@@ -162,15 +163,26 @@ export function SaleAdjustmentControls({
       if (hiddenStatus) hiddenStatus.hidden = false;
       hiddenStatus = null;
       const card = findPaymentPromotionCard([copy('Promotion'), 'Promo', 'Promotion']);
+
       if (card) {
+        setPaymentPromoCard((current) => (current === card ? current : card));
+
         const row = card.firstElementChild;
         const status = row?.querySelector('span');
+
         if (status instanceof HTMLElement) {
           status.hidden = true;
           hiddenStatus = status;
         }
+
+        if (row instanceof HTMLElement) {
+          setPaymentPromoTarget((current) => (current === row ? current : row));
+          return;
+        }
       }
-      setPaymentPromoTarget((current) => (current === card ? current : card));
+
+      setPaymentPromoTarget(null);
+      setPaymentPromoCard(null);
     };
 
     syncTarget();
@@ -185,8 +197,45 @@ export function SaleAdjustmentControls({
   if ((!sale && workspace.cart.lines.length === 0) || (sale && sale.status !== 'OPEN')) return null;
 
   const adjustments = sale?.adjustments ?? [];
+
   const promotionAdjustments = adjustments.filter((item) => item.source === 'PROMOTION');
+
   const manualAdjustments = adjustments.filter((item) => item.source === 'MANUAL_DISCOUNT');
+
+  const visibleAdjustments = [...promotionAdjustments, ...manualAdjustments];
+
+  const appliedAdjustmentSummary =
+    sale && visibleAdjustments.length > 0 ? (
+      <div className="mt-3 space-y-2">
+        {visibleAdjustments.map((adjustment) => (
+          <div
+            key={adjustment.id}
+            className="flex items-center justify-between gap-3 rounded-xl bg-(--color-surface-muted)/60 px-3 py-2"
+          >
+            <div className="min-w-0">
+              <p className="truncate text-xs font-semibold">
+                {adjustment.source === 'PROMOTION'
+                  ? sale.promotionCode
+                    ? `${text('Promotion')} · ${sale.promotionCode}`
+                    : text('Promotion')
+                  : text('Manual discount')}
+              </p>
+
+              {adjustment.label ? (
+                <p className="mt-0.5 truncate text-[11px] text-(--color-text-muted)">
+                  {adjustment.label}
+                </p>
+              ) : null}
+            </div>
+
+            <span className="shrink-0 text-xs font-bold tabular-nums text-(--color-brand)">
+              −{formatMoney(adjustment.actualAmount, sale.currency, runtime.locale)}
+            </span>
+          </div>
+        ))}
+      </div>
+    ) : null;
+
   const discountApiValue = discountValueForApi(discountType, discountValue);
   const canSaveDiscount =
     Boolean(sale) &&
@@ -238,6 +287,8 @@ export function SaleAdjustmentControls({
       );
       commitSaleToCache(queryClient, updated);
       setPromoCode(updated.promotionCode ?? code);
+      setOpen(false);
+
       showToast({
         variant: 'success',
         title: text('Promotion applied'),
@@ -294,36 +345,51 @@ export function SaleAdjustmentControls({
     }
   };
 
-  const saveOrderDiscount = () => {
+  const saveOrderDiscount = async () => {
     if (!discountApiValue || !discountReason.trim() || !canSaveDiscount) return;
-    workspace.setOrderDiscount({
-      type: discountType,
-      value: discountApiValue,
-      reason: discountReason.trim(),
-    });
+
+    try {
+      await workspace.setOrderDiscount({
+        type: discountType,
+        value: discountApiValue,
+        reason: discountReason.trim(),
+      });
+
+      setOpen(false);
+    } catch {
+      // Error sudah ditangani oleh sale core controller.
+      // Dialog tetap terbuka agar user bisa memperbaiki input / mencoba lagi.
+    }
   };
 
   const trigger = (
     <DButton
       size="sm"
-      variant="secondary"
-      fullWidth={placement === 'payment'}
+      variant="primary"
       disabled={preparing}
       loading={preparing}
+      leftIcon={<BadgePercent className="size-4" />}
       onClick={() => void prepareAndOpen()}
     >
-      <BadgePercent className="mr-1.5 size-4" />
       {text('Discounts & promotions')}
     </DButton>
   );
 
   return (
-    <>
-      {placement === 'payment'
-        ? paymentPromoTarget
-          ? createPortal(<div className="mt-3">{trigger}</div>, paymentPromoTarget)
-          : null
-        : trigger}
+    <div className="flex justify-between">
+      {placement === 'payment' ? (
+        <>
+          {paymentPromoTarget
+            ? createPortal(<div className="ml-auto shrink-0">{trigger}</div>, paymentPromoTarget)
+            : null}
+
+          {paymentPromoCard && appliedAdjustmentSummary
+            ? createPortal(appliedAdjustmentSummary, paymentPromoCard)
+            : null}
+        </>
+      ) : (
+        trigger
+      )}
 
       {sale ? (
         <DDialog
@@ -485,6 +551,6 @@ export function SaleAdjustmentControls({
           </div>
         </DDialog>
       ) : null}
-    </>
+    </div>
   );
 }
