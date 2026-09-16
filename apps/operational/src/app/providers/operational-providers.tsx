@@ -5,6 +5,7 @@ import {
   type SessionEndReason,
 } from '@digvation/business-auth';
 import {
+  AuthenticatedRuntimeProjectionProvider,
   ConnectivityProvider,
   DeploymentBootstrapProvider,
   type DeploymentBootstrapConfig,
@@ -131,26 +132,28 @@ function OperationalAuthBoundary({
   }
 
   return (
-    <AuthProvider
-      session={authenticatedSession}
-      authPort={authPort}
-      onLogout={() => setLoggingOut(true)}
-    >
-      <DLocalizationProvider locale={runtimeLocale(authenticatedSession.preferences.locale)}>
-        <OperationalSessionProvider>
-          <PosOperationalSessionProvider>
-            <div
-              className={`min-h-screen transition-[opacity,transform] duration-150 ease-out ${
-                isLoggingOut ? 'pointer-events-none -translate-y-1 opacity-0' : 'opacity-100'
-              }`}
-              onTransitionEnd={completeLogoutTransition}
-            >
-              <RouterProvider router={router} />
-            </div>
-          </PosOperationalSessionProvider>
-        </OperationalSessionProvider>
-      </DLocalizationProvider>
-    </AuthProvider>
+    <AuthenticatedRuntimeProjectionProvider projection={authenticatedSession}>
+      <AuthProvider
+        session={authenticatedSession}
+        authPort={authPort}
+        onLogout={() => setLoggingOut(true)}
+      >
+        <DLocalizationProvider locale={runtimeLocale(authenticatedSession.preferences.locale)}>
+          <OperationalSessionProvider>
+            <PosOperationalSessionProvider>
+              <div
+                className={`min-h-screen transition-[opacity,transform] duration-150 ease-out ${
+                  isLoggingOut ? 'pointer-events-none -translate-y-1 opacity-0' : 'opacity-100'
+                }`}
+                onTransitionEnd={completeLogoutTransition}
+              >
+                <RouterProvider router={router} />
+              </div>
+            </PosOperationalSessionProvider>
+          </OperationalSessionProvider>
+        </DLocalizationProvider>
+      </AuthProvider>
+    </AuthenticatedRuntimeProjectionProvider>
   );
 }
 
