@@ -1,5 +1,4 @@
 import { ApiClient } from '@digvation/business-api';
-import type { RuntimeConfig } from '@digvation/business-runtime';
 
 import {
   HttpCashierTransactionAdapter,
@@ -41,11 +40,11 @@ export function isLocalCashierDemoEnabled(): boolean {
 
 /** Selects the Runtime-backed Operational transaction boundary once. */
 export function createCashierTransactionAdapter(
-  runtime: RuntimeConfig,
+  apiBaseUrl: string,
   getAccessToken?: () => Promise<string | null>,
 ): OperationalCashierTransactionPort {
   const client = new ApiClient({
-    baseUrl: runtime.apiBaseUrl,
+    baseUrl: apiBaseUrl,
     applicationSurface: 'operational',
     ...(getAccessToken ? { getAccessToken } : {}),
   });
