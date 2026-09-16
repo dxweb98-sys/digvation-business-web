@@ -229,13 +229,13 @@ function TransactionDetail({
   text: (id: string, en: string) => string;
   label: (value: string) => string;
   formatDate: (date: Date, options?: Intl.DateTimeFormatOptions) => string;
-  formatMoney: (amount: string, currency?: string) => string;
+  formatMoney: (amount: string, currency: string) => string;
 }) {
   const activeLines = sale.lines.filter((line) => line.removedAt === null);
   const discountRows = saleDiscountRows(sale);
   const successfulPayments = sale.payments.filter((payment) => payment.status === 'SUCCEEDED');
   const totalPaid = successfulPayments
-    .reduce((sum, payment) => sum.plus(createDecimal(payment.appliedAmount)), createDecimal(0))
+    .reduce((sum, payment) => sum.plus(createDecimal(payment.appliedAmount)), createDecimal('0'))
     .toFixed(4);
   const balance = createDecimal(sale.totalAmount).minus(createDecimal(totalPaid));
   const balanceDue = balance.greaterThan(0) ? balance.toFixed(4) : '0.0000';
@@ -243,13 +243,13 @@ function TransactionDetail({
     .filter((payment) => payment.method === 'CASH' && payment.tenderedAmount)
     .reduce(
       (sum, payment) => sum.plus(createDecimal(payment.tenderedAmount ?? '0')),
-      createDecimal(0),
+      createDecimal('0'),
     );
   const cashChange = successfulPayments
     .filter((payment) => payment.method === 'CASH')
     .reduce(
       (sum, payment) => sum.plus(createDecimal(payment.changeAmount ?? '0')),
-      createDecimal(0),
+      createDecimal('0'),
     );
 
   return (
