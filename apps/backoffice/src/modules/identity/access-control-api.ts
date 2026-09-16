@@ -42,7 +42,7 @@ export interface AccessUser {
   roles: AccessRole[];
 }
 
-export type InvitationDeliveryStatus = 'PENDING' | 'SENT' | 'DELIVERED' | 'READ' | 'FAILED';
+export type InvitationDeliveryStatus = 'PENDING' | 'SENT' | 'FAILED';
 
 export interface UserInvitation {
   id: string;
