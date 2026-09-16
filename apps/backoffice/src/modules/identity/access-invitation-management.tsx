@@ -303,8 +303,7 @@ export function InvitationDialog({
 }
 
 function deliveryBadgeVariant(status: InvitationDeliveryStatus) {
-  if (status === 'FAILED') return 'danger' as const;
-  if (status === 'DELIVERED' || status === 'READ') return 'success' as const;
+  if (status === 'FAILED') return 'warning' as const;
   if (status === 'SENT') return 'secondary' as const;
   return 'warning' as const;
 }
