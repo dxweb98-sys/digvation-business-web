@@ -15,6 +15,7 @@ export interface AuthIdentity {
 export interface SessionBusiness {
   tenantId: string;
   name: string;
+  currency: string;
 }
 
 export interface SessionAccess {
