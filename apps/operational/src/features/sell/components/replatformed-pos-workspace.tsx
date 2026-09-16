@@ -1188,7 +1188,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
             : copy('Promotions and discounts')
         }
         taxAmount={workspace.cart.taxAmount}
-        taxLabel={sale ? saleTaxLabel(sale, copy('Tax')) : copy('Tax')}
+        taxLabel={sale ? saleTaxLabel(sale, copy('Tax'), copy('Tax included')) : copy('Tax')}
         isEstimate={workspace.cart.isLocalDraft}
         locale={workspace.locale}
         customer={cartCustomer}
@@ -1242,7 +1242,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
             : copy('Promotions and discounts')
         }
         taxAmount={workspace.cart.taxAmount}
-        taxLabel={sale ? saleTaxLabel(sale, copy('Tax')) : copy('Tax')}
+        taxLabel={sale ? saleTaxLabel(sale, copy('Tax'), copy('Tax included')) : copy('Tax')}
         locale={workspace.locale}
         customer={cartCustomer}
         method={paymentMethod}
@@ -2128,7 +2128,9 @@ function ReferenceCartPanel({
                         {money(line.effectiveUnitPrice, locale)}
                         {line.variantNameSnapshot ? `, ${line.variantNameSnapshot}` : ''}
                         {line.itemTypeSnapshot === 'SERVICE' ? (
-                          <span className="ml-1 font-semibold text-cyan-700">{copy('Service')}</span>
+                          <span className="ml-1 font-semibold text-cyan-700">
+                            {copy('Service')}
+                          </span>
                         ) : null}
                       </p>
                     </div>
@@ -2147,7 +2149,9 @@ function ReferenceCartPanel({
                         type="button"
                         aria-label={`${copy('Decrease quantity')} ${line.itemNameSnapshot}`}
                         onClick={() => increment(line, 'down')}
-                        disabled={createDecimal(line.quantity).lessThanOrEqualTo(createDecimal('1'))}
+                        disabled={createDecimal(line.quantity).lessThanOrEqualTo(
+                          createDecimal('1'),
+                        )}
                         className="flex h-9 items-center justify-center border-r border-[var(--color-border)] text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)] active:bg-[var(--color-surface-muted)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[var(--color-text-muted)]"
                       >
                         <Minus className="size-3.5" />
@@ -3216,7 +3220,9 @@ function ReceiptContent({
         ) : null}
         {hasTax ? (
           <div className="flex justify-between gap-3">
-            <dt className="text-slate-500">{saleTaxLabel(sale, copy('Tax'))}</dt>
+            <dt className="text-slate-500">
+              {saleTaxLabel(sale, copy('Tax'), copy('Tax included'))}
+            </dt>
             <dd>{money(sale.taxAmount, locale)}</dd>
           </div>
         ) : null}
@@ -3359,7 +3365,9 @@ function ReferenceFinancialSummary({ sale, locale }: { sale: Sale; locale: strin
             ) : null}
             {hasTax ? (
               <div className="flex justify-between gap-3">
-                <dt className="text-[var(--color-text-muted)]">{saleTaxLabel(sale, copy('Tax'))}</dt>
+                <dt className="text-[var(--color-text-muted)]">
+                  {saleTaxLabel(sale, copy('Tax'), copy('Tax included'))}
+                </dt>
                 <dd>{money(sale.taxAmount, locale)}</dd>
               </div>
             ) : null}

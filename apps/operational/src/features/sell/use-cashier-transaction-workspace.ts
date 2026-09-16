@@ -53,11 +53,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
   const effectiveConnectivity = isLocalCashierDemoEnabled() ? 'ONLINE' : connectivity.state;
 
   useEffect(() => {
-    if (
-      isLocalCashierDemoEnabled() ||
-      !selectedLocationId ||
-      effectiveConnectivity !== 'ONLINE'
-    ) {
+    if (isLocalCashierDemoEnabled() || !selectedLocationId || effectiveConnectivity !== 'ONLINE') {
       return undefined;
     }
     const timer = window.setInterval(() => {
@@ -175,7 +171,9 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
   ) => {
     if (context === 'TRANSACTION_ADJUSTMENT') {
       if (!targetSaleId) {
-        throw new Error(copy('The transaction being adjusted is no longer active. Reopen the adjustment.'));
+        throw new Error(
+          copy('The transaction being adjusted is no longer active. Reopen the adjustment.'),
+        );
       }
       const target =
         queueContextSale?.id === targetSaleId
@@ -221,7 +219,9 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
       const targetSaleId =
         context === 'TRANSACTION_ADJUSTMENT' ? (queueContextSale?.id ?? undefined) : undefined;
       if (context === 'TRANSACTION_ADJUSTMENT' && !targetSaleId) {
-        throw new Error(copy('The transaction being adjusted is no longer active. Reopen the adjustment.'));
+        throw new Error(
+          copy('The transaction being adjusted is no longer active. Reopen the adjustment.'),
+        );
       }
       const variants = await catalog.loadActiveVariants(item);
       if (variants.length > 0) {
@@ -304,7 +304,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
       return await loadQueueContext(saleId);
     } catch (error) {
       command.reportError(error);
-      throw new Error(copy('The latest transaction could not be loaded.'));
+      throw new Error(copy('The latest transaction could not be loaded.'), { cause: error });
     }
   };
 
@@ -643,7 +643,9 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     items: catalog.items,
     categories: catalog.categories,
     employees: employeeOptions.employees,
-    paymentRoutes: (paymentRoutesQuery.data?.items ?? []).filter((route) => route.status === 'ACTIVE'),
+    paymentRoutes: (paymentRoutesQuery.data?.items ?? []).filter(
+      (route) => route.status === 'ACTIVE',
+    ),
     selectedLocationId: selectedLocationId ?? '',
     search: catalog.search,
     itemType: catalog.itemType,

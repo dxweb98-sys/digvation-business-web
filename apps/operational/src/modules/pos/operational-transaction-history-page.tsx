@@ -192,7 +192,10 @@ export function OperationalTransactionHistoryPage() {
         className="w-full max-w-4xl"
       >
         {detail.isLoading ? (
-          <div className="space-y-4" aria-label={text('Memuat detail transaksi', 'Loading transaction detail')}>
+          <div
+            className="space-y-4"
+            aria-label={text('Memuat detail transaksi', 'Loading transaction detail')}
+          >
             <DSkeleton className="h-24 w-full rounded-2xl" />
             <DSkeleton className="h-44 w-full rounded-2xl" />
             <DSkeleton className="h-32 w-full rounded-2xl" />
@@ -200,7 +203,6 @@ export function OperationalTransactionHistoryPage() {
         ) : detail.data ? (
           <TransactionDetail
             sale={detail.data}
-            locale={locale}
             text={text}
             label={label}
             formatDate={formatDate}
@@ -218,14 +220,12 @@ export function OperationalTransactionHistoryPage() {
 
 function TransactionDetail({
   sale,
-  locale,
   text,
   label,
   formatDate,
   formatMoney,
 }: {
   sale: OperationalSaleDetail;
-  locale: string;
   text: (id: string, en: string) => string;
   label: (value: string) => string;
   formatDate: (date: Date, options?: Intl.DateTimeFormatOptions) => string;
@@ -273,7 +273,9 @@ function TransactionDetail({
         </div>
         <div className="mt-4 grid gap-3 border-t border-[var(--color-border)] pt-4 sm:grid-cols-2">
           <div>
-            <p className="text-xs text-[var(--color-text-muted)]">{text('Tanggal dan waktu', 'Date and time')}</p>
+            <p className="text-xs text-[var(--color-text-muted)]">
+              {text('Tanggal dan waktu', 'Date and time')}
+            </p>
             <p className="mt-1 font-semibold">
               {formatDate(new Date(sale.finalizedAt ?? sale.createdAt), {
                 dateStyle: 'medium',
@@ -282,7 +284,9 @@ function TransactionDetail({
             </p>
           </div>
           <div>
-            <p className="text-xs text-[var(--color-text-muted)]">{text('Status pengerjaan', 'Work status')}</p>
+            <p className="text-xs text-[var(--color-text-muted)]">
+              {text('Status pengerjaan', 'Work status')}
+            </p>
             <p className="mt-1 font-semibold">{label(sale.operationalState)}</p>
           </div>
         </div>
@@ -305,11 +309,14 @@ function TransactionDetail({
                   <div className="min-w-0">
                     <p className="font-semibold">{line.itemNameSnapshot}</p>
                     <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                      {line.quantity.replace(/\.0+$/, '')} × {formatMoney(line.effectiveUnitPrice, sale.currency)}
+                      {line.quantity.replace(/\.0+$/, '')} ×{' '}
+                      {formatMoney(line.effectiveUnitPrice, sale.currency)}
                       {line.variantNameSnapshot ? `, ${line.variantNameSnapshot}` : ''}
                     </p>
                   </div>
-                  <p className="shrink-0 font-bold">{formatMoney(line.grossAmount, sale.currency)}</p>
+                  <p className="shrink-0 font-bold">
+                    {formatMoney(line.grossAmount, sale.currency)}
+                  </p>
                 </div>
 
                 {isPositive(line.lineDiscountAmount) ? (
@@ -342,7 +349,8 @@ function TransactionDetail({
                           : null;
                         return (
                           <p key={participation.employeeId} className="font-semibold">
-                            {workerName}{share ? ` ${share}` : ''}
+                            {workerName}
+                            {share ? ` ${share}` : ''}
                           </p>
                         );
                       })}
@@ -352,7 +360,8 @@ function TransactionDetail({
 
                 {line.fulfillment ? (
                   <p className="mt-2 text-xs text-[var(--color-text-muted)]">
-                    {text('Status pengerjaan', 'Work status')}: <strong>{label(line.fulfillment.status)}</strong>
+                    {text('Status pengerjaan', 'Work status')}:{' '}
+                    <strong>{label(line.fulfillment.status)}</strong>
                   </p>
                 ) : null}
               </article>
@@ -361,7 +370,7 @@ function TransactionDetail({
         </div>
       </section>
 
-      {(discountRows.length > 0 || isPositive(sale.taxAmount)) ? (
+      {discountRows.length > 0 || isPositive(sale.taxAmount) ? (
         <section>
           <h3 className="mb-3 font-bold">{text('Penyesuaian dan pajak', 'Adjustments and tax')}</h3>
           <div className="space-y-2 rounded-2xl border border-[var(--color-border)] p-4">
@@ -369,7 +378,8 @@ function TransactionDetail({
               <div key={row.id} className="flex items-start justify-between gap-4 text-xs">
                 <div className="min-w-0">
                   <p className="font-semibold">
-                    {row.label}{row.percentage ? ` (${row.percentage}%)` : ''}
+                    {row.label}
+                    {row.percentage ? ` (${row.percentage}%)` : ''}
                   </p>
                   <p className="mt-0.5 text-[var(--color-text-muted)]">
                     {row.scope === 'TRANSACTION'
@@ -386,7 +396,9 @@ function TransactionDetail({
             ))}
             {isPositive(sale.taxAmount) ? (
               <div className="flex justify-between gap-4 border-t border-[var(--color-border)] pt-2 text-xs">
-                <span className="font-semibold">{saleTaxLabel(sale, text('Pajak', 'Tax'))}</span>
+                <span className="font-semibold">
+                  {saleTaxLabel(sale, text('Pajak', 'Tax'), text('Pajak termasuk', 'Tax included'))}
+                </span>
                 <span className="font-semibold">{formatMoney(sale.taxAmount, sale.currency)}</span>
               </div>
             ) : null}
@@ -415,14 +427,19 @@ function TransactionDetail({
                         })}
                       </p>
                     </div>
-                    <p className="font-bold">{formatMoney(payment.appliedAmount, payment.currency)}</p>
+                    <p className="font-bold">
+                      {formatMoney(payment.appliedAmount, payment.currency)}
+                    </p>
                   </div>
                 </article>
               ))}
             </div>
           ) : (
             <p className="rounded-2xl border border-dashed border-[var(--color-border)] p-4 text-xs text-[var(--color-text-muted)]">
-              {text('Belum ada pembayaran untuk transaksi ini.', 'No payment has been recorded for this transaction.')}
+              {text(
+                'Belum ada pembayaran untuk transaksi ini.',
+                'No payment has been recorded for this transaction.',
+              )}
             </p>
           )}
         </div>
@@ -436,13 +453,17 @@ function TransactionDetail({
             </div>
             {isPositive(sale.discountAmount) ? (
               <div className="flex justify-between gap-4">
-                <dt className="text-[var(--color-text-muted)]">{text('Promo dan diskon', 'Promotions and discounts')}</dt>
+                <dt className="text-[var(--color-text-muted)]">
+                  {text('Promo dan diskon', 'Promotions and discounts')}
+                </dt>
                 <dd>−{formatMoney(sale.discountAmount, sale.currency)}</dd>
               </div>
             ) : null}
             {isPositive(sale.taxAmount) ? (
               <div className="flex justify-between gap-4">
-                <dt className="text-[var(--color-text-muted)]">{saleTaxLabel(sale, text('Pajak', 'Tax'))}</dt>
+                <dt className="text-[var(--color-text-muted)]">
+                  {saleTaxLabel(sale, text('Pajak', 'Tax'), text('Pajak termasuk', 'Tax included'))}
+                </dt>
                 <dd>{formatMoney(sale.taxAmount, sale.currency)}</dd>
               </div>
             ) : null}
@@ -464,13 +485,17 @@ function TransactionDetail({
                 ) : null}
                 {cashTendered.greaterThan(0) ? (
                   <div className="flex justify-between gap-4">
-                    <dt className="text-[var(--color-text-muted)]">{text('Uang diterima', 'Cash received')}</dt>
+                    <dt className="text-[var(--color-text-muted)]">
+                      {text('Uang diterima', 'Cash received')}
+                    </dt>
                     <dd>{formatMoney(cashTendered.toFixed(4), sale.currency)}</dd>
                   </div>
                 ) : null}
                 {cashChange.greaterThan(0) ? (
                   <div className="flex justify-between gap-4">
-                    <dt className="text-[var(--color-text-muted)]">{text('Kembalian', 'Change')}</dt>
+                    <dt className="text-[var(--color-text-muted)]">
+                      {text('Kembalian', 'Change')}
+                    </dt>
                     <dd>{formatMoney(cashChange.toFixed(4), sale.currency)}</dd>
                   </div>
                 ) : null}

@@ -1,6 +1,12 @@
 import { createDecimal } from '@digvation/pos-money';
 
-import type { Employee, Sale, SaleAdjustment, SaleLine, TaxTreatment } from './cashier-transaction.types';
+import type {
+  Employee,
+  Sale,
+  SaleAdjustment,
+  SaleLine,
+  TaxTreatment,
+} from './cashier-transaction.types';
 
 export interface DiscountPresentationRow {
   id: string;
@@ -82,9 +88,7 @@ export function saleDiscountRows(sale: DiscountPresentationSale): DiscountPresen
           : adjustment.label || 'Diskon manual',
       amount: adjustment.actualAmount,
       percentage:
-        adjustment.type === 'PERCENTAGE'
-          ? percentageFromRate(adjustment.configuredValue)
-          : null,
+        adjustment.type === 'PERCENTAGE' ? percentageFromRate(adjustment.configuredValue) : null,
     }));
 
   const hasManualTransactionRow = rows.some(
@@ -117,7 +121,7 @@ export function transactionDiscountPercentage(sale: DiscountPresentationSale): s
   const rows = saleDiscountRows(sale);
   const transactionRows = rows.filter((row) => row.scope === 'TRANSACTION');
   return rows.length === 1 && transactionRows.length === 1
-    ? transactionRows[0]?.percentage ?? null
+    ? (transactionRows[0]?.percentage ?? null)
     : null;
 }
 

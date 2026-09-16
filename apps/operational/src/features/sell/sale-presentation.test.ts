@@ -41,9 +41,7 @@ const emptyOrderDiscount = {
 describe('sale presentation', () => {
   it('keeps the authoritative base line subtotal separate from the net line total', () => {
     expect(lineBaseSubtotal({ grossAmount: '150000.0000' })).toBe('150000.0000');
-    expect(lineDiscountPercentage({ discountType: 'PERCENTAGE', discountValue: '0.1' })).toBe(
-      '10',
-    );
+    expect(lineDiscountPercentage({ discountType: 'PERCENTAGE', discountValue: '0.1' })).toBe('10');
     expect(
       lineDiscountPercentage({ discountType: 'FIXED_AMOUNT', discountValue: '15000.0000' }),
     ).toBeNull();
@@ -138,7 +136,7 @@ describe('sale presentation', () => {
 
     expect(saleTaxTreatment(sale)).toBe('INCLUDED');
     expect(saleTaxLabel(sale, 'Pajak')).toBe('Pajak termasuk (11%)');
-    expect(saleTaxLabel(sale, 'Tax')).toBe('Tax included (11%)');
+    expect(saleTaxLabel(sale, 'Tax', 'Tax included')).toBe('Tax included (11%)');
   });
 
   it('resolves performer display name from immutable snapshot, canonical employees, then fallback', () => {
@@ -155,21 +153,17 @@ describe('sale presentation', () => {
     } satisfies EmployeeContribution;
 
     expect(
-      employeeDisplayName(
-        { contributions: [contribution] },
-        'employee-1',
-        [{ id: 'employee-1', displayName: 'Nama Baru' }],
-      ),
+      employeeDisplayName({ contributions: [contribution] }, 'employee-1', [
+        { id: 'employee-1', displayName: 'Nama Baru' },
+      ]),
     ).toBe('Rindu Putri');
     expect(
-      employeeDisplayName(
-        { contributions: [] },
-        'employee-1',
-        [{ id: 'employee-1', displayName: 'Rindu Putri' }],
-      ),
+      employeeDisplayName({ contributions: [] }, 'employee-1', [
+        { id: 'employee-1', displayName: 'Rindu Putri' },
+      ]),
     ).toBe('Rindu Putri');
-    expect(employeeDisplayName({ contributions: [] }, 'missing-id', [], 'Karyawan tidak tersedia')).toBe(
-      'Karyawan tidak tersedia',
-    );
+    expect(
+      employeeDisplayName({ contributions: [] }, 'missing-id', [], 'Karyawan tidak tersedia'),
+    ).toBe('Karyawan tidak tersedia');
   });
 });
