@@ -1,19 +1,13 @@
 import {
   AuthProvider,
-  useAuth,
   type AuthPort,
   type AuthSession,
   type SessionEndReason,
 } from '@digvation/business-auth';
 import {
-  ApplicationSplash,
-  applyEffectiveBusinessConfiguration,
   ConnectivityProvider,
-  loadAuthenticatedRuntimeAvailability,
-  RuntimeProvider,
-  useRuntime,
-  type RuntimeAvailabilityConfig,
-  type RuntimeConfig,
+  DeploymentBootstrapProvider,
+  type DeploymentBootstrapConfig,
 } from '@digvation/business-runtime';
 import { DLocalizationProvider, DToastProvider as ToastProvider, useToast } from '@digvation/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -25,7 +19,6 @@ import {
   useEffect,
   useRef,
   useState,
-  type ReactNode,
   type TransitionEvent,
 } from 'react';
 
@@ -33,106 +26,20 @@ import { operationalCopy, type OperationalLocale } from '../localization/operati
 import { OperationalLoginPage } from '../../modules/operational/operational-login-page';
 import { OperationalSessionProvider } from '../../modules/operational/operational-session-provider';
 import { PosOperationalSessionProvider } from '../../modules/pos/pos-operational-session-provider';
-import { OperationalAvailabilityProvider } from './operational-availability-context';
 
 function runtimeLocale(locale: string): OperationalLocale {
   return locale === 'en-US' ? 'en-US' : 'id-ID';
 }
 
-function hasImplementedOperationalSurface(availability: RuntimeAvailabilityConfig): boolean {
-  const permissions = availability.effectivePermissions;
+function hasImplementedOperationalSurface(session: AuthSession): boolean {
+  const permissions = session.access.permissions;
   const hasPos =
-    availability.effectiveEntitlements.products.includes('POS') &&
+    session.access.products.includes('POS') &&
     permissions.some((permission) => permission.startsWith('sales:'));
   const hasExpenses =
-    availability.effectiveEntitlements.capabilities.includes('FINANCE_OPERATIONS') &&
+    session.access.capabilities.includes('FINANCE_OPERATIONS') &&
     permissions.some((permission) => permission.startsWith('expenses:'));
   return hasPos || hasExpenses;
-}
-
-function AuthenticatedOperationalRuntime({ children }: { children: ReactNode }) {
-  const { session, authPort } = useAuth();
-  const bootstrapRuntime = useRuntime();
-  const locale = runtimeLocale(bootstrapRuntime.locale);
-  const copy = (value: string) => operationalCopy(value, locale);
-  const [state, setState] = useState<'loading' | 'allowed' | 'denied' | 'unavailable'>('loading');
-  const [effectiveRuntime, setEffectiveRuntime] = useState<RuntimeConfig | null>(null);
-  const [availability, setAvailability] = useState<RuntimeAvailabilityConfig | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    setState('loading');
-    setEffectiveRuntime(null);
-    setAvailability(null);
-    void (async () => {
-      const token = await authPort.getAccessToken?.();
-      if (!token) {
-        if (active) setState('denied');
-        return;
-      }
-      try {
-        const nextAvailability = await loadAuthenticatedRuntimeAvailability(
-          bootstrapRuntime.apiBaseUrl,
-          token,
-        );
-        if (!active) return;
-        if (
-          !nextAvailability.effectiveFoundations.includes('OPERATIONAL_ACCESS') ||
-          !hasImplementedOperationalSurface(nextAvailability)
-        ) {
-          setState('denied');
-          return;
-        }
-        setAvailability(nextAvailability);
-        setEffectiveRuntime(
-          applyEffectiveBusinessConfiguration(
-            bootstrapRuntime,
-            nextAvailability.businessConfiguration,
-          ),
-        );
-        setState('allowed');
-      } catch {
-        if (active) setState('unavailable');
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, [authPort, bootstrapRuntime, session.identity.userId]);
-
-  if (state === 'allowed' && effectiveRuntime && availability)
-    return (
-      <RuntimeProvider config={effectiveRuntime}>
-        <OperationalAvailabilityProvider availability={availability}>
-          <DLocalizationProvider locale={runtimeLocale(effectiveRuntime.locale)}>
-            {children}
-          </DLocalizationProvider>
-        </OperationalAvailabilityProvider>
-      </RuntimeProvider>
-    );
-
-  if (state === 'loading')
-    return (
-      <ApplicationSplash
-        productName={bootstrapRuntime.branding.productName}
-        message={locale === 'id-ID' ? 'Memuat Operasional...' : 'Loading Operational...'}
-      />
-    );
-
-  return (
-    <main className="grid min-h-screen place-items-center bg-[var(--color-background)] p-6 text-center">
-      <section className="max-w-md rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
-        <h1 className="text-lg font-semibold">
-          {state === 'denied'
-            ? copy('Operational access unavailable')
-            : copy('Operational context unavailable')}
-        </h1>
-        <p className="mt-2 text-sm text-[var(--color-text-muted)]">
-          {copy('Contact an administrator if this access should be available.')}
-        </p>
-      </section>
-    </main>
-  );
 }
 
 const queryClient = new QueryClient({
@@ -149,26 +56,26 @@ const queryClient = new QueryClient({
 });
 
 interface OperationalProvidersProps {
-  runtime: RuntimeConfig;
+  bootstrap: DeploymentBootstrapConfig;
   session: AuthSession | null;
   authPort: AuthPort;
   router: RouterProviderProps['router'];
 }
 
-type OperationalAuthBoundaryProps = OperationalProvidersProps;
+type OperationalAuthBoundaryProps = Omit<OperationalProvidersProps, 'bootstrap'>;
 
 function OperationalAuthBoundary({
-  runtime,
   session,
   authPort,
   router,
 }: OperationalAuthBoundaryProps) {
-  const locale = runtimeLocale(runtime.locale);
-  const copy = (value: string) => operationalCopy(value, locale);
   const [authenticatedSession, setAuthenticatedSession] = useState(session);
   const [isLoggingOut, setLoggingOut] = useState(false);
   const sessionEnded = useRef(false);
   const { showToast } = useToast();
+
+  const locale = runtimeLocale(authenticatedSession?.preferences.locale ?? 'id-ID');
+  const copy = (value: string) => operationalCopy(value, locale);
 
   const handleSessionEnded = useCallback(
     (_reason: SessionEndReason) => {
@@ -206,15 +113,30 @@ function OperationalAuthBoundary({
     return <OperationalLoginPage authPort={authPort} onAuthenticated={handleAuthenticated} />;
   }
 
+  const allowed =
+    authenticatedSession.access.foundations.includes('OPERATIONAL_ACCESS') &&
+    hasImplementedOperationalSurface(authenticatedSession);
+
+  if (!allowed) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[var(--color-background)] p-6 text-center">
+        <section className="max-w-md rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+          <h1 className="text-lg font-semibold">{copy('Operational access unavailable')}</h1>
+          <p className="mt-2 text-sm text-[var(--color-text-muted)]">
+            {copy('Contact an administrator if this access should be available.')}
+          </p>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <AuthProvider
       session={authenticatedSession}
       authPort={authPort}
       onLogout={() => setLoggingOut(true)}
     >
-      <AuthenticatedOperationalRuntime
-        key={`${authenticatedSession.identity.userId}:${runtime.apiBaseUrl}`}
-      >
+      <DLocalizationProvider locale={runtimeLocale(authenticatedSession.preferences.locale)}>
         <OperationalSessionProvider>
           <PosOperationalSessionProvider>
             <div
@@ -227,31 +149,32 @@ function OperationalAuthBoundary({
             </div>
           </PosOperationalSessionProvider>
         </OperationalSessionProvider>
-      </AuthenticatedOperationalRuntime>
+      </DLocalizationProvider>
     </AuthProvider>
   );
 }
 
 export function OperationalProviders({
-  runtime,
+  bootstrap,
   session,
   authPort,
   router,
 }: OperationalProvidersProps) {
   return (
-    <RuntimeProvider config={runtime}>
+    <DeploymentBootstrapProvider config={bootstrap}>
       <ConnectivityProvider>
         <QueryClientProvider client={queryClient}>
-          <ToastProvider>
-            <OperationalAuthBoundary
-              runtime={runtime}
-              session={session}
-              authPort={authPort}
-              router={router}
-            />
-          </ToastProvider>
+          <DLocalizationProvider locale={runtimeLocale(bootstrap.defaults.locale)}>
+            <ToastProvider>
+              <OperationalAuthBoundary
+                session={session}
+                authPort={authPort}
+                router={router}
+              />
+            </ToastProvider>
+          </DLocalizationProvider>
         </QueryClientProvider>
       </ConnectivityProvider>
-    </RuntimeProvider>
+    </DeploymentBootstrapProvider>
   );
 }
