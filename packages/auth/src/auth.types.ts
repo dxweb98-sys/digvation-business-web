@@ -36,6 +36,7 @@ export interface SessionDeployment {
   profile: string;
 }
 
+/** Canonical authenticated session contract returned by Business Runtime. */
 export interface AuthSession {
   identity: AuthIdentity;
   business: SessionBusiness;
@@ -43,6 +44,24 @@ export interface AuthSession {
   preferences: SessionPreferences;
   deployment: SessionDeployment;
   contextVersion: string;
+}
+
+/**
+ * Transitional browser-only aliases for screens that have not yet moved from
+ * the former runtime/auth overlays. Every value is derived from AuthSession;
+ * these fields never introduce a second authorization authority.
+ */
+export interface LegacyCompatibleAuthSession extends AuthSession {
+  identity: AuthIdentity & {
+    readonly workspace: string;
+    readonly permissions: readonly string[];
+  };
+  readonly effectiveEntitlements: {
+    readonly products: readonly string[];
+    readonly capabilities: readonly string[];
+  };
+  readonly effectiveFoundations: readonly string[];
+  readonly effectivePermissions: readonly string[];
 }
 
 export interface AuthLoginInput {
