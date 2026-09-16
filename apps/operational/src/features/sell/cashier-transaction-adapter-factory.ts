@@ -17,6 +17,8 @@ type OperationalCashierTransactionPort = PerformerCapableTransactionPort &
   OperationalProjectionQuery &
   OperationalPromotionCommands;
 
+type ApiTarget = string | { readonly apiBaseUrl: string };
+
 function withServicePerformers(adapter: SaleTransactionPort): PerformerCapableTransactionPort {
   if (!adapter.setSaleLinePerformers) {
     adapter.setSaleLinePerformers = async (saleId, saleLineId, input) => {
@@ -40,9 +42,10 @@ export function isLocalCashierDemoEnabled(): boolean {
 
 /** Selects the Runtime-backed Operational transaction boundary once. */
 export function createCashierTransactionAdapter(
-  apiBaseUrl: string,
+  target: ApiTarget,
   getAccessToken?: () => Promise<string | null>,
 ): OperationalCashierTransactionPort {
+  const apiBaseUrl = typeof target === 'string' ? target : target.apiBaseUrl;
   const client = new ApiClient({
     baseUrl: apiBaseUrl,
     applicationSurface: 'operational',
