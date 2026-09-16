@@ -1,8 +1,11 @@
 import { createContext, useContext, useEffect, type ReactNode } from 'react';
 
-import type { RuntimeConfig, ThemeColorConfig } from './runtime-config.types';
+import type {
+  DeploymentBootstrapConfig,
+  ThemeColorConfig,
+} from './runtime-config.types';
 
-const RuntimeContext = createContext<RuntimeConfig | null>(null);
+const DeploymentBootstrapContext = createContext<DeploymentBootstrapConfig | null>(null);
 
 const THEME_COLOR_PROPERTIES: Record<keyof ThemeColorConfig, string> = {
   background: '--color-background',
@@ -20,12 +23,15 @@ const THEME_COLOR_PROPERTIES: Record<keyof ThemeColorConfig, string> = {
   accentCoral: '--color-accent-coral',
 };
 
-interface RuntimeProviderProps {
-  config: RuntimeConfig;
+interface DeploymentBootstrapProviderProps {
+  config: DeploymentBootstrapConfig;
   children: ReactNode;
 }
 
-export function RuntimeProvider({ config, children }: RuntimeProviderProps) {
+export function DeploymentBootstrapProvider({
+  config,
+  children,
+}: DeploymentBootstrapProviderProps) {
   useEffect(() => {
     const root = document.documentElement;
     const previousPreset = root.dataset.themePreset;
@@ -70,15 +76,19 @@ export function RuntimeProvider({ config, children }: RuntimeProviderProps) {
     };
   }, [config.theme]);
 
-  return <RuntimeContext.Provider value={config}>{children}</RuntimeContext.Provider>;
+  return (
+    <DeploymentBootstrapContext.Provider value={config}>
+      {children}
+    </DeploymentBootstrapContext.Provider>
+  );
 }
 
-export function useRuntime(): RuntimeConfig {
-  const runtime = useContext(RuntimeContext);
+export function useDeploymentBootstrap(): DeploymentBootstrapConfig {
+  const bootstrap = useContext(DeploymentBootstrapContext);
 
-  if (!runtime) {
-    throw new Error('RuntimeProvider is missing.');
+  if (!bootstrap) {
+    throw new Error('DeploymentBootstrapProvider is missing.');
   }
 
-  return runtime;
+  return bootstrap;
 }
