@@ -1,32 +1,25 @@
 {
   "apiBaseUrl": "http://127.0.0.1:4003",
-  "workspace": "local",
-  "locale": "id-ID",
-  "currency": "IDR",
-  "defaultCountry": "ID",
   "deploymentProfile": "SHARED",
-  "applications": {
-    "cashier": true,
-    "backoffice": true
+  "workspaceResolution": {
+    "mode": "FIXED",
+    "workspace": "local"
   },
-  "effectiveEntitlements": {
-    "products": ["POS"],
-    "capabilities": ["FINANCE_OPERATIONS"]
+  "applications": {
+    "backoffice": true,
+    "operational": true
   },
   "branding": {
     "mode": "DIGVATION_DEFAULT",
     "productName": "Digvation Business",
-    "companyName": "Digvation",
-    "businessName": "Development Workspace"
+    "companyName": "Digvation"
   },
   "theme": {
     "preset": "DIGVATION_LIGHT",
     "radius": "SOFT"
   },
-  "capabilities": {
-    "notifications": false,
-    "fulfillment": false,
-    "customers": false,
-    "loyalty": false
+  "defaults": {
+    "locale": "id-ID",
+    "country": "ID"
   }
 }
