@@ -1,10 +1,16 @@
 import type {
   BusinessDateFormat,
   BusinessTimeFormat,
-  RuntimeConfig,
 } from './runtime-config.types';
 
 export type BusinessDateTimeValue = Date | string | number;
+
+export interface BusinessDateTimePreferences {
+  locale: string;
+  timezone: string;
+  dateFormat: string;
+  timeFormat: string;
+}
 
 export interface BusinessDateTimeFormatter {
   readonly timezone: string;
@@ -24,16 +30,20 @@ type DateParts = { year: string; month: string; day: string };
 const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 export function createBusinessDateTimeFormatter(
-  runtime: Pick<RuntimeConfig, 'locale' | 'businessConfiguration'>,
+  preferences?: Partial<BusinessDateTimePreferences>,
 ): BusinessDateTimeFormatter {
-  const preferences = runtime.businessConfiguration?.preferences;
-  // UTC is only a bootstrap/unauthenticated fallback. Authenticated apps receive
-  // canonical Business Preferences through effective business configuration.
+  // UTC is only an unauthenticated fallback. Authenticated application code
+  // passes persisted Runtime business preferences from AuthSession.
   const timezone = preferences?.timezone ?? 'UTC';
-  const locale = preferences?.defaultLocale ?? runtime.locale ?? 'id-ID';
-  const dateFormat: BusinessDateFormat =
-    preferences?.dateFormat ?? (locale === 'en-US' ? 'MM/DD/YYYY' : 'DD/MM/YYYY');
-  const timeFormat: BusinessTimeFormat = preferences?.timeFormat ?? 'HH:mm';
+  const locale = preferences?.locale ?? 'id-ID';
+  const dateFormat: BusinessDateFormat = isBusinessDateFormat(preferences?.dateFormat)
+    ? preferences.dateFormat
+    : locale === 'en-US'
+      ? 'MM/DD/YYYY'
+      : 'DD/MM/YYYY';
+  const timeFormat: BusinessTimeFormat = isBusinessTimeFormat(preferences?.timeFormat)
+    ? preferences.timeFormat
+    : 'HH:mm';
 
   const isDateOnly = (value: BusinessDateTimeValue): value is string =>
     typeof value === 'string' && DATE_ONLY.test(value);
@@ -136,4 +146,12 @@ export function createBusinessDateTimeFormatter(
     formatDateTime,
     formatDateOnly,
   };
+}
+
+function isBusinessDateFormat(value: string | undefined): value is BusinessDateFormat {
+  return value === 'DD/MM/YYYY' || value === 'MM/DD/YYYY' || value === 'YYYY-MM-DD';
+}
+
+function isBusinessTimeFormat(value: string | undefined): value is BusinessTimeFormat {
+  return value === 'HH:mm' || value === 'hh:mm a';
 }
