@@ -20,7 +20,7 @@ export function AccountPage() {
         <dl className="mt-6 grid gap-3 sm:grid-cols-2">
           {[
             [copy('Name'), session.identity.displayName],
-            [copy('Email'), session.identity.email ?? copy('Not available')],
+            [copy('Username'), session.identity.username ?? copy('Not available')],
             [copy('Business'), businessName],
             [copy('Version'), version.version],
           ].map(([label, value]) => (

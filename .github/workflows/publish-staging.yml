@@ -1,0 +1,60 @@
+name: Publish Staging Web Images
+
+on:
+  push:
+    branches: [stage]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: staging-web-images-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      IMAGE_BASE: ghcr.io/${{ github.repository }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Publish Backoffice image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: backoffice
+          push: true
+          build-args: |
+            BUILD_REVISION=${{ github.sha }}
+          tags: |
+            ${{ env.IMAGE_BASE }}:staging-backoffice
+            ${{ env.IMAGE_BASE }}:staging-backoffice-${{ github.sha }}
+
+      - name: Publish Operational image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: operational
+          push: true
+          build-args: |
+            BUILD_REVISION=${{ github.sha }}
+          tags: |
+            ${{ env.IMAGE_BASE }}:staging-operational
+            ${{ env.IMAGE_BASE }}:staging-operational-${{ github.sha }}

@@ -44,3 +44,45 @@ jobs:
         env:
           VITE_BUILD_REVISION: ${{ github.sha }}
         run: pnpm test:e2e
+
+      - name: Build immutable Backoffice and Operational images
+        run: |
+          docker build --target backoffice --build-arg BUILD_REVISION=${{ github.sha }} --tag business-backoffice-ci:${{ github.sha }} .
+          docker build --target operational --build-arg BUILD_REVISION=${{ github.sha }} --tag business-operational-ci:${{ github.sha }} .
+
+      - name: Verify web image identity
+        run: |
+          test "$(docker inspect --format '{{ index .Config.Labels \"org.opencontainers.image.revision\" }}' business-backoffice-ci:${{ github.sha }})" = "${{ github.sha }}"
+          test "$(docker inspect --format '{{ index .Config.Labels \"org.opencontainers.image.revision\" }}' business-operational-ci:${{ github.sha }})" = "${{ github.sha }}"
+
+      - name: Web container routing and runtime-config smoke
+        run: |
+          docker run --detach --name business-backoffice-smoke --publish 18081:8080 \
+            --volume "$PWD/deployment/runtime-config.example.json:/usr/share/nginx/html/runtime-config.json:ro" \
+            business-backoffice-ci:${{ github.sha }}
+          docker run --detach --name business-operational-smoke --publish 18082:8080 \
+            --volume "$PWD/deployment/runtime-config.example.json:/usr/share/nginx/html/runtime-config.json:ro" \
+            business-operational-ci:${{ github.sha }}
+
+          for port in 18081 18082; do
+            ready=false
+            for attempt in $(seq 1 20); do
+              if curl --fail --silent "http://127.0.0.1:${port}/healthz"; then ready=true; break; fi
+              sleep 1
+            done
+            test "$ready" = true
+            curl --fail --silent "http://127.0.0.1:${port}/login" >/dev/null
+            curl --fail --silent "http://127.0.0.1:${port}/runtime-config.json" >/dev/null
+            curl --fail --silent --head "http://127.0.0.1:${port}/runtime-config.json" | grep -i '^cache-control: no-store'
+            test "$(curl --silent --output /dev/null --write-out '%{http_code}' "http://127.0.0.1:${port}/api/v1/session/context")" = 404
+          done
+
+          test "$(docker exec business-backoffice-smoke id -u)" != 0
+          test "$(docker exec business-operational-smoke id -u)" != 0
+
+      - name: Web container diagnostics and cleanup
+        if: always()
+        run: |
+          docker logs business-backoffice-smoke 2>/dev/null || true
+          docker logs business-operational-smoke 2>/dev/null || true
+          docker rm --force business-backoffice-smoke business-operational-smoke 2>/dev/null || true
