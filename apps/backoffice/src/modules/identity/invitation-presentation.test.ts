@@ -17,8 +17,8 @@ const invitation = {
 describe('invitation presentation', () => {
   it('keeps invitation lifecycle separate from WhatsApp delivery state', () => {
     expect(invitationLifecycleStatus(invitation, now)).toBe('PENDING');
+    expect(invitationDeliveryLabel('PENDING')).toBe('Menunggu dikirim');
     expect(invitationDeliveryLabel('SENT')).toBe('Terkirim');
-    expect(invitationDeliveryLabel('DELIVERED')).toBe('Terkirim ke perangkat');
     expect(invitationDeliveryLabel('FAILED')).toBe('Gagal dikirim');
   });
 
