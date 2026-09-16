@@ -1,6 +1,6 @@
 import { ApiClient } from '@digvation/business-api';
 import { useAuth } from '@digvation/business-auth';
-import { useRuntime } from '@digvation/business-runtime';
+import { useDeploymentBootstrap } from '@digvation/business-runtime';
 import { DButton, DDropdown, useToast } from '@digvation/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bell } from 'lucide-react';
@@ -14,7 +14,7 @@ const recentLimit = 6;
 const refreshIntervalMs = 60_000;
 
 export function OperationalNotificationBell() {
-  const runtime = useRuntime();
+  const bootstrap = useDeploymentBootstrap();
   const { session, authPort } = useAuth();
   const { locale, formatDate, formatMoney } = useOperationalLocalization();
   const navigate = useNavigate();
@@ -22,18 +22,18 @@ export function OperationalNotificationBell() {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
   const [open, setOpen] = useState(false);
-  const notificationScope = `${session.identity.workspace}:${session.identity.userId}`;
+  const notificationScope = `${session.business.tenantId}:${session.identity.userId}`;
   const api = useMemo(
     () =>
       new NotificationApi(
         new ApiClient({
-          baseUrl: runtime.apiBaseUrl,
+          baseUrl: bootstrap.apiBaseUrl,
           ...(authPort.getAccessToken
             ? { getAccessToken: authPort.getAccessToken.bind(authPort) }
             : {}),
         }),
       ),
-    [authPort, runtime.apiBaseUrl],
+    [authPort, bootstrap.apiBaseUrl],
   );
   const unread = useQuery({
     queryKey: ['notifications', notificationScope, 'unread-count'],
@@ -179,7 +179,7 @@ export function OperationalNotificationBell() {
                 <span
                   className={[
                     'mt-1.5 size-2 shrink-0 rounded-full',
-                    notification.readAt ? 'bg-transparent' : 'bg-[var(--color-brand)]',
+                    notification.readAt ? '' : 'bg-[var(--color-brand)]',
                   ].join(' ')}
                   aria-hidden="true"
                 />
