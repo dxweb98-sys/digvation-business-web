@@ -1,4 +1,4 @@
-import type { BackofficeSession } from './auth-session';
+import type { AuthSession } from '@digvation/business-auth';
 
 export type BackofficeCapability =
   | 'dashboard'
@@ -144,11 +144,11 @@ const actionPermissions: Record<BackofficeAction, readonly string[]> = {
 };
 
 export function canAccessBackoffice(
-  session: BackofficeSession,
+  session: AuthSession,
   capability: BackofficeCapability,
 ): boolean {
   const requirement = capabilityPermissions[capability];
-  const permissions = session.identity.permissions;
+  const permissions = session.access.permissions;
   const hasAll = (requirement.allOf ?? []).every((permission) => permissions.includes(permission));
   const hasAny =
     !requirement.anyOf || requirement.anyOf.some((permission) => permissions.includes(permission));
@@ -156,10 +156,10 @@ export function canAccessBackoffice(
 }
 
 export function canPerformBackofficeAction(
-  session: BackofficeSession,
+  session: AuthSession,
   action: BackofficeAction,
 ): boolean {
   return actionPermissions[action].every((permission) =>
-    session.identity.permissions.includes(permission),
+    session.access.permissions.includes(permission),
   );
 }
