@@ -15,7 +15,7 @@ import { resolveBackofficeLocale } from '../localization/backoffice-locale';
 import {
   BackofficeLocalizationProvider,
   useBackofficeLocalization,
-} from '../localization/backoffice-localization';
+} from '../localization/backoffice-localization.legacy';
 import { BusinessLocationProvider } from './business-location-context';
 
 const queryClient = new QueryClient({
@@ -34,7 +34,7 @@ interface BackofficeProvidersProps {
 export function BackofficeProviders({ bootstrap, auth, router }: BackofficeProvidersProps) {
   return (
     <DeploymentBootstrapProvider config={bootstrap}>
-      <BackofficeLocalizationProvider initialLocale={resolveBackofficeLocale(bootstrap.defaults.locale)}>
+      <BackofficeLocalizationProvider>
         <BackofficeDesignSystemProviders auth={auth} router={router} />
       </BackofficeLocalizationProvider>
     </DeploymentBootstrapProvider>
