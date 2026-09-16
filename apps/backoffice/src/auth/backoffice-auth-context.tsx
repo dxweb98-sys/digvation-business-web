@@ -11,9 +11,10 @@ import {
 import type {
   AuthLoginInput,
   AuthPort,
-  AuthSession,
+  LegacyCompatibleAuthSession,
   SessionEndReason,
 } from '@digvation/business-auth';
+import { withLegacySessionAliases } from '@digvation/business-auth';
 import { useToast } from '@digvation/ui';
 import { ApiClient } from '@digvation/business-api';
 
@@ -28,7 +29,7 @@ type AuthenticationStatus =
 
 interface BackofficeAuthContextValue {
   status: AuthenticationStatus;
-  session: AuthSession | null;
+  session: LegacyCompatibleAuthSession | null;
   login(input: AuthLoginInput): Promise<void>;
   logout(): Promise<void>;
   refreshSessionContext(): Promise<void>;
@@ -47,7 +48,7 @@ export function BackofficeAuthProvider({
   children: ReactNode;
 }) {
   const [status, setStatus] = useState<AuthenticationStatus>('hydrating');
-  const [session, setSession] = useState<AuthSession | null>(null);
+  const [session, setSession] = useState<LegacyCompatibleAuthSession | null>(null);
   const { showToast } = useToast();
   const { t } = useBackofficeLocalization();
   const sessionExpired = useRef(false);
@@ -74,7 +75,7 @@ export function BackofficeAuthProvider({
     void auth.me().then(
       (restored) => {
         if (!isMounted || sessionExpired.current) return;
-        setSession(restored);
+        setSession(restored ? withLegacySessionAliases(restored) : null);
         setStatus(restored ? 'authenticated' : 'unauthenticated');
       },
       () => {
@@ -92,7 +93,7 @@ export function BackofficeAuthProvider({
     async (input: AuthLoginInput) => {
       const authenticated = await auth.login(input);
       sessionExpired.current = false;
-      setSession(authenticated);
+      setSession(withLegacySessionAliases(authenticated));
       setStatus('authenticated');
     },
     [auth],
@@ -116,7 +117,7 @@ export function BackofficeAuthProvider({
         return;
       }
       sessionExpired.current = false;
-      setSession(refreshed);
+      setSession(withLegacySessionAliases(refreshed));
       setStatus('authenticated');
     } catch {
       setStatus('unavailable');
