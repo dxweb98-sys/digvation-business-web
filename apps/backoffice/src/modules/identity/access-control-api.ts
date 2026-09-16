@@ -42,6 +42,8 @@ export interface AccessUser {
   roles: AccessRole[];
 }
 
+export type InvitationDeliveryStatus = 'PENDING' | 'SENT' | 'DELIVERED' | 'READ' | 'FAILED';
+
 export interface UserInvitation {
   id: string;
   phoneE164: string;
@@ -53,6 +55,11 @@ export interface UserInvitation {
   revokedAt: string | null;
   createdAt: string;
   roles: AccessRole[];
+  deliveryStatus: InvitationDeliveryStatus;
+  lastDeliveryAt: string | null;
+  deliveryErrorCode: string | null;
+  providerMessageId: string | null;
+  deliveryAttempts: number;
 }
 
 export interface Page<T> {
