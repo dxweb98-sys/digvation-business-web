@@ -3,6 +3,8 @@ import { createBrowserRouter } from 'react-router';
 import { AuthenticatedRoute } from '../../auth/authenticated-route';
 import { AuthorizedRoute } from '../../auth/authorized-route';
 import { BackofficeLoginPage } from '../../auth/backoffice-login-page';
+import { InvitationAcceptPage } from '../../auth/invitation-accept-page';
+import { PasswordResetPage } from '../../auth/password-reset-page';
 import { UnauthorizedPage } from '../../routes/authorization/unauthorized-page';
 import { DashboardPage } from '../../modules/dashboard/dashboard-page';
 import { BackofficeShell } from '../shell/backoffice-shell';
@@ -20,6 +22,8 @@ import { NotificationsPage } from '../../modules/notifications';
 
 export const backofficeRouter = createBrowserRouter([
   { path: '/login', element: <BackofficeLoginPage /> },
+  { path: '/invitation/accept', element: <InvitationAcceptPage /> },
+  { path: '/password/reset', element: <PasswordResetPage /> },
   {
     element: <AuthenticatedRoute />,
     children: [
