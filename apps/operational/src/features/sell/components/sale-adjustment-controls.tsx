@@ -124,7 +124,7 @@ export function SaleAdjustmentControls({
   placement = 'inline',
 }: SaleAdjustmentControlsProps) {
   const runtime = useRuntime();
-  const { authPort } = useAuth();
+  const { authPort, session } = useAuth();
   const { copy, locale } = useOperationalLocalization();
   const text = (value: string) => localCopy[value]?.[locale] ?? copy(value);
   const { showToast } = useToast();
@@ -136,14 +136,17 @@ export function SaleAdjustmentControls({
   const [discountReason, setDiscountReason] = useState('');
   const [promoCode, setPromoCode] = useState('');
   const [promoBusy, setPromoBusy] = useState(false);
+
   const [paymentPromoTarget, setPaymentPromoTarget] = useState<HTMLElement | null>(null);
+
+  const [paymentPromoCard, setPaymentPromoCard] = useState<HTMLElement | null>(null);
 
   const adapter = useMemo(
     () => createCashierTransactionAdapter(runtime, authPort.getAccessToken?.bind(authPort)),
     [authPort, runtime],
   );
   const sale = workspace.viewModel.sale;
-  const promotionsEnabled = runtime.effectiveEntitlements.capabilities.includes('PROMOTIONS');
+  const promotionsEnabled = session.access.capabilities.includes('PROMOTIONS');
   const monetaryAvailable = workspace.viewModel.monetaryMutation.state === 'AVAILABLE';
   const disabledMessage =
     workspace.viewModel.monetaryMutation.state === 'DISABLED'
@@ -152,7 +155,6 @@ export function SaleAdjustmentControls({
 
   useEffect(() => {
     if (placement !== 'payment') {
-      setPaymentPromoTarget(null);
       return undefined;
     }
 
@@ -161,15 +163,26 @@ export function SaleAdjustmentControls({
       if (hiddenStatus) hiddenStatus.hidden = false;
       hiddenStatus = null;
       const card = findPaymentPromotionCard([copy('Promotion'), 'Promo', 'Promotion']);
+
       if (card) {
+        setPaymentPromoCard((current) => (current === card ? current : card));
+
         const row = card.firstElementChild;
         const status = row?.querySelector('span');
+
         if (status instanceof HTMLElement) {
           status.hidden = true;
           hiddenStatus = status;
         }
+
+        if (row instanceof HTMLElement) {
+          setPaymentPromoTarget((current) => (current === row ? current : row));
+          return;
+        }
       }
-      setPaymentPromoTarget((current) => (current === card ? current : card));
+
+      setPaymentPromoTarget(null);
+      setPaymentPromoCard(null);
     };
 
     syncTarget();
@@ -184,8 +197,45 @@ export function SaleAdjustmentControls({
   if ((!sale && workspace.cart.lines.length === 0) || (sale && sale.status !== 'OPEN')) return null;
 
   const adjustments = sale?.adjustments ?? [];
+
   const promotionAdjustments = adjustments.filter((item) => item.source === 'PROMOTION');
+
   const manualAdjustments = adjustments.filter((item) => item.source === 'MANUAL_DISCOUNT');
+
+  const visibleAdjustments = [...promotionAdjustments, ...manualAdjustments];
+
+  const appliedAdjustmentSummary =
+    sale && visibleAdjustments.length > 0 ? (
+      <div className="mt-3 space-y-2">
+        {visibleAdjustments.map((adjustment) => (
+          <div
+            key={adjustment.id}
+            className="flex items-center justify-between gap-3 rounded-xl bg-(--color-surface-muted)/60 px-3 py-2"
+          >
+            <div className="min-w-0">
+              <p className="truncate text-xs font-semibold">
+                {adjustment.source === 'PROMOTION'
+                  ? sale.promotionCode
+                    ? `${text('Promotion')} · ${sale.promotionCode}`
+                    : text('Promotion')
+                  : text('Manual discount')}
+              </p>
+
+              {adjustment.label ? (
+                <p className="mt-0.5 truncate text-[11px] text-(--color-text-muted)">
+                  {adjustment.label}
+                </p>
+              ) : null}
+            </div>
+
+            <span className="shrink-0 text-xs font-bold tabular-nums text-(--color-brand)">
+              −{formatMoney(adjustment.actualAmount, sale.currency, runtime.locale)}
+            </span>
+          </div>
+        ))}
+      </div>
+    ) : null;
+
   const discountApiValue = discountValueForApi(discountType, discountValue);
   const canSaveDiscount =
     Boolean(sale) &&
@@ -237,6 +287,8 @@ export function SaleAdjustmentControls({
       );
       commitSaleToCache(queryClient, updated);
       setPromoCode(updated.promotionCode ?? code);
+      setOpen(false);
+
       showToast({
         variant: 'success',
         title: text('Promotion applied'),
@@ -293,36 +345,51 @@ export function SaleAdjustmentControls({
     }
   };
 
-  const saveOrderDiscount = () => {
+  const saveOrderDiscount = async () => {
     if (!discountApiValue || !discountReason.trim() || !canSaveDiscount) return;
-    workspace.setOrderDiscount({
-      type: discountType,
-      value: discountApiValue,
-      reason: discountReason.trim(),
-    });
+
+    try {
+      await workspace.setOrderDiscount({
+        type: discountType,
+        value: discountApiValue,
+        reason: discountReason.trim(),
+      });
+
+      setOpen(false);
+    } catch {
+      // Error sudah ditangani oleh sale core controller.
+      // Dialog tetap terbuka agar user bisa memperbaiki input / mencoba lagi.
+    }
   };
 
   const trigger = (
     <DButton
       size="sm"
-      variant="secondary"
-      fullWidth={placement === 'payment'}
+      variant="primary"
       disabled={preparing}
       loading={preparing}
+      leftIcon={<BadgePercent className="size-4" />}
       onClick={() => void prepareAndOpen()}
     >
-      <BadgePercent className="mr-1.5 size-4" />
       {text('Discounts & promotions')}
     </DButton>
   );
 
   return (
-    <>
-      {placement === 'payment'
-        ? paymentPromoTarget
-          ? createPortal(<div className="mt-3">{trigger}</div>, paymentPromoTarget)
-          : null
-        : trigger}
+    <div className="flex justify-between">
+      {placement === 'payment' ? (
+        <>
+          {paymentPromoTarget
+            ? createPortal(<div className="ml-auto shrink-0">{trigger}</div>, paymentPromoTarget)
+            : null}
+
+          {paymentPromoCard && appliedAdjustmentSummary
+            ? createPortal(appliedAdjustmentSummary, paymentPromoCard)
+            : null}
+        </>
+      ) : (
+        trigger
+      )}
 
       {sale ? (
         <DDialog
@@ -331,7 +398,7 @@ export function SaleAdjustmentControls({
           title={text('Discounts & promotions')}
           description={text('Manage transaction discounts and promo codes before payment.')}
           ariaLabel={text('Discounts & promotions')}
-          className="w-full max-w-lg overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
+          className="w-full max-w-lg overflow-hidden rounded-t-2xl bg-(--color-surface) shadow-xl sm:rounded-xl"
           footer={
             <div className="flex justify-end">
               <DButton variant="ghost" onClick={() => setOpen(false)}>
@@ -342,16 +409,16 @@ export function SaleAdjustmentControls({
         >
           <div className="space-y-4">
             {disabledMessage ? (
-              <div className="rounded-xl bg-[var(--color-surface-muted)] px-3 py-2 text-xs text-[var(--color-text-muted)]">
+              <div className="rounded-xl bg-(--color-surface-muted) px-3 py-2 text-xs text-(--color-text-muted)">
                 {disabledMessage}
               </div>
             ) : null}
 
-            <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
+            <section className="rounded-2xl border border-(--color-border) bg-(--color-background) p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-bold">{text('Manual transaction discount')}</h3>
-                  <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                  <p className="mt-1 text-xs text-(--color-text-muted)">
                     {text('A reason is required and the server recalculates the final amount.')}
                   </p>
                 </div>
@@ -408,16 +475,16 @@ export function SaleAdjustmentControls({
             </section>
 
             {promotionsEnabled ? (
-              <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
+              <section className="rounded-2xl border border-(--color-border) bg-(--color-background) p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <h3 className="text-sm font-bold">{text('Promo code')}</h3>
-                    <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                    <p className="mt-1 text-xs text-(--color-text-muted)">
                       {text('Eligibility and the applied amount are validated by the server.')}
                     </p>
                   </div>
                   {sale.promotionCode ? (
-                    <span className="rounded-full bg-[var(--color-brand)]/10 px-2 py-1 text-[10px] font-bold text-[var(--color-brand)]">
+                    <span className="rounded-full bg-(--color-brand)/10 px-2 py-1 text-[10px] font-bold text-(--color-brand)">
                       {sale.promotionCode}
                     </span>
                   ) : null}
@@ -456,24 +523,24 @@ export function SaleAdjustmentControls({
             ) : null}
 
             {adjustments.length ? (
-              <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
+              <section className="rounded-2xl border border-(--color-border) bg-(--color-background) p-4">
                 <h3 className="text-sm font-bold">{text('Applied discounts')}</h3>
                 <div className="mt-3 space-y-2">
                   {[...promotionAdjustments, ...manualAdjustments].map((adjustment) => (
                     <div
                       key={adjustment.id}
-                      className="flex items-start justify-between gap-3 rounded-xl bg-[var(--color-surface-muted)]/60 px-3 py-2"
+                      className="flex items-start justify-between gap-3 rounded-xl bg-(--color-surface-muted)/60 px-3 py-2"
                     >
                       <div className="min-w-0">
                         <p className="truncate text-xs font-semibold">{adjustment.label}</p>
-                        <p className="mt-0.5 text-[11px] text-[var(--color-text-muted)]">
+                        <p className="mt-0.5 text-[11px] text-(--color-text-muted)">
                           {text(
                             adjustment.source === 'PROMOTION' ? 'Promotion' : 'Manual discount',
                           )}
                           {adjustment.reason ? ` · ${adjustment.reason}` : ''}
                         </p>
                       </div>
-                      <span className="shrink-0 text-xs font-bold tabular-nums text-[var(--color-brand)]">
+                      <span className="shrink-0 text-xs font-bold tabular-nums text-(--color-brand)">
                         −{formatMoney(adjustment.actualAmount, sale.currency, runtime.locale)}
                       </span>
                     </div>
@@ -484,6 +551,6 @@ export function SaleAdjustmentControls({
           </div>
         </DDialog>
       ) : null}
-    </>
+    </div>
   );
 }
