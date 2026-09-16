@@ -122,3 +122,28 @@ export interface EffectiveBusinessConfiguration {
   profile: EffectiveBusinessProfileConfiguration;
   preferences: EffectiveBusinessPreferences;
 }
+
+/**
+ * Minimal authenticated data needed to project the former `useRuntime()` view.
+ * Applications pass their canonical AuthSession structurally; this package does
+ * not fetch, cache, or calculate authenticated access itself.
+ */
+export interface AuthenticatedRuntimeProjection {
+  readonly business: {
+    readonly name: string;
+    readonly currency: string;
+  };
+  readonly access: {
+    readonly products: readonly string[];
+    readonly capabilities: readonly string[];
+    readonly foundations: readonly string[];
+    readonly permissions: readonly string[];
+  };
+  readonly preferences: {
+    readonly locale: string;
+    readonly timezone: string;
+    readonly dateFormat: string;
+    readonly timeFormat: string;
+  };
+  readonly contextVersion: string;
+}
