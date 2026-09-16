@@ -67,6 +67,13 @@ import {
   type TransactionCustomer,
 } from '../customer-member-lookup';
 import { hasStartableQueuedWork } from '../queued-sale-work';
+import {
+  employeeDisplayName,
+  lineDiscountPercentage,
+  saleDiscountRows,
+  saleTaxLabel,
+  transactionDiscountLabel,
+} from '../sale-presentation';
 import type {
   CatalogItem,
   Employee,
@@ -338,7 +345,7 @@ function serviceWorkAssignmentSummary(
     .map(
       (contributor) =>
         employees.find((employee) => employee.id === contributor.employeeId)?.displayName ??
-        contributor.employeeId,
+        copyFor('Employee unavailable', locale),
     );
   return `${names.join(', ')} ${copyFor('for all work units', locale)}`;
 }
@@ -352,13 +359,16 @@ function employeeWorkSummary(
   if (!assigned.length) return copyFor('Not assigned', locale);
   return assigned
     .map((participation) => {
-      const employee = employees.find((candidate) => candidate.id === participation.employeeId);
+      const displayName = employeeDisplayName(
+        line,
+        participation.employeeId,
+        employees,
+        copyFor('Employee unavailable', locale),
+      );
       const share = participation.shareRate
         ? `${createDecimal(participation.shareRate).times(100).toFixed(0)}%`
         : null;
-      return share
-        ? `${employee?.displayName ?? participation.employeeId} ${share}`
-        : (employee?.displayName ?? participation.employeeId);
+      return share ? `${displayName} ${share}` : displayName;
     })
     .join(', ');
 }
@@ -1171,8 +1181,14 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         lines={lines}
         total={total}
         gross={workspace.cart.grossAmount}
+        discountAmount={workspace.cart.discountAmount}
+        discountLabel={
+          sale
+            ? transactionDiscountLabel(sale, copy('Promotions and discounts'))
+            : copy('Promotions and discounts')
+        }
         taxAmount={workspace.cart.taxAmount}
-        taxLabel={copy('Tax')}
+        taxLabel={sale ? saleTaxLabel(sale, copy('Tax')) : copy('Tax')}
         isEstimate={workspace.cart.isLocalDraft}
         locale={workspace.locale}
         customer={cartCustomer}
@@ -1220,8 +1236,13 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         total={total}
         gross={workspace.cart.grossAmount}
         discountAmount={workspace.cart.discountAmount}
+        discountLabel={
+          sale
+            ? transactionDiscountLabel(sale, copy('Promotions and discounts'))
+            : copy('Promotions and discounts')
+        }
         taxAmount={workspace.cart.taxAmount}
-        taxLabel={copy('Tax')}
+        taxLabel={sale ? saleTaxLabel(sale, copy('Tax')) : copy('Tax')}
         locale={workspace.locale}
         customer={cartCustomer}
         method={paymentMethod}
@@ -1881,6 +1902,8 @@ function ReferenceFloatingCart({
   lines,
   total,
   gross,
+  discountAmount,
+  discountLabel,
   taxAmount,
   taxLabel,
   isEstimate,
@@ -1896,6 +1919,8 @@ function ReferenceFloatingCart({
   lines: readonly CartDisplayLine[];
   total: string;
   gross: string;
+  discountAmount: string;
+  discountLabel: string;
   taxAmount: string;
   taxLabel: string;
   isEstimate: boolean;
@@ -1912,6 +1937,8 @@ function ReferenceFloatingCart({
       lines={lines}
       total={total}
       gross={gross}
+      discountAmount={discountAmount}
+      discountLabel={discountLabel}
       taxAmount={taxAmount}
       taxLabel={taxLabel}
       isEstimate={isEstimate}
@@ -2013,6 +2040,8 @@ function ReferenceCartPanel({
   lines,
   total,
   gross,
+  discountAmount,
+  discountLabel,
   taxAmount,
   taxLabel,
   isEstimate,
@@ -2026,6 +2055,8 @@ function ReferenceCartPanel({
   lines: readonly CartDisplayLine[];
   total: string;
   gross: string;
+  discountAmount: string;
+  discountLabel: string;
   taxAmount: string;
   taxLabel: string;
   isEstimate: boolean;
@@ -2038,6 +2069,7 @@ function ReferenceCartPanel({
 }) {
   const { copy } = useOperationalLocalization();
   const status = customerStatus(customer);
+  const hasDiscount = !createDecimal(discountAmount).equals(createDecimal('0'));
   const hasTax = !createDecimal(taxAmount).equals(createDecimal('0'));
   const increment = (line: CartDisplayLine, direction: 'up' | 'down') => {
     const next =
@@ -2080,65 +2112,79 @@ function ReferenceCartPanel({
       >
         {lines.length ? (
           <div className="space-y-2 overflow-y-auto p-3">
-            {lines.map((line) => (
-              <div
-                key={line.id}
-                className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 shadow-sm"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold leading-tight">
-                      {line.itemNameSnapshot}
-                    </p>
-                    <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
-                      {money(line.effectiveUnitPrice, locale)}
-                      {line.variantNameSnapshot ? `, ${line.variantNameSnapshot}` : ''}
-                      {line.itemTypeSnapshot === 'SERVICE' ? (
-                        <span className="ml-1 font-semibold text-cyan-700">{copy('Service')}</span>
-                      ) : null}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    aria-label={`${copy('Remove')} ${line.itemNameSnapshot}`}
-                    onClick={() => onRemove(line)}
-                    className="shrink-0 rounded-lg p-1.5 text-[var(--color-text-muted)] hover:bg-[var(--color-danger)]/10 hover:text-[var(--color-danger)]"
-                  >
-                    <Trash2 className="size-3.5" />
-                  </button>
-                </div>
-                <div className="mt-3 flex items-center justify-between gap-3">
-                  <div className="inline-grid grid-cols-[36px_48px_36px] items-center overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] shadow-[inset_0_1px_0_rgb(15_23_42_/_0.02)]">
+            {lines.map((line) => {
+              const discountPercentage = lineDiscountPercentage(line);
+              return (
+                <div
+                  key={line.id}
+                  className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 shadow-sm"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold leading-tight">
+                        {line.itemNameSnapshot}
+                      </p>
+                      <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
+                        {money(line.effectiveUnitPrice, locale)}
+                        {line.variantNameSnapshot ? `, ${line.variantNameSnapshot}` : ''}
+                        {line.itemTypeSnapshot === 'SERVICE' ? (
+                          <span className="ml-1 font-semibold text-cyan-700">{copy('Service')}</span>
+                        ) : null}
+                      </p>
+                    </div>
                     <button
                       type="button"
-                      aria-label={`${copy('Decrease quantity')} ${line.itemNameSnapshot}`}
-                      onClick={() => increment(line, 'down')}
-                      disabled={createDecimal(line.quantity).lessThanOrEqualTo(createDecimal('1'))}
-                      className="flex h-9 items-center justify-center border-r border-[var(--color-border)] text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)] active:bg-[var(--color-surface-muted)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[var(--color-text-muted)]"
+                      aria-label={`${copy('Remove')} ${line.itemNameSnapshot}`}
+                      onClick={() => onRemove(line)}
+                      className="shrink-0 rounded-lg p-1.5 text-[var(--color-text-muted)] hover:bg-[var(--color-danger)]/10 hover:text-[var(--color-danger)]"
                     >
-                      <Minus className="size-3.5" />
-                    </button>
-                    <output
-                      aria-label={`${copy('Quantity')} ${line.itemNameSnapshot}`}
-                      className="flex h-9 w-12 items-center justify-center text-xs font-bold tabular-nums text-[var(--color-text)]"
-                    >
-                      {quantity(line.quantity)}
-                    </output>
-                    <button
-                      type="button"
-                      aria-label={`${copy('Increase quantity')} ${line.itemNameSnapshot}`}
-                      onClick={() => increment(line, 'up')}
-                      className="flex h-9 items-center justify-center border-l border-[var(--color-border)] text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)] active:bg-[var(--color-surface-muted)]"
-                    >
-                      <Plus className="size-3.5" />
+                      <Trash2 className="size-3.5" />
                     </button>
                   </div>
-                  <p className="text-sm font-bold text-[var(--color-brand)]">
-                    {money(line.totalAmount, locale)}
-                  </p>
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <div className="inline-grid grid-cols-[36px_48px_36px] items-center overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] shadow-[inset_0_1px_0_rgb(15_23_42_/_0.02)]">
+                      <button
+                        type="button"
+                        aria-label={`${copy('Decrease quantity')} ${line.itemNameSnapshot}`}
+                        onClick={() => increment(line, 'down')}
+                        disabled={createDecimal(line.quantity).lessThanOrEqualTo(createDecimal('1'))}
+                        className="flex h-9 items-center justify-center border-r border-[var(--color-border)] text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)] active:bg-[var(--color-surface-muted)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[var(--color-text-muted)]"
+                      >
+                        <Minus className="size-3.5" />
+                      </button>
+                      <output
+                        aria-label={`${copy('Quantity')} ${line.itemNameSnapshot}`}
+                        className="flex h-9 w-12 items-center justify-center text-xs font-bold tabular-nums text-[var(--color-text)]"
+                      >
+                        {quantity(line.quantity)}
+                      </output>
+                      <button
+                        type="button"
+                        aria-label={`${copy('Increase quantity')} ${line.itemNameSnapshot}`}
+                        onClick={() => increment(line, 'up')}
+                        className="flex h-9 items-center justify-center border-l border-[var(--color-border)] text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)] active:bg-[var(--color-surface-muted)]"
+                      >
+                        <Plus className="size-3.5" />
+                      </button>
+                    </div>
+                    <p className="text-sm font-bold text-[var(--color-brand)]">
+                      {money(line.totalAmount, locale)}
+                    </p>
+                  </div>
+                  {isPositiveDecimal(line.lineDiscountAmount) ? (
+                    <div className="mt-2 flex items-center justify-between gap-3 text-[11px]">
+                      <span className="text-[var(--color-text-muted)]">
+                        {copy('Item discount')}
+                        {discountPercentage ? ` (${discountPercentage}%)` : ''}
+                      </span>
+                      <span className="font-semibold text-[var(--color-danger)]">
+                        −{money(line.lineDiscountAmount, locale)}
+                      </span>
+                    </div>
+                  ) : null}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center px-4 py-10 text-center">
@@ -2160,6 +2206,14 @@ function ReferenceCartPanel({
             </span>
             <span className="font-medium">{money(gross, locale)}</span>
           </div>
+          {hasDiscount ? (
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-[var(--color-text-muted)]">{discountLabel}</span>
+              <span className="font-medium text-[var(--color-danger)]">
+                −{money(discountAmount, locale)}
+              </span>
+            </div>
+          ) : null}
           {hasTax ? (
             <div className="flex items-center justify-between text-xs">
               <span className="text-[var(--color-text-muted)]">{taxLabel}</span>
@@ -2352,6 +2406,7 @@ function ReferencePaymentDialog({
   total,
   gross,
   discountAmount,
+  discountLabel,
   taxAmount,
   taxLabel,
   locale,
@@ -2376,6 +2431,7 @@ function ReferencePaymentDialog({
   total: string;
   gross: string;
   discountAmount: string;
+  discountLabel: string;
   taxAmount: string;
   taxLabel: string;
   locale: string;
@@ -2402,6 +2458,7 @@ function ReferencePaymentDialog({
   const activeRoute = routeByMethod.get(method) ?? null;
   const isCash = method === 'CASH';
   const needsProvider = method === 'BANK_TRANSFER' || method === 'WALLET';
+  const hasDiscount = !createDecimal(discountAmount).equals(createDecimal('0'));
   const hasTax = !createDecimal(taxAmount).equals(createDecimal('0'));
   const canPay =
     lines.length > 0 &&
@@ -2472,10 +2529,14 @@ function ReferencePaymentDialog({
               <span className="text-[var(--color-text-muted)]">{copy('Subtotal')}</span>
               <span className="font-semibold">{money(gross, locale)}</span>
             </div>
-            <div className="mt-1 flex justify-between">
-              <span className="text-[var(--color-text-muted)]">{copy('Transaction discount')}</span>
-              <span className="font-semibold">{money(discountAmount, locale)}</span>
-            </div>
+            {hasDiscount ? (
+              <div className="mt-1 flex justify-between">
+                <span className="text-[var(--color-text-muted)]">{discountLabel}</span>
+                <span className="font-semibold text-[var(--color-danger)]">
+                  −{money(discountAmount, locale)}
+                </span>
+              </div>
+            ) : null}
             {hasTax ? (
               <div className="mt-1 flex justify-between">
                 <span className="text-[var(--color-text-muted)]">{taxLabel}</span>
@@ -2519,24 +2580,34 @@ function ReferencePaymentDialog({
             </span>
           </div>
           <div className="max-h-[120px] divide-y divide-[var(--color-border)] overflow-y-auto">
-            {lines.map((line) => (
-              <div key={line.id} className="px-4 py-2.5">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold">{line.itemNameSnapshot}</p>
-                    <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
-                      {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
-                      {line.itemTypeSnapshot === 'SERVICE' ? (
-                        <span className="ml-1 font-semibold text-[var(--color-brand)]">
-                          {copy('Service')}
-                        </span>
+            {lines.map((line) => {
+              const discountPercentage = lineDiscountPercentage(line);
+              return (
+                <div key={line.id} className="px-4 py-2.5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold">{line.itemNameSnapshot}</p>
+                      <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
+                        {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
+                        {line.itemTypeSnapshot === 'SERVICE' ? (
+                          <span className="ml-1 font-semibold text-[var(--color-brand)]">
+                            {copy('Service')}
+                          </span>
+                        ) : null}
+                      </p>
+                      {isPositiveDecimal(line.lineDiscountAmount) ? (
+                        <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
+                          {copy('Item discount')}
+                          {discountPercentage ? ` (${discountPercentage}%)` : ''}: −
+                          {money(line.lineDiscountAmount, locale)}
+                        </p>
                       ) : null}
-                    </p>
+                    </div>
+                    <p className="shrink-0 text-sm font-bold">{money(line.totalAmount, locale)}</p>
                   </div>
-                  <p className="shrink-0 text-sm font-bold">{money(line.totalAmount, locale)}</p>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -2932,6 +3003,7 @@ function ReferenceTransactionDetail({
                       line.employeeAssignmentModeSnapshot !== 'NONE' ||
                       line.allowEmployeeContributionSnapshot;
                     const employeeIssues = employeeAssignmentIssues(line, locale);
+                    const discountPercentage = lineDiscountPercentage(line);
                     if (isMultiUnitService) {
                       return (
                         <ReferenceServiceWorkLine
@@ -2955,6 +3027,13 @@ function ReferenceTransactionDetail({
                               {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
                               {line.variantNameSnapshot ? `, ${line.variantNameSnapshot}` : ''}
                             </p>
+                            {isPositiveDecimal(line.lineDiscountAmount) ? (
+                              <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
+                                {copy('Item discount')}
+                                {discountPercentage ? ` (${discountPercentage}%)` : ''}: −
+                                {money(line.lineDiscountAmount, locale)}
+                              </p>
+                            ) : null}
                             {line.fulfillment ? (
                               <p className="mt-1 text-[11px] font-medium text-[var(--color-text-muted)]">
                                 {label(line.fulfillment.status)}
@@ -2994,7 +3073,7 @@ function ReferenceTransactionDetail({
                               </div>
                             ) : null}
                           </div>
-                          <p className="text-sm font-bold">{money(line.totalAmount, locale)}</p>
+                          <p className="text-sm font-bold">{money(line.grossAmount, locale)}</p>
                         </div>
                       </div>
                     );
@@ -3060,6 +3139,7 @@ function ReceiptContent({
   hasTax: boolean;
 }) {
   const { copy } = useOperationalLocalization();
+  const discountRows = saleDiscountRows(sale);
   return (
     <>
       <header className="text-center">
@@ -3082,22 +3162,34 @@ function ReceiptContent({
       <div className="my-4 border-t border-dashed border-slate-300" />
 
       <section className="space-y-2.5">
-        {activeLines.map((line) => (
-          <div key={line.id} className="text-xs leading-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="font-bold">{line.itemNameSnapshot}</p>
-                {line.variantNameSnapshot ? (
-                  <p className="mt-0.5 text-slate-500">{line.variantNameSnapshot}</p>
-                ) : null}
+        {activeLines.map((line) => {
+          const discountPercentage = lineDiscountPercentage(line);
+          return (
+            <div key={line.id} className="text-xs leading-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-bold">{line.itemNameSnapshot}</p>
+                  {line.variantNameSnapshot ? (
+                    <p className="mt-0.5 text-slate-500">{line.variantNameSnapshot}</p>
+                  ) : null}
+                </div>
+                <p className="shrink-0 font-bold">{money(line.grossAmount, locale)}</p>
               </div>
-              <p className="shrink-0 font-bold">{money(line.totalAmount, locale)}</p>
+              <p className="mt-1 text-slate-500">
+                {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
+              </p>
+              {isPositiveDecimal(line.lineDiscountAmount) ? (
+                <div className="mt-1 flex justify-between gap-3 text-slate-500">
+                  <span>
+                    {copy('Item discount')}
+                    {discountPercentage ? ` (${discountPercentage}%)` : ''}
+                  </span>
+                  <span>−{money(line.lineDiscountAmount, locale)}</span>
+                </div>
+              ) : null}
             </div>
-            <p className="mt-1 text-slate-500">
-              {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
-            </p>
-          </div>
-        ))}
+          );
+        })}
       </section>
 
       <div className="my-4 border-t border-dashed border-slate-300" />
@@ -3107,22 +3199,24 @@ function ReceiptContent({
           <dt className="text-slate-500">{copy('Subtotal')}</dt>
           <dd>{money(sale.grossAmount, locale)}</dd>
         </div>
-        {hasDiscount ? (
+        {discountRows.map((row) => (
+          <div key={row.id} className="flex justify-between gap-3">
+            <dt className="text-slate-500">
+              {row.label || copy('Discount')}
+              {row.percentage ? ` (${row.percentage}%)` : ''}
+            </dt>
+            <dd>−{money(row.amount, locale)}</dd>
+          </div>
+        ))}
+        {hasDiscount && discountRows.length === 0 ? (
           <div className="flex justify-between gap-3">
-            <dt className="text-slate-500">{copy('Discount')} </dt>
+            <dt className="text-slate-500">{copy('Discount')}</dt>
             <dd>−{money(sale.discountAmount, locale)}</dd>
           </div>
         ) : null}
         {hasTax ? (
           <div className="flex justify-between gap-3">
-            <dt className="text-slate-500">
-              {copy('Tax')} (
-              {sale.totalAmount > sale.taxAmount
-                ? ((Number(sale.taxAmount) / (Number(sale.totalAmount) - Number(sale.taxAmount))) * 100).toFixed(0)
-                : 0}
-              %)
-            </dt>
-
+            <dt className="text-slate-500">{saleTaxLabel(sale, copy('Tax'))}</dt>
             <dd>{money(sale.taxAmount, locale)}</dd>
           </div>
         ) : null}
@@ -3185,6 +3279,7 @@ function ReferenceServiceWorkLine({
 }) {
   const { copy } = useOperationalLocalization();
   const workSummary = serviceWorkAssignmentSummary(units, employees, locale);
+  const discountPercentage = lineDiscountPercentage(line);
 
   return (
     <div className="p-4">
@@ -3195,6 +3290,13 @@ function ReferenceServiceWorkLine({
             {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
             {line.variantNameSnapshot ? `, ${line.variantNameSnapshot}` : ''}
           </p>
+          {isPositiveDecimal(line.lineDiscountAmount) ? (
+            <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
+              {copy('Item discount')}
+              {discountPercentage ? ` (${discountPercentage}%)` : ''}: −
+              {money(line.lineDiscountAmount, locale)}
+            </p>
+          ) : null}
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
             <span className="min-w-0 flex-1 truncate text-[var(--color-text-muted)]">
               {units.length} {copy('work units')}, {workSummary}
@@ -3212,7 +3314,7 @@ function ReferenceServiceWorkLine({
             ) : null}
           </div>
         </div>
-        <p className="shrink-0 text-sm font-bold">{money(line.totalAmount, locale)}</p>
+        <p className="shrink-0 text-sm font-bold">{money(line.grossAmount, locale)}</p>
       </div>
     </div>
   );
@@ -3249,13 +3351,15 @@ function ReferenceFinancialSummary({ sale, locale }: { sale: Sale; locale: strin
             </div>
             {hasDiscount ? (
               <div className="flex justify-between gap-3">
-                <dt className="text-[var(--color-text-muted)]">{copy('Promotion discount')}</dt>
+                <dt className="text-[var(--color-text-muted)]">
+                  {transactionDiscountLabel(sale, copy('Promotions and discounts'))}
+                </dt>
                 <dd>−{money(sale.discountAmount, locale)}</dd>
               </div>
             ) : null}
             {hasTax ? (
               <div className="flex justify-between gap-3">
-                <dt className="text-[var(--color-text-muted)]">{copy('Tax')}</dt>
+                <dt className="text-[var(--color-text-muted)]">{saleTaxLabel(sale, copy('Tax'))}</dt>
                 <dd>{money(sale.taxAmount, locale)}</dd>
               </div>
             ) : null}
@@ -3919,7 +4023,7 @@ function ReferenceEmployeeDialog({
           <div>
             <p className="text-sm font-semibold">{line.itemNameSnapshot}</p>
             <p className="text-xs text-[var(--color-text-muted)]">
-              {copy('Quantity')} {quantity(line.quantity)}, {money(line.totalAmount, locale)}
+              {copy('Quantity')} {quantity(line.quantity)}, {money(line.grossAmount, locale)}
             </p>
           </div>
           <span

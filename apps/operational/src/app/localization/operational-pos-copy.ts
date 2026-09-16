@@ -39,6 +39,10 @@ const posCopy: Record<string, LocalizedCopy> = {
   'Preview details': { 'id-ID': 'Lihat detail', 'en-US': 'Preview details' },
   'Actions for': { 'id-ID': 'Tindakan untuk', 'en-US': 'Actions for' },
   'No employees assigned': { 'id-ID': 'Belum ada karyawan', 'en-US': 'No employees assigned' },
+  'Employee unavailable': {
+    'id-ID': 'Karyawan tidak tersedia',
+    'en-US': 'Employee unavailable',
+  },
   configurations: { 'id-ID': 'konfigurasi', 'en-US': 'configurations' },
   'for all work units': { 'id-ID': 'untuk semua pengerjaan', 'en-US': 'for all work units' },
   'Not assigned': { 'id-ID': 'Belum ditentukan', 'en-US': 'Not assigned' },
@@ -192,6 +196,7 @@ const posCopy: Record<string, LocalizedCopy> = {
   'Add to queue': { 'id-ID': 'Masukkan ke antrian', 'en-US': 'Add to queue' },
   'Payment total': { 'id-ID': 'Total pembayaran', 'en-US': 'Payment total' },
   'Transaction discount': { 'id-ID': 'Diskon transaksi', 'en-US': 'Transaction discount' },
+  'Promotions and discounts': { 'id-ID': 'Promo dan diskon', 'en-US': 'Promotions and discounts' },
   Promotion: { 'id-ID': 'Promo', 'en-US': 'Promotion' },
   'Use member points': { 'id-ID': 'Gunakan poin member', 'en-US': 'Use member points' },
   'Choose a payment method before continuing.': {
@@ -221,6 +226,8 @@ const posCopy: Record<string, LocalizedCopy> = {
   Configure: { 'id-ID': 'Atur', 'en-US': 'Configure' },
   Cashier: { 'id-ID': 'Kasir', 'en-US': 'Cashier' },
   Discount: { 'id-ID': 'Diskon', 'en-US': 'Discount' },
+  'Item discount': { 'id-ID': 'Diskon item', 'en-US': 'Item discount' },
+  'Tax included': { 'id-ID': 'Pajak termasuk', 'en-US': 'Tax included' },
   'Paid amount': { 'id-ID': 'Dibayar', 'en-US': 'Paid amount' },
   'Cash received': { 'id-ID': 'Uang diterima', 'en-US': 'Cash received' },
   'Thank you for your purchase.': {
