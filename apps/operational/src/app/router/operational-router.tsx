@@ -1,8 +1,8 @@
+import { useAuth } from '@digvation/business-auth';
 import { Navigate, createBrowserRouter } from 'react-router';
 import type { ReactNode } from 'react';
 
 import { useOperationalLocalization } from '../localization/operational-localization';
-import { useOperationalAvailability } from '../providers/operational-availability-context';
 import { SellPage } from '../../routes/sell/sell-page';
 import { OperationalShell } from '../../modules/operational/operational-shell';
 import type { OperationalNavigationSection } from '../../modules/operational/operational-navigation';
@@ -15,10 +15,10 @@ import { financeOperationalNavigation } from '../../modules/finance/finance-oper
 import { OperationalExpensesPage } from '../../modules/finance/operational-expenses-page';
 
 function useOperationalSurfaceAccess() {
-  const availability = useOperationalAvailability();
-  const permissions = availability.effectivePermissions;
-  const hasPos = availability.effectiveEntitlements.products.includes('POS');
-  const hasFinance = availability.effectiveEntitlements.capabilities.includes('FINANCE_OPERATIONS');
+  const { session } = useAuth();
+  const permissions = session.access.permissions;
+  const hasPos = session.access.products.includes('POS');
+  const hasFinance = session.access.capabilities.includes('FINANCE_OPERATIONS');
   return {
     canSell: hasPos && permissions.includes('sales:create'),
     canReadSales: hasPos && permissions.includes('sales:read'),
