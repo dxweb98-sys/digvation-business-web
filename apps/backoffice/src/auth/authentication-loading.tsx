@@ -1,18 +1,25 @@
-import { ApplicationSplash, useRuntime } from '@digvation/business-runtime';
+import {
+  ApplicationSplash,
+  useDeploymentBootstrap,
+} from '@digvation/business-runtime';
 import { useBackofficeLocalization } from '../app/localization/backoffice-localization';
 
 export function AuthenticationLoading() {
-  const runtime = useRuntime();
+  const bootstrap = useDeploymentBootstrap();
   const { locale } = useBackofficeLocalization();
 
   return (
     <ApplicationSplash
-      productName={runtime.branding.productName}
+      productName={bootstrap.branding.productName}
       message={locale === 'id' ? 'Menyiapkan Backoffice' : 'Preparing Backoffice'}
       mark={
-        runtime.branding.logoUrl ? (
+        bootstrap.branding.logoUrl ? (
           <span className="grid size-9 place-items-center rounded-[var(--radius-control)] bg-white p-1">
-            <img src={runtime.branding.logoUrl} alt="" className="size-full object-contain" />
+            <img
+              src={bootstrap.branding.logoUrl}
+              alt=""
+              className="size-full object-contain"
+            />
           </span>
         ) : (
           <span className="flex h-5 items-end gap-1">
