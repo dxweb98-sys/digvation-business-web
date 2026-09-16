@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
 import {
   createBusinessDateTimeFormatter,
-  useRuntime,
+  useDeploymentBootstrap,
 } from '@digvation/business-runtime';
 
+import { useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import {
   BackofficeLocalizationProvider,
   readStoredBackofficeLocale,
@@ -18,10 +19,17 @@ export type {
 
 export function useBackofficeLocalization() {
   const localization = useLegacyBackofficeLocalization();
-  const runtime = useRuntime();
+  const bootstrap = useDeploymentBootstrap();
+  const { session } = useBackofficeAuth();
   const dateTime = useMemo(
-    () => createBusinessDateTimeFormatter(runtime),
-    [runtime.businessConfiguration, runtime.locale],
+    () =>
+      createBusinessDateTimeFormatter(
+        session?.preferences ?? {
+          locale: bootstrap.defaults.locale,
+          timezone: 'UTC',
+        },
+      ),
+    [bootstrap.defaults.locale, session?.contextVersion, session?.preferences],
   );
 
   return useMemo(
