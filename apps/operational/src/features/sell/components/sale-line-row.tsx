@@ -3,6 +3,7 @@ import { DBadge, DButton } from '@digvation-labs/ui';
 import { Minus, Plus, SlidersHorizontal, Trash2 } from 'lucide-react';
 
 import type { SaleLine } from '../cashier-transaction.types';
+import { lineDiscountPercentage } from '../sale-presentation';
 import type { ActionAvailability } from '../sale-workspace-view-model';
 
 interface SaleLineRowProps {
@@ -30,6 +31,8 @@ export function SaleLineRow({
   const contributorCount = line.participations.filter(
     (participation) => participation.shareRate !== null,
   ).length;
+  const discountPercentage = lineDiscountPercentage(line);
+  const hasLineDiscount = createDecimal(line.lineDiscountAmount).greaterThan(0);
 
   const increase = () => onQuantityChange(line, createDecimal(line.quantity).plus('1').toFixed());
   const decrease = () => {
@@ -42,14 +45,25 @@ export function SaleLineRow({
         <div className="min-w-0">
           <p className="truncate text-sm font-bold">{line.itemNameSnapshot}</p>
           <p className="mt-1 truncate text-xs text-[var(--color-text-muted)]">
-            {line.variantNameSnapshot ? `${line.variantNameSnapshot} Ã‚Â· ` : ''}
+            {line.variantNameSnapshot ? `${line.variantNameSnapshot} · ` : ''}
             {line.itemCodeSnapshot}
           </p>
         </div>
         <p className="shrink-0 text-sm font-bold tabular-nums">
-          {formatMoney(line.totalAmount, line.currency, locale)}
+          {formatMoney(line.grossAmount, line.currency, locale)}
         </p>
       </div>
+
+      {hasLineDiscount ? (
+        <div className="mt-2 flex items-center justify-between gap-3 text-xs">
+          <span className="text-[var(--color-text-muted)]">
+            Diskon item{discountPercentage ? ` (${discountPercentage}%)` : ''}
+          </span>
+          <span className="font-semibold text-[var(--color-danger)] tabular-nums">
+            −{formatMoney(line.lineDiscountAmount, line.currency, locale)}
+          </span>
+        </div>
+      ) : null}
 
       <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-semibold text-[var(--color-text-muted)]">
         {line.fulfillment ? (

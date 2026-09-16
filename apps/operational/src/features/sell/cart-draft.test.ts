@@ -66,7 +66,7 @@ describe('CartDraft local mutations', () => {
     expect(removeCartDraftLine(changed, changed.lines[0]!.id).lines).toEqual([]);
   });
 
-  it('shows the Runtime promotion snapshot on the matching sale line', () => {
+  it('shows the Runtime promotion snapshot without replacing the base line subtotal', () => {
     const line = {
       id: 'line-1',
       itemNameSnapshot: 'Item one',
@@ -74,6 +74,10 @@ describe('CartDraft local mutations', () => {
       variantNameSnapshot: 'Regular',
       quantity: '1.0000',
       effectiveUnitPrice: '12500.0000',
+      grossAmount: '12500.0000',
+      lineDiscountAmount: '1250.0000',
+      discountType: null,
+      discountValue: null,
       totalAmount: '11250.0000',
     } as SaleLine;
     const adjustment = {
@@ -93,8 +97,91 @@ describe('CartDraft local mutations', () => {
       createdAt: '2026-09-16T00:00:00.000Z',
     } satisfies SaleAdjustment;
 
-    expect(saleDisplayLines([line], [adjustment])[0]?.variantNameSnapshot).toBe(
-      'Regular · Promo: Promo September',
-    );
+    const displayed = saleDisplayLines([line], [adjustment])[0];
+
+    expect(displayed?.variantNameSnapshot).toBe('Regular · Promo: Promo September');
+    expect(displayed?.effectiveUnitPrice).toBe('12500.0000');
+    expect(displayed?.totalAmount).toBe('12500.0000');
+    expect(displayed?.discountType).toBe('PERCENTAGE');
+    expect(displayed?.discountValue).toBe('0.1');
+  });
+
+  it('keeps a line-specific discount explicit while preserving its base line subtotal', () => {
+    const line = {
+      id: 'line-2',
+      itemNameSnapshot: 'Hair Color',
+      itemTypeSnapshot: 'SERVICE',
+      variantNameSnapshot: 'Red',
+      quantity: '1.0000',
+      effectiveUnitPrice: '150000.0000',
+      grossAmount: '150000.0000',
+      lineDiscountAmount: '15000.0000',
+      discountType: 'PERCENTAGE',
+      discountValue: '0.1',
+      totalAmount: '135000.0000',
+    } as SaleLine;
+
+    const displayed = saleDisplayLines([line])[0];
+
+    expect(displayed?.effectiveUnitPrice).toBe('150000.0000');
+    expect(displayed?.totalAmount).toBe('150000.0000');
+    expect(displayed?.lineDiscountAmount).toBe('15000.0000');
+    expect(displayed?.discountType).toBe('PERCENTAGE');
+    expect(displayed?.discountValue).toBe('0.1');
+  });
+
+  it('does not attach one percentage to a combined line discount with several adjustments', () => {
+    const line = {
+      id: 'line-3',
+      itemNameSnapshot: 'Hair Color',
+      itemTypeSnapshot: 'SERVICE',
+      variantNameSnapshot: 'Red',
+      quantity: '1.0000',
+      effectiveUnitPrice: '150000.0000',
+      grossAmount: '150000.0000',
+      lineDiscountAmount: '20000.0000',
+      discountType: 'PERCENTAGE',
+      discountValue: '0.05',
+      totalAmount: '130000.0000',
+    } as SaleLine;
+    const promotion = {
+      id: 'promo-line',
+      source: 'PROMOTION',
+      scope: 'ITEM',
+      type: 'PERCENTAGE',
+      configuredValue: '0.1',
+      requestedValue: null,
+      actualAmount: '15000.0000',
+      promotionId: 'promotion-1',
+      label: 'Promo September',
+      saleLineId: 'line-3',
+      actorId: null,
+      actorKind: null,
+      reason: null,
+      createdAt: '2026-09-17T00:00:00.000Z',
+    } satisfies SaleAdjustment;
+    const manual = {
+      id: 'manual-line',
+      source: 'MANUAL_DISCOUNT',
+      scope: 'ITEM',
+      type: 'FIXED_AMOUNT',
+      configuredValue: '5000.0000',
+      requestedValue: '5000.0000',
+      actualAmount: '5000.0000',
+      promotionId: null,
+      label: 'Diskon layanan',
+      saleLineId: 'line-3',
+      actorId: 'actor-1',
+      actorKind: 'USER',
+      reason: 'Diskon layanan',
+      createdAt: '2026-09-17T00:00:00.000Z',
+    } satisfies SaleAdjustment;
+
+    const displayed = saleDisplayLines([line], [promotion, manual])[0];
+
+    expect(displayed?.totalAmount).toBe('150000.0000');
+    expect(displayed?.lineDiscountAmount).toBe('20000.0000');
+    expect(displayed?.discountType).toBeNull();
+    expect(displayed?.discountValue).toBeNull();
   });
 });
