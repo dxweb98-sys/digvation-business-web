@@ -1,14 +1,17 @@
 import { runtimeConfigSchema } from './runtime-config.schema';
-import type { RuntimeConfig, RuntimeConfigPort } from './runtime-config.types';
+import type {
+  DeploymentBootstrapConfig,
+  DeploymentBootstrapConfigPort,
+} from './runtime-config.types';
 
-export class HttpRuntimeConfigAdapter implements RuntimeConfigPort {
+export class HttpDeploymentBootstrapAdapter implements DeploymentBootstrapConfigPort {
   public constructor(private readonly path = '/runtime-config.json') {}
 
-  public async load(): Promise<RuntimeConfig> {
+  public async load(): Promise<DeploymentBootstrapConfig> {
     const response = await fetch(this.path, { cache: 'no-store' });
 
     if (!response.ok) {
-      throw new Error(`Runtime configuration failed with HTTP ${response.status}.`);
+      throw new Error(`Deployment bootstrap failed with HTTP ${response.status}.`);
     }
 
     return runtimeConfigSchema.parse(await response.json());
