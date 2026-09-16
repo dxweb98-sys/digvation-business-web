@@ -1,6 +1,6 @@
 import { ApiClient } from '@digvation/business-api';
 import { useAuth } from '@digvation/business-auth';
-import { useConnectivity, useRuntime } from '@digvation/business-runtime';
+import { useConnectivity, useDeploymentBootstrap } from '@digvation/business-runtime';
 import { DAvatar, DButton, DDialog, DDropdown, useToast } from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
 import { Building2, Check, ChevronDown, LogOut, MapPin, Menu, UserRound } from 'lucide-react';
@@ -24,8 +24,7 @@ function formatCurrentDate(locale: string): string {
   }).format(new Date());
 }
 
-function identityInitials(displayName: string, initials?: string): string | null {
-  if (initials?.trim()) return initials.trim().slice(0, 2).toUpperCase();
+function identityInitials(displayName: string): string | null {
   const derived = displayName
     .trim()
     .split(/\s+/)
@@ -41,14 +40,13 @@ interface OperationalShellProps {
 }
 
 export function OperationalShell({ navigationSections }: OperationalShellProps) {
-  const runtime = useRuntime();
+  const bootstrap = useDeploymentBootstrap();
   const connectivity = useConnectivity();
   const { copy, label } = useOperationalLocalization();
   const { session, authPort, logout } = useAuth();
   const { showToast } = useToast();
   const [isLoggingOut, setLoggingOut] = useState(false);
   const [isAccountDialogOpen, setAccountDialogOpen] = useState(false);
-  const [isRequestingPasswordChange, setRequestingPasswordChange] = useState(false);
   const {
     selectedLocationId,
     selectLocation,
@@ -63,13 +61,13 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
     () =>
       new OperationalAccessApi(
         new ApiClient({
-          baseUrl: runtime.apiBaseUrl,
+          baseUrl: bootstrap.apiBaseUrl,
           ...(authPort.getAccessToken
             ? { getAccessToken: authPort.getAccessToken.bind(authPort) }
             : {}),
         }),
       ),
-    [authPort, runtime],
+    [authPort, bootstrap.apiBaseUrl],
   );
   const operationalAccessQuery = useQuery({
     queryKey: operationalAccessKeys.context(),
@@ -81,14 +79,14 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
   );
   const selectedLocation = locations.find((location) => location.id === selectedLocationId) ?? null;
   const brandSubtitle =
-    runtime.branding.businessName ?? runtime.branding.companyName ?? copy('Operational');
-  const userInitials = identityInitials(session.identity.displayName, session.identity.initials);
-  const primaryRole = session.identity.roles?.[0] ?? null;
+    session.business.name || bootstrap.branding.companyName || copy('Operational');
+  const userInitials = identityInitials(session.identity.displayName);
+  const primaryRole = session.identity.roles[0] ?? null;
   const usernameLabel = session.identity.username?.trim()
     ? `@${session.identity.username.trim()}`
     : null;
   const userContextLabel = [usernameLabel, primaryRole?.name ?? null].filter(Boolean).join(' · ');
-  const headerIdentityContext = userContextLabel || session.identity.email || copy('Account');
+  const headerIdentityContext = userContextLabel || copy('Account');
 
   useEffect(() => {
     const resolved = resolveOperationalLocationSelection(
@@ -152,37 +150,6 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
     }
   };
 
-  const requestPasswordChange = async () => {
-    if (isRequestingPasswordChange) return;
-    const email = session.identity.email;
-    if (!email) {
-      showToast({
-        title: copy('Email unavailable'),
-        description: copy('Contact an administrator to change your password.'),
-        variant: 'warning',
-      });
-      return;
-    }
-
-    setRequestingPasswordChange(true);
-    try {
-      await authPort.requestPasswordChange({ email });
-      showToast({
-        title: copy('Request received'),
-        description: copy('Instructions will be sent to the account email.'),
-        variant: 'success',
-      });
-    } catch {
-      showToast({
-        title: copy('Password change request failed'),
-        description: copy('Try again or contact an administrator.'),
-        variant: 'danger',
-      });
-    } finally {
-      setRequestingPasswordChange(false);
-    }
-  };
-
   const branchLabel =
     selectedLocation?.name ??
     copy(operationalAccessQuery.isLoading ? 'Loading branch' : 'Choose branch');
@@ -192,10 +159,10 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
       <aside className="operational-shell__sidebar hidden min-h-0 shrink-0 flex-col border-r border-[var(--color-border)] bg-[var(--color-surface)] shadow-[1px_0_0_var(--color-border)] md:flex md:w-[232px] lg:w-[280px]">
         <div className="flex min-h-16 items-center gap-3 border-b border-[var(--color-border)] px-5 py-3">
           <div className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-[var(--radius-control)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]">
-            {runtime.branding.logoUrl ? (
+            {bootstrap.branding.logoUrl ? (
               <img
-                src={runtime.branding.logoUrl}
-                alt={`${runtime.branding.productName} logo`}
+                src={bootstrap.branding.logoUrl}
+                alt={`${bootstrap.branding.productName} logo`}
                 className="size-full object-contain p-1"
               />
             ) : (
@@ -204,7 +171,7 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
           </div>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold leading-5 text-[var(--color-text)]">
-              {runtime.branding.productName}
+              {bootstrap.branding.productName}
             </p>
             <p className="truncate text-xs leading-4 text-[var(--color-text-muted)]">
               {brandSubtitle}
@@ -228,7 +195,6 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
           <div className="px-4 py-3">
             <div className="flex min-w-0 items-center gap-3">
               <DAvatar
-                {...(session.identity.avatarUrl ? { src: session.identity.avatarUrl } : {})}
                 alt=""
                 name={session.identity.displayName}
                 fallback={
@@ -300,7 +266,7 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
               <span className="size-1.5 rounded-full bg-current" /> {label(connectivity.state)}
             </span>
             <span className="operational-shell__header-date hidden text-xs text-[var(--color-text-muted)] md:inline">
-              {formatCurrentDate(runtime.locale)}
+              {formatCurrentDate(session.preferences.locale)}
             </span>
           </div>
 
@@ -323,7 +289,6 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
                 </span>
               </span>
               <DAvatar
-                {...(session.identity.avatarUrl ? { src: session.identity.avatarUrl } : {})}
                 alt=""
                 name={session.identity.displayName}
                 fallback={
@@ -432,19 +397,13 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
             <DButton variant="secondary" onClick={() => setAccountDialogOpen(false)}>
               {copy('Close')}
             </DButton>
-            <DButton
-              loading={isRequestingPasswordChange}
-              onClick={() => void requestPasswordChange()}
-            >
-              {copy('Request password change')}
-            </DButton>
+            <DButton disabled>{copy('Request password change')}</DButton>
           </div>
         }
       >
         <div>
           <div className="flex min-w-0 items-center gap-3.5">
             <DAvatar
-              {...(session.identity.avatarUrl ? { src: session.identity.avatarUrl } : {})}
               alt=""
               name={session.identity.displayName}
               fallback={
@@ -460,11 +419,6 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
               <p className="mt-0.5 truncate text-sm text-[var(--color-text-muted)]">
                 {headerIdentityContext}
               </p>
-              {session.identity.email ? (
-                <p className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">
-                  {session.identity.email}
-                </p>
-              ) : null}
             </div>
           </div>
           {selectedLocation ? (
