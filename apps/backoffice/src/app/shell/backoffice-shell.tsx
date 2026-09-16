@@ -1,4 +1,5 @@
-import { useRuntime } from '@digvation/business-runtime';
+import type { AuthSession } from '@digvation/business-auth';
+import { useDeploymentBootstrap } from '@digvation/business-runtime';
 import { DAvatar, DButton, DDropdown } from '@digvation/ui';
 import {
   BadgePercent,
@@ -23,7 +24,6 @@ import { useState } from 'react';
 
 import { canAccessBackoffice, type BackofficeCapability } from '../../auth/backoffice-access';
 import { useBackofficeAuth } from '../../auth/backoffice-auth-context';
-import type { BackofficeSession } from '../../auth/auth-session';
 import { NotificationBell } from '../../modules/notifications';
 import {
   type BackofficeMessageKey,
@@ -111,7 +111,7 @@ const navigationSections: ReadonlyArray<{
 ];
 
 export function BackofficeShell() {
-  const runtime = useRuntime();
+  const bootstrap = useDeploymentBootstrap();
   const { t, formatDate } = useBackofficeLocalization();
   const { session, logout } = useBackofficeAuth();
   const location = useLocation();
@@ -130,7 +130,7 @@ export function BackofficeShell() {
   if (!session) return null;
 
   const brandSubtitle =
-    runtime.branding.businessName ?? runtime.branding.companyName ?? 'Backoffice';
+    session.business.name || bootstrap.branding.companyName || 'Backoffice';
   const roleContext =
     session.identity.roles.map((role) => role.name).join(', ') || t('authenticatedUser');
   const currentDate = formatDate(new Date(), {
@@ -144,10 +144,10 @@ export function BackofficeShell() {
       <aside className="backoffice-shell__sidebar hidden min-h-0 shrink-0 flex-col border-r border-[var(--color-border)] bg-[var(--color-surface)] shadow-[1px_0_0_var(--color-border)] md:flex md:w-[232px] lg:w-[280px]">
         <div className="flex min-h-16 items-center gap-3 border-b border-[var(--color-border)] px-5 py-3">
           <div className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-[var(--radius-control)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]">
-            {runtime.branding.logoUrl ? (
+            {bootstrap.branding.logoUrl ? (
               <img
-                src={runtime.branding.logoUrl}
-                alt={`${runtime.branding.productName} logo`}
+                src={bootstrap.branding.logoUrl}
+                alt={`${bootstrap.branding.productName} logo`}
                 className="size-full object-contain p-1"
               />
             ) : (
@@ -156,7 +156,7 @@ export function BackofficeShell() {
           </div>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold leading-5 text-[var(--color-text)]">
-              {runtime.branding.productName}
+              {bootstrap.branding.productName}
             </p>
             <p className="truncate text-xs leading-4 text-[var(--color-text-muted)]">
               {brandSubtitle}
@@ -320,7 +320,7 @@ export function BackofficeShell() {
   );
 }
 
-function NavigationGroups({ session }: { session: BackofficeSession }) {
+function NavigationGroups({ session }: { session: AuthSession }) {
   const { t } = useBackofficeLocalization();
   return (
     <>

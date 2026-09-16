@@ -3,7 +3,7 @@ import { Building2 } from 'lucide-react';
 import { useRef, useState, type FormEvent, type TransitionEvent } from 'react';
 
 import type { AuthPort, AuthSession } from '@digvation/business-auth';
-import { useRuntime } from '@digvation/business-runtime';
+import { useDeploymentBootstrap } from '@digvation/business-runtime';
 import { useOperationalLocalization } from '../../app/localization/operational-localization';
 
 interface OperationalLoginPageProps {
@@ -20,7 +20,7 @@ function loginFailureMessage(error: unknown, copy: (value: string) => string) {
 
 /** Operational-owned login composition using the canonical shared field, button, and toast primitives. */
 export function OperationalLoginPage({ authPort, onAuthenticated }: OperationalLoginPageProps) {
-  const runtime = useRuntime();
+  const bootstrap = useDeploymentBootstrap();
   const { copy } = useOperationalLocalization();
   const { showToast } = useToast();
   const [identifier, setIdentifier] = useState('');
@@ -86,7 +86,7 @@ export function OperationalLoginPage({ authPort, onAuthenticated }: OperationalL
             <span className="absolute inset-0 -z-10 rounded-2xl bg-[var(--color-brand)]/20 animate-ping [animation-duration:2s]" />
           </div>
           <h1 className="text-3xl font-bold tracking-[-0.04em] text-[var(--color-text)]">
-            {runtime.branding.productName}
+            {bootstrap.branding.productName}
           </h1>
           <p className="mt-2 text-sm text-[var(--color-text-muted)]">{copy('Operational')}</p>
         </header>

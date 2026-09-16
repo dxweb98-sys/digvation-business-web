@@ -1,6 +1,6 @@
-# Digvation POS Web
+# Digvation Business Web
 
-Frontend product workspace for the Digvation white-label POS platform.
+Frontend product workspace for Digvation Business, with independently deployable Operational and Backoffice applications.
 
 ## Repository status
 
@@ -30,18 +30,32 @@ feat/* | fix/* | refactor/* | chore/*
 
 This is a multi-app monorepo, not one monolithic frontend application and not a microfrontend architecture.
 
-- `apps/cashier` — operational cashier experience.
+- `apps/operational` — live Operational execution experience, including the current POS selling implementation.
 - `apps/backoffice` — management/configuration experience.
 
 Both applications are independently deployable and consume deliberate shared packages from `packages/*`; they never import each other's internals.
 
-A future approved application is added under `apps/<application-name>` without restructuring existing applications.
+A future approved application is added under `apps/<application-name>` only when the architecture actually requires another deployable application.
 
-## Authentication during early frontend development
+## Runtime authority
 
-Production POS AUTH-01 is still implemented in the backend track. Frontend Foundation therefore uses the approved `AuthPort` with a development-only `MockAuthAdapter`. Business screens do not know token storage or transport mechanics.
+Browser bootstrap and authenticated business context are deliberately separate.
 
-When AUTH-01 is accepted, `MockAuthAdapter` is replaced by the production adapter without redesigning business screens.
+Before authentication, `runtime-config.json` is deployment bootstrap only. It provides API origin, deployment metadata, login workspace resolution, application shell availability, branding/theme fallback, and locale/country fallback defaults.
+
+After authentication, the canonical application-composition contract is:
+
+```text
+GET /api/v1/session/context
+```
+
+The session context supplies identity, tenant/business identity, Runtime-owned currency, effective products/capabilities/foundations/permissions, effective business preferences, deployment metadata, and `contextVersion`.
+
+The browser must not reconstruct effective authorization from role payloads or static runtime config. Domain data and commands remain owned by their corresponding Runtime/domain APIs.
+
+`GET /api/v1/runtime/context` is compatibility-only during migration. `GET /api/v1/auth/me` is identity-oriented and is not the full application-context authority.
+
+See `docs/architecture/FRONTEND_RUNTIME_BRANDING_AND_APP_TOPOLOGY.md`.
 
 ## Development
 
@@ -63,9 +77,10 @@ Official validation before checkpoint handoff:
 
 ```bash
 pnpm verify
+pnpm test:e2e
 ```
 
-Run Cashier and Backoffice together for review:
+Run Operational and Backoffice together for review:
 
 ```bash
 pnpm dev
@@ -74,8 +89,8 @@ pnpm dev
 Default local URLs:
 
 ```text
-Cashier    http://localhost:5173
-Backoffice http://localhost:5174
+Operational http://localhost:5173
+Backoffice  http://localhost:5174
 ```
 
 Run only one app when needed:
@@ -84,6 +99,8 @@ Run only one app when needed:
 pnpm dev:cashier
 pnpm dev:backoffice
 ```
+
+The historical `dev:cashier` script name may remain until an explicit tooling rename is approved; it currently starts the Operational application.
 
 Build everything, then preview both production builds:
 
@@ -95,19 +112,19 @@ pnpm preview
 Preview ports:
 
 ```text
-Cashier    http://localhost:4173
-Backoffice http://localhost:4174
+Operational http://localhost:4173
+Backoffice  http://localhost:4174
 ```
 
 ## Product boundary
 
-Digvation POS remains a domain-neutral, tenant-aware, white-label transactional product. Runtime differences are configuration/capability driven. Client-specific source forks and business-type conditionals are forbidden.
+Digvation Business is tenant-aware and can support shared, isolated, or dedicated deployment and white-label presentation without client-specific source forks or business-type authorization conditionals.
 
 Deployment topology and branding are separate concerns:
 
 ```text
 Deployment Profile
-├── SHARED                # shared / SaaS infrastructure
+├── SHARED
 ├── BUSINESS_ISOLATED
 └── DEDICATED
 
@@ -116,13 +133,11 @@ Branding Mode
 └── WHITE_LABEL
 ```
 
-Runtime application availability can disable Cashier or Backoffice for a workspace. Production deployments should additionally avoid publishing/routing app artifacts that the customer does not use.
+Deployment bootstrap may disable Operational or Backoffice at shell level. Production deployments should additionally avoid publishing/routing application artifacts that the customer does not use. This shell availability does not replace backend authorization or authenticated entitlement checks.
 
-Branding can provide product, company, business, and logo identity. Theme configuration can override semantic colors and approved shape tokens without forking application source.
+Branding can provide deployment presentation fallback such as product/company/logo identity. Authenticated business identity comes from session context. Theme configuration can override semantic colors and approved shape tokens without forking application source.
 
 The Digvation default is light-first: white/off-white surfaces with controlled Yellow, Mint, Sky, Lavender, and Coral accent tokens. Standard Digvation UI uses those accents individually; it does not combine them into rainbow or spectrum gradients.
-
-See `docs/architecture/FRONTEND_RUNTIME_BRANDING_AND_APP_TOPOLOGY.md`.
 
 ## Branch terminology
 
@@ -132,18 +147,6 @@ When branch integration is implemented, one permitted branch may auto-select; mu
 
 ## Backend compatibility
 
-Current locked backend transactional baseline:
-
-```text
-Digvation POS backend v0.3.0
-SHA d58327fa17322d1a98049d842f43742635e744f7
-```
-
-AUTH-01 specification baseline:
-
-```text
-SHA 9008e605b96660b5183e937b1b15088d5f6faa27
-target backend release v0.4.0 after approval
-```
+Current backend compatibility remains governed by `contracts/contract-lock.json` and the frontend/backend reconciliation standard. Historical names in locked records do not change current architecture ownership.
 
 See `contracts/contract-lock.json` and `docs/integration/FRONTEND_BACKEND_RECONCILIATION_STANDARD.md`.

@@ -1,6 +1,7 @@
+import { useOptionalAuth } from '@digvation/business-auth';
 import {
   createBusinessDateTimeFormatter,
-  useRuntime,
+  useDeploymentBootstrap,
 } from '@digvation/business-runtime';
 
 import {
@@ -18,8 +19,14 @@ export {
 export type { OperationalLocale };
 
 export function useOperationalLocalization() {
-  const runtime = useRuntime();
-  const dateTime = createBusinessDateTimeFormatter(runtime);
+  const bootstrap = useDeploymentBootstrap();
+  const auth = useOptionalAuth();
+  const dateTime = createBusinessDateTimeFormatter(
+    auth?.session.preferences ?? {
+      locale: bootstrap.defaults.locale,
+      timezone: 'UTC',
+    },
+  );
   const locale: OperationalLocale = resolveOperationalLocale(dateTime.locale);
 
   return {

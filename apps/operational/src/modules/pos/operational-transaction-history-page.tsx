@@ -1,6 +1,6 @@
 import { ApiClient } from '@digvation/business-api';
 import { useAuth } from '@digvation/business-auth';
-import { useRuntime } from '@digvation/business-runtime';
+import { useDeploymentBootstrap } from '@digvation/business-runtime';
 import {
   DBadge,
   DConnectionError,
@@ -20,7 +20,7 @@ import { OperationalTransactionHistoryApi, type OperationalSale } from './transa
 const PAGE_SIZE = 20;
 
 export function OperationalTransactionHistoryPage() {
-  const runtime = useRuntime();
+  const bootstrap = useDeploymentBootstrap();
   const { authPort } = useAuth();
   const { selectedLocationId } = useOperationalSession();
   const { copy, label, formatDate, formatMoney } = useOperationalLocalization();
@@ -32,13 +32,13 @@ export function OperationalTransactionHistoryPage() {
     () =>
       new OperationalTransactionHistoryApi(
         new ApiClient({
-          baseUrl: runtime.apiBaseUrl,
+          baseUrl: bootstrap.apiBaseUrl,
           ...(authPort.getAccessToken
             ? { getAccessToken: authPort.getAccessToken.bind(authPort) }
             : {}),
         }),
       ),
-    [authPort, runtime.apiBaseUrl],
+    [authPort, bootstrap.apiBaseUrl],
   );
   const list = useQuery({
     queryKey: [

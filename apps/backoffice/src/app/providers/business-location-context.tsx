@@ -1,4 +1,4 @@
-import { useRuntime } from '@digvation/business-runtime';
+import { useDeploymentBootstrap } from '@digvation/business-runtime';
 import { useQuery } from '@tanstack/react-query';
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 
@@ -49,17 +49,17 @@ function writePreference(key: string, value: string): void {
 }
 
 export function BusinessLocationProvider({ children }: { children: ReactNode }) {
-  const runtime = useRuntime();
+  const bootstrap = useDeploymentBootstrap();
   const { session, createApiClient } = useBackofficeAuth();
   const api = useMemo(
-    () => createApiClient(runtime.apiBaseUrl),
-    [createApiClient, runtime.apiBaseUrl],
+    () => createApiClient(bootstrap.apiBaseUrl),
+    [bootstrap.apiBaseUrl, createApiClient],
   );
   const canReadOperationalAccess = Boolean(
-    session?.identity.permissions.includes('operational-access:read'),
+    session?.access.permissions.includes('operational-access:read'),
   );
   const preferenceKey = session
-    ? `digvation.backoffice.dashboard.location.v1:${session.identity.workspace}:${session.identity.userId}`
+    ? `digvation.backoffice.dashboard.location.v1:${session.business.tenantId}:${session.identity.userId}`
     : 'digvation.backoffice.dashboard.location.v1:anonymous';
   const [preferredLocationId, setPreferredLocationId] = useState<string | null>(() =>
     readPreference(preferenceKey),

@@ -2,7 +2,7 @@ export type DeploymentProfile = 'SHARED' | 'BUSINESS_ISOLATED' | 'DEDICATED';
 export type BrandingMode = 'DIGVATION_DEFAULT' | 'WHITE_LABEL';
 export type ThemePreset = 'DIGVATION_LIGHT' | 'CUSTOM';
 export type ThemeRadius = 'COMPACT' | 'SOFT' | 'ROUNDED';
-export type ApplicationId = 'cashier' | 'backoffice';
+export type ApplicationId = 'operational' | 'backoffice';
 export type BusinessProduct = 'POS';
 export type BusinessCapability =
   | 'FINANCE_OPERATIONS'
@@ -28,7 +28,6 @@ export interface BrandingConfig {
   mode: BrandingMode;
   productName: string;
   companyName?: string | undefined;
-  businessName?: string | undefined;
   logoUrl?: string | undefined;
 }
 
@@ -55,17 +54,47 @@ export interface ThemeConfig {
 }
 
 export interface ApplicationAvailabilityConfig {
-  cashier: boolean;
+  operational: boolean;
   backoffice: boolean;
 }
 
-export interface CapabilityConfig {
-  notifications: boolean;
-  fulfillment: boolean;
-  customers: boolean;
-  loyalty: boolean;
+export type WorkspaceResolutionConfig =
+  | Readonly<{
+      mode: 'FIXED';
+      workspace: string;
+    }>
+  | Readonly<{
+      mode: 'LOGIN';
+      defaultWorkspace?: string | undefined;
+    }>;
+
+export interface DeploymentBootstrapDefaults {
+  locale: BusinessLocale;
+  country: string;
 }
 
+export interface DeploymentBootstrapConfig {
+  /**
+   * API origin used before authentication. Empty string means same-origin and
+   * keeps the existing /api/v1 request paths unchanged.
+   */
+  apiBaseUrl: string;
+  deploymentProfile: DeploymentProfile;
+  workspaceResolution: WorkspaceResolutionConfig;
+  applications: ApplicationAvailabilityConfig;
+  branding: BrandingConfig;
+  theme: ThemeConfig;
+  defaults: DeploymentBootstrapDefaults;
+}
+
+export interface DeploymentBootstrapConfigPort {
+  load(): Promise<DeploymentBootstrapConfig>;
+}
+
+/**
+ * Compile-time vocabulary mirrors the Runtime contract only. These values are
+ * never a browser-side entitlement authority.
+ */
 export interface EffectiveEntitlementConfig {
   products: readonly BusinessProduct[];
   capabilities: readonly BusinessCapability[];
@@ -94,28 +123,27 @@ export interface EffectiveBusinessConfiguration {
   preferences: EffectiveBusinessPreferences;
 }
 
-export interface RuntimeAvailabilityConfig {
-  effectiveEntitlements: EffectiveEntitlementConfig;
-  effectiveFoundations: readonly BusinessFoundation[];
-  effectivePermissions: readonly string[];
-  businessConfiguration?: EffectiveBusinessConfiguration | undefined;
-}
-
-export interface RuntimeConfig {
-  apiBaseUrl: string;
-  workspace: string;
-  locale: string;
-  currency: string;
-  defaultCountry: string;
-  deploymentProfile: DeploymentProfile;
-  applications: ApplicationAvailabilityConfig;
-  effectiveEntitlements: EffectiveEntitlementConfig;
-  branding: BrandingConfig;
-  theme: ThemeConfig;
-  capabilities: CapabilityConfig;
-  businessConfiguration?: EffectiveBusinessConfiguration | undefined;
-}
-
-export interface RuntimeConfigPort {
-  load(): Promise<RuntimeConfig>;
+/**
+ * Minimal authenticated data needed to project the former `useRuntime()` view.
+ * Applications pass their canonical AuthSession structurally; this package does
+ * not fetch, cache, or calculate authenticated access itself.
+ */
+export interface AuthenticatedRuntimeProjection {
+  readonly business: {
+    readonly name: string;
+    readonly currency: string;
+  };
+  readonly access: {
+    readonly products: readonly string[];
+    readonly capabilities: readonly string[];
+    readonly foundations: readonly string[];
+    readonly permissions: readonly string[];
+  };
+  readonly preferences: {
+    readonly locale: string;
+    readonly timezone: string;
+    readonly dateFormat: string;
+    readonly timeFormat: string;
+  };
+  readonly contextVersion: string;
 }

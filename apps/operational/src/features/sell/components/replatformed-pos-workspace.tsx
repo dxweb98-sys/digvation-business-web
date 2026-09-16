@@ -3109,21 +3109,21 @@ function ReceiptContent({
         </div>
         {hasDiscount ? (
           <div className="flex justify-between gap-3">
-            <dt className="text-slate-500">{copy('Discount')}</dt>
+            <dt className="text-slate-500">{copy('Discount')} </dt>
             <dd>−{money(sale.discountAmount, locale)}</dd>
           </div>
         ) : null}
         {hasTax ? (
           <div className="flex justify-between gap-3">
-            <dt className="text-slate-500">{copy('Tax')}</dt>
-
-            <dd>
-              (
+            <dt className="text-slate-500">
+              {copy('Tax')} (
               {sale.totalAmount > sale.taxAmount
-                ? ((sale.taxAmount / (sale.totalAmount - sale.taxAmount)) * 100).toFixed(0)
+                ? ((Number(sale.taxAmount) / (Number(sale.totalAmount) - Number(sale.taxAmount))) * 100).toFixed(0)
                 : 0}
-              %) {money(sale.taxAmount, locale)}
-            </dd>
+              %)
+            </dt>
+
+            <dd>{money(sale.taxAmount, locale)}</dd>
           </div>
         ) : null}
         <div className="mt-2 flex justify-between gap-3 border-t border-slate-200 pt-2 text-sm font-black">
@@ -3412,8 +3412,7 @@ function ReferenceOrderAdjustmentDialog({
           {activeLines.map((line) => {
             const lineMutable = !line.fulfillment || line.fulfillment.status === 'WAITING';
             const canDecrease =
-              lineMutable &&
-              createDecimal(line.quantity).greaterThan(createDecimal('1'));
+              lineMutable && createDecimal(line.quantity).greaterThan(createDecimal('1'));
             const canRemove = lineMutable;
             const projectedTotalAfterRemoval = saleTotal.minus(createDecimal(line.totalAmount));
             const removalRefund = paidAmount.greaterThan(projectedTotalAfterRemoval)

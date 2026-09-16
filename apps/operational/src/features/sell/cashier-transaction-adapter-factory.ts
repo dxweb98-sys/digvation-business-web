@@ -1,5 +1,4 @@
 import { ApiClient } from '@digvation/business-api';
-import type { RuntimeConfig } from '@digvation/business-runtime';
 
 import {
   HttpCashierTransactionAdapter,
@@ -17,6 +16,8 @@ type PerformerCapableTransactionPort = SaleTransactionPort & {
 type OperationalCashierTransactionPort = PerformerCapableTransactionPort &
   OperationalProjectionQuery &
   OperationalPromotionCommands;
+
+type ApiTarget = string | { readonly apiBaseUrl: string };
 
 function withServicePerformers(adapter: SaleTransactionPort): PerformerCapableTransactionPort {
   if (!adapter.setSaleLinePerformers) {
@@ -41,11 +42,12 @@ export function isLocalCashierDemoEnabled(): boolean {
 
 /** Selects the Runtime-backed Operational transaction boundary once. */
 export function createCashierTransactionAdapter(
-  runtime: RuntimeConfig,
+  target: ApiTarget,
   getAccessToken?: () => Promise<string | null>,
 ): OperationalCashierTransactionPort {
+  const apiBaseUrl = typeof target === 'string' ? target : target.apiBaseUrl;
   const client = new ApiClient({
-    baseUrl: runtime.apiBaseUrl,
+    baseUrl: apiBaseUrl,
     applicationSurface: 'operational',
     ...(getAccessToken ? { getAccessToken } : {}),
   });

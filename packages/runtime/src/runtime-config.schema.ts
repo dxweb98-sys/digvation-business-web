@@ -1,37 +1,36 @@
 import { z } from 'zod';
 
 const hexColorSchema = z.string().regex(/^#[0-9A-Fa-f]{6}$/);
+const apiBaseUrlSchema = z.string().refine(
+  (value) =>
+    value === '' ||
+    /^https?:\/\/[^\s/$.?#].[^\s]*$/i.test(value),
+  'apiBaseUrl must be empty for same-origin or an absolute HTTP(S) origin',
+);
+
+const workspaceResolutionSchema = z.discriminatedUnion('mode', [
+  z.object({
+    mode: z.literal('FIXED'),
+    workspace: z.string().min(1),
+  }),
+  z.object({
+    mode: z.literal('LOGIN'),
+    defaultWorkspace: z.string().min(1).optional(),
+  }),
+]);
 
 export const runtimeConfigSchema = z.object({
-  apiBaseUrl: z.string().min(1),
-  workspace: z.string().min(1),
-  locale: z.string().min(2),
-  currency: z.string().regex(/^[A-Z]{3}$/),
-  defaultCountry: z.string().regex(/^[A-Z]{2}$/),
+  apiBaseUrl: apiBaseUrlSchema,
   deploymentProfile: z.enum(['SHARED', 'BUSINESS_ISOLATED', 'DEDICATED']),
+  workspaceResolution: workspaceResolutionSchema,
   applications: z.object({
-    cashier: z.boolean(),
+    operational: z.boolean(),
     backoffice: z.boolean(),
-  }),
-  effectiveEntitlements: z.object({
-    products: z.array(z.enum(['POS'])),
-    capabilities: z.array(
-      z.enum([
-        'FINANCE_OPERATIONS',
-        'BUSINESS_ANALYTICS',
-        'WORKFORCE_ATTENDANCE',
-        'MEMBERSHIP',
-        'LOYALTY_POINTS',
-        'TAX_FISCAL',
-        'PROMOTIONS',
-      ]),
-    ),
   }),
   branding: z.object({
     mode: z.enum(['DIGVATION_DEFAULT', 'WHITE_LABEL']),
     productName: z.string().min(1),
     companyName: z.string().min(1).optional(),
-    businessName: z.string().min(1).optional(),
     logoUrl: z.string().min(1).optional(),
   }),
   theme: z.object({
@@ -55,10 +54,8 @@ export const runtimeConfigSchema = z.object({
       })
       .optional(),
   }),
-  capabilities: z.object({
-    notifications: z.boolean(),
-    fulfillment: z.boolean(),
-    customers: z.boolean(),
-    loyalty: z.boolean(),
+  defaults: z.object({
+    locale: z.enum(['id-ID', 'en-US']),
+    country: z.string().regex(/^[A-Z]{2}$/),
   }),
 });

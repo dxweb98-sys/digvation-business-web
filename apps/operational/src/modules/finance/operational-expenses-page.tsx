@@ -1,6 +1,6 @@
 import { ApiClient } from '@digvation/business-api';
 import { useAuth } from '@digvation/business-auth';
-import { useRuntime } from '@digvation/business-runtime';
+import { useDeploymentBootstrap } from '@digvation/business-runtime';
 import {
   DBadge,
   DButton,
@@ -18,19 +18,14 @@ import { Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { useOperationalLocalization } from '../../app/localization/operational-localization';
-import {
-  hasOperationalPermission,
-  useOperationalAvailability,
-} from '../../app/providers/operational-availability-context';
 import { useOperationalSession } from '../operational/operational-session-provider';
 import { OperationalExpenseApi, type OperationalExpense } from './operational-expense-api';
 
 const PAGE_SIZE = 20;
 
 export function OperationalExpensesPage() {
-  const runtime = useRuntime();
-  const { authPort } = useAuth();
-  const availability = useOperationalAvailability();
+  const bootstrap = useDeploymentBootstrap();
+  const { session, authPort } = useAuth();
   const { selectedLocationId } = useOperationalSession();
   const { copy, label, formatDate, formatMoney } = useOperationalLocalization();
   const { showToast } = useToast();
@@ -46,18 +41,18 @@ export function OperationalExpensesPage() {
     () =>
       new OperationalExpenseApi(
         new ApiClient({
-          baseUrl: runtime.apiBaseUrl,
+          baseUrl: bootstrap.apiBaseUrl,
           applicationSurface: 'operational',
           ...(authPort.getAccessToken
             ? { getAccessToken: authPort.getAccessToken.bind(authPort) }
             : {}),
         }),
       ),
-    [authPort, runtime.apiBaseUrl],
+    [authPort, bootstrap.apiBaseUrl],
   );
   const canCreate =
-    hasOperationalPermission(availability, 'expenses:create') &&
-    hasOperationalPermission(availability, 'financial-accounts:read');
+    session.access.permissions.includes('expenses:create') &&
+    session.access.permissions.includes('financial-accounts:read');
 
   const expenses = useQuery({
     queryKey: ['operational-expenses', selectedLocationId, offset],

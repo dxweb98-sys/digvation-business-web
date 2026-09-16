@@ -1,4 +1,4 @@
-import type { BackofficeSession } from '../../auth/auth-session';
+import type { AuthSession } from '@digvation/business-auth';
 
 export type ReportType =
   | 'business-performance'
@@ -15,7 +15,11 @@ export type ReportType =
   | 'locations';
 
 export type DashboardWidget =
-  'TOP_ITEMS' | 'PAYMENT_MIX' | 'RECENT_TRANSACTIONS' | 'TOP_EMPLOYEES' | 'BUSINESS_INSIGHT';
+  | 'TOP_ITEMS'
+  | 'PAYMENT_MIX'
+  | 'RECENT_TRANSACTIONS'
+  | 'TOP_EMPLOYEES'
+  | 'BUSINESS_INSIGHT';
 
 const REPORT_PERMISSION: Record<ReportType, string> = {
   'business-performance': 'sales:read',
@@ -51,25 +55,24 @@ const DASHBOARD_REPORT: Record<DashboardWidget, ReportType> = {
 };
 
 /**
- * Report visibility is derived from the effective runtime composition only.
- * Effective permissions have already been intersected with product,
- * capability, foundation and RBAC availability by Business Runtime.
+ * Report visibility is derived from the effective authenticated session.
+ * Runtime has already intersected RBAC grants with product, capability, and
+ * foundation availability before projecting access.permissions.
  */
-export function isReportAvailable(session: BackofficeSession | null, type: ReportType): boolean {
+export function isReportAvailable(session: AuthSession | null, type: ReportType): boolean {
   if (!session) return false;
-  if (!session.identity.permissions.includes(REPORT_PERMISSION[type])) return false;
-  if (POS_REPORTS.has(type) && !session.effectiveEntitlements.products.includes('POS'))
-    return false;
+  if (!session.access.permissions.includes(REPORT_PERMISSION[type])) return false;
+  if (POS_REPORTS.has(type) && !session.access.products.includes('POS')) return false;
   return true;
 }
 
 /** Compatibility name used by report routes and selectors. */
-export function canAccessReport(session: BackofficeSession | null, type: ReportType): boolean {
+export function canAccessReport(session: AuthSession | null, type: ReportType): boolean {
   return isReportAvailable(session, type);
 }
 
 export function isDashboardWidgetAvailable(
-  session: BackofficeSession | null,
+  session: AuthSession | null,
   widget: DashboardWidget,
 ): boolean {
   return isReportAvailable(session, DASHBOARD_REPORT[widget]);
@@ -77,7 +80,7 @@ export function isDashboardWidgetAvailable(
 
 /** All dashboard contributions for enabled features are shown. */
 export function canShowDashboardWidget(
-  session: BackofficeSession | null,
+  session: AuthSession | null,
   widget: DashboardWidget,
 ): boolean {
   return isDashboardWidgetAvailable(session, widget);

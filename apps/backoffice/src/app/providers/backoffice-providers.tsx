@@ -1,23 +1,22 @@
 import {
-  applyEffectiveBusinessConfiguration,
-  RuntimeProvider,
-  useRuntime,
-  type RuntimeConfig,
+  AuthenticatedRuntimeProjectionProvider,
+  DeploymentBootstrapProvider,
+  type DeploymentBootstrapConfig,
 } from '@digvation/business-runtime';
+import type { AuthPort } from '@digvation/business-auth';
 import { DLocalizationProvider, DToastProvider } from '@digvation/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 import type { RouterProviderProps } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 
 import { AuthenticationLoading } from '../../auth/authentication-loading';
 import { BackofficeAuthProvider, useBackofficeAuth } from '../../auth/backoffice-auth-context';
-import type { HttpAuthAdapter } from '../../auth/http-auth-adapter';
 import { resolveBackofficeLocale } from '../localization/backoffice-locale';
 import {
   BackofficeLocalizationProvider,
   useBackofficeLocalization,
-} from '../localization/backoffice-localization';
+} from '../localization/backoffice-localization.legacy';
 import { BusinessLocationProvider } from './business-location-context';
 
 const queryClient = new QueryClient({
@@ -28,25 +27,25 @@ const queryClient = new QueryClient({
 });
 
 interface BackofficeProvidersProps {
-  runtime: RuntimeConfig;
-  auth: HttpAuthAdapter;
+  bootstrap: DeploymentBootstrapConfig;
+  auth: AuthPort;
   router: RouterProviderProps['router'];
 }
 
-export function BackofficeProviders({ runtime, auth, router }: BackofficeProvidersProps) {
+export function BackofficeProviders({ bootstrap, auth, router }: BackofficeProvidersProps) {
   return (
-    <RuntimeProvider config={runtime}>
+    <DeploymentBootstrapProvider config={bootstrap}>
       <BackofficeLocalizationProvider>
         <BackofficeDesignSystemProviders auth={auth} router={router} />
       </BackofficeLocalizationProvider>
-    </RuntimeProvider>
+    </DeploymentBootstrapProvider>
   );
 }
 
 function BackofficeDesignSystemProviders({
   auth,
   router,
-}: Omit<BackofficeProvidersProps, 'runtime'>) {
+}: Omit<BackofficeProvidersProps, 'bootstrap'>) {
   const { locale } = useBackofficeLocalization();
 
   return (
@@ -61,29 +60,29 @@ function BackofficeDesignSystemProviders({
 }
 
 function AuthenticatedBackofficeProviders({ router }: Pick<BackofficeProvidersProps, 'router'>) {
-  const bootstrapRuntime = useRuntime();
   const { session, status } = useBackofficeAuth();
   const { setLocale } = useBackofficeLocalization();
-  const runtime = useMemo(
-    () => applyEffectiveBusinessConfiguration(bootstrapRuntime, session?.businessConfiguration),
-    [bootstrapRuntime, session?.businessConfiguration],
-  );
-  const configuredLocale =
-    session?.businessConfiguration?.preferences.defaultLocale ?? bootstrapRuntime.locale;
 
   useEffect(() => {
-    setLocale(resolveBackofficeLocale(configuredLocale));
-  }, [configuredLocale, setLocale]);
+    if (!session) return;
+    setLocale(resolveBackofficeLocale(session.preferences.locale));
+  }, [session, setLocale]);
 
   if (status === 'hydrating') return <AuthenticationLoading />;
 
+  const content = (
+    <QueryClientProvider client={queryClient}>
+      <BusinessLocationProvider>
+        <RouterProvider router={router} />
+      </BusinessLocationProvider>
+    </QueryClientProvider>
+  );
+
+  if (!session) return content;
+
   return (
-    <RuntimeProvider config={runtime}>
-      <QueryClientProvider client={queryClient}>
-        <BusinessLocationProvider>
-          <RouterProvider router={router} />
-        </BusinessLocationProvider>
-      </QueryClientProvider>
-    </RuntimeProvider>
+    <AuthenticatedRuntimeProjectionProvider projection={session}>
+      {content}
+    </AuthenticatedRuntimeProjectionProvider>
   );
 }
