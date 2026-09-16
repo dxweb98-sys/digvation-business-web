@@ -26,6 +26,10 @@ jobs:
         run: corepack prepare pnpm@11.22.0 --activate
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Build Operational baseline
+        env:
+          VITE_BUILD_REVISION: baseline-e2e-probe
+        run: pnpm build:operational
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
       - name: Run current E2E suite against dev application baseline
