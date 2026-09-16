@@ -29,10 +29,6 @@ export function invitationDeliveryLabel(status: InvitationDeliveryStatus): strin
   switch (status) {
     case 'SENT':
       return 'Terkirim';
-    case 'DELIVERED':
-      return 'Terkirim ke perangkat';
-    case 'READ':
-      return 'Dibaca';
     case 'FAILED':
       return 'Gagal dikirim';
     default:
