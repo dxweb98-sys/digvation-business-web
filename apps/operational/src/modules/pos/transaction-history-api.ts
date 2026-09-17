@@ -1,7 +1,14 @@
 import type { ApiClient } from '@digvation/business-api';
 
-export type SaleStatus = 'OPEN' | 'FINALIZED' | 'VOIDED';
-export interface OperationalSale {
+import type {
+  Payment,
+  SaleAdjustment,
+  SaleLine,
+  SaleStatus,
+  TaxTreatment,
+} from '../../features/sell/cashier-transaction.types';
+
+export interface OperationalSaleListItem {
   id: string;
   saleNumber: string;
   invoiceNumber: string | null;
@@ -12,6 +19,84 @@ export interface OperationalSale {
   createdAt: string;
   finalizedAt: string | null;
 }
+
+export interface OperationalSaleDetailLine extends SaleLine {
+  overrideActorId: string | null;
+  overrideActorKind: string | null;
+  discountActorId: string | null;
+  discountActorKind: string | null;
+  itemTaxRuleId: string | null;
+  itemTaxCode: string | null;
+  itemTaxName: string | null;
+  itemTaxRate: string | null;
+  itemTaxTreatment: TaxTreatment | null;
+  itemTaxAmount: string;
+  transactionTaxBaseAmount: string;
+  transactionTaxAmount: string;
+}
+
+export interface OperationalSaleDetail extends OperationalSaleListItem {
+  operationalState: 'UNSUBMITTED' | 'QUEUED' | 'IN_PROGRESS';
+  version: number;
+  grossAmount: string;
+  discountAmount: string;
+  netPreTaxAmount: string;
+  taxAmount: string;
+  orderDiscountType: 'PERCENTAGE' | 'FIXED_AMOUNT' | null;
+  orderDiscountValue: string | null;
+  orderDiscountReason: string | null;
+  orderDiscountActorId: string | null;
+  orderDiscountActorKind: string | null;
+  orderDiscountAmount: string;
+  transactionTaxRuleId: string | null;
+  transactionTaxCode: string | null;
+  transactionTaxName: string | null;
+  transactionTaxRate: string | null;
+  transactionTaxTreatment: TaxTreatment | null;
+  transactionTaxBaseAmount: string;
+  transactionTaxAmount: string;
+  promotionCode: string | null;
+  adjustments: SaleAdjustment[];
+  createdByActorId: string;
+  createdByActorKind: string;
+  voidedAt: string | null;
+  updatedAt: string;
+  lines: OperationalSaleDetailLine[];
+  payments: Payment[];
+}
+
+type OperationalSaleDetailLinePayload = Omit<
+  OperationalSaleDetailLine,
+  'participations' | 'contributions'
+> & {
+  participations?: OperationalSaleDetailLine['participations'] | null;
+  contributions?: OperationalSaleDetailLine['contributions'] | null;
+};
+
+export type OperationalSaleDetailPayload = Omit<
+  OperationalSaleDetail,
+  'adjustments' | 'lines' | 'payments'
+> & {
+  adjustments?: SaleAdjustment[] | null;
+  lines?: OperationalSaleDetailLinePayload[] | null;
+  payments?: Payment[] | null;
+};
+
+export function normalizeOperationalSaleDetail(
+  payload: OperationalSaleDetailPayload,
+): OperationalSaleDetail {
+  return {
+    ...payload,
+    adjustments: payload.adjustments ?? [],
+    lines: (payload.lines ?? []).map((line) => ({
+      ...line,
+      participations: line.participations ?? [],
+      contributions: line.contributions ?? [],
+    })),
+    payments: payload.payments ?? [],
+  };
+}
+
 export interface Page<T> {
   items: T[];
   total: number;
@@ -32,10 +117,12 @@ export class OperationalTransactionHistoryApi {
   constructor(private readonly client: ApiClient) {}
 
   list(query: Query) {
-    return this.client.get<Page<OperationalSale>>(`/api/v1/sales?${queryString(query)}`);
+    return this.client.get<Page<OperationalSaleListItem>>(`/api/v1/sales?${queryString(query)}`);
   }
 
   get(id: string) {
-    return this.client.get<OperationalSale>(`/api/v1/sales/${id}`);
+    return this.client
+      .get<OperationalSaleDetailPayload>(`/api/v1/sales/${id}`)
+      .then(normalizeOperationalSaleDetail);
   }
 }
