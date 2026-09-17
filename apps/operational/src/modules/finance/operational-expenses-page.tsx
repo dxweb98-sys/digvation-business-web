@@ -28,7 +28,6 @@ export function OperationalExpensesPage() {
   const { session, authPort } = useAuth();
   const { selectedLocationId } = useOperationalSession();
   const { copy, label, locale, formatDate, formatMoney } = useOperationalLocalization();
-  const { copy, label, locale, formatDate, formatMoney } = useOperationalLocalization();
   const { showToast } = useToast();
   const queryClient = useQueryClient();
   const [offset, setOffset] = useState(0);
@@ -154,13 +153,11 @@ export function OperationalExpensesPage() {
     <div className="p-5 md:p-6 lg:p-8">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-brand)]">
+          <p className="text-xs font-bold uppercase tracking-[0.14em] text-(--color-brand)">
             {copy('Operations')}
           </p>
-          <h1 className="mt-1 text-2xl font-bold text-[var(--color-text)]">{pageTitle}</h1>
-          <p className="mt-1 text-sm text-[var(--color-text-muted)]">{pageDescription}</p>
-          <h1 className="mt-1 text-2xl font-bold text-[var(--color-text)]">{pageTitle}</h1>
-          <p className="mt-1 text-sm text-[var(--color-text-muted)]">{pageDescription}</p>
+          <h1 className="mt-1 text-2xl font-bold text-(--color-text)">{pageTitle}</h1>
+          <p className="mt-1 text-sm text-(--color-text-muted)">{pageDescription}</p>
         </div>
         {canCreate ? (
           <DButton
