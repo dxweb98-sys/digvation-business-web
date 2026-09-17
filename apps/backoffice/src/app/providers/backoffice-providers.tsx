@@ -16,7 +16,7 @@ import { resolveBackofficeLocale } from '../localization/backoffice-locale';
 import {
   BackofficeLocalizationProvider,
   useBackofficeLocalization,
-} from '../localization/backoffice-localization.legacy';
+} from '../localization/backoffice-localization-base';
 import { BusinessLocationProvider } from './business-location-context';
 
 const queryClient = new QueryClient({

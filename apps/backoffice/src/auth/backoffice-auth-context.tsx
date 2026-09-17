@@ -19,7 +19,7 @@ import { useToast } from '@digvation/ui';
 import { ApiClient } from '@digvation/business-api';
 
 import { isBackofficeSessionExpired } from '../app/api/backoffice-api-error';
-import { useBackofficeLocalization } from '../app/localization/backoffice-localization.legacy';
+import { useBackofficeLocalization } from '../app/localization/backoffice-localization-base';
 
 type AuthenticationStatus =
   | 'hydrating'
