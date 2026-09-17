@@ -9,7 +9,7 @@ import {
   operationalLabel,
   resolveOperationalLocale,
   type OperationalLocale,
-} from './operational-localization.legacy';
+} from './operational-localization-base';
 
 export {
   operationalCopy,

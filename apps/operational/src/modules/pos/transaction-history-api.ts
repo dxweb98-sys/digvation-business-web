@@ -65,6 +65,36 @@ export interface OperationalSaleDetail extends OperationalSaleListItem {
   payments: Payment[];
 }
 
+type OperationalSaleDetailLinePayload = Omit<
+  OperationalSaleDetailLine,
+  'participations' | 'contributions'
+> &
+  Partial<Pick<OperationalSaleDetailLine, 'participations' | 'contributions'>>;
+
+export type OperationalSaleDetailPayload = Omit<
+  OperationalSaleDetail,
+  'adjustments' | 'lines' | 'payments'
+> & {
+  adjustments?: SaleAdjustment[];
+  lines?: OperationalSaleDetailLinePayload[];
+  payments?: Payment[];
+};
+
+export function normalizeOperationalSaleDetail(
+  payload: OperationalSaleDetailPayload,
+): OperationalSaleDetail {
+  return {
+    ...payload,
+    adjustments: payload.adjustments ?? [],
+    lines: (payload.lines ?? []).map((line) => ({
+      ...line,
+      participations: line.participations ?? [],
+      contributions: line.contributions ?? [],
+    })),
+    payments: payload.payments ?? [],
+  };
+}
+
 export interface Page<T> {
   items: T[];
   total: number;
@@ -88,7 +118,8 @@ export class OperationalTransactionHistoryApi {
     return this.client.get<Page<OperationalSaleListItem>>(`/api/v1/sales?${queryString(query)}`);
   }
 
-  get(id: string) {
-    return this.client.get<OperationalSaleDetail>(`/api/v1/sales/${id}`);
+  async get(id: string) {
+    const payload = await this.client.get<OperationalSaleDetailPayload>(`/api/v1/sales/${id}`);
+    return normalizeOperationalSaleDetail(payload);
   }
 }

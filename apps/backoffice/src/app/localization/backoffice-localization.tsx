@@ -9,13 +9,13 @@ import {
   BackofficeLocalizationProvider,
   readStoredBackofficeLocale,
   useBackofficeLocalization as useLegacyBackofficeLocalization,
-} from './backoffice-localization.legacy';
+} from './backoffice-localization-base';
 
 export { BackofficeLocalizationProvider, readStoredBackofficeLocale };
 export type {
   BackofficeLocale,
   BackofficeMessageKey,
-} from './backoffice-localization.legacy';
+} from './backoffice-localization-base';
 
 export function useBackofficeLocalization() {
   const localization = useLegacyBackofficeLocalization();
