@@ -114,9 +114,7 @@ export function OperationalTransactionHistoryPage() {
         <div>
           <p className="font-mono text-xs font-semibold">{row.saleNumber}</p>
           {row.invoiceNumber ? (
-            <p className="mt-1 font-mono text-xs text-[var(--color-text-muted)]">
-              {row.invoiceNumber}
-            </p>
+            <p className="mt-1 font-mono text-xs text-(--color-text-muted)">{row.invoiceNumber}</p>
           ) : null}
         </div>
       ),
@@ -140,13 +138,13 @@ export function OperationalTransactionHistoryPage() {
   return (
     <div className="p-5 md:p-6 lg:p-8">
       <header>
-        <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-brand)]">
+        <p className="text-xs font-bold uppercase tracking-[0.14em] text-(--color-brand)">
           {copy('Operations')}
         </p>
-        <h1 className="mt-1 text-2xl font-bold text-[var(--color-text)]">
+        <h1 className="mt-1 text-2xl font-bold text-(--color-text)">
           {copy('Transaction history')}
         </h1>
-        <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+        <p className="mt-1 text-sm text-(--color-text-muted)">
           {copy('Operational transaction history for the active authorized location.')}
         </p>
       </header>
@@ -192,7 +190,10 @@ export function OperationalTransactionHistoryPage() {
         className="w-full max-w-4xl"
       >
         {detail.isLoading ? (
-          <div className="space-y-4" aria-label={text('Memuat detail transaksi', 'Loading transaction detail')}>
+          <div
+            className="space-y-4"
+            aria-label={text('Memuat detail transaksi', 'Loading transaction detail')}
+          >
             <DSkeleton className="h-24 w-full rounded-2xl" />
             <DSkeleton className="h-44 w-full rounded-2xl" />
             <DSkeleton className="h-32 w-full rounded-2xl" />
@@ -207,7 +208,7 @@ export function OperationalTransactionHistoryPage() {
             formatMoney={formatMoney}
           />
         ) : (
-          <p className="text-sm text-[var(--color-text-muted)]">
+          <p className="text-sm text-(--color-text-muted)">
             {copy('Could not load transaction history.')}
           </p>
         )}
@@ -218,7 +219,6 @@ export function OperationalTransactionHistoryPage() {
 
 function TransactionDetail({
   sale,
-  locale,
   text,
   label,
   formatDate,
@@ -229,40 +229,43 @@ function TransactionDetail({
   text: (id: string, en: string) => string;
   label: (value: string) => string;
   formatDate: (date: Date, options?: Intl.DateTimeFormatOptions) => string;
-  formatMoney: (amount: string, currency?: string) => string;
+  formatMoney: (amount: string, currency: string) => string;
 }) {
   const activeLines = sale.lines.filter((line) => line.removedAt === null);
   const discountRows = saleDiscountRows(sale);
   const successfulPayments = sale.payments.filter((payment) => payment.status === 'SUCCEEDED');
   const totalPaid = successfulPayments
-    .reduce((sum, payment) => sum.plus(createDecimal(payment.appliedAmount)), createDecimal(0))
+    .reduce(
+      (sum, payment) => sum.plus(createDecimal(String(payment.appliedAmount))),
+      createDecimal('0'),
+    )
     .toFixed(4);
-  const balance = createDecimal(sale.totalAmount).minus(createDecimal(totalPaid));
+  const balance = createDecimal(String(sale.totalAmount)).minus(createDecimal(totalPaid));
   const balanceDue = balance.greaterThan(0) ? balance.toFixed(4) : '0.0000';
   const cashTendered = successfulPayments
     .filter((payment) => payment.method === 'CASH' && payment.tenderedAmount)
     .reduce(
-      (sum, payment) => sum.plus(createDecimal(payment.tenderedAmount ?? '0')),
-      createDecimal(0),
+      (sum, payment) => sum.plus(createDecimal(String(payment.tenderedAmount ?? 0))),
+      createDecimal('0'),
     );
   const cashChange = successfulPayments
     .filter((payment) => payment.method === 'CASH')
     .reduce(
-      (sum, payment) => sum.plus(createDecimal(payment.changeAmount ?? '0')),
-      createDecimal(0),
+      (sum, payment) => sum.plus(createDecimal(String(payment.changeAmount ?? 0))),
+      createDecimal('0'),
     );
 
   return (
     <div className="max-h-[72vh] space-y-6 overflow-y-auto pr-1 text-sm">
-      <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-muted)]/35 p-4 sm:p-5">
+      <section className="rounded-2xl border border-(--color-border) bg-(--color-surface-muted)/35 p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-(--color-text-muted)">
               {text('Transaksi', 'Transaction')}
             </p>
             <p className="mt-1 break-all font-mono text-base font-bold">{sale.saleNumber}</p>
             {sale.invoiceNumber ? (
-              <p className="mt-1 font-mono text-xs text-[var(--color-text-muted)]">
+              <p className="mt-1 font-mono text-xs text-(--color-text-muted)">
                 {sale.invoiceNumber}
               </p>
             ) : null}
@@ -271,9 +274,11 @@ function TransactionDetail({
             {label(sale.status)}
           </DBadge>
         </div>
-        <div className="mt-4 grid gap-3 border-t border-[var(--color-border)] pt-4 sm:grid-cols-2">
+        <div className="mt-4 grid gap-3 border-t border-(--color-border) pt-4 sm:grid-cols-2">
           <div>
-            <p className="text-xs text-[var(--color-text-muted)]">{text('Tanggal dan waktu', 'Date and time')}</p>
+            <p className="text-xs text-(--color-text-muted)">
+              {text('Tanggal dan waktu', 'Date and time')}
+            </p>
             <p className="mt-1 font-semibold">
               {formatDate(new Date(sale.finalizedAt ?? sale.createdAt), {
                 dateStyle: 'medium',
@@ -282,7 +287,9 @@ function TransactionDetail({
             </p>
           </div>
           <div>
-            <p className="text-xs text-[var(--color-text-muted)]">{text('Status pengerjaan', 'Work status')}</p>
+            <p className="text-xs text-(--color-text-muted)">
+              {text('Status pengerjaan', 'Work status')}
+            </p>
             <p className="mt-1 font-semibold">{label(sale.operationalState)}</p>
           </div>
         </div>
@@ -291,11 +298,11 @@ function TransactionDetail({
       <section>
         <div className="mb-3 flex items-center justify-between gap-3">
           <h3 className="font-bold">{text('Pesanan', 'Order')}</h3>
-          <span className="text-xs text-[var(--color-text-muted)]">
+          <span className="text-xs text-(--color-text-muted)">
             {activeLines.length} {text('item', 'items')}
           </span>
         </div>
-        <div className="divide-y divide-[var(--color-border)] overflow-hidden rounded-2xl border border-[var(--color-border)]">
+        <div className="divide-y divide-(--color-border) overflow-hidden rounded-2xl border border-(--color-border)">
           {activeLines.map((line) => {
             const assigned = line.participations.filter((participation) => participation.assigned);
             const discountPercentage = lineDiscountPercentage(line);
@@ -304,29 +311,32 @@ function TransactionDetail({
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <p className="font-semibold">{line.itemNameSnapshot}</p>
-                    <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                      {line.quantity.replace(/\.0+$/, '')} × {formatMoney(line.effectiveUnitPrice, sale.currency)}
+                    <p className="mt-1 text-xs text-(--color-text-muted)">
+                      {line.quantity.replace(/\.0+$/, '')} ×{' '}
+                      {formatMoney(line.effectiveUnitPrice, sale.currency)}
                       {line.variantNameSnapshot ? `, ${line.variantNameSnapshot}` : ''}
                     </p>
                   </div>
-                  <p className="shrink-0 font-bold">{formatMoney(line.grossAmount, sale.currency)}</p>
+                  <p className="shrink-0 font-bold">
+                    {formatMoney(line.grossAmount, sale.currency)}
+                  </p>
                 </div>
 
                 {isPositive(line.lineDiscountAmount) ? (
                   <div className="mt-2 flex justify-between gap-4 text-xs">
-                    <span className="text-[var(--color-text-muted)]">
+                    <span className="text-(--color-text-muted)">
                       {text('Diskon item', 'Item discount')}
                       {discountPercentage ? ` (${discountPercentage}%)` : ''}
                     </span>
-                    <span className="font-semibold text-[var(--color-danger)]">
+                    <span className="font-semibold text-(--color-danger)">
                       −{formatMoney(line.lineDiscountAmount, sale.currency)}
                     </span>
                   </div>
                 ) : null}
 
                 {line.itemTypeSnapshot === 'SERVICE' && assigned.length ? (
-                  <div className="mt-3 border-t border-dashed border-[var(--color-border)] pt-3">
-                    <p className="text-xs font-medium text-[var(--color-text-muted)]">
+                  <div className="mt-3 border-t border-dashed border-(--color-border) pt-3">
+                    <p className="text-xs font-medium text-(--color-text-muted)">
                       {text('Pengerjaan', 'Service worker')}
                     </p>
                     <div className="mt-1 space-y-1 text-xs">
@@ -342,7 +352,8 @@ function TransactionDetail({
                           : null;
                         return (
                           <p key={participation.employeeId} className="font-semibold">
-                            {workerName}{share ? ` ${share}` : ''}
+                            {workerName}
+                            {share ? ` ${share}` : ''}
                           </p>
                         );
                       })}
@@ -351,8 +362,9 @@ function TransactionDetail({
                 ) : null}
 
                 {line.fulfillment ? (
-                  <p className="mt-2 text-xs text-[var(--color-text-muted)]">
-                    {text('Status pengerjaan', 'Work status')}: <strong>{label(line.fulfillment.status)}</strong>
+                  <p className="mt-2 text-xs text-(--color-text-muted)">
+                    {text('Status pengerjaan', 'Work status')}:{' '}
+                    <strong>{label(line.fulfillment.status)}</strong>
                   </p>
                 ) : null}
               </article>
@@ -361,17 +373,18 @@ function TransactionDetail({
         </div>
       </section>
 
-      {(discountRows.length > 0 || isPositive(sale.taxAmount)) ? (
+      {discountRows.length > 0 || isPositive(sale.taxAmount) ? (
         <section>
           <h3 className="mb-3 font-bold">{text('Penyesuaian dan pajak', 'Adjustments and tax')}</h3>
-          <div className="space-y-2 rounded-2xl border border-[var(--color-border)] p-4">
+          <div className="space-y-2 rounded-2xl border border-(--color-border) p-4">
             {discountRows.map((row) => (
               <div key={row.id} className="flex items-start justify-between gap-4 text-xs">
                 <div className="min-w-0">
                   <p className="font-semibold">
-                    {row.label}{row.percentage ? ` (${row.percentage}%)` : ''}
+                    {row.label}
+                    {row.percentage ? ` (${row.percentage}%)` : ''}
                   </p>
-                  <p className="mt-0.5 text-[var(--color-text-muted)]">
+                  <p className="mt-0.5 text-(--color-text-muted)">
                     {row.scope === 'TRANSACTION'
                       ? text('Transaksi', 'Transaction')
                       : row.scope === 'ITEM'
@@ -379,13 +392,13 @@ function TransactionDetail({
                         : text('Kategori', 'Category')}
                   </p>
                 </div>
-                <span className="shrink-0 font-semibold text-[var(--color-danger)]">
+                <span className="shrink-0 font-semibold text-(--color-danger)">
                   −{formatMoney(row.amount, sale.currency)}
                 </span>
               </div>
             ))}
             {isPositive(sale.taxAmount) ? (
-              <div className="flex justify-between gap-4 border-t border-[var(--color-border)] pt-2 text-xs">
+              <div className="flex justify-between gap-4 border-t border-(--color-border) pt-2 text-xs">
                 <span className="font-semibold">{saleTaxLabel(sale, text('Pajak', 'Tax'))}</span>
                 <span className="font-semibold">{formatMoney(sale.taxAmount, sale.currency)}</span>
               </div>
@@ -398,79 +411,90 @@ function TransactionDetail({
         <div>
           <h3 className="mb-3 font-bold">{text('Pembayaran', 'Payment')}</h3>
           {sale.payments.length ? (
-            <div className="divide-y divide-[var(--color-border)] overflow-hidden rounded-2xl border border-[var(--color-border)]">
+            <div className="divide-y divide-(--color-border) overflow-hidden rounded-2xl border border-(--color-border)">
               {sale.payments.map((payment) => (
                 <article key={payment.id} className="p-4">
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <p className="font-semibold">{label(payment.method)}</p>
-                      <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                      <p className="mt-1 text-xs text-(--color-text-muted)">
                         {label(payment.status)}
                         {payment.providerReference ? ` · ${payment.providerReference}` : ''}
                       </p>
-                      <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                      <p className="mt-1 text-xs text-(--color-text-muted)">
                         {formatDate(new Date(payment.terminalAt ?? payment.updatedAt), {
                           dateStyle: 'medium',
                           timeStyle: 'short',
                         })}
                       </p>
                     </div>
-                    <p className="font-bold">{formatMoney(payment.appliedAmount, payment.currency)}</p>
+                    <p className="font-bold">
+                      {formatMoney(payment.appliedAmount, payment.currency)}
+                    </p>
                   </div>
                 </article>
               ))}
             </div>
           ) : (
-            <p className="rounded-2xl border border-dashed border-[var(--color-border)] p-4 text-xs text-[var(--color-text-muted)]">
-              {text('Belum ada pembayaran untuk transaksi ini.', 'No payment has been recorded for this transaction.')}
+            <p className="rounded-2xl border border-dashed border-(--color-border) p-4 text-xs text-(--color-text-muted)">
+              {text(
+                'Belum ada pembayaran untuk transaksi ini.',
+                'No payment has been recorded for this transaction.',
+              )}
             </p>
           )}
         </div>
 
         <div>
           <h3 className="mb-3 font-bold">{text('Ringkasan', 'Summary')}</h3>
-          <dl className="space-y-2 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-muted)]/30 p-4 text-sm">
+          <dl className="space-y-2 rounded-2xl border border-(--color-border) bg-(--color-surface-muted)/30 p-4 text-sm">
             <div className="flex justify-between gap-4">
-              <dt className="text-[var(--color-text-muted)]">{text('Subtotal', 'Subtotal')}</dt>
+              <dt className="text-(--color-text-muted)">{text('Subtotal', 'Subtotal')}</dt>
               <dd>{formatMoney(sale.grossAmount, sale.currency)}</dd>
             </div>
             {isPositive(sale.discountAmount) ? (
               <div className="flex justify-between gap-4">
-                <dt className="text-[var(--color-text-muted)]">{text('Promo dan diskon', 'Promotions and discounts')}</dt>
+                <dt className="text-(--color-text-muted)">
+                  {text('Promo dan diskon', 'Promotions and discounts')}
+                </dt>
                 <dd>−{formatMoney(sale.discountAmount, sale.currency)}</dd>
               </div>
             ) : null}
             {isPositive(sale.taxAmount) ? (
               <div className="flex justify-between gap-4">
-                <dt className="text-[var(--color-text-muted)]">{saleTaxLabel(sale, text('Pajak', 'Tax'))}</dt>
+                <dt className="text-(--color-text-muted)">
+                  {saleTaxLabel(sale, text('Pajak', 'Tax'))}
+                </dt>
                 <dd>{formatMoney(sale.taxAmount, sale.currency)}</dd>
               </div>
             ) : null}
-            <div className="flex justify-between gap-4 border-t border-[var(--color-border)] pt-2 font-bold">
+            <div className="flex justify-between gap-4 border-t border-(--color-border) pt-2 font-bold">
               <dt>{text('Total', 'Total')}</dt>
               <dd>{formatMoney(sale.totalAmount, sale.currency)}</dd>
             </div>
             {successfulPayments.length ? (
               <>
                 <div className="flex justify-between gap-4">
-                  <dt className="text-[var(--color-text-muted)]">{text('Dibayar', 'Paid')}</dt>
+                  <dt className="text-(--color-text-muted)">{text('Dibayar', 'Paid')}</dt>
                   <dd>{formatMoney(totalPaid, sale.currency)}</dd>
                 </div>
                 {isPositive(balanceDue) ? (
                   <div className="flex justify-between gap-4">
-                    <dt className="text-[var(--color-text-muted)]">{text('Sisa', 'Balance')}</dt>
+                    <dt className="text-(--color-text-muted)">{text('Sisa', 'Balance')}</dt>
                     <dd>{formatMoney(balanceDue, sale.currency)}</dd>
                   </div>
                 ) : null}
                 {cashTendered.greaterThan(0) ? (
                   <div className="flex justify-between gap-4">
-                    <dt className="text-[var(--color-text-muted)]">{text('Uang diterima', 'Cash received')}</dt>
+                    <dt className="text-(--color-text-muted)">
+                      {text('Uang diterima', 'Cash received')}
+                    </dt>
                     <dd>{formatMoney(cashTendered.toFixed(4), sale.currency)}</dd>
                   </div>
                 ) : null}
                 {cashChange.greaterThan(0) ? (
                   <div className="flex justify-between gap-4">
-                    <dt className="text-[var(--color-text-muted)]">{text('Kembalian', 'Change')}</dt>
+                    <dt className="text-(--color-text-muted)">{text('Kembalian', 'Change')}</dt>
                     <dd>{formatMoney(cashChange.toFixed(4), sale.currency)}</dd>
                   </div>
                 ) : null}
