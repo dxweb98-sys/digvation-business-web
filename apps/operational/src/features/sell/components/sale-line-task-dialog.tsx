@@ -1,7 +1,7 @@
 import { createDecimal, formatMoney } from '@digvation/pos-money';
 import { DButton, DCheckbox, DDecimalInput, DDialog, DInput, DSelect } from '@digvation-labs/ui';
 import { CheckCircle2, Play, Square, UserRound, X } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 
 import {
   operationalCopy,
@@ -16,6 +16,7 @@ import type {
   FulfillmentStatus,
   SaleLine,
 } from '../cashier-transaction.types';
+import { employeeDisplayName } from '../sale-presentation';
 import { actionBlockMessage, type ActionAvailability } from '../sale-workspace-view-model';
 
 interface SaleLineTaskDialogProps {
@@ -118,11 +119,6 @@ export function SaleLineTaskDialog({
   );
   const [discountReason, setDiscountReason] = useState(line.discountReason ?? '');
   const [formError, setFormError] = useState<string | null>(null);
-
-  const employeeById = useMemo(
-    () => new Map(employees.map((employee) => [employee.id, employee])),
-    [employees],
-  );
 
   const monetaryDisabled = monetaryAvailability.state !== 'AVAILABLE' || isBusy;
   const operationalDisabled = operationalAvailability.state !== 'AVAILABLE' || isBusy;
@@ -344,8 +340,12 @@ export function SaleLineTaskDialog({
                     {contributionPreview.preview.map((entry) => (
                       <div key={entry.employeeId} className="flex justify-between gap-3">
                         <span className="truncate text-[var(--color-text-muted)]">
-                          {employeeById.get(entry.employeeId)?.displayName ??
-                            entry.employeeId.slice(0, 8)}
+                          {employeeDisplayName(
+                            line,
+                            entry.employeeId,
+                            employees,
+                            copy('Employee unavailable'),
+                          )}
                         </span>
                         <span className="font-semibold tabular-nums">
                           {formatMoney(entry.contributionAmount, line.currency, locale)}

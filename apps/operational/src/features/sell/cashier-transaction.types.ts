@@ -20,6 +20,7 @@ export type PaymentStatus = 'PENDING' | 'SUCCEEDED' | 'FAILED' | 'CANCELLED' | '
 export type FulfillmentStatus = 'WAITING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELED';
 export type EmployeeAssignmentMode = 'NONE' | 'OPTIONAL' | 'REQUIRED';
 export type DiscountType = 'PERCENTAGE' | 'FIXED_AMOUNT';
+export type TaxTreatment = 'INCLUDED' | 'EXCLUDED';
 
 export interface ApiPage<T> {
   items: T[];
@@ -228,13 +229,25 @@ export interface SaleLine {
   effectiveUnitPrice: string;
   overrideAmount: string | null;
   overrideReason: string | null;
+  overrideActorId?: string | null;
+  overrideActorKind?: string | null;
   discountType: DiscountType | null;
   discountValue: string | null;
   discountReason: string | null;
+  discountActorId?: string | null;
+  discountActorKind?: string | null;
+  itemTaxRuleId?: string | null;
+  itemTaxCode?: string | null;
+  itemTaxName?: string | null;
+  itemTaxRate?: string | null;
+  itemTaxTreatment?: TaxTreatment | null;
   grossAmount: string;
   lineDiscountAmount: string;
   orderDiscountAllocationAmount: string;
   discountedCustomerBaseAmount: string;
+  itemTaxAmount?: string;
+  transactionTaxBaseAmount?: string;
+  transactionTaxAmount?: string;
   includedTaxAmount: string;
   excludedTaxAmount: string;
   netPreTaxAmount: string;
@@ -250,6 +263,8 @@ export interface SaleLine {
 
 export interface Sale {
   id: string;
+  saleNumber?: string;
+  invoiceNumber?: string | null;
   sellingLocationId: string;
   currency: string;
   status: SaleStatus;
@@ -263,9 +278,20 @@ export interface Sale {
   orderDiscountType: DiscountType | null;
   orderDiscountValue: string | null;
   orderDiscountReason: string | null;
+  orderDiscountActorId?: string | null;
+  orderDiscountActorKind?: string | null;
   orderDiscountAmount: string;
+  transactionTaxRuleId?: string | null;
+  transactionTaxCode?: string | null;
+  transactionTaxName?: string | null;
+  transactionTaxRate?: string | null;
+  transactionTaxTreatment?: TaxTreatment | null;
+  transactionTaxBaseAmount?: string;
+  transactionTaxAmount?: string;
   promotionCode?: string | null;
   adjustments?: SaleAdjustment[];
+  createdByActorId?: string;
+  createdByActorKind?: string;
   finalizedAt: string | null;
   voidedAt: string | null;
   createdAt: string;

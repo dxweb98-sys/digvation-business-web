@@ -44,7 +44,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
   const [lineTaskId, setLineTaskId] = useState<string | null>(null);
   const [isCompletionOpen, setCompletionOpen] = useState(false);
   const [queueContextSale, setQueueContextSale] = useState<Sale | null>(null);
-  const [areEmployeeOptionsEnabled, setEmployeeOptionsEnabled] = useState(false);
+  const [areEmployeeOptionsEnabled, setEmployeeOptionsEnabled] = useState(true);
   const pendingPerformerIntent = useRef<{ lineId: string; token: symbol } | null>(null);
   const transactionAdapter = useMemo(
     () => createCashierTransactionAdapter(runtime, authPort.getAccessToken?.bind(authPort)),
