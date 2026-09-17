@@ -2,7 +2,8 @@ import { createBrowserRouter } from 'react-router';
 
 import { AuthenticatedRoute } from '../../auth/authenticated-route';
 import { AuthorizedRoute } from '../../auth/authorized-route';
-import { BackofficeLoginPage } from '../../auth/backoffice-login-page';
+import { BackofficeLoginPage, PASSWORD_RECOVERY_PATH } from '../../auth/backoffice-login-page';
+import { BackofficePasswordRecoveryPage } from '../../auth/backoffice-password-recovery-page';
 import { UnauthorizedPage } from '../../routes/authorization/unauthorized-page';
 import { DashboardPage } from '../../modules/dashboard/dashboard-page';
 import { BackofficeShell } from '../shell/backoffice-shell';
@@ -20,6 +21,7 @@ import { NotificationsPage } from '../../modules/notifications';
 
 export const backofficeRouter = createBrowserRouter([
   { path: '/login', element: <BackofficeLoginPage /> },
+  { path: PASSWORD_RECOVERY_PATH, element: <BackofficePasswordRecoveryPage /> },
   {
     element: <AuthenticatedRoute />,
     children: [
