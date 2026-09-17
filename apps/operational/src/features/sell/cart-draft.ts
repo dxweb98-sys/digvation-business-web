@@ -4,6 +4,7 @@ import type { StartSaleInput } from './cashier-transaction.adapter';
 import type {
   CatalogItem,
   CatalogVariant,
+  DiscountType,
   ResolvedPrice,
   SaleAdjustment,
   SaleLine,
@@ -37,6 +38,9 @@ export interface CartDisplayLine {
   quantity: string;
   effectiveUnitPrice: string;
   totalAmount: string;
+  lineDiscountAmount: string;
+  discountType: DiscountType | null;
+  discountValue: string | null;
 }
 
 export function isPositiveCartQuantity(value: string): boolean {
@@ -118,6 +122,9 @@ export function cartDraftDisplayLines(draft: CartDraft | null): CartDisplayLine[
     quantity: line.quantity,
     effectiveUnitPrice: line.resolvedUnitPrice,
     totalAmount: createDecimal(line.resolvedUnitPrice).times(line.quantity).toFixed(4),
+    lineDiscountAmount: '0.0000',
+    discountType: null,
+    discountValue: null,
   }));
 }
 
@@ -126,10 +133,12 @@ export function saleDisplayLines(
   adjustments: readonly SaleAdjustment[] = [],
 ): CartDisplayLine[] {
   return lines.map((line) => {
-    const promotion = adjustments.find(
-      (adjustment) => adjustment.source === 'PROMOTION' && adjustment.saleLineId === line.id,
-    );
+    const lineAdjustments = adjustments.filter((adjustment) => adjustment.saleLineId === line.id);
+    const promotion = lineAdjustments.find((adjustment) => adjustment.source === 'PROMOTION');
     const promotionLabel = promotion ? `Promo: ${promotion.label}` : null;
+    const singleLineAdjustment = lineAdjustments.length === 1 ? lineAdjustments[0] : null;
+    const hasSeveralLineAdjustments = lineAdjustments.length > 1;
+
     return {
       id: line.id,
       itemNameSnapshot: line.itemNameSnapshot,
@@ -138,7 +147,14 @@ export function saleDisplayLines(
         [line.variantNameSnapshot, promotionLabel].filter(Boolean).join(' · ') || null,
       quantity: line.quantity,
       effectiveUnitPrice: line.effectiveUnitPrice,
-      totalAmount: line.totalAmount,
+      totalAmount: line.grossAmount,
+      lineDiscountAmount: line.lineDiscountAmount,
+      discountType: hasSeveralLineAdjustments
+        ? null
+        : (singleLineAdjustment?.type ?? line.discountType),
+      discountValue: hasSeveralLineAdjustments
+        ? null
+        : (singleLineAdjustment?.configuredValue ?? line.discountValue),
     };
   });
 }
