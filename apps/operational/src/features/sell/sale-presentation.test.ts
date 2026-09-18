@@ -7,6 +7,7 @@ import {
   lineDiscountPercentage,
   percentageFromRate,
   saleDiscountRows,
+  saleSettlement,
   saleTaxLabel,
   saleTaxPercentage,
   saleTaxTreatment,
@@ -171,5 +172,58 @@ describe('sale presentation', () => {
     expect(employeeDisplayName({ contributions: [] }, 'missing-id', [], 'Karyawan tidak tersedia')).toBe(
       'Karyawan tidak tersedia',
     );
+  });
+});
+
+describe('saleSettlement', () => {
+  const payment = (
+    status: 'SUCCEEDED' | 'PENDING' | 'FAILED',
+    appliedAmount: string,
+    method: 'CASH' | 'QRIS' = 'CASH',
+    tenderedAmount: string | null = null,
+    changeAmount: string | null = null,
+  ) => ({ status, method, appliedAmount, tenderedAmount, changeAmount });
+
+  it('reports an unpaid sale with the full authoritative total as balance', () => {
+    expect(saleSettlement({ totalAmount: '184815.0000', payments: [] })).toEqual({
+      totalPaid: '0.0000',
+      balanceDue: '184815.0000',
+      cashTendered: null,
+      cashChange: null,
+      paymentState: 'UNPAID',
+    });
+  });
+
+  it('sums only succeeded payments and exposes cash tendered and change', () => {
+    expect(
+      saleSettlement({
+        totalAmount: '150000.0000',
+        payments: [
+          payment('SUCCEEDED', '150000.0000', 'CASH', '200000.0000', '50000.0000'),
+          payment('FAILED', '150000.0000'),
+        ],
+      }),
+    ).toEqual({
+      totalPaid: '150000.0000',
+      balanceDue: '0.0000',
+      cashTendered: '200000.0000',
+      cashChange: '50000.0000',
+      paymentState: 'PAID',
+    });
+  });
+
+  it('keeps a sale partially paid while a payment is pending or the total is not covered', () => {
+    expect(
+      saleSettlement({
+        totalAmount: '150000.0000',
+        payments: [payment('SUCCEEDED', '50000.0000', 'QRIS')],
+      }),
+    ).toMatchObject({ balanceDue: '100000.0000', paymentState: 'PARTIALLY_PAID' });
+    expect(
+      saleSettlement({
+        totalAmount: '150000.0000',
+        payments: [payment('SUCCEEDED', '150000.0000', 'QRIS'), payment('PENDING', '1.0000')],
+      }).paymentState,
+    ).toBe('PARTIALLY_PAID');
   });
 });

@@ -14,6 +14,7 @@ describe('LocalCashierTransactionAdapter', () => {
         {
           sellingLocationId: branch.id,
           currency: 'IDR',
+          customer: { type: 'NON_MEMBER', name: 'Siti Aminah', phone: '+6281234567890' },
           lines: [
             { catalogItemId: item.id, quantity: '1' },
             { catalogItemId: 'missing-item', quantity: '1' },
@@ -47,6 +48,7 @@ describe('LocalCashierTransactionAdapter', () => {
       {
         sellingLocationId: branch.id,
         currency: 'IDR',
+        customer: { type: 'NON_MEMBER', name: 'Siti Aminah', phone: '+6281234567890' },
         lines: [
           {
             catalogItemId: hairStyling.id,

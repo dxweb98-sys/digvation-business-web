@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
+import { referenceQueryPolicy } from '../../app/data/operational-cache-policy';
 import type { SellingCatalogQuery } from './cashier-transaction.adapter';
 import { cashierTransactionKeys } from './cashier-transaction-keys';
 import type { CatalogItem, CatalogVariant } from './cashier-transaction.types';
@@ -42,8 +43,7 @@ export function useSellingCatalog({
       return { categories: categoriesPage.items, items: itemsPage.items };
     },
     enabled: Boolean(sellingLocationId && currency),
-    staleTime: query.getOperationalCatalog ? 60_000 : 0,
-    refetchOnMount: query.getOperationalCatalog ? false : 'always',
+    ...referenceQueryPolicy,
   });
 
   const activeItems = useMemo(
@@ -65,7 +65,8 @@ export function useSellingCatalog({
     const page = await queryClient.fetchQuery({
       queryKey: cashierTransactionKeys.variants(item.id),
       queryFn: ({ signal }) => query.listCatalogVariants(item.id, signal),
-      staleTime: 0,
+      staleTime: referenceQueryPolicy.staleTime,
+      gcTime: referenceQueryPolicy.gcTime,
     });
     return page.items.filter((variant) => variant.status === 'ACTIVE');
   };

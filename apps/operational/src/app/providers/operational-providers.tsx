@@ -23,6 +23,7 @@ import {
   type TransitionEvent,
 } from 'react';
 
+import { operationalQueryClientDefaults } from '../data/operational-cache-policy';
 import { operationalCopy, type OperationalLocale } from '../localization/operational-localization';
 import { OperationalLoginPage } from '../../modules/operational/operational-login-page';
 import { OperationalSessionProvider } from '../../modules/operational/operational-session-provider';
@@ -44,16 +45,7 @@ function hasImplementedOperationalSurface(session: AuthSession): boolean {
 }
 
 const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      refetchOnWindowFocus: true,
-    },
-    mutations: {
-      retry: false,
-      networkMode: 'always',
-    },
-  },
+  defaultOptions: operationalQueryClientDefaults,
 });
 
 interface OperationalProvidersProps {
@@ -103,6 +95,16 @@ function OperationalAuthBoundary({
     setAuthenticatedSession(nextSession);
   }, []);
 
+  useEffect(() => {
+    if (!isLoggingOut) return undefined;
+    // Return to sign-in even when the exit transition end is not delivered.
+    const timer = window.setTimeout(() => {
+      setAuthenticatedSession(null);
+      setLoggingOut(false);
+    }, 260);
+    return () => window.clearTimeout(timer);
+  }, [isLoggingOut]);
+
   const completeLogoutTransition = (event: TransitionEvent<HTMLDivElement>) => {
     if (event.target !== event.currentTarget || event.propertyName !== 'opacity') return;
     if (!isLoggingOut) return;
@@ -142,7 +144,7 @@ function OperationalAuthBoundary({
           <OperationalSessionProvider>
             <PosOperationalSessionProvider>
               <div
-                className={`min-h-screen transition-[opacity,transform] duration-150 ease-out ${
+                className={`operational-view-enter min-h-screen transition-[opacity,transform] duration-150 ease-out ${
                   isLoggingOut ? 'pointer-events-none -translate-y-1 opacity-0' : 'opacity-100'
                 }`}
                 onTransitionEnd={completeLogoutTransition}

@@ -1,9 +1,13 @@
 import { useAuth } from '@digvation/pos-auth';
 import { useConnectivity, useRuntime } from '@digvation/pos-runtime';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 
+import {
+  referenceQueryPolicy,
+  transactionQueryPolicy,
+} from '../../app/data/operational-cache-policy';
 import {
   operationalCopy,
   resolveOperationalLocale,
@@ -52,22 +56,9 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
   );
   const effectiveConnectivity = isLocalCashierDemoEnabled() ? 'ONLINE' : connectivity.state;
 
-  useEffect(() => {
-    if (
-      isLocalCashierDemoEnabled() ||
-      !selectedLocationId ||
-      effectiveConnectivity !== 'ONLINE'
-    ) {
-      return undefined;
-    }
-    const timer = window.setInterval(() => {
-      void queryClient.invalidateQueries({
-        queryKey: cashierTransactionKeys.sales(),
-        refetchType: 'active',
-      });
-    }, 5_000);
-    return () => window.clearInterval(timer);
-  }, [effectiveConnectivity, queryClient, selectedLocationId]);
+  // The queue keeps itself fresh through its own polling query, which pauses
+  // while the tab is in the background. A second timer here would refetch the
+  // same list twice as often, including while nobody is looking at it.
 
   const command = useSaleCommandCoordinator({ client: transactionAdapter, rememberSale });
 
@@ -87,8 +78,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
         signal,
       ),
     enabled: Boolean(selectedLocationId && runtime.currency),
-    staleTime: 0,
-    refetchOnMount: 'always',
+    ...referenceQueryPolicy,
   });
 
   const activeSaleId = routeSaleId ?? undefined;
@@ -127,6 +117,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
         signal,
       ),
     enabled: Boolean(saleWorkspace.sale && lineTask?.allowEmployeeContributionSnapshot),
+    ...transactionQueryPolicy,
   });
 
   const cacheQueueContext = (sale: Sale) => {
@@ -679,6 +670,9 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     changeDraftQuantity: saleWorkspace.changeDraftQuantity,
     removeDraftLine: saleWorkspace.removeDraftLine,
     commitDraft: saleWorkspace.commitDraft,
+    customer: saleWorkspace.customer,
+    isCustomerPending: saleWorkspace.isCustomerPending,
+    changeCustomer: saleWorkspace.changeCustomer,
     cart: saleWorkspace.cart,
     openLineTask,
     closeLineTask: () => setLineTaskId(null),

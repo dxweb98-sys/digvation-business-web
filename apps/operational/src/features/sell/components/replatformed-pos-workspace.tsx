@@ -2,11 +2,10 @@ import { useAuth } from '@digvation/pos-auth';
 import { createDecimal, formatMoney } from '@digvation/pos-money';
 import { useRuntime } from '@digvation/pos-runtime';
 import {
+  DAlert,
   DBadge as Badge,
   DButton,
   DButton as Button,
-  DCheckbox,
-  DCombobox,
   DCombobox as Combobox,
   DConfirmDialog,
   DDialog,
@@ -14,6 +13,7 @@ import {
   DDropdown as Dropdown,
   DInput,
   DInput as Input,
+  DRadio,
   DSearchInput as SearchInput,
   DSelect as Select,
   DSkeleton as Skeleton,
@@ -26,6 +26,7 @@ import {
   Banknote,
   CheckCircle2,
   ChevronDown,
+  ChevronRight,
   Clock,
   CreditCard,
   Eye,
@@ -49,6 +50,10 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
 import {
+  QUEUE_REFRESH_INTERVAL_MS,
+  liveQueryPolicy,
+} from '../../../app/data/operational-cache-policy';
+import {
   operationalCopy,
   resolveOperationalLocale,
   useOperationalLocalization,
@@ -61,16 +66,13 @@ import {
   createCashierTransactionAdapter,
   isLocalCashierDemoEnabled,
 } from '../cashier-transaction-adapter-factory';
-import {
-  customerMemberLookup,
-  type MemberCustomerLookupResult,
-  type TransactionCustomer,
-} from '../customer-member-lookup';
 import { hasStartableQueuedWork } from '../queued-sale-work';
 import {
   employeeDisplayName,
+  formatServiceDuration,
   lineDiscountPercentage,
   saleDiscountRows,
+  saleSettlement,
   saleTaxLabel,
   transactionDiscountLabel,
 } from '../sale-presentation';
@@ -81,6 +83,8 @@ import type {
   PaymentMethod,
   PaymentRoute,
   Sale,
+  SaleCustomer,
+  SaleCustomerSelection,
   SaleLine,
 } from '../cashier-transaction.types';
 import type { CatalogItemTypeFilter } from '../use-selling-catalog';
@@ -91,6 +95,16 @@ import {
   PosCurrencyInput,
   PosNumericInput,
 } from './pos-controls';
+import {
+  SaleDetailHeader,
+  SaleDetailSection,
+  SaleFinancialSummary,
+  SaleLineItem,
+  SaleLineItemList,
+  SalePaymentList,
+  StatusPill,
+} from './sale-detail-presentation';
+import { SaleAdjustmentControls } from './sale-adjustment-controls';
 import { SaleLineTaskDialog } from './sale-line-task-dialog';
 import type { VariantPickerState } from './variant-picker';
 import './replatformed-pos-workspace.css';
@@ -104,7 +118,6 @@ interface QueuedSaleEntry {
   saleCreatedAt: string;
 }
 
-type PosCustomer = TransactionCustomer;
 interface ServiceWorkContributor {
   employeeId: string;
   shareRate: string;
@@ -117,31 +130,11 @@ interface ServiceWorkUnit {
 
 type ServiceWorkUnitsByLine = Readonly<Record<string, readonly ServiceWorkUnit[]>>;
 
-const CURRENT_CUSTOMER_KEY = 'digvation-pos-demo-current-customer';
 const QUEUED_SALE_IDS_KEY = 'digvation-pos-demo-queued-sale-ids';
 const CANCELED_SALE_REASONS_KEY = 'digvation-pos-demo-canceled-sale-reasons';
-const saleCustomerKey = (saleId: string) => `digvation-pos-demo-customer:${saleId}`;
 
 function copyFor(value: string, locale: string): string {
   return operationalCopy(value, resolveOperationalLocale(locale));
-}
-
-function readStoredCustomer(key: string): PosCustomer | null {
-  try {
-    const raw = window.sessionStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as PosCustomer) : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeStoredCustomer(key: string, customer: PosCustomer | null): void {
-  try {
-    if (customer) window.sessionStorage.setItem(key, JSON.stringify(customer));
-    else window.sessionStorage.removeItem(key);
-  } catch {
-    // Session storage is optional presentation state only.
-  }
 }
 
 function readQueuedSaleEntries(): QueuedSaleEntry[] {
@@ -232,29 +225,49 @@ function money(amount: string, locale: string) {
   return formatMoney(amount, 'IDR', locale, 0);
 }
 
+function formatDurationMinutes(minutes: number | null | undefined, locale: string): string | null {
+  return formatServiceDuration(minutes, {
+    hour: copyFor('hour-short', locale),
+    minute: copyFor('minute-short', locale),
+  });
+}
+
 function quantity(value: string) {
   const normalized = value.replace(/(\.\d*?[1-9])0+$|\.0+$/, '$1');
   return normalized === '-0' ? '0' : normalized;
 }
 
-function transactionNumber(saleId: string, locale: string) {
-  return saleId.startsWith('SALE-DEMO-')
-    ? saleId
-    : `${copyFor('Transaction', locale)} ${saleId.slice(0, 8)}`;
+function transactionNumber(sale: Pick<Sale, 'id' | 'saleNumber'>, locale: string) {
+  // Prefer the authoritative sale number; fall back to the short id for sales without one.
+  if (sale.saleNumber) return sale.saleNumber;
+  return sale.id.startsWith('SALE-DEMO-')
+    ? sale.id
+    : `${copyFor('Transaction', locale)} ${sale.id.slice(0, 8)}`;
 }
 
-function saleCustomer(saleId: string | undefined, locale: string): PosCustomer {
-  const stored = saleId ? readStoredCustomer(saleCustomerKey(saleId)) : null;
-  return stored ?? { name: copyFor('General customer', locale), phone: '' };
+/**
+ * The Sale owns its customer identity, so presentation reads it straight from
+ * the Sale. A Sale captured before the customer contract carries no identity:
+ * it stays neutral and is never shown as a general or anonymous customer.
+ */
+function customerDisplayName(customer: SaleCustomer | null, locale: string): string {
+  return customer && customer.name.trim()
+    ? customer.name
+    : copyFor('Customer data is not available', locale);
 }
 
-function customerStatus(customer: PosCustomer | null): {
-  label: 'Guest' | 'Member' | 'Non-member';
-  variant: 'default' | 'primary' | 'outline';
-} {
-  if (!customer) return { label: 'Guest', variant: 'default' };
-  if (customer.membership) return { label: 'Member', variant: 'primary' };
-  return { label: 'Non-member', variant: 'outline' };
+function customerDisplayDetail(customer: SaleCustomer | null): string | null {
+  return customer && customer.phoneE164.trim() ? customer.phoneE164 : null;
+}
+
+function customerStatus(customer: SaleCustomer | null): {
+  label: 'Member' | 'Non-member';
+  variant: 'primary' | 'outline';
+} | null {
+  if (!customer) return null;
+  return customer.type === 'MEMBER'
+    ? { label: 'Member', variant: 'primary' }
+    : { label: 'Non-member', variant: 'outline' };
 }
 
 function serviceWorkKey(line: SaleLine): string {
@@ -558,9 +571,13 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     () => createCashierTransactionAdapter(runtime, authPort.getAccessToken?.bind(authPort)),
     [authPort, runtime],
   );
+  // The queue is shared operational reality, so it polls — but only while this
+  // tab is focused, and it keeps serving the last answer while refetching.
   const transactionsQuery = useQuery({
     queryKey: cashierTransactionKeys.sales(),
     queryFn: ({ signal }) => adapter.listSales(signal),
+    ...liveQueryPolicy,
+    refetchInterval: QUEUE_REFRESH_INTERVAL_MS,
   });
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -580,9 +597,6 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const [queuePaymentTarget, setQueuePaymentTarget] = useState<Sale | null>(null);
   const [queuePaymentAmount, setQueuePaymentAmount] = useState<string | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
-  const [cartCustomer, setCartCustomer] = useState<PosCustomer | null>(() =>
-    readStoredCustomer(CURRENT_CUSTOMER_KEY),
-  );
   const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [payNow, setPayNow] = useState(true);
@@ -603,14 +617,12 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   } | null>(null);
   const [serviceWorkUnits, setServiceWorkUnits] = useState<ServiceWorkUnitsByLine>({});
   const [receiptSaleId, setReceiptSaleId] = useState<string | null>(null);
+  const [isSendingReceipt, setSendingReceipt] = useState(false);
 
   const sale = workspace.viewModel.sale;
   const lines = workspace.cart.lines;
   const total = workspace.cart.totalAmount;
-
-  useEffect(() => {
-    writeStoredCustomer(CURRENT_CUSTOMER_KEY, cartCustomer);
-  }, [cartCustomer]);
+  const activeCustomer = workspace.customer;
 
   const displayedQueueDetail =
     receiptSaleId && sale?.id === receiptSaleId && hasSuccessfulPayment(sale) ? sale : queueDetail;
@@ -659,6 +671,20 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   };
 
   const openCheckout = async () => {
+    // A transaction belongs to a customer. Without one there is nothing to
+    // check out, so the selector is opened instead of creating a Sale.
+    if (!activeCustomer) {
+      showToast({
+        title: copy('Choose the customer first'),
+        description: copy(
+          'A transaction belongs to a customer. Fill in the name and WhatsApp number, or choose a member.',
+        ),
+        variant: 'warning',
+      });
+      setCartOpen(false);
+      setCustomerPickerOpen(true);
+      return;
+    }
     const issues = processIssues(sale, lines, workspace.locale);
     if (issues.length) {
       showToast({
@@ -700,12 +726,35 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     setCheckoutOpen(true);
   };
 
+  /**
+   * Requests receipt delivery for a captured transaction. Delivery is separate
+   * from the transaction: a provider that is absent or failing is reported as a
+   * delivery outcome and never touches the Sale, its payment or its queue state.
+   */
+  const sendReceipt = async (target: Sale) => {
+    setSendingReceipt(true);
+    try {
+      await adapter.requestReceiptDelivery(target.id, 'WHATSAPP');
+      showToast({
+        title: copy('Send via WhatsApp'),
+        description: transactionNumber(target, workspace.locale),
+      });
+    } catch (error) {
+      showToast({
+        title: copy('Not available yet'),
+        description: cashierTransactionErrorMessage(error),
+        variant: 'warning',
+      });
+    } finally {
+      setSendingReceipt(false);
+    }
+  };
+
   const commitCheckoutToQueue = (
     completedSale: Sale,
     wasPaid: boolean,
     destination: FulfillmentDestination,
   ) => {
-    writeStoredCustomer(saleCustomerKey(completedSale.id), cartCustomer);
     if (isLocalDemo) {
       const committedEntry: QueuedSaleEntry = {
         saleId: completedSale.id,
@@ -728,7 +777,6 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     setQueueTab('QUEUED');
     setQueueOpen(true);
     setCartOpen(false);
-    setCartCustomer(null);
     setCheckoutOpen(false);
 
     workspace.clearProcessedDraft();
@@ -745,10 +793,10 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       title: wasPaid ? copy('Payment successful') : copy('Transaction created'),
       description:
         destination === 'START_PROCESS'
-          ? `${transactionNumber(completedSale.id, workspace.locale)} ${copy('Added to queue and ready to start.')}`
+          ? `${transactionNumber(completedSale, workspace.locale)} ${copy('Added to queue and ready to start.')}`
           : wasPaid
-            ? `${transactionNumber(completedSale.id, workspace.locale)} ${copy('Paid and added to queue.')}`
-            : `${transactionNumber(completedSale.id, workspace.locale)} ${copy('Added to queue. Payment has not been received.')}`,
+            ? `${transactionNumber(completedSale, workspace.locale)} ${copy('Paid and added to queue.')}`
+            : `${transactionNumber(completedSale, workspace.locale)} ${copy('Added to queue. Payment has not been received.')}`,
       variant: 'success',
     });
   };
@@ -777,7 +825,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       setQueueTab('PROGRESS');
       showToast({
         title: copy('Work started'),
-        description: `${transactionNumber(transaction.id, workspace.locale)} ${copy('is now being worked on.')}`,
+        description: `${transactionNumber(transaction, workspace.locale)} ${copy('is now being worked on.')}`,
         variant: 'success',
       });
       return true;
@@ -854,7 +902,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       setCompletionConfirmationTarget(null);
       showToast({
         title: copy('Transaction completed'),
-        description: `${transactionNumber(finalized.id, workspace.locale)} ${copy('has been completed.')}`,
+        description: `${transactionNumber(finalized, workspace.locale)} ${copy('has been completed.')}`,
         variant: 'success',
       });
     } catch {
@@ -1191,7 +1239,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         taxLabel={sale ? saleTaxLabel(sale, copy('Tax')) : copy('Tax')}
         isEstimate={workspace.cart.isLocalDraft}
         locale={workspace.locale}
-        customer={cartCustomer}
+        customer={activeCustomer}
         onChooseCustomer={() => setCustomerPickerOpen(true)}
         onQuantity={(line, next) => {
           if (workspace.cart.isLocalDraft) workspace.changeDraftQuantity(line.id, next);
@@ -1212,17 +1260,22 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
 
       <ReferenceCustomerDialog
         open={customerPickerOpen}
-        customer={cartCustomer}
+        customer={activeCustomer}
+        isSaving={workspace.isCustomerPending}
         onClose={() => setCustomerPickerOpen(false)}
-        onChoose={(customer) => {
-          setCartCustomer(customer);
-          if (sale?.id) writeStoredCustomer(saleCustomerKey(sale.id), customer);
-          setCustomerPickerOpen(false);
-        }}
-        onUseGeneralCustomer={() => {
-          setCartCustomer(null);
-          if (sale?.id) writeStoredCustomer(saleCustomerKey(sale.id), null);
-          setCustomerPickerOpen(false);
+        onChoose={(selection) => {
+          // Runtime validates and normalizes the identity; the dialog closes
+          // only once the change is accepted.
+          void workspace
+            .changeCustomer(selection)
+            .then(() => setCustomerPickerOpen(false))
+            .catch((error: unknown) => {
+              showToast({
+                title: copy('Could not save the customer'),
+                description: cashierTransactionErrorMessage(error),
+                variant: 'danger',
+              });
+            });
         }}
       />
 
@@ -1244,7 +1297,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         taxAmount={workspace.cart.taxAmount}
         taxLabel={sale ? saleTaxLabel(sale, copy('Tax')) : copy('Tax')}
         locale={workspace.locale}
-        customer={cartCustomer}
+        customer={activeCustomer}
         method={paymentMethod}
         provider={provider}
         tender={tender}
@@ -1261,6 +1314,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         quickTender={quickTender}
         isSubmitting={workspace.isCoreMutating}
         onQueue={() => void completeCheckout('QUEUE')}
+        adjustmentSlot={<SaleAdjustmentControls workspace={workspace} placement="payment" />}
       />
 
       <ReferenceTransactionDetail
@@ -1281,8 +1335,6 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         onNewSale={() => {
           setQueueDetail(null);
           setReceiptSaleId(null);
-          setCartCustomer(null);
-          writeStoredCustomer(CURRENT_CUSTOMER_KEY, null);
           setCartOpen(false);
           workspace.newSale();
         }}
@@ -1290,6 +1342,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           setQueueDetail(transaction);
           setReceiptSaleId(transaction.id);
         }}
+        onSendReceipt={(transaction) => void sendReceipt(transaction)}
+        isSendingReceipt={isSendingReceipt}
         onAssign={(line) => {
           if (!displayedQueueDetail) return;
           workspace.requestEmployeeOptions();
@@ -1357,7 +1411,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         title={copy('Complete transaction')}
         message={
           completionConfirmationTarget
-            ? `${copy('Complete transaction')} ${transactionNumber(completionConfirmationTarget.id, workspace.locale)}? ${copy('Completing this transaction closes finished work.')}`
+            ? `${copy('Complete transaction')} ${transactionNumber(completionConfirmationTarget, workspace.locale)}? ${copy('Completing this transaction closes finished work.')}`
             : undefined
         }
         confirmLabel={copy('Complete transaction')}
@@ -1513,10 +1567,13 @@ function ReferenceCatalogCard({
   const { copy } = useOperationalLocalization();
   const isService = item.type === 'SERVICE';
   const displayPrice = item.displayPrice;
+  const variantCount = item.variants?.length ?? 0;
+  const needsVariantChoice = variantCount > 0;
+  const duration = formatDurationMinutes(item.serviceDefinition?.defaultDurationMinutes, locale);
   return (
     <button
       type="button"
-      aria-label={`${copy('Add')} ${item.name}`}
+      aria-label={`${copy(needsVariantChoice ? 'Choose variant' : 'Add')} ${item.name}`}
       disabled={disabled}
       onClick={onAdd}
       className="group rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-left transition-all hover:border-[var(--color-brand)]/40 hover:shadow-md active:scale-[.98] disabled:opacity-50"
@@ -1534,20 +1591,38 @@ function ReferenceCatalogCard({
       </div>
       <p className="truncate font-mono text-[10px] text-[var(--color-text-muted)]">{item.code}</p>
       <p className="mt-1 line-clamp-2 min-h-10 text-sm font-semibold leading-tight">{item.name}</p>
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold text-[var(--color-text-muted)]">
-          {price
-            ? displayPrice?.kind === 'FROM'
-              ? `${copy('From')} ${money(price, locale)}`
-              : money(price, locale)
-            : copy('Price available when selected')}
-        </p>
-        <span
-          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${isService ? 'bg-cyan-500/10 text-cyan-700' : 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]'}`}
-        >
-          {copy(isService ? 'Service' : 'Product')}
-        </span>
-      </div>
+      {/* Reserved metadata row keeps the price baseline aligned across the grid. */}
+      <p className="mt-1 flex min-h-4 items-center gap-1 text-[11px] text-[var(--color-text-muted)]">
+        {duration ? (
+          <>
+            <Clock className="size-3 shrink-0" aria-hidden="true" />
+            {duration}
+          </>
+        ) : null}
+      </p>
+      <p className="mt-1.5 text-sm font-semibold text-[var(--color-text)]">
+        {price
+          ? displayPrice?.kind === 'FROM'
+            ? `${copy('From')} ${money(price, locale)}`
+            : money(price, locale)
+          : copy('Price available when selected')}
+      </p>
+      {/* Items with variants open a picker first, so the card says so instead of implying a direct add. */}
+      <p
+        className={`mt-1.5 flex items-center gap-1 text-[11px] font-semibold ${needsVariantChoice ? 'text-[var(--color-brand)]' : 'text-[var(--color-text-muted)]'}`}
+      >
+        {needsVariantChoice ? (
+          <>
+            {copy('Choose variant')}
+            <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
+          </>
+        ) : (
+          <>
+            <Plus className="size-3 shrink-0" aria-hidden="true" />
+            {copy('Add')}
+          </>
+        )}
+      </p>
     </button>
   );
 }
@@ -1615,7 +1690,7 @@ function ReferenceQueueBoard({
               </p>
             </div>
           </div>
-          <div className="hidden items-center gap-2 md:flex">
+          <div className="pos-queue-status-summary items-center gap-2">
             {statuses.map((status) => (
               <span
                 key={status}
@@ -1635,7 +1710,7 @@ function ReferenceQueueBoard({
           />
         </button>
         <div
-          className={`grid transition-all duration-300 ease-out ${open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
+          className={`pos-collapsible grid ${open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
         >
           <div className="overflow-hidden">
             <DTabs
@@ -1729,7 +1804,7 @@ function ReferenceQueueCard({
   const { balanceDue } = financialSummary(sale);
   const hasPayment = hasSuccessfulPayment(sale);
   const paid = hasSuccessfulCheckout(sale);
-  const customer = saleCustomer(sale.id, locale);
+  const customer = sale.customer ?? null;
   const canStartWork = hasStartableQueuedWork(sale);
   const actionItems = [
     {
@@ -1812,9 +1887,11 @@ function ReferenceQueueCard({
       <div className="mb-2 flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="font-mono text-[11px] text-[var(--color-text-muted)]">
-            {transactionNumber(sale.id, locale)}
+            {transactionNumber(sale, locale)}
           </p>
-          <p className="mt-0.5 truncate text-sm font-bold">{customer.name}</p>
+          <p className="mt-0.5 truncate text-sm font-bold">
+            {customerDisplayName(customer, locale)}
+          </p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <span
@@ -1861,7 +1938,7 @@ function ReferenceQueueCard({
             trigger={({ open }) => (
               <button
                 type="button"
-                aria-label={`${copy('Actions for')} ${transactionNumber(sale.id, locale)}`}
+                aria-label={`${copy('Actions for')} ${transactionNumber(sale, locale)}`}
                 aria-expanded={open}
                 className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 text-[11px] font-semibold text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand)]/20"
               >
@@ -1925,13 +2002,23 @@ function ReferenceFloatingCart({
   taxLabel: string;
   isEstimate: boolean;
   locale: string;
-  customer: PosCustomer | null;
+  customer: SaleCustomer | null;
   onChooseCustomer: () => void;
   onQuantity: (line: CartDisplayLine, quantity: string) => void;
   onRemove: (line: CartDisplayLine) => void;
   onCheckout: () => void;
 }) {
   const { copy } = useOperationalLocalization();
+  useEffect(() => {
+    if (!open) return undefined;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      if (document.querySelector('[aria-modal="true"]')) return;
+      onOpenChange(false);
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [onOpenChange, open]);
   const panel = (
     <ReferenceCartPanel
       lines={lines}
@@ -1959,7 +2046,7 @@ function ReferenceFloatingCart({
         type="button"
         aria-label={copy('Close active cart')}
         onClick={() => onOpenChange(false)}
-        className={`fixed inset-0 z-40 hidden bg-transparent md:block ${open ? '' : 'pointer-events-none opacity-0'}`}
+        className={`operational-cart-backdrop fixed inset-0 z-40 bg-transparent ${open ? '' : 'pointer-events-none'}`}
       />
       <button
         type="button"
@@ -1975,7 +2062,7 @@ function ReferenceFloatingCart({
             </span>
           ) : null}
         </div>
-        <div className="hidden text-left sm:block">
+        <div className="operational-cart-button-label text-left">
           <p className="text-xs font-bold leading-none">{copy('Cart')}</p>
           <p className="mt-1 text-[11px] opacity-90">{money(total, locale)}</p>
         </div>
@@ -2061,7 +2148,7 @@ function ReferenceCartPanel({
   taxLabel: string;
   isEstimate: boolean;
   locale: string;
-  customer: PosCustomer | null;
+  customer: SaleCustomer | null;
   onChooseCustomer: () => void;
   onQuantity: (line: CartDisplayLine, quantity: string) => void;
   onRemove: (line: CartDisplayLine) => void;
@@ -2094,14 +2181,17 @@ function ReferenceCartPanel({
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-1.5">
               <p className="truncate text-xs font-semibold">
-                {customer?.name ?? copy('General customer')}
+                {customer ? customer.name : copy('Choose customer')}
               </p>
-              <Badge variant={status.variant} className="shrink-0 px-2 py-0 text-[10px]">
-                {copy(status.label)}
-              </Badge>
+              {status ? (
+                <Badge variant={status.variant} className="shrink-0 px-2 py-0 text-[10px]">
+                  {copy(status.label)}
+                </Badge>
+              ) : null}
             </div>
             <p className="mt-0.5 truncate text-[11px] text-[var(--color-text-muted)]">
-              {customer?.phone ?? copy('Choose customer')}
+              {customerDisplayDetail(customer) ??
+                copy('Name and WhatsApp number are both required.')}
             </p>
           </div>
           <ChevronDown className="size-4 shrink-0 text-[var(--color-text-muted)]" />
@@ -2117,7 +2207,7 @@ function ReferenceCartPanel({
               return (
                 <div
                   key={line.id}
-                  className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 shadow-sm"
+                  className="pos-cart-line-enter rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 shadow-sm"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -2224,10 +2314,18 @@ function ReferenceCartPanel({
             <span className="text-sm font-bold">
               {copy(isEstimate ? 'Estimated total' : 'Total')}
             </span>
-            <span className="text-lg font-bold text-[var(--color-brand)]">
+            <span
+              key={total}
+              className="pos-value-updated text-lg font-bold tabular-nums text-[var(--color-brand)]"
+            >
               {money(total, locale)}
             </span>
           </div>
+          {isEstimate && lines.length ? (
+            <p className="text-[11px] leading-4 text-[var(--color-text-muted)]">
+              {copy('Tax and promotions are finalized when the transaction is created.')}
+            </p>
+          ) : null}
           <Button
             fullWidth
             disabled={!lines.length}
@@ -2245,38 +2343,36 @@ function ReferenceCartPanel({
 function ReferenceCustomerDialog({
   open,
   customer,
+  isSaving,
   onClose,
   onChoose,
-  onUseGeneralCustomer,
 }: {
   open: boolean;
-  customer: PosCustomer | null;
+  customer: SaleCustomer | null;
+  isSaving: boolean;
   onClose: () => void;
-  onChoose: (customer: PosCustomer) => void;
-  onUseGeneralCustomer: () => void;
+  onChoose: (selection: SaleCustomerSelection) => void;
 }) {
   const { copy } = useOperationalLocalization();
-  const [mode, setMode] = useState<'MEMBER' | 'NON_MEMBER'>('MEMBER');
-  const [memberSearch, setMemberSearch] = useState('');
-  const [selectedMember, setSelectedMember] = useState<MemberCustomerLookupResult | null>(null);
+  const [mode, setMode] = useState<'NON_MEMBER' | 'MEMBER'>('NON_MEMBER');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const memberResults = useMemo(
-    () => customerMemberLookup.searchMembers(memberSearch),
-    [memberSearch],
-  );
-  const chooseNonMember = () => {
-    const normalizedName = name.trim();
-    const normalizedPhone = phone.trim();
-    if (!normalizedName || !normalizedPhone) return;
-    onChoose({ name: normalizedName, phone: normalizedPhone });
-    setName('');
-    setPhone('');
-  };
-  const changeMode = (nextMode: 'MEMBER' | 'NON_MEMBER') => {
-    setMode(nextMode);
-    setSelectedMember(null);
-    setMemberSearch('');
+  const [openedFor, setOpenedFor] = useState<string | null>(null);
+
+  // Each time the dialog opens it shows the identity the transaction currently
+  // carries, never what was typed for an earlier transaction.
+  const identityKey = open ? `${customer?.type ?? 'NONE'}:${customer?.phoneE164 ?? ''}` : null;
+  if (openedFor !== identityKey) {
+    setOpenedFor(identityKey);
+    setMode(customer?.type === 'MEMBER' ? 'MEMBER' : 'NON_MEMBER');
+    setName(customer?.type === 'NON_MEMBER' ? customer.name : '');
+    setPhone(customer?.type === 'NON_MEMBER' ? customer.phoneE164 : '');
+  }
+
+  const canSubmit = Boolean(name.trim() && phone.trim()) && !isSaving;
+  const submitNonMember = () => {
+    if (!canSubmit) return;
+    onChoose({ type: 'NON_MEMBER', name: name.trim(), phone: phone.trim() });
   };
 
   return (
@@ -2290,110 +2386,60 @@ function ReferenceCustomerDialog({
       className="pos-reference-dialog w-full max-w-md overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
     >
       <div className="min-h-0 space-y-3 overflow-y-auto">
-        <button
-          type="button"
-          onClick={onUseGeneralCustomer}
-          className={`flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left transition-colors ${customer === null ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/5' : 'border-[var(--color-border)] hover:bg-[var(--color-surface-muted)]'}`}
-        >
-          <div className="grid size-8 place-items-center rounded-lg bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]">
-            <User className="size-4" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">{copy('Use general customer')}</p>
-            <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
-              {copy('Continue without selecting a customer.')}
-            </p>
-          </div>
-          {customer === null ? <CheckCircle2 className="size-4 text-[var(--color-brand)]" /> : null}
-        </button>
-        <div className="border-t border-[var(--color-border)] pt-3">
-          <div className="flex gap-2" aria-label={copy('Customer')}>
-            <Button
-              size="sm"
-              variant={mode === 'MEMBER' ? 'primary' : 'secondary'}
-              onClick={() => changeMode('MEMBER')}
-            >
-              {copy('Member')}
-            </Button>
-            <Button
-              size="sm"
-              variant={mode === 'NON_MEMBER' ? 'primary' : 'secondary'}
-              onClick={() => changeMode('NON_MEMBER')}
-            >
-              {copy('Non-member')}
-            </Button>
-          </div>
-
-          {mode === 'MEMBER' ? (
-            <div className="mt-3 space-y-3">
-              <DCombobox
-                key="member-search"
-                ariaLabel={copy('Search name or phone number')}
-                value={selectedMember?.customerId ?? ''}
-                options={memberResults.map((member) => ({
-                  value: member.customerId,
-                  label: member.name,
-                  detail: `${member.phone}, ${member.membership.memberCode}`,
-                }))}
-                onChange={(customerId) => {
-                  setSelectedMember(
-                    memberResults.find((member) => member.customerId === customerId) ?? null,
-                  );
-                }}
-                onSearchChange={(query) => {
-                  setMemberSearch(query);
-                  setSelectedMember(null);
-                }}
-                placeholder={copy('Search name or phone number')}
-                idleMessage={copy('Search by name, phone number, or member code.')}
-                renderEmpty={() => copy('Member not found.')}
-                renderOption={(option) => {
-                  const member = memberResults.find(
-                    (result) => result.customerId === String(option.value),
-                  );
-                  return (
-                    <span className="min-w-0">
-                      <span className="block truncate">{option.label}</span>
-                      {member ? (
-                        <span className="mt-0.5 block truncate text-xs font-normal text-[var(--color-text-muted)]">
-                          {member.phone}, {member.membership.memberCode}
-                        </span>
-                      ) : null}
-                    </span>
-                  );
-                }}
-              />
-              <Button
-                fullWidth
-                disabled={!selectedMember}
-                onClick={() => selectedMember && onChoose(selectedMember)}
-              >
-                {copy('Use customer')}
-              </Button>
-            </div>
-          ) : (
-            <div className="mt-3 space-y-3">
-              <DInput
-                aria-label={copy('Customer name')}
-                label={copy('Name')}
-                value={name}
-                onChange={setName}
-                placeholder={copy('Customer name')}
-              />
-              <DInput
-                aria-label={copy('Phone number')}
-                label={copy('Phone number')}
-                value={phone}
-                onChange={setPhone}
-                placeholder={copy('Phone number')}
-                inputMode="tel"
-              />
-              <Button fullWidth disabled={!name.trim() || !phone.trim()} onClick={chooseNonMember}>
-                {copy('Use customer')}
-              </Button>
-            </div>
+        <p className="text-xs text-[var(--color-text-muted)]">
+          {copy(
+            'A transaction belongs to a customer. Fill in the name and WhatsApp number, or choose a member.',
           )}
+        </p>
+        <div className="flex gap-2" aria-label={copy('Customer')}>
+          <Button
+            size="sm"
+            variant={mode === 'NON_MEMBER' ? 'primary' : 'secondary'}
+            onClick={() => setMode('NON_MEMBER')}
+          >
+            {copy('Non-member')}
+          </Button>
+          <Button
+            size="sm"
+            variant={mode === 'MEMBER' ? 'primary' : 'secondary'}
+            onClick={() => setMode('MEMBER')}
+          >
+            {copy('Member')}
+          </Button>
         </div>
+
+        {mode === 'NON_MEMBER' ? (
+          <div className="space-y-3">
+            <DInput
+              aria-label={copy('Customer name')}
+              label={copy('Name')}
+              value={name}
+              onChange={setName}
+              placeholder={copy('Customer name')}
+            />
+            <DInput
+              aria-label={copy('WhatsApp number')}
+              label={copy('WhatsApp number')}
+              value={phone}
+              onChange={setPhone}
+              placeholder={copy('WhatsApp number')}
+              inputMode="tel"
+              hint={copy('Name and WhatsApp number are both required.')}
+            />
+            <Button fullWidth disabled={!canSubmit} onClick={submitNonMember}>
+              {copy('Use customer')}
+            </Button>
+          </div>
+        ) : (
+          // Member identity is owned by the canonical Customer authority. Until
+          // that directory is connected there is nothing truthful to search, so
+          // the state says so instead of offering invented members.
+          <DAlert variant="info" title={copy('Member lookup is not available yet')}>
+            {copy(
+              'Member identity comes from the customer directory, which is not connected to this installation yet.',
+            )}
+          </DAlert>
+        )}
       </div>
     </DDialog>
   );
@@ -2424,6 +2470,7 @@ function ReferencePaymentDialog({
   quickTender,
   isSubmitting,
   onQueue,
+  adjustmentSlot,
 }: {
   open: boolean;
   onClose: () => void;
@@ -2435,7 +2482,7 @@ function ReferencePaymentDialog({
   taxAmount: string;
   taxLabel: string;
   locale: string;
-  customer: PosCustomer | null;
+  customer: SaleCustomer | null;
   method: PaymentMethod;
   provider: string;
   tender: string;
@@ -2449,6 +2496,8 @@ function ReferencePaymentDialog({
   quickTender: readonly string[];
   isSubmitting: boolean;
   onQueue: () => void;
+  /** Applied promotions and discounts for the authoritative Sale being paid. */
+  adjustmentSlot?: ReactNode;
 }) {
   const { copy, label } = useOperationalLocalization();
   const { routes: paymentRoutes, isPending: isPaymentRoutesPending } = useCachedPaymentRoutes();
@@ -2460,6 +2509,7 @@ function ReferencePaymentDialog({
   const needsProvider = method === 'BANK_TRANSFER' || method === 'WALLET';
   const hasDiscount = !createDecimal(discountAmount).equals(createDecimal('0'));
   const hasTax = !createDecimal(taxAmount).equals(createDecimal('0'));
+  const customerBadge = customerStatus(customer);
   const canPay =
     lines.length > 0 &&
     Boolean(activeRoute) &&
@@ -2494,7 +2544,7 @@ function ReferencePaymentDialog({
             {copy('Cancel')}
           </DButton>
           <DButton disabled={!canConfirm} loading={isSubmitting} onClick={onQueue}>
-            {copy('Add to queue')}
+            {copy(payNow ? 'Pay and add to queue' : 'Add to queue')}
           </DButton>
         </div>
       }
@@ -2504,21 +2554,23 @@ function ReferencePaymentDialog({
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs text-[var(--color-text-muted)]">{copy('Payment total')}</p>
-              <h3 className="mt-0.5 text-2xl font-bold leading-tight text-[var(--color-brand)]">
+              <h3
+                key={total}
+                className="pos-value-updated mt-0.5 text-2xl font-bold leading-tight tabular-nums text-[var(--color-brand)]"
+              >
                 {money(total, locale)}
               </h3>
             </div>
             <div className="min-w-0 text-right">
               <p className="text-xs text-[var(--color-text-muted)]">{copy('Customer')}</p>
               <p className="max-w-[170px] truncate text-sm font-semibold">
-                {customer?.name ?? copy('General customer')}
+                {customerDisplayName(customer, locale)}
               </p>
-              <Badge
-                variant={customerStatus(customer).variant}
-                className="mt-1 px-2 py-0 text-[10px]"
-              >
-                {copy(customerStatus(customer).label)}
-              </Badge>
+              {customerBadge ? (
+                <Badge variant={customerBadge.variant} className="mt-1 px-2 py-0 text-[10px]">
+                  {copy(customerBadge.label)}
+                </Badge>
+              ) : null}
               <p className="text-[11px] text-[var(--color-text-muted)]">
                 {lines.length} {copy('items')}
               </p>
@@ -2550,25 +2602,9 @@ function ReferencePaymentDialog({
           </div>
         </div>
 
-        <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
-          <div className="flex items-start justify-between gap-3">
-            <p className="text-sm font-semibold">{copy('Promotion')}</p>
-            <span className="shrink-0 rounded-full bg-[var(--color-surface-muted)] px-2 py-1 text-[10px] font-semibold text-[var(--color-text-muted)]">
-              {copy('Not available')}
-            </span>
-          </div>
-        </div>
+        {adjustmentSlot}
 
-        {customer?.membership ? (
-          <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
-            <div className="flex items-start justify-between gap-3">
-              <p className="text-sm font-semibold">{copy('Use member points')}</p>
-              <span className="shrink-0 rounded-full bg-[var(--color-surface-muted)] px-2 py-1 text-[10px] font-semibold text-[var(--color-text-muted)]">
-                {label('OPTIONAL')}
-              </span>
-            </div>
-          </div>
-        ) : null}
+
 
         <div className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)]">
           <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-2.5">
@@ -2611,24 +2647,44 @@ function ReferencePaymentDialog({
           </div>
         </div>
 
-        <label className="flex cursor-pointer items-start gap-2.5 px-1 py-1.5">
-          <span className="mt-0.5 shrink-0">
-            <DCheckbox
-              checked={payNow}
-              onChange={(event) => onPayNowChange(event.target.checked)}
-            />
-          </span>
-          <span className="min-w-0">
-            <span className="block text-sm font-semibold">{copy('Pay now')}</span>
-            <span className="mt-0.5 block text-xs leading-4 text-[var(--color-text-muted)]">
-              {copy(
-                payNow
-                  ? 'Choose a payment method before continuing.'
-                  : 'Payment can be recorded after transaction creation.',
-              )}
-            </span>
-          </span>
-        </label>
+        {/* Two named outcomes, because this choice changes the checkout flow instead of toggling a setting. */}
+        <fieldset className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-3">
+          <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+            {copy('Payment timing')}
+          </legend>
+          <div className="mt-1 grid gap-2 sm:grid-cols-2">
+            {[
+              {
+                value: true,
+                title: copy('Pay now'),
+                description: copy('Choose a payment method before continuing.'),
+              },
+              {
+                value: false,
+                title: copy('Pay later'),
+                description: copy('Payment can be recorded after transaction creation.'),
+              },
+            ].map((option) => (
+              <label
+                key={String(option.value)}
+                className={`pos-choice ${payNow === option.value ? 'pos-choice--selected' : ''}`}
+              >
+                <DRadio
+                  name="pos-payment-timing"
+                  className="mt-0.5 shrink-0"
+                  checked={payNow === option.value}
+                  onChange={() => onPayNowChange(option.value)}
+                />
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold">{option.title}</span>
+                  <span className="mt-0.5 block text-xs leading-4 text-[var(--color-text-muted)]">
+                    {option.description}
+                  </span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
 
         {payNow ? (
           <>
@@ -2646,10 +2702,10 @@ function ReferencePaymentDialog({
                       type="button"
                       disabled={disabled}
                       onClick={() => onMethod(option.value)}
-                      className={`flex h-10 items-center justify-center gap-1.5 rounded-xl border text-xs font-semibold transition-all active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-40 ${method === option.value ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white shadow-sm' : 'border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)]'}`}
+                      className={`flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-xl border px-2 text-xs font-semibold transition-all active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-40 ${method === option.value ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white shadow-sm' : 'border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)]'}`}
                     >
                       {option.icon}
-                      <span className="hidden sm:inline">{label(option.value)}</span>
+                      <span className="pos-payment-method-label">{label(option.value)}</span>
                     </button>
                   );
                 })}
@@ -2753,8 +2809,30 @@ function ReferencePaymentDialog({
   );
 }
 
+function useRetainedValue<T>(value: T | null): T | null {
+  // Keep the last value while a DS dialog plays its close transition.
+  const [retained, setRetained] = useState<T | null>(value);
+  if (value !== null && value !== retained) setRetained(value);
+  return value ?? retained;
+}
+
+const fulfillmentTone: Record<string, 'neutral' | 'brand' | 'success' | 'warning' | 'danger'> = {
+  WAITING: 'warning',
+  IN_PROGRESS: 'brand',
+  COMPLETED: 'success',
+  CANCELED: 'danger',
+};
+
+function queueStatusTone(status: QueueStatus | null) {
+  if (status === 'QUEUED') return 'warning' as const;
+  if (status === 'PROGRESS') return 'brand' as const;
+  if (status === 'COMPLETED') return 'success' as const;
+  if (status === 'CANCELED') return 'danger' as const;
+  return 'neutral' as const;
+}
+
 function ReferenceTransactionDetail({
-  sale,
+  sale: currentSale,
   locale,
   employees,
   businessName,
@@ -2764,6 +2842,8 @@ function ReferenceTransactionDetail({
   showPaymentReceipt,
   onClose,
   onViewReceipt,
+  onSendReceipt,
+  isSendingReceipt,
   onAssign,
   serviceWorkUnits,
   onManageServiceWork,
@@ -2781,6 +2861,8 @@ function ReferenceTransactionDetail({
   onClose: () => void;
   onNewSale: () => void;
   onViewReceipt: (sale: Sale) => void;
+  onSendReceipt?: (sale: Sale) => void;
+  isSendingReceipt?: boolean;
   onAssign: (line: SaleLine) => void;
   serviceWorkUnits: ServiceWorkUnitsByLine;
   onManageServiceWork: (line: SaleLine) => void;
@@ -2789,10 +2871,11 @@ function ReferenceTransactionDetail({
 }) {
   const { copy, label } = useOperationalLocalization();
   const [receiptPaper, setReceiptPaper] = useState<'58' | '80'>('80');
+  const sale = useRetainedValue(currentSale);
   if (!sale) return null;
+  const open = currentSale !== null;
   const status = queueStatus(sale);
-  const customerContext = readStoredCustomer(saleCustomerKey(sale.id));
-  const customer = customerContext ?? saleCustomer(sale.id, locale);
+  const customer = sale.customer ?? null;
   const activeLines = sale.lines.filter((line) => !line.removedAt);
   const payments = successfulPayments(sale).filter((payment) =>
     createDecimal(payment.appliedAmount).greaterThan(createDecimal('0')),
@@ -2801,6 +2884,7 @@ function ReferenceTransactionDetail({
   const receiptAvailable = payments.length > 0;
   const showReceipt = showPaymentReceipt && receiptAvailable;
   const { totalPaid } = financialSummary(sale);
+  const settlement = saleSettlement(sale);
   const hasDiscount = !createDecimal(sale.discountAmount).equals(createDecimal('0'));
   const hasTax = !createDecimal(sale.taxAmount).equals(createDecimal('0'));
   const completionIssues =
@@ -2810,44 +2894,70 @@ function ReferenceTransactionDetail({
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(sale.finalizedAt ?? sale.updatedAt));
+  const identity = transactionNumber(sale, locale);
+  const format = (amount: string) => money(amount, locale);
+  const discountRows = saleDiscountRows(sale);
+  const summaryDiscounts =
+    discountRows.length === 0 && hasDiscount
+      ? [
+          {
+            id: 'sale-discount',
+            source: 'MANUAL_DISCOUNT' as const,
+            scope: 'TRANSACTION' as const,
+            saleLineId: null,
+            label: copy('Promotions and discounts'),
+            amount: sale.discountAmount,
+            percentage: null,
+          },
+        ]
+      : discountRows;
+  const paymentStateLabel =
+    settlement.paymentState === 'PAID'
+      ? 'Paid'
+      : settlement.paymentState === 'PARTIALLY_PAID'
+        ? 'Partially paid'
+        : 'Unpaid';
 
   return (
     <>
       <Dialog
-        open
+        open={open}
         onClose={onClose}
         title={copy(showReceipt ? 'Preview receipt' : 'Transaction details')}
-        description={transactionNumber(sale.id, locale)}
+        description={identity}
         ariaLabel={copy(showReceipt ? 'Preview receipt' : 'Transaction details')}
         closeOnEscape
         closeOnOverlay
         noPadding
-        className={`pos-reference-dialog max-h-[92dvh] w-full overflow-hidden rounded-t-2xl bg-(--color-surface) shadow-xl sm:rounded-xl ${showReceipt ? 'max-w-md' : 'max-w-lg'}`}
+        size={showReceipt ? 'md' : 'lg'}
+        className="pos-reference-dialog max-h-[92dvh] w-full overflow-hidden"
         footer={
-          <div className="flex shrink-0 flex-col-reverse justify-between items-center gap-2 sm:flex-row">
+          <div
+            className={`flex flex-col-reverse gap-2 sm:flex-row sm:items-center ${showReceipt ? 'sm:justify-between' : 'sm:justify-end'}`}
+          >
             {showReceipt ? (
-              <div className="pos-receipt-preview-toolbar flex items-center justify-between gap-3">
-                <div className="flex items-center gap-1.5" aria-label={copy('Paper size')}>
-                  <DButton
-                    size="sm"
-                    variant={receiptPaper === '58' ? 'primary' : 'secondary'}
-                    onClick={() => setReceiptPaper('58')}
-                  >
-                    58 mm
-                  </DButton>
-                  <DButton
-                    size="sm"
-                    variant={receiptPaper === '80' ? 'primary' : 'secondary'}
-                    onClick={() => setReceiptPaper('80')}
-                  >
-                    80 mm
-                  </DButton>
-                </div>
+              <div
+                className="pos-receipt-preview-toolbar flex items-center gap-1.5"
+                aria-label={copy('Paper size')}
+              >
+                <DButton
+                  size="sm"
+                  variant={receiptPaper === '58' ? 'primary' : 'secondary'}
+                  onClick={() => setReceiptPaper('58')}
+                >
+                  58 mm
+                </DButton>
+                <DButton
+                  size="sm"
+                  variant={receiptPaper === '80' ? 'primary' : 'secondary'}
+                  onClick={() => setReceiptPaper('80')}
+                >
+                  80 mm
+                </DButton>
               </div>
             ) : null}
-
             <div
-              className={`flex shrink-0 flex-col-reverse justify-end items-center gap-2 sm:flex-row ${showReceipt ? 'pos-receipt-actions' : ''}`}
+              className={`flex flex-col-reverse gap-2 sm:flex-row sm:items-center ${showReceipt ? 'pos-receipt-actions' : ''}`}
             >
               <DButton variant="ghost" onClick={onClose}>
                 {copy('Close')}
@@ -2870,6 +2980,15 @@ function ReferenceTransactionDetail({
                   onClick={onComplete}
                 >
                   {copy('Complete transaction')}
+                </DButton>
+              ) : null}
+              {showReceipt && onSendReceipt ? (
+                <DButton
+                  variant="outline"
+                  loading={Boolean(isSendingReceipt)}
+                  onClick={() => onSendReceipt(sale)}
+                >
+                  {copy('Send via WhatsApp')}
                 </DButton>
               ) : null}
               {showReceipt ? (
@@ -2907,186 +3026,262 @@ function ReferenceTransactionDetail({
             </div>
           </div>
         ) : (
-          <div className="flex min-h-0 flex-1 flex-col">
-            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4 sm:px-6">
-              <div className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)]">
-                <div className="bg-gradient-to-br from-[var(--color-brand)]/5 to-transparent px-5 py-4">
-                  <p className="font-mono text-xs text-[var(--color-text-muted)]">
-                    {transactionNumber(sale.id, locale)}
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-1">
-                    <span
-                      className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${status ? statusMeta[status].tone : 'bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]'}`}
-                    >
-                      {status ? label(statusMeta[status].value) : label('OPEN')}
+          <div className="pos-detail-story flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-5 sm:px-6">
+            <SaleDetailHeader
+              eyebrow={copy('Transaction')}
+              number={identity}
+              secondaryNumber={sale.invoiceNumber}
+              badges={
+                <>
+                  <StatusPill
+                    tone={queueStatusTone(status)}
+                    icon={status ? statusMeta[status].icon : null}
+                  >
+                    {status ? label(statusMeta[status].value) : label('OPEN')}
+                  </StatusPill>
+                  <StatusPill
+                    tone={
+                      settlement.paymentState === 'PAID'
+                        ? 'success'
+                        : settlement.paymentState === 'PARTIALLY_PAID'
+                          ? 'warning'
+                          : 'neutral'
+                    }
+                  >
+                    {copy(paymentStateLabel)}
+                  </StatusPill>
+                </>
+              }
+              totalLabel={copy('Total')}
+              total={format(sale.totalAmount)}
+              settlementNote={
+                settlement.balanceDue !== '0.0000' ? (
+                  <span className="text-[var(--color-warning)]">
+                    {copy('Balance due')} {format(settlement.balanceDue)}
+                  </span>
+                ) : null
+              }
+              meta={[
+                { label: copy('Date'), value: transactionDate },
+                {
+                  label: copy('Customer'),
+                  value: (
+                    <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+                      <span className="truncate">{customerDisplayName(customer, locale)}</span>
+                      {customerStatus(customer) ? (
+                        <Badge
+                          variant={customerStatus(customer)!.variant}
+                          className="shrink-0 text-[10px]"
+                        >
+                          {copy(customerStatus(customer)!.label)}
+                        </Badge>
+                      ) : null}
+                      {customerDisplayDetail(customer) ? (
+                        <span className="w-full text-xs font-normal text-[var(--color-text-muted)]">
+                          {customerDisplayDetail(customer)}
+                        </span>
+                      ) : null}
                     </span>
-                    <span
-                      className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${hasSuccessfulCheckout(sale) ? 'bg-[var(--color-success)]/10 text-[var(--color-success)]' : receiptAvailable ? 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]' : 'bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]'}`}
-                    >
-                      {copy(
-                        hasSuccessfulCheckout(sale)
-                          ? 'Paid'
-                          : receiptAvailable
-                            ? 'Partially paid'
-                            : 'Unpaid',
-                      )}
-                    </span>
-                  </div>
-                  <p className="mt-3 text-xs text-[var(--color-text-muted)]">{transactionDate}</p>
-                  <div className="mt-3 flex items-center gap-2 text-sm">
-                    <span className="truncate font-semibold">{customer.name}</span>
-                    <Badge
-                      variant={customerStatus(customerContext).variant}
-                      className="shrink-0 text-[10px]"
-                    >
-                      {copy(customerStatus(customerContext).label)}
-                    </Badge>
-                  </div>
-                  {customer.membership ? (
-                    <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                      {customer.membership.memberCode}, {label(customer.membership.status)}
-                    </p>
-                  ) : customer.phone ? (
-                    <p className="mt-1 text-xs text-[var(--color-text-muted)]">{customer.phone}</p>
-                  ) : null}
+                  ),
+                },
+              ]}
+            />
+
+            {sale.status === 'VOIDED' && cancellationReason ? (
+              <div className="rounded-[var(--radius-control)] border border-[var(--color-danger)]/25 bg-[var(--color-danger)]/10 px-3 py-2 text-xs">
+                <p className="font-semibold text-[var(--color-danger)]">
+                  {copy('Cancellation reason')}
+                </p>
+                <p className="mt-1 text-[var(--color-text-muted)]">{cancellationReason}</p>
+              </div>
+            ) : null}
+
+            {completionIssues.length ? (
+              <div className="rounded-[var(--radius-control)] border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 px-3 py-2 text-xs">
+                <p className="font-semibold text-[var(--color-warning)]">
+                  {copy('Not ready to complete')}
+                </p>
+                <div className="mt-2 space-y-2 text-[var(--color-text-muted)]">
+                  {completionIssueGroups.map((group) => (
+                    <div key={group.id}>
+                      <p className="font-semibold text-[var(--color-text)]">{group.label}</p>
+                      <ul className="mt-0.5 list-disc space-y-0.5 pl-4">
+                        {group.issues.map((issue) => (
+                          <li key={issue}>{issue}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
                 </div>
               </div>
+            ) : null}
 
-              {sale.status === 'VOIDED' && cancellationReason ? (
-                <div className="rounded-xl border border-[var(--color-danger)]/25 bg-[var(--color-danger)]/10 px-3 py-2 text-xs">
-                  <p className="font-semibold text-[var(--color-danger)]">
-                    {copy('Cancellation reason')}
-                  </p>
-                  <p className="mt-1 text-[var(--color-text-muted)]">{cancellationReason}</p>
-                </div>
-              ) : null}
-
-              {completionIssues.length ? (
-                <div className="rounded-xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 px-3 py-2 text-xs">
-                  <p className="font-semibold text-[var(--color-warning)]">
-                    {copy('Not ready to complete')}
-                  </p>
-                  <div className="mt-2 space-y-2 text-[var(--color-text-muted)]">
-                    {completionIssueGroups.map((group) => (
-                      <div key={group.id}>
-                        <p className="font-semibold text-[var(--color-text)]">{group.label}</p>
-                        <ul className="mt-0.5 list-disc space-y-0.5 pl-4">
-                          {group.issues.map((issue) => (
-                            <li key={issue}>{issue}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-
-              <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)]">
-                <header className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-3">
-                  <h3 className="text-sm font-semibold">{copy('Order')}</h3>
-                  <span className="text-xs text-[var(--color-text-muted)]">
-                    {activeLines.length} {copy('items')}
-                  </span>
-                </header>
-                <div className="min-h-[144px] max-h-[min(38dvh,360px)] flex-1 divide-y divide-[var(--color-border)] overflow-y-auto overscroll-contain">
-                  {activeLines.map((line) => {
-                    const isMultiUnitService =
-                      line.itemTypeSnapshot === 'SERVICE' &&
-                      line.fulfillmentBehaviorSnapshot === 'TRACKED' &&
-                      serviceWorkUnitCount(line) > 1;
-                    const isTrackedService =
-                      line.itemTypeSnapshot === 'SERVICE' &&
-                      line.fulfillmentBehaviorSnapshot === 'TRACKED' &&
-                      line.fulfillment !== null;
-                    const canEditServiceWork = isTrackedService && status === 'PROGRESS';
-                    const requiresEmployeeAttribution =
-                      line.employeeAssignmentModeSnapshot !== 'NONE' ||
-                      line.allowEmployeeContributionSnapshot;
-                    const employeeIssues = employeeAssignmentIssues(line, locale);
-                    const discountPercentage = lineDiscountPercentage(line);
-                    if (isMultiUnitService) {
-                      return (
-                        <ReferenceServiceWorkLine
-                          key={line.id}
-                          line={line}
-                          employees={employees}
-                          locale={locale}
-                          units={serviceWorkUnitsFor(line, serviceWorkUnits[serviceWorkKey(line)])}
-                          active={status === 'PROGRESS'}
-                          isMutating={isMutating}
-                          onManage={() => onManageServiceWork(line)}
-                        />
-                      );
-                    }
-                    return (
-                      <div key={line.id} className="p-4">
-                        <div className="flex justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-semibold">{line.itemNameSnapshot}</p>
-                            <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                              {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
-                              {line.variantNameSnapshot ? `, ${line.variantNameSnapshot}` : ''}
-                            </p>
-                            {isPositiveDecimal(line.lineDiscountAmount) ? (
-                              <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
-                                {copy('Item discount')}
-                                {discountPercentage ? ` (${discountPercentage}%)` : ''}: −
-                                {money(line.lineDiscountAmount, locale)}
-                              </p>
-                            ) : null}
+            <SaleDetailSection
+              title={copy('Order')}
+              aside={`${activeLines.length} ${copy('items')}`}
+            >
+              <SaleLineItemList>
+                {activeLines.map((line) => {
+                  const isTrackedService =
+                    line.itemTypeSnapshot === 'SERVICE' &&
+                    line.fulfillmentBehaviorSnapshot === 'TRACKED' &&
+                    line.fulfillment !== null;
+                  const isMultiUnitService =
+                    line.itemTypeSnapshot === 'SERVICE' &&
+                    line.fulfillmentBehaviorSnapshot === 'TRACKED' &&
+                    serviceWorkUnitCount(line) > 1;
+                  const requiresEmployeeAttribution =
+                    line.employeeAssignmentModeSnapshot !== 'NONE' ||
+                    line.allowEmployeeContributionSnapshot;
+                  const employeeIssues = employeeAssignmentIssues(line, locale);
+                  const discountPercentage = lineDiscountPercentage(line);
+                  const units = isMultiUnitService
+                    ? serviceWorkUnitsFor(line, serviceWorkUnits[serviceWorkKey(line)])
+                    : [];
+                  const durationLabel = formatDurationMinutes(
+                    line.defaultDurationMinutesSnapshot,
+                    locale,
+                  );
+                  const workSummary = isMultiUnitService
+                    ? `${units.length} ${copy('work units')} · ${serviceWorkAssignmentSummary(units, employees, locale)}`
+                    : isTrackedService && requiresEmployeeAttribution
+                      ? employeeIssues.length
+                        ? employeeWorkSummary(line, employees, locale)
+                        : `${copy('Performed by')} ${employeeWorkSummary(line, employees, locale)}`
+                      : null;
+                  const editable = isMultiUnitService
+                    ? status === 'PROGRESS'
+                    : isTrackedService && requiresEmployeeAttribution && status === 'PROGRESS';
+                  const onEdit = () =>
+                    isMultiUnitService ? onManageServiceWork(line) : onAssign(line);
+                  return (
+                    <SaleLineItem
+                      key={line.id}
+                      name={line.itemNameSnapshot}
+                      pricing={`${quantity(line.quantity)} × ${format(line.effectiveUnitPrice)}${line.variantNameSnapshot ? ` · ${line.variantNameSnapshot}` : ''}`}
+                      amount={format(line.grossAmount)}
+                      discount={
+                        isPositiveDecimal(line.lineDiscountAmount)
+                          ? {
+                              label: `${copy('Item discount')}${discountPercentage ? ` (${discountPercentage}%)` : ''}`,
+                              amount: format(line.lineDiscountAmount),
+                            }
+                          : null
+                      }
+                      context={
+                        line.fulfillment || workSummary || durationLabel ? (
+                          <>
                             {line.fulfillment ? (
-                              <p className="mt-1 text-[11px] font-medium text-[var(--color-text-muted)]">
+                              <StatusPill
+                                tone={fulfillmentTone[line.fulfillment.status] ?? 'neutral'}
+                              >
                                 {label(line.fulfillment.status)}
-                              </p>
+                              </StatusPill>
                             ) : null}
-                            {isTrackedService && requiresEmployeeAttribution ? (
-                              <div className="mt-2 flex min-w-0 items-center gap-2 text-xs">
-                                <span className="shrink-0 font-medium text-[var(--color-text-muted)]">
-                                  {copy('Work')}
-                                </span>
-                                <span className="min-w-0 flex-1 truncate text-[var(--color-text-muted)]">
-                                  {employeeWorkSummary(line, employees, locale)}
-                                </span>
-                                {canEditServiceWork ? (
-                                  employeeIssues.length > 0 ? (
-                                    <DButton
-                                      size="sm"
-                                      variant="outline"
-                                      disabled={isMutating}
-                                      className="h-7 px-2 text-[11px]"
-                                      onClick={() => onAssign(line)}
-                                    >
-                                      {copy('Configure')}
-                                    </DButton>
-                                  ) : (
-                                    <DButton
-                                      size="icon"
-                                      variant="ghost"
-                                      disabled={isMutating}
-                                      aria-label={`${copy('Configure')} ${line.itemNameSnapshot}`}
-                                      onClick={() => onAssign(line)}
-                                    >
-                                      <Pencil className="size-3.5" />
-                                    </DButton>
-                                  )
-                                ) : null}
-                              </div>
+                            {durationLabel ? <span>{durationLabel}</span> : null}
+                            {workSummary ? (
+                              <span className="min-w-0 truncate">{workSummary}</span>
                             ) : null}
-                          </div>
-                          <p className="text-sm font-bold">{money(line.grossAmount, locale)}</p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-            </div>
-            <ReferenceFinancialSummary sale={sale} locale={locale} />
+                          </>
+                        ) : null
+                      }
+                      action={
+                        editable ? (
+                          !isMultiUnitService && employeeIssues.length > 0 ? (
+                            <DButton
+                              size="sm"
+                              variant="outline"
+                              disabled={isMutating}
+                              className="h-7 px-2 text-[11px]"
+                              onClick={onEdit}
+                            >
+                              {copy('Configure')}
+                            </DButton>
+                          ) : (
+                            <DButton
+                              size="icon"
+                              variant="ghost"
+                              disabled={isMutating}
+                              aria-label={`${copy('Configure')} ${line.itemNameSnapshot}`}
+                              onClick={onEdit}
+                            >
+                              <Pencil className="size-3.5" />
+                            </DButton>
+                          )
+                        ) : null
+                      }
+                    />
+                  );
+                })}
+              </SaleLineItemList>
+            </SaleDetailSection>
+
+            <SaleDetailSection title={copy('Order summary')} surface="muted">
+              <SaleFinancialSummary
+                labels={{
+                  subtotal: copy('Subtotal'),
+                  total: copy('Total'),
+                  paid: copy('Paid amount'),
+                  balance: copy('Balance due'),
+                  settled: copy('Paid'),
+                  cashReceived: copy('Cash received'),
+                  change: copy('Change'),
+                  discountContext: (row) =>
+                    `${copy(row.source === 'PROMOTION' ? 'Promotion' : 'Manual discount')} · ${copy(
+                      row.scope === 'TRANSACTION'
+                        ? 'Whole transaction'
+                        : row.scope === 'ITEM'
+                          ? 'Item-level'
+                          : 'Category-level',
+                    )}`,
+                }}
+                gross={sale.grossAmount}
+                discounts={summaryDiscounts}
+                tax={
+                  hasTax
+                    ? { label: saleTaxLabel(sale, copy('Tax')), amount: sale.taxAmount }
+                    : null
+                }
+                total={sale.totalAmount}
+                settlement={settlement}
+                format={format}
+              />
+            </SaleDetailSection>
+
+            {sale.payments.length ? (
+              <SaleDetailSection title={copy('Payment history')}>
+                <SalePaymentList
+                  emptyLabel={copy('No payment recorded yet.')}
+                  payments={sale.payments.map((item) => ({
+                    id: item.id,
+                    method: label(item.method),
+                    status: (
+                      <StatusPill
+                        tone={
+                          item.status === 'SUCCEEDED'
+                            ? 'success'
+                            : item.status === 'PENDING'
+                              ? 'warning'
+                              : 'danger'
+                        }
+                      >
+                        {label(item.status)}
+                      </StatusPill>
+                    ),
+                    detail: new Intl.DateTimeFormat(locale, {
+                      dateStyle: 'medium',
+                      timeStyle: 'short',
+                    }).format(new Date(item.terminalAt ?? item.updatedAt)),
+                    amount: format(item.appliedAmount),
+                  }))}
+                />
+              </SaleDetailSection>
+            ) : null}
           </div>
         )}
       </Dialog>
 
-      {showReceipt
+      {open && showReceipt
         ? createPortal(
             <div className={`pos-receipt-print pos-receipt-print--${receiptPaper}`}>
               <ReceiptContent
@@ -3127,7 +3322,7 @@ function ReceiptContent({
 }: {
   sale: Sale;
   activeLines: readonly SaleLine[];
-  customer: PosCustomer;
+  customer: SaleCustomer | null;
   locale: string;
   businessName: string;
   branchName: string;
@@ -3146,7 +3341,9 @@ function ReceiptContent({
         <h2 className="text-lg font-black tracking-tight">{businessName}</h2>
         <p className="mt-1 text-xs text-slate-500">{branchName}</p>
         <div className="my-4 border-t border-dashed border-slate-300" />
-        <p className="font-mono text-xs font-semibold">{transactionNumber(sale.id, locale)}</p>
+        <p className="font-mono text-xs font-semibold">
+          {transactionNumber(sale, locale)}
+        </p>
         <p className="mt-1 text-[11px] text-slate-500">{transactionDate}</p>
         <p className="mt-1 text-[11px] text-slate-500">
           {copy('Cashier')}: {cashierName}
@@ -3155,8 +3352,10 @@ function ReceiptContent({
 
       <section className="mt-4 text-xs">
         <p className="font-semibold">{copy('Customer')}</p>
-        <p className="mt-1">{customer.name}</p>
-        {customer.phone ? <p className="text-slate-500">{customer.phone}</p> : null}
+        <p className="mt-1">{customerDisplayName(customer, locale)}</p>
+        {customerDisplayDetail(customer) ? (
+          <p className="text-slate-500">{customerDisplayDetail(customer)}</p>
+        ) : null}
       </section>
 
       <div className="my-4 border-t border-dashed border-slate-300" />
@@ -3260,170 +3459,6 @@ function ReceiptContent({
   );
 }
 
-function ReferenceServiceWorkLine({
-  line,
-  employees,
-  locale,
-  units,
-  active,
-  isMutating,
-  onManage,
-}: {
-  line: SaleLine;
-  employees: readonly Employee[];
-  locale: string;
-  units: readonly ServiceWorkUnit[];
-  active: boolean;
-  isMutating: boolean;
-  onManage: () => void;
-}) {
-  const { copy } = useOperationalLocalization();
-  const workSummary = serviceWorkAssignmentSummary(units, employees, locale);
-  const discountPercentage = lineDiscountPercentage(line);
-
-  return (
-    <div className="p-4">
-      <div className="flex justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold">{line.itemNameSnapshot}</p>
-          <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-            {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
-            {line.variantNameSnapshot ? `, ${line.variantNameSnapshot}` : ''}
-          </p>
-          {isPositiveDecimal(line.lineDiscountAmount) ? (
-            <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
-              {copy('Item discount')}
-              {discountPercentage ? ` (${discountPercentage}%)` : ''}: −
-              {money(line.lineDiscountAmount, locale)}
-            </p>
-          ) : null}
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
-            <span className="min-w-0 flex-1 truncate text-[var(--color-text-muted)]">
-              {units.length} {copy('work units')}, {workSummary}
-            </span>
-            {active ? (
-              <DButton
-                size="icon"
-                variant="ghost"
-                disabled={isMutating}
-                aria-label={`${copy('Configure')} ${line.itemNameSnapshot}`}
-                onClick={onManage}
-              >
-                <Pencil className="size-3.5" />
-              </DButton>
-            ) : null}
-          </div>
-        </div>
-        <p className="shrink-0 text-sm font-bold">{money(line.grossAmount, locale)}</p>
-      </div>
-    </div>
-  );
-}
-
-function ReferenceFinancialSummary({ sale, locale }: { sale: Sale; locale: string }) {
-  const { copy } = useOperationalLocalization();
-  const [expanded, setExpanded] = useState(false);
-  const { totalPaid, balanceDue } = financialSummary(sale);
-  const hasDiscount = !createDecimal(sale.discountAmount).equals(createDecimal('0'));
-  const hasTax = !createDecimal(sale.taxAmount).equals(createDecimal('0'));
-  const cashPayments = successfulPayments(sale).filter((payment) => payment.method === 'CASH');
-  const cashTendered = cashPayments.reduce(
-    (total, payment) => total.plus(createDecimal(payment.tenderedAmount ?? '0')),
-    createDecimal('0'),
-  );
-  const cashChange = cashPayments.reduce(
-    (total, payment) => total.plus(createDecimal(payment.changeAmount ?? '0')),
-    createDecimal('0'),
-  );
-  const hasCashTendered = cashPayments.some((payment) => payment.tenderedAmount !== null);
-  const hasCashChange = !cashChange.equals(createDecimal('0'));
-
-  return (
-    <section className="sticky bottom-0 z-10 flex shrink-0 flex-col border-t border-[var(--color-border)] bg-[var(--color-surface)]">
-      <div
-        className={`order-2 grid transition-[grid-template-rows] duration-200 ease-out ${expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
-      >
-        <div className="overflow-hidden">
-          <dl className="space-y-1.5 border-b border-[var(--color-border)] px-5 py-3 text-xs">
-            <div className="flex justify-between gap-3">
-              <dt className="text-[var(--color-text-muted)]">{copy('Subtotal')}</dt>
-              <dd>{money(sale.grossAmount, locale)}</dd>
-            </div>
-            {hasDiscount ? (
-              <div className="flex justify-between gap-3">
-                <dt className="text-[var(--color-text-muted)]">
-                  {transactionDiscountLabel(sale, copy('Promotions and discounts'))}
-                </dt>
-                <dd>−{money(sale.discountAmount, locale)}</dd>
-              </div>
-            ) : null}
-            {hasTax ? (
-              <div className="flex justify-between gap-3">
-                <dt className="text-[var(--color-text-muted)]">{saleTaxLabel(sale, copy('Tax'))}</dt>
-                <dd>{money(sale.taxAmount, locale)}</dd>
-              </div>
-            ) : null}
-            <div className="flex justify-between gap-3 border-t border-[var(--color-border)] pt-2 font-semibold">
-              <dt>{copy('Total')}</dt>
-              <dd>{money(sale.totalAmount, locale)}</dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt className="text-[var(--color-text-muted)]">{copy('Paid amount')}</dt>
-              <dd>{money(totalPaid, locale)}</dd>
-            </div>
-            <div className="flex justify-between gap-3 font-semibold text-[var(--color-brand)]">
-              <dt>{copy('Balance')}</dt>
-              <dd>{money(balanceDue, locale)}</dd>
-            </div>
-            {hasCashTendered ? (
-              <div className="flex justify-between gap-3">
-                <dt className="text-[var(--color-text-muted)]">{copy('Cash received')}</dt>
-                <dd>{money(cashTendered.toFixed(4), locale)}</dd>
-              </div>
-            ) : null}
-            {hasCashChange ? (
-              <div className="flex justify-between gap-3">
-                <dt className="text-[var(--color-text-muted)]">{copy('Change')}</dt>
-                <dd>{money(cashChange.toFixed(4), locale)}</dd>
-              </div>
-            ) : null}
-          </dl>
-        </div>
-      </div>
-      <button
-        type="button"
-        aria-expanded={expanded}
-        onClick={() => setExpanded((current) => !current)}
-        className="order-1 grid w-full grid-cols-[1fr_1fr_1fr_auto] items-center gap-3 px-5 py-3 text-left text-xs transition-colors duration-200 hover:bg-[var(--color-surface-muted)]"
-      >
-        <span>
-          <span className="block text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]">
-            {copy('Total')}
-          </span>
-          <span className="mt-0.5 block font-semibold">{money(sale.totalAmount, locale)}</span>
-        </span>
-        <span>
-          <span className="block text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]">
-            {copy('Paid amount')}
-          </span>
-          <span className="mt-0.5 block font-semibold">{money(totalPaid, locale)}</span>
-        </span>
-        <span className="text-right">
-          <span className="block text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]">
-            {copy('Balance')}
-          </span>
-          <span className="mt-0.5 block font-semibold text-[var(--color-brand)]">
-            {money(balanceDue, locale)}
-          </span>
-        </span>
-        <ChevronDown
-          className={`size-4 text-[var(--color-text-muted)] transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
-        />
-      </button>
-    </section>
-  );
-}
-
 function ReferenceOrderAdjustmentDialog({
   sale,
   items,
@@ -3481,7 +3516,7 @@ function ReferenceOrderAdjustmentDialog({
       open
       onClose={onClose}
       title={copy('Adjust order')}
-      description={`${transactionNumber(sale.id, locale)}. ${copy('Changes apply to this transaction.')}`}
+      description={`${transactionNumber(sale, locale)}. ${copy('Changes apply to this transaction.')}`}
       ariaLabel={copy('Adjust order')}
       closeOnEscape
       closeOnOverlay
@@ -3719,7 +3754,7 @@ function ReferenceBalancePaymentDialog({
       open
       onClose={onClose}
       title={copy(hasSuccessfulPayment(sale) ? 'Pay balance' : 'Pay')}
-      description={transactionNumber(sale.id, locale)}
+      description={transactionNumber(sale, locale)}
       ariaLabel={copy('Payment')}
       closeOnEscape
       closeOnOverlay
@@ -3759,7 +3794,7 @@ function ReferenceBalancePaymentDialog({
                 className={`flex h-10 items-center justify-center gap-1 rounded-xl border text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${method === option.value ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white' : 'border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]'}`}
               >
                 {option.icon}
-                <span className="hidden sm:inline">{label(option.value)}</span>
+                <span className="pos-payment-method-label">{label(option.value)}</span>
               </button>
             );
           })}
@@ -3845,7 +3880,7 @@ function ReferenceCancelDialog({
             </p>
             <h2 className="mt-1 text-lg font-semibold">{copy('Cancel this transaction?')}</h2>
             <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-              {sale ? transactionNumber(sale.id, locale) : ''}.{' '}
+              {sale ? transactionNumber(sale, locale) : ''}.{' '}
               {copy('The transaction remains recorded in today queue.')}
             </p>
           </div>

@@ -1,4 +1,6 @@
 @import 'tailwindcss';
+/* Shared runtime presentation (startup splash) is composed by this app. */
+@source '../../../../packages/runtime/src';
 
 html,
 body,
@@ -12,6 +14,7 @@ body,
 body {
   margin: 0;
   overflow: hidden;
+  background-color: var(--color-background);
 }
 
 * {
@@ -30,7 +33,16 @@ body {
   display: none;
 }
 
+/* The sidebar carries the persistent identity, so the header trigger stays compact on desktop. */
+.operational-shell__account-name {
+  display: block;
+}
+
 @media (min-width: 768px) {
+  .operational-shell__account-name {
+    display: none;
+  }
+
   .operational-shell__sidebar {
     display: flex;
     width: 232px;
@@ -61,4 +73,53 @@ textarea {
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
+}
+
+.operational-startup-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  /* Backwards fill only, so the settled opacity does not pin the fade-out transition. */
+  animation: operational-view-fade-in 200ms ease-out backwards;
+  transition: opacity 240ms ease-in;
+}
+
+.operational-startup-splash--leaving {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Entrance for the sign-in surface and the authenticated application after auth transitions. */
+.operational-view-enter {
+  animation: operational-view-enter 200ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+
+@keyframes operational-view-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes operational-view-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .operational-startup-splash,
+  .operational-view-enter {
+    animation: none;
+    transition: none;
+  }
 }

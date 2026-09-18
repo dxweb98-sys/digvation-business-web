@@ -1,7 +1,19 @@
+/*
+ * Operational motion tokens: short, transform/opacity-only transitions that clarify state
+ * changes without delaying interaction. Exits are faster than entrances.
+ */
+:root {
+  --pos-motion-enter: 180ms;
+  --pos-motion-exit: 130ms;
+  --pos-motion-collapse: 240ms;
+  --pos-ease-enter: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --pos-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+}
+
 @keyframes pos-reference-dialog-in {
   from {
     opacity: 0;
-    transform: translateY(10px) scale(0.98);
+    transform: translateY(8px) scale(0.985);
   }
 
   to {
@@ -11,15 +23,45 @@
 }
 
 .pos-reference-dialog {
-  animation: pos-reference-dialog-in 0.2s ease-out;
+  animation: pos-reference-dialog-in var(--pos-motion-enter) var(--pos-ease-enter);
 }
 
 .operational-cart-panel {
   display: none;
 }
 
+/* Named responsive helpers: the Design System stylesheet ships an unlayered `.hidden`, which
+   overrides layered `sm:`/`md:` display utilities, so these reveals are declared explicitly. */
+.operational-cart-backdrop,
+.operational-cart-button-label,
+.pos-payment-method-label,
+.pos-queue-status-summary {
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .operational-cart-button-label {
+    display: block;
+  }
+
+  .pos-payment-method-label {
+    display: inline;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
 @media (min-width: 768px) {
   .operational-cart-panel {
+    display: flex;
+  }
+
+  .operational-cart-backdrop {
+    display: block;
+  }
+
+  .pos-queue-status-summary {
     display: flex;
   }
 }
@@ -53,12 +95,99 @@
 }
 
 .pos-queue-content-enter {
-  animation: pos-queue-content-in 0.18s ease-out;
+  animation: pos-queue-content-in var(--pos-motion-enter) var(--pos-ease-enter);
+}
+
+.pos-dialog-stack > * + * {
+  margin-top: 16px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 16px;
+}
+
+/* Explicit two-outcome choice rows (payment timing). */
+.pos-choice {
+  display: flex;
+  min-height: 44px;
+  cursor: pointer;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background-color: var(--color-surface);
+  padding: 10px 12px;
+  transition:
+    border-color var(--pos-motion-enter) var(--pos-ease-enter),
+    background-color var(--pos-motion-enter) var(--pos-ease-enter);
+}
+
+.pos-choice:hover {
+  background-color: color-mix(in srgb, var(--color-surface-muted) 55%, var(--color-surface));
+}
+
+.pos-choice--selected {
+  border-color: color-mix(in srgb, var(--color-brand) 45%, transparent);
+  background-color: color-mix(in srgb, var(--color-brand) 6%, var(--color-surface));
+}
+
+.pos-choice:focus-within {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.pos-collapsible {
+  transition: grid-template-rows var(--pos-motion-collapse) var(--pos-ease-enter);
+}
+
+@keyframes pos-item-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.pos-cart-line-enter,
+.pos-adjustment-enter {
+  animation: pos-item-enter var(--pos-motion-enter) var(--pos-ease-enter);
+}
+
+@keyframes pos-value-updated {
+  from {
+    opacity: 0.35;
+    transform: translateY(2px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.pos-value-updated {
+  display: inline-block;
+  animation: pos-value-updated 220ms var(--pos-ease-enter);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pos-queue-content-enter {
+  .pos-reference-dialog,
+  .pos-queue-content-enter,
+  .pos-cart-line-enter,
+  .pos-adjustment-enter,
+  .pos-value-updated,
+  .pos-control-popover {
     animation: none;
+  }
+
+  .pos-choice {
+    transition: none;
+  }
+
+  .pos-collapsible {
+    transition: none;
   }
 }
 

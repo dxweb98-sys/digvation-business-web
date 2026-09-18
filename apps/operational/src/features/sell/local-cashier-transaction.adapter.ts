@@ -11,6 +11,7 @@ import type {
   PaymentTransitionInput,
   PriceOverrideInput,
   SaleTransactionPort,
+  SetSaleCustomerInput,
   SetSaleLineQuantityInput,
   StartSaleInput,
 } from './cashier-transaction.adapter';
@@ -28,6 +29,7 @@ import type {
   SaleLine,
   SellingLocation,
 } from './cashier-transaction.types';
+import { localSaleCustomerSnapshot } from './local-sale-customer';
 
 interface DemoItem extends CatalogItem {
   prices: Record<string, string>;
@@ -210,7 +212,11 @@ export class LocalCashierTransactionAdapter implements SaleTransactionPort {
           `${idempotencyKey}:line:${index}`,
         );
       }
-      const started = { ...sale, version: 1 };
+      const started = {
+        ...sale,
+        version: 1,
+        customer: localSaleCustomerSnapshot(input.customer),
+      };
       this.sales.set(started.id, started);
       return clone(started);
     } catch (error) {
@@ -218,6 +224,23 @@ export class LocalCashierTransactionAdapter implements SaleTransactionPort {
       this.sequence = sequence;
       throw error;
     }
+  }
+
+  public async setSaleCustomer(
+    saleId: string,
+    input: SetSaleCustomerInput,
+    idempotencyKey: string,
+  ): Promise<Sale> {
+    void idempotencyKey;
+    const sale = this.openSale(saleId, input.expectedVersion);
+    const next: Sale = {
+      ...sale,
+      customer: localSaleCustomerSnapshot(input.customer),
+      version: sale.version + 1,
+      updatedAt: timestamp(),
+    };
+    this.sales.set(next.id, next);
+    return clone(next);
   }
 
   public async addSaleLine(

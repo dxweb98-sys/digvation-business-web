@@ -1,6 +1,13 @@
 import { createDecimal } from '@digvation/pos-money';
 
-import type { Employee, Sale, SaleAdjustment, SaleLine, TaxTreatment } from './cashier-transaction.types';
+import type {
+  Employee,
+  Payment,
+  Sale,
+  SaleAdjustment,
+  SaleLine,
+  TaxTreatment,
+} from './cashier-transaction.types';
 
 export interface DiscountPresentationRow {
   id: string;
@@ -191,4 +198,70 @@ export function employeeDisplayName(
   if (snapshot?.trim()) return snapshot;
   const current = employees.find((employee) => employee.id === employeeId)?.displayName;
   return current?.trim() || unavailableLabel;
+}
+
+type SettlementPayment = Pick<
+  Payment,
+  'status' | 'method' | 'appliedAmount' | 'tenderedAmount' | 'changeAmount'
+>;
+
+export interface SaleSettlement {
+  totalPaid: string;
+  balanceDue: string;
+  cashTendered: string | null;
+  cashChange: string | null;
+  paymentState: 'PAID' | 'PARTIALLY_PAID' | 'UNPAID';
+}
+
+/**
+ * Presentation projection of recorded payments against the authoritative Sale total. It only
+ * sums succeeded payment amounts returned by Runtime; no pricing, tax, or discount rule is applied.
+ */
+export function saleSettlement(sale: {
+  totalAmount: string;
+  payments: readonly SettlementPayment[];
+}): SaleSettlement {
+  const succeeded = sale.payments.filter((payment) => payment.status === 'SUCCEEDED');
+  const totalPaid = succeeded.reduce(
+    (sum, payment) => sum.plus(createDecimal(String(payment.appliedAmount))),
+    createDecimal('0'),
+  );
+  const balance = createDecimal(String(sale.totalAmount)).minus(totalPaid);
+  const cash = succeeded.filter((payment) => payment.method === 'CASH');
+  const cashTendered = cash
+    .filter((payment) => payment.tenderedAmount !== null)
+    .reduce(
+      (sum, payment) => sum.plus(createDecimal(String(payment.tenderedAmount))),
+      createDecimal('0'),
+    );
+  const cashChange = cash.reduce(
+    (sum, payment) => sum.plus(createDecimal(String(payment.changeAmount ?? '0'))),
+    createDecimal('0'),
+  );
+  const hasPending = sale.payments.some((payment) => payment.status === 'PENDING');
+  const settled = !hasPending && totalPaid.equals(createDecimal(String(sale.totalAmount)));
+
+  return {
+    totalPaid: totalPaid.toFixed(4),
+    balanceDue: balance.greaterThan(0) ? balance.toFixed(4) : '0.0000',
+    cashTendered: cash.some((payment) => payment.tenderedAmount !== null)
+      ? cashTendered.toFixed(4)
+      : null,
+    cashChange: cashChange.greaterThan(0) ? cashChange.toFixed(4) : null,
+    paymentState: settled ? 'PAID' : totalPaid.greaterThan(0) ? 'PARTIALLY_PAID' : 'UNPAID',
+  };
+}
+
+/** Presents an authoritative service duration in whole hours and minutes. */
+export function formatServiceDuration(
+  minutes: number | null | undefined,
+  labels: { hour: string; minute: string },
+): string | null {
+  if (!minutes || minutes <= 0) return null;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (hours === 0) return `${rest} ${labels.minute}`;
+  return rest === 0
+    ? `${hours} ${labels.hour}`
+    : `${hours} ${labels.hour} ${rest} ${labels.minute}`;
 }

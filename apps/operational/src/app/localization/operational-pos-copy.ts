@@ -3,6 +3,102 @@ import type { OperationalLocale } from './operational-localization';
 type LocalizedCopy = Record<OperationalLocale, string>;
 
 const posCopy: Record<string, LocalizedCopy> = {
+  'Pay later': { 'id-ID': 'Bayar nanti', 'en-US': 'Pay later' },
+  'Payment timing': { 'id-ID': 'Waktu pembayaran', 'en-US': 'Payment timing' },
+  'Pay and add to queue': {
+    'id-ID': 'Bayar dan masukkan ke antrian',
+    'en-US': 'Pay and add to queue',
+  },
+  'Choose variant': { 'id-ID': 'Pilih varian', 'en-US': 'Choose variant' },
+  'hour-short': { 'id-ID': 'jam', 'en-US': 'hr' },
+  'minute-short': { 'id-ID': 'mnt', 'en-US': 'min' },
+  Role: { 'id-ID': 'Peran', 'en-US': 'Role' },
+  'App version': { 'id-ID': 'Versi aplikasi', 'en-US': 'App version' },
+  'Switch branch': { 'id-ID': 'Ganti cabang', 'en-US': 'Switch branch' },
+  'Send reset link via WhatsApp': {
+    'id-ID': 'Kirim tautan lewat WhatsApp',
+    'en-US': 'Send reset link via WhatsApp',
+  },
+  'A link to set a new password will be sent to the WhatsApp number registered on your account.': {
+    'id-ID':
+      'Tautan untuk membuat kata sandi baru akan dikirim ke nomor WhatsApp yang terdaftar pada akun Anda.',
+    'en-US':
+      'A link to set a new password will be sent to the WhatsApp number registered on your account.',
+  },
+  'Link sent to your WhatsApp.': {
+    'id-ID': 'Tautan sudah dikirim ke WhatsApp Anda.',
+    'en-US': 'Link sent to your WhatsApp.',
+  },
+  'Password change is not available yet. Contact your administrator.': {
+    'id-ID': 'Ubah kata sandi belum dapat digunakan. Hubungi administrator Anda.',
+    'en-US': 'Password change is not available yet. Contact your administrator.',
+  },
+  'The request could not be sent. Try again.': {
+    'id-ID': 'Permintaan belum berhasil dikirim. Coba lagi.',
+    'en-US': 'The request could not be sent. Try again.',
+  },
+  'Payment history': { 'id-ID': 'Riwayat pembayaran', 'en-US': 'Payment history' },
+  'Promo code was not found.': {
+    'id-ID': 'Kode promo tidak ditemukan.',
+    'en-US': 'Promo code was not found.',
+  },
+  'This promotion is currently disabled.': {
+    'id-ID': 'Promo sedang nonaktif.',
+    'en-US': 'This promotion is currently disabled.',
+  },
+  'This promotion has not started yet.': {
+    'id-ID': 'Promo belum berlaku.',
+    'en-US': 'This promotion has not started yet.',
+  },
+  'This promotion has ended.': {
+    'id-ID': 'Promo sudah berakhir.',
+    'en-US': 'This promotion has ended.',
+  },
+  'This promo code is not valid at this location.': {
+    'id-ID': 'Kode promo tidak berlaku di cabang ini.',
+    'en-US': 'This promo code is not valid at this location.',
+  },
+  'This promo code is not valid for the transaction currency.': {
+    'id-ID': 'Kode promo tidak berlaku untuk mata uang transaksi ini.',
+    'en-US': 'This promo code is not valid for the transaction currency.',
+  },
+  'The minimum purchase has not been met.': {
+    'id-ID': 'Minimum pembelian belum terpenuhi.',
+    'en-US': 'The minimum purchase has not been met.',
+  },
+  'This promo code does not apply to the items in this transaction.': {
+    'id-ID': 'Kode promo tidak berlaku untuk item pada transaksi ini.',
+    'en-US': 'This promo code does not apply to the items in this transaction.',
+  },
+  'No payment recorded yet.': {
+    'id-ID': 'Belum ada pembayaran yang dicatat.',
+    'en-US': 'No payment recorded yet.',
+  },
+  'Performed by': { 'id-ID': 'Dikerjakan oleh', 'en-US': 'Performed by' },
+  'Order summary': { 'id-ID': 'Ringkasan', 'en-US': 'Summary' },
+  'Whole transaction': { 'id-ID': 'Seluruh transaksi', 'en-US': 'Whole transaction' },
+  'Item-level': { 'id-ID': 'Per item', 'en-US': 'Item-level' },
+  'Category-level': { 'id-ID': 'Per kategori', 'en-US': 'Category-level' },
+  'Balance due': { 'id-ID': 'Sisa tagihan', 'en-US': 'Balance due' },
+  'Tax and promotions are finalized when the transaction is created.': {
+    'id-ID': 'Pajak dan promo dihitung saat transaksi dibuat.',
+    'en-US': 'Tax and promotions are finalized when the transaction is created.',
+  },
+  'Promotions & discounts': { 'id-ID': 'Promo & diskon', 'en-US': 'Promotions & discounts' },
+  'No promotion or discount applied yet.': {
+    'id-ID': 'Belum ada promo atau diskon.',
+    'en-US': 'No promotion or discount applied yet.',
+  },
+  'Manage adjustments': { 'id-ID': 'Atur', 'en-US': 'Manage' },
+  'Add adjustment': { 'id-ID': 'Tambah', 'en-US': 'Add' },
+  'Applied adjustments': { 'id-ID': 'Sedang diterapkan', 'en-US': 'Currently applied' },
+  'Total after adjustments': {
+    'id-ID': 'Total setelah penyesuaian',
+    'en-US': 'Total after adjustments',
+  },
+  'Manual discount': { 'id-ID': 'Diskon manual', 'en-US': 'Manual discount' },
+  'Opening Operational…': { 'id-ID': 'Membuka Operational…', 'en-US': 'Opening Operational…' },
+  'Preparing Operational': { 'id-ID': 'Menyiapkan Operational', 'en-US': 'Preparing Operational' },
   Transaction: { 'id-ID': 'Transaksi', 'en-US': 'Transaction' },
   Add: { 'id-ID': 'Tambah', 'en-US': 'Add' },
   From: { 'id-ID': 'Mulai', 'en-US': 'From' },

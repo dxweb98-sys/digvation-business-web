@@ -14,6 +14,7 @@ import type {
   PaymentStatus,
   ResolvedPrice,
   Sale,
+  SaleCustomerSelection,
   SellingLocation,
 } from './cashier-transaction.types';
 
@@ -26,11 +27,18 @@ export interface CreateSaleInput {
 }
 
 export interface StartSaleInput extends CreateSaleInput {
+  /** The Sale is created together with the Customer it belongs to. */
+  customer: SaleCustomerSelection;
   lines: Array<{
     catalogItemId: string;
     catalogVariantId?: string;
     quantity: string;
   }>;
+}
+
+export interface SetSaleCustomerInput {
+  expectedVersion: number;
+  customer: SaleCustomerSelection;
 }
 
 export interface AddSaleLineInput {
@@ -138,6 +146,11 @@ export interface SaleTransactionClient {
   getSale(saleId: string, signal?: AbortSignal): Promise<Sale>;
   createSale(input: CreateSaleInput, idempotencyKey: string): Promise<Sale>;
   startSale(input: StartSaleInput, idempotencyKey: string): Promise<Sale>;
+  setSaleCustomer(
+    saleId: string,
+    input: SetSaleCustomerInput,
+    idempotencyKey: string,
+  ): Promise<Sale>;
   addSaleLine(saleId: string, input: AddSaleLineInput, idempotencyKey: string): Promise<Sale>;
   setSaleLineQuantity(
     saleId: string,
@@ -318,6 +331,16 @@ export class HttpCashierTransactionAdapter
 
   public startSale(input: StartSaleInput, idempotencyKey: string): Promise<Sale> {
     return this.client.post<Sale>(`${API_PREFIX}/sales/start`, input, {
+      headers: { 'Idempotency-Key': idempotencyKey },
+    });
+  }
+
+  public setSaleCustomer(
+    saleId: string,
+    input: SetSaleCustomerInput,
+    idempotencyKey: string,
+  ): Promise<Sale> {
+    return this.client.post<Sale>(`${API_PREFIX}/sales/${saleId}/customer`, input, {
       headers: { 'Idempotency-Key': idempotencyKey },
     });
   }

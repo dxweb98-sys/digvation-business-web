@@ -261,6 +261,28 @@ export interface SaleLine {
   contributions: EmployeeContribution[];
 }
 
+export type SaleCustomerType = 'MEMBER' | 'NON_MEMBER';
+
+/**
+ * The Customer a Sale belongs to, as captured on the Sale itself.
+ *
+ * This is the only authority for who a transaction belongs to. It survives
+ * reload, cashier change and tab change because it lives on the Sale, never in
+ * browser storage. `null` on a Sale means the Sale was captured before this
+ * contract existed: unknown history, never a general customer.
+ */
+export interface SaleCustomer {
+  type: SaleCustomerType;
+  referenceId: string | null;
+  name: string;
+  phoneE164: string;
+}
+
+/** Customer identity requested from Runtime, which resolves and normalizes it. */
+export type SaleCustomerSelection =
+  | { type: 'NON_MEMBER'; name: string; phone: string }
+  | { type: 'MEMBER'; referenceId: string };
+
 export interface Sale {
   id: string;
   saleNumber?: string;
@@ -290,6 +312,7 @@ export interface Sale {
   transactionTaxAmount?: string;
   promotionCode?: string | null;
   adjustments?: SaleAdjustment[];
+  customer?: SaleCustomer | null;
   createdByActorId?: string;
   createdByActorKind?: string;
   finalizedAt: string | null;

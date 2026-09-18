@@ -5,6 +5,7 @@ import type {
   CreatePaymentInput,
   CreateSaleInput,
   SaleTransactionPort,
+  SetSaleCustomerInput,
   SetSaleLineQuantityInput,
   SellingCatalogDisplayInput,
   StartSaleInput,
@@ -44,9 +45,22 @@ export interface OperationalPromotionCommands {
   ): Promise<Sale>;
 }
 
+/**
+ * Receipt delivery is requested for a captured transaction and handled outside
+ * it. Runtime resolves the destination from the transaction's own customer
+ * snapshot, so no destination is ever sent from here.
+ */
+export interface OperationalReceiptDeliveryCommands {
+  requestReceiptDelivery(
+    saleId: string,
+    channel: 'WHATSAPP',
+  ): Promise<{ deliveryId: string; channel: 'WHATSAPP'; state: string }>;
+}
+
 export type OperationalAwareTransactionPort = SaleTransactionPort &
   OperationalProjectionQuery &
-  OperationalPromotionCommands;
+  OperationalPromotionCommands &
+  OperationalReceiptDeliveryCommands;
 
 export function attachOperationalProjection(
   client: ApiClient,
@@ -95,6 +109,22 @@ export function attachOperationalProjection(
     client.post<Sale>(`${OPERATIONAL_PREFIX}/transactions`, input, {
       headers: { 'Idempotency-Key': idempotencyKey },
     });
+
+  operational.setSaleCustomer = (
+    saleId: string,
+    input: SetSaleCustomerInput,
+    idempotencyKey: string,
+  ) =>
+    client.post<Sale>(`${OPERATIONAL_PREFIX}/transactions/${saleId}/customer`, input, {
+      headers: { 'Idempotency-Key': idempotencyKey },
+    });
+
+  operational.requestReceiptDelivery = (saleId: string, channel: 'WHATSAPP') =>
+    client.post<{ deliveryId: string; channel: 'WHATSAPP'; state: string }>(
+      `${OPERATIONAL_PREFIX}/transactions/${saleId}/receipt-deliveries`,
+      { channel },
+      idempotencyHeaders(`receipt-delivery-${saleId}`),
+    );
 
   operational.getSale = (saleId, signal) =>
     client.get<Sale>(`${OPERATIONAL_PREFIX}/transactions/${saleId}`, { signal });

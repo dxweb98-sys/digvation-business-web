@@ -7,6 +7,8 @@ import type {
   DiscountType,
   ResolvedPrice,
   SaleAdjustment,
+  SaleCustomer,
+  SaleCustomerSelection,
   SaleLine,
 } from './cashier-transaction.types';
 
@@ -27,6 +29,12 @@ export interface CartDraftLine {
 export interface CartDraft {
   sellingLocationId: string;
   currency: string;
+  /**
+   * Who the cashier is serving. While the cart is still a local draft there is
+   * no Sale to own the identity yet, so it is held here and sent with the very
+   * request that creates the Sale — never stored in the browser as authority.
+   */
+  customer: SaleCustomerSelection | null;
   lines: readonly CartDraftLine[];
 }
 
@@ -49,7 +57,35 @@ export function isPositiveCartQuantity(value: string): boolean {
 }
 
 export function emptyCartDraft(sellingLocationId: string, currency: string): CartDraft {
-  return { sellingLocationId, currency, lines: [] };
+  // A new cart starts with no customer. Nothing is inherited from the previous
+  // transaction, the previous cashier or the previous session.
+  return { sellingLocationId, currency, customer: null, lines: [] };
+}
+
+export function setCartDraftCustomer(
+  draft: CartDraft,
+  customer: SaleCustomerSelection | null,
+): CartDraft {
+  return { ...draft, customer };
+}
+
+/**
+ * Presentation of the customer chosen for a cart that has no Sale yet. The
+ * values are exactly what the cashier typed; Runtime normalizes them when the
+ * Sale is created and the Sale's own snapshot takes over from that moment.
+ */
+export function draftCustomerSnapshot(
+  selection: SaleCustomerSelection | null,
+): SaleCustomer | null {
+  if (!selection) return null;
+  if (selection.type === 'MEMBER')
+    return { type: 'MEMBER', referenceId: selection.referenceId, name: '', phoneE164: '' };
+  return {
+    type: 'NON_MEMBER',
+    referenceId: null,
+    name: selection.name,
+    phoneE164: selection.phone,
+  };
 }
 
 export function addCartDraftSelection(
@@ -168,9 +204,13 @@ export function cartDraftEstimatedTotal(draft: CartDraft | null): string {
 export function cartDraftStartInput(draft: CartDraft): StartSaleInput {
   if (draft.lines.length === 0) throw new Error('Add at least one item before checkout.');
   if (draft.lines.length > 100) throw new Error('A CartDraft cannot contain more than 100 lines.');
+  // The Sale is created with its Customer in one request, so a captured Sale
+  // never exists without the identity it belongs to.
+  if (!draft.customer) throw new Error('Choose the customer before checkout.');
   return {
     sellingLocationId: draft.sellingLocationId,
     currency: draft.currency,
+    customer: draft.customer,
     lines: draft.lines.map((line) => ({
       catalogItemId: line.catalogItemId,
       ...(line.catalogVariantId ? { catalogVariantId: line.catalogVariantId } : {}),

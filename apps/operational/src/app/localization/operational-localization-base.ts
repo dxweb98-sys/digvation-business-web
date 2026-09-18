@@ -225,17 +225,42 @@ const copy: Record<string, LocalizedLabel> = {
     'en-US': 'Select products or services from the catalog.',
   },
   'Cart is empty': { 'id-ID': 'Keranjang kosong', 'en-US': 'Cart is empty' },
-  'General customer': { 'id-ID': 'Pelanggan umum', 'en-US': 'General customer' },
-  Guest: { 'id-ID': 'Umum', 'en-US': 'Guest' },
   Member: { 'id-ID': 'Member', 'en-US': 'Member' },
   'Non-member': { 'id-ID': 'Non-member', 'en-US': 'Non-member' },
   Customer: { 'id-ID': 'Pelanggan', 'en-US': 'Customer' },
   'Choose customer': { 'id-ID': 'Pilih pelanggan', 'en-US': 'Choose customer' },
-  'Use general customer': { 'id-ID': 'Gunakan pelanggan umum', 'en-US': 'Use general customer' },
-  'Continue without selecting a customer.': {
-    'id-ID': 'Lanjutkan tanpa memilih pelanggan.',
-    'en-US': 'Continue without selecting a customer.',
+  'Customer data is not available': {
+    'id-ID': 'Data pelanggan tidak tersedia',
+    'en-US': 'Customer data is not available',
   },
+  'Choose the customer first': {
+    'id-ID': 'Pilih pelanggan terlebih dahulu',
+    'en-US': 'Choose the customer first',
+  },
+  'A transaction belongs to a customer. Fill in the name and WhatsApp number, or choose a member.': {
+    'id-ID':
+      'Transaksi selalu milik seorang pelanggan. Isi nama dan nomor WhatsApp, atau pilih member.',
+    'en-US':
+      'A transaction belongs to a customer. Fill in the name and WhatsApp number, or choose a member.',
+  },
+  'WhatsApp number': { 'id-ID': 'Nomor WhatsApp', 'en-US': 'WhatsApp number' },
+  'Name and WhatsApp number are both required.': {
+    'id-ID': 'Nama dan nomor WhatsApp wajib diisi.',
+    'en-US': 'Name and WhatsApp number are both required.',
+  },
+  'Member lookup is not available yet': {
+    'id-ID': 'Pencarian member belum tersedia',
+    'en-US': 'Member lookup is not available yet',
+  },
+  'Member identity comes from the customer directory, which is not connected to this installation yet.':
+    {
+      'id-ID':
+        'Identitas member berasal dari direktori pelanggan, yang belum terhubung pada instalasi ini.',
+      'en-US':
+        'Member identity comes from the customer directory, which is not connected to this installation yet.',
+    },
+  'Send via WhatsApp': { 'id-ID': 'Kirim via WhatsApp', 'en-US': 'Send via WhatsApp' },
+  'Not available yet': { 'id-ID': 'Belum tersedia', 'en-US': 'Not available yet' },
   'Search name or phone number': {
     'id-ID': 'Cari nama atau nomor telepon',
     'en-US': 'Search name or phone number',

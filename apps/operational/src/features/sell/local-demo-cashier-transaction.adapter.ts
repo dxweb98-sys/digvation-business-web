@@ -14,6 +14,7 @@ import type {
   PriceOverrideInput,
   SaleTransactionClient,
   SellingCatalogQuery,
+  SetSaleCustomerInput,
   SetSaleLineQuantityInput,
   StartSaleInput,
 } from './cashier-transaction.adapter';
@@ -31,6 +32,7 @@ import type {
   SaleLine,
   SellingLocation,
 } from './cashier-transaction.types';
+import { localSaleCustomerSnapshot } from './local-sale-customer';
 
 const DEMO_CREATED_AT = '2026-09-04T09:00:00.000Z';
 
@@ -475,7 +477,11 @@ export class LocalDemoCashierTransactionAdapter
           `${idempotencyKey}:line:${index}`,
         );
       }
-      const started = { ...sale, version: 1 };
+      const started = {
+        ...sale,
+        version: 1,
+        customer: localSaleCustomerSnapshot(input.customer),
+      };
       state.sales.set(started.id, started);
       return clone(started);
     } catch (error) {
@@ -484,6 +490,20 @@ export class LocalDemoCashierTransactionAdapter
       state.lineCounter = lineCounter;
       throw error;
     }
+  }
+
+  public async setSaleCustomer(
+    saleId: string,
+    input: SetSaleCustomerInput,
+    idempotencyKey: string,
+  ): Promise<Sale> {
+    void idempotencyKey;
+    const sale = requireOpenSale(saleId);
+    if (sale.version !== input.expectedVersion)
+      throw new Error('Sale changed; reload before retrying.');
+    sale.customer = localSaleCustomerSnapshot(input.customer);
+    touch(sale);
+    return clone(sale);
   }
 
   public async addSaleLine(

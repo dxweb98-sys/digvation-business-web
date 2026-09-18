@@ -1,6 +1,6 @@
 import { DButton, DInput, useToast } from '@digvation/ui';
 import { Building2 } from 'lucide-react';
-import { useRef, useState, type FormEvent, type TransitionEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type TransitionEvent } from 'react';
 
 import type { AuthPort, AuthSession } from '@digvation/business-auth';
 import { useDeploymentBootstrap } from '@digvation/business-runtime';
@@ -37,6 +37,17 @@ export function OperationalLoginPage({ authPort, onAuthenticated }: OperationalL
     onAuthenticated(authenticatedSession.current);
   };
 
+  useEffect(() => {
+    if (!isLeaving) return undefined;
+    // Continue into Operational even when the exit transition end is not delivered.
+    const timer = window.setTimeout(() => {
+      if (hasCompletedTransition.current || !authenticatedSession.current) return;
+      hasCompletedTransition.current = true;
+      onAuthenticated(authenticatedSession.current);
+    }, 320);
+    return () => window.clearTimeout(timer);
+  }, [isLeaving, onAuthenticated]);
+
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (isSubmitting || isLeaving) return;
@@ -71,7 +82,7 @@ export function OperationalLoginPage({ authPort, onAuthenticated }: OperationalL
 
   return (
     <main
-      className={`grid min-h-screen place-items-center overflow-hidden bg-[var(--color-background)] px-4 py-8 transition-[opacity,transform] duration-200 ease-out sm:px-6 ${
+      className={`operational-view-enter grid min-h-screen place-items-center overflow-hidden bg-[var(--color-background)] px-4 py-8 transition-[opacity,transform] duration-200 ease-out sm:px-6 ${
         isLeaving ? 'pointer-events-none -translate-y-1 opacity-0' : 'translate-y-0 opacity-100'
       }`}
       onTransitionEnd={completeTransition}
