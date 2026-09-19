@@ -4316,13 +4316,17 @@ function ReferenceBalancePaymentDialog({
   sale,
   availableToPay,
   locale,
+  paymentRoutes,
+  isPaymentRoutesLoading,
   method,
+  paymentRouteId,
   appliedAmount,
   paymentReference,
   tender,
   isMutating,
   onClose,
   onMethod,
+  onPaymentRoute,
   onAppliedAmount,
   onPaymentReference,
   onTender,
@@ -4332,13 +4336,17 @@ function ReferenceBalancePaymentDialog({
   sale: Sale | null;
   availableToPay: string | null;
   locale: string;
+  paymentRoutes: readonly PaymentRoute[];
+  isPaymentRoutesLoading: boolean;
   method: PaymentMethod;
+  paymentRouteId: string;
   appliedAmount: string;
   paymentReference: string;
   tender: string;
   isMutating: boolean;
   onClose: () => void;
   onMethod: (method: PaymentMethod) => void;
+  onPaymentRoute: (paymentRouteId: string) => void;
   onAppliedAmount: (amount: string) => void;
   onPaymentReference: (reference: string) => void;
   onTender: (amount: string) => void;
@@ -4346,11 +4354,9 @@ function ReferenceBalancePaymentDialog({
   onPay: () => void;
 }) {
   const { copy, label } = useOperationalLocalization();
-  const { routes: paymentRoutes, isPending: isPaymentRoutesPending } = useCachedPaymentRoutes();
-  const routeByMethod = new Map(
-    paymentRoutes.map((route) => [route.paymentMethod, route] as const),
-  );
-  const activeRoute = routeByMethod.get(method) ?? null;
+  const routesForMethod = paymentRoutes.filter((route) => route.paymentMethod === method);
+  const activeRoute =
+    routesForMethod.find((route) => route.id === paymentRouteId) ?? routesForMethod[0] ?? null;
   if (!sale) return null;
 
   const allocationState = paymentAllocationSummary(sale);
@@ -4457,8 +4463,10 @@ function ReferenceBalancePaymentDialog({
           </p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {methods.map((option) => {
-              const routeAvailable = routeByMethod.has(option.value);
-              const disabled = isPaymentRoutesPending || !routeAvailable || hasPending;
+              const routeAvailable = paymentRoutes.some(
+                (route) => route.paymentMethod === option.value,
+              );
+              const disabled = isPaymentRoutesLoading || !routeAvailable || hasPending;
               return (
                 <button
                   key={option.value}
@@ -4475,13 +4483,29 @@ function ReferenceBalancePaymentDialog({
           </div>
 
           {activeRoute ? (
-            <div className="mt-3 rounded-xl bg-[var(--color-surface-muted)]/60 px-3 py-2.5">
-              <p className="text-[11px] text-[var(--color-text-muted)]">
+            <div className="mt-3">
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
                 {copy('Settlement account')}
               </p>
-              <p className="mt-0.5 text-sm font-semibold">
-                {activeRoute.financialAccountName}
-              </p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {routesForMethod.map((route) => (
+                  <button
+                    key={route.id}
+                    type="button"
+                    onClick={() => onPaymentRoute(route.id)}
+                    className={`rounded-xl border px-3 py-2.5 text-left transition-colors ${activeRoute.id === route.id ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10' : 'border-[var(--color-border)] bg-[var(--color-surface-muted)]/50 hover:bg-[var(--color-surface-muted)]'}`}
+                  >
+                    <span className="block truncate text-sm font-semibold">
+                      {route.financialAccountName}
+                    </span>
+                    {route.financialAccountCode ? (
+                      <span className="mt-0.5 block truncate text-[11px] text-[var(--color-text-muted)]">
+                        {route.financialAccountCode}
+                      </span>
+                    ) : null}
+                  </button>
+                ))}
+              </div>
             </div>
           ) : null}
 
