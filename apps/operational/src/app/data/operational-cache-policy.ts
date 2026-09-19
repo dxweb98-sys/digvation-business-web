@@ -42,7 +42,7 @@ export const transactionQueryPolicy = {
 } as const;
 
 /**
- * Captured records read for review: transaction history pages, expense lists.
+ * Captured records read for review, such as expense lists.
  * Paging back and forth reuses what was already loaded.
  */
 export const historyQueryPolicy = {

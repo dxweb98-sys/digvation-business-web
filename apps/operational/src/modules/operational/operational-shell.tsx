@@ -7,6 +7,7 @@ import {
   Building2,
   Check,
   ChevronDown,
+  ChevronsUpDown,
   KeyRound,
   LogOut,
   MapPin,
@@ -194,6 +195,38 @@ export function OperationalShell({
     setAccountDialogOpen(true);
   };
 
+  // The single account entry point: sidebar on desktop, navigation menu on mobile.
+  const profileButton = (
+    <button
+      type="button"
+      onClick={openAccountDialog}
+      aria-label={copy('Open account information')}
+      aria-haspopup="dialog"
+      aria-expanded={isAccountDialogOpen}
+      className="flex w-full min-w-0 items-center gap-3 rounded-[var(--radius-control)] px-2 py-2 text-left transition-colors duration-150 hover:bg-[var(--color-surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/25"
+    >
+      <DAvatar
+        alt=""
+        name={session.identity.displayName}
+        fallback={userInitials ?? <UserRound className="size-4" aria-label={copy('Account')} />}
+        size="sm"
+        className="shrink-0 bg-[var(--color-brand)]/10 text-xs font-bold text-[var(--color-brand)]"
+      />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-medium leading-5 text-[var(--color-text)]">
+          {session.identity.displayName}
+        </span>
+        <span className="block truncate text-xs leading-4 text-[var(--color-text-muted)]">
+          {usernameLabel ?? primaryRole?.name ?? copy('Account')}
+        </span>
+      </span>
+      <ChevronsUpDown
+        className="size-4 shrink-0 text-[var(--color-text-muted)]"
+        aria-hidden="true"
+      />
+    </button>
+  );
+
   const branchLabel =
     selectedLocation?.name ??
     copy(operationalAccessQuery.isLoading ? 'Loading branch' : 'Choose branch');
@@ -235,41 +268,7 @@ export function OperationalShell({
           <OperationalNavigationGroups navigationSections={navigationSections} />
         </nav>
 
-        <div className="mt-auto border-t border-[var(--color-border)]">
-          <div className="px-4 py-3">
-            <div className="flex min-w-0 items-center gap-3">
-              <DAvatar
-                alt=""
-                name={session.identity.displayName}
-                fallback={
-                  userInitials ?? <UserRound className="size-4" aria-label={copy('Account')} />
-                }
-                size="sm"
-                className="shrink-0 bg-[var(--color-brand)]/10 text-xs font-bold text-[var(--color-brand)]"
-              />
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-medium leading-5 text-[var(--color-text)]">
-                  {session.identity.displayName}
-                </span>
-                <span className="block truncate text-xs leading-4 text-[var(--color-text-muted)]">
-                  {primaryRole?.name ?? usernameLabel ?? copy('Account')}
-                </span>
-              </span>
-            </div>
-          </div>
-          <div className="border-t border-[var(--color-border)] px-3 py-2">
-            <DButton
-              variant="ghost"
-              type="button"
-              leftIcon={<LogOut className="size-4 shrink-0" />}
-              loading={isLoggingOut}
-              onClick={() => void handleLogout()}
-              className="flex h-9 w-full items-center justify-start gap-2.5 px-3 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)]"
-            >
-              {copy('Logout')}
-            </DButton>
-          </div>
-        </div>
+        <div className="mt-auto border-t border-[var(--color-border)] p-2">{profileButton}</div>
       </aside>
 
       <main className="operational-shell__main flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden">
@@ -298,6 +297,7 @@ export function OperationalShell({
                 <nav className="p-3">
                   <OperationalNavigationGroups navigationSections={navigationSections} />
                 </nav>
+                <div className="border-t border-[var(--color-border)] p-2">{profileButton}</div>
               </DDropdown>
             </div>
             <span
@@ -316,28 +316,6 @@ export function OperationalShell({
 
           <div className="flex min-w-0 items-center gap-1.5">
             <OperationalNotificationBell />
-            <button
-              type="button"
-              onClick={openAccountDialog}
-              aria-label={copy('Open account information')}
-              aria-haspopup="dialog"
-              aria-expanded={isAccountDialogOpen}
-              className="operational-shell__account-trigger flex h-10 min-w-0 items-center gap-2 rounded-[var(--radius-control)] px-1.5 transition-colors duration-150 hover:bg-[var(--color-surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/25"
-            >
-              <DAvatar
-                alt=""
-                name={session.identity.displayName}
-                fallback={
-                  userInitials ?? <UserRound className="size-4" aria-label={copy('Account')} />
-                }
-                size="sm"
-                className="shrink-0 bg-[var(--color-brand)]/10 text-xs font-bold text-[var(--color-brand)]"
-              />
-              <span className="operational-shell__account-name min-w-0 max-w-[40vw] truncate text-sm font-semibold leading-5 text-[var(--color-text)]">
-                {session.identity.displayName}
-              </span>
-              <ChevronDown className="size-4 shrink-0 text-[var(--color-text-muted)]" />
-            </button>
           </div>
         </header>
 

@@ -271,7 +271,8 @@ function notificationContext(
 }
 
 function safeOperationalNotificationPath(path: string | null): string | null {
-  return path === '/expenses' || path === '/transactions' ? path : null;
+  // Transaction history lives in Backoffice, so only Operational routes are linked here.
+  return path === '/expenses' ? path : null;
 }
 
 function stringValue(value: unknown): string | null {

@@ -33,16 +33,7 @@ body {
   display: none;
 }
 
-/* The sidebar carries the persistent identity, so the header trigger stays compact on desktop. */
-.operational-shell__account-name {
-  display: block;
-}
-
 @media (min-width: 768px) {
-  .operational-shell__account-name {
-    display: none;
-  }
-
   .operational-shell__sidebar {
     display: flex;
     width: 232px;
