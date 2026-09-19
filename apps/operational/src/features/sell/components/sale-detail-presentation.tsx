@@ -307,6 +307,44 @@ export function SaleFinancialSummary({
   );
 }
 
+/**
+ * How the transaction was paid: only the payments that settled it. The split indicator belongs
+ * to the section title and the paid total to the summary, so a single payment stays one plain row.
+ */
+export function SalePaymentComposition({
+  components,
+}: {
+  components: readonly {
+    id: string;
+    /** Settlement account name, or the method when no account was recorded. */
+    name: string;
+    /** Payment method, shown only when it differs from the name. */
+    method: string | null;
+    reference: string | null;
+    amount: string;
+  }[];
+}) {
+  return (
+    <ul className="divide-y divide-[var(--color-border)]">
+      {components.map((component) => (
+        <li key={component.id} className="flex items-start justify-between gap-4 py-2.5">
+          <div className="min-w-0">
+            <p className="break-words text-sm font-medium text-[var(--color-text)]">
+              {component.name}
+            </p>
+            {component.method || component.reference ? (
+              <p className="mt-0.5 break-all text-xs text-[var(--color-text-muted)]">
+                {[component.method, component.reference].filter(Boolean).join(' · ')}
+              </p>
+            ) : null}
+          </div>
+          <span className="shrink-0 text-sm font-semibold tabular-nums">{component.amount}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function SalePaymentList({
   payments,
   emptyLabel,

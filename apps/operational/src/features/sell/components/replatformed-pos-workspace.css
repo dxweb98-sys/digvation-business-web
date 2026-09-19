@@ -134,6 +134,168 @@
   outline-offset: 2px;
 }
 
+/* Payment progress: what Runtime has recorded vs. what is still open. */
+.pos-payment-progress {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  border-radius: var(--radius-control);
+  background-color: color-mix(in srgb, var(--color-surface-muted) 60%, transparent);
+  padding: 10px 12px;
+}
+
+.pos-payment-progress__label {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.pos-payment-progress__value {
+  margin-top: 2px;
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+/* What the payment being prepared will do. */
+.pos-payment-intent {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.pos-payment-intent--full {
+  border-color: color-mix(in srgb, var(--color-success) 30%, transparent);
+  background-color: color-mix(in srgb, var(--color-success) 8%, var(--color-surface));
+  color: var(--color-success);
+}
+
+.pos-payment-intent--split {
+  border-color: color-mix(in srgb, var(--color-brand) 25%, transparent);
+  background-color: color-mix(in srgb, var(--color-brand) 6%, var(--color-surface));
+  color: var(--color-brand);
+}
+
+.pos-payment-intent__action {
+  flex-shrink: 0;
+  min-height: 32px;
+  border-radius: var(--radius-control);
+  padding: 0 8px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.pos-payment-intent__action:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* Confirmation step. */
+.pos-payment-review__hero {
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background-color: var(--color-background);
+  padding: 14px 16px;
+}
+
+.pos-payment-review__rows {
+  display: grid;
+  gap: 6px;
+  border-radius: var(--radius-control);
+  background-color: color-mix(in srgb, var(--color-surface-muted) 60%, transparent);
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+.pos-payment-review__rows > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pos-payment-review__rows dt {
+  min-width: 0;
+  color: var(--color-text-muted);
+}
+
+.pos-payment-review__rows dd {
+  flex-shrink: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.pos-payment-review__rows-total {
+  margin-top: 2px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 8px;
+}
+
+.pos-payment-review__rows-total dt {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.pos-payment-review__rows-total dd {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* Recorded payments keep their real status: paid, waiting, or not counted. */
+.pos-payment-row {
+  display: flex;
+  gap: 10px;
+  padding: 12px 16px;
+}
+
+.pos-payment-row__icon {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 999px;
+}
+
+.pos-payment-row--paid .pos-payment-row__icon {
+  background-color: color-mix(in srgb, var(--color-success) 12%, transparent);
+  color: var(--color-success);
+}
+
+.pos-payment-row--paid .pos-payment-row__status {
+  font-weight: 600;
+  color: var(--color-success);
+}
+
+.pos-payment-row--waiting {
+  background-color: color-mix(in srgb, var(--color-warning) 6%, transparent);
+}
+
+.pos-payment-row--waiting .pos-payment-row__icon {
+  background-color: color-mix(in srgb, var(--color-warning) 14%, transparent);
+  color: var(--color-warning);
+}
+
+.pos-payment-row--waiting .pos-payment-row__status {
+  font-weight: 600;
+  color: var(--color-warning);
+}
+
+.pos-payment-row--void .pos-payment-row__icon {
+  background-color: var(--color-surface-muted);
+  color: var(--color-text-muted);
+}
+
+.pos-payment-row--void .pos-payment-row__amount {
+  color: var(--color-text-muted);
+  text-decoration: line-through;
+}
+
 .pos-collapsible {
   transition: grid-template-rows var(--pos-motion-collapse) var(--pos-ease-enter);
 }

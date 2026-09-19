@@ -531,6 +531,162 @@ const posCopy: Record<string, LocalizedCopy> = {
     'id-ID': 'Struk sedang dikirim ke customer',
     'en-US': 'Receipt is being sent to the customer',
   },
+  Remaining: { 'id-ID': 'Sisa', 'en-US': 'Remaining' },
+  Received: { 'id-ID': 'Diterima', 'en-US': 'Received' },
+  'Payment progress': { 'id-ID': 'Progres pembayaran', 'en-US': 'Payment progress' },
+  'Already paid': { 'id-ID': 'Sudah dibayar', 'en-US': 'Already paid' },
+  waiting: { 'id-ID': 'menunggu', 'en-US': 'waiting' },
+  'will remain to pay with another method.': {
+    'id-ID': 'tersisa untuk dibayar dengan metode lain.',
+    'en-US': 'will remain to pay with another method.',
+  },
+  'Pay remaining': { 'id-ID': 'Bayar sisanya', 'en-US': 'Pay remaining' },
+  'Pay full amount': { 'id-ID': 'Bayar penuh', 'en-US': 'Pay full amount' },
+  'Pays the remaining balance': {
+    'id-ID': 'Melunasi sisa tagihan',
+    'en-US': 'Pays the remaining balance',
+  },
+  'Full payment': { 'id-ID': 'Pembayaran penuh', 'en-US': 'Full payment' },
+  'This payment completes the transaction.': {
+    'id-ID': 'Pembayaran ini menyelesaikan transaksi.',
+    'en-US': 'This payment completes the transaction.',
+  },
+  'You are receiving': { 'id-ID': 'Anda menerima pembayaran', 'en-US': 'You are receiving' },
+  'You are receiving part of the total': {
+    'id-ID': 'Anda menerima sebagian dari total',
+    'en-US': 'You are receiving part of the total',
+  },
+  'Transaction total': { 'id-ID': 'Total transaksi', 'en-US': 'Transaction total' },
+  'This payment': { 'id-ID': 'Pembayaran ini', 'en-US': 'This payment' },
+  'Remaining after this payment': {
+    'id-ID': 'Sisa setelah pembayaran ini',
+    'en-US': 'Remaining after this payment',
+  },
+  'will remain. You will continue with another payment method.': {
+    'id-ID': 'masih tersisa. Lanjutkan dengan metode pembayaran lain.',
+    'en-US': 'will remain. You will continue with another payment method.',
+  },
+  'Check the method and amount. A recorded payment cannot be edited afterwards.': {
+    'id-ID': 'Periksa metode dan nominal. Pembayaran yang sudah dicatat tidak dapat diubah.',
+    'en-US': 'Check the method and amount. A recorded payment cannot be edited afterwards.',
+  },
+  'Waiting for payment': { 'id-ID': 'Menunggu pembayaran', 'en-US': 'Waiting for payment' },
+  'Failed · not counted': { 'id-ID': 'Gagal · tidak dihitung', 'en-US': 'Failed · not counted' },
+  'Cancelled · not counted': {
+    'id-ID': 'Dibatalkan · tidak dihitung',
+    'en-US': 'Cancelled · not counted',
+  },
+  'Expired · not counted': {
+    'id-ID': 'Kedaluwarsa · tidak dihitung',
+    'en-US': 'Expired · not counted',
+  },
+  'Payments recorded': { 'id-ID': 'Pembayaran tercatat', 'en-US': 'Payments recorded' },
+  'Check that this payment was received before confirming it.': {
+    'id-ID': 'Pastikan pembayaran ini sudah diterima sebelum dikonfirmasi.',
+    'en-US': 'Check that this payment was received before confirming it.',
+  },
+  'Received · complete payment': {
+    'id-ID': 'Diterima · selesaikan pembayaran',
+    'en-US': 'Received · complete payment',
+  },
+  'Payment received': { 'id-ID': 'Pembayaran diterima', 'en-US': 'Payment received' },
+  'Not received': { 'id-ID': 'Tidak diterima', 'en-US': 'Not received' },
+  'Cancel this payment': { 'id-ID': 'Batalkan pembayaran ini', 'en-US': 'Cancel this payment' },
+  'Payment is not finished': {
+    'id-ID': 'Pembayaran belum selesai',
+    'en-US': 'Payment is not finished',
+  },
+  'is already recorded for this transaction.': {
+    'id-ID': 'sudah tercatat untuk transaksi ini.',
+    'en-US': 'is already recorded for this transaction.',
+  },
+  'is still unpaid.': { 'id-ID': 'belum dibayar.', 'en-US': 'is still unpaid.' },
+  'A payment is waiting for confirmation. Confirm or cancel it before leaving the payment.': {
+    'id-ID':
+      'Ada pembayaran yang menunggu konfirmasi. Konfirmasi atau batalkan sebelum meninggalkan pembayaran.',
+    'en-US':
+      'A payment is waiting for confirmation. Confirm or cancel it before leaving the payment.',
+  },
+  'Continue with another payment method, or add the transaction to the queue and collect the rest later. Recorded payments stay on the transaction.':
+    {
+      'id-ID':
+        'Lanjutkan dengan metode pembayaran lain, atau masukkan transaksi ke antrian dan tagih sisanya nanti. Pembayaran yang sudah tercatat tetap tersimpan di transaksi.',
+      'en-US':
+        'Continue with another payment method, or add the transaction to the queue and collect the rest later. Recorded payments stay on the transaction.',
+    },
+  'Confirm payment': { 'id-ID': 'Konfirmasi pembayaran', 'en-US': 'Confirm payment' },
+  'Continue payment': { 'id-ID': 'Lanjutkan pembayaran', 'en-US': 'Continue payment' },
+  'Back to edit': { 'id-ID': 'Kembali ubah', 'en-US': 'Back to edit' },
+  'Confirm and complete': { 'id-ID': 'Konfirmasi dan selesaikan', 'en-US': 'Confirm and complete' },
+  'Add to queue, collect later': {
+    'id-ID': 'Masukkan antrian, tagih nanti',
+    'en-US': 'Add to queue, collect later',
+  },
+  'Leave payment': { 'id-ID': 'Tinggalkan pembayaran', 'en-US': 'Leave payment' },
+  'The transaction is not complete until the remaining amount is paid.': {
+    'id-ID': 'Transaksi belum selesai sampai sisa tagihan dibayar.',
+    'en-US': 'The transaction is not complete until the remaining amount is paid.',
+  },
+  'Next payment': { 'id-ID': 'Pembayaran berikutnya', 'en-US': 'Next payment' },
+  'Payment was not recorded': {
+    'id-ID': 'Pembayaran tidak tercatat',
+    'en-US': 'Payment was not recorded',
+  },
+  'Nothing was added to the paid amount.': {
+    'id-ID': 'Tidak ada yang ditambahkan ke jumlah terbayar.',
+    'en-US': 'Nothing was added to the paid amount.',
+  },
+  'Confirm or cancel the waiting payment before adding another one.': {
+    'id-ID': 'Konfirmasi atau batalkan pembayaran yang menunggu sebelum menambah pembayaran lain.',
+    'en-US': 'Confirm or cancel the waiting payment before adding another one.',
+  },
+  'Payment waiting for confirmation': {
+    'id-ID': 'Pembayaran menunggu konfirmasi',
+    'en-US': 'Payment waiting for confirmation',
+  },
+  'Confirm the payment once it is received.': {
+    'id-ID': 'Konfirmasi pembayaran setelah dana diterima.',
+    'en-US': 'Confirm the payment once it is received.',
+  },
+  'Added to queue. Collect the remaining balance from the queue.': {
+    'id-ID': 'Masuk antrian. Tagih sisa pembayaran dari antrian.',
+    'en-US': 'Added to queue. Collect the remaining balance from the queue.',
+  },
+  'Payment updated': { 'id-ID': 'Pembayaran diperbarui', 'en-US': 'Payment updated' },
+  'Transaction payment is complete.': {
+    'id-ID': 'Pembayaran transaksi sudah lunas.',
+    'en-US': 'Transaction payment is complete.',
+  },
+  'Resolve pending payments before continuing.': {
+    'id-ID': 'Selesaikan pembayaran yang menunggu sebelum melanjutkan.',
+    'en-US': 'Resolve pending payments before continuing.',
+  },
+  'Check the money has arrived': {
+    'id-ID': 'Pastikan dana sudah masuk',
+    'en-US': 'Check the money has arrived',
+  },
+  'Confirm only after the payment is visible in': {
+    'id-ID': 'Konfirmasi hanya setelah pembayaran terlihat di',
+    'en-US': 'Confirm only after the payment is visible in',
+  },
+  'It is recorded as received immediately.': {
+    'id-ID': 'Pembayaran langsung dicatat sebagai diterima.',
+    'en-US': 'It is recorded as received immediately.',
+  },
+  'Received payments cannot be edited or removed here. If one is wrong, do not record it again; tell your manager so it can be corrected.':
+    {
+      'id-ID':
+        'Pembayaran yang sudah diterima tidak dapat diubah atau dihapus di sini. Jika ada yang salah, jangan catat ulang; laporkan ke manajer agar dikoreksi.',
+      'en-US':
+        'Received payments cannot be edited or removed here. If one is wrong, do not record it again; tell your manager so it can be corrected.',
+    },
+  'Split Payment': { 'id-ID': 'Split Payment', 'en-US': 'Split Payment' },
+  methods: { 'id-ID': 'metode', 'en-US': 'methods' },
+  'Total paid': { 'id-ID': 'Total dibayar', 'en-US': 'Total paid' },
+  'Other payment attempts': {
+    'id-ID': 'Percobaan pembayaran lain',
+    'en-US': 'Other payment attempts',
+  },
 };
 
 export function operationalPosCopy(value: string, locale: OperationalLocale): string | undefined {
