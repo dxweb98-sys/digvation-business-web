@@ -44,6 +44,8 @@ export interface Item {
   description: string | null;
   lifecycle: 'DRAFT' | 'ACTIVE' | 'INACTIVE';
   fulfillmentBehavior: 'INSTANT' | 'TRACKED';
+  /** With active variants: REQUIRED sells variants only; OPTIONAL also sells the item itself. */
+  variantSelectionMode: VariantSelectionMode;
   version: number;
   serviceDefinition: {
     defaultDurationMinutes: number | null;
@@ -70,6 +72,19 @@ export interface Price {
   effectiveFrom: string;
   effectiveUntil: string | null;
   cancelledAt: string | null;
+  createdAt: string;
+}
+/** Item price history row: item price and variant price changes share one Catalog-owned history. */
+export interface PriceHistoryEntry extends Price {
+  catalogVariantCode: string | null;
+  catalogVariantName: string | null;
+  previousAmount: string | null;
+  changedBy: { id: string; kind: string; displayName: string | null } | null;
+}
+export interface VariantPriceChange {
+  catalogVariantId: string;
+  changed: boolean;
+  price: Price;
 }
 export interface DefaultPrice {
   catalogItemId: string;
@@ -88,10 +103,13 @@ export interface ResolvedPrice {
   sourceScope: { catalogVariantId: string | null; locationId: string | null };
 }
 
+export type VariantSelectionMode = 'REQUIRED' | 'OPTIONAL';
+
 export interface CreateCatalogItemInput extends Omit<
   Item,
-  'id' | 'version' | 'code' | 'serviceDefinition'
+  'id' | 'version' | 'code' | 'serviceDefinition' | 'variantSelectionMode'
 > {
+  variantSelectionMode?: VariantSelectionMode;
   code?: string;
   serviceDefinition?: Item['serviceDefinition'];
 }
@@ -185,8 +203,8 @@ export class CatalogApi {
     });
   }
   listPrices(itemId: string) {
-    return this.client.get<Page<Price>>(
-      `/api/v1/pricing/prices?catalogItemId=${itemId}&limit=50&offset=0`,
+    return this.client.get<Page<PriceHistoryEntry>>(
+      `/api/v1/pricing/prices?catalogItemId=${itemId}&limit=100&offset=0`,
     );
   }
   listDefaultPrices(catalogItemIds: string[], currency: string, effectiveAt: string) {
@@ -225,6 +243,19 @@ export class CatalogApi {
     effectiveFrom: string;
   }) {
     return this.client.post<Price>('/api/v1/pricing/prices/change', input);
+  }
+  /** Runtime applies the amount to every active variant (or the listed ones) in one transaction. */
+  changeVariantPrices(input: {
+    catalogItemId: string;
+    catalogVariantIds?: string[];
+    currency: string;
+    amount: string;
+    effectiveFrom: string;
+  }) {
+    return this.client.post<{ items: VariantPriceChange[] }>(
+      '/api/v1/pricing/prices/change-variants',
+      input,
+    );
   }
   cancelPrice(id: string) {
     return this.client.post<Price>(`/api/v1/pricing/prices/${id}/cancel`, {});

@@ -57,9 +57,9 @@ export function CatalogItemImageField({
   };
 
   return (
-    <section className="rounded-(--radius-card) border border-(--color-border) p-4">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <div className="grid size-28 shrink-0 place-items-center overflow-hidden rounded-2xl border border-(--color-border) bg-(--color-surface-muted)">
+    <div>
+      <div className="flex flex-row items-center gap-4 md:w-36 md:flex-col md:items-stretch">
+        <div className="grid size-24 shrink-0 place-items-center overflow-hidden rounded-2xl border border-(--color-border) bg-(--color-surface-muted) md:size-36">
           {visibleUrl ? (
             <img
               src={visibleUrl}
@@ -71,11 +71,10 @@ export function CatalogItemImageField({
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-semibold">{copy('Item image')}</h2>
-          <p className="mt-1 text-xs leading-5 text-(--color-text-muted)">
+          <p className="text-xs leading-5 text-(--color-text-muted)">
             {copy('JPEG, PNG, or WebP. Maximum 1 MB. One primary image is kept per item.')}
           </p>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-2 flex flex-wrap gap-2">
             <input
               ref={inputRef}
               type="file"
@@ -90,6 +89,7 @@ export function CatalogItemImageField({
             <DButton
               type="button"
               variant="secondary"
+              size="sm"
               leftIcon={<Upload className="size-4" />}
               disabled={disabled}
               onClick={() => inputRef.current?.click()}
@@ -99,7 +99,8 @@ export function CatalogItemImageField({
             {visibleUrl ? (
               <DButton
                 type="button"
-                variant="secondary"
+                variant="ghost"
+                size="sm"
                 leftIcon={<Trash2 className="size-4" />}
                 disabled={disabled}
                 onClick={() => {
@@ -120,6 +121,6 @@ export function CatalogItemImageField({
           {error ? <p className="mt-2 text-sm text-(--color-danger)">{error}</p> : null}
         </div>
       </div>
-    </section>
+    </div>
   );
 }

@@ -93,6 +93,8 @@ export interface CatalogItem {
   description: string | null;
   lifecycle: CatalogLifecycle;
   fulfillmentBehavior: 'INSTANT' | 'TRACKED';
+  /** With active variants: REQUIRED sells variants only; OPTIONAL also sells the item itself. */
+  variantSelectionMode?: 'REQUIRED' | 'OPTIONAL';
   version: number;
   createdAt: string;
   updatedAt: string;

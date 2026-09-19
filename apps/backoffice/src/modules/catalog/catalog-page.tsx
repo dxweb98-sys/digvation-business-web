@@ -112,6 +112,8 @@ export function CatalogPage() {
   if (!session) return null;
 
   const refreshItems = () => {
+    // Item saves can append prices effective now; read prices at a fresh instant.
+    setPricingEffectiveAt(new Date().toISOString());
     void client.invalidateQueries({ queryKey: keys.items });
     void client.invalidateQueries({ queryKey: ['catalog', 'default-prices'] });
     void client.invalidateQueries({ queryKey: ['catalog', 'image'] });
@@ -150,14 +152,23 @@ export function CatalogPage() {
     },
     {
       key: 'defaultPrice',
-      label: copy('Default Price'),
-      render: (candidate) => (
-        <PriceLabel
-          price={defaultPriceByItemId.get(candidate.id)}
-          loading={defaultPrices.isLoading}
-          available={can('viewPricing')}
-        />
-      ),
+      label: copy('Price'),
+      // Follow the selling model: an item that requires a variant has no price of its own to sell.
+      render: (candidate) =>
+        candidate.variantCount > 0 && candidate.variantSelectionMode === 'REQUIRED' ? (
+          <span className="text-sm text-[var(--color-text-muted)]">Harga per varian</span>
+        ) : (
+          <div>
+            <PriceLabel
+              price={defaultPriceByItemId.get(candidate.id)}
+              loading={defaultPrices.isLoading}
+              available={can('viewPricing')}
+            />
+            {candidate.variantCount > 0 ? (
+              <p className="text-xs text-[var(--color-text-muted)]">+ pilihan varian</p>
+            ) : null}
+          </div>
+        ),
     },
     { key: 'variants', label: copy('Variants'), render: (candidate) => candidate.variantCount },
     {
