@@ -58,7 +58,6 @@ import {
   resolveOperationalLocale,
   useOperationalLocalization,
 } from '../../../app/localization/operational-localization';
-import { useCashierSession } from '../../../app/providers/cashier-session-provider';
 import { cashierTransactionKeys } from '../cashier-transaction-keys';
 import { cashierTransactionErrorMessage } from '../cashier-transaction-errors';
 import type { CartDisplayLine } from '../cart-draft';
@@ -472,20 +471,6 @@ function isPositiveDecimal(value: string) {
   } catch {
     return false;
   }
-}
-
-function useCachedPaymentRoutes(): { routes: PaymentRoute[]; isPending: boolean } {
-  const runtime = useRuntime();
-  const { selectedLocationId } = useCashierSession();
-  const query = useQuery({
-    queryKey: cashierTransactionKeys.paymentRoutes(selectedLocationId ?? '', runtime.currency),
-    queryFn: async () => ({ items: [] as PaymentRoute[], limit: 0, offset: 0 }),
-    enabled: false,
-  });
-  return {
-    routes: (query.data?.items ?? []).filter((route) => route.status === 'ACTIVE'),
-    isPending: query.data === undefined,
-  };
 }
 
 function employeeAssignmentIssues(line: SaleLine, locale: string): string[] {
