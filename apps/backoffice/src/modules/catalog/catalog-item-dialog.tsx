@@ -12,7 +12,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
 import { isSessionExpiredError } from '../../auth/backoffice-auth-context';
-import type { CatalogApi, Category, Item, TaxCategory, TaxProfile } from './catalog-api';
+import type { CatalogApi, Category, Item } from './catalog-api';
 import { CatalogItemImageField } from './catalog-item-image-field';
 import { DialogFooter } from './catalog-shared';
 
@@ -35,11 +35,8 @@ function validOptionalMoney(value: string) {
 export function CatalogItemDialog({
   item,
   categories,
-  taxCategories,
-  taxProfile,
   currency,
   api,
-  canViewTax,
   canViewPricing,
   canCreatePricing,
   canCreateVariants,
@@ -49,11 +46,8 @@ export function CatalogItemDialog({
 }: {
   item: Item | null | undefined;
   categories: Category[];
-  taxCategories: TaxCategory[];
-  taxProfile?: TaxProfile;
   currency: string;
   api: CatalogApi;
-  canViewTax: boolean;
   canViewPricing: boolean;
   canCreatePricing: boolean;
   canCreateVariants: boolean;
@@ -68,7 +62,6 @@ export function CatalogItemDialog({
   const [name, setName] = useState(item?.name ?? '');
   const [type, setType] = useState<Item['type']>(item?.type ?? 'PRODUCT');
   const [categoryId, setCategoryId] = useState(item?.categoryId ?? null);
-  const [taxCategoryId, setTaxCategoryId] = useState(item?.taxCategoryId ?? null);
   const [description, setDescription] = useState(item?.description ?? '');
   const [lifecycle, setLifecycle] = useState<Item['lifecycle']>(item?.lifecycle ?? 'DRAFT');
   const [defaultPrice, setDefaultPrice] = useState('');
@@ -123,14 +116,6 @@ export function CatalogItemDialog({
       ),
     [categories, item?.categoryId],
   );
-  const availableTaxCategories = useMemo(
-    () =>
-      taxCategories.filter(
-        (category) => category.status === 'ACTIVE' || category.id === item?.taxCategoryId,
-      ),
-    [item?.taxCategoryId, taxCategories],
-  );
-
   const updateVariant = (key: string, change: Partial<DraftVariant>) =>
     setVariants((current) =>
       current.map((variant) => (variant.key === key ? { ...variant, ...change } : variant)),
@@ -162,7 +147,6 @@ export function CatalogItemDialog({
           ...baseInput,
           ...(code.trim() ? { code: code.trim().toUpperCase() } : {}),
           type,
-          ...(canViewTax ? { taxCategoryId } : {}),
         });
         createdItem = true;
 
@@ -205,7 +189,6 @@ export function CatalogItemDialog({
       } else if (item) {
         persistedItem = await api.updateItem(item, {
           ...baseInput,
-          ...(canViewTax && taxCategoryId !== item.taxCategoryId ? { taxCategoryId } : {}),
         });
 
         const nextPrice = defaultPrice.trim();
@@ -362,9 +345,9 @@ export function CatalogItemDialog({
           </div>
         </section>
 
-        {showPrice || canViewTax ? (
+        {showPrice ? (
           <section className="border-b border-(--color-border) pb-5">
-            <h2 className="text-sm font-semibold">Harga & Pajak</h2>
+            <h2 className="text-sm font-semibold">Harga</h2>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               {showPrice ? (
                 <div>
@@ -398,28 +381,6 @@ export function CatalogItemDialog({
                       Anda tidak memiliki akses untuk mengubah harga.
                     </p>
                   ) : null}
-                </div>
-              ) : null}
-              {canViewTax ? (
-                <div>
-                  <DSelect
-                    label="Kategori Pajak Item"
-                    value={taxCategoryId}
-                    onChange={(value) => setTaxCategoryId(value as string | null)}
-                    clearable
-                    options={availableTaxCategories.map((category) => ({
-                      label:
-                        category.status === 'ACTIVE'
-                          ? category.name
-                          : `${category.name} · Nonaktif`,
-                      value: category.id,
-                    }))}
-                  />
-                  <p className="mt-1 text-xs text-(--color-text-muted)">
-                    {taxProfile?.itemTaxEnabled
-                      ? 'Kosongkan jika item tidak memiliki pajak khusus.'
-                      : 'Pajak item sedang dinonaktifkan di pengaturan pajak.'}
-                  </p>
                 </div>
               ) : null}
             </div>

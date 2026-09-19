@@ -36,8 +36,6 @@ const keys = {
   items: ['catalog', 'items'] as const,
   categories: ['catalog', 'categories'] as const,
   categoryOptions: ['catalog', 'category-options'] as const,
-  taxCategories: ['catalog', 'tax-categories'] as const,
-  taxProfile: ['catalog', 'tax-profile'] as const,
   defaults: (itemIds: string[], currency: string, effectiveAt: string) =>
     ['catalog', 'default-prices', itemIds, currency, effectiveAt] as const,
 };
@@ -69,7 +67,6 @@ export function CatalogPage() {
 
   const can = (action: BackofficeAction) =>
     Boolean(session && canPerformBackofficeAction(session, action));
-  const canViewTax = can('viewTax');
 
   const categoryOptions = useQuery({
     queryKey: keys.categoryOptions,
@@ -95,16 +92,6 @@ export function CatalogPage() {
         offset: (categoryPage - 1) * categoryPageSize,
       }),
     enabled: Boolean(session),
-  });
-  const taxCategories = useQuery({
-    queryKey: keys.taxCategories,
-    queryFn: () => api.listTaxCategories(),
-    enabled: Boolean(session && canViewTax),
-  });
-  const taxProfile = useQuery({
-    queryKey: keys.taxProfile,
-    queryFn: () => api.getTaxProfile(),
-    enabled: Boolean(session && canViewTax),
   });
   const itemRows = items.data?.items ?? [];
   const defaultPrices = useQuery({
@@ -200,7 +187,7 @@ export function CatalogPage() {
         eyebrow={copy('Master Data')}
         title={copy('Catalog')}
         description={copy(
-          'Manage items, categories, pricing, variants, and tax assignment from one catalog workspace.',
+          'Manage items, categories, pricing, and variants from one catalog workspace.',
         )}
       />
 
@@ -363,11 +350,8 @@ export function CatalogPage() {
         key={item?.id ?? (item === null ? 'new' : 'closed')}
         item={item}
         categories={allCategories}
-        taxCategories={taxCategories.data?.items ?? []}
-        {...(taxProfile.data ? { taxProfile: taxProfile.data } : {})}
         currency={currency}
         api={api}
-        canViewTax={canViewTax}
         canViewPricing={can('viewPricing')}
         canCreatePricing={can('createPricing')}
         canCreateVariants={can('createCatalog')}
@@ -379,7 +363,6 @@ export function CatalogPage() {
         key={detailItem?.id ?? 'closed'}
         item={detailItem}
         categories={allCategories}
-        taxCategories={taxCategories.data?.items ?? []}
         defaultPrice={detailItem ? defaultPriceByItemId.get(detailItem.id) : undefined}
         defaultPriceLoading={defaultPrices.isLoading}
         currency={currency}
@@ -390,7 +373,6 @@ export function CatalogPage() {
         canViewPricing={can('viewPricing')}
         canCreatePricing={can('createPricing')}
         canCancelPricing={can('cancelPricing')}
-        canViewTax={canViewTax}
         onPricingChanged={() => {
           setPricingEffectiveAt(new Date().toISOString());
           void client.invalidateQueries({ queryKey: ['catalog', 'prices', detailItem?.id ?? ''] });

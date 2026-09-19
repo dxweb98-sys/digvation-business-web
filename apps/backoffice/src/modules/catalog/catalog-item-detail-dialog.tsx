@@ -17,7 +17,6 @@ import type {
   CatalogManagementItem,
   Category,
   DefaultPrice,
-  TaxCategory,
   Variant,
 } from './catalog-api';
 import { CatalogItemThumbnail } from './catalog-item-thumbnail';
@@ -35,7 +34,6 @@ const keys = {
 export function CatalogItemDetailDialog({
   item,
   categories,
-  taxCategories,
   defaultPrice,
   defaultPriceLoading,
   currency,
@@ -46,7 +44,6 @@ export function CatalogItemDetailDialog({
   canViewPricing,
   canCreatePricing,
   canCancelPricing,
-  canViewTax,
   onPricingChanged,
   onVariantsChanged,
   onClose,
@@ -54,7 +51,6 @@ export function CatalogItemDetailDialog({
 }: {
   item: CatalogManagementItem | null;
   categories: Category[];
-  taxCategories: TaxCategory[];
   defaultPrice: DefaultPrice | undefined;
   defaultPriceLoading: boolean;
   currency: string;
@@ -65,7 +61,6 @@ export function CatalogItemDetailDialog({
   canViewPricing: boolean;
   canCreatePricing: boolean;
   canCancelPricing: boolean;
-  canViewTax: boolean;
   onPricingChanged: () => void;
   onVariantsChanged: () => void;
   onClose: () => void;
@@ -107,10 +102,6 @@ export function CatalogItemDetailDialog({
   const categoryName = item.categoryId
     ? (categories.find((candidate) => candidate.id === item.categoryId)?.name ?? item.categoryId)
     : 'Belum ditentukan';
-  const taxCategoryName = item.taxCategoryId
-    ? (taxCategories.find((candidate) => candidate.id === item.taxCategoryId)?.name ??
-      item.taxCategoryId)
-    : 'Tidak ada pajak khusus item';
   const defaultHistory = (priceHistory.data?.items ?? []).filter(
     (price) => price.catalogVariantId === null && price.locationId === null,
   );
@@ -333,7 +324,6 @@ export function CatalogItemDetailDialog({
                 }
               />
             ) : null}
-            {canViewTax ? <DetailField label="Kategori Pajak" value={taxCategoryName} /> : null}
             <div className="sm:col-span-2 lg:col-span-4">
               <DetailField
                 label="Deskripsi"
