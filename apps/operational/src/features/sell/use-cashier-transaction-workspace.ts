@@ -23,7 +23,9 @@ import { cashierTransactionKeys } from './cashier-transaction-keys';
 import type {
   CatalogItem,
   CatalogVariant,
+  Payment,
   PaymentMethod,
+  PaymentStatus,
   QueueSale,
   Sale,
   SaleLine,
@@ -608,6 +610,37 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     }
   };
 
+  const transitionQueuedPayment = async (
+    targetSale: Sale,
+    payment: Payment,
+    status: Exclude<PaymentStatus, 'PENDING'>,
+  ) => {
+    command.clearNotice();
+    try {
+      const authoritative = await transactionAdapter.getSale(targetSale.id);
+      const livePayment = authoritative.payments.find(
+        (candidate) => candidate.id === payment.id,
+      );
+      if (!livePayment || livePayment.status !== 'PENDING')
+        throw new Error(copy('The pending payment is no longer available.'));
+      const updated = await command.runMutation(() =>
+        transactionAdapter.transitionSalePayment(
+          authoritative.id,
+          livePayment.id,
+          {
+            expectedVersion: authoritative.version,
+            status,
+          },
+        ),
+      );
+      cacheQueueContext(updated);
+      return updated;
+    } catch (error) {
+      command.reportError(error);
+      throw error;
+    }
+  };
+
   const createPayment = (
     method: PaymentMethod,
     appliedAmount: string,
@@ -702,6 +735,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     setQueuedWorkUnits,
     finalizeQueuedSale,
     createQueuedPayment,
+    transitionQueuedPayment,
     openCompletion: () => setCompletionOpen(true),
     closeCompletion: () => setCompletionOpen(false),
     setOrderDiscount: core.setOrderDiscount,
