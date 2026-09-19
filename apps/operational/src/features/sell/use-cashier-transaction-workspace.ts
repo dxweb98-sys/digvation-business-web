@@ -581,6 +581,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     appliedAmount: string,
     tenderedAmount?: string,
     providerReference?: string,
+    paymentRouteId?: string,
   ) => {
     command.clearNotice();
     try {
@@ -595,6 +596,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
           {
             expectedVersion: authoritative.version,
             method,
+            ...(paymentRouteId ? { paymentRouteId } : {}),
             appliedAmount,
             ...(tenderedAmount ? { tenderedAmount } : {}),
             ...(providerReference ? { providerReference } : {}),
@@ -646,7 +648,15 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     appliedAmount: string,
     tenderedAmount?: string,
     providerReference?: string,
-  ) => core.createPayment(method, appliedAmount, tenderedAmount, providerReference);
+    paymentRouteId?: string,
+  ) =>
+    core.createPayment(
+      method,
+      appliedAmount,
+      tenderedAmount,
+      providerReference,
+      paymentRouteId,
+    );
 
   const voidQueuedSale = async (targetSale: Sale) => {
     command.clearNotice();
