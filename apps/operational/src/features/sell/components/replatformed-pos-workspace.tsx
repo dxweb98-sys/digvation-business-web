@@ -1123,6 +1123,18 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       createDecimal(tendered).lessThan(createDecimal(allocation))
     )
       return;
+    const selectedRoute =
+      workspace.paymentRoutes.find(
+        (route) => route.id === paymentRouteId && route.paymentMethod === paymentMethod,
+      ) ?? workspace.paymentRoutes.find((route) => route.paymentMethod === paymentMethod);
+    if (!selectedRoute) {
+      showToast({
+        title: copy('Payment method unavailable'),
+        description: copy('Configure an active settlement account for this payment method.'),
+        variant: 'warning',
+      });
+      return;
+    }
     let completedSale: Sale;
     try {
       completedSale = await workspace.createPayment(
@@ -1130,6 +1142,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         allocation,
         tendered,
         paymentReference.trim() || undefined,
+        selectedRoute.id,
       );
     } catch (error) {
       showToast({
@@ -1193,6 +1206,18 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       createDecimal(tendered).lessThan(createDecimal(allocation))
     )
       return;
+    const selectedRoute =
+      workspace.paymentRoutes.find(
+        (route) => route.id === paymentRouteId && route.paymentMethod === paymentMethod,
+      ) ?? workspace.paymentRoutes.find((route) => route.paymentMethod === paymentMethod);
+    if (!selectedRoute) {
+      showToast({
+        title: copy('Payment method unavailable'),
+        description: copy('Configure an active settlement account for this payment method.'),
+        variant: 'warning',
+      });
+      return;
+    }
     try {
       const updatedSale = await workspace.createQueuedPayment(
         transaction,
@@ -1200,6 +1225,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         allocation,
         tendered,
         paymentReference.trim() || undefined,
+        selectedRoute.id,
       );
       const nextAllocation = paymentAllocationSummary(updatedSale);
       setQueuePaymentTarget(updatedSale);
