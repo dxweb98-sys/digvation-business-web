@@ -15,6 +15,7 @@ const safeMessages = {
     DOMAIN_VALIDATION_ERROR: 'Data yang dimasukkan tidak valid.',
     BUSINESS_TIMEZONE_INVALID:
       'Zona waktu tidak valid. Gunakan zona waktu IANA seperti Asia/Jakarta.',
+    BACKOFFICE_ACCESS_DENIED: 'Akun ini tidak memiliki akses ke Backoffice.',
     ACCOUNT_IN_USE:
       'Akun masih digunakan oleh rute pembayaran aktif. Nonaktifkan atau pindahkan rute terlebih dahulu.',
     ROUTE_ACCOUNT_TYPE_MISMATCH: 'Jenis akun tidak sesuai dengan metode pembayaran.',
@@ -34,6 +35,7 @@ const safeMessages = {
     INACTIVE_REFERENCE: 'The selected reference is no longer active.',
     DOMAIN_VALIDATION_ERROR: 'The submitted data is invalid.',
     BUSINESS_TIMEZONE_INVALID: 'Invalid timezone. Use an IANA timezone such as Asia/Jakarta.',
+    BACKOFFICE_ACCESS_DENIED: 'This account does not have access to Backoffice.',
     ACCOUNT_IN_USE:
       'The account is used by an active payment route. Deactivate or move the route first.',
     ROUTE_ACCOUNT_TYPE_MISMATCH: 'The account type is not compatible with the payment method.',

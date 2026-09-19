@@ -73,6 +73,8 @@ describe('HttpAuthAdapter session hydration', () => {
     ]);
     expect(urls.some((url) => url.includes('/auth/me'))).toBe(false);
     expect(urls.some((url) => url.includes('/runtime/context'))).toBe(false);
+    const contextHeaders = new Headers(fetchMock.mock.calls[1]?.[1]?.headers);
+    expect(contextHeaders.get('X-Digvation-Session-Channel')).toBe('operational');
   });
 
   it('fails closed when canonical session context is unavailable after login', async () => {
@@ -110,4 +112,61 @@ describe('HttpAuthAdapter session hydration', () => {
       adapter.login({ identifier: 'operator', password: 'secret' }),
     ).rejects.toThrow('AUTH_WORKSPACE_REQUIRED');
   });
+
+  it('fails Backoffice login closed and revokes the browser session when Runtime denies application access', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          success: true,
+          data: {
+            accessToken: 'access-token',
+            accessExpiresAt: '2099-01-01T00:00:00.000Z',
+            refreshExpiresAt: '2099-02-01T00:00:00.000Z',
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse(
+          {
+            success: false,
+            error: {
+              code: 'BACKOFFICE_ACCESS_DENIED',
+              message: 'Backoffice access is not available',
+            },
+          },
+          403,
+        ),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({ success: true, data: { completed: true } }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const adapter = new HttpAuthAdapter(
+      'https://runtime.test',
+      'workspace-a',
+      'backoffice',
+    );
+
+    await expect(
+      adapter.login({ identifier: 'operator', password: 'secret' }),
+    ).rejects.toMatchObject({
+      status: 403,
+      code: 'BACKOFFICE_ACCESS_DENIED',
+    });
+
+    expect(window.sessionStorage.length).toBe(0);
+    const urls = fetchMock.mock.calls.map(([input]) => String(input));
+    expect(urls).toEqual([
+      'https://runtime.test/api/v1/auth/browser/login',
+      'https://runtime.test/api/v1/session/context',
+      'https://runtime.test/api/v1/auth/browser/logout',
+    ]);
+    for (const index of [0, 1, 2]) {
+      const headers = new Headers(fetchMock.mock.calls[index]?.[1]?.headers);
+      expect(headers.get('X-Digvation-Session-Channel')).toBe('backoffice');
+    }
+  });
+
 });

@@ -16,12 +16,14 @@ interface ApiResponse<T> {
 /** Browser adapter for authenticated Business Web experiences. */
 export class HttpAuthAdapter implements AuthPort {
   private readonly sessionClient: BrowserSessionClient;
+  private readonly sessionChannel: string;
 
   public constructor(
     private readonly apiBaseUrl: string,
     private readonly workspace: string | undefined,
     storageNamespace = 'business-web',
   ) {
+    this.sessionChannel = storageNamespace;
     this.sessionClient = new BrowserSessionClient(apiBaseUrl, storageNamespace);
   }
 
@@ -43,7 +45,7 @@ export class HttpAuthAdapter implements AuthPort {
     try {
       return await this.currentSession(accessToken);
     } catch (error) {
-      this.sessionClient.clearClientSession();
+      await this.sessionClient.logout();
       throw error;
     }
   }
@@ -107,6 +109,7 @@ export class HttpAuthAdapter implements AuthPort {
     options: { method: 'GET'; accessToken: string },
   ): Promise<T> {
     const headers = new Headers();
+    headers.set('X-Digvation-Session-Channel', this.sessionChannel);
     headers.set('authorization', `Bearer ${options.accessToken}`);
     const response = await fetch(`${this.apiBaseUrl}${path}`, {
       method: options.method,

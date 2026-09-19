@@ -54,6 +54,8 @@ export type BackofficeAction =
   | 'createReconciliation'
   | 'updateReconciliation';
 
+export const BACKOFFICE_ACCESS_PERMISSION = 'backoffice:access';
+
 interface PermissionRequirement {
   allOf?: readonly string[];
   anyOf?: readonly string[];
@@ -137,6 +139,8 @@ export function canAccessBackoffice(
   session: AuthSession,
   capability: BackofficeCapability,
 ): boolean {
+  if (!session.access.permissions.includes(BACKOFFICE_ACCESS_PERMISSION))
+    return false;
   const requirement = capabilityPermissions[capability];
   const permissions = session.access.permissions;
   const hasAll = (requirement.allOf ?? []).every((permission) => permissions.includes(permission));
@@ -149,6 +153,8 @@ export function canPerformBackofficeAction(
   session: AuthSession,
   action: BackofficeAction,
 ): boolean {
+  if (!session.access.permissions.includes(BACKOFFICE_ACCESS_PERMISSION))
+    return false;
   return actionPermissions[action].every((permission) =>
     session.access.permissions.includes(permission),
   );
