@@ -13,6 +13,10 @@ export interface Payment {
   tenderedAmount: string | null;
   changeAmount: string | null;
   providerReference: string | null;
+  financePaymentRouteId?: string | null;
+  financeFinancialAccountId?: string | null;
+  financeFinancialAccountCodeSnapshot?: string | null;
+  financeFinancialAccountNameSnapshot?: string | null;
   terminalAt: string | null;
   createdAt: string;
 }

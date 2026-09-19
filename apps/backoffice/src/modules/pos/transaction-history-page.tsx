@@ -415,8 +415,14 @@ function TransactionDetail({
                   >
                     <div className="min-w-0">
                       <p className="font-medium text-[var(--color-text)]">
-                        {humanReadableLabel(payment.method, locale)}
+                        {payment.financeFinancialAccountNameSnapshot?.trim() ||
+                          humanReadableLabel(payment.method, locale)}
                       </p>
+                      {payment.financeFinancialAccountNameSnapshot?.trim() ? (
+                        <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
+                          {humanReadableLabel(payment.method, locale)}
+                        </p>
+                      ) : null}
                       {payment.providerReference ? (
                         <p className="mt-1 break-words font-mono text-xs text-[var(--color-text-muted)]">
                           {payment.providerReference}
