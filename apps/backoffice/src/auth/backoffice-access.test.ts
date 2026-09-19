@@ -1,7 +1,11 @@
 import type { AuthSession } from '@digvation/business-auth';
 import { describe, expect, it } from 'vitest';
 
-import { canAccessBackoffice, canPerformBackofficeAction } from './backoffice-access';
+import {
+  BACKOFFICE_ACCESS_PERMISSION,
+  canAccessBackoffice,
+  canPerformBackofficeAction,
+} from './backoffice-access';
 
 function sessionWith(...permissions: string[]): AuthSession {
   return {
@@ -33,33 +37,37 @@ function sessionWith(...permissions: string[]): AuthSession {
   };
 }
 
+function backofficeSessionWith(...permissions: string[]): AuthSession {
+  return sessionWith(BACKOFFICE_ACCESS_PERMISSION, ...permissions);
+}
+
 describe('Backoffice effective permission access', () => {
   it('shows a contribution when Runtime projected its read permission', () => {
     expect(
-      canAccessBackoffice(sessionWith('sales:read', 'sales:read-completed'), 'transactions'),
+      canAccessBackoffice(backofficeSessionWith('sales:read', 'sales:read-completed'), 'transactions'),
     ).toBe(true);
     // Without completed-transaction access the history would only hold summaries.
-    expect(canAccessBackoffice(sessionWith('sales:read'), 'transactions')).toBe(false);
-    expect(canAccessBackoffice(sessionWith(), 'transactions')).toBe(false);
+    expect(canAccessBackoffice(backofficeSessionWith('sales:read'), 'transactions')).toBe(false);
+    expect(canAccessBackoffice(backofficeSessionWith(), 'transactions')).toBe(false);
   });
 
   it('does not duplicate Finance entitlement rules in the Web layer', () => {
-    expect(canAccessBackoffice(sessionWith('expenses:read'), 'expenses')).toBe(true);
-    expect(canAccessBackoffice(sessionWith(), 'expenses')).toBe(false);
+    expect(canAccessBackoffice(backofficeSessionWith('expenses:read'), 'expenses')).toBe(true);
+    expect(canAccessBackoffice(backofficeSessionWith(), 'expenses')).toBe(false);
   });
 
   it('uses projected Attendance permission as the visibility authority', () => {
-    expect(canAccessBackoffice(sessionWith('attendance:read'), 'attendance')).toBe(true);
-    expect(canAccessBackoffice(sessionWith(), 'attendance')).toBe(false);
+    expect(canAccessBackoffice(backofficeSessionWith('attendance:read'), 'attendance')).toBe(true);
+    expect(canAccessBackoffice(backofficeSessionWith(), 'attendance')).toBe(false);
   });
 
   it('uses projected Promotion permission and keeps mutation grants granular', () => {
-    const reader = sessionWith('promotions:read');
-    const creator = sessionWith('promotions:read', 'promotions:create');
-    const editor = sessionWith('promotions:read', 'promotions:update');
+    const reader = backofficeSessionWith('promotions:read');
+    const creator = backofficeSessionWith('promotions:read', 'promotions:create');
+    const editor = backofficeSessionWith('promotions:read', 'promotions:update');
 
     expect(canAccessBackoffice(reader, 'promotions')).toBe(true);
-    expect(canAccessBackoffice(sessionWith(), 'promotions')).toBe(false);
+    expect(canAccessBackoffice(backofficeSessionWith(), 'promotions')).toBe(false);
     expect(canPerformBackofficeAction(reader, 'createPromotion')).toBe(false);
     expect(canPerformBackofficeAction(creator, 'createPromotion')).toBe(true);
     expect(canPerformBackofficeAction(reader, 'updatePromotion')).toBe(false);
@@ -67,8 +75,42 @@ describe('Backoffice effective permission access', () => {
   });
 
   it('allows shared reporting for any readable authoritative projection', () => {
-    expect(canAccessBackoffice(sessionWith('employees:read'), 'reports')).toBe(true);
-    expect(canAccessBackoffice(sessionWith('attendance:read'), 'reports')).toBe(true);
-    expect(canAccessBackoffice(sessionWith(), 'reports')).toBe(false);
+    expect(canAccessBackoffice(backofficeSessionWith('employees:read'), 'reports')).toBe(true);
+    expect(canAccessBackoffice(backofficeSessionWith('attendance:read'), 'reports')).toBe(true);
+    expect(canAccessBackoffice(backofficeSessionWith(), 'reports')).toBe(false);
   });
+
+  it('does not treat an Operational role name or its permissions as Backoffice authority', () => {
+    const operationalOnly = sessionWith(
+      'sales:read',
+      'sales:create',
+      'sales:update',
+      'locations:read',
+      'catalog:read',
+      'pricing:read',
+    );
+    operationalOnly.identity.roles = [
+      {
+        id: 'role-cashier',
+        code: 'CASHIER',
+        name: 'Cashier',
+        systemKey: null,
+      },
+    ];
+
+    expect(canAccessBackoffice(operationalOnly, 'dashboard')).toBe(false);
+    expect(canAccessBackoffice(operationalOnly, 'catalog')).toBe(false);
+    expect(canPerformBackofficeAction(operationalOnly, 'viewSellingLocations')).toBe(false);
+
+    operationalOnly.identity.roles = [
+      {
+        id: 'role-mechanic',
+        code: 'MECHANIC',
+        name: 'Mechanic',
+        systemKey: null,
+      },
+    ];
+    expect(canAccessBackoffice(operationalOnly, 'dashboard')).toBe(false);
+  });
+
 });
