@@ -208,6 +208,24 @@ describe('saleSettlement', () => {
     });
   });
 
+  it('reconciles an exact two-way split and keeps cash tender separate from applied amount', () => {
+    expect(
+      saleSettlement({
+        totalAmount: '500000.0000',
+        payments: [
+          payment('SUCCEEDED', '300000.0000', 'QRIS'),
+          payment('SUCCEEDED', '200000.0000', 'CASH', '250000.0000', '50000.0000'),
+        ],
+      }),
+    ).toEqual({
+      totalPaid: '500000.0000',
+      balanceDue: '0.0000',
+      cashTendered: '250000.0000',
+      cashChange: '50000.0000',
+      paymentState: 'PAID',
+    });
+  });
+
   it('keeps a sale partially paid while a payment is pending or the total is not covered', () => {
     expect(
       saleSettlement({
