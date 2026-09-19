@@ -17,6 +17,47 @@ export interface DiscountPresentationRow {
   label: string;
   amount: string;
   percentage: string | null;
+  /** Recorded reason of a manual discount; never used as its title. */
+  reason: string | null;
+}
+
+/** Title and optional supporting note shown for one discount, identical on every surface. */
+export interface DiscountPresentationText {
+  title: string;
+  note: string | null;
+}
+
+function discountTitle(word: string, percentage: string | null): string {
+  return percentage ? `${word} (${percentage}%)` : word;
+}
+
+function reasonNote(reason: string | null | undefined): string | null {
+  const note = reason?.trim();
+  return note ? note : null;
+}
+
+/**
+ * A manual discount is titled by what it is ("Diskon (10%)" or "Diskon"); its
+ * recorded reason is only supporting text. A promotion keeps its own name.
+ */
+export function discountPresentation(
+  row: Pick<DiscountPresentationRow, 'source' | 'label' | 'percentage' | 'reason'>,
+  discountWord: string,
+): DiscountPresentationText {
+  if (row.source === 'PROMOTION')
+    return { title: discountTitle(row.label, row.percentage), note: null };
+  return { title: discountTitle(discountWord, row.percentage), note: reasonNote(row.reason) };
+}
+
+/** The manual discount set on one sale line, presented like any other manual discount. */
+export function lineDiscountPresentation(
+  line: Pick<SaleLine, 'discountType' | 'discountValue' | 'discountReason'>,
+  discountWord: string,
+): DiscountPresentationText {
+  return {
+    title: discountTitle(discountWord, lineDiscountPercentage(line)),
+    note: reasonNote(line.discountReason),
+  };
 }
 
 type DiscountPresentationSale = Pick<
@@ -75,6 +116,52 @@ export function lineDiscountPercentage(
   return line.discountType === 'PERCENTAGE' ? percentageFromRate(line.discountValue) : null;
 }
 
+/** One discount applied to a sale line, ready to render with its amount. */
+export interface LineDiscountRow extends DiscountPresentationText {
+  id: string;
+  amount: string;
+}
+
+/**
+ * Discounts on one line from the Runtime adjustments, so a promotion keeps its
+ * name and a manual discount reads "Diskon" with its reason as the note.
+ */
+export function lineDiscountRows(
+  sale: Pick<Sale, 'adjustments'>,
+  line: Pick<
+    SaleLine,
+    'id' | 'lineDiscountAmount' | 'discountType' | 'discountValue' | 'discountReason'
+  >,
+  discountWord: string,
+): LineDiscountRow[] {
+  const rows = (sale.adjustments ?? [])
+    .filter((adjustment) => adjustment.saleLineId === line.id && positive(adjustment.actualAmount))
+    .map((adjustment) => ({
+      id: adjustment.id,
+      amount: adjustment.actualAmount,
+      ...discountPresentation(
+        {
+          source: adjustment.source,
+          label: adjustment.label || 'Promo',
+          percentage:
+            adjustment.type === 'PERCENTAGE'
+              ? percentageFromRate(adjustment.configuredValue)
+              : null,
+          reason: adjustment.source === 'MANUAL_DISCOUNT' ? adjustment.reason : null,
+        },
+        discountWord,
+      ),
+    }));
+  if (rows.length || !positive(line.lineDiscountAmount)) return rows;
+  return [
+    {
+      id: `${line.id}-discount`,
+      amount: line.lineDiscountAmount,
+      ...lineDiscountPresentation(line, discountWord),
+    },
+  ];
+}
+
 export function saleDiscountRows(sale: DiscountPresentationSale): DiscountPresentationRow[] {
   const rows = (sale.adjustments ?? [])
     .filter((adjustment) => positive(adjustment.actualAmount))
@@ -89,9 +176,8 @@ export function saleDiscountRows(sale: DiscountPresentationSale): DiscountPresen
           : adjustment.label || 'Diskon manual',
       amount: adjustment.actualAmount,
       percentage:
-        adjustment.type === 'PERCENTAGE'
-          ? percentageFromRate(adjustment.configuredValue)
-          : null,
+        adjustment.type === 'PERCENTAGE' ? percentageFromRate(adjustment.configuredValue) : null,
+      reason: adjustment.source === 'MANUAL_DISCOUNT' ? adjustment.reason : null,
     }));
 
   const hasManualTransactionRow = rows.some(
@@ -114,6 +200,7 @@ export function saleDiscountRows(sale: DiscountPresentationSale): DiscountPresen
         sale.orderDiscountType === 'PERCENTAGE'
           ? percentageFromRate(sale.orderDiscountValue)
           : null,
+      reason: sale.orderDiscountReason,
     });
   }
 
@@ -124,7 +211,7 @@ export function transactionDiscountPercentage(sale: DiscountPresentationSale): s
   const rows = saleDiscountRows(sale);
   const transactionRows = rows.filter((row) => row.scope === 'TRANSACTION');
   return rows.length === 1 && transactionRows.length === 1
-    ? transactionRows[0]?.percentage ?? null
+    ? (transactionRows[0]?.percentage ?? null)
     : null;
 }
 

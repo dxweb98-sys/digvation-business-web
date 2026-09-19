@@ -12,14 +12,13 @@ import {
   DDialog as Dialog,
   DDropdown as Dropdown,
   DInput,
-  DInput as Input,
   DRadio,
   DSearchInput as SearchInput,
   DSelect as Select,
   DSkeleton as Skeleton,
   useToast,
 } from '@digvation-labs/ui';
-import { DTabs, DTabsContent, DTabsList, DTabsTrigger } from '@digvation/ui';
+import { DTabs, DTabsContent, DTabsList, DTabsTrigger, DTextarea } from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
 import {
   AlertCircle,
@@ -72,6 +71,8 @@ import {
   formatServiceDuration,
   lineDiscountPercentage,
   saleDiscountRows,
+  discountPresentation,
+  lineDiscountRows,
   saleSettlement,
   saleTaxLabel,
   transactionDiscountLabel,
@@ -1393,6 +1394,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       />
 
       <ReferenceOrderAdjustmentDialog
+        key={displayedAdjustmentTarget?.id ?? 'adjustment-closed'}
         sale={displayedAdjustmentTarget}
         items={workspace.items}
         locale={workspace.locale}
@@ -1680,9 +1682,7 @@ function ReferenceQueueBoard({
             className={`size-[18px] text-[var(--color-text-muted)] transition-transform md:hidden ${open ? 'rotate-180' : ''}`}
           />
         </button>
-        <div
-          className={`pos-collapsible grid ${open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
-        >
+        <div className={`pos-collapsible grid ${open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
           <div className="overflow-hidden">
             <DTabs
               value={active}
@@ -2189,7 +2189,9 @@ function ReferenceCartPanel({
                         {money(line.effectiveUnitPrice, locale)}
                         {line.variantNameSnapshot ? `, ${line.variantNameSnapshot}` : ''}
                         {line.itemTypeSnapshot === 'SERVICE' ? (
-                          <span className="ml-1 font-semibold text-cyan-700">{copy('Service')}</span>
+                          <span className="ml-1 font-semibold text-cyan-700">
+                            {copy('Service')}
+                          </span>
                         ) : null}
                       </p>
                     </div>
@@ -2208,7 +2210,9 @@ function ReferenceCartPanel({
                         type="button"
                         aria-label={`${copy('Decrease quantity')} ${line.itemNameSnapshot}`}
                         onClick={() => increment(line, 'down')}
-                        disabled={createDecimal(line.quantity).lessThanOrEqualTo(createDecimal('1'))}
+                        disabled={createDecimal(line.quantity).lessThanOrEqualTo(
+                          createDecimal('1'),
+                        )}
                         className="flex h-9 items-center justify-center border-r border-[var(--color-border)] text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)] active:bg-[var(--color-surface-muted)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[var(--color-text-muted)]"
                       >
                         <Minus className="size-3.5" />
@@ -2510,7 +2514,7 @@ function ReferencePaymentDialog({
       closeOnOverlay
       className="pos-reference-dialog w-full max-w-lg overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
       footer={
-        <div className="flex shrink-0 flex-col-reverse justify-end gap-2 sm:flex-row">
+        <div className="flex flex-col-reverse justify-end gap-2 sm:flex-row">
           <DButton variant="ghost" onClick={onClose}>
             {copy('Cancel')}
           </DButton>
@@ -2574,8 +2578,6 @@ function ReferencePaymentDialog({
         </div>
 
         {adjustmentSlot}
-
-
 
         <div className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)]">
           <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-2.5">
@@ -2874,6 +2876,7 @@ function ReferenceTransactionDetail({
             label: copy('Promotions and discounts'),
             amount: sale.discountAmount,
             percentage: null,
+            reason: null,
           },
         ]
       : discountRows;
@@ -2895,40 +2898,69 @@ function ReferenceTransactionDetail({
         closeOnEscape
         closeOnOverlay
         noPadding
-        size={showReceipt ? 'md' : 'lg'}
+        size="md"
         className="pos-reference-dialog max-h-[92dvh] w-full overflow-hidden"
         footer={
-          <div
-            className={`flex flex-col-reverse gap-2 sm:flex-row sm:items-center ${showReceipt ? 'sm:justify-between' : 'sm:justify-end'}`}
-          >
-            {showReceipt ? (
-              <div
-                className="pos-receipt-preview-toolbar flex items-center gap-1.5"
-                aria-label={copy('Paper size')}
-              >
-                <DButton
-                  size="sm"
-                  variant={receiptPaper === '58' ? 'primary' : 'secondary'}
-                  onClick={() => setReceiptPaper('58')}
+          showReceipt ? (
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between gap-3">
+                <span
+                  id="pos-receipt-paper-label"
+                  className="text-xs text-[var(--color-text-muted)]"
                 >
-                  58 mm
+                  {copy('Paper width')}
+                </span>
+                <div
+                  role="radiogroup"
+                  aria-labelledby="pos-receipt-paper-label"
+                  className="grid grid-cols-2 gap-1 rounded-[var(--radius-control)] bg-[var(--color-surface-muted)] p-1"
+                >
+                  {(['58', '80'] as const).map((paper) => (
+                    <button
+                      key={paper}
+                      type="button"
+                      role="radio"
+                      aria-checked={receiptPaper === paper}
+                      onClick={() => setReceiptPaper(paper)}
+                      className={`min-h-8 rounded-[calc(var(--radius-control)-2px)] px-3 text-xs font-semibold tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/30 ${
+                        receiptPaper === paper
+                          ? 'bg-[var(--color-surface)] text-[var(--color-text)] shadow-sm'
+                          : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
+                      }`}
+                    >
+                      {paper} mm
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+                <DButton variant="ghost" onClick={onClose}>
+                  {copy('Close')}
                 </DButton>
+                {onSendReceipt ? (
+                  <DButton
+                    variant="outline"
+                    loading={Boolean(isSendingReceipt)}
+                    onClick={() => onSendReceipt(sale)}
+                  >
+                    {copy('Send via WhatsApp')}
+                  </DButton>
+                ) : null}
                 <DButton
-                  size="sm"
-                  variant={receiptPaper === '80' ? 'primary' : 'secondary'}
-                  onClick={() => setReceiptPaper('80')}
+                  variant="primary"
+                  leftIcon={<Printer className="size-3.5" />}
+                  onClick={() => window.print()}
                 >
-                  80 mm
+                  {copy('Print')}
                 </DButton>
               </div>
-            ) : null}
-            <div
-              className={`flex flex-col-reverse gap-2 sm:flex-row sm:items-center ${showReceipt ? 'pos-receipt-actions' : ''}`}
-            >
+            </div>
+          ) : (
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
               <DButton variant="ghost" onClick={onClose}>
                 {copy('Close')}
               </DButton>
-              {!showReceipt && receiptAvailable ? (
+              {receiptAvailable ? (
                 <DButton
                   rightIcon={<Printer className="size-3.5" />}
                   variant="outline"
@@ -2937,7 +2969,7 @@ function ReferenceTransactionDetail({
                   {copy('View receipt')}
                 </DButton>
               ) : null}
-              {!showReceipt && status === 'PROGRESS' ? (
+              {status === 'PROGRESS' ? (
                 <DButton
                   variant="primary"
                   disabled={completionIssues.length > 0}
@@ -2948,32 +2980,15 @@ function ReferenceTransactionDetail({
                   {copy('Complete transaction')}
                 </DButton>
               ) : null}
-              {showReceipt && onSendReceipt ? (
-                <DButton
-                  variant="outline"
-                  loading={Boolean(isSendingReceipt)}
-                  onClick={() => onSendReceipt(sale)}
-                >
-                  {copy('Send via WhatsApp')}
-                </DButton>
-              ) : null}
-              {showReceipt ? (
-                <DButton
-                  rightIcon={<Printer className="size-3.5" />}
-                  variant="outline"
-                  onClick={() => window.print()}
-                >
-                  {copy('Print')}
-                </DButton>
-              ) : null}
             </div>
-          </div>
+          )
         }
       >
         {showReceipt ? (
-          <div className="flex max-h-[92dvh] min-h-0 flex-col px-5 py-4 sm:px-6">
+          // The receipt sits as paper on a muted desk; the dialog body is the only scroll region.
+          <div className="pos-receipt-desk">
             <div
-              className={`pos-receipt-preview pos-receipt-print--${receiptPaper} min-h-0 flex-1 overflow-y-auto bg-white text-slate-950`}
+              className={`pos-receipt-preview pos-receipt-print--${receiptPaper} bg-white text-slate-950`}
             >
               <ReceiptContent
                 sale={sale}
@@ -3101,7 +3116,6 @@ function ReferenceTransactionDetail({
                     attributed &&
                     (employeeAssignmentIssues(line, locale).length > 0 ||
                       (plannedUnits > 0 && plannedUnits !== serviceWorkUnitCount(line)));
-                  const discountPercentage = lineDiscountPercentage(line);
                   const durationLabel = formatDurationMinutes(
                     line.defaultDurationMinutesSnapshot,
                     locale,
@@ -3114,16 +3128,13 @@ function ReferenceTransactionDetail({
                     <SaleLineItem
                       key={line.id}
                       name={line.itemNameSnapshot}
-                      pricing={`${quantity(line.quantity)} × ${format(line.effectiveUnitPrice)}${line.variantNameSnapshot ? ` · ${line.variantNameSnapshot}` : ''}`}
+                      variant={line.variantNameSnapshot}
+                      pricing={`${quantity(line.quantity)} × ${format(line.effectiveUnitPrice)}`}
                       amount={format(line.grossAmount)}
-                      discount={
-                        isPositiveDecimal(line.lineDiscountAmount)
-                          ? {
-                              label: `${copy('Item discount')}${discountPercentage ? ` (${discountPercentage}%)` : ''}`,
-                              amount: format(line.lineDiscountAmount),
-                            }
-                          : null
-                      }
+                      discounts={lineDiscountRows(sale, line, copy('Discount')).map((row) => ({
+                        ...row,
+                        amount: format(row.amount),
+                      }))}
                       context={
                         line.fulfillment || durationLabel ? (
                           <>
@@ -3166,6 +3177,7 @@ function ReferenceTransactionDetail({
                   settled: copy('Paid'),
                   cashReceived: copy('Cash received'),
                   change: copy('Change'),
+                  discount: copy('Discount'),
                   discountContext: (row) =>
                     `${copy(row.source === 'PROMOTION' ? 'Promotion' : 'Manual discount')} · ${copy(
                       row.scope === 'TRANSACTION'
@@ -3178,9 +3190,7 @@ function ReferenceTransactionDetail({
                 gross={sale.grossAmount}
                 discounts={summaryDiscounts}
                 tax={
-                  hasTax
-                    ? { label: saleTaxLabel(sale, copy('Tax')), amount: sale.taxAmount }
-                    : null
+                  hasTax ? { label: saleTaxLabel(sale, copy('Tax')), amount: sale.taxAmount } : null
                 }
                 total={sale.totalAmount}
                 settlement={settlement}
@@ -3281,9 +3291,7 @@ function ReceiptContent({
         <h2 className="text-lg font-black tracking-tight">{businessName}</h2>
         <p className="mt-1 text-xs text-slate-500">{branchName}</p>
         <div className="my-4 border-t border-dashed border-slate-300" />
-        <p className="font-mono text-xs font-semibold">
-          {transactionNumber(sale, locale)}
-        </p>
+        <p className="font-mono text-xs font-semibold">{transactionNumber(sale, locale)}</p>
         <p className="mt-1 text-[11px] text-slate-500">{transactionDate}</p>
         <p className="mt-1 text-[11px] text-slate-500">
           {copy('Cashier')}: {cashierName}
@@ -3302,7 +3310,7 @@ function ReceiptContent({
 
       <section className="space-y-2.5">
         {activeLines.map((line) => {
-          const discountPercentage = lineDiscountPercentage(line);
+          const lineDiscounts = lineDiscountRows(sale, line, copy('Discount'));
           return (
             <div key={line.id} className="text-xs leading-4">
               <div className="flex items-start justify-between gap-3">
@@ -3317,15 +3325,22 @@ function ReceiptContent({
               <p className="mt-1 text-slate-500">
                 {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
               </p>
-              {isPositiveDecimal(line.lineDiscountAmount) ? (
-                <div className="mt-1 flex justify-between gap-3 text-slate-500">
-                  <span>
-                    {copy('Item discount')}
-                    {discountPercentage ? ` (${discountPercentage}%)` : ''}
+              {lineDiscounts.map((discount) => (
+                <div
+                  key={discount.id}
+                  className="mt-1 flex items-start justify-between gap-3 text-slate-500"
+                >
+                  <span className="min-w-0">
+                    {discount.title}
+                    {discount.note ? (
+                      <span className="block break-words text-[10px] leading-3">
+                        {discount.note}
+                      </span>
+                    ) : null}
                   </span>
-                  <span>−{money(line.lineDiscountAmount, locale)}</span>
+                  <span className="shrink-0">−{money(discount.amount, locale)}</span>
                 </div>
-              ) : null}
+              ))}
             </div>
           );
         })}
@@ -3338,15 +3353,20 @@ function ReceiptContent({
           <dt className="text-slate-500">{copy('Subtotal')}</dt>
           <dd>{money(sale.grossAmount, locale)}</dd>
         </div>
-        {discountRows.map((row) => (
-          <div key={row.id} className="flex justify-between gap-3">
-            <dt className="text-slate-500">
-              {row.label || copy('Discount')}
-              {row.percentage ? ` (${row.percentage}%)` : ''}
-            </dt>
-            <dd>−{money(row.amount, locale)}</dd>
-          </div>
-        ))}
+        {discountRows.map((row) => {
+          const text = discountPresentation(row, copy('Discount'));
+          return (
+            <div key={row.id} className="flex items-start justify-between gap-3">
+              <dt className="min-w-0 text-slate-500">
+                {text.title}
+                {text.note ? (
+                  <span className="block break-words text-[10px] leading-3">{text.note}</span>
+                ) : null}
+              </dt>
+              <dd className="shrink-0">−{money(row.amount, locale)}</dd>
+            </div>
+          );
+        })}
         {hasDiscount && discountRows.length === 0 ? (
           <div className="flex justify-between gap-3">
             <dt className="text-slate-500">{copy('Discount')}</dt>
@@ -3424,6 +3444,16 @@ function ReferenceOrderAdjustmentDialog({
 }) {
   const { copy } = useOperationalLocalization();
   const [catalogSearch, setCatalogSearch] = useState('');
+  const [catalogOpen, setCatalogOpen] = useState(false);
+  // Quantities when the dialog opened; only rows that differ show what changed.
+  const [baseline] = useState<ReadonlyMap<string, string>>(
+    () =>
+      new Map(
+        (sale?.lines ?? [])
+          .filter((line) => line.removedAt === null)
+          .map((line) => [line.id, line.quantity]),
+      ),
+  );
   const [variantSelection, setVariantSelection] = useState<{
     itemId: string;
     variantId: string;
@@ -3435,11 +3465,33 @@ function ReferenceOrderAdjustmentDialog({
 
   if (!sale) return null;
 
-  const paid = hasSuccessfulPayment(sale);
-  const { totalPaid } = financialSummary(sale);
-  const paidAmount = createDecimal(totalPaid);
-  const saleTotal = createDecimal(sale.totalAmount);
   const activeLines = sale.lines.filter((line) => line.removedAt === null);
+  const removedCount = [...baseline.keys()].filter(
+    (lineId) => !activeLines.some((line) => line.id === lineId),
+  ).length;
+  const changed =
+    removedCount > 0 ||
+    activeLines.some((line) => {
+      const before = baseline.get(line.id);
+      return before === undefined || !createDecimal(before).equals(createDecimal(line.quantity));
+    });
+  // Both figures come from the Runtime-returned Sale after each command.
+  const settlement = saleSettlement(sale);
+  const paidAmount = createDecimal(settlement.totalPaid);
+  const saleTotal = createDecimal(sale.totalAmount);
+  const consequence = paidAmount.greaterThan(saleTotal)
+    ? {
+        label: copy('Refund'),
+        amount: paidAmount.minus(saleTotal).toFixed(4),
+        tone: 'text-[var(--color-warning)]',
+      }
+    : paidAmount.greaterThan(createDecimal('0')) && saleTotal.greaterThan(paidAmount)
+      ? {
+          label: copy('Additional payment'),
+          amount: settlement.balanceDue,
+          tone: 'text-[var(--color-brand)]',
+        }
+      : { label: copy('Total'), amount: sale.totalAmount, tone: 'text-[var(--color-text)]' };
   const options = items
     .filter((item) => {
       const query = catalogSearch.trim().toLocaleLowerCase();
@@ -3450,70 +3502,83 @@ function ReferenceOrderAdjustmentDialog({
       value: item.id,
       label: `${item.name} (${item.code})`,
     }));
+  const stepperClass =
+    'flex size-8 items-center justify-center rounded-lg border border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] disabled:cursor-not-allowed disabled:opacity-40';
 
   return (
     <Dialog
       open
       onClose={onClose}
       title={copy('Adjust order')}
-      description={`${transactionNumber(sale, locale)}. ${copy('Changes apply to this transaction.')}`}
+      description={transactionNumber(sale, locale)}
       ariaLabel={copy('Adjust order')}
       closeOnEscape
       closeOnOverlay
       className="pos-reference-dialog w-full max-w-xl overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
       footer={
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={onClose}>
-            {copy('Cancel')}
-          </Button>
-          <Button disabled={isMutating} onClick={onClose}>
-            {copy('Confirm adjustment')}
-          </Button>
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0" aria-live="polite">
+            <p className="text-[11px] text-[var(--color-text-muted)]">{consequence.label}</p>
+            <p className={`text-base font-semibold tabular-nums ${consequence.tone}`}>
+              {money(consequence.amount, locale)}
+            </p>
+          </div>
+          <div className="flex shrink-0 gap-2">
+            {changed ? null : (
+              <Button variant="ghost" onClick={onClose}>
+                {copy('Cancel')}
+              </Button>
+            )}
+            <Button disabled={isMutating} onClick={onClose}>
+              {copy('Save adjustment')}
+            </Button>
+          </div>
         </div>
       }
     >
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
-        {paid ? (
-          <div className="rounded-xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 px-3 py-2 text-xs">
-            <p className="font-semibold text-[var(--color-warning)]">
-              {copy('Previous payment remains recorded')}
-            </p>
-            <p className="mt-1 text-[var(--color-text-muted)]">
-              {copy('You can add items. Reducing or removing paid items requires a refund.')}
-            </p>
-          </div>
-        ) : (
-          <p className="text-xs text-[var(--color-text-muted)]">
-            {copy('Change quantity or remove items that have not started, then confirm.')}
-          </p>
-        )}
-        <div className="divide-y divide-[var(--color-border)] overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-background)]">
+      <div className="space-y-3">
+        <p className="text-xs text-[var(--color-text-muted)]">
+          {copy(
+            hasSuccessfulPayment(sale)
+              ? 'Each change is recorded right away. Items already paid stay on the payment record.'
+              : 'Each change is recorded right away.',
+          )}
+        </p>
+        <ul className="divide-y divide-[var(--color-border)] rounded-xl border border-[var(--color-border)]">
           {activeLines.map((line) => {
             const lineMutable = !line.fulfillment || line.fulfillment.status === 'WAITING';
             const canDecrease =
               lineMutable && createDecimal(line.quantity).greaterThan(createDecimal('1'));
-            const canRemove = lineMutable;
-            const projectedTotalAfterRemoval = saleTotal.minus(createDecimal(line.totalAmount));
-            const removalRefund = paidAmount.greaterThan(projectedTotalAfterRemoval)
-              ? paidAmount.minus(projectedTotalAfterRemoval)
-              : createDecimal('0');
+            const before = baseline.get(line.id);
+            const lineChange =
+              before === undefined
+                ? copy('New')
+                : createDecimal(before).equals(createDecimal(line.quantity))
+                  ? null
+                  : `${copy('Was')} ${quantity(before)}`;
             return (
-              <div key={line.id} className="flex items-center justify-between gap-3 p-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold">{line.itemNameSnapshot}</p>
-                  {line.variantNameSnapshot ? (
-                    <p className="mt-0.5 truncate text-xs font-medium text-[var(--color-text-muted)]">
-                      {line.variantNameSnapshot}
-                    </p>
-                  ) : null}
-                  <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
-                    {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
+              <li key={line.id} className="flex items-center gap-3 px-3 py-2">
+                <div className="min-w-0 flex-1">
+                  <p
+                    className="truncate text-sm"
+                    title={`${line.itemNameSnapshot}${line.variantNameSnapshot ? ` · ${line.variantNameSnapshot}` : ''}`}
+                  >
+                    <span className="font-semibold">{line.itemNameSnapshot}</span>
+                    {line.variantNameSnapshot ? (
+                      <span className="text-[var(--color-text-muted)]">
+                        {' '}
+                        · {line.variantNameSnapshot}
+                      </span>
+                    ) : null}
                   </p>
-                  {paid && removalRefund.greaterThan(createDecimal('0')) ? (
-                    <p className="mt-1 text-[11px] font-semibold text-[var(--color-warning)]">
-                      {copy('Refund required')}: {money(removalRefund.toFixed(4), locale)}
-                    </p>
-                  ) : null}
+                  <p className="flex items-center gap-2 text-xs tabular-nums text-[var(--color-text-muted)]">
+                    {money(line.effectiveUnitPrice, locale)}
+                    {lineChange ? (
+                      <span className="rounded-full bg-[var(--color-brand)]/10 px-1.5 text-[10px] font-semibold text-[var(--color-brand)]">
+                        {lineChange}
+                      </span>
+                    ) : null}
+                  </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
                   <button
@@ -3526,11 +3591,11 @@ function ReferenceOrderAdjustmentDialog({
                         createDecimal(line.quantity).minus(createDecimal('1')).toFixed(4),
                       )
                     }
-                    className="flex size-8 items-center justify-center rounded-lg border border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] disabled:cursor-not-allowed disabled:opacity-40"
+                    className={stepperClass}
                   >
                     <Minus className="size-3.5" />
                   </button>
-                  <span className="w-8 text-center text-xs font-semibold">
+                  <span className="w-7 text-center text-xs font-semibold tabular-nums">
                     {quantity(line.quantity)}
                   </span>
                   <button
@@ -3543,46 +3608,60 @@ function ReferenceOrderAdjustmentDialog({
                         createDecimal(line.quantity).plus(createDecimal('1')).toFixed(4),
                       )
                     }
-                    className="flex size-8 items-center justify-center rounded-lg border border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] disabled:cursor-not-allowed disabled:opacity-40"
+                    className={stepperClass}
                   >
                     <Plus className="size-3.5" />
                   </button>
                   <button
                     type="button"
                     aria-label={`${copy('Remove')} ${line.itemNameSnapshot}`}
-                    disabled={!canRemove || isMutating}
+                    disabled={!lineMutable || isMutating}
                     onClick={() => onRemove(line)}
-                    className="ml-1 flex size-8 items-center justify-center rounded-lg text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="ml-0.5 flex size-8 items-center justify-center rounded-lg text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <Trash2 className="size-3.5" />
                   </button>
                 </div>
-              </div>
+              </li>
             );
           })}
-        </div>
-
-        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] p-3">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
-            {copy('Add item from catalog')}
+        </ul>
+        {removedCount ? (
+          <p className="text-xs text-[var(--color-text-muted)]">
+            {removedCount} {copy('items removed')}
           </p>
-          <Combobox
-            ariaLabel={copy('Add item from catalog')}
-            value={null}
-            placeholder={copy('Search product or service')}
-            options={options}
-            onSearchChange={setCatalogSearch}
-            onChange={(itemId) => {
-              const item = items.find((candidate) => candidate.id === itemId);
-              if (item) onAdd(item);
-            }}
+        ) : null}
+
+        {catalogOpen || variantPicker ? (
+          <div className="space-y-2">
+            <Combobox
+              ariaLabel={copy('Add item from catalog')}
+              value={null}
+              placeholder={copy('Search product or service')}
+              options={options}
+              onSearchChange={setCatalogSearch}
+              onChange={(itemId) => {
+                const item = items.find((candidate) => candidate.id === itemId);
+                if (item) onAdd(item);
+              }}
+              disabled={isMutating}
+              idleMessage={copy('Search by item name or code.')}
+            />
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setCatalogOpen(true)}
             disabled={isMutating}
-            idleMessage={copy('Search by item name or code.')}
-          />
-        </div>
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-semibold text-[var(--color-brand)] hover:bg-[var(--color-brand)]/10 disabled:opacity-50"
+          >
+            <Plus className="size-3.5" aria-hidden="true" />
+            {copy('Add item from catalog')}
+          </button>
+        )}
 
         {variantPicker ? (
-          <section className="border-t border-[var(--color-border)] pt-3">
+          <section className="rounded-xl border border-[var(--color-border)] p-3">
             <div className="space-y-3">
               <p className="text-sm font-semibold text-[var(--color-text)]">
                 {variantPicker.item.name}
@@ -3806,61 +3885,15 @@ function ReferenceCancelDialog({
   return (
     <Dialog
       open={Boolean(sale)}
+      title={copy('Cancel transaction')}
+      description={sale ? transactionNumber(sale, locale) : ''}
       onClose={onClose}
       ariaLabel={copy('Cancel transaction')}
       closeOnEscape={!isMutating}
       closeOnOverlay={!isMutating}
-      className="pos-reference-dialog w-full max-w-md rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
-    >
-      <div className="p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-danger)]">
-              {copy('Cancel transaction')}
-            </p>
-            <h2 className="mt-1 text-lg font-semibold">{copy('Cancel this transaction?')}</h2>
-            <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-              {sale ? transactionNumber(sale, locale) : ''}.{' '}
-              {copy('The transaction remains recorded in today queue.')}
-            </p>
-          </div>
-          <button
-            type="button"
-            aria-label={copy('Close')}
-            disabled={isMutating}
-            onClick={onClose}
-            className="rounded-lg p-2 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] disabled:opacity-40"
-          >
-            <X className="size-[18px]" />
-          </button>
-        </div>
-        {hasRefund ? (
-          <div className="mt-4 rounded-xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 px-3 py-3">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-sm font-semibold text-[var(--color-warning)]">
-                {copy('Refund required')}
-              </span>
-              <span className="text-sm font-bold text-[var(--color-warning)]">
-                {money(refundAmount, locale)}
-              </span>
-            </div>
-            <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-              {copy('Previous payment remains recorded')}
-            </p>
-          </div>
-        ) : null}
-        <label className="mt-5 block text-sm font-medium">
-          {copy('Cancellation reason')}
-          <Input
-            className="mt-1.5 h-10 rounded-lg"
-            autoFocus
-            value={reason}
-            disabled={isMutating}
-            onChange={onReasonChange}
-            placeholder={copy('Example: Customer request')}
-          />
-        </label>
-        <div className="mt-5 flex justify-end gap-2">
+      className="pos-reference-dialog w-full max-w-md rounded-t-2xl bg-(--color-surface) shadow-xl sm:rounded-xl"
+      footer={
+        <div className="flex justify-end gap-2">
           <Button variant="outline" disabled={isMutating} onClick={onClose}>
             {copy('Back')}
           </Button>
@@ -3873,7 +3906,36 @@ function ReferenceCancelDialog({
             {copy('Confirm cancellation')}
           </Button>
         </div>
-      </div>
+      }
+    >
+      <>
+        {hasRefund ? (
+          <div className="mt-4 rounded-xl border border-(--color-warning)/30 bg-(--color-warning)/10 px-3 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm font-semibold text-(--color-warning)">
+                {copy('Refund required')}
+              </span>
+              <span className="text-sm font-bold text-(--color-warning)">
+                {money(refundAmount, locale)}
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-(--color-text-muted)">
+              {copy('Previous payment remains recorded')}
+            </p>
+          </div>
+        ) : null}
+        <label className="mt-5 block text-sm font-medium">
+          {copy('Cancellation reason')}
+          <DTextarea
+            className="mt-1.5 h-10 rounded-lg"
+            autoFocus
+            value={reason}
+            disabled={isMutating}
+            onChange={onReasonChange}
+            placeholder={copy('Example: Customer request')}
+          />
+        </label>
+      </>
     </Dialog>
   );
 }

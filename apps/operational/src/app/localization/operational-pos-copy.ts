@@ -427,6 +427,21 @@ const posCopy: Record<string, LocalizedCopy> = {
     'id-ID': 'Pengerjaan belum tersedia untuk transaksi ini.',
     'en-US': 'Work units are not available for this transaction.',
   },
+  Refund: { 'id-ID': 'Pengembalian dana', 'en-US': 'Refund' },
+  'Additional payment': { 'id-ID': 'Tambahan pembayaran', 'en-US': 'Additional payment' },
+  'Save adjustment': { 'id-ID': 'Simpan penyesuaian', 'en-US': 'Save adjustment' },
+  'Each change is recorded right away.': {
+    'id-ID': 'Setiap perubahan langsung tercatat.',
+    'en-US': 'Each change is recorded right away.',
+  },
+  'Each change is recorded right away. Items already paid stay on the payment record.': {
+    'id-ID':
+      'Setiap perubahan langsung tercatat. Item yang sudah dibayar tetap ada di catatan pembayaran.',
+    'en-US': 'Each change is recorded right away. Items already paid stay on the payment record.',
+  },
+  New: { 'id-ID': 'Baru', 'en-US': 'New' },
+  Was: { 'id-ID': 'Semula', 'en-US': 'Was' },
+  'items removed': { 'id-ID': 'item dihapus', 'en-US': 'items removed' },
   'Who is doing this service?': {
     'id-ID': 'Siapa yang mengerjakan?',
     'en-US': 'Who is doing this service?',
@@ -506,6 +521,7 @@ const posCopy: Record<string, LocalizedCopy> = {
   'Choose employee': { 'id-ID': 'Pilih karyawan', 'en-US': 'Choose employee' },
   'Edit employee': { 'id-ID': 'Ubah', 'en-US': 'Edit employee' },
   'Change employee': { 'id-ID': 'Ubah karyawan', 'en-US': 'Change employee' },
+  'Paper width': { 'id-ID': 'Lebar kertas', 'en-US': 'Paper width' },
 };
 
 export function operationalPosCopy(value: string, locale: OperationalLocale): string | undefined {

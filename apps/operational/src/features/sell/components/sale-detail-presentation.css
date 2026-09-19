@@ -48,3 +48,16 @@
   flex-direction: column;
   gap: 20px;
 }
+
+/* Order rows: tight inside an item, clearly wider between items. */
+.pos-line-item {
+  padding-block: 12px;
+}
+
+.pos-line-list > .pos-line-item:first-child {
+  padding-top: 10px;
+}
+
+.pos-line-list > .pos-line-item:last-child {
+  padding-bottom: 10px;
+}

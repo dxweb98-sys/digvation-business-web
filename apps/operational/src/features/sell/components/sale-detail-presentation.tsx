@@ -2,10 +2,15 @@ import type { ReactNode } from 'react';
 
 import './sale-detail-presentation.css';
 
-import type { DiscountPresentationRow, SaleSettlement } from '../sale-presentation';
+import {
+  discountPresentation,
+  type DiscountPresentationRow,
+  type DiscountPresentationText,
+  type SaleSettlement,
+} from '../sale-presentation';
 
 /**
- * Presentation primitives shared by the queue transaction detail and Transaction History detail.
+ * Presentation primitives for the Operational transaction detail and receipt.
  * They only lay out authoritative Sale values that callers have already formatted.
  */
 
@@ -125,23 +130,31 @@ export function SaleDetailSection({
 }
 
 export function SaleLineItemList({ children }: { children: ReactNode }) {
-  return <ul className="divide-y divide-[var(--color-border)]">{children}</ul>;
+  return <ul className="pos-line-list divide-y divide-[var(--color-border)]">{children}</ul>;
 }
 
+/**
+ * One order row. Space inside an item stays tight and space between items is
+ * wider, so each item reads as one unit without adding a card per item. The
+ * money column on the right carries the line total and any discount.
+ */
 export function SaleLineItem({
   name,
+  variant,
   pricing,
   amount,
-  discount,
+  discounts = [],
   context,
   detail,
   action,
 }: {
   name: string;
-  /** Quantity, unit price, and variant as one secondary line. */
+  variant?: string | null;
+  /** Quantity × unit price. */
   pricing: string;
   amount: string;
-  discount?: { label: string; amount: string } | null;
+  /** Discounts on this line, each with its own title, optional note and amount. */
+  discounts?: readonly { id: string; title: string; note: string | null; amount: string }[];
   /** Secondary operational context such as fulfillment status and performers. */
   context?: ReactNode;
   /** A full-width block under the context row, such as who performs the service. */
@@ -149,27 +162,35 @@ export function SaleLineItem({
   action?: ReactNode;
 }) {
   return (
-    <li className="py-3">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold leading-5 text-[var(--color-text)]">{name}</p>
-          <p className="mt-0.5 text-xs tabular-nums text-[var(--color-text-muted)]">{pricing}</p>
-        </div>
-        <p className="shrink-0 text-sm font-semibold tabular-nums text-[var(--color-text)]">
-          {amount}
+    <li className="pos-line-item">
+      <div className="flex min-w-0 items-baseline justify-between gap-4">
+        <p className="min-w-0 break-words text-sm font-semibold leading-5 text-[var(--color-text)]">
+          {name}
         </p>
+        <span className="shrink-0 text-sm font-semibold tabular-nums text-[var(--color-text)]">
+          {amount}
+        </span>
       </div>
-      {discount ? (
-        <div className="mt-1 flex items-center justify-between gap-4 text-xs">
-          <span className="text-[var(--color-text-muted)]">{discount.label}</span>
-          <span className="font-medium tabular-nums text-[var(--color-danger)]">
+      <p className="mt-0.5 flex min-w-0 flex-wrap gap-x-3 text-xs tabular-nums text-[var(--color-text-muted)]">
+        {variant ? <span className="min-w-0 break-words">{variant}</span> : null}
+        <span>{pricing}</span>
+      </p>
+      {discounts.map((discount) => (
+        <div key={discount.id} className="mt-1 flex items-start justify-between gap-4 text-xs">
+          <span className="min-w-0 text-[var(--color-text-muted)]">
+            {discount.title}
+            {discount.note ? (
+              <span className="block break-words text-[11px] leading-4">{discount.note}</span>
+            ) : null}
+          </span>
+          <span className="shrink-0 font-medium tabular-nums text-[var(--color-danger)]">
             −{discount.amount}
           </span>
         </div>
-      ) : null}
+      ))}
       {context || action ? (
-        <div className="mt-2 flex min-w-0 items-center gap-2 rounded-[var(--radius-control)] bg-[var(--color-surface-muted)]/55 px-2.5 py-1.5 text-xs text-[var(--color-text-muted)]">
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+        <div className="mt-1.5 flex min-w-0 items-center gap-3 text-xs text-[var(--color-text-muted)]">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
             {context}
           </div>
           {action ? <div className="shrink-0">{action}</div> : null}
@@ -177,6 +198,23 @@ export function SaleLineItem({
       ) : null}
       {detail}
     </li>
+  );
+}
+
+/** Discount title with its supporting note underneath; the note never becomes the title. */
+function DiscountTerm({
+  text,
+  context,
+}: {
+  text: DiscountPresentationText;
+  context: string | null;
+}) {
+  const note = text.note ?? context;
+  return (
+    <dt className="min-w-0 text-[var(--color-text-muted)]">
+      <span className="text-[var(--color-text)]">{text.title}</span>
+      {note ? <span className="block break-words text-xs">{note}</span> : null}
+    </dt>
   );
 }
 
@@ -197,7 +235,9 @@ export function SaleFinancialSummary({
     settled: string;
     cashReceived: string;
     change: string;
-    /** Source and scope context, for example "Promo · Whole transaction". */
+    /** Title word of a manual discount, for example "Diskon". */
+    discount: string;
+    /** Source and scope context shown under a promotion, for example "Promo · Whole transaction". */
     discountContext: (row: DiscountPresentationRow) => string;
   };
   gross: string;
@@ -217,13 +257,10 @@ export function SaleFinancialSummary({
         </div>
         {discounts.map((row) => (
           <div key={row.id} className="flex items-start justify-between gap-4">
-            <dt className="min-w-0 text-[var(--color-text-muted)]">
-              <span className="text-[var(--color-text)]">
-                {row.label}
-                {row.percentage ? ` (${row.percentage}%)` : ''}
-              </span>
-              <span className="block text-xs">{labels.discountContext(row)}</span>
-            </dt>
+            <DiscountTerm
+              text={discountPresentation(row, labels.discount)}
+              context={row.source === 'PROMOTION' ? labels.discountContext(row) : null}
+            />
             <dd className="shrink-0 tabular-nums text-[var(--color-danger)]">
               −{format(row.amount)}
             </dd>

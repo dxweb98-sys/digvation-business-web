@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import type { EmployeeContribution, SaleAdjustment } from './cashier-transaction.types';
 import {
+  discountPresentation,
+  lineDiscountPresentation,
   employeeDisplayName,
   lineBaseSubtotal,
   lineDiscountPercentage,
@@ -42,9 +44,7 @@ const emptyOrderDiscount = {
 describe('sale presentation', () => {
   it('keeps the authoritative base line subtotal separate from the net line total', () => {
     expect(lineBaseSubtotal({ grossAmount: '150000.0000' })).toBe('150000.0000');
-    expect(lineDiscountPercentage({ discountType: 'PERCENTAGE', discountValue: '0.1' })).toBe(
-      '10',
-    );
+    expect(lineDiscountPercentage({ discountType: 'PERCENTAGE', discountValue: '0.1' })).toBe('10');
     expect(
       lineDiscountPercentage({ discountType: 'FIXED_AMOUNT', discountValue: '15000.0000' }),
     ).toBeNull();
@@ -156,22 +156,18 @@ describe('sale presentation', () => {
     } satisfies EmployeeContribution;
 
     expect(
-      employeeDisplayName(
-        { contributions: [contribution] },
-        'employee-1',
-        [{ id: 'employee-1', displayName: 'Nama Baru' }],
-      ),
+      employeeDisplayName({ contributions: [contribution] }, 'employee-1', [
+        { id: 'employee-1', displayName: 'Nama Baru' },
+      ]),
     ).toBe('Rindu Putri');
     expect(
-      employeeDisplayName(
-        { contributions: [] },
-        'employee-1',
-        [{ id: 'employee-1', displayName: 'Rindu Putri' }],
-      ),
+      employeeDisplayName({ contributions: [] }, 'employee-1', [
+        { id: 'employee-1', displayName: 'Rindu Putri' },
+      ]),
     ).toBe('Rindu Putri');
-    expect(employeeDisplayName({ contributions: [] }, 'missing-id', [], 'Karyawan tidak tersedia')).toBe(
-      'Karyawan tidak tersedia',
-    );
+    expect(
+      employeeDisplayName({ contributions: [] }, 'missing-id', [], 'Karyawan tidak tersedia'),
+    ).toBe('Karyawan tidak tersedia');
   });
 });
 
@@ -225,5 +221,50 @@ describe('saleSettlement', () => {
         payments: [payment('SUCCEEDED', '150000.0000', 'QRIS'), payment('PENDING', '1.0000')],
       }).paymentState,
     ).toBe('PARTIALLY_PAID');
+  });
+});
+
+describe('discount presentation', () => {
+  const manual = (percentage: string | null, reason: string | null) => ({
+    source: 'MANUAL_DISCOUNT' as const,
+    label: reason ?? '',
+    percentage,
+    reason,
+  });
+
+  it('titles a manual discount by what it is and keeps the reason secondary', () => {
+    expect(discountPresentation(manual('10', 'diskon apaan'), 'Diskon')).toEqual({
+      title: 'Diskon (10%)',
+      note: 'diskon apaan',
+    });
+    expect(discountPresentation(manual(null, 'diskon apaan'), 'Diskon')).toEqual({
+      title: 'Diskon',
+      note: 'diskon apaan',
+    });
+  });
+
+  it('omits the note when no reason was recorded', () => {
+    expect(discountPresentation(manual('10', '  '), 'Diskon')).toEqual({
+      title: 'Diskon (10%)',
+      note: null,
+    });
+  });
+
+  it('keeps the promotion name', () => {
+    expect(
+      discountPresentation(
+        { source: 'PROMOTION', label: 'Promo Hari Ibu', percentage: '15', reason: null },
+        'Diskon',
+      ),
+    ).toEqual({ title: 'Promo Hari Ibu (15%)', note: null });
+  });
+
+  it('presents a line discount the same way', () => {
+    expect(
+      lineDiscountPresentation(
+        { discountType: 'PERCENTAGE', discountValue: '0.1', discountReason: 'langganan' },
+        'Diskon',
+      ),
+    ).toEqual({ title: 'Diskon (10%)', note: 'langganan' });
   });
 });
