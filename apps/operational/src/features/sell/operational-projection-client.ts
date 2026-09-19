@@ -207,6 +207,12 @@ export function attachOperationalProjection(
       input,
     );
 
+  operational.setSaleLineWorkUnits = (saleId, saleLineId, input) =>
+    client.post<Sale>(
+      `${OPERATIONAL_PREFIX}/transactions/${saleId}/lines/${saleLineId}/work-units`,
+      input,
+    );
+
   operational.setSaleLineAssignments = (saleId, saleLineId, input) =>
     client.post<Sale>(
       `${OPERATIONAL_PREFIX}/transactions/${saleId}/lines/${saleLineId}/assignments`,

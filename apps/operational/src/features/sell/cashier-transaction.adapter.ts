@@ -81,6 +81,12 @@ export interface ServicePerformersInput {
   performers: Array<{ employeeId: string; shareRate?: string }>;
 }
 
+export interface ServiceWorkUnitsInput {
+  expectedVersion: number;
+  /** One entry per unit of quantity, in unit order; shares are fractions summing to 1. */
+  units: Array<{ performers: Array<{ employeeId: string; shareRate: string }> }>;
+}
+
 export interface FulfillmentInput {
   expectedVersion: number;
   status: Exclude<FulfillmentStatus, 'WAITING'>;
@@ -176,6 +182,11 @@ export interface SaleTransactionClient {
     saleId: string,
     saleLineId: string,
     input: ServicePerformersInput,
+  ): Promise<Sale>;
+  setSaleLineWorkUnits?(
+    saleId: string,
+    saleLineId: string,
+    input: ServiceWorkUnitsInput,
   ): Promise<Sale>;
   setSaleLineAssignments(saleId: string, saleLineId: string, input: AssignmentInput): Promise<Sale>;
   setSaleLineContributions(
@@ -437,6 +448,17 @@ export class HttpCashierTransactionAdapter
   ): Promise<Sale> {
     return this.client.post<Sale>(
       `${API_PREFIX}/sales/${saleId}/lines/${saleLineId}/performers`,
+      input,
+    );
+  }
+
+  public setSaleLineWorkUnits(
+    saleId: string,
+    saleLineId: string,
+    input: ServiceWorkUnitsInput,
+  ): Promise<Sale> {
+    return this.client.post<Sale>(
+      `${API_PREFIX}/sales/${saleId}/lines/${saleLineId}/work-units`,
       input,
     );
   }

@@ -134,6 +134,7 @@ export function SaleLineItem({
   amount,
   discount,
   context,
+  detail,
   action,
 }: {
   name: string;
@@ -143,6 +144,8 @@ export function SaleLineItem({
   discount?: { label: string; amount: string } | null;
   /** Secondary operational context such as fulfillment status and performers. */
   context?: ReactNode;
+  /** A full-width block under the context row, such as who performs the service. */
+  detail?: ReactNode;
   action?: ReactNode;
 }) {
   return (
@@ -172,6 +175,7 @@ export function SaleLineItem({
           {action ? <div className="shrink-0">{action}</div> : null}
         </div>
       ) : null}
+      {detail}
     </li>
   );
 }

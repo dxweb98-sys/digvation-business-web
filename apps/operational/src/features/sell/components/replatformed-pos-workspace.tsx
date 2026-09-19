@@ -90,11 +90,7 @@ import type {
 import type { CatalogItemTypeFilter } from '../use-selling-catalog';
 import type { useCashierTransactionWorkspace } from '../use-cashier-transaction-workspace';
 
-import {
-  normalizeCurrencyPresentationInput,
-  PosCurrencyInput,
-  PosNumericInput,
-} from './pos-controls';
+import { normalizeCurrencyPresentationInput, PosCurrencyInput } from './pos-controls';
 import {
   SaleDetailHeader,
   SaleDetailSection,
@@ -106,6 +102,19 @@ import {
 } from './sale-detail-presentation';
 import { SaleAdjustmentControls } from './sale-adjustment-controls';
 import { SaleLineTaskDialog } from './sale-line-task-dialog';
+import {
+  ServicePerformersDialog,
+  serviceWorkUnitAllocations,
+  serviceWorkUnitCount,
+} from './service-performers-dialog';
+import {
+  formatPercent,
+  formatUnitRanges,
+  groupAllocations,
+  resolveAllocation,
+  type PerformerAllocation,
+  type ServiceLineWorkPlan,
+} from '../service-performer-allocation';
 import type { VariantPickerState } from './variant-picker';
 import './replatformed-pos-workspace.css';
 
@@ -117,18 +126,6 @@ interface QueuedSaleEntry {
   sellingLocationId: string;
   saleCreatedAt: string;
 }
-
-interface ServiceWorkContributor {
-  employeeId: string;
-  shareRate: string;
-}
-
-interface ServiceWorkUnit {
-  index: number;
-  contributors: readonly ServiceWorkContributor[];
-}
-
-type ServiceWorkUnitsByLine = Readonly<Record<string, readonly ServiceWorkUnit[]>>;
 
 const QUEUED_SALE_IDS_KEY = 'digvation-pos-demo-queued-sale-ids';
 const CANCELED_SALE_REASONS_KEY = 'digvation-pos-demo-canceled-sale-reasons';
@@ -270,120 +267,184 @@ function customerStatus(customer: SaleCustomer | null): {
     : { label: 'Non-member', variant: 'outline' };
 }
 
-function serviceWorkKey(line: SaleLine): string {
-  return `${line.saleId}:${line.id}`;
+interface PerformerCredit {
+  employeeId: string;
+  name: string;
+  /** Shown only when the split was set by hand; an even split needs no numbers. */
+  percent: string | null;
 }
 
-function serviceWorkUnitCount(line: SaleLine): number {
-  try {
-    const quantity = createDecimal(line.quantity);
-    if (!quantity.isInteger() || quantity.lessThanOrEqualTo(createDecimal('1'))) return 1;
-    const count = quantity.toNumber();
-    return Number.isSafeInteger(count) ? count : 1;
-  } catch {
-    return 1;
-  }
+interface PerformerGroup {
+  /** Units this setting covers, e.g. "1–2, 4–7"; null when it covers the whole line. */
+  units: string | null;
+  performers: PerformerCredit[];
 }
 
-function defaultWorkContributors(line: SaleLine): ServiceWorkContributor[] {
-  return line.participations
-    .filter((participation) => participation.assigned)
-    .map((participation) => ({
-      employeeId: participation.employeeId,
-      shareRate: participation.shareRate ?? '0.0000',
-    }));
-}
-
-function serviceWorkUnitsFor(
-  line: SaleLine,
-  storedUnits: readonly ServiceWorkUnit[] | undefined,
-): ServiceWorkUnit[] {
-  const count = serviceWorkUnitCount(line);
-  const storedByIndex = new Map(storedUnits?.map((unit) => [unit.index, unit]));
-  const fallbackContributors = defaultWorkContributors(line);
-
-  return Array.from({ length: count }, (value, index) => {
-    void value;
-    const stored = storedByIndex.get(index);
-    return {
-      index,
-      contributors: stored?.contributors ?? fallbackContributors,
-    };
-  });
-}
-
-function contributionTotal(contributors: readonly ServiceWorkContributor[]) {
-  return contributors.reduce(
-    (total, contributor) => total.plus(createDecimal(contributor.shareRate || '0')),
-    createDecimal('0'),
-  );
-}
-
-function hasValidWorkAssignment(line: SaleLine, unit: ServiceWorkUnit): boolean {
-  if (
-    line.employeeAssignmentModeSnapshot === 'REQUIRED' &&
-    !unit.contributors.some((contributor) => contributor.employeeId)
-  ) {
-    return false;
-  }
-  if (line.allowEmployeeContributionSnapshot) {
-    return (
-      unit.contributors.length > 0 &&
-      unit.contributors.every((contributor) => Boolean(contributor.employeeId)) &&
-      contributionTotal(unit.contributors).equals(createDecimal('1'))
-    );
-  }
-  return true;
-}
-
-function serviceWorkAssignmentSummary(
-  units: readonly ServiceWorkUnit[],
-  employees: readonly Employee[],
-  locale: string,
-): string {
-  const assignments = units.map((unit) =>
-    unit.contributors
-      .filter((contributor) => contributor.employeeId)
-      .map((contributor) => `${contributor.employeeId}:${contributor.shareRate}`)
-      .join('|'),
-  );
-  const firstAssignment = assignments[0] ?? '';
-  if (!firstAssignment || assignments.some((assignment) => !assignment))
-    return copyFor('No employees assigned', locale);
-  const configurationCount = new Set(assignments).size;
-  if (configurationCount > 1) return `${configurationCount} ${copyFor('configurations', locale)}`;
-
-  const names = (units[0]?.contributors ?? [])
-    .filter((contributor) => contributor.employeeId)
-    .map(
-      (contributor) =>
-        employees.find((employee) => employee.id === contributor.employeeId)?.displayName ??
-        copyFor('Employee unavailable', locale),
-    );
-  return `${names.join(', ')} ${copyFor('for all work units', locale)}`;
-}
-
-function employeeWorkSummary(
+/**
+ * Who performs a service line. Units with an identical assignment collapse
+ * into one group, so a line reads as one setting unless units really differ.
+ */
+function servicePerformerSummary(
   line: SaleLine,
   employees: readonly Employee[],
   locale: string,
-): string {
-  const assigned = line.participations.filter((participation) => participation.assigned);
-  if (!assigned.length) return copyFor('Not assigned', locale);
-  return assigned
-    .map((participation) => {
-      const displayName = employeeDisplayName(
+): { unitCount: number; groups: PerformerGroup[] } {
+  const units = serviceWorkUnitAllocations(line);
+  const credits = (allocation: PerformerAllocation): PerformerCredit[] => {
+    const { shares } = resolveAllocation(allocation);
+    const custom = shares.some((share) => share.manual);
+    return shares.map((share) => ({
+      employeeId: share.employeeId,
+      name: employeeDisplayName(
         line,
-        participation.employeeId,
+        share.employeeId,
         employees,
         copyFor('Employee unavailable', locale),
-      );
-      const share = participation.shareRate
-        ? `${createDecimal(participation.shareRate).times(100).toFixed(0)}%`
-        : null;
-      return share ? `${displayName} ${share}` : displayName;
-    })
-    .join(', ');
+      ),
+      percent: custom ? `${formatPercent(share.basisPoints, locale)}%` : null,
+    }));
+  };
+  const grouped = groupAllocations(units);
+  return {
+    unitCount: units.length,
+    groups: grouped.map((group) => ({
+      units: grouped.length > 1 ? formatUnitRanges(group.unitNumbers) : null,
+      performers: credits(group.allocation),
+    })),
+  };
+}
+
+/** Distinct settings listed before the rest folds away, keeping long lines scannable. */
+const VISIBLE_PERFORMER_GROUPS = 3;
+
+function PerformerNames({ performers }: { performers: readonly PerformerCredit[] }) {
+  const { copy } = useOperationalLocalization();
+  if (!performers.length)
+    return (
+      <span className="font-medium text-[var(--color-warning)]">{copy('No employee yet')}</span>
+    );
+  return (
+    // Bold name + muted share already separate people; a wrapped name keeps its
+    // share right after its last word.
+    <ul className="m-0 flex min-w-0 list-none flex-wrap gap-x-3 gap-y-0.5 p-0">
+      {performers.map((performer) => (
+        <li key={performer.employeeId} className="min-w-0 break-words">
+          <span className="font-medium text-[var(--color-text)]">{performer.name}</span>
+          {performer.percent ? (
+            <span className="ml-1 whitespace-nowrap tabular-nums text-[var(--color-text-muted)]">
+              {performer.percent}
+            </span>
+          ) : null}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * The performers of one service line as a compact, self-contained block: who,
+ * which services it covers, and the one action that changes it.
+ */
+function ServicePerformerSummary({
+  itemName,
+  summary,
+  needsAttention,
+  editable,
+  disabled,
+  onEdit,
+}: {
+  itemName: string;
+  summary: ReturnType<typeof servicePerformerSummary>;
+  needsAttention: boolean;
+  editable: boolean;
+  disabled: boolean;
+  onEdit: () => void;
+}) {
+  const { copy } = useOperationalLocalization();
+  const [expanded, setExpanded] = useState(false);
+  const { unitCount, groups } = summary;
+  const varied = groups.length > 1;
+  const foldable = groups.length > VISIBLE_PERFORMER_GROUPS;
+  const shown = foldable && !expanded ? groups.slice(0, VISIBLE_PERFORMER_GROUPS - 1) : groups;
+  const hiddenCount = groups.length - shown.length;
+  const scope = varied
+    ? copy('Different for each service')
+    : unitCount > 1
+      ? `${copy('Applies to')} ${unitCount} ${copy('services')}`
+      : null;
+
+  return (
+    <section
+      aria-label={`${copy('Performed by')}: ${itemName}`}
+      className={`mt-2 rounded-[var(--radius-control)] px-3 py-2 text-xs ${
+        needsAttention
+          ? 'bg-[var(--color-warning)]/10 ring-1 ring-inset ring-[var(--color-warning)]/25'
+          : 'bg-[var(--color-surface-muted)]/70'
+      }`}
+    >
+      <div className="flex min-h-7 items-center justify-between gap-2">
+        <p className="flex min-w-0 flex-wrap items-baseline gap-x-1.5">
+          <span className="font-semibold text-[var(--color-text)]">{copy('Performed by')}</span>
+          {scope ? <span className="text-[var(--color-text-muted)]">· {scope}</span> : null}
+        </p>
+        {editable ? (
+          <DButton
+            size="sm"
+            variant={needsAttention ? 'outline' : 'ghost'}
+            disabled={disabled}
+            leftIcon={
+              needsAttention ? <UserPlus className="size-3.5" /> : <Pencil className="size-3.5" />
+            }
+            aria-label={`${copy(needsAttention ? 'Choose employee' : 'Change employee')}: ${itemName}`}
+            className="-mr-1.5 h-7 shrink-0 px-2 text-xs"
+            onClick={onEdit}
+          >
+            {copy(needsAttention ? 'Choose employee' : 'Edit employee')}
+          </DButton>
+        ) : null}
+      </div>
+
+      {varied ? (
+        <>
+          <dl className="mt-0.5 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3">
+            {shown.map((group, index) => (
+              <div
+                key={group.units}
+                className={`col-span-2 grid grid-cols-subgrid py-1.5 ${
+                  index > 0 ? 'border-t border-[var(--color-border)]' : ''
+                }`}
+              >
+                <dt className="max-w-[7.5rem] break-words tabular-nums text-[var(--color-text-muted)]">
+                  {copy('Service')} {group.units}
+                </dt>
+                <dd className="m-0 min-w-0">
+                  <PerformerNames performers={group.performers} />
+                </dd>
+              </div>
+            ))}
+          </dl>
+          {foldable ? (
+            <button
+              type="button"
+              aria-expanded={expanded}
+              onClick={() => setExpanded((current) => !current)}
+              className="inline-flex min-h-7 items-center gap-1 rounded-md font-semibold text-[var(--color-brand)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/30"
+            >
+              {expanded ? copy('Show less') : `${copy('Show')} ${hiddenCount} ${copy('more')}`}
+              <ChevronDown
+                className={`size-3.5 transition-transform motion-reduce:transition-none ${expanded ? 'rotate-180' : ''}`}
+                aria-hidden="true"
+              />
+            </button>
+          ) : null}
+        </>
+      ) : (
+        <div className="pb-0.5">
+          <PerformerNames performers={groups[0]?.performers ?? []} />
+        </div>
+      )}
+    </section>
+  );
 }
 
 function queueStatus(sale: Sale): QueueStatus | null {
@@ -441,7 +502,7 @@ function employeeAssignmentIssues(line: SaleLine, locale: string): string[] {
   return issues;
 }
 
-function workflowIssues(sale: Sale, serviceWorkUnits: ServiceWorkUnitsByLine = {}, locale: string) {
+function workflowIssues(sale: Sale, locale: string) {
   const issues: string[] = [];
   const active = sale.lines.filter((line) => line.removedAt === null);
   if (!active.length) issues.push(copyFor('Add at least one item.', locale));
@@ -467,13 +528,11 @@ function workflowIssues(sale: Sale, serviceWorkUnits: ServiceWorkUnitsByLine = {
       line.itemTypeSnapshot === 'SERVICE' && line.fulfillmentBehaviorSnapshot === 'TRACKED';
     if (!requiresTrackedServiceAssignment) continue;
 
-    const units = serviceWorkUnitsFor(line, serviceWorkUnits[serviceWorkKey(line)]);
-    if (units.length > 1) {
-      if (units.some((unit) => !hasValidWorkAssignment(line, unit))) {
-        issues.push(
-          `${line.itemNameSnapshot}: ${copyFor('Each service unit must have employee contribution totaling 100%.', locale)}`,
-        );
-      }
+    const plannedUnits = line.workUnits?.length ?? 0;
+    if (plannedUnits > 0 && plannedUnits !== serviceWorkUnitCount(line)) {
+      issues.push(
+        `${line.itemNameSnapshot}: ${copyFor('Every work unit needs at least one employee.', locale)}`,
+      );
       continue;
     }
 
@@ -606,16 +665,11 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const [completionConfirmationTarget, setCompletionConfirmationTarget] = useState<Sale | null>(
     null,
   );
-  const [assignmentLine, setAssignmentLine] = useState<SaleLine | null>(null);
-  const [queueAssignmentTarget, setQueueAssignmentTarget] = useState<{
+  const [performerTarget, setPerformerTarget] = useState<{
     sale: Sale;
     line: SaleLine;
   } | null>(null);
-  const [serviceWorkTarget, setServiceWorkTarget] = useState<{
-    sale: Sale;
-    line: SaleLine;
-  } | null>(null);
-  const [serviceWorkUnits, setServiceWorkUnits] = useState<ServiceWorkUnitsByLine>({});
+  const [isSavingPerformers, setSavingPerformers] = useState(false);
   const [receiptSaleId, setReceiptSaleId] = useState<string | null>(null);
   const [isSendingReceipt, setSendingReceipt] = useState(false);
 
@@ -839,50 +893,33 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     }
   };
 
-  const saveServiceWorkUnits = async (
+  const savePerformers = async (
     target: { sale: Sale; line: SaleLine },
-    units: readonly ServiceWorkUnit[],
+    plans: ServiceLineWorkPlan[],
   ) => {
-    if (units.some((unit) => !hasValidWorkAssignment(target.line, unit))) {
-      showToast({
-        title: copy('Complete employee assignment'),
-        description: copy('Each service unit must have employee contribution totaling 100%.'),
-        variant: 'warning',
-      });
-      return;
-    }
-
-    const representative = units[0];
-    if (!representative) return;
+    setSavingPerformers(true);
     try {
-      const updated = await workspace.setQueuedAssignments(
-        target.sale,
-        target.line,
-        representative.contributors.map((contributor) => contributor.employeeId),
-        representative.contributors.map((contributor) => ({
-          employeeId: contributor.employeeId,
-          shareRate: contributor.shareRate,
-        })),
-      );
-      setServiceWorkUnits((current) => ({ ...current, [serviceWorkKey(target.line)]: units }));
+      const updated = await workspace.setQueuedWorkUnits(target.sale, plans);
       setQueueDetail(updated);
-      setServiceWorkTarget(null);
+      setPerformerTarget(null);
       showToast({
-        title: copy('Work assignment updated'),
-        description: copy('Employee assignments were saved for each service unit.'),
+        title: copy('Employee updated'),
+        description: copy('Service assignment saved for this transaction.'),
         variant: 'success',
       });
     } catch {
       showToast({
-        title: copy('Could not update work assignment'),
-        description: copy('Employee assignments were not changed. Try again.'),
+        title: copy('Could not update employee'),
+        description: copy('Assignment was not changed. Try again.'),
         variant: 'danger',
       });
+    } finally {
+      setSavingPerformers(false);
     }
   };
 
   const completeQueuedTransaction = (transaction: Sale) => {
-    const issues = workflowIssues(transaction, serviceWorkUnits, workspace.locale);
+    const issues = workflowIssues(transaction, workspace.locale);
     if (issues.length) return;
     setCompletionConfirmationTarget(transaction);
   };
@@ -890,7 +927,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const confirmQueuedCompletion = async () => {
     if (
       !completionConfirmationTarget ||
-      workflowIssues(completionConfirmationTarget, serviceWorkUnits, workspace.locale).length
+      workflowIssues(completionConfirmationTarget, workspace.locale).length
     ) {
       return;
     }
@@ -1347,13 +1384,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         onAssign={(line) => {
           if (!displayedQueueDetail) return;
           workspace.requestEmployeeOptions();
-          setQueueAssignmentTarget({ sale: displayedQueueDetail, line });
-        }}
-        serviceWorkUnits={serviceWorkUnits}
-        onManageServiceWork={(line) => {
-          if (!displayedQueueDetail) return;
-          workspace.requestEmployeeOptions();
-          setServiceWorkTarget({ sale: displayedQueueDetail, line });
+          setPerformerTarget({ sale: displayedQueueDetail, line });
         }}
         onComplete={() => {
           if (displayedQueueDetail) void completeQueuedTransaction(displayedQueueDetail);
@@ -1432,77 +1463,17 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         onConfirm={confirmCancel}
       />
 
-      <ReferenceEmployeeDialog
-        key={assignmentLine?.id ?? 'closed'}
-        line={assignmentLine}
-        employees={workspace.employees}
-        locale={workspace.locale}
-        onClose={() => setAssignmentLine(null)}
-        onSave={(employeeIds, contributors) => {
-          if (!assignmentLine) return;
-          workspace.setAssignments(assignmentLine, employeeIds);
-          if (assignmentLine.allowEmployeeContributionSnapshot)
-            workspace.setContributions(assignmentLine, contributors);
-          setAssignmentLine(null);
-        }}
-      />
-
-      <ReferenceServiceWorkDialog
-        key={
-          serviceWorkTarget
-            ? `${serviceWorkTarget.sale.id}:${serviceWorkTarget.line.id}`
-            : 'service-work-closed'
-        }
-        line={serviceWorkTarget?.line ?? null}
-        employees={workspace.employees}
-        locale={workspace.locale}
-        units={
-          serviceWorkTarget
-            ? serviceWorkUnitsFor(
-                serviceWorkTarget.line,
-                serviceWorkUnits[serviceWorkKey(serviceWorkTarget.line)],
-              )
-            : []
-        }
-        onClose={() => setServiceWorkTarget(null)}
-        onSave={(units) => {
-          if (serviceWorkTarget) void saveServiceWorkUnits(serviceWorkTarget, units);
-        }}
-      />
-
-      <ReferenceEmployeeDialog
-        key={
-          queueAssignmentTarget
-            ? `${queueAssignmentTarget.sale.id}:${queueAssignmentTarget.line.id}`
-            : 'queue-assignment-closed'
-        }
-        line={queueAssignmentTarget?.line ?? null}
-        employees={workspace.employees}
-        locale={workspace.locale}
-        onClose={() => setQueueAssignmentTarget(null)}
-        onSave={(employeeIds, contributors) => {
-          const target = queueAssignmentTarget;
-          if (!target) return;
-          void workspace
-            .setQueuedAssignments(target.sale, target.line, employeeIds, contributors)
-            .then((updated) => {
-              setQueueDetail(updated);
-              setQueueAssignmentTarget(null);
-              showToast({
-                title: copy('Employee updated'),
-                description: copy('Service assignment saved for this transaction.'),
-                variant: 'success',
-              });
-            })
-            .catch(() => {
-              showToast({
-                title: copy('Could not update employee'),
-                description: copy('Assignment was not changed. Try again.'),
-                variant: 'danger',
-              });
-            });
-        }}
-      />
+      {performerTarget ? (
+        <ServicePerformersDialog
+          key={`${performerTarget.sale.id}:${performerTarget.line.id}`}
+          sale={performerTarget.sale}
+          lineId={performerTarget.line.id}
+          employees={workspace.employees}
+          isSaving={isSavingPerformers}
+          onClose={() => setPerformerTarget(null)}
+          onSave={(plans) => void savePerformers(performerTarget, plans)}
+        />
+      ) : null}
 
       {workspace.lineTask ? (
         <SaleLineTaskDialog
@@ -2845,8 +2816,6 @@ function ReferenceTransactionDetail({
   onSendReceipt,
   isSendingReceipt,
   onAssign,
-  serviceWorkUnits,
-  onManageServiceWork,
   onComplete,
   isMutating,
 }: {
@@ -2864,8 +2833,6 @@ function ReferenceTransactionDetail({
   onSendReceipt?: (sale: Sale) => void;
   isSendingReceipt?: boolean;
   onAssign: (line: SaleLine) => void;
-  serviceWorkUnits: ServiceWorkUnitsByLine;
-  onManageServiceWork: (line: SaleLine) => void;
   onComplete: () => void;
   isMutating: boolean;
 }) {
@@ -2887,8 +2854,7 @@ function ReferenceTransactionDetail({
   const settlement = saleSettlement(sale);
   const hasDiscount = !createDecimal(sale.discountAmount).equals(createDecimal('0'));
   const hasTax = !createDecimal(sale.taxAmount).equals(createDecimal('0'));
-  const completionIssues =
-    status === 'PROGRESS' ? workflowIssues(sale, serviceWorkUnits, locale) : [];
+  const completionIssues = status === 'PROGRESS' ? workflowIssues(sale, locale) : [];
   const completionIssueGroups = groupWorkflowIssues(sale, completionIssues, locale);
   const transactionDate = new Intl.DateTimeFormat(locale, {
     dateStyle: 'medium',
@@ -3126,34 +3092,24 @@ function ReferenceTransactionDetail({
                     line.itemTypeSnapshot === 'SERVICE' &&
                     line.fulfillmentBehaviorSnapshot === 'TRACKED' &&
                     line.fulfillment !== null;
-                  const isMultiUnitService =
-                    line.itemTypeSnapshot === 'SERVICE' &&
-                    line.fulfillmentBehaviorSnapshot === 'TRACKED' &&
-                    serviceWorkUnitCount(line) > 1;
                   const requiresEmployeeAttribution =
                     line.employeeAssignmentModeSnapshot !== 'NONE' ||
                     line.allowEmployeeContributionSnapshot;
-                  const employeeIssues = employeeAssignmentIssues(line, locale);
+                  const attributed = isTrackedService && requiresEmployeeAttribution;
+                  const plannedUnits = line.workUnits?.length ?? 0;
+                  const needsAttention =
+                    attributed &&
+                    (employeeAssignmentIssues(line, locale).length > 0 ||
+                      (plannedUnits > 0 && plannedUnits !== serviceWorkUnitCount(line)));
                   const discountPercentage = lineDiscountPercentage(line);
-                  const units = isMultiUnitService
-                    ? serviceWorkUnitsFor(line, serviceWorkUnits[serviceWorkKey(line)])
-                    : [];
                   const durationLabel = formatDurationMinutes(
                     line.defaultDurationMinutesSnapshot,
                     locale,
                   );
-                  const workSummary = isMultiUnitService
-                    ? `${units.length} ${copy('work units')} · ${serviceWorkAssignmentSummary(units, employees, locale)}`
-                    : isTrackedService && requiresEmployeeAttribution
-                      ? employeeIssues.length
-                        ? employeeWorkSummary(line, employees, locale)
-                        : `${copy('Performed by')} ${employeeWorkSummary(line, employees, locale)}`
-                      : null;
-                  const editable = isMultiUnitService
-                    ? status === 'PROGRESS'
-                    : isTrackedService && requiresEmployeeAttribution && status === 'PROGRESS';
-                  const onEdit = () =>
-                    isMultiUnitService ? onManageServiceWork(line) : onAssign(line);
+                  const workSummary = attributed
+                    ? servicePerformerSummary(line, employees, locale)
+                    : null;
+                  const editable = attributed && status === 'PROGRESS';
                   return (
                     <SaleLineItem
                       key={line.id}
@@ -3169,7 +3125,7 @@ function ReferenceTransactionDetail({
                           : null
                       }
                       context={
-                        line.fulfillment || workSummary || durationLabel ? (
+                        line.fulfillment || durationLabel ? (
                           <>
                             {line.fulfillment ? (
                               <StatusPill
@@ -3179,35 +3135,19 @@ function ReferenceTransactionDetail({
                               </StatusPill>
                             ) : null}
                             {durationLabel ? <span>{durationLabel}</span> : null}
-                            {workSummary ? (
-                              <span className="min-w-0 truncate">{workSummary}</span>
-                            ) : null}
                           </>
                         ) : null
                       }
-                      action={
-                        editable ? (
-                          !isMultiUnitService && employeeIssues.length > 0 ? (
-                            <DButton
-                              size="sm"
-                              variant="outline"
-                              disabled={isMutating}
-                              className="h-7 px-2 text-[11px]"
-                              onClick={onEdit}
-                            >
-                              {copy('Configure')}
-                            </DButton>
-                          ) : (
-                            <DButton
-                              size="icon"
-                              variant="ghost"
-                              disabled={isMutating}
-                              aria-label={`${copy('Configure')} ${line.itemNameSnapshot}`}
-                              onClick={onEdit}
-                            >
-                              <Pencil className="size-3.5" />
-                            </DButton>
-                          )
+                      detail={
+                        workSummary ? (
+                          <ServicePerformerSummary
+                            itemName={line.itemNameSnapshot}
+                            summary={workSummary}
+                            needsAttention={needsAttention}
+                            editable={editable}
+                            disabled={isMutating}
+                            onEdit={() => onAssign(line)}
+                          />
                         ) : null
                       }
                     />
@@ -3933,456 +3873,6 @@ function ReferenceCancelDialog({
             {copy('Confirm cancellation')}
           </Button>
         </div>
-      </div>
-    </Dialog>
-  );
-}
-
-function ReferenceEmployeeDialog({
-  line,
-  employees,
-  locale,
-  onClose,
-  onSave,
-}: {
-  line: SaleLine | null;
-  employees: readonly Employee[];
-  locale: string;
-  onClose: () => void;
-  onSave: (
-    employeeIds: string[],
-    contributors: Array<{ employeeId: string; shareRate: string }>,
-  ) => void;
-}) {
-  const { copy } = useOperationalLocalization();
-  const initialRows =
-    line?.participations
-      .filter((participation) => participation.assigned)
-      .map((participation) => ({
-        employeeId: participation.employeeId,
-        shareRate: participation.shareRate
-          ? createDecimal(participation.shareRate).times(100).toFixed(0)
-          : '100',
-        locked: true,
-      })) ?? [];
-  const [rows, setRows] = useState<
-    Array<{ employeeId: string; shareRate: string; locked: boolean }>
-  >([]);
-  const isOpen = Boolean(line);
-  const activeRows = rows.length
-    ? rows
-    : initialRows.length
-      ? initialRows
-      : [{ employeeId: '', shareRate: '100', locked: false }];
-  const distribute = (
-    source: Array<{ employeeId: string; shareRate: string; locked: boolean }>,
-  ) => {
-    const locked = source
-      .filter((row) => row.locked)
-      .reduce((sum, row) => sum.plus(createDecimal(row.shareRate || '0')), createDecimal('0'));
-    const openRows = source.filter((row) => !row.locked);
-    if (!openRows.length) return source;
-    const remaining = createDecimal('100').minus(locked).greaterThan(createDecimal('0'))
-      ? createDecimal('100').minus(locked)
-      : createDecimal('0');
-    const base = remaining.dividedBy(openRows.length).toFixed(0);
-    let placed = createDecimal('0');
-    return source.map((row) => {
-      if (row.locked) return row;
-      placed = placed.plus(createDecimal(base));
-      const isLast = openRows.indexOf(row) === openRows.length - 1;
-      return {
-        ...row,
-        shareRate: isLast ? remaining.minus(placed.minus(createDecimal(base))).toFixed(0) : base,
-      };
-    });
-  };
-  const total = activeRows.reduce(
-    (sum, row) => sum.plus(createDecimal(row.shareRate || '0')),
-    createDecimal('0'),
-  );
-  const valid =
-    activeRows.length > 0 &&
-    activeRows.every((row) => row.employeeId) &&
-    total.equals(createDecimal('100'));
-  if (!line) return null;
-
-  return (
-    <Dialog
-      open={isOpen}
-      title={copy('Employees for service')}
-      description={copy('Set employees and contribution shares before completing the transaction.')}
-      onClose={() => {
-        setRows([]);
-        onClose();
-      }}
-      ariaLabel={copy('Employees for service')}
-      closeOnEscape
-      closeOnOverlay
-      className="pos-reference-dialog w-full max-w-2xl overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
-      footer={
-        <footer className="flex shrink-0 items-center justify-between gap-2">
-          <span className="text-[11px] text-[var(--color-text-muted)]">
-            {copy(valid ? 'All shares total 100%' : 'Complete employee shares')}
-          </span>
-          <div className="flex gap-2">
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setRows([]);
-                onClose();
-              }}
-            >
-              {copy('Cancel')}
-            </Button>
-            <Button
-              disabled={!valid}
-              onClick={() =>
-                onSave(
-                  activeRows.map((row) => row.employeeId),
-                  activeRows.map((row) => ({
-                    employeeId: row.employeeId,
-                    shareRate: createDecimal(row.shareRate).dividedBy(100).toFixed(4),
-                  })),
-                )
-              }
-            >
-              {copy('Save')}
-            </Button>
-          </div>
-        </footer>
-      }
-    >
-      <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)]/20 p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <div>
-            <p className="text-sm font-semibold">{line.itemNameSnapshot}</p>
-            <p className="text-xs text-[var(--color-text-muted)]">
-              {copy('Quantity')} {quantity(line.quantity)}, {money(line.grossAmount, locale)}
-            </p>
-          </div>
-          <span
-            className={`rounded-full px-2.5 py-1 text-xs font-semibold ${valid ? 'bg-[var(--color-success)]/10 text-[var(--color-success)]' : 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]'}`}
-          >
-            {copy('Total')} {total.toFixed(0)}%
-          </span>
-        </div>
-        <div className="space-y-2">
-          {activeRows.map((row, index) => (
-            <div key={`${row.employeeId}-${index}`} className="grid grid-cols-12 items-end gap-2">
-              <label className="col-span-6 text-xs font-medium">
-                {copy('Employee')}
-                <div className="mt-1">
-                  <Combobox
-                    ariaLabel={`${copy('Employee')} ${index + 1}`}
-                    value={row.employeeId}
-                    placeholder={copy('Select an employee.')}
-                    options={employees.map((employee) => ({
-                      value: employee.id,
-                      label: employee.displayName,
-                    }))}
-                    onChange={(employeeId) => {
-                      if (typeof employeeId !== 'string') return;
-                      const next = [...activeRows];
-                      next[index] = { ...next[index]!, employeeId };
-                      setRows(next);
-                    }}
-                  />
-                </div>
-              </label>
-              <label className="col-span-3 text-xs font-medium">
-                {copy('Share')}
-                <div className="mt-1">
-                  <PosNumericInput
-                    aria-label={`${copy('Share')} ${index + 1}`}
-                    className="h-9 rounded-lg text-sm"
-                    disabled={activeRows.length === 1}
-                    value={row.shareRate}
-                    integer
-                    min="0"
-                    max="100"
-                    suffix="%"
-                    onChange={(shareRate) => {
-                      const next = [...activeRows];
-                      next[index] = {
-                        ...next[index]!,
-                        shareRate,
-                        locked: true,
-                      };
-                      setRows(distribute(next));
-                    }}
-                  />
-                </div>
-              </label>
-              <div className="col-span-3 flex h-9 items-center justify-end gap-1">
-                <button
-                  type="button"
-                  title={copy('Split evenly')}
-                  disabled={activeRows.length === 1}
-                  onClick={() => {
-                    const next = [...activeRows];
-                    next[index] = { ...next[index]!, locked: !next[index]!.locked };
-                    setRows(distribute(next));
-                  }}
-                  className={`rounded-lg p-2 transition-colors ${row.locked ? 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]'}`}
-                >
-                  %
-                </button>
-                <button
-                  type="button"
-                  aria-label={`${copy('Remove')} ${copy('Employee')} ${index + 1}`}
-                  disabled={activeRows.length === 1}
-                  onClick={() =>
-                    setRows(
-                      distribute(
-                        activeRows.filter((row, rowIndex) => Boolean(row) && rowIndex !== index),
-                      ),
-                    )
-                  }
-                  className="rounded-lg p-2 text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10"
-                >
-                  <Trash2 className="size-3.5" />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={() =>
-            setRows(distribute([...activeRows, { employeeId: '', shareRate: '0', locked: false }]))
-          }
-          className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-[var(--color-brand)] hover:underline"
-        >
-          <UserPlus className="size-3" />
-          {copy('Add employee')}
-        </button>
-        {!valid ? (
-          <p className="mt-2 text-xs text-[var(--color-warning)]">
-            {copy('Complete employees and make sure total share is 100%.')}
-          </p>
-        ) : null}
-      </div>
-    </Dialog>
-  );
-}
-
-function editableWorkContributors(
-  contributors: readonly ServiceWorkContributor[],
-): ServiceWorkContributor[] {
-  return contributors.length
-    ? contributors.map((contributor) => ({ ...contributor }))
-    : [{ employeeId: '', shareRate: '1.0000' }];
-}
-
-function ServiceWorkContributorEditor({
-  contributors,
-  employees,
-  onChange,
-}: {
-  contributors: readonly ServiceWorkContributor[];
-  employees: readonly Employee[];
-  onChange: (contributors: ServiceWorkContributor[]) => void;
-}) {
-  const { copy } = useOperationalLocalization();
-  const rows = editableWorkContributors(contributors);
-  const total = contributionTotal(rows).times(100).toFixed(0);
-
-  return (
-    <div className="space-y-2">
-      {rows.map((row, index) => (
-        <div
-          key={`${row.employeeId}-${index}`}
-          className="grid grid-cols-[minmax(0,1fr)_74px_28px] items-end gap-2"
-        >
-          <label className="text-[11px] font-medium text-[var(--color-text-muted)]">
-            {copy('Employee')}
-            <Combobox
-              ariaLabel={`${copy('Employee')} ${index + 1}`}
-              value={row.employeeId}
-              placeholder={copy('Select an employee.')}
-              options={employees.map((employee) => ({
-                value: employee.id,
-                label: employee.displayName,
-              }))}
-              onChange={(employeeId) => {
-                if (typeof employeeId !== 'string') return;
-                const next = [...rows];
-                next[index] = { ...next[index]!, employeeId };
-                onChange(next);
-              }}
-            />
-          </label>
-          <label className="text-[11px] font-medium text-[var(--color-text-muted)]">
-            {copy('Share')}
-            <PosNumericInput
-              aria-label={`${copy('Share')} ${index + 1}`}
-              className="h-9 rounded-lg text-sm"
-              value={createDecimal(row.shareRate).times(100).toFixed(0)}
-              integer
-              min="0"
-              max="100"
-              suffix="%"
-              onChange={(shareRate) => {
-                const next = [...rows];
-                next[index] = {
-                  ...next[index]!,
-                  shareRate: createDecimal(shareRate || '0')
-                    .dividedBy(100)
-                    .toFixed(4),
-                };
-                onChange(next);
-              }}
-            />
-          </label>
-          <button
-            type="button"
-            disabled={rows.length === 1}
-            aria-label={`${copy('Remove')} ${copy('Employee')} ${index + 1}`}
-            onClick={() => onChange([...rows.slice(0, index), ...rows.slice(index + 1)])}
-            className="mb-0.5 rounded-lg p-2 text-[var(--color-danger)] transition-colors hover:bg-[var(--color-danger)]/10 disabled:opacity-40"
-          >
-            <Trash2 className="size-3.5" />
-          </button>
-        </div>
-      ))}
-      <div className="flex items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={() => onChange([...rows, { employeeId: '', shareRate: '0.0000' }])}
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--color-brand)] hover:underline"
-        >
-          <UserPlus className="size-3" />
-          {copy('Add employee')}
-        </button>
-        <span
-          className={`text-xs font-semibold ${total === '100' ? 'text-[var(--color-success)]' : 'text-[var(--color-warning)]'}`}
-        >
-          {copy('Total')} {total}%
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function ReferenceServiceWorkDialog({
-  line,
-  employees,
-  locale,
-  units,
-  onClose,
-  onSave,
-}: {
-  line: SaleLine | null;
-  employees: readonly Employee[];
-  locale: string;
-  units: readonly ServiceWorkUnit[];
-  onClose: () => void;
-  onSave: (units: readonly ServiceWorkUnit[]) => void;
-}) {
-  const { copy } = useOperationalLocalization();
-  const [mode, setMode] = useState<'SAME' | 'PER_UNIT'>('SAME');
-  const [sharedContributors, setSharedContributors] = useState<ServiceWorkContributor[]>(() =>
-    editableWorkContributors(units[0]?.contributors ?? []),
-  );
-  const [unitPlans, setUnitPlans] = useState<ServiceWorkUnit[]>(() =>
-    units.map((unit) => ({
-      ...unit,
-      contributors: editableWorkContributors(unit.contributors),
-    })),
-  );
-
-  if (!line) return null;
-  const plannedUnits =
-    mode === 'SAME'
-      ? units.map((unit) => ({ ...unit, contributors: sharedContributors }))
-      : unitPlans;
-  const valid = plannedUnits.every((unit) => hasValidWorkAssignment(line, unit));
-
-  return (
-    <Dialog
-      open
-      title={copy('Manage work')}
-      description={`${line.itemNameSnapshot}, ${quantity(line.quantity)} ${copy('work units')}`}
-      onClose={onClose}
-      ariaLabel={copy('Manage work')}
-      closeOnEscape
-      closeOnOverlay
-      className="pos-reference-dialog w-full max-w-2xl overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
-      footer={
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-[11px] text-[var(--color-text-muted)]">
-            {copy(valid ? 'Each work unit totals 100%' : 'Each work unit must total 100%')}
-          </span>
-          <div className="flex gap-2">
-            <Button variant="ghost" onClick={onClose}>
-              {copy('Cancel')}
-            </Button>
-            <Button disabled={!valid} onClick={() => onSave(plannedUnits)}>
-              {copy('Save work')}
-            </Button>
-          </div>
-        </div>
-      }
-    >
-      <div className="space-y-4">
-        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)]/20 p-3">
-          <p className="text-sm font-semibold">{line.itemNameSnapshot}</p>
-          <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-            {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
-          </p>
-        </div>
-        <div className="flex gap-2" aria-label={copy('Work mode')}>
-          <DButton
-            size="sm"
-            variant={mode === 'SAME' ? 'primary' : 'secondary'}
-            onClick={() => setMode('SAME')}
-          >
-            {copy('Same for all')}
-          </DButton>
-          <DButton
-            size="sm"
-            variant={mode === 'PER_UNIT' ? 'primary' : 'secondary'}
-            onClick={() => setMode('PER_UNIT')}
-          >
-            {copy('Set per work unit')}
-          </DButton>
-        </div>
-        {mode === 'SAME' ? (
-          <div className="rounded-xl border border-[var(--color-border)] p-3">
-            <p className="mb-3 text-xs text-[var(--color-text-muted)]">
-              {copy('Apply this configuration to all work units.')}
-            </p>
-            <ServiceWorkContributorEditor
-              contributors={sharedContributors}
-              employees={employees}
-              onChange={setSharedContributors}
-            />
-          </div>
-        ) : (
-          <div className="max-h-[52dvh] space-y-2 overflow-y-auto pr-1">
-            {unitPlans.map((unit) => (
-              <div key={unit.index} className="rounded-xl border border-[var(--color-border)] p-3">
-                <div className="mb-3">
-                  <p className="text-sm font-semibold">
-                    {copy('Work unit')} #{unit.index + 1}
-                  </p>
-                </div>
-                <ServiceWorkContributorEditor
-                  contributors={unit.contributors}
-                  employees={employees}
-                  onChange={(contributors) =>
-                    setUnitPlans((current) =>
-                      current.map((candidate) =>
-                        candidate.index === unit.index ? { ...candidate, contributors } : candidate,
-                      ),
-                    )
-                  }
-                />
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </Dialog>
   );

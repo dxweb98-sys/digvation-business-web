@@ -419,6 +419,93 @@ const posCopy: Record<string, LocalizedCopy> = {
     'en-US': 'Apply this configuration to all work units.',
   },
   'Work unit': { 'id-ID': 'Pengerjaan', 'en-US': 'Work unit' },
+  'Every work unit needs at least one employee.': {
+    'id-ID': 'Setiap pengerjaan membutuhkan minimal satu karyawan.',
+    'en-US': 'Every work unit needs at least one employee.',
+  },
+  'Work units are not available for this transaction.': {
+    'id-ID': 'Pengerjaan belum tersedia untuk transaksi ini.',
+    'en-US': 'Work units are not available for this transaction.',
+  },
+  'Who is doing this service?': {
+    'id-ID': 'Siapa yang mengerjakan?',
+    'en-US': 'Who is doing this service?',
+  },
+  'How employees are assigned': {
+    'id-ID': 'Cara menentukan karyawan',
+    'en-US': 'How employees are assigned',
+  },
+  'Same for every service': { 'id-ID': 'Sama untuk semua', 'en-US': 'Same for every service' },
+  'Different for each service': {
+    'id-ID': 'Berbeda tiap layanan',
+    'en-US': 'Different for each service',
+  },
+  'Service being set': { 'id-ID': 'Layanan yang sedang diatur', 'en-US': 'Service being set' },
+  'services set': { 'id-ID': 'layanan sudah diatur', 'en-US': 'services set' },
+  'Previous service': { 'id-ID': 'Layanan sebelumnya', 'en-US': 'Previous service' },
+  'Next service': { 'id-ID': 'Layanan berikutnya', 'en-US': 'Next service' },
+  Set: { 'id-ID': 'Sudah diatur', 'en-US': 'Set' },
+  'Check the percentages': { 'id-ID': 'Periksa persentase', 'en-US': 'Check the percentages' },
+  'Employees for this service': {
+    'id-ID': 'Karyawan untuk layanan ini',
+    'en-US': 'Employees for this service',
+  },
+  employees: { 'id-ID': 'karyawan', 'en-US': 'employees' },
+  'Work split': { 'id-ID': 'Pembagian pengerjaan', 'en-US': 'Work split' },
+  'Change one percentage; the rest is shared automatically.': {
+    'id-ID': 'Ubah persentase satu karyawan, sisanya dibagi otomatis.',
+    'en-US': 'Change one percentage; the rest is shared automatically.',
+  },
+  auto: { 'id-ID': 'otomatis', 'en-US': 'auto' },
+  'Percentages exceed 100%. Lower one of them.': {
+    'id-ID': 'Total persentase melebihi 100%. Kurangi salah satunya.',
+    'en-US': 'Percentages exceed 100%. Lower one of them.',
+  },
+  'Percentages must total 100%.': {
+    'id-ID': 'Total persentase harus 100%.',
+    'en-US': 'Percentages must total 100%.',
+  },
+  'Each service has its own setting. Replace them all with the setting of': {
+    'id-ID': 'Tiap layanan punya pengaturan sendiri. Ganti semuanya dengan pengaturan',
+    'en-US': 'Each service has its own setting. Replace them all with the setting of',
+  },
+  Replace: { 'id-ID': 'Ganti', 'en-US': 'Replace' },
+  'The service line is no longer available.': {
+    'id-ID': 'Layanan ini sudah tidak tersedia.',
+    'en-US': 'The service line is no longer available.',
+  },
+  'Use for all services': { 'id-ID': 'Pakai untuk semua layanan', 'en-US': 'Use for all services' },
+  'Applies to': { 'id-ID': 'Berlaku untuk', 'en-US': 'Applies to' },
+  services: { 'id-ID': 'layanan', 'en-US': 'services' },
+  Employees: { 'id-ID': 'Karyawan', 'en-US': 'Employees' },
+  'employees selected': { 'id-ID': 'dipilih', 'en-US': 'employees selected' },
+  'Search employee': { 'id-ID': 'Cari karyawan', 'en-US': 'Search employee' },
+  'No employee matches this search.': {
+    'id-ID': 'Tidak ada karyawan yang cocok.',
+    'en-US': 'No employee matches this search.',
+  },
+  'Discard employee changes?': {
+    'id-ID': 'Buang perubahan karyawan?',
+    'en-US': 'Discard employee changes?',
+  },
+  'The employees and work split you changed will not be saved.': {
+    'id-ID': 'Karyawan dan pembagian pengerjaan yang Anda ubah tidak akan disimpan.',
+    'en-US': 'The employees and work split you changed will not be saved.',
+  },
+  Show: { 'id-ID': 'Tampilkan', 'en-US': 'Show' },
+  more: { 'id-ID': 'lainnya', 'en-US': 'more' },
+  'Show less': { 'id-ID': 'Sembunyikan', 'en-US': 'Show less' },
+  'Discard changes': { 'id-ID': 'Buang perubahan', 'en-US': 'Discard changes' },
+  'Keep editing': { 'id-ID': 'Lanjut mengubah', 'en-US': 'Keep editing' },
+  'Select at least one employee.': {
+    'id-ID': 'Pilih minimal satu karyawan.',
+    'en-US': 'Select at least one employee.',
+  },
+  'No employee yet': { 'id-ID': 'Belum ada karyawan', 'en-US': 'No employee yet' },
+  'no employee yet': { 'id-ID': 'belum ada karyawan', 'en-US': 'no employee yet' },
+  'Choose employee': { 'id-ID': 'Pilih karyawan', 'en-US': 'Choose employee' },
+  'Edit employee': { 'id-ID': 'Ubah', 'en-US': 'Edit employee' },
+  'Change employee': { 'id-ID': 'Ubah karyawan', 'en-US': 'Change employee' },
 };
 
 export function operationalPosCopy(value: string, locale: OperationalLocale): string | undefined {

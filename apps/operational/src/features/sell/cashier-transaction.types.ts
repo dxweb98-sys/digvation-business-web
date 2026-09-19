@@ -145,6 +145,14 @@ export interface SaleParticipation {
   shareRate: string | null;
 }
 
+/** One unit of a service line's quantity and the employees who perform it. */
+export interface SaleLineWorkUnit {
+  unitNumber: number;
+  employeeIds: string[];
+  /** Contribution share of the unit per employee; null share means an equal split. */
+  performers?: Array<{ employeeId: string; shareRate: string | null }>;
+}
+
 export interface EmployeeContribution {
   saleId: string;
   saleLineId: string;
@@ -259,6 +267,8 @@ export interface SaleLine {
   fulfillment: SaleLineFulfillment | null;
   participations: SaleParticipation[];
   contributions: EmployeeContribution[];
+  /** Runtime per-quantity plan; empty or absent when assigned at line level. */
+  workUnits?: SaleLineWorkUnit[];
 }
 
 export type SaleCustomerType = 'MEMBER' | 'NON_MEMBER';
@@ -280,8 +290,7 @@ export interface SaleCustomer {
 
 /** Customer identity requested from Runtime, which resolves and normalizes it. */
 export type SaleCustomerSelection =
-  | { type: 'NON_MEMBER'; name: string; phone: string }
-  | { type: 'MEMBER'; referenceId: string };
+  { type: 'NON_MEMBER'; name: string; phone: string } | { type: 'MEMBER'; referenceId: string };
 
 export interface Sale {
   id: string;

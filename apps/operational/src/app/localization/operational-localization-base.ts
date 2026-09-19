@@ -371,7 +371,7 @@ const copy: Record<string, LocalizedLabel> = {
     'id-ID': 'Atur harga atau diskon item ini.',
     'en-US': 'Configure price or item discount.',
   },
-  'Service workers': { 'id-ID': 'Pelaksana jasa', 'en-US': 'Service workers' },
+  'Service workers': { 'id-ID': 'Karyawan yang mengerjakan', 'en-US': 'Service workers' },
   'Select employees who perform this service. Leave shares blank to split evenly.': {
     'id-ID': 'Pilih karyawan yang mengerjakan jasa ini. Kosongkan porsi untuk membagi rata.',
     'en-US': 'Select employees who perform this service. Leave shares blank to split evenly.',
@@ -382,7 +382,7 @@ const copy: Record<string, LocalizedLabel> = {
     'id-ID': 'Belum ada karyawan aktif yang dapat mengerjakan jasa.',
     'en-US': 'No active employees can perform this service.',
   },
-  'Save workers': { 'id-ID': 'Simpan pelaksana', 'en-US': 'Save workers' },
+  'Save workers': { 'id-ID': 'Simpan karyawan', 'en-US': 'Save workers' },
   'No workers selected': { 'id-ID': 'Belum ada pelaksana dipilih', 'en-US': 'No workers selected' },
   'workers selected': { 'id-ID': 'pelaksana dipilih', 'en-US': 'workers selected' },
   'Service value allocation': {

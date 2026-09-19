@@ -28,6 +28,7 @@ import type {
   SaleLine,
 } from './cashier-transaction.types';
 import { fetchResolvedPrice, fetchResolvedVariantPrices } from './resolved-price-query';
+import type { ServiceLineWorkPlan } from './service-performer-allocation';
 import { createSaleWorkspaceViewModel } from './sale-workspace-view-model';
 import { useEmployeeOptions } from './use-employee-options';
 import { useSaleCommandCoordinator } from './use-sale-command-coordinator';
@@ -166,7 +167,9 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
   ) => {
     if (context === 'TRANSACTION_ADJUSTMENT') {
       if (!targetSaleId) {
-        throw new Error(copy('The transaction being adjusted is no longer active. Reopen the adjustment.'));
+        throw new Error(
+          copy('The transaction being adjusted is no longer active. Reopen the adjustment.'),
+        );
       }
       const target =
         queueContextSale?.id === targetSaleId
@@ -212,7 +215,9 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
       const targetSaleId =
         context === 'TRANSACTION_ADJUSTMENT' ? (queueContextSale?.id ?? undefined) : undefined;
       if (context === 'TRANSACTION_ADJUSTMENT' && !targetSaleId) {
-        throw new Error(copy('The transaction being adjusted is no longer active. Reopen the adjustment.'));
+        throw new Error(
+          copy('The transaction being adjusted is no longer active. Reopen the adjustment.'),
+        );
       }
       const variants = await catalog.loadActiveVariants(item);
       if (variants.length > 0) {
@@ -491,31 +496,32 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     void setCurrentPerformers(line, contributors);
   };
 
-  const setQueuedAssignments = async (
-    sale: Sale,
-    line: SaleLine,
-    employeeIds: string[],
-    contributors: Array<{ employeeId: string; shareRate?: string }>,
-  ) => {
+  /**
+   * Persists who performs each unit of the given service lines and their share
+   * of it. Lines are saved one after another on the latest Sale version.
+   */
+  const setQueuedWorkUnits = async (sale: Sale, plans: readonly ServiceLineWorkPlan[]) => {
     command.clearNotice();
     try {
-      const authoritative = await transactionAdapter.getSale(sale.id);
-      const liveLine = authoritative.lines.find(
-        (candidate) => candidate.id === line.id && candidate.removedAt === null,
-      );
-      if (!liveLine) throw new Error(copy('The service line is no longer available.'));
-      const performers = contributors.length
-        ? contributors
-        : employeeIds.map((employeeId) => ({ employeeId }));
-      const updated = await command.runMutation(() =>
-        transactionAdapter.setSaleLinePerformers(authoritative.id, liveLine.id, {
-          expectedVersion: authoritative.version,
-          performers,
-        }),
-      );
-      command.commitSale(updated);
-      if (queueContextSale?.id === updated.id) setQueueContextSale(updated);
-      return updated;
+      if (!transactionAdapter.setSaleLineWorkUnits)
+        throw new Error(copy('Work units are not available for this transaction.'));
+      let current = await transactionAdapter.getSale(sale.id);
+      for (const plan of plans) {
+        const liveLine = current.lines.find(
+          (candidate) => candidate.id === plan.lineId && candidate.removedAt === null,
+        );
+        if (!liveLine) throw new Error(copy('The service line is no longer available.'));
+        const base = current;
+        current = await command.runMutation(() =>
+          transactionAdapter.setSaleLineWorkUnits!(base.id, liveLine.id, {
+            expectedVersion: base.version,
+            units: plan.units.map((performers) => ({ performers })),
+          }),
+        );
+        command.commitSale(current);
+      }
+      if (queueContextSale?.id === current.id) setQueueContextSale(current);
+      return current;
     } catch (error) {
       command.reportError(error);
       throw error;
@@ -634,7 +640,9 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     items: catalog.items,
     categories: catalog.categories,
     employees: employeeOptions.employees,
-    paymentRoutes: (paymentRoutesQuery.data?.items ?? []).filter((route) => route.status === 'ACTIVE'),
+    paymentRoutes: (paymentRoutesQuery.data?.items ?? []).filter(
+      (route) => route.status === 'ACTIVE',
+    ),
     selectedLocationId: selectedLocationId ?? '',
     search: catalog.search,
     itemType: catalog.itemType,
@@ -687,7 +695,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     queueSale,
     startSaleWork,
     transitionQueuedFulfillment,
-    setQueuedAssignments,
+    setQueuedWorkUnits,
     finalizeQueuedSale,
     createQueuedPayment,
     openCompletion: () => setCompletionOpen(true),
