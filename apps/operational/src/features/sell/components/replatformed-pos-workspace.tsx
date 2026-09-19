@@ -58,7 +58,6 @@ import {
   resolveOperationalLocale,
   useOperationalLocalization,
 } from '../../../app/localization/operational-localization';
-import { useCashierSession } from '../../../app/providers/cashier-session-provider';
 import { cashierTransactionKeys } from '../cashier-transaction-keys';
 import { cashierTransactionErrorMessage } from '../cashier-transaction-errors';
 import type { CartDisplayLine } from '../cart-draft';
@@ -85,6 +84,7 @@ import type {
   Payment,
   PaymentMethod,
   PaymentRoute,
+  PaymentStatus,
   QueueSale,
   Sale,
   SaleCustomer,
@@ -473,20 +473,6 @@ function isPositiveDecimal(value: string) {
   }
 }
 
-function useCachedPaymentRoutes(): { routes: PaymentRoute[]; isPending: boolean } {
-  const runtime = useRuntime();
-  const { selectedLocationId } = useCashierSession();
-  const query = useQuery({
-    queryKey: cashierTransactionKeys.paymentRoutes(selectedLocationId ?? '', runtime.currency),
-    queryFn: async () => ({ items: [] as PaymentRoute[], limit: 0, offset: 0 }),
-    enabled: false,
-  });
-  return {
-    routes: (query.data?.items ?? []).filter((route) => route.status === 'ACTIVE'),
-    isPending: query.data === undefined,
-  };
-}
-
 function employeeAssignmentIssues(line: SaleLine, locale: string): string[] {
   const issues: string[] = [];
   if (
@@ -624,6 +610,30 @@ function financialSummary(sale: Sale) {
   };
 }
 
+function paymentAllocationSummary(sale: Sale) {
+  const successful = sale.payments
+    .filter((payment) => payment.status === 'SUCCEEDED')
+    .reduce((sum, payment) => sum.plus(createDecimal(payment.appliedAmount)), createDecimal('0'));
+  const pending = sale.payments
+    .filter((payment) => payment.status === 'PENDING')
+    .reduce((sum, payment) => sum.plus(createDecimal(payment.appliedAmount)), createDecimal('0'));
+  const remaining = createDecimal(sale.totalAmount).minus(successful).minus(pending);
+  return {
+    successfulAmount: successful.toFixed(4),
+    pendingAmount: pending.toFixed(4),
+    remainingToAllocate: remaining.greaterThan(0) ? remaining.toFixed(4) : '0.0000',
+  };
+}
+
+function paymentAccountLabel(
+  payment: Payment,
+  fallback: (method: PaymentMethod) => string,
+): string {
+  return payment.financeFinancialAccountNameSnapshot?.trim() || fallback(payment.method);
+}
+
+type TerminalPaymentStatus = Exclude<PaymentStatus, 'PENDING'>;
+
 function hasSuccessfulPayment(sale: Sale): boolean {
   return successfulPayments(sale).some((payment) =>
     createDecimal(payment.appliedAmount).greaterThan(createDecimal('0')),
@@ -670,7 +680,9 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [payNow, setPayNow] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
-  const [provider, setProvider] = useState('');
+  const [paymentRouteId, setPaymentRouteId] = useState('');
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentReference, setPaymentReference] = useState('');
   const [tender, setTender] = useState('');
   const [completionConfirmationTarget, setCompletionConfirmationTarget] = useState<Sale | null>(
     null,
@@ -786,17 +798,23 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       }
     }
 
-    setTender(normalizeCurrencyPresentationInput(checkoutTotal));
+    const latestPaymentRoutes = await workspace.refreshPaymentRoutes();
+    const normalizedCheckoutTotal = normalizeCurrencyPresentationInput(checkoutTotal);
+    setPaymentAmount(normalizedCheckoutTotal);
+    setTender(normalizedCheckoutTotal);
     setPayNow(true);
     setPaymentMethod('CASH');
-    setProvider('');
+    setPaymentRouteId(
+      latestPaymentRoutes.find((route) => route.paymentMethod === 'CASH')?.id ?? '',
+    );
+    setPaymentReference('');
     setCartOpen(false);
     setCheckoutOpen(true);
   };
 
   /**
    * Requests receipt delivery for a captured transaction. Delivery is separate
-   * from the transaction: a provider that is absent or failing is reported as a
+   * from the transaction: a delivery provider that is absent or failing is reported as a
    * delivery outcome and never touches the Sale, its payment or its queue state.
    */
   const sendReceipt = async (target: Pick<QueueSale, 'id' | 'saleNumber'>) => {
@@ -999,9 +1017,15 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         transaction.id,
       );
       setQueueDetail(null);
+      const latestPaymentRoutes = await workspace.refreshPaymentRoutes();
+      const normalizedAvailable = normalizeCurrencyPresentationInput(availableToPay);
       setPaymentMethod('CASH');
-      setProvider('');
-      setTender(normalizeCurrencyPresentationInput(availableToPay));
+      setPaymentRouteId(
+        latestPaymentRoutes.find((route) => route.paymentMethod === 'CASH')?.id ?? '',
+      );
+      setPaymentAmount(normalizedAvailable);
+      setPaymentReference('');
+      setTender(normalizedAvailable);
       setQueuePaymentTarget(hydrated);
       setQueuePaymentAmount(availableToPay);
     } catch {
@@ -1055,10 +1079,10 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const completeCheckout = async (destination: FulfillmentDestination) => {
     if (!sale || !lines.length) return;
 
-    if (!payNow) {
+    if (!payNow || hasSuccessfulCheckout(sale)) {
       try {
         const submitted = await workspace.queueSale(sale);
-        commitCheckoutToQueue(submitted, false, destination);
+        commitCheckoutToQueue(submitted, hasSuccessfulCheckout(sale), destination);
         if (destination === 'START_PROCESS') await startQueuedWork(submitted);
       } catch (error) {
         showToast({
@@ -1070,33 +1094,82 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       return;
     }
 
-    const applied = paymentMethod === 'CASH' ? tender || total : total;
-    if (!isPositiveDecimal(applied)) return;
-    if (paymentMethod === 'CASH' && createDecimal(applied).lessThan(createDecimal(total))) return;
-    if ((paymentMethod === 'BANK_TRANSFER' || paymentMethod === 'WALLET') && !provider) return;
+    const allocation = normalizeCurrencyPresentationInput(paymentAmount);
+    const allocationState = paymentAllocationSummary(sale);
+    if (
+      !isPositiveDecimal(allocation) ||
+      createDecimal(allocation).greaterThan(createDecimal(allocationState.remainingToAllocate))
+    )
+      return;
+    const tendered =
+      paymentMethod === 'CASH'
+        ? normalizeCurrencyPresentationInput(tender || allocation)
+        : undefined;
+    if (
+      tendered &&
+      createDecimal(tendered).lessThan(createDecimal(allocation))
+    )
+      return;
+    const selectedRoute =
+      workspace.paymentRoutes.find(
+        (route) => route.id === paymentRouteId && route.paymentMethod === paymentMethod,
+      ) ?? workspace.paymentRoutes.find((route) => route.paymentMethod === paymentMethod);
+    if (!selectedRoute) {
+      showToast({
+        title: copy('Payment method unavailable'),
+        description: copy('Configure an active settlement account for this payment method.'),
+        variant: 'warning',
+      });
+      return;
+    }
+    let completedSale: Sale;
     try {
-      const completedSale = await workspace.createPayment(
+      completedSale = await workspace.createPayment(
         paymentMethod,
-        total,
-        paymentMethod === 'CASH' ? applied : undefined,
-        provider || undefined,
+        allocation,
+        tendered,
+        paymentReference.trim() || undefined,
+        selectedRoute.id,
       );
-      if (!hasSuccessfulCheckout(completedSale)) {
-        showToast({
-          title: copy('Payment incomplete'),
-          description: copy('Payment was not completed. The cart remains available.'),
-          variant: 'warning',
-        });
-        return;
-      }
+    } catch (error) {
+      showToast({
+        title: copy('Payment failed'),
+        description: cashierTransactionErrorMessage(error),
+        variant: 'danger',
+      });
+      return;
+    }
+
+    const nextAllocation = paymentAllocationSummary(completedSale);
+    if (!hasSuccessfulCheckout(completedSale)) {
+      setPaymentAmount(normalizeCurrencyPresentationInput(nextAllocation.remainingToAllocate));
+      setTender(normalizeCurrencyPresentationInput(nextAllocation.remainingToAllocate));
+      setPaymentReference('');
+      showToast({
+        title: copy(
+          completedSale.payments.some((payment) => payment.status === 'PENDING')
+            ? 'Payment pending'
+            : 'Payment recorded',
+        ),
+        description: isPositiveDecimal(nextAllocation.remainingToAllocate)
+          ? `${copy('Remaining')}: ${money(nextAllocation.remainingToAllocate, workspace.locale)}`
+          : copy('Resolve the pending payment before continuing.'),
+        variant: 'success',
+      });
+      return;
+    }
+
+    try {
       const submitted = await workspace.queueSale(completedSale);
       commitCheckoutToQueue(submitted, true, destination);
       if (destination === 'START_PROCESS') await startQueuedWork(submitted);
     } catch (error) {
       showToast({
-        title: copy('Checkout failed'),
-        description: `${cashierTransactionErrorMessage(error)} ${copy('The cart was not changed.')}`,
-        variant: 'danger',
+        title: copy('Payment complete'),
+        description: `${cashierTransactionErrorMessage(error)} ${copy(
+          'Payment is preserved. Try adding the transaction to the queue again.',
+        )}`,
+        variant: 'warning',
       });
     }
   };
@@ -1104,29 +1177,67 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const payQueueBalance = async () => {
     const transaction = displayedQueuePaymentTarget;
     if (!transaction || !queuePaymentAmount) return;
-    const due = queuePaymentAmount;
-    const applied = paymentMethod === 'CASH' ? tender || due : due;
-    if (!isPositiveDecimal(applied)) return;
-    if (paymentMethod === 'CASH' && createDecimal(applied).lessThan(createDecimal(due))) return;
-    if ((paymentMethod === 'BANK_TRANSFER' || paymentMethod === 'WALLET') && !provider) return;
+    const due = normalizeCurrencyPresentationInput(queuePaymentAmount);
+    const allocation = normalizeCurrencyPresentationInput(paymentAmount);
+    if (
+      !isPositiveDecimal(allocation) ||
+      createDecimal(allocation).greaterThan(createDecimal(due))
+    )
+      return;
+    const tendered =
+      paymentMethod === 'CASH'
+        ? normalizeCurrencyPresentationInput(tender || allocation)
+        : undefined;
+    if (
+      tendered &&
+      createDecimal(tendered).lessThan(createDecimal(allocation))
+    )
+      return;
+    const selectedRoute =
+      workspace.paymentRoutes.find(
+        (route) => route.id === paymentRouteId && route.paymentMethod === paymentMethod,
+      ) ?? workspace.paymentRoutes.find((route) => route.paymentMethod === paymentMethod);
+    if (!selectedRoute) {
+      showToast({
+        title: copy('Payment method unavailable'),
+        description: copy('Configure an active settlement account for this payment method.'),
+        variant: 'warning',
+      });
+      return;
+    }
     try {
       const updatedSale = await workspace.createQueuedPayment(
         transaction,
         paymentMethod,
-        due,
-        paymentMethod === 'CASH' ? applied : undefined,
-        provider || undefined,
+        allocation,
+        tendered,
+        paymentReference.trim() || undefined,
+        selectedRoute.id,
       );
-      setQueuePaymentTarget(null);
-      setQueuePaymentAmount(null);
-      setQueueDetail(updatedSale);
-      setReceiptSaleId(updatedSale.id);
-      workspace.closeQueueContext();
+      const nextAllocation = paymentAllocationSummary(updatedSale);
+      setQueuePaymentTarget(updatedSale);
+      setQueuePaymentAmount(nextAllocation.remainingToAllocate);
+      setPaymentAmount(normalizeCurrencyPresentationInput(nextAllocation.remainingToAllocate));
+      setTender(normalizeCurrencyPresentationInput(nextAllocation.remainingToAllocate));
+      setPaymentReference('');
+      if (hasSuccessfulCheckout(updatedSale)) {
+        setQueuePaymentTarget(null);
+        setQueuePaymentAmount(null);
+        setQueueDetail(updatedSale);
+        setReceiptSaleId(updatedSale.id);
+        workspace.closeQueueContext();
+      }
       showToast({
         title: hasSuccessfulCheckout(updatedSale)
           ? copy('Payment complete')
-          : copy('Payment recorded'),
-        description: copy('Transaction status was not changed.'),
+          : updatedSale.payments.some((payment) => payment.status === 'PENDING')
+            ? copy('Payment pending')
+            : copy('Payment recorded'),
+        description: hasSuccessfulCheckout(updatedSale)
+          ? copy('Transaction payment is complete.')
+          : isPositiveDecimal(nextAllocation.remainingToAllocate)
+            ? `${copy('Remaining')}: ${money(nextAllocation.remainingToAllocate, workspace.locale)}`
+            : copy('Resolve the pending payment before continuing.'),
         variant: 'success',
       });
     } catch (error) {
@@ -1138,15 +1249,93 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     }
   };
 
+  const transitionCheckoutPayment = async (
+    payment: Payment,
+    status: TerminalPaymentStatus,
+  ) => {
+    try {
+      const updatedSale = await workspace.transitionPayment(payment, status);
+      const nextAllocation = paymentAllocationSummary(updatedSale);
+      setPaymentAmount(normalizeCurrencyPresentationInput(nextAllocation.remainingToAllocate));
+      setTender(normalizeCurrencyPresentationInput(nextAllocation.remainingToAllocate));
+      setPaymentReference('');
+      if (hasSuccessfulCheckout(updatedSale)) {
+        try {
+          const submitted = await workspace.queueSale(updatedSale);
+          commitCheckoutToQueue(submitted, true, 'QUEUE');
+          return;
+        } catch (error) {
+          showToast({
+            title: copy('Payment complete'),
+            description: `${cashierTransactionErrorMessage(error)} ${copy(
+              'Payment is preserved. Try adding the transaction to the queue again.',
+            )}`,
+            variant: 'warning',
+          });
+          return;
+        }
+      }
+      showToast({
+        title: copy(status === 'SUCCEEDED' ? 'Payment recorded' : 'Payment updated'),
+        description: isPositiveDecimal(nextAllocation.remainingToAllocate)
+          ? `${copy('Remaining')}: ${money(nextAllocation.remainingToAllocate, workspace.locale)}`
+          : copy('Resolve pending payments before continuing.'),
+        variant: status === 'SUCCEEDED' ? 'success' : 'warning',
+      });
+    } catch (error) {
+      showToast({
+        title: copy('Payment failed'),
+        description: cashierTransactionErrorMessage(error),
+        variant: 'danger',
+      });
+    }
+  };
+
+  const transitionQueuePayment = async (
+    payment: Payment,
+    status: TerminalPaymentStatus,
+  ) => {
+    const transaction = displayedQueuePaymentTarget;
+    if (!transaction) return;
+    try {
+      const updatedSale = await workspace.transitionQueuedPayment(
+        transaction,
+        payment,
+        status,
+      );
+      const nextAllocation = paymentAllocationSummary(updatedSale);
+      setQueuePaymentTarget(updatedSale);
+      setQueuePaymentAmount(nextAllocation.remainingToAllocate);
+      setPaymentAmount(normalizeCurrencyPresentationInput(nextAllocation.remainingToAllocate));
+      setTender(normalizeCurrencyPresentationInput(nextAllocation.remainingToAllocate));
+      setPaymentReference('');
+      if (hasSuccessfulCheckout(updatedSale)) {
+        setQueuePaymentTarget(null);
+        setQueuePaymentAmount(null);
+        setQueueDetail(updatedSale);
+        setReceiptSaleId(updatedSale.id);
+        workspace.closeQueueContext();
+      }
+      showToast({
+        title: copy(status === 'SUCCEEDED' ? 'Payment recorded' : 'Payment updated'),
+        description: hasSuccessfulCheckout(updatedSale)
+          ? copy('Transaction payment is complete.')
+          : `${copy('Remaining')}: ${money(
+              financialSummary(updatedSale).balanceDue,
+              workspace.locale,
+            )}`,
+        variant: status === 'SUCCEEDED' ? 'success' : 'warning',
+      });
+    } catch (error) {
+      showToast({
+        title: copy('Payment failed'),
+        description: cashierTransactionErrorMessage(error),
+        variant: 'danger',
+      });
+    }
+  };
+
   const quickTender = ['50000', '100000', '150000', '200000', '500000'];
-  const normalizedTotal = normalizeCurrencyPresentationInput(total);
-  const effectiveTender = tender || normalizedTotal;
-  const cashShort =
-    paymentMethod === 'CASH' &&
-    createDecimal(effectiveTender).lessThan(createDecimal(normalizedTotal));
-  const change = cashShort
-    ? '0'
-    : createDecimal(effectiveTender).minus(createDecimal(normalizedTotal)).toFixed(0);
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden px-3 pb-3 pt-3 sm:px-4 sm:pb-4 lg:px-5 lg:pb-5">
@@ -1352,6 +1541,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           setCheckoutOpen(false);
           setCartOpen(true);
         }}
+        sale={sale}
         lines={lines}
         total={total}
         gross={workspace.cart.grossAmount}
@@ -1365,19 +1555,31 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         taxLabel={sale ? saleTaxLabel(sale, copy('Tax')) : copy('Tax')}
         locale={workspace.locale}
         customer={activeCustomer}
+        paymentRoutes={workspace.paymentRoutes}
+        isPaymentRoutesLoading={workspace.isLoadingPaymentRoutes}
         method={paymentMethod}
-        provider={provider}
+        paymentRouteId={paymentRouteId}
+        appliedAmount={paymentAmount}
+        paymentReference={paymentReference}
         tender={tender}
-        change={change}
-        isCashShort={cashShort}
         payNow={payNow}
         onPayNowChange={setPayNow}
         onMethod={(next) => {
           setPaymentMethod(next);
-          setProvider('');
+          setPaymentRouteId(
+            workspace.paymentRoutes.find((route) => route.paymentMethod === next)?.id ?? '',
+          );
+          setPaymentReference('');
+          if (next === 'CASH') setTender(paymentAmount);
         }}
-        onProvider={setProvider}
+        onPaymentRoute={setPaymentRouteId}
+        onAppliedAmount={(amount) => {
+          setPaymentAmount(amount);
+          if (paymentMethod === 'CASH') setTender(amount);
+        }}
+        onPaymentReference={setPaymentReference}
         onTender={setTender}
+        onTransitionPayment={(payment, status) => void transitionCheckoutPayment(payment, status)}
         quickTender={quickTender}
         isSubmitting={workspace.isCoreMutating}
         onQueue={() => void completeCheckout('QUEUE')}
@@ -1448,8 +1650,12 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         sale={displayedQueuePaymentTarget}
         availableToPay={queuePaymentAmount}
         locale={workspace.locale}
+        paymentRoutes={workspace.paymentRoutes}
+        isPaymentRoutesLoading={workspace.isLoadingPaymentRoutes}
         method={paymentMethod}
-        provider={provider}
+        paymentRouteId={paymentRouteId}
+        appliedAmount={paymentAmount}
+        paymentReference={paymentReference}
         tender={tender}
         isMutating={workspace.isCoreMutating}
         onClose={() => {
@@ -1459,10 +1665,20 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         }}
         onMethod={(next) => {
           setPaymentMethod(next);
-          setProvider('');
+          setPaymentRouteId(
+            workspace.paymentRoutes.find((route) => route.paymentMethod === next)?.id ?? '',
+          );
+          setPaymentReference('');
+          if (next === 'CASH') setTender(paymentAmount);
         }}
-        onProvider={setProvider}
+        onPaymentRoute={setPaymentRouteId}
+        onAppliedAmount={(amount) => {
+          setPaymentAmount(amount);
+          if (paymentMethod === 'CASH') setTender(amount);
+        }}
+        onPaymentReference={setPaymentReference}
         onTender={setTender}
+        onTransitionPayment={(payment, status) => void transitionQueuePayment(payment, status)}
         onPay={() => void payQueueBalance()}
       />
 
@@ -2604,9 +2820,103 @@ function ReferenceCustomerDialog({
   );
 }
 
+function PaymentAttemptList({
+  payments,
+  locale,
+  isMutating,
+  onTransition,
+}: {
+  payments: readonly Payment[];
+  locale: string;
+  isMutating: boolean;
+  onTransition: (payment: Payment, status: TerminalPaymentStatus) => void;
+}) {
+  const { copy, label } = useOperationalLocalization();
+  if (!payments.length) return null;
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)]">
+      <div className="border-b border-[var(--color-border)] px-4 py-2.5">
+        <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+          {copy('Payments')}
+        </p>
+      </div>
+      <div className="divide-y divide-[var(--color-border)]">
+        {payments.map((payment) => {
+          const accountName = paymentAccountLabel(payment, (method) => label(method));
+          const methodName = label(payment.method);
+          return (
+            <div key={payment.id} className="px-4 py-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold">{accountName}</p>
+                  {accountName !== methodName ? (
+                    <p className="mt-0.5 text-[11px] text-[var(--color-text-muted)]">
+                      {methodName}
+                    </p>
+                  ) : null}
+                  {payment.providerReference ? (
+                    <p className="mt-1 break-all font-mono text-[11px] text-[var(--color-text-muted)]">
+                      {payment.providerReference}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="text-sm font-bold tabular-nums">
+                    {money(payment.appliedAmount, locale)}
+                  </p>
+                  <span className="mt-1 inline-flex rounded-full bg-[var(--color-surface-muted)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-text-muted)]">
+                    {label(payment.status)}
+                  </span>
+                </div>
+              </div>
+              {payment.method === 'CASH' && payment.tenderedAmount ? (
+                <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
+                  {copy('Cash received')}: {money(payment.tenderedAmount, locale)}
+                  {isPositiveDecimal(payment.changeAmount ?? '0')
+                    ? ` · ${copy('Change')}: ${money(payment.changeAmount ?? '0', locale)}`
+                    : ''}
+                </p>
+              ) : null}
+              {payment.status === 'PENDING' ? (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <Button
+                    size="sm"
+                    disabled={isMutating}
+                    onClick={() => onTransition(payment, 'SUCCEEDED')}
+                  >
+                    {copy('Mark succeeded')}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={isMutating}
+                    onClick={() => onTransition(payment, 'FAILED')}
+                  >
+                    {copy('Failed')}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={isMutating}
+                    onClick={() => onTransition(payment, 'CANCELLED')}
+                  >
+                    {copy('Cancel')}
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function ReferencePaymentDialog({
   open,
   onClose,
+  sale,
   lines,
   total,
   gross,
@@ -2616,16 +2926,21 @@ function ReferencePaymentDialog({
   taxLabel,
   locale,
   customer,
+  paymentRoutes,
+  isPaymentRoutesLoading,
   method,
-  provider,
+  paymentRouteId,
+  appliedAmount,
+  paymentReference,
   tender,
-  change,
-  isCashShort,
   payNow,
   onPayNowChange,
   onMethod,
-  onProvider,
+  onPaymentRoute,
+  onAppliedAmount,
+  onPaymentReference,
   onTender,
+  onTransitionPayment,
   quickTender,
   isSubmitting,
   onQueue,
@@ -2633,6 +2948,7 @@ function ReferencePaymentDialog({
 }: {
   open: boolean;
   onClose: () => void;
+  sale: Sale | null;
   lines: readonly CartDisplayLine[];
   total: string;
   gross: string;
@@ -2642,16 +2958,21 @@ function ReferencePaymentDialog({
   taxLabel: string;
   locale: string;
   customer: SaleCustomer | null;
+  paymentRoutes: readonly PaymentRoute[];
+  isPaymentRoutesLoading: boolean;
   method: PaymentMethod;
-  provider: string;
+  paymentRouteId: string;
+  appliedAmount: string;
+  paymentReference: string;
   tender: string;
-  change: string;
-  isCashShort: boolean;
   payNow: boolean;
   onPayNowChange: (payNow: boolean) => void;
   onMethod: (method: PaymentMethod) => void;
-  onProvider: (provider: string) => void;
+  onPaymentRoute: (paymentRouteId: string) => void;
+  onAppliedAmount: (amount: string) => void;
+  onPaymentReference: (reference: string) => void;
   onTender: (amount: string) => void;
+  onTransitionPayment: (payment: Payment, status: TerminalPaymentStatus) => void;
   quickTender: readonly string[];
   isSubmitting: boolean;
   onQueue: () => void;
@@ -2659,34 +2980,62 @@ function ReferencePaymentDialog({
   adjustmentSlot?: ReactNode;
 }) {
   const { copy, label } = useOperationalLocalization();
-  const { routes: paymentRoutes, isPending: isPaymentRoutesPending } = useCachedPaymentRoutes();
-  const routeByMethod = new Map(
-    paymentRoutes.map((route) => [route.paymentMethod, route] as const),
-  );
-  const activeRoute = routeByMethod.get(method) ?? null;
+  const routesForMethod = paymentRoutes.filter((route) => route.paymentMethod === method);
+  const activeRoute =
+    routesForMethod.find((route) => route.id === paymentRouteId) ?? routesForMethod[0] ?? null;
   const isCash = method === 'CASH';
-  const needsProvider = method === 'BANK_TRANSFER' || method === 'WALLET';
   const hasDiscount = !createDecimal(discountAmount).equals(createDecimal('0'));
   const hasTax = !createDecimal(taxAmount).equals(createDecimal('0'));
   const customerBadge = customerStatus(customer);
+  const allocationState = sale
+    ? paymentAllocationSummary(sale)
+    : { successfulAmount: '0.0000', pendingAmount: '0.0000', remainingToAllocate: total };
+  const normalizedAllocation = normalizeCurrencyPresentationInput(
+    appliedAmount || allocationState.remainingToAllocate,
+  );
+  const allocationPositive = isPositiveDecimal(normalizedAllocation);
+  const overAllocated =
+    allocationPositive &&
+    createDecimal(normalizedAllocation).greaterThan(
+      createDecimal(allocationState.remainingToAllocate),
+    );
+  const hasPending = sale?.payments.some((payment) => payment.status === 'PENDING') ?? false;
+  const normalizedTender = normalizeCurrencyPresentationInput(tender || normalizedAllocation);
+  const cashShort =
+    isCash &&
+    allocationPositive &&
+    createDecimal(normalizedTender).lessThan(createDecimal(normalizedAllocation));
+  const cashChange =
+    isCash && allocationPositive && !cashShort
+      ? createDecimal(normalizedTender).minus(createDecimal(normalizedAllocation)).toFixed(0)
+      : '0';
+  const fullyPaid = sale ? hasSuccessfulCheckout(sale) : false;
   const canPay =
     lines.length > 0 &&
     Boolean(activeRoute) &&
-    !isCashShort &&
-    (!needsProvider || Boolean(provider)) &&
+    allocationPositive &&
+    !overAllocated &&
+    !hasPending &&
+    !cashShort &&
     !isSubmitting;
-  const canConfirm = payNow ? canPay : lines.length > 0 && !isSubmitting;
+  const canConfirm = payNow
+    ? (fullyPaid || canPay) && !isSubmitting
+    : lines.length > 0 && !isSubmitting;
   const methods: Array<{ value: PaymentMethod; icon: ReactNode }> = [
     { value: 'CASH', icon: <Banknote className="size-[15px]" /> },
     { value: 'BANK_TRANSFER', icon: <CreditCard className="size-[15px]" /> },
     { value: 'QRIS', icon: <QrCode className="size-[15px]" /> },
     { value: 'WALLET', icon: <ShoppingBag className="size-[15px]" /> },
   ];
-  const providerOptions = needsProvider && activeRoute ? [activeRoute.financialAccountName] : [];
-  const normalizedQuickTender = [total, ...quickTender]
+  const normalizedQuickTender = [normalizedAllocation, ...quickTender]
     .map((amount) => normalizeCurrencyPresentationInput(amount))
     .filter((amount, index, list) => list.indexOf(amount) === index)
     .slice(0, 6);
+  const completesAllocation =
+    allocationPositive &&
+    createDecimal(normalizedAllocation).equals(
+      createDecimal(allocationState.remainingToAllocate),
+    );
 
   return (
     <DDialog
@@ -2703,7 +3052,15 @@ function ReferencePaymentDialog({
             {copy('Cancel')}
           </DButton>
           <DButton disabled={!canConfirm} loading={isSubmitting} onClick={onQueue}>
-            {copy(payNow ? 'Pay and add to queue' : 'Add to queue')}
+            {copy(
+              payNow
+                ? fullyPaid
+                  ? 'Add to queue'
+                  : isCash && completesAllocation
+                    ? 'Pay and add to queue'
+                    : 'Record payment'
+                : 'Add to queue',
+            )}
           </DButton>
         </div>
       }
@@ -2713,10 +3070,7 @@ function ReferencePaymentDialog({
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs text-[var(--color-text-muted)]">{copy('Payment total')}</p>
-              <h3
-                key={total}
-                className="pos-value-updated mt-0.5 text-2xl font-bold leading-tight tabular-nums text-[var(--color-brand)]"
-              >
+              <h3 className="mt-0.5 text-2xl font-bold leading-tight tabular-nums text-[var(--color-brand)]">
                 {money(total, locale)}
               </h3>
             </div>
@@ -2759,9 +3113,54 @@ function ReferencePaymentDialog({
               <span className="font-bold text-[var(--color-brand)]">{money(total, locale)}</span>
             </div>
           </div>
+          {payNow ? (
+            <>
+              <div className="mt-3 rounded-xl border border-[var(--color-brand)]/15 bg-[var(--color-brand)]/5 px-3 py-2.5">
+                <p className="text-xs font-semibold text-[var(--color-brand)]">
+                  {copy('Split payment')}
+                </p>
+                <p className="mt-1 text-[11px] leading-4 text-[var(--color-text-muted)]">
+                  {copy(
+                    sale?.payments.length
+                      ? 'Add another payment method for the remaining balance.'
+                      : 'Change the payment amount below to split this transaction across multiple payment methods.',
+                  )}
+                </p>
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                <div>
+                  <p className="text-[var(--color-text-muted)]">{copy('Paid amount')}</p>
+                  <p className="mt-0.5 font-semibold tabular-nums">
+                    {money(allocationState.successfulAmount, locale)}
+                  </p>
+                </div>
+                <div className="text-center">
+                  <p className="text-[var(--color-text-muted)]">{copy('Pending')}</p>
+                  <p className="mt-0.5 font-semibold tabular-nums">
+                    {money(allocationState.pendingAmount, locale)}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[var(--color-text-muted)]">{copy('Remaining')}</p>
+                  <p className="mt-0.5 font-bold tabular-nums text-[var(--color-brand)]">
+                    {money(allocationState.remainingToAllocate, locale)}
+                  </p>
+                </div>
+              </div>
+            </>
+          ) : null}
         </div>
 
         {adjustmentSlot}
+
+        {sale?.payments.length ? (
+          <PaymentAttemptList
+            payments={sale.payments}
+            locale={locale}
+            isMutating={isSubmitting}
+            onTransition={onTransitionPayment}
+          />
+        ) : null}
 
         <div className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)]">
           <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-2.5">
@@ -2782,11 +3181,6 @@ function ReferencePaymentDialog({
                       <p className="truncate text-sm font-semibold">{line.itemNameSnapshot}</p>
                       <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
                         {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
-                        {line.itemTypeSnapshot === 'SERVICE' ? (
-                          <span className="ml-1 font-semibold text-[var(--color-brand)]">
-                            {copy('Service')}
-                          </span>
-                        ) : null}
                       </p>
                       {isPositiveDecimal(line.lineDiscountAmount) ? (
                         <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
@@ -2804,7 +3198,6 @@ function ReferencePaymentDialog({
           </div>
         </div>
 
-        {/* Two named outcomes, because this choice changes the checkout flow instead of toggling a setting. */}
         <fieldset className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-3">
           <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
             {copy('Payment timing')}
@@ -2846,13 +3239,29 @@ function ReferencePaymentDialog({
         {payNow ? (
           <>
             <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+              <label className="block text-sm font-medium">
+                {copy('Payment amount')}
+                <PosCurrencyInput
+                  aria-label={copy('Payment amount')}
+                  className="mt-1.5 h-10 rounded-lg bg-[var(--color-surface)] text-right text-lg font-bold"
+                  value={appliedAmount}
+                  onChange={onAppliedAmount}
+                />
+              </label>
+              {overAllocated ? (
+                <p className="mt-1 text-xs text-[var(--color-danger)]">
+                  {copy('Payment allocation cannot exceed the remaining amount.')}
+                </p>
+              ) : null}
+              <p className="mt-4 mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
                 {copy('Payment method')}
               </p>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {methods.map((option) => {
-                  const routeAvailable = routeByMethod.has(option.value);
-                  const disabled = isPaymentRoutesPending || !routeAvailable;
+                  const routeAvailable = paymentRoutes.some(
+                    (route) => route.paymentMethod === option.value,
+                  );
+                  const disabled = isPaymentRoutesLoading || !routeAvailable || hasPending;
                   return (
                     <button
                       key={option.value}
@@ -2867,52 +3276,54 @@ function ReferencePaymentDialog({
                   );
                 })}
               </div>
-              {needsProvider ? (
+              {activeRoute ? (
                 <div className="mt-3">
-                  <p className="mb-2 text-xs font-semibold text-[var(--color-text-muted)]">
-                    {copy(method === 'BANK_TRANSFER' ? 'Select bank' : 'Select digital wallet')}
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+                    {copy('Settlement account')}
                   </p>
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    {providerOptions.map((option) => (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {routesForMethod.map((route) => (
                       <button
-                        key={option}
+                        key={route.id}
                         type="button"
-                        onClick={() => onProvider(option)}
-                        className={`h-9 rounded-xl border px-3 text-xs font-semibold transition-all active:scale-[.98] ${provider === option ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]'}`}
+                        onClick={() => onPaymentRoute(route.id)}
+                        className={`rounded-xl border px-3 py-2.5 text-left transition-colors ${activeRoute.id === route.id ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10' : 'border-[var(--color-border)] bg-[var(--color-surface-muted)]/50 hover:bg-[var(--color-surface-muted)]'}`}
                       >
-                        {option}
+                        <span className="block truncate text-sm font-semibold">
+                          {route.financialAccountName}
+                        </span>
+                        {route.financialAccountCode ? (
+                          <span className="mt-0.5 block truncate text-[11px] text-[var(--color-text-muted)]">
+                            {route.financialAccountCode}
+                          </span>
+                        ) : null}
                       </button>
                     ))}
                   </div>
                 </div>
               ) : null}
-              {method === 'QRIS' ? (
-                <div className="mt-3 rounded-xl border border-[var(--color-brand)]/20 bg-[var(--color-brand)]/5 p-3">
-                  <p className="text-sm font-bold text-[var(--color-brand)]">QRIS</p>
-                  {activeRoute ? (
-                    <p className="mt-1 text-xs font-semibold text-[var(--color-text)]">
-                      {activeRoute.financialAccountName}
-                    </p>
-                  ) : null}
-                  <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                    {copy('QRIS payment will be recorded for this transaction.')}
-                  </p>
-                </div>
+              {!isCash ? (
+                <DInput
+                  aria-label={copy('Payment reference')}
+                  label={copy('Payment reference')}
+                  value={paymentReference}
+                  onChange={onPaymentReference}
+                  placeholder={copy('Optional reference')}
+                  className="mt-3"
+                />
               ) : null}
             </div>
 
             {isCash ? (
               <div className="space-y-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
                 <label className="block text-sm font-medium">
-                  {copy('Amount paid')}
-                  <div className="relative mt-1.5">
-                    <PosCurrencyInput
-                      aria-label={copy('Amount paid')}
-                      className="h-10 rounded-lg bg-[var(--color-surface)] text-right text-lg font-bold"
-                      value={tender}
-                      onChange={onTender}
-                    />
-                  </div>
+                  {copy('Cash received')}
+                  <PosCurrencyInput
+                    aria-label={copy('Cash received')}
+                    className="mt-1.5 h-10 rounded-lg bg-[var(--color-surface)] text-right text-lg font-bold"
+                    value={tender}
+                    onChange={onTender}
+                  />
                 </label>
                 <div className="grid grid-cols-3 gap-2">
                   {normalizedQuickTender.map((amount) => (
@@ -2927,38 +3338,24 @@ function ReferencePaymentDialog({
                   ))}
                 </div>
                 <div
-                  className={`flex items-center justify-between rounded-xl px-3 py-2 ${isCashShort ? 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]' : 'bg-[var(--color-success)]/10 text-[var(--color-success)]'}`}
+                  className={`flex items-center justify-between rounded-xl px-3 py-2 ${cashShort ? 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]' : 'bg-[var(--color-success)]/10 text-[var(--color-success)]'}`}
                 >
                   <span className="text-sm font-bold">
-                    {copy(isCashShort ? 'Payment short' : 'Change')}
+                    {copy(cashShort ? 'Payment short' : 'Change')}
                   </span>
-                  <span className="text-sm font-bold">
-                    {isCashShort
-                      ? money(
-                          createDecimal(normalizeCurrencyPresentationInput(total))
-                            .minus(createDecimal(normalizeCurrencyPresentationInput(tender || '0')))
-                            .toFixed(0),
-                          locale,
-                        )
-                      : money(change, locale)}
+                  <span className="text-sm font-bold tabular-nums">
+                    {money(
+                      cashShort
+                        ? createDecimal(normalizedAllocation)
+                            .minus(createDecimal(normalizedTender || '0'))
+                            .toFixed(0)
+                        : cashChange,
+                      locale,
+                    )}
                   </span>
                 </div>
               </div>
-            ) : (
-              <div className="rounded-2xl border border-[var(--color-brand)]/20 bg-[var(--color-brand)]/5 p-3">
-                <p className="text-sm font-bold text-[var(--color-brand)]">
-                  {copy('Payment')} {label(method)}
-                </p>
-                {activeRoute ? (
-                  <p className="mt-1 text-xs font-semibold text-[var(--color-text)]">
-                    {activeRoute.financialAccountName}
-                  </p>
-                ) : null}
-                <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                  {copy('Select a provider if required, then record the payment.')}
-                </p>
-              </div>
-            )}
+            ) : null}
           </>
         ) : null}
       </div>
@@ -3033,10 +3430,8 @@ function ReferenceTransactionDetail({
   const payments = successfulPayments(sale).filter((payment) =>
     createDecimal(payment.appliedAmount).greaterThan(createDecimal('0')),
   );
-  const payment = payments[payments.length - 1] ?? null;
   const receiptAvailable = payments.length > 0;
   const showReceipt = showPaymentReceipt && receiptAvailable;
-  const { totalPaid } = financialSummary(sale);
   const settlement = saleSettlement(sale);
   const hasDiscount = !createDecimal(sale.discountAmount).equals(createDecimal('0'));
   const hasTax = !createDecimal(sale.taxAmount).equals(createDecimal('0'));
@@ -3183,8 +3578,6 @@ function ReferenceTransactionDetail({
                 branchName={branchName}
                 cashierName={cashierName}
                 transactionDate={transactionDate}
-                totalPaid={totalPaid}
-                payment={payment}
                 hasDiscount={hasDiscount}
                 hasTax={hasTax}
               />
@@ -3388,7 +3781,7 @@ function ReferenceTransactionDetail({
                   emptyLabel={copy('No payment recorded yet.')}
                   payments={sale.payments.map((item) => ({
                     id: item.id,
-                    method: label(item.method),
+                    method: paymentAccountLabel(item, (method) => label(method)),
                     status: (
                       <StatusPill
                         tone={
@@ -3427,8 +3820,6 @@ function ReferenceTransactionDetail({
                 branchName={branchName}
                 cashierName={cashierName}
                 transactionDate={transactionDate}
-                totalPaid={totalPaid}
-                payment={payment}
                 hasDiscount={hasDiscount}
                 hasTax={hasTax}
               />
@@ -3449,8 +3840,6 @@ function ReceiptContent({
   branchName,
   cashierName,
   transactionDate,
-  totalPaid,
-  payment,
   hasDiscount,
   hasTax,
 }: {
@@ -3462,13 +3851,15 @@ function ReceiptContent({
   branchName: string;
   cashierName: string;
   transactionDate: string;
-  totalPaid: string;
-  payment: Payment | null;
   hasDiscount: boolean;
   hasTax: boolean;
 }) {
-  const { copy } = useOperationalLocalization();
+  const { copy, label } = useOperationalLocalization();
   const discountRows = saleDiscountRows(sale);
+  const receiptPayments = successfulPayments(sale).filter((payment) =>
+    createDecimal(payment.appliedAmount).greaterThan(0),
+  );
+  const settlement = saleSettlement(sale);
   return (
     <>
       <header className="text-center">
@@ -3572,25 +3963,35 @@ function ReceiptContent({
       <div className="my-4 border-t border-dashed border-slate-300" />
 
       <section className="space-y-1.5 text-xs">
-        <div className="flex justify-between gap-3">
-          <span className="text-slate-500">{copy('Paid amount')}</span>
-          <span>{money(totalPaid, locale)}</span>
+        <p className="font-semibold">{copy('Payment')}</p>
+        {receiptPayments.map((payment) => (
+          <div key={payment.id} className="flex items-start justify-between gap-3">
+            <span className="min-w-0 text-slate-500">
+              {paymentAccountLabel(payment, (method) => label(method))}
+              {payment.providerReference ? (
+                <span className="block break-all font-mono text-[10px]">
+                  {payment.providerReference}
+                </span>
+              ) : null}
+            </span>
+            <span className="shrink-0">{money(payment.appliedAmount, locale)}</span>
+          </div>
+        ))}
+        <div className="mt-2 flex justify-between gap-3 border-t border-slate-200 pt-2 font-semibold">
+          <span>{copy('Total paid')}</span>
+          <span>{money(settlement.totalPaid, locale)}</span>
         </div>
-        {payment?.method === 'CASH' ? (
-          <>
-            {payment.tenderedAmount ? (
-              <div className="flex justify-between gap-3">
-                <span className="text-slate-500">{copy('Cash received')}</span>
-                <span>{money(payment.tenderedAmount, locale)}</span>
-              </div>
-            ) : null}
-            {isPositiveDecimal(payment.changeAmount ?? '0') ? (
-              <div className="flex justify-between gap-3">
-                <span className="text-slate-500">{copy('Change')}</span>
-                <span>{money(payment.changeAmount ?? '0.0000', locale)}</span>
-              </div>
-            ) : null}
-          </>
+        {settlement.cashTendered ? (
+          <div className="flex justify-between gap-3">
+            <span className="text-slate-500">{copy('Cash received')}</span>
+            <span>{money(settlement.cashTendered, locale)}</span>
+          </div>
+        ) : null}
+        {settlement.cashChange ? (
+          <div className="flex justify-between gap-3">
+            <span className="text-slate-500">{copy('Change')}</span>
+            <span>{money(settlement.cashChange, locale)}</span>
+          </div>
         ) : null}
       </section>
 
@@ -3902,47 +4303,76 @@ function ReferenceBalancePaymentDialog({
   sale,
   availableToPay,
   locale,
+  paymentRoutes,
+  isPaymentRoutesLoading,
   method,
-  provider,
+  paymentRouteId,
+  appliedAmount,
+  paymentReference,
   tender,
   isMutating,
   onClose,
   onMethod,
-  onProvider,
+  onPaymentRoute,
+  onAppliedAmount,
+  onPaymentReference,
   onTender,
+  onTransitionPayment,
   onPay,
 }: {
   sale: Sale | null;
   availableToPay: string | null;
   locale: string;
+  paymentRoutes: readonly PaymentRoute[];
+  isPaymentRoutesLoading: boolean;
   method: PaymentMethod;
-  provider: string;
+  paymentRouteId: string;
+  appliedAmount: string;
+  paymentReference: string;
   tender: string;
   isMutating: boolean;
   onClose: () => void;
   onMethod: (method: PaymentMethod) => void;
-  onProvider: (provider: string) => void;
+  onPaymentRoute: (paymentRouteId: string) => void;
+  onAppliedAmount: (amount: string) => void;
+  onPaymentReference: (reference: string) => void;
   onTender: (amount: string) => void;
+  onTransitionPayment: (payment: Payment, status: TerminalPaymentStatus) => void;
   onPay: () => void;
 }) {
   const { copy, label } = useOperationalLocalization();
-  const { routes: paymentRoutes, isPending: isPaymentRoutesPending } = useCachedPaymentRoutes();
-  const routeByMethod = new Map(
-    paymentRoutes.map((route) => [route.paymentMethod, route] as const),
-  );
-  const activeRoute = routeByMethod.get(method) ?? null;
+  const routesForMethod = paymentRoutes.filter((route) => route.paymentMethod === method);
+  const activeRoute =
+    routesForMethod.find((route) => route.id === paymentRouteId) ?? routesForMethod[0] ?? null;
   if (!sale) return null;
-  const { totalPaid } = financialSummary(sale);
-  const balanceDue = availableToPay ?? '0.0000';
+
+  const allocationState = paymentAllocationSummary(sale);
+  const { totalPaid, balanceDue } = financialSummary(sale);
+  const remainingToAllocate = availableToPay ?? allocationState.remainingToAllocate;
+  const normalizedAllocation = normalizeCurrencyPresentationInput(
+    appliedAmount || remainingToAllocate,
+  );
+  const allocationPositive = isPositiveDecimal(normalizedAllocation);
+  const overAllocated =
+    allocationPositive &&
+    createDecimal(normalizedAllocation).greaterThan(createDecimal(remainingToAllocate));
+  const hasPending = sale.payments.some((payment) => payment.status === 'PENDING');
   const isCash = method === 'CASH';
-  const needsProvider = method === 'BANK_TRANSFER' || method === 'WALLET';
-  const applied = isCash ? tender || balanceDue : balanceDue;
-  const cashShort = isCash && createDecimal(applied).lessThan(createDecimal(balanceDue));
+  const normalizedTender = normalizeCurrencyPresentationInput(tender || normalizedAllocation);
+  const cashShort =
+    isCash &&
+    allocationPositive &&
+    createDecimal(normalizedTender).lessThan(createDecimal(normalizedAllocation));
+  const cashChange =
+    isCash && allocationPositive && !cashShort
+      ? createDecimal(normalizedTender).minus(createDecimal(normalizedAllocation)).toFixed(0)
+      : '0';
   const canPay =
-    isPositiveDecimal(applied) &&
+    allocationPositive &&
+    !overAllocated &&
+    !hasPending &&
     Boolean(activeRoute) &&
     !cashShort &&
-    (!needsProvider || Boolean(provider)) &&
     !isMutating;
   const methods: Array<{ value: PaymentMethod; icon: ReactNode }> = [
     { value: 'CASH', icon: <Banknote className="size-4" /> },
@@ -3950,7 +4380,6 @@ function ReferenceBalancePaymentDialog({
     { value: 'QRIS', icon: <QrCode className="size-4" /> },
     { value: 'WALLET', icon: <ShoppingBag className="size-4" /> },
   ];
-  const providerOptions = needsProvider && activeRoute ? [activeRoute.financialAccountName] : [];
 
   return (
     <Dialog
@@ -3963,86 +4392,152 @@ function ReferenceBalancePaymentDialog({
       closeOnOverlay
       className="pos-reference-dialog w-full max-w-md overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
       footer={
-        <div className="flex justify-end gap-2">
+        <div className="flex flex-col-reverse justify-end gap-2 sm:flex-row">
           <Button variant="ghost" onClick={onClose}>
             {copy('Cancel')}
           </Button>
           <Button disabled={!canPay} loading={isMutating} onClick={onPay}>
-            {copy('Pay')} {money(balanceDue, locale)}
+            {copy('Record payment')} {money(normalizedAllocation || '0', locale)}
           </Button>
         </div>
       }
     >
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
-        <div className="grid grid-cols-2 gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] p-3 text-sm">
+        <div className="grid grid-cols-3 gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] p-3 text-sm">
           <div>
             <p className="text-xs text-[var(--color-text-muted)]">{copy('Paid amount')}</p>
-            <p className="mt-1 font-semibold">{money(totalPaid, locale)}</p>
+            <p className="mt-1 font-semibold tabular-nums">{money(totalPaid, locale)}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-xs text-[var(--color-text-muted)]">{copy('Pending')}</p>
+            <p className="mt-1 font-semibold tabular-nums">
+              {money(allocationState.pendingAmount, locale)}
+            </p>
           </div>
           <div className="text-right">
             <p className="text-xs text-[var(--color-text-muted)]">{copy('Balance')}</p>
-            <p className="mt-1 font-bold text-[var(--color-brand)]">{money(balanceDue, locale)}</p>
+            <p className="mt-1 font-bold tabular-nums text-[var(--color-brand)]">
+              {money(balanceDue, locale)}
+            </p>
           </div>
         </div>
-        <div className="grid grid-cols-4 gap-2">
-          {methods.map((option) => {
-            const routeAvailable = routeByMethod.has(option.value);
-            const disabled = isPaymentRoutesPending || !routeAvailable;
-            return (
-              <button
-                key={option.value}
-                type="button"
-                disabled={disabled}
-                onClick={() => onMethod(option.value)}
-                className={`flex h-10 items-center justify-center gap-1 rounded-xl border text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${method === option.value ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white' : 'border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]'}`}
-              >
-                {option.icon}
-                <span className="pos-payment-method-label">{label(option.value)}</span>
-              </button>
-            );
-          })}
+
+        <PaymentAttemptList
+          payments={sale.payments}
+          locale={locale}
+          isMutating={isMutating}
+          onTransition={onTransitionPayment}
+        />
+
+        <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
+          <label className="block text-sm font-medium">
+            {copy('Payment amount')}
+            <PosCurrencyInput
+              aria-label={copy('Payment amount')}
+              className="mt-1.5 h-10 rounded-lg text-right text-lg font-bold"
+              value={appliedAmount}
+              onChange={onAppliedAmount}
+            />
+          </label>
+          {overAllocated ? (
+            <p className="mt-1 text-xs text-[var(--color-danger)]">
+              {copy('Payment allocation cannot exceed the remaining amount.')}
+            </p>
+          ) : null}
+
+          <p className="mt-4 mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+            {copy('Payment method')}
+          </p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {methods.map((option) => {
+              const routeAvailable = paymentRoutes.some(
+                (route) => route.paymentMethod === option.value,
+              );
+              const disabled = isPaymentRoutesLoading || !routeAvailable || hasPending;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => onMethod(option.value)}
+                  className={`flex h-10 items-center justify-center gap-1 rounded-xl border text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${method === option.value ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white' : 'border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]'}`}
+                >
+                  {option.icon}
+                  <span className="pos-payment-method-label">{label(option.value)}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {activeRoute ? (
+            <div className="mt-3">
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+                {copy('Settlement account')}
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {routesForMethod.map((route) => (
+                  <button
+                    key={route.id}
+                    type="button"
+                    onClick={() => onPaymentRoute(route.id)}
+                    className={`rounded-xl border px-3 py-2.5 text-left transition-colors ${activeRoute.id === route.id ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10' : 'border-[var(--color-border)] bg-[var(--color-surface-muted)]/50 hover:bg-[var(--color-surface-muted)]'}`}
+                  >
+                    <span className="block truncate text-sm font-semibold">
+                      {route.financialAccountName}
+                    </span>
+                    {route.financialAccountCode ? (
+                      <span className="mt-0.5 block truncate text-[11px] text-[var(--color-text-muted)]">
+                        {route.financialAccountCode}
+                      </span>
+                    ) : null}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {!isCash ? (
+            <DInput
+              aria-label={copy('Payment reference')}
+              label={copy('Payment reference')}
+              value={paymentReference}
+              onChange={onPaymentReference}
+              placeholder={copy('Optional reference')}
+              className="mt-3"
+            />
+          ) : null}
         </div>
-        {needsProvider ? (
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {providerOptions.map((option) => (
-              <button
-                key={option}
-                type="button"
-                onClick={() => onProvider(option)}
-                className={`h-9 rounded-lg border px-3 text-xs font-semibold ${provider === option ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]'}`}
-              >
-                {option}
-              </button>
-            ))}
+
+        {isCash ? (
+          <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
+            <label className="block text-sm font-medium">
+              {copy('Cash received')}
+              <PosCurrencyInput
+                aria-label={copy('Cash received')}
+                className="mt-1.5 h-10 rounded-lg text-right text-lg font-bold"
+                value={tender}
+                onChange={onTender}
+              />
+            </label>
+            <div
+              className={`mt-3 flex items-center justify-between rounded-xl px-3 py-2 ${cashShort ? 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]' : 'bg-[var(--color-success)]/10 text-[var(--color-success)]'}`}
+            >
+              <span className="text-sm font-bold">
+                {copy(cashShort ? 'Payment short' : 'Change')}
+              </span>
+              <span className="text-sm font-bold tabular-nums">
+                {money(
+                  cashShort
+                    ? createDecimal(normalizedAllocation)
+                        .minus(createDecimal(normalizedTender || '0'))
+                        .toFixed(0)
+                    : cashChange,
+                  locale,
+                )}
+              </span>
+            </div>
           </div>
         ) : null}
-        {isCash ? (
-          <label className="block text-sm font-medium">
-            {copy('Amount paid')}
-            <PosCurrencyInput
-              aria-label={copy('Amount paid')}
-              className="mt-1.5 h-10 rounded-lg text-right text-lg font-bold"
-              value={tender}
-              onChange={onTender}
-            />
-            {cashShort ? (
-              <span className="mt-1 block text-xs text-[var(--color-warning)]">
-                {copy('Payment amount is insufficient.')}
-              </span>
-            ) : null}
-          </label>
-        ) : (
-          <div className="rounded-xl border border-[var(--color-brand)]/20 bg-[var(--color-brand)]/5 p-3 text-xs text-[var(--color-text-muted)]">
-            <p>
-              {copy('Record payment')} {label(method)} {money(balanceDue, locale)}.
-            </p>
-            {activeRoute ? (
-              <p className="mt-1 font-semibold text-[var(--color-text)]">
-                {activeRoute.financialAccountName}
-              </p>
-            ) : null}
-          </div>
-        )}
       </div>
     </Dialog>
   );

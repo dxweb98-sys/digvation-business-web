@@ -300,6 +300,59 @@ const copy: Record<string, LocalizedLabel> = {
   'Estimated total': { 'id-ID': 'Estimasi total', 'en-US': 'Estimated total' },
   Payment: { 'id-ID': 'Pembayaran', 'en-US': 'Payment' },
   'Payment method': { 'id-ID': 'Metode pembayaran', 'en-US': 'Payment method' },
+  'Split payment': { 'id-ID': 'Pembayaran terbagi', 'en-US': 'Split payment' },
+  'Payment amount': { 'id-ID': 'Jumlah pembayaran', 'en-US': 'Payment amount' },
+  'Paid amount': { 'id-ID': 'Sudah dibayar', 'en-US': 'Paid amount' },
+  Pending: { 'id-ID': 'Menunggu', 'en-US': 'Pending' },
+  Remaining: { 'id-ID': 'Sisa', 'en-US': 'Remaining' },
+  'Settlement account': { 'id-ID': 'Akun pembayaran', 'en-US': 'Settlement account' },
+  'Payment reference': { 'id-ID': 'Referensi pembayaran', 'en-US': 'Payment reference' },
+  'Optional reference': { 'id-ID': 'Referensi opsional', 'en-US': 'Optional reference' },
+  'Record payment': { 'id-ID': 'Catat pembayaran', 'en-US': 'Record payment' },
+  'Total paid': { 'id-ID': 'Total dibayar', 'en-US': 'Total paid' },
+  'Cash received': { 'id-ID': 'Uang diterima', 'en-US': 'Cash received' },
+  Change: { 'id-ID': 'Kembalian', 'en-US': 'Change' },
+  'Payment method unavailable': {
+    'id-ID': 'Metode pembayaran tidak tersedia',
+    'en-US': 'Payment method unavailable',
+  },
+  'Configure an active settlement account for this payment method.': {
+    'id-ID': 'Tambahkan akun pembayaran aktif untuk metode ini di Backoffice.',
+    'en-US': 'Configure an active settlement account for this payment method.',
+  },
+  'Payment allocation cannot exceed the remaining amount.': {
+    'id-ID': 'Jumlah pembayaran tidak boleh melebihi sisa tagihan.',
+    'en-US': 'Payment allocation cannot exceed the remaining amount.',
+  },
+  'Change the payment amount below to split this transaction across multiple payment methods.': {
+    'id-ID': 'Ubah jumlah pembayaran di bawah untuk membagi transaksi ke beberapa metode pembayaran.',
+    'en-US': 'Change the payment amount below to split this transaction across multiple payment methods.',
+  },
+  'Add another payment method for the remaining balance.': {
+    'id-ID': 'Tambahkan metode pembayaran lain untuk melunasi sisa tagihan.',
+    'en-US': 'Add another payment method for the remaining balance.',
+  },
+  'Payment amount': { 'id-ID': 'Nominal pembayaran', 'en-US': 'Payment amount' },
+  'Settlement account': { 'id-ID': 'Akun penerimaan', 'en-US': 'Settlement account' },
+  'Split payment': { 'id-ID': 'Pembayaran terbagi', 'en-US': 'Split payment' },
+  'Add another payment method for the remaining balance.': {
+    'id-ID': 'Tambahkan metode pembayaran lain untuk sisa tagihan.',
+    'en-US': 'Add another payment method for the remaining balance.',
+  },
+  'Change the payment amount below to split this transaction across multiple payment methods.': {
+    'id-ID':
+      'Ubah nominal pembayaran di bawah untuk membagi transaksi ke beberapa metode pembayaran.',
+    'en-US':
+      'Change the payment amount below to split this transaction across multiple payment methods.',
+  },
+  'Payment method unavailable': {
+    'id-ID': 'Metode pembayaran tidak tersedia',
+    'en-US': 'Payment method unavailable',
+  },
+  'Configure an active settlement account for this payment method.': {
+    'id-ID': 'Konfigurasikan akun penerimaan aktif untuk metode pembayaran ini.',
+    'en-US': 'Configure an active settlement account for this payment method.',
+  },
   Cash: { 'id-ID': 'Tunai', 'en-US': 'Cash' },
   Transfer: { 'id-ID': 'Transfer', 'en-US': 'Transfer' },
   'Digital wallet': { 'id-ID': 'Dompet digital', 'en-US': 'Digital wallet' },
