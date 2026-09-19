@@ -3141,23 +3141,24 @@ function ReferencePaymentDialog({
                 </p>
               </div>
               <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-              <div>
-                <p className="text-[var(--color-text-muted)]">{copy('Paid amount')}</p>
-                <p className="mt-0.5 font-semibold tabular-nums">
-                  {money(allocationState.successfulAmount, locale)}
-                </p>
-              </div>
-              <div className="text-center">
-                <p className="text-[var(--color-text-muted)]">{copy('Pending')}</p>
-                <p className="mt-0.5 font-semibold tabular-nums">
-                  {money(allocationState.pendingAmount, locale)}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-[var(--color-text-muted)]">{copy('Remaining')}</p>
-                <p className="mt-0.5 font-bold tabular-nums text-[var(--color-brand)]">
-                  {money(allocationState.remainingToAllocate, locale)}
-                </p>
+                <div>
+                  <p className="text-[var(--color-text-muted)]">{copy('Paid amount')}</p>
+                  <p className="mt-0.5 font-semibold tabular-nums">
+                    {money(allocationState.successfulAmount, locale)}
+                  </p>
+                </div>
+                <div className="text-center">
+                  <p className="text-[var(--color-text-muted)]">{copy('Pending')}</p>
+                  <p className="mt-0.5 font-semibold tabular-nums">
+                    {money(allocationState.pendingAmount, locale)}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[var(--color-text-muted)]">{copy('Remaining')}</p>
+                  <p className="mt-0.5 font-bold tabular-nums text-[var(--color-brand)]">
+                    {money(allocationState.remainingToAllocate, locale)}
+                  </p>
+                </div>
               </div>
             </>
           ) : null}
