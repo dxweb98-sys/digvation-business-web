@@ -90,11 +90,6 @@ function numberValue(value: DashboardRow[string] | undefined): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function percentageChange(current: number, previous: number): number | null {
-  if (previous === 0) return current === 0 ? 0 : null;
-  return ((current - previous) / Math.abs(previous)) * 100;
-}
-
 function welcomeCopy(locale: 'id' | 'en', name: string, hour: number) {
   if (locale === 'id') {
     const greeting =
