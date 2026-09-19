@@ -695,6 +695,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [payNow, setPayNow] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
+  const [paymentRouteId, setPaymentRouteId] = useState('');
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentReference, setPaymentReference] = useState('');
   const [tender, setTender] = useState('');
@@ -817,6 +818,9 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     setTender(normalizedCheckoutTotal);
     setPayNow(true);
     setPaymentMethod('CASH');
+    setPaymentRouteId(
+      workspace.paymentRoutes.find((route) => route.paymentMethod === 'CASH')?.id ?? '',
+    );
     setPaymentReference('');
     setCartOpen(false);
     setCheckoutOpen(true);
@@ -1029,6 +1033,9 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       setQueueDetail(null);
       const normalizedAvailable = normalizeCurrencyPresentationInput(availableToPay);
       setPaymentMethod('CASH');
+      setPaymentRouteId(
+        workspace.paymentRoutes.find((route) => route.paymentMethod === 'CASH')?.id ?? '',
+      );
       setPaymentAmount(normalizedAvailable);
       setPaymentReference('');
       setTender(normalizedAvailable);
