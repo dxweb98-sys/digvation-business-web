@@ -1,6 +1,7 @@
 import type { ApiClient } from '@digvation/business-api';
 
 import type {
+  DashboardDailySummary,
   DashboardDataset,
   DashboardFilterState,
   DashboardOperationalAccess,
@@ -12,6 +13,13 @@ export class DashboardApi {
 
   operationalAccess(): Promise<DashboardOperationalAccess> {
     return this.api.get<DashboardOperationalAccess>('/api/v1/operational-access/context');
+  }
+
+  dailySummary(locationId: string): Promise<DashboardDailySummary> {
+    const params = new URLSearchParams({ sellingLocationId: locationId });
+    return this.api.get<DashboardDailySummary>(
+      `/api/v1/reports/dashboard-summary?${params.toString()}`,
+    );
   }
 
   report(
