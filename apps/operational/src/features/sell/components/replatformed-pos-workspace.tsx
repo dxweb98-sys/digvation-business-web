@@ -38,10 +38,10 @@ import {
   QrCode,
   RotateCcw,
   ShoppingBag,
+  Sparkles,
   Trash2,
   User,
   UserPlus,
-  Wrench,
   X,
   XCircle,
 } from 'lucide-react';
@@ -1195,7 +1195,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
               />
               <ReferenceTypeButton
                 active={workspace.itemType === 'SERVICE'}
-                icon={<Wrench className="size-3.5" />}
+                icon={<Sparkles className="size-3.5" />}
                 label={copy('Service')}
                 onClick={() => selectType('SERVICE')}
               />
@@ -1215,7 +1215,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
                 <button
                   type="button"
                   onClick={() => setSelectedCategory('')}
-                  className={`inline-flex h-9 shrink-0 items-center rounded-lg px-2.5 text-xs font-semibold transition-colors ${selectedCategory ? 'bg-(--color-surface-muted) text-(--color-text-muted)' : 'bg-[var(--color-brand)] text-white'}`}
+                  className={`inline-flex h-9 shrink-0 items-center rounded-lg px-2.5 text-xs font-semibold transition-colors ${selectedCategory ? 'bg-(--color-surface-muted) text-(--color-text-muted)' : 'bg-(--color-brand) text-white'}`}
                 >
                   {copy('All')}
                 </button>
@@ -1224,7 +1224,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
                     key={category.id}
                     type="button"
                     onClick={() => setSelectedCategory(category.id)}
-                    className={`inline-flex h-9 shrink-0 items-center rounded-lg px-2.5 text-xs font-semibold transition-colors ${selectedCategory === category.id ? 'bg-(--color-brand) text-white' : 'bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]'}`}
+                    className={`inline-flex h-9 shrink-0 items-center rounded-lg px-2.5 text-xs font-semibold transition-colors ${selectedCategory === category.id ? 'bg-(--color-brand) text-white' : 'bg-(--color-surface-muted) text-(--color-text-muted)'}`}
                   >
                     {category.name}
                   </button>
@@ -1237,7 +1237,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           {workspace.isLoadingCatalog ? (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
               {Array.from({ length: 10 }).map((item, index) => (
-                <Skeleton key={`${String(item)}-${index}`} className="h-40 rounded-2xl" />
+                <Skeleton key={`${String(item)}-${index}`} className="aspect-[3/4] rounded-2xl" />
               ))}
             </div>
           ) : visibleItems.length === 0 ? (
@@ -1524,6 +1524,52 @@ function ReferenceTypeButton({
   );
 }
 
+/** Initials that stand in for an item photo, e.g. "Hair Spa" -> "HS", "Manicure" -> "Ma". */
+function itemMonogram(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length > 1) return `${words[0]![0]}${words[1]![0]}`.toUpperCase();
+  const word = words[0] ?? '';
+  return `${word.charAt(0).toUpperCase()}${word.charAt(1).toLowerCase()}`;
+}
+
+/**
+ * The card's media band: the item photo edge to edge, or its initials on a
+ * soft tint filling the same band, so every card keeps one height and one
+ * rhythm whether or not a photo exists.
+ */
+function CatalogItemMedia({ item }: { item: CatalogItem }) {
+  const isService = item.type === 'SERVICE';
+  const imageUrl = item.image?.url;
+  return (
+    <span
+      aria-hidden="true"
+      className={`relative block aspect-[4/3] w-full overflow-hidden border-b sm:aspect-[3/2] border-[var(--color-border)] ${
+        imageUrl
+          ? 'bg-[var(--color-surface-muted)]'
+          : isService
+            ? 'bg-[linear-gradient(135deg,color-mix(in_srgb,var(--color-brand)_14%,var(--color-surface))_0%,color-mix(in_srgb,var(--color-brand)_5%,var(--color-surface))_100%)] text-[var(--color-brand)]'
+            : 'bg-[linear-gradient(135deg,color-mix(in_srgb,var(--color-accent-mint)_70%,var(--color-surface))_0%,color-mix(in_srgb,var(--color-accent-mint)_30%,var(--color-surface))_100%)] text-[var(--color-text)]'
+      }`}
+    >
+      {imageUrl ? (
+        <img
+          src={imageUrl}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          className="size-full object-cover transition-transform duration-300 group-hover:scale-[1.04] motion-reduce:transition-none"
+        />
+      ) : (
+        <span className="absolute inset-0 grid place-items-center">
+          <span className="grid size-14 place-items-center rounded-full bg-[var(--color-surface)]/70 text-lg font-semibold tracking-wide shadow-sm ring-1 ring-inset ring-current/10 sm:size-16 sm:text-xl">
+            {itemMonogram(item.name)}
+          </span>
+        </span>
+      )}
+    </span>
+  );
+}
+
 function ReferenceCatalogCard({
   item,
   price,
@@ -1538,7 +1584,6 @@ function ReferenceCatalogCard({
   onAdd: () => void;
 }) {
   const { copy } = useOperationalLocalization();
-  const isService = item.type === 'SERVICE';
   const displayPrice = item.displayPrice;
   const variantCount = item.variants?.length ?? 0;
   const needsVariantChoice = variantCount > 0;
@@ -1549,53 +1594,66 @@ function ReferenceCatalogCard({
       aria-label={`${copy(needsVariantChoice ? 'Choose variant' : 'Add')} ${item.name}`}
       disabled={disabled}
       onClick={onAdd}
-      className="group rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-left transition-all hover:border-[var(--color-brand)]/40 hover:shadow-md active:scale-[.98] disabled:opacity-50"
+      className="group flex h-full flex-col overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] text-left transition-all hover:border-[var(--color-brand)]/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/40 active:scale-[.98] disabled:opacity-50"
     >
-      <div
-        className={`mb-2 flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl ${isService ? 'bg-cyan-500/10 text-cyan-600' : 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]'}`}
-      >
-        {item.image?.url ? (
-          <img src={item.image.url} alt="" loading="lazy" className="size-full object-cover" />
-        ) : isService ? (
-          <Wrench className="size-7" />
-        ) : (
-          <ShoppingBag className="size-7" />
-        )}
-      </div>
-      <p className="truncate font-mono text-[10px] text-[var(--color-text-muted)]">{item.code}</p>
-      <p className="mt-1 line-clamp-2 min-h-10 text-sm font-semibold leading-tight">{item.name}</p>
-      {/* Reserved metadata row keeps the price baseline aligned across the grid. */}
-      <p className="mt-1 flex min-h-4 items-center gap-1 text-[11px] text-[var(--color-text-muted)]">
-        {duration ? (
-          <>
-            <Clock className="size-3 shrink-0" aria-hidden="true" />
-            {duration}
-          </>
-        ) : null}
-      </p>
-      <p className="mt-1.5 text-sm font-semibold text-[var(--color-text)]">
-        {price
-          ? displayPrice?.kind === 'FROM'
-            ? `${copy('From')} ${money(price, locale)}`
-            : money(price, locale)
-          : copy('Price available when selected')}
-      </p>
-      {/* Items with variants open a picker first, so the card says so instead of implying a direct add. */}
-      <p
-        className={`mt-1.5 flex items-center gap-1 text-[11px] font-semibold ${needsVariantChoice ? 'text-[var(--color-brand)]' : 'text-[var(--color-text-muted)]'}`}
-      >
-        {needsVariantChoice ? (
-          <>
-            {copy('Choose variant')}
-            <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
-          </>
-        ) : (
-          <>
-            <Plus className="size-3 shrink-0" aria-hidden="true" />
-            {copy('Add')}
-          </>
-        )}
-      </p>
+      <CatalogItemMedia item={item} />
+      <span className="flex min-w-0 flex-1 flex-col gap-3 p-3">
+        {/* Identity: a quiet reference line (code, plus duration when the item has one) over the name. */}
+        <span className="block min-w-0">
+          <span className="flex min-w-0 items-center gap-1.5 text-[11px] leading-4 text-[var(--color-text-muted)]">
+            <span className="truncate font-mono tracking-tight">{item.code}</span>
+            {duration ? (
+              <span className="flex shrink-0 items-center gap-1">
+                <span aria-hidden="true">·</span>
+                <Clock className="size-3" aria-hidden="true" />
+                {duration}
+              </span>
+            ) : null}
+          </span>
+          <span className="mt-1 line-clamp-2 text-sm font-semibold leading-snug text-[var(--color-text)]">
+            {item.name}
+          </span>
+        </span>
+        {/* Commerce: price and action stay anchored to the bottom, so they line up across a grid row. */}
+        <span className="mt-auto block border-t border-[var(--color-border)]/70 pt-2.5">
+          {price ? (
+            <span className="flex items-baseline gap-1 tabular-nums">
+              {displayPrice?.kind === 'FROM' ? (
+                <span className="text-[11px] font-medium text-[var(--color-text-muted)]">
+                  {copy('From')}
+                </span>
+              ) : null}
+              <span className="text-sm font-bold text-[var(--color-text)]">
+                {money(price, locale)}
+              </span>
+            </span>
+          ) : (
+            <span className="block text-[11px] leading-5 text-[var(--color-text-muted)]">
+              {copy('Price available when selected')}
+            </span>
+          )}
+          {/* Both outcomes share one treatment; the wording and icon say whether a picker opens first. */}
+          <span className="mt-1 flex items-center gap-1 text-[11px] font-semibold leading-4 text-[var(--color-brand)]">
+            {needsVariantChoice ? (
+              <>
+                {copy('Choose variant')}
+                <ChevronRight
+                  className="size-3.5 shrink-0 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
+                  aria-hidden="true"
+                />
+              </>
+            ) : (
+              <>
+                <Plus
+                  className="size-3.5 shrink-0 transition-transform group-hover:rotate-90 motion-reduce:transition-none"
+                  aria-hidden="true"
+                />
+                {copy('Add')}
+              </>
+            )}
+          </span>
+        </span>
+      </span>
     </button>
   );
 }
