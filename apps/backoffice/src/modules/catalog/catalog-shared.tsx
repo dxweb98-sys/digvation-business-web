@@ -97,3 +97,49 @@ export function DetailField({
     </div>
   );
 }
+
+/**
+ * One section of the Catalog item dialogs. `primary` sections hold what the user is here for
+ * (identity, pricing, variants); `secondary` sections hold supporting or historical information.
+ */
+export function CatalogSection({
+  title,
+  description,
+  count,
+  actions,
+  tone = 'primary',
+  children,
+}: {
+  title: string;
+  description?: ReactNode;
+  count?: number;
+  actions?: ReactNode;
+  tone?: 'primary' | 'secondary';
+  children: ReactNode;
+}) {
+  return (
+    <section className="py-6 first:pt-0 last:pb-0" aria-label={title}>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <h2
+              className={
+                tone === 'primary'
+                  ? 'text-base font-semibold text-[var(--color-text)]'
+                  : 'text-sm font-semibold text-[var(--color-text-muted)]'
+              }
+            >
+              {title}
+            </h2>
+            {count !== undefined ? <DBadge variant="secondary">{count}</DBadge> : null}
+          </div>
+          {description ? (
+            <p className="mt-1 max-w-2xl text-sm text-[var(--color-text-muted)]">{description}</p>
+          ) : null}
+        </div>
+        {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
+      </div>
+      <div className="mt-4">{children}</div>
+    </section>
+  );
+}

@@ -1837,11 +1837,12 @@ function ReferenceCatalogCard({
   const displayPrice = item.displayPrice;
   const variantCount = item.variants?.length ?? 0;
   const needsVariantChoice = variantCount > 0;
+  const choiceLabel = item.variantSelectionMode === 'OPTIONAL' ? 'Choose option' : 'Choose variant';
   const duration = formatDurationMinutes(item.serviceDefinition?.defaultDurationMinutes, locale);
   return (
     <button
       type="button"
-      aria-label={`${copy(needsVariantChoice ? 'Choose variant' : 'Add')} ${item.name}`}
+      aria-label={`${copy(needsVariantChoice ? choiceLabel : 'Add')} ${item.name}`}
       disabled={disabled}
       onClick={onAdd}
       className="group flex h-full flex-col overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] text-left transition-all hover:border-[var(--color-brand)]/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/40 active:scale-[.98] disabled:opacity-50"
@@ -1886,7 +1887,7 @@ function ReferenceCatalogCard({
           <span className="mt-1 flex items-center gap-1 text-[11px] font-semibold leading-4 text-[var(--color-brand)]">
             {needsVariantChoice ? (
               <>
-                {copy('Choose variant')}
+                {copy(choiceLabel)}
                 <ChevronRight
                   className="size-3.5 shrink-0 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
                   aria-hidden="true"
@@ -4055,6 +4056,9 @@ function ReceiptContent({
   );
 }
 
+/** Select value for "the item itself"; it becomes no variant when added. */
+const ADJUSTMENT_ITEM_OPTION = 'item-option';
+
 function ReferenceOrderAdjustmentDialog({
   sale,
   items,
@@ -4074,7 +4078,7 @@ function ReferenceOrderAdjustmentDialog({
   variantPicker: VariantPickerState | null;
   onClose: () => void;
   onAdd: (item: CatalogItem) => void;
-  onAddVariant: (catalogVariantId: string) => void;
+  onAddVariant: (catalogVariantId: string | null) => void;
   onQuantity: (line: SaleLine, quantity: string) => void;
   onRemove: (line: SaleLine) => void;
 }) {
@@ -4303,23 +4307,37 @@ function ReferenceOrderAdjustmentDialog({
                 {variantPicker.item.name}
               </p>
               <Select
-                label={copy('Variant')}
+                label={copy(variantPicker.itemOption ? 'Option' : 'Variant')}
                 value={selectedVariantId}
-                placeholder={copy('Select variant')}
-                options={variantPicker.variants.map((variant) => {
-                  const price = variantPicker.pricesByVariantId?.[variant.id];
-                  const isUnavailable =
-                    variantPicker.unavailableVariantIds?.includes(variant.id) ?? false;
-                  return {
-                    value: variant.id,
-                    label: isUnavailable
-                      ? `${variant.name} (${copy('Price unavailable')})`
-                      : price
-                        ? `${variant.name} (${money(price, locale)})`
-                        : variant.name,
-                    disabled: isUnavailable,
-                  };
-                })}
+                placeholder={copy(variantPicker.itemOption ? 'Select option' : 'Select variant')}
+                options={[
+                  ...(variantPicker.itemOption
+                    ? [
+                        {
+                          value: ADJUSTMENT_ITEM_OPTION,
+                          label:
+                            variantPicker.itemOption.price === null
+                              ? `${copy('Without variant')} (${copy('Price unavailable')})`
+                              : `${copy('Without variant')} (${money(variantPicker.itemOption.price, locale)})`,
+                          disabled: variantPicker.itemOption.price === null,
+                        },
+                      ]
+                    : []),
+                  ...variantPicker.variants.map((variant) => {
+                    const price = variantPicker.pricesByVariantId?.[variant.id];
+                    const isUnavailable =
+                      variantPicker.unavailableVariantIds?.includes(variant.id) ?? false;
+                    return {
+                      value: variant.id,
+                      label: isUnavailable
+                        ? `${variant.name} (${copy('Price unavailable')})`
+                        : price
+                          ? `${variant.name} (${money(price, locale)})`
+                          : variant.name,
+                      disabled: isUnavailable,
+                    };
+                  }),
+                ]}
                 onChange={(value) =>
                   setVariantSelection(
                     typeof value === 'string'
@@ -4336,7 +4354,10 @@ function ReferenceOrderAdjustmentDialog({
                   leftIcon={<Plus className="size-3.5" />}
                   disabled={selectedVariantId === null || isMutating}
                   onClick={() => {
-                    if (selectedVariantId) onAddVariant(selectedVariantId);
+                    if (selectedVariantId)
+                      onAddVariant(
+                        selectedVariantId === ADJUSTMENT_ITEM_OPTION ? null : selectedVariantId,
+                      );
                   }}
                 >
                   {copy('Add item')}

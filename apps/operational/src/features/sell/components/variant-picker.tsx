@@ -7,6 +7,9 @@ import {
   operationalCopy,
   resolveOperationalLocale,
 } from '../../../app/localization/operational-localization';
+
+const copyFor = (locale: string, value: string) =>
+  operationalCopy(value, resolveOperationalLocale(locale));
 import type { CatalogItem, CatalogVariant } from '../cashier-transaction.types';
 
 export type VariantPickerContext = 'CART' | 'TRANSACTION_ADJUSTMENT';
@@ -14,6 +17,11 @@ export type VariantPickerContext = 'CART' | 'TRANSACTION_ADJUSTMENT';
 export interface VariantPickerState {
   item: CatalogItem;
   variants: readonly CatalogVariant[];
+  /**
+   * Present only when the item itself is also sold without a variant; `price` is its own price,
+   * or null when no current price is available. Absent for items that require a variant.
+   */
+  itemOption?: { price: string | null } | null;
   pricesByVariantId?: Readonly<Record<string, string>>;
   unavailableVariantIds?: readonly string[];
   locale?: string;
@@ -27,9 +35,13 @@ interface VariantPickerProps extends VariantPickerState {
   onClose: () => void;
 }
 
+/** Picker-local choice for "the item itself"; never sent anywhere (it becomes no variant). */
+const ITEM_OPTION = 'item-option';
+
 export function VariantPicker({
   item,
   variants,
+  itemOption = null,
   pricesByVariantId = {},
   unavailableVariantIds = [],
   locale = 'id-ID',
@@ -40,6 +52,26 @@ export function VariantPicker({
 }: VariantPickerProps) {
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
   const isAdjustment = context === 'TRANSACTION_ADJUSTMENT';
+  const choices = [
+    ...(itemOption
+      ? [
+          {
+            id: ITEM_OPTION,
+            name: copyFor(locale, 'Without variant'),
+            detail: copyFor(locale, 'Sold as the item itself'),
+            price: itemOption.price ?? undefined,
+            unavailable: itemOption.price === null,
+          },
+        ]
+      : []),
+    ...variants.map((variant) => ({
+      id: variant.id,
+      name: variant.name,
+      detail: variant.code,
+      price: pricesByVariantId[variant.id],
+      unavailable: unavailableVariantIds.includes(variant.id),
+    })),
+  ];
   const operationalLocale = resolveOperationalLocale(locale);
   const copy = (value: string) => operationalCopy(value, operationalLocale);
 
@@ -58,16 +90,20 @@ export function VariantPicker({
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-brand)]">
-            {copy('Select variant')}
+            {copy(itemOption ? 'Select option' : 'Select variant')}
           </p>
           <h2 id="variant-picker-title" className="mt-1 text-lg font-bold">
             {item.name}
           </h2>
           <p className="mt-1 text-sm text-[var(--color-text-muted)]">
             {copy(
-              isAdjustment
-                ? 'Select one variant to add to the transaction.'
-                : 'Select one variant to add to the cart.',
+              itemOption
+                ? isAdjustment
+                  ? 'Select one option to add to the transaction.'
+                  : 'Select one option to add to the cart.'
+                : isAdjustment
+                  ? 'Select one variant to add to the transaction.'
+                  : 'Select one variant to add to the cart.',
             )}
           </p>
         </div>
@@ -83,23 +119,25 @@ export function VariantPicker({
       </div>
 
       <div className="mt-4 divide-y divide-[var(--color-border)] overflow-hidden rounded-xl border border-[var(--color-border)]">
-        {variants.map((variant) => {
-          const price = pricesByVariantId[variant.id];
-          const isUnavailable = unavailableVariantIds.includes(variant.id);
-          const selected = selectedVariantId === variant.id;
+        {choices.map((choice) => {
+          const price = choice.price;
+          const isUnavailable = choice.unavailable;
+          const selected = selectedVariantId === choice.id;
           return (
             <button
-              key={variant.id}
+              key={choice.id}
               type="button"
               disabled={isUnavailable}
-              onClick={() => setSelectedVariantId(variant.id)}
+              onClick={() => setSelectedVariantId(choice.id)}
               aria-pressed={selected}
               className={`flex min-h-14 w-full items-center justify-between gap-4 px-3.5 py-2.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${selected ? 'bg-[var(--color-brand)]/7 shadow-[inset_2px_0_0_var(--color-brand)]' : 'bg-[var(--color-surface)] hover:bg-[var(--color-surface-muted)]/60'}`}
             >
               <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold">{variant.name}</span>
-                <span className="mt-0.5 block font-mono text-[10px] text-[var(--color-text-muted)]">
-                  {variant.code}
+                <span className="block truncate text-sm font-semibold">{choice.name}</span>
+                <span
+                  className={`mt-0.5 block text-[10px] text-[var(--color-text-muted)] ${choice.id === ITEM_OPTION ? '' : 'font-mono'}`}
+                >
+                  {choice.detail}
                 </span>
               </span>
               <span className="flex shrink-0 items-center gap-3">
@@ -131,7 +169,8 @@ export function VariantPicker({
           type="button"
           disabled={selectedVariantId === null}
           onClick={() => {
-            if (selectedVariantId) onSelect(selectedVariantId);
+            if (selectedVariantId)
+              onSelect(selectedVariantId === ITEM_OPTION ? null : selectedVariantId);
           }}
         >
           {copy(isAdjustment ? 'Add to transaction' : 'Add to cart')}

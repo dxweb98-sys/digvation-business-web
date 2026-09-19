@@ -388,6 +388,22 @@ const copy: Record<string, LocalizedLabel> = {
     'en-US': 'Employee contribution must total 100%.',
   },
   'Select variant': { 'id-ID': 'Pilih varian', 'en-US': 'Select variant' },
+  'Select option': { 'id-ID': 'Pilih opsi', 'en-US': 'Select option' },
+  'Choose option': { 'id-ID': 'Pilih opsi', 'en-US': 'Choose option' },
+  Option: { 'id-ID': 'Opsi', 'en-US': 'Option' },
+  'Without variant': { 'id-ID': 'Tanpa varian', 'en-US': 'Without variant' },
+  'Sold as the item itself': {
+    'id-ID': 'Dijual tanpa memilih varian',
+    'en-US': 'Sold as the item itself',
+  },
+  'Select one option to add to the cart.': {
+    'id-ID': 'Pilih satu opsi untuk ditambahkan ke keranjang.',
+    'en-US': 'Select one option to add to the cart.',
+  },
+  'Select one option to add to the transaction.': {
+    'id-ID': 'Pilih satu opsi untuk ditambahkan ke transaksi.',
+    'en-US': 'Select one option to add to the transaction.',
+  },
   'Select one variant to add to the transaction.': {
     'id-ID': 'Pilih satu varian untuk ditambahkan ke transaksi.',
     'en-US': 'Select one variant to add to the transaction.',

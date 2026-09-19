@@ -240,9 +240,26 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
               currency: runtime.currency,
             })
           : { pricesByVariantId: {}, unavailableVariantIds: [] };
+        // The item itself is a choice only when Catalog sells it without a variant.
+        const itemOption =
+          item.variantSelectionMode === 'OPTIONAL'
+            ? {
+                price: selectedLocationId
+                  ? await fetchResolvedPrice(queryClient, transactionAdapter, {
+                      catalogItemId: item.id,
+                      sellingLocationId: selectedLocationId,
+                      currency: runtime.currency,
+                    }).then(
+                      (price) => price.amount,
+                      () => null,
+                    )
+                  : null,
+              }
+            : null;
         setVariantPicker({
           item,
           variants,
+          itemOption,
           pricesByVariantId: resolvedVariants.pricesByVariantId,
           unavailableVariantIds: resolvedVariants.unavailableVariantIds,
           locale: runtime.locale,

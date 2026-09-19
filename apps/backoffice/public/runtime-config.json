@@ -1,18 +1,18 @@
 {
   "apiBaseUrl": "http://127.0.0.1:4003",
-  "deploymentProfile": "SHARED",
+  "deploymentProfile": "DEDICATED",
   "workspaceResolution": {
     "mode": "FIXED",
-    "workspace": "local"
+    "workspace": "dgv-salon"
   },
   "applications": {
-    "backoffice": true,
-    "operational": true
+    "operational": true,
+    "backoffice": true
   },
   "branding": {
     "mode": "DIGVATION_DEFAULT",
-    "productName": "Digvation Business",
-    "companyName": "Digvation"
+    "productName": "Digvation",
+    "companyName": "Digvation Indonesia"
   },
   "theme": {
     "preset": "DIGVATION_LIGHT",

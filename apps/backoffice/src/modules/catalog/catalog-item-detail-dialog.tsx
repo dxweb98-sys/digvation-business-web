@@ -1,14 +1,14 @@
 import {
-  DBadge,
   DButton,
   DConfirmDialog,
   DDataTable,
   DDialog,
+  DInfoNote,
   useToast,
   type TableColumn,
 } from '@digvation/ui';
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
-import { BadgeDollarSign, Pencil, Plus, Power, RotateCcw } from 'lucide-react';
+import { BadgeDollarSign, Layers, Pencil, Plus, Power, RotateCcw } from 'lucide-react';
 import { useState } from 'react';
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
 import { isSessionExpiredError } from '../../auth/backoffice-auth-context';
@@ -20,9 +20,27 @@ import type {
   Variant,
 } from './catalog-api';
 import { CatalogItemThumbnail } from './catalog-item-thumbnail';
-import { PriceChangeDialog, PriceHistoryTable, VariantPriceLabel } from './catalog-pricing';
+import { useCatalogLocalization } from './catalog-localization';
+import {
+  explicitVariantPriceRange,
+  variantPriceState,
+  type VariantPriceState,
+} from './catalog-price-history';
+import {
+  ItemPriceHistory,
+  PriceChangeDialog,
+  VariantBulkPriceDialog,
+  VariantPriceLabel,
+} from './catalog-pricing';
 import { CatalogNamedRecordDialog } from './catalog-record-dialog';
-import { DetailField, PriceLabel, Status } from './catalog-shared';
+import { SellingModelBadge, sellingModel, sellingModelCopy } from './catalog-selling';
+import { CatalogSection, DetailField, PriceLabel, Status } from './catalog-shared';
+import { sameAmount } from './catalog-variant-price-draft';
+
+const HISTORY_PREVIEW = 5;
+
+type SellingOptionRow =
+  { kind: 'item'; id: string } | { kind: 'variant'; id: string; variant: Variant };
 
 const keys = {
   prices: (itemId: string) => ['catalog', 'prices', itemId] as const,
@@ -68,8 +86,11 @@ export function CatalogItemDetailDialog({
 }) {
   const client = useQueryClient();
   const { showToast } = useToast();
+  const { formatMoney } = useCatalogLocalization();
   const [editingVariant, setEditingVariant] = useState<Variant | null | undefined>();
   const [pricingTarget, setPricingTarget] = useState<'default' | Variant | null>(null);
+  const [bulkPricing, setBulkPricing] = useState(false);
+  const [showAllHistory, setShowAllHistory] = useState(false);
   const [statusTarget, setStatusTarget] = useState<Variant | null>(null);
   const [changingStatus, setChangingStatus] = useState(false);
 
@@ -102,16 +123,26 @@ export function CatalogItemDetailDialog({
   const categoryName = item.categoryId
     ? (categories.find((candidate) => candidate.id === item.categoryId)?.name ?? item.categoryId)
     : 'Belum ditentukan';
-  const defaultHistory = (priceHistory.data?.items ?? []).filter(
-    (price) => price.catalogVariantId === null && price.locationId === null,
-  );
-  const variantPriceById = new Map(
+  // Location-specific prices are managed elsewhere; this history covers the item and its variants.
+  const history = (priceHistory.data?.items ?? []).filter((price) => price.locationId === null);
+  const variantStates = new Map<string, VariantPriceState>(
     (variants.data?.items ?? []).map((variant, index) => [
       variant.id,
-      resolvedVariantPrices[index],
+      variantPriceState(resolvedVariantPrices[index], variant.id),
     ]),
   );
   const variantCount = variants.data?.items.length ?? item.variantCount;
+  const activeVariants = (variants.data?.items ?? []).filter(
+    (variant) => variant.status === 'ACTIVE',
+  );
+  const hasVariants = activeVariants.length > 0;
+  const variantsWithoutPrice = activeVariants.filter((variant) => {
+    return variantStates.get(variant.id)?.kind === 'missing';
+  }).length;
+  const refreshPricing = () => {
+    onPricingChanged();
+    void client.invalidateQueries({ queryKey: ['catalog', 'variant-price'] });
+  };
 
   const refreshVariants = () => void client.invalidateQueries({ queryKey: keys.variants(item.id) });
   const refreshVariantsAndCount = () => {
@@ -119,30 +150,79 @@ export function CatalogItemDetailDialog({
     onVariantsChanged();
   };
 
-  const variantColumns: TableColumn<Variant>[] = [
-    { key: 'code', label: 'Kode' },
-    { key: 'name', label: 'Nama Varian' },
+  const model = sellingModel(hasVariants, item.variantSelectionMode);
+  // Sellable options as the cashier sees them: the item itself (when it is sold without a
+  // variant) followed by every variant at its own price.
+  const optionRows: SellingOptionRow[] = [
+    ...(model === 'ITEM_AND_VARIANTS' ? [{ kind: 'item' as const, id: 'item' }] : []),
+    ...(variants.data?.items ?? []).map((variant) => ({
+      kind: 'variant' as const,
+      id: variant.id,
+      variant,
+    })),
+  ];
+  const optionColumns: TableColumn<SellingOptionRow>[] = [
+    {
+      key: 'name',
+      label: model === 'ITEM_AND_VARIANTS' ? 'Pilihan' : 'Varian',
+      render: (row) =>
+        row.kind === 'item' ? (
+          <div className="min-w-0">
+            <p className="font-medium text-[var(--color-text)]">Tanpa varian</p>
+            <p className="text-xs text-[var(--color-text-muted)]">Item dijual sendiri</p>
+          </div>
+        ) : (
+          <div className="min-w-0">
+            <p className="font-medium text-[var(--color-text)]">{row.variant.name}</p>
+            <p className="text-xs text-[var(--color-text-muted)]">SKU {row.variant.code}</p>
+          </div>
+        ),
+    },
     ...(canViewPricing
       ? [
           {
             key: 'price',
             label: 'Harga',
-            render: (variant: Variant) => (
-              <VariantPriceLabel
-                query={variantPriceById.get(variant.id)}
-                variantId={variant.id}
-                currency={currency}
-              />
+            render: (row: SellingOptionRow) => (
+              <div className="font-semibold tabular-nums">
+                {row.kind === 'item' ? (
+                  <PriceLabel
+                    price={defaultPrice}
+                    loading={defaultPriceLoading}
+                    emptyLabel="Belum diatur"
+                  />
+                ) : (
+                  <VariantPriceLabel
+                    state={variantStates.get(row.variant.id) ?? { kind: 'loading' }}
+                  />
+                )}
+              </div>
             ),
-          } as TableColumn<Variant>,
+          } as TableColumn<SellingOptionRow>,
         ]
       : []),
     {
       key: 'status',
       label: 'Status',
-      render: (variant) => <Status value={variant.status} />,
+      render: (row) =>
+        row.kind === 'item' ? <Status value="ACTIVE" /> : <Status value={row.variant.status} />,
     },
   ];
+  const optionRange = explicitVariantPriceRange([
+    ...(model === 'ITEM_AND_VARIANTS' && defaultPrice
+      ? [
+          {
+            kind: 'explicit' as const,
+            amount: defaultPrice.amount,
+            currency: defaultPrice.currency,
+          },
+        ]
+      : []),
+    ...activeVariants.map(
+      (variant) => variantStates.get(variant.id) ?? { kind: 'loading' as const },
+    ),
+  ]);
+  const visibleHistory = showAllHistory ? history : history.slice(0, HISTORY_PREVIEW);
 
   const confirmVariantStatus = async () => {
     if (!statusTarget || changingStatus) return;
@@ -186,12 +266,12 @@ export function CatalogItemDetailDialog({
         </div>
       }
     >
-      <div>
-        <section className="border-b border-[var(--color-border)] pb-5">
+      <div className="divide-y divide-[var(--color-border)]">
+        <section className="pb-6" aria-label="Ringkasan item">
           <div className="grid gap-5 md:grid-cols-[auto_minmax(0,1fr)]">
             <CatalogItemThumbnail api={api} itemId={item.id} itemName={item.name} size="detail" />
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0 space-y-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <h2 className="break-words text-2xl font-semibold tracking-tight text-[var(--color-text)]">
                     {item.name}
@@ -203,117 +283,147 @@ export function CatalogItemDetailDialog({
                 <Status value={item.lifecycle} />
               </div>
 
-              <div className="mt-5 flex flex-wrap items-end justify-between gap-4 border-t border-[var(--color-border)] pt-4">
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
-                    Harga Saat Ini
-                  </p>
-                  <div className="mt-1 text-3xl font-semibold tracking-tight text-[var(--color-text)]">
-                    {canViewPricing ? (
-                      <PriceLabel
-                        price={defaultPrice}
-                        loading={defaultPriceLoading}
-                        available
-                        emptyLabel="Belum diatur"
-                      />
-                    ) : (
-                      '—'
-                    )}
+              {canViewPricing ? (
+                <div className="flex flex-wrap items-end justify-between gap-4 rounded-xl bg-[var(--color-surface-muted)] px-4 py-3">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-xs font-medium text-[var(--color-text-muted)]">
+                        {model === 'DIRECT'
+                          ? 'Harga jual'
+                          : model === 'ITEM_AND_VARIANTS'
+                            ? 'Pilihan harga'
+                            : 'Harga varian'}
+                      </p>
+                      {variants.isLoading ? null : <SellingModelBadge model={model} />}
+                    </div>
+                    <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight">
+                      {model === 'DIRECT' ? (
+                        <PriceLabel
+                          price={defaultPrice}
+                          loading={defaultPriceLoading}
+                          emptyLabel="Belum diatur"
+                        />
+                      ) : optionRange ? (
+                        sameAmount(optionRange.min.amount, optionRange.max.amount) ? (
+                          formatMoney(optionRange.min.amount, optionRange.min.currency)
+                        ) : (
+                          `${formatMoney(optionRange.min.amount, optionRange.min.currency)} – ${formatMoney(optionRange.max.amount, optionRange.max.currency)}`
+                        )
+                      ) : (
+                        '—'
+                      )}
+                    </p>
+                    <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
+                      {sellingModelCopy[model].description}
+                    </p>
                   </div>
+                  {canCreatePricing && model === 'DIRECT' ? (
+                    <DButton
+                      variant="outline"
+                      size="sm"
+                      leftIcon={<BadgeDollarSign className="size-4" />}
+                      onClick={() => setPricingTarget('default')}
+                    >
+                      {defaultPrice ? 'Ubah harga' : 'Atur harga'}
+                    </DButton>
+                  ) : null}
                 </div>
-                {canCreatePricing ? (
-                  <DButton
-                    leftIcon={<BadgeDollarSign className="size-4" />}
-                    onClick={() => setPricingTarget('default')}
-                  >
-                    {defaultPrice ? 'Ubah Harga' : 'Atur Harga'}
-                  </DButton>
-                ) : null}
-              </div>
+              ) : null}
             </div>
           </div>
         </section>
 
-        <section className="border-b border-[var(--color-border)] py-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-semibold">Varian</h2>
-              <DBadge variant="secondary">{variantCount}</DBadge>
-            </div>
-            {canCreate ? (
-              <DButton
-                leftIcon={<Plus className="size-4" />}
-                onClick={() => setEditingVariant(null)}
-              >
-                Tambah Varian
-              </DButton>
-            ) : null}
-          </div>
-          <div className="mt-4">
-            <DDataTable
-              columns={variantColumns}
-              data={variants.data?.items ?? []}
-              loading={variants.isLoading}
-              rowKey="id"
-              emptyMessage="Item ini belum memiliki varian."
-              actions={[
-                {
-                  label: 'Edit varian',
-                  icon: <Pencil className="size-4" />,
-                  onClick: setEditingVariant,
-                  show: () => canUpdate,
-                },
-                {
-                  label: 'Ubah harga varian',
-                  icon: <BadgeDollarSign className="size-4" />,
-                  onClick: setPricingTarget,
-                  show: () => canViewPricing,
-                },
-                {
-                  label: 'Nonaktifkan varian',
-                  icon: <Power className="size-4" />,
-                  onClick: setStatusTarget,
-                  show: (variant) => canUpdate && variant.status === 'ACTIVE',
-                },
-                {
-                  label: 'Aktifkan varian',
-                  icon: <RotateCcw className="size-4" />,
-                  onClick: setStatusTarget,
-                  show: (variant) => canUpdate && variant.status === 'INACTIVE',
-                },
-              ]}
-            />
-          </div>
-        </section>
+        <CatalogSection
+          title={model === 'ITEM_AND_VARIANTS' ? 'Pilihan harga' : 'Varian'}
+          count={model === 'ITEM_AND_VARIANTS' ? optionRows.length : variantCount}
+          description={
+            model === 'ITEM_AND_VARIANTS'
+              ? 'Kasir memilih salah satu: tanpa varian atau salah satu varian.'
+              : model === 'VARIANT_REQUIRED'
+                ? 'Kasir wajib memilih salah satu varian.'
+                : undefined
+          }
+          actions={
+            <>
+              {canCreatePricing && hasVariants ? (
+                <DButton
+                  variant="secondary"
+                  size="sm"
+                  leftIcon={<Layers className="size-4" />}
+                  onClick={() => setBulkPricing(true)}
+                >
+                  Terapkan harga ke semua varian
+                </DButton>
+              ) : null}
+              {canCreate ? (
+                <DButton
+                  variant="secondary"
+                  size="sm"
+                  leftIcon={<Plus className="size-4" />}
+                  onClick={() => setEditingVariant(null)}
+                >
+                  Tambah varian
+                </DButton>
+              ) : null}
+            </>
+          }
+        >
+          {canViewPricing && variantsWithoutPrice > 0 ? (
+            <DInfoNote variant="warning" className="mb-4">
+              {variantsWithoutPrice} varian aktif belum memiliki harga dan tidak bisa dijual.
+              {canCreatePricing
+                ? ' Terapkan satu harga ke semua varian atau atur harga tiap varian.'
+                : ''}
+            </DInfoNote>
+          ) : null}
+          <DDataTable
+            columns={optionColumns}
+            data={optionRows}
+            loading={variants.isLoading}
+            rowKey="id"
+            emptyMessage="Item ini tidak memiliki varian."
+            actions={[
+              {
+                label: 'Ubah harga',
+                icon: <BadgeDollarSign className="size-4" />,
+                onClick: () => setPricingTarget('default'),
+                show: (row) => canCreatePricing && row.kind === 'item',
+              },
+              {
+                label: 'Ubah harga varian',
+                icon: <BadgeDollarSign className="size-4" />,
+                onClick: (row) => row.kind === 'variant' && setPricingTarget(row.variant),
+                show: (row) =>
+                  canCreatePricing && row.kind === 'variant' && row.variant.status === 'ACTIVE',
+              },
+              {
+                label: 'Edit varian',
+                icon: <Pencil className="size-4" />,
+                onClick: (row) => row.kind === 'variant' && setEditingVariant(row.variant),
+                show: (row) => canUpdate && row.kind === 'variant',
+              },
+              {
+                label: 'Nonaktifkan varian',
+                icon: <Power className="size-4" />,
+                onClick: (row) => row.kind === 'variant' && setStatusTarget(row.variant),
+                show: (row) =>
+                  canUpdate && row.kind === 'variant' && row.variant.status === 'ACTIVE',
+              },
+              {
+                label: 'Aktifkan varian',
+                icon: <RotateCcw className="size-4" />,
+                onClick: (row) => row.kind === 'variant' && setStatusTarget(row.variant),
+                show: (row) =>
+                  canUpdate && row.kind === 'variant' && row.variant.status === 'INACTIVE',
+              },
+            ]}
+          />
+        </CatalogSection>
 
-        {canViewPricing ? (
-          <section className="border-b border-[var(--color-border)] py-5">
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-semibold">Riwayat Harga</h2>
-              <DBadge variant="secondary">{defaultHistory.length}</DBadge>
-            </div>
-            <div className="mt-4">
-              <PriceHistoryTable
-                prices={defaultHistory}
-                currency={currency}
-                loading={priceHistory.isLoading}
-                canCancel={canCancelPricing}
-                onCancel={async (price) => {
-                  await api.cancelPrice(price.id);
-                  onPricingChanged();
-                }}
-                emptyMessage="Belum ada riwayat harga."
-              />
-            </div>
-          </section>
-        ) : null}
-
-        <section className="pt-5">
-          <h2 className="text-base font-semibold">Informasi Item</h2>
-          <dl className="mt-4 grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
+        <CatalogSection title="Informasi item" tone="secondary">
+          <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
             <DetailField label="Tipe" value={item.type === 'SERVICE' ? 'Jasa' : 'Produk'} />
             <DetailField label="Kategori" value={categoryName} />
-            <DetailField label="Status" value={<Status value={item.lifecycle} />} />
             {item.type === 'SERVICE' ? (
               <DetailField
                 label="Durasi Layanan"
@@ -331,7 +441,40 @@ export function CatalogItemDetailDialog({
               />
             </div>
           </dl>
-        </section>
+        </CatalogSection>
+
+        {canViewPricing ? (
+          <CatalogSection
+            title="Riwayat Harga Item"
+            tone="secondary"
+            count={history.length}
+            description="Perubahan harga item dan semua varian, terbaru di atas."
+          >
+            <ItemPriceHistory
+              entries={visibleHistory}
+              loading={priceHistory.isLoading}
+              error={priceHistory.isError}
+              canCancel={canCancelPricing}
+              onCancel={async (price) => {
+                await api.cancelPrice(price.id);
+                refreshPricing();
+              }}
+            />
+            {history.length > HISTORY_PREVIEW ? (
+              <div className="mt-3 flex justify-center">
+                <DButton
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAllHistory((current) => !current)}
+                >
+                  {showAllHistory
+                    ? 'Tampilkan lebih sedikit'
+                    : `Tampilkan semua riwayat (${history.length})`}
+                </DButton>
+              </div>
+            ) : null}
+          </CatalogSection>
+        ) : null}
       </div>
 
       <CatalogNamedRecordDialog
@@ -348,26 +491,27 @@ export function CatalogItemDetailDialog({
       />
 
       <PriceChangeDialog
+        key={`price-${pricingTarget === 'default' ? 'item' : (pricingTarget?.id ?? 'closed')}`}
         target={pricingTarget}
         item={item}
         currency={currency}
-        prices={(priceHistory.data?.items ?? []).filter((price) =>
-          pricingTarget === 'default'
-            ? price.catalogVariantId === null && price.locationId === null
-            : pricingTarget
-              ? price.catalogVariantId === pricingTarget.id && price.locationId === null
-              : false,
-        )}
-        historyLoading={priceHistory.isLoading}
-        canCreate={canCreatePricing}
-        canCancel={canCancelPricing}
         api={api}
         onClose={() => setPricingTarget(null)}
-        onSaved={() => {
-          onPricingChanged();
-          void client.invalidateQueries({ queryKey: ['catalog', 'variant-price'] });
-        }}
+        onSaved={refreshPricing}
       />
+
+      {bulkPricing ? (
+        <VariantBulkPriceDialog
+          open
+          item={item}
+          currency={currency}
+          variants={variants.data?.items ?? []}
+          variantStates={variantStates}
+          api={api}
+          onClose={() => setBulkPricing(false)}
+          onSaved={refreshPricing}
+        />
+      ) : null}
 
       <DConfirmDialog
         open={Boolean(statusTarget)}

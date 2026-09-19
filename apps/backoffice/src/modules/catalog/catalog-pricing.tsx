@@ -1,114 +1,176 @@
 import {
+  DBadge,
   DButton,
   DConfirmDialog,
   DCurrencyInput,
   DDataTable,
   DDatePicker,
   DDialog,
+  DInfoNote,
   useToast,
 } from '@digvation/ui';
-import { Ban } from 'lucide-react';
+import { ArrowRight, Ban } from 'lucide-react';
 import { useState } from 'react';
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
 import { isSessionExpiredError } from '../../auth/backoffice-auth-context';
-import type { CatalogApi, CatalogManagementItem, Price, Variant } from './catalog-api';
+import type { CatalogApi, CatalogManagementItem, PriceHistoryEntry, Variant } from './catalog-api';
 import { useCatalogLocalization } from './catalog-localization';
-import { Status } from './catalog-shared';
+import {
+  bulkVariantPricePreview,
+  priceChangeActorLabel,
+  priceHistoryTarget,
+  type VariantPriceState,
+} from './catalog-price-history';
+import { isValidSellingPrice } from './catalog-variant-price-draft';
 
-export function VariantPriceLabel({
-  query,
-  variantId,
-  currency,
-}: {
-  query:
-    | {
-        data:
-          | {
-              amount: string;
-              currency: string;
-              sourceScope: { catalogVariantId: string | null };
-            }
-          | undefined;
-        isLoading: boolean;
-        isError: boolean;
-      }
-    | undefined;
-  variantId: string;
-  currency: string;
-}) {
-  const { copy, formatMoney } = useCatalogLocalization();
-  if (!query || query.isLoading)
-    return <span className="text-[var(--color-text-muted)]">{copy('Loading...')}</span>;
-  if (query.isError || !query.data)
-    return <span className="text-[var(--color-text-muted)]">{copy('Not set')}</span>;
-  const inherited = query.data.sourceScope.catalogVariantId !== variantId;
-  return (
-    <div>
-      <p>{formatMoney(query.data.amount, query.data.currency || currency)}</p>
-      {inherited ? (
-        <p className="text-xs text-[var(--color-text-muted)]">{copy('Uses default price')}</p>
-      ) : null}
-    </div>
-  );
+const EFFECTIVE_FROM = /^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d$/;
+const nowLocalMinute = () => {
+  const now = new Date();
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+};
+
+function useEffectiveFrom() {
+  const [effectiveFrom, setEffectiveFrom] = useState(nowLocalMinute);
+  const [chosen, setChosen] = useState(false);
+  return {
+    effectiveFrom,
+    setEffectiveFrom: (value: string) => {
+      setChosen(true);
+      setEffectiveFrom(value);
+    },
+    valid: EFFECTIVE_FROM.test(effectiveFrom),
+    // The picker is minute-precise; an untouched default means "now", so consecutive changes
+    // within the same minute do not collide at one effective instant.
+    toIso: () => (chosen ? new Date(effectiveFrom) : new Date()).toISOString(),
+  };
 }
 
-export function PriceHistoryTable({
-  prices,
-  currency,
+function useSaveError() {
+  const { showToast } = useToast();
+  return (error: unknown, fallback: string) => {
+    if (!isSessionExpiredError(error))
+      showToast({
+        variant: 'danger',
+        title: normalizeBackofficeApiError(error, fallback).safeMessage,
+      });
+  };
+}
+
+export function VariantPriceLabel({ state }: { state: VariantPriceState }) {
+  const { copy, formatMoney } = useCatalogLocalization();
+  if (state.kind === 'loading')
+    return <span className="text-[var(--color-text-muted)]">{copy('Loading...')}</span>;
+  if (state.kind === 'missing')
+    return <DBadge variant="warning">{copy('No variant price')}</DBadge>;
+  if (state.kind === 'unavailable')
+    return (
+      <span className="text-xs text-[var(--color-text-muted)]">
+        {copy('Shown when the item is active')}
+      </span>
+    );
+  return <p>{formatMoney(state.amount, state.currency)}</p>;
+}
+
+export function ItemPriceHistory({
+  entries,
   loading,
+  error,
   canCancel,
   onCancel,
-  emptyMessage,
 }: {
-  prices: Price[];
-  currency: string;
+  entries: PriceHistoryEntry[];
   loading: boolean;
+  error: boolean;
   canCancel: boolean;
-  onCancel: (price: Price) => Promise<void>;
-  emptyMessage: string;
+  onCancel: (price: PriceHistoryEntry) => Promise<void>;
 }) {
-  const [pending, setPending] = useState<Price | null>(null);
+  const [pending, setPending] = useState<PriceHistoryEntry | null>(null);
   const { showToast } = useToast();
+  const onError = useSaveError();
   const { copy, formatDate, formatMoney } = useCatalogLocalization();
+  const dateTime = (value: string) =>
+    formatDate(new Date(value), { dateStyle: 'medium', timeStyle: 'short' });
+
+  if (error)
+    return <DInfoNote variant="danger">{copy('Price history could not be loaded.')}</DInfoNote>;
   return (
     <>
       <DDataTable
         columns={[
           {
-            key: 'amount',
-            label: copy('Price'),
-            render: (price: Price) => formatMoney(price.amount, price.currency || currency),
+            key: 'target',
+            label: copy('Price for'),
+            render: (entry: PriceHistoryEntry) => {
+              const target = priceHistoryTarget(entry);
+              return (
+                <div className="min-w-0">
+                  <p className="font-medium">
+                    {target.scope === 'ITEM' ? copy('Item price') : target.name}
+                  </p>
+                  <p className="text-xs text-[var(--color-text-muted)]">
+                    {target.scope === 'ITEM' ? copy('Parent item') : copy('Variant')}
+                    {target.sku ? ` · SKU ${target.sku}` : ''}
+                  </p>
+                </div>
+              );
+            },
+          },
+          {
+            key: 'change',
+            label: copy('Price change'),
+            render: (entry: PriceHistoryEntry) => (
+              <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
+                {entry.previousAmount ? (
+                  <>
+                    <span className="text-[var(--color-text-muted)]">
+                      {formatMoney(entry.previousAmount, entry.currency)}
+                    </span>
+                    <ArrowRight
+                      className="size-3.5 text-[var(--color-text-muted)]"
+                      aria-label={copy('changed to')}
+                    />
+                  </>
+                ) : (
+                  <span className="text-xs text-[var(--color-text-muted)]">
+                    {copy('First price')} ·
+                  </span>
+                )}
+                <span className="font-semibold">{formatMoney(entry.amount, entry.currency)}</span>
+              </div>
+            ),
           },
           {
             key: 'effectiveFrom',
             label: copy('Effective from'),
-            render: (price: Price) =>
-              formatDate(new Date(price.effectiveFrom), {
-                dateStyle: 'medium',
-                timeStyle: 'short',
-              }),
+            render: (entry: PriceHistoryEntry) => dateTime(entry.effectiveFrom),
           },
           {
-            key: 'effectiveUntil',
-            label: copy('Effective until'),
-            render: (price: Price) =>
-              price.effectiveUntil
-                ? formatDate(new Date(price.effectiveUntil), {
-                    dateStyle: 'medium',
-                    timeStyle: 'short',
-                  })
-                : copy('Effective now'),
+            key: 'changedBy',
+            label: copy('Changed by'),
+            render: (entry: PriceHistoryEntry) => (
+              <div>
+                <p>{priceChangeActorLabel(entry)}</p>
+                <p className="text-xs text-[var(--color-text-muted)]">
+                  {dateTime(entry.createdAt)}
+                </p>
+              </div>
+            ),
           },
           {
             key: 'cancelledAt',
             label: copy('Status'),
-            render: (price: Price) => <Status value={price.cancelledAt ? 'CANCELLED' : 'ACTIVE'} />,
+            render: (entry: PriceHistoryEntry) =>
+              entry.cancelledAt ? (
+                <DBadge variant="secondary">{copy('Cancelled')}</DBadge>
+              ) : (
+                <DBadge variant="success">{copy('Recorded')}</DBadge>
+              ),
           },
         ]}
-        data={prices}
+        data={entries}
         loading={loading}
         rowKey="id"
-        emptyMessage={emptyMessage}
+        emptyMessage={copy('No price changes yet.')}
         actions={[
           {
             label: copy('Cancel price'),
@@ -129,14 +191,7 @@ export function PriceHistoryTable({
               showToast({ variant: 'success', title: copy('Price cancelled.') });
               setPending(null);
             })
-            .catch((error) => {
-              if (!isSessionExpiredError(error))
-                showToast({
-                  variant: 'danger',
-                  title: normalizeBackofficeApiError(error, copy('Could not cancel price.'))
-                    .safeMessage,
-                });
-            });
+            .catch((error) => onError(error, copy('Could not cancel price.')));
         }}
         title={copy('Cancel price?')}
         message={copy('Price history is retained, but this price no longer applies.')}
@@ -147,14 +202,29 @@ export function PriceHistoryTable({
   );
 }
 
+function EffectiveFromField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const { copy } = useCatalogLocalization();
+  return (
+    <DDatePicker
+      label={copy('Effective from')}
+      value={value}
+      onChange={onChange}
+      variant="date-time"
+      placeholder={copy('Select the date the price takes effect')}
+    />
+  );
+}
+
 export function PriceChangeDialog({
   target,
   item,
   currency,
-  prices,
-  historyLoading,
-  canCreate,
-  canCancel,
   api,
   onClose,
   onSaved,
@@ -162,23 +232,22 @@ export function PriceChangeDialog({
   target: 'default' | Variant | null;
   item: CatalogManagementItem;
   currency: string;
-  prices: Price[];
-  historyLoading: boolean;
-  canCreate: boolean;
-  canCancel: boolean;
   api: CatalogApi;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const { showToast } = useToast();
+  const onError = useSaveError();
   const { copy } = useCatalogLocalization();
   const [amount, setAmount] = useState('');
-  const [effectiveFrom, setEffectiveFrom] = useState(() => new Date().toISOString().slice(0, 16));
+  const [saving, setSaving] = useState(false);
+  const effective = useEffectiveFrom();
   const variant = target && target !== 'default' ? target : null;
-  const validEffectiveFrom = /^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d$/.test(effectiveFrom);
+  const validAmount = isValidSellingPrice(amount);
 
   const save = async () => {
-    if (!target || !amount.trim() || !validEffectiveFrom) return;
+    if (!target || !validAmount || !effective.valid || saving) return;
+    setSaving(true);
     try {
       await api.changePrice({
         catalogItemId: item.id,
@@ -186,17 +255,15 @@ export function PriceChangeDialog({
         locationId: null,
         currency,
         amount: amount.trim(),
-        effectiveFrom: new Date(effectiveFrom).toISOString(),
+        effectiveFrom: effective.toIso(),
       });
       onSaved();
       showToast({ variant: 'success', title: copy('Price updated.') });
       onClose();
     } catch (error) {
-      if (!isSessionExpiredError(error))
-        showToast({
-          variant: 'danger',
-          title: normalizeBackofficeApiError(error, copy('Could not update price.')).safeMessage,
-        });
+      onError(error, copy('Could not update price.'));
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -204,10 +271,10 @@ export function PriceChangeDialog({
     <DDialog
       open={Boolean(target)}
       onClose={onClose}
-      title={variant ? `${copy('Variant price')} — ${variant.name}` : copy('Change default price')}
+      title={variant ? `${copy('Variant price')} — ${variant.name}` : copy('Change item price')}
       description={
         variant
-          ? copy('Variant prices are final prices, not differences from the default price.')
+          ? copy('This variant is sold at exactly this price. Other variants are not changed.')
           : copy('A new price is added to effective history; the previous price is unchanged.')
       }
       footer={
@@ -215,62 +282,178 @@ export function PriceChangeDialog({
           <DButton variant="secondary" onClick={onClose}>
             {copy('Cancel')}
           </DButton>
-          {canCreate ? (
-            <DButton onClick={() => void save()} disabled={!amount.trim() || !validEffectiveFrom}>
-              {copy('Save price')}
-            </DButton>
-          ) : null}
+          <DButton
+            onClick={() => void save()}
+            disabled={!validAmount || !effective.valid}
+            loading={saving}
+          >
+            {copy('Save price')}
+          </DButton>
+        </div>
+      }
+    >
+      <div className="grid gap-4 sm:grid-cols-2">
+        <DCurrencyInput
+          label={`${copy('New price')} (${currency})`}
+          value={amount}
+          onValueChange={setAmount}
+          placeholder={copy('For example, 100000')}
+        />
+        <EffectiveFromField value={effective.effectiveFrom} onChange={effective.setEffectiveFrom} />
+      </div>
+    </DDialog>
+  );
+}
+
+export function VariantBulkPriceDialog({
+  open,
+  item,
+  currency,
+  variants,
+  variantStates,
+  api,
+  onClose,
+  onSaved,
+}: {
+  open: boolean;
+  item: CatalogManagementItem;
+  currency: string;
+  variants: readonly Variant[];
+  variantStates: ReadonlyMap<string, VariantPriceState>;
+  api: CatalogApi;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const { showToast } = useToast();
+  const onError = useSaveError();
+  const { copy, formatMoney } = useCatalogLocalization();
+  const [amount, setAmount] = useState('');
+  const [saving, setSaving] = useState(false);
+  const effective = useEffectiveFrom();
+  const validAmount = isValidSellingPrice(amount);
+  const preview = bulkVariantPricePreview(variants, variantStates, amount);
+  const changing = validAmount ? preview.filter((row) => !row.unchanged).length : 0;
+  const inactiveCount = variants.filter((variant) => variant.status !== 'ACTIVE').length;
+
+  const save = async () => {
+    if (!validAmount || !effective.valid || !preview.length || saving) return;
+    setSaving(true);
+    try {
+      const result = await api.changeVariantPrices({
+        catalogItemId: item.id,
+        currency,
+        amount: amount.trim(),
+        effectiveFrom: effective.toIso(),
+      });
+      const changed = result.items.filter((change) => change.changed).length;
+      onSaved();
+      showToast({
+        variant: 'success',
+        title:
+          changed > 0
+            ? `${copy('Price applied to')} ${changed} ${copy('variants.')}`
+            : copy('All variants already had this price.'),
+      });
+      onClose();
+    } catch (error) {
+      onError(error, copy('Could not apply the price. No variant was changed.'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <DDialog
+      open={open}
+      onClose={onClose}
+      size="lg"
+      title={copy('Apply price to all variants')}
+      description={copy(
+        'Every active variant gets this exact price as its own price. You can still edit each variant afterwards.',
+      )}
+      footer={
+        <div className="flex flex-wrap justify-end gap-2">
+          <DButton variant="secondary" onClick={onClose}>
+            {copy('Cancel')}
+          </DButton>
+          <DButton
+            onClick={() => void save()}
+            disabled={!validAmount || !effective.valid || !preview.length}
+            loading={saving}
+          >
+            {validAmount && changing > 0
+              ? `${copy('Apply to')} ${changing} ${copy('variants')}`
+              : copy('Apply price')}
+          </DButton>
         </div>
       }
     >
       <div className="space-y-5">
-        {canCreate ? (
-          <div className="grid gap-4 sm:grid-cols-2">
-            <DCurrencyInput
-              label={copy('New price')}
-              value={amount}
-              onValueChange={setAmount}
-              placeholder={copy('For example, 100000')}
-            />
-            <DDatePicker
-              label={copy('Effective from')}
-              value={effectiveFrom}
-              onChange={setEffectiveFrom}
-              variant="date-time"
-              placeholder={copy('Select the date the price takes effect')}
-            />
-            <p className="text-sm text-[var(--color-text-muted)]">
-              {copy('Currency:')} {currency}
-            </p>
-          </div>
-        ) : null}
-        <div className="border-t border-[var(--color-border)] pt-4">
-          <h3 className="text-sm font-semibold">{copy('Price history')}</h3>
-          {variant ? (
-            <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-              {copy(
-                'Only variant-specific prices are recorded here. The item default price is not variant history.',
-              )}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <DCurrencyInput
+            label={`${copy('Price for every variant')} (${currency})`}
+            value={amount}
+            onValueChange={setAmount}
+            placeholder={copy('For example, 100000')}
+          />
+          <EffectiveFromField
+            value={effective.effectiveFrom}
+            onChange={effective.setEffectiveFrom}
+          />
+        </div>
+
+        <div>
+          <h3 className="text-sm font-semibold">{copy('What will change')}</h3>
+          <ul className="mt-2 divide-y divide-[var(--color-border)] rounded-xl border border-[var(--color-border)]">
+            {preview.map(({ variant, state, unchanged }) => (
+              <li
+                key={variant.id}
+                className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 text-sm"
+              >
+                <div className="min-w-0">
+                  <p className="font-medium">{variant.name}</p>
+                  <p className="text-xs text-[var(--color-text-muted)]">SKU {variant.code}</p>
+                </div>
+                <div className="flex items-center gap-1.5 tabular-nums">
+                  <span className="text-[var(--color-text-muted)]">
+                    {state.kind === 'explicit'
+                      ? formatMoney(state.amount, state.currency)
+                      : state.kind === 'loading'
+                        ? copy('Loading...')
+                        : state.kind === 'unavailable'
+                          ? '—'
+                          : copy('No variant price')}
+                  </span>
+                  {validAmount ? (
+                    unchanged ? (
+                      <DBadge variant="secondary">{copy('Already this price')}</DBadge>
+                    ) : (
+                      <>
+                        <ArrowRight
+                          className="size-3.5 text-[var(--color-text-muted)]"
+                          aria-label={copy('changed to')}
+                        />
+                        <span className="font-semibold">
+                          {formatMoney(amount.trim(), currency)}
+                        </span>
+                      </>
+                    )
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ul>
+          {inactiveCount ? (
+            <p className="mt-2 text-xs text-[var(--color-text-muted)]">
+              {inactiveCount} {copy('inactive variants are not changed.')}
             </p>
           ) : null}
-          <div className="mt-3">
-            <PriceHistoryTable
-              prices={prices}
-              currency={currency}
-              loading={historyLoading}
-              canCancel={canCancel}
-              onCancel={async (price) => {
-                await api.cancelPrice(price.id);
-                onSaved();
-              }}
-              emptyMessage={
-                variant
-                  ? copy('No variant-specific price history.')
-                  : copy('No default price history.')
-              }
-            />
-          </div>
         </div>
+        <DInfoNote variant="info">
+          {copy(
+            'Each changed variant is recorded separately in Item Price History. Past transactions keep the price they were sold at.',
+          )}
+        </DInfoNote>
       </div>
     </DDialog>
   );
