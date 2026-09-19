@@ -2939,13 +2939,17 @@ function ReferencePaymentDialog({
   taxLabel,
   locale,
   customer,
+  paymentRoutes,
+  isPaymentRoutesLoading,
   method,
+  paymentRouteId,
   appliedAmount,
   paymentReference,
   tender,
   payNow,
   onPayNowChange,
   onMethod,
+  onPaymentRoute,
   onAppliedAmount,
   onPaymentReference,
   onTender,
@@ -2967,13 +2971,17 @@ function ReferencePaymentDialog({
   taxLabel: string;
   locale: string;
   customer: SaleCustomer | null;
+  paymentRoutes: readonly PaymentRoute[];
+  isPaymentRoutesLoading: boolean;
   method: PaymentMethod;
+  paymentRouteId: string;
   appliedAmount: string;
   paymentReference: string;
   tender: string;
   payNow: boolean;
   onPayNowChange: (payNow: boolean) => void;
   onMethod: (method: PaymentMethod) => void;
+  onPaymentRoute: (paymentRouteId: string) => void;
   onAppliedAmount: (amount: string) => void;
   onPaymentReference: (reference: string) => void;
   onTender: (amount: string) => void;
@@ -2985,11 +2993,9 @@ function ReferencePaymentDialog({
   adjustmentSlot?: ReactNode;
 }) {
   const { copy, label } = useOperationalLocalization();
-  const { routes: paymentRoutes, isPending: isPaymentRoutesPending } = useCachedPaymentRoutes();
-  const routeByMethod = new Map(
-    paymentRoutes.map((route) => [route.paymentMethod, route] as const),
-  );
-  const activeRoute = routeByMethod.get(method) ?? null;
+  const routesForMethod = paymentRoutes.filter((route) => route.paymentMethod === method);
+  const activeRoute =
+    routesForMethod.find((route) => route.id === paymentRouteId) ?? routesForMethod[0] ?? null;
   const isCash = method === 'CASH';
   const hasDiscount = !createDecimal(discountAmount).equals(createDecimal('0'));
   const hasTax = !createDecimal(taxAmount).equals(createDecimal('0'));
@@ -3121,7 +3127,20 @@ function ReferencePaymentDialog({
             </div>
           </div>
           {payNow ? (
-            <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+            <>
+              <div className="mt-3 rounded-xl border border-[var(--color-brand)]/15 bg-[var(--color-brand)]/5 px-3 py-2.5">
+                <p className="text-xs font-semibold text-[var(--color-brand)]">
+                  {copy('Split payment')}
+                </p>
+                <p className="mt-1 text-[11px] leading-4 text-[var(--color-text-muted)]">
+                  {copy(
+                    sale?.payments.length
+                      ? 'Add another payment method for the remaining balance.'
+                      : 'Change the payment amount below to split this transaction across multiple payment methods.',
+                  )}
+                </p>
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
               <div>
                 <p className="text-[var(--color-text-muted)]">{copy('Paid amount')}</p>
                 <p className="mt-0.5 font-semibold tabular-nums">
@@ -3140,7 +3159,7 @@ function ReferencePaymentDialog({
                   {money(allocationState.remainingToAllocate, locale)}
                 </p>
               </div>
-            </div>
+            </>
           ) : null}
         </div>
 
@@ -3251,8 +3270,10 @@ function ReferencePaymentDialog({
               </p>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {methods.map((option) => {
-                  const routeAvailable = routeByMethod.has(option.value);
-                  const disabled = isPaymentRoutesPending || !routeAvailable || hasPending;
+                  const routeAvailable = paymentRoutes.some(
+                    (route) => route.paymentMethod === option.value,
+                  );
+                  const disabled = isPaymentRoutesLoading || !routeAvailable || hasPending;
                   return (
                     <button
                       key={option.value}
@@ -3268,13 +3289,29 @@ function ReferencePaymentDialog({
                 })}
               </div>
               {activeRoute ? (
-                <div className="mt-3 rounded-xl bg-[var(--color-surface-muted)]/60 px-3 py-2.5">
-                  <p className="text-[11px] text-[var(--color-text-muted)]">
+                <div className="mt-3">
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
                     {copy('Settlement account')}
                   </p>
-                  <p className="mt-0.5 text-sm font-semibold">
-                    {activeRoute.financialAccountName}
-                  </p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {routesForMethod.map((route) => (
+                      <button
+                        key={route.id}
+                        type="button"
+                        onClick={() => onPaymentRoute(route.id)}
+                        className={`rounded-xl border px-3 py-2.5 text-left transition-colors ${activeRoute.id === route.id ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10' : 'border-[var(--color-border)] bg-[var(--color-surface-muted)]/50 hover:bg-[var(--color-surface-muted)]'}`}
+                      >
+                        <span className="block truncate text-sm font-semibold">
+                          {route.financialAccountName}
+                        </span>
+                        {route.financialAccountCode ? (
+                          <span className="mt-0.5 block truncate text-[11px] text-[var(--color-text-muted)]">
+                            {route.financialAccountCode}
+                          </span>
+                        ) : null}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               ) : null}
               {!isCash ? (
