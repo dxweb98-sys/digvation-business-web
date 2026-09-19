@@ -9,6 +9,7 @@ import {
   DInput,
   DSelect,
   DSkeleton,
+  DToggle,
   DTabs,
   DTabsContent,
   DTabsList,
@@ -29,9 +30,11 @@ import {
   BusinessSettingsApi,
   type BusinessPreferences,
   type BusinessProfile,
+  type BusinessTaxConfiguration,
   type NumberingPreference,
   type SellingLocation,
 } from './business-settings-api';
+import { useBusinessConfigurationI18n } from './business-configuration-i18n';
 
 const keys = {
   configuration: ['business-settings', 'configuration'] as const,
@@ -106,6 +109,7 @@ export function BusinessConfigurationPage() {
           {canViewProfile ? (
             <DTabsTrigger value="localization">{copy('Localization')}</DTabsTrigger>
           ) : null}
+          {canViewProfile ? <DTabsTrigger value="tax">{copy('Tax')}</DTabsTrigger> : null}
           {canViewProfile ? (
             <DTabsTrigger value="numbering">{copy('Numbering')}</DTabsTrigger>
           ) : null}
@@ -135,6 +139,16 @@ export function BusinessConfigurationPage() {
         <DTabsContent value="localization" className="mt-5">
           <LocalizationSection
             preferences={configuration.data?.preferences}
+            loading={configuration.isLoading}
+            canUpdate={canUpdateProfile}
+            api={api}
+            onChanged={() => invalidate(keys.configuration)}
+          />
+        </DTabsContent>
+
+        <DTabsContent value="tax" className="mt-5">
+          <TaxSection
+            tax={configuration.data?.tax}
             loading={configuration.isLoading}
             canUpdate={canUpdateProfile}
             api={api}
@@ -244,6 +258,147 @@ function ProfileSection({
         }
       >
         <DInput label={copy('Business name')} value={name} onChange={setDraftName} autoFocus />
+      </DDialog>
+    </Card>
+  );
+}
+
+
+function TaxSection({
+  tax,
+  loading,
+  canUpdate,
+  api,
+  onChanged,
+}: {
+  tax?: BusinessTaxConfiguration | undefined;
+  loading: boolean;
+  canUpdate: boolean;
+  api: BusinessSettingsApi;
+  onChanged: () => void;
+}) {
+  const { copy } = useBusinessConfigurationI18n();
+  const { showToast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [draftEnabled, setDraftEnabled] = useState(false);
+  const [draftPercent, setDraftPercent] = useState('11');
+  const [saving, setSaving] = useState(false);
+
+  const configuredPercent = tax ? String(Number(tax.rate) * 100) : '11';
+
+  const edit = () => {
+    if (!tax) return;
+    setDraftEnabled(tax.enabled);
+    setDraftPercent(configuredPercent);
+    setOpen(true);
+  };
+
+  const close = () => {
+    if (saving) return;
+    setOpen(false);
+  };
+
+  const percent = Number(draftPercent);
+  const validPercent =
+    draftPercent.trim().length > 0 &&
+    Number.isFinite(percent) &&
+    percent >= 0 &&
+    percent <= 100;
+
+  const save = async () => {
+    if (!tax || saving || !validPercent) return;
+    setSaving(true);
+    try {
+      await api.updateTax(tax, {
+        enabled: draftEnabled,
+        rate: String(percent / 100),
+      });
+      onChanged();
+      setOpen(false);
+      showToast({ variant: 'success', title: copy('Tax configuration updated.') });
+    } catch (error) {
+      if (!isSessionExpiredError(error))
+        showToast({
+          variant: 'danger',
+          title: normalizeBackofficeApiError(
+            error,
+            copy('Could not update tax configuration.'),
+          ).safeMessage,
+        });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Card>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 className="font-semibold">{copy('Tax')}</h2>
+          <p className="mt-1 max-w-2xl text-sm text-(--color-text-muted)">
+            {copy(
+              'Tax is configured once for the business and applied by Runtime to transaction totals.',
+            )}
+          </p>
+        </div>
+        {canUpdate && tax ? (
+          <DButton variant="secondary" size="sm" onClick={edit}>
+            {copy('Edit tax')}
+          </DButton>
+        ) : null}
+      </div>
+
+      {loading ? (
+        <DSkeleton className="mt-5 h-16" />
+      ) : tax ? (
+        <dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2">
+          <Fact label={copy('Enable tax')} value={copy(tax.enabled ? 'Active' : 'Inactive')} />
+          <Fact label={copy('Tax percentage')} value={`${configuredPercent}%`} />
+        </dl>
+      ) : null}
+
+      <DDialog
+        open={open}
+        onClose={close}
+        title={copy('Tax')}
+        description={copy(
+          'New transactions use this business tax. Existing finalized transactions keep their recorded tax.',
+        )}
+        footer={
+          <div className="flex justify-end gap-2">
+            <DButton variant="secondary" onClick={close} disabled={saving}>
+              {copy('Cancel')}
+            </DButton>
+            <DButton onClick={() => void save()} loading={saving} disabled={!validPercent}>
+              {copy('Save tax')}
+            </DButton>
+          </div>
+        }
+      >
+        <div className="space-y-5">
+          <div className="flex items-center justify-between gap-5 rounded-(--radius-control) border border-(--color-border) px-4 py-3">
+            <div>
+              <p className="text-sm font-medium">{copy('Enable tax')}</p>
+              <p className="mt-1 text-xs text-(--color-text-muted)">
+                {copy('When disabled, new transactions have zero tax.')}
+              </p>
+            </div>
+            <DToggle
+              checked={draftEnabled}
+              onChange={setDraftEnabled}
+              ariaLabel={copy('Enable tax')}
+            />
+          </div>
+          <DInput
+            label={copy('Tax percentage')}
+            inputMode="decimal"
+            value={draftPercent}
+            onChange={setDraftPercent}
+            placeholder="11"
+            hint={copy('Enter a percentage from 0 to 100.')}
+            error={validPercent ? undefined : copy('Tax percentage must be between 0 and 100.')}
+          />
+        </div>
       </DDialog>
     </Card>
   );

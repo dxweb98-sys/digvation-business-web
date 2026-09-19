@@ -29,9 +29,19 @@ export interface BusinessPreferences {
   updatedAt: string | null;
 }
 
+export interface BusinessTaxConfiguration {
+  enabled: boolean;
+  /** Decimal fraction from Runtime; "0.11" means 11%. */
+  rate: string;
+  version: number;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
 export interface EffectiveBusinessConfiguration {
   profile: BusinessProfile & { configured: boolean };
   preferences: BusinessPreferences;
+  tax: BusinessTaxConfiguration;
 }
 
 export interface NumberingPreference {
@@ -99,6 +109,18 @@ export class BusinessSettingsApi {
     return configurationChanged(
       this.client.patch<BusinessPreferences>('/api/v1/business-preferences', {
         expectedVersion: preferences.version,
+        ...input,
+      }),
+    );
+  }
+
+  updateTax(
+    tax: BusinessTaxConfiguration,
+    input: Pick<BusinessTaxConfiguration, 'enabled' | 'rate'>,
+  ) {
+    return configurationChanged(
+      this.client.patch<BusinessTaxConfiguration>('/api/v1/business-configuration/tax', {
+        expectedVersion: tax.version,
         ...input,
       }),
     );
