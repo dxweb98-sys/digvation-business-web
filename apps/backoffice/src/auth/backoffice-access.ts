@@ -13,7 +13,6 @@ export type BackofficeCapability =
   | 'reports'
   | 'transactions'
   | 'configuration'
-  | 'tax'
   | 'accessControl'
   | 'activity';
 
@@ -39,10 +38,6 @@ export type BackofficeAction =
   | 'cancelPricing'
   | 'createPromotion'
   | 'updatePromotion'
-  | 'viewTax'
-  | 'createTax'
-  | 'updateTax'
-  | 'cancelTax'
   | 'createEmployee'
   | 'updateEmployee'
   | 'manageAttendance'
@@ -89,14 +84,12 @@ const capabilityPermissions: Record<BackofficeCapability, PermissionRequirement>
       'cash:read',
       'settlements:read',
       'reconciliations:read',
-      'tax:read',
       'locations:read',
     ],
   },
   // History shows completed transactions in full, which Runtime grants only with sales:read-completed.
   transactions: { allOf: ['sales:read', 'sales:read-completed'] },
   configuration: { anyOf: ['business-profile:read', 'locations:read'] },
-  tax: { allOf: ['tax:read'] },
   accessControl: { allOf: ['roles:read'] },
   activity: { allOf: ['activity:read'] },
 };
@@ -123,10 +116,6 @@ const actionPermissions: Record<BackofficeAction, readonly string[]> = {
   cancelPricing: ['pricing:cancel'],
   createPromotion: ['promotions:create'],
   updatePromotion: ['promotions:update'],
-  viewTax: ['tax:read'],
-  createTax: ['tax:create'],
-  updateTax: ['tax:update'],
-  cancelTax: ['tax:cancel'],
   createEmployee: ['employees:create'],
   updateEmployee: ['employees:update'],
   manageAttendance: ['attendance:manage'],

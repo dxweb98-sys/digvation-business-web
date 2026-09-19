@@ -90,7 +90,6 @@ export interface CatalogItem {
   name: string;
   type: 'PRODUCT' | 'SERVICE';
   categoryId: string | null;
-  taxCategoryId: string | null;
   description: string | null;
   lifecycle: CatalogLifecycle;
   fulfillmentBehavior: 'INSTANT' | 'TRACKED';

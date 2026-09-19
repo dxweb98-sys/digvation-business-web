@@ -663,7 +663,6 @@ export class LocalCashierTransactionAdapter implements SaleTransactionPort {
         type,
         prices,
         categoryId: type === 'SERVICE' ? 'demo-services' : 'demo-products',
-        taxCategoryId: null,
         description: null,
         lifecycle: 'ACTIVE',
         fulfillmentBehavior: tracked ? 'TRACKED' : 'INSTANT',

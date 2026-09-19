@@ -32,14 +32,6 @@ export interface NamedRecord {
   version: number;
 }
 export type Category = NamedRecord;
-export type TaxCategory = NamedRecord;
-export interface TaxProfile {
-  itemTaxEnabled: boolean;
-  transactionTaxEnabled: boolean;
-  version: number;
-  createdAt: string | null;
-  updatedAt: string | null;
-}
 export interface Variant extends NamedRecord {
   catalogItemId: string;
 }
@@ -49,7 +41,6 @@ export interface Item {
   name: string;
   type: 'PRODUCT' | 'SERVICE';
   categoryId: string | null;
-  taxCategoryId: string | null;
   description: string | null;
   lifecycle: 'DRAFT' | 'ACTIVE' | 'INACTIVE';
   fulfillmentBehavior: 'INSTANT' | 'TRACKED';
@@ -99,10 +90,9 @@ export interface ResolvedPrice {
 
 export interface CreateCatalogItemInput extends Omit<
   Item,
-  'id' | 'version' | 'code' | 'serviceDefinition' | 'taxCategoryId'
+  'id' | 'version' | 'code' | 'serviceDefinition'
 > {
   code?: string;
-  taxCategoryId?: string | null;
   serviceDefinition?: Item['serviceDefinition'];
 }
 
@@ -178,12 +168,6 @@ export class CatalogApi {
       expectedVersion: item.version,
       ...input,
     });
-  }
-  listTaxCategories() {
-    return this.client.get<Page<TaxCategory>>('/api/v1/tax/categories?limit=100&offset=0');
-  }
-  getTaxProfile() {
-    return this.client.get<TaxProfile>('/api/v1/tax/profile');
   }
   listVariants(itemId: string) {
     return this.client.get<Page<Variant>>(`/api/v1/catalog/items/${itemId}/variants${page}`);
