@@ -86,6 +86,11 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     ...referenceQueryPolicy,
   });
 
+  const refreshPaymentRoutes = async () => {
+    const result = await paymentRoutesQuery.refetch();
+    return (result.data?.items ?? []).filter((route) => route.status === 'ACTIVE');
+  };
+
   const activeSaleId = routeSaleId ?? undefined;
   const saleWorkspace = useSaleWorkspaceController({
     client: transactionAdapter,
@@ -690,6 +695,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     paymentRoutes: (paymentRoutesQuery.data?.items ?? []).filter(
       (route) => route.status === 'ACTIVE',
     ),
+    refreshPaymentRoutes,
     selectedLocationId: selectedLocationId ?? '',
     search: catalog.search,
     itemType: catalog.itemType,
