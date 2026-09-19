@@ -41,3 +41,18 @@ export interface DashboardFilterState {
   to: string;
   locationId: string;
 }
+
+export interface DashboardDailySummary {
+  date: string;
+  currency: string;
+  income: string;
+  expenses?: string;
+  netRevenue?: string;
+  totalTransactions: number;
+  financeAvailable: boolean;
+  transactionCompletion: {
+    total: number;
+    finalized: number;
+    voided: number;
+  };
+}
