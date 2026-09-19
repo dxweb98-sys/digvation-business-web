@@ -300,6 +300,27 @@ const copy: Record<string, LocalizedLabel> = {
   'Estimated total': { 'id-ID': 'Estimasi total', 'en-US': 'Estimated total' },
   Payment: { 'id-ID': 'Pembayaran', 'en-US': 'Payment' },
   'Payment method': { 'id-ID': 'Metode pembayaran', 'en-US': 'Payment method' },
+  'Payment amount': { 'id-ID': 'Nominal pembayaran', 'en-US': 'Payment amount' },
+  'Settlement account': { 'id-ID': 'Akun penerimaan', 'en-US': 'Settlement account' },
+  'Split payment': { 'id-ID': 'Pembayaran terbagi', 'en-US': 'Split payment' },
+  'Add another payment method for the remaining balance.': {
+    'id-ID': 'Tambahkan metode pembayaran lain untuk sisa tagihan.',
+    'en-US': 'Add another payment method for the remaining balance.',
+  },
+  'Change the payment amount below to split this transaction across multiple payment methods.': {
+    'id-ID':
+      'Ubah nominal pembayaran di bawah untuk membagi transaksi ke beberapa metode pembayaran.',
+    'en-US':
+      'Change the payment amount below to split this transaction across multiple payment methods.',
+  },
+  'Payment method unavailable': {
+    'id-ID': 'Metode pembayaran tidak tersedia',
+    'en-US': 'Payment method unavailable',
+  },
+  'Configure an active settlement account for this payment method.': {
+    'id-ID': 'Konfigurasikan akun penerimaan aktif untuk metode pembayaran ini.',
+    'en-US': 'Configure an active settlement account for this payment method.',
+  },
   Cash: { 'id-ID': 'Tunai', 'en-US': 'Cash' },
   Transfer: { 'id-ID': 'Transfer', 'en-US': 'Transfer' },
   'Digital wallet': { 'id-ID': 'Dompet digital', 'en-US': 'Digital wallet' },

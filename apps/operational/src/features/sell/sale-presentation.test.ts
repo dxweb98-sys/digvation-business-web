@@ -2,11 +2,14 @@ import { describe, expect, it } from 'vitest';
 
 import type { EmployeeContribution, SaleAdjustment } from './cashier-transaction.types';
 import {
+  appliedPaymentComposition,
   discountPresentation,
   lineDiscountPresentation,
   employeeDisplayName,
   lineBaseSubtotal,
   lineDiscountPercentage,
+  paymentIntent,
+  paymentProgress,
   percentageFromRate,
   saleDiscountRows,
   saleSettlement,
@@ -208,6 +211,24 @@ describe('saleSettlement', () => {
     });
   });
 
+  it('reconciles an exact two-way split and keeps cash tender separate from applied amount', () => {
+    expect(
+      saleSettlement({
+        totalAmount: '500000.0000',
+        payments: [
+          payment('SUCCEEDED', '300000.0000', 'QRIS'),
+          payment('SUCCEEDED', '200000.0000', 'CASH', '250000.0000', '50000.0000'),
+        ],
+      }),
+    ).toEqual({
+      totalPaid: '500000.0000',
+      balanceDue: '0.0000',
+      cashTendered: '250000.0000',
+      cashChange: '50000.0000',
+      paymentState: 'PAID',
+    });
+  });
+
   it('keeps a sale partially paid while a payment is pending or the total is not covered', () => {
     expect(
       saleSettlement({
@@ -266,5 +287,166 @@ describe('discount presentation', () => {
         'Diskon',
       ),
     ).toEqual({ title: 'Diskon (10%)', note: 'langganan' });
+  });
+});
+
+describe('payment progress and intent', () => {
+  const payment = (
+    status: 'SUCCEEDED' | 'PENDING' | 'FAILED' | 'CANCELLED',
+    appliedAmount: string,
+  ) => ({
+    status,
+    appliedAmount,
+  });
+
+  it('treats one method for the whole total as a full payment', () => {
+    expect(paymentIntent({ totalAmount: '500000', payments: [] }, '500000')).toMatchObject({
+      remainingAmount: '500000.0000',
+      remainingAfter: '0.0000',
+      outcome: 'COMPLETES',
+      isSplit: false,
+    });
+  });
+
+  it('marks a partial first payment as a split that leaves a balance', () => {
+    expect(paymentIntent({ totalAmount: '500000', payments: [] }, '300000')).toMatchObject({
+      remainingAfter: '200000.0000',
+      outcome: 'LEAVES_BALANCE',
+      isSplit: true,
+    });
+  });
+
+  it('recalculates what remains when the amount is corrected before confirming', () => {
+    const sale = { totalAmount: '500000', payments: [] };
+    expect(paymentIntent(sale, '300000').remainingAfter).toBe('200000.0000');
+    expect(paymentIntent(sale, '250000').remainingAfter).toBe('250000.0000');
+  });
+
+  it('completes the sale when the next cash payment covers the remaining balance', () => {
+    const sale = { totalAmount: '500000', payments: [payment('SUCCEEDED', '300000')] };
+    expect(paymentIntent(sale, '200000')).toMatchObject({
+      paidAmount: '300000.0000',
+      remainingAmount: '200000.0000',
+      outcome: 'COMPLETES',
+      isSplit: true,
+    });
+  });
+
+  it('never counts failed or cancelled attempts and reserves pending ones', () => {
+    expect(
+      paymentProgress({
+        totalAmount: '500000',
+        payments: [
+          payment('SUCCEEDED', '300000'),
+          payment('FAILED', '150000'),
+          payment('CANCELLED', '200000'),
+          payment('PENDING', '50000'),
+        ],
+      }),
+    ).toEqual({
+      paidAmount: '300000.0000',
+      pendingAmount: '50000.0000',
+      remainingAmount: '150000.0000',
+    });
+  });
+});
+
+describe('appliedPaymentComposition', () => {
+  const payment = (
+    id: string,
+    status: 'SUCCEEDED' | 'PENDING' | 'FAILED' | 'CANCELLED' | 'EXPIRED',
+    appliedAmount: string,
+  ) => ({ id, status, appliedAmount });
+
+  it('treats one successful payment as a single payment', () => {
+    const result = appliedPaymentComposition({
+      totalAmount: '500000.0000',
+      payments: [payment('cash', 'SUCCEEDED', '500000.0000')],
+    });
+    expect(result).toMatchObject({ isSplit: false, settled: true, totalPaid: '500000.0000' });
+    expect(result.components.map((item) => item.id)).toEqual(['cash']);
+  });
+
+  it('classifies two payments that settle the sale together as a split payment', () => {
+    const result = appliedPaymentComposition({
+      totalAmount: '500000.0000',
+      payments: [
+        payment('bca', 'SUCCEEDED', '300000.0000'),
+        payment('cash', 'SUCCEEDED', '200000.0000'),
+      ],
+    });
+    expect(result).toMatchObject({ isSplit: true, totalPaid: '500000.0000' });
+    expect(result.components.map((item) => item.id)).toEqual(['bca', 'cash']);
+  });
+
+  it('never counts a failed attempt, so a failed transfer plus cash is not a split', () => {
+    const result = appliedPaymentComposition({
+      totalAmount: '500000.0000',
+      payments: [
+        payment('bca', 'FAILED', '500000.0000'),
+        payment('cash', 'SUCCEEDED', '500000.0000'),
+      ],
+    });
+    expect(result.isSplit).toBe(false);
+    expect(result.components.map((item) => item.id)).toEqual(['cash']);
+  });
+
+  it('never counts a cancelled or expired attempt toward settlement', () => {
+    const result = appliedPaymentComposition({
+      totalAmount: '500000.0000',
+      payments: [
+        payment('bca', 'CANCELLED', '300000.0000'),
+        payment('qris', 'EXPIRED', '200000.0000'),
+        payment('cash', 'SUCCEEDED', '500000.0000'),
+      ],
+    });
+    expect(result).toMatchObject({ isSplit: false, totalPaid: '500000.0000' });
+  });
+
+  it('lists every component of a three-way split', () => {
+    const result = appliedPaymentComposition({
+      totalAmount: '500000.0000',
+      payments: [
+        payment('bca', 'SUCCEEDED', '200000.0000'),
+        payment('cash', 'SUCCEEDED', '150000.0000'),
+        payment('wallet', 'SUCCEEDED', '150000.0000'),
+      ],
+    });
+    expect(result).toMatchObject({ isSplit: true, totalPaid: '500000.0000' });
+    expect(result.components).toHaveLength(3);
+  });
+
+  it('does not call a partly paid sale a split payment yet', () => {
+    const result = appliedPaymentComposition({
+      totalAmount: '500000.0000',
+      payments: [
+        payment('bca', 'SUCCEEDED', '100000.0000'),
+        payment('cash', 'SUCCEEDED', '100000.0000'),
+      ],
+    });
+    expect(result).toMatchObject({ isSplit: false, settled: false, totalPaid: '200000.0000' });
+  });
+});
+
+describe('appliedPaymentComposition order', () => {
+  it('lists split components in the order they were taken', () => {
+    const result = appliedPaymentComposition({
+      totalAmount: '300000.0000',
+      payments: [
+        {
+          id: 'cash',
+          status: 'SUCCEEDED',
+          appliedAmount: '100000',
+          createdAt: '2026-09-19T08:03:00.000Z',
+        },
+        {
+          id: 'bca',
+          status: 'SUCCEEDED',
+          appliedAmount: '200000',
+          createdAt: '2026-09-19T08:01:00.000Z',
+        },
+      ],
+    });
+    expect(result.components.map((item) => item.id)).toEqual(['bca', 'cash']);
   });
 });

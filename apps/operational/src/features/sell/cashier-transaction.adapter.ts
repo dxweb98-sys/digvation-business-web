@@ -96,6 +96,7 @@ export interface FulfillmentInput {
 export interface CreatePaymentInput {
   expectedVersion: number;
   method: PaymentMethod;
+  paymentRouteId?: string;
   appliedAmount: string;
   tenderedAmount?: string;
   providerReference?: string;

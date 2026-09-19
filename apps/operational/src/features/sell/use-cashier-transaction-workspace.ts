@@ -23,7 +23,9 @@ import { cashierTransactionKeys } from './cashier-transaction-keys';
 import type {
   CatalogItem,
   CatalogVariant,
+  Payment,
   PaymentMethod,
+  PaymentStatus,
   QueueSale,
   Sale,
   SaleLine,
@@ -83,6 +85,11 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     enabled: Boolean(selectedLocationId && runtime.currency),
     ...referenceQueryPolicy,
   });
+
+  const refreshPaymentRoutes = async () => {
+    const result = await paymentRoutesQuery.refetch();
+    return (result.data?.items ?? []).filter((route) => route.status === 'ACTIVE');
+  };
 
   const activeSaleId = routeSaleId ?? undefined;
   const saleWorkspace = useSaleWorkspaceController({
@@ -579,6 +586,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     appliedAmount: string,
     tenderedAmount?: string,
     providerReference?: string,
+    paymentRouteId?: string,
   ) => {
     command.clearNotice();
     try {
@@ -593,6 +601,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
           {
             expectedVersion: authoritative.version,
             method,
+            ...(paymentRouteId ? { paymentRouteId } : {}),
             appliedAmount,
             ...(tenderedAmount ? { tenderedAmount } : {}),
             ...(providerReference ? { providerReference } : {}),
@@ -608,12 +617,51 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     }
   };
 
+  const transitionQueuedPayment = async (
+    targetSale: Sale,
+    payment: Payment,
+    status: Exclude<PaymentStatus, 'PENDING'>,
+  ) => {
+    command.clearNotice();
+    try {
+      const authoritative = await transactionAdapter.getSale(targetSale.id);
+      const livePayment = authoritative.payments.find(
+        (candidate) => candidate.id === payment.id,
+      );
+      if (!livePayment || livePayment.status !== 'PENDING')
+        throw new Error(copy('The pending payment is no longer available.'));
+      const updated = await command.runMutation(() =>
+        transactionAdapter.transitionSalePayment(
+          authoritative.id,
+          livePayment.id,
+          {
+            expectedVersion: authoritative.version,
+            status,
+          },
+        ),
+      );
+      cacheQueueContext(updated);
+      return updated;
+    } catch (error) {
+      command.reportError(error);
+      throw error;
+    }
+  };
+
   const createPayment = (
     method: PaymentMethod,
     appliedAmount: string,
     tenderedAmount?: string,
     providerReference?: string,
-  ) => core.createPayment(method, appliedAmount, tenderedAmount, providerReference);
+    paymentRouteId?: string,
+  ) =>
+    core.createPayment(
+      method,
+      appliedAmount,
+      tenderedAmount,
+      providerReference,
+      paymentRouteId,
+    );
 
   const voidQueuedSale = async (targetSale: Sale) => {
     command.clearNotice();
@@ -647,6 +695,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     paymentRoutes: (paymentRoutesQuery.data?.items ?? []).filter(
       (route) => route.status === 'ACTIVE',
     ),
+    refreshPaymentRoutes,
     selectedLocationId: selectedLocationId ?? '',
     search: catalog.search,
     itemType: catalog.itemType,
@@ -702,6 +751,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     setQueuedWorkUnits,
     finalizeQueuedSale,
     createQueuedPayment,
+    transitionQueuedPayment,
     openCompletion: () => setCompletionOpen(true),
     closeCompletion: () => setCompletionOpen(false),
     setOrderDiscount: core.setOrderDiscount,

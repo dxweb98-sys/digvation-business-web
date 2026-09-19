@@ -306,21 +306,35 @@ function AccountEditor({
               accountReference: accountReference.trim(),
               accountHolderName: accountHolderName.trim() || null,
             };
-      if (account) await api.updateAccount(account, { name: name.trim(), ...details });
-      else
-        await api.createAccount({
-          code: code.trim().toUpperCase() || null,
-          name: name.trim(),
-          type,
-          currency: currency.trim().toUpperCase(),
-          ...details,
-        });
+      const saved = account
+        ? await api.updateAccount(account, { name: name.trim(), ...details })
+        : await api.createAccount({
+            code: code.trim().toUpperCase() || null,
+            name: name.trim(),
+            type,
+            currency: currency.trim().toUpperCase(),
+            ...details,
+          });
+      let checkoutProvisioned = false;
+      try {
+        checkoutProvisioned = await provisionDefaultCheckoutRoute(api, saved);
+      } catch {
+        checkoutProvisioned = false;
+      }
       onSaved();
       onClose();
       showToast({
         variant: 'success',
         title: copy(account ? 'Financial account updated.' : 'Financial account added.'),
       });
+      if (!checkoutProvisioned && saved.status === 'ACTIVE') {
+        showToast({
+          variant: 'warning',
+          title: copy(
+            'Configure payment routing if this account should be available in Operational checkout.',
+          ),
+        });
+      }
     } catch (error) {
       showApiError(error, copy, showToast, copy('Could not save financial account.'));
     }
@@ -687,9 +701,13 @@ function RouteEditor({
           limit: 100,
           offset: 0,
         });
-        const sameScope = existing.items.find((item) => item.currency === account?.currency);
-        if (sameScope)
-          await api.updateRoute(sameScope, { financialAccountId: accountId, status: 'ACTIVE' });
+        const sameAccountRoute = existing.items.find(
+          (item) =>
+            item.currency === account?.currency &&
+            item.financialAccountId === accountId,
+        );
+        if (sameAccountRoute)
+          await api.updateRoute(sameAccountRoute, { status: 'ACTIVE' });
         else
           await api.createRoute({
             sellingLocationId: locationId,
@@ -904,6 +922,46 @@ function Fact({
     </div>
   );
 }
+async function provisionDefaultCheckoutRoute(
+  api: FinancialAccountsApi,
+  account: FinancialAccount,
+): Promise<boolean> {
+  if (account.status !== 'ACTIVE') return false;
+  const method: PaymentMethod =
+    account.type === 'BANK'
+      ? 'BANK_TRANSFER'
+      : account.type === 'E_WALLET'
+        ? 'WALLET'
+        : 'CASH';
+  const locations = await api.listLocations(100, 0);
+  const activeLocations = locations.items.filter((location) => location.status === 'ACTIVE');
+  if (activeLocations.length !== 1) return false;
+
+  const location = activeLocations[0]!;
+  const existing = await api.listRoutes({
+    sellingLocationId: location.id,
+    paymentMethod: method,
+    limit: 100,
+    offset: 0,
+  });
+  const sameAccountRoute = existing.items.find(
+    (route) =>
+      route.financialAccountId === account.id &&
+      route.currency === account.currency,
+  );
+  if (sameAccountRoute) {
+    if (sameAccountRoute.status !== 'ACTIVE')
+      await api.updateRoute(sameAccountRoute, { status: 'ACTIVE' });
+    return true;
+  }
+  await api.createRoute({
+    sellingLocationId: location.id,
+    paymentMethod: method,
+    financialAccountId: account.id,
+  });
+  return true;
+}
+
 function accountTypeLabel(type: FinancialAccountType) {
   return type === 'CASH' ? 'Cash account' : type === 'BANK' ? 'Bank account' : 'E-wallet account';
 }

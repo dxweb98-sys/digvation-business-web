@@ -339,6 +339,112 @@ export function saleSettlement(sale: {
   };
 }
 
+type ProgressPayment = Pick<Payment, 'status' | 'appliedAmount'>;
+
+export interface AppliedPaymentComposition<P> {
+  /** Payments that actually settle the sale, in the order they were taken. */
+  components: P[];
+  totalPaid: string;
+  /** Every applied payment together covers the total and nothing is still waiting. */
+  settled: boolean;
+  /** More than one applied payment settled the sale. Failed or cancelled attempts never count. */
+  isSplit: boolean;
+}
+
+/**
+ * How a sale was actually paid. Mirrors Runtime settlement, which only counts succeeded
+ * payments; the number of payment records or methods tried says nothing on its own.
+ */
+export function appliedPaymentComposition<
+  P extends ProgressPayment & { createdAt?: string },
+>(sale: { totalAmount: string; payments: readonly P[] }): AppliedPaymentComposition<P> {
+  const components = sale.payments
+    .filter(
+      (payment) =>
+        payment.status === 'SUCCEEDED' &&
+        createDecimal(String(payment.appliedAmount)).greaterThan(0),
+    )
+    .sort((left, right) => (left.createdAt ?? '').localeCompare(right.createdAt ?? ''));
+  const totalPaid = components.reduce(
+    (sum, payment) => sum.plus(createDecimal(String(payment.appliedAmount))),
+    createDecimal('0'),
+  );
+  const settled =
+    !sale.payments.some((payment) => payment.status === 'PENDING') &&
+    totalPaid.greaterThanOrEqualTo(createDecimal(String(sale.totalAmount)));
+  return {
+    components,
+    totalPaid: totalPaid.toFixed(4),
+    settled,
+    isSplit: settled && components.length > 1,
+  };
+}
+
+export interface PaymentProgress {
+  /** Payments Runtime reports as succeeded. */
+  paidAmount: string;
+  /** Payments Runtime has accepted but that still wait for confirmation. */
+  pendingAmount: string;
+  /** What is still open for a new payment. */
+  remainingAmount: string;
+}
+
+/** Presentation projection of Runtime payment state for an open checkout. */
+export function paymentProgress(sale: {
+  totalAmount: string;
+  payments: readonly ProgressPayment[];
+}): PaymentProgress {
+  const sum = (status: Payment['status']) =>
+    sale.payments
+      .filter((payment) => payment.status === status)
+      .reduce(
+        (total, payment) => total.plus(createDecimal(String(payment.appliedAmount))),
+        createDecimal('0'),
+      );
+  const paid = sum('SUCCEEDED');
+  const pending = sum('PENDING');
+  const remaining = createDecimal(String(sale.totalAmount)).minus(paid).minus(pending);
+  return {
+    paidAmount: paid.toFixed(4),
+    pendingAmount: pending.toFixed(4),
+    remainingAmount: remaining.greaterThan(0) ? remaining.toFixed(4) : '0.0000',
+  };
+}
+
+export type PaymentIntentOutcome = 'COMPLETES' | 'LEAVES_BALANCE';
+
+export interface PaymentIntent extends PaymentProgress {
+  amount: string;
+  remainingAfter: string;
+  outcome: PaymentIntentOutcome;
+  /** The transaction is, or will be, settled by more than one payment. */
+  isSplit: boolean;
+}
+
+/**
+ * Describes what the payment being prepared will do before it is sent. Runtime still decides
+ * whether the payment is accepted and whether the transaction is settled.
+ */
+export function paymentIntent(
+  sale: { totalAmount: string; payments: readonly ProgressPayment[] },
+  amount: string,
+): PaymentIntent {
+  const progress = paymentProgress(sale);
+  const applied = createDecimal(amount || '0');
+  const after = createDecimal(progress.remainingAmount).minus(applied);
+  const hasEarlierPayment =
+    createDecimal(progress.paidAmount).greaterThan(0) ||
+    createDecimal(progress.pendingAmount).greaterThan(0);
+  const settlesBalance = after.lessThanOrEqualTo(0);
+  return {
+    ...progress,
+    amount: applied.toFixed(4),
+    remainingAfter: settlesBalance ? '0.0000' : after.toFixed(4),
+    outcome: settlesBalance ? 'COMPLETES' : 'LEAVES_BALANCE',
+    isSplit: hasEarlierPayment || !settlesBalance,
+  };
+}
+
 /** Presents an authoritative service duration in whole hours and minutes. */
 export function formatServiceDuration(
   minutes: number | null | undefined,
