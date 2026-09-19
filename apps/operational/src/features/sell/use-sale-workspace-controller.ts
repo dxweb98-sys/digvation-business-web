@@ -4,6 +4,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 
+import { transactionQueryPolicy } from '../../app/data/operational-cache-policy';
 import {
   operationalCopy,
   resolveOperationalLocale,
@@ -14,9 +15,11 @@ import {
   cartDraftDisplayLines,
   cartDraftEstimatedTotal,
   cartDraftStartInput,
+  draftCustomerSnapshot,
   emptyCartDraft,
   removeCartDraftLine,
   saleDisplayLines,
+  setCartDraftCustomer,
   setCartDraftQuantity,
   type CartDraft,
 } from './cart-draft';
@@ -27,6 +30,8 @@ import type {
   CatalogVariant,
   ResolvedPrice,
   Sale,
+  SaleCustomer,
+  SaleCustomerSelection,
   SaleLine,
 } from './cashier-transaction.types';
 import { createSaleWorkspaceViewModel } from './sale-workspace-view-model';
@@ -129,7 +134,7 @@ export function useSaleWorkspaceController({
     queryKey: cashierTransactionKeys.sale(routeSaleId ?? 'idle'),
     queryFn: ({ signal }) => client.getSale(routeSaleId!, signal),
     enabled: Boolean(routeSaleId),
-    staleTime: 10_000,
+    ...transactionQueryPolicy,
   });
 
   useEffect(() => {
@@ -192,6 +197,25 @@ export function useSaleWorkspaceController({
       if (isKnownApiFailure(error)) setRetryCommitIntent(null);
       await command.recoverFailure(error);
     },
+  });
+
+  const customerMutation = useMutation({
+    mutationFn: (intent: {
+      saleId: string;
+      expectedVersion: number;
+      customer: SaleCustomerSelection;
+    }) =>
+      command.runMutation(async () => {
+        if (connectivity === 'OFFLINE')
+          throw new Error(copy('Reconnect before changing this transaction.'));
+        return client.setSaleCustomer(
+          intent.saleId,
+          { expectedVersion: intent.expectedVersion, customer: intent.customer },
+          createIdempotencyKey('sale-customer'),
+        );
+      }),
+    onSuccess: command.commitSale,
+    onError: async (error, intent) => command.recoverFailure(error, intent.saleId),
   });
 
   const quantityMutation = useMutation({
@@ -302,6 +326,32 @@ export function useSaleWorkspaceController({
     removeMutation.mutate({ saleId: sale.id, saleLineId: line.id, expectedVersion: sale.version });
   };
 
+  /**
+   * Identity of the transaction being served: the Sale owns it once the Sale
+   * exists, and the local draft holds it only until then.
+   */
+  const activeCustomer: SaleCustomer | null =
+    saleQuery.data?.customer ?? draftCustomerSnapshot(draft?.customer ?? null);
+
+  const changeCustomer = async (selection: SaleCustomerSelection) => {
+    const sale = saleQuery.data;
+    if (!sale) {
+      setDraft((current) =>
+        setCartDraftCustomer(
+          current ?? emptyCartDraft(selectedLocationId ?? '', currency),
+          selection,
+        ),
+      );
+      setRetryCommitIntent(null);
+      return;
+    }
+    await customerMutation.mutateAsync({
+      saleId: sale.id,
+      expectedVersion: sale.version,
+      customer: selection,
+    });
+  };
+
   const commitDraft = async () => {
     if (!draft?.lines.length) throw new Error(copy('Add at least one item before payment.'));
     const intent =
@@ -322,6 +372,9 @@ export function useSaleWorkspaceController({
   return {
     sale: saleQuery.data ?? null,
     viewModel,
+    customer: activeCustomer,
+    isCustomerPending: customerMutation.isPending,
+    changeCustomer,
     isLoading: Boolean(routeSaleId) && saleQuery.isLoading,
     cart: {
       lines: cartLines,

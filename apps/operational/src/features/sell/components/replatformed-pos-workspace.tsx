@@ -2,30 +2,30 @@ import { useAuth } from '@digvation/pos-auth';
 import { createDecimal, formatMoney } from '@digvation/pos-money';
 import { useRuntime } from '@digvation/pos-runtime';
 import {
+  DAlert,
   DBadge as Badge,
   DButton,
   DButton as Button,
-  DCheckbox,
-  DCombobox,
   DCombobox as Combobox,
   DConfirmDialog,
   DDialog,
   DDialog as Dialog,
   DDropdown as Dropdown,
   DInput,
-  DInput as Input,
+  DRadio,
   DSearchInput as SearchInput,
   DSelect as Select,
   DSkeleton as Skeleton,
   useToast,
 } from '@digvation-labs/ui';
-import { DTabs, DTabsContent, DTabsList, DTabsTrigger } from '@digvation/ui';
+import { DTabs, DTabsContent, DTabsList, DTabsTrigger, DTextarea } from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
 import {
   AlertCircle,
   Banknote,
   CheckCircle2,
   ChevronDown,
+  ChevronRight,
   Clock,
   CreditCard,
   Eye,
@@ -35,19 +35,24 @@ import {
   PlayCircle,
   Plus,
   Printer,
+  Send,
   QrCode,
   RotateCcw,
   ShoppingBag,
+  Sparkles,
   Trash2,
   User,
   UserPlus,
-  Wrench,
   X,
   XCircle,
 } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
+import {
+  QUEUE_REFRESH_INTERVAL_MS,
+  liveQueryPolicy,
+} from '../../../app/data/operational-cache-policy';
 import {
   operationalCopy,
   resolveOperationalLocale,
@@ -61,38 +66,66 @@ import {
   createCashierTransactionAdapter,
   isLocalCashierDemoEnabled,
 } from '../cashier-transaction-adapter-factory';
-import {
-  customerMemberLookup,
-  type MemberCustomerLookupResult,
-  type TransactionCustomer,
-} from '../customer-member-lookup';
 import { hasStartableQueuedWork } from '../queued-sale-work';
 import {
   employeeDisplayName,
+  formatServiceDuration,
   lineDiscountPercentage,
   saleDiscountRows,
+  discountPresentation,
+  lineDiscountRows,
+  saleSettlement,
   saleTaxLabel,
   transactionDiscountLabel,
 } from '../sale-presentation';
 import type {
   CatalogItem,
+  CompletedSaleSummary,
   Employee,
   Payment,
   PaymentMethod,
   PaymentRoute,
+  QueueSale,
   Sale,
+  SaleCustomer,
+  SaleCustomerSelection,
   SaleLine,
 } from '../cashier-transaction.types';
 import type { CatalogItemTypeFilter } from '../use-selling-catalog';
 import type { useCashierTransactionWorkspace } from '../use-cashier-transaction-workspace';
 
+import { normalizeCurrencyPresentationInput, PosCurrencyInput } from './pos-controls';
 import {
-  normalizeCurrencyPresentationInput,
-  PosCurrencyInput,
-  PosNumericInput,
-} from './pos-controls';
+  SaleDetailHeader,
+  SaleDetailSection,
+  SaleFinancialSummary,
+  SaleLineItem,
+  SaleLineItemList,
+  SalePaymentList,
+  StatusPill,
+} from './sale-detail-presentation';
+import { SaleAdjustmentControls } from './sale-adjustment-controls';
 import { SaleLineTaskDialog } from './sale-line-task-dialog';
+import {
+  ServicePerformersDialog,
+  serviceWorkUnitAllocations,
+  serviceWorkUnitCount,
+} from './service-performers-dialog';
+import {
+  formatPercent,
+  formatUnitRanges,
+  groupAllocations,
+  resolveAllocation,
+  type PerformerAllocation,
+  type ServiceLineWorkPlan,
+} from '../service-performer-allocation';
 import type { VariantPickerState } from './variant-picker';
+import {
+  isCompletedSaleSummary,
+  presentableTransaction,
+  restrictedQueueSummary,
+  useCanReadCompletedSaleDetails,
+} from '../completed-sale-visibility';
 import './replatformed-pos-workspace.css';
 
 type Workspace = ReturnType<typeof useCashierTransactionWorkspace>;
@@ -104,44 +137,11 @@ interface QueuedSaleEntry {
   saleCreatedAt: string;
 }
 
-type PosCustomer = TransactionCustomer;
-interface ServiceWorkContributor {
-  employeeId: string;
-  shareRate: string;
-}
-
-interface ServiceWorkUnit {
-  index: number;
-  contributors: readonly ServiceWorkContributor[];
-}
-
-type ServiceWorkUnitsByLine = Readonly<Record<string, readonly ServiceWorkUnit[]>>;
-
-const CURRENT_CUSTOMER_KEY = 'digvation-pos-demo-current-customer';
 const QUEUED_SALE_IDS_KEY = 'digvation-pos-demo-queued-sale-ids';
 const CANCELED_SALE_REASONS_KEY = 'digvation-pos-demo-canceled-sale-reasons';
-const saleCustomerKey = (saleId: string) => `digvation-pos-demo-customer:${saleId}`;
 
 function copyFor(value: string, locale: string): string {
   return operationalCopy(value, resolveOperationalLocale(locale));
-}
-
-function readStoredCustomer(key: string): PosCustomer | null {
-  try {
-    const raw = window.sessionStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as PosCustomer) : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeStoredCustomer(key: string, customer: PosCustomer | null): void {
-  try {
-    if (customer) window.sessionStorage.setItem(key, JSON.stringify(customer));
-    else window.sessionStorage.removeItem(key);
-  } catch {
-    // Session storage is optional presentation state only.
-  }
 }
 
 function readQueuedSaleEntries(): QueuedSaleEntry[] {
@@ -232,148 +232,232 @@ function money(amount: string, locale: string) {
   return formatMoney(amount, 'IDR', locale, 0);
 }
 
+function formatDurationMinutes(minutes: number | null | undefined, locale: string): string | null {
+  return formatServiceDuration(minutes, {
+    hour: copyFor('hour-short', locale),
+    minute: copyFor('minute-short', locale),
+  });
+}
+
 function quantity(value: string) {
   const normalized = value.replace(/(\.\d*?[1-9])0+$|\.0+$/, '$1');
   return normalized === '-0' ? '0' : normalized;
 }
 
-function transactionNumber(saleId: string, locale: string) {
-  return saleId.startsWith('SALE-DEMO-')
-    ? saleId
-    : `${copyFor('Transaction', locale)} ${saleId.slice(0, 8)}`;
+function transactionNumber(sale: Pick<Sale, 'id' | 'saleNumber'>, locale: string) {
+  // Prefer the authoritative sale number; fall back to the short id for sales without one.
+  if (sale.saleNumber) return sale.saleNumber;
+  return sale.id.startsWith('SALE-DEMO-')
+    ? sale.id
+    : `${copyFor('Transaction', locale)} ${sale.id.slice(0, 8)}`;
 }
 
-function saleCustomer(saleId: string | undefined, locale: string): PosCustomer {
-  const stored = saleId ? readStoredCustomer(saleCustomerKey(saleId)) : null;
-  return stored ?? { name: copyFor('General customer', locale), phone: '' };
+/**
+ * The Sale owns its customer identity, so presentation reads it straight from
+ * the Sale. A Sale captured before the customer contract carries no identity:
+ * it stays neutral and is never shown as a general or anonymous customer.
+ */
+function customerDisplayName(customer: Pick<SaleCustomer, 'name'> | null, locale: string): string {
+  return customer && customer.name.trim()
+    ? customer.name
+    : copyFor('Customer data is not available', locale);
 }
 
-function customerStatus(customer: PosCustomer | null): {
-  label: 'Guest' | 'Member' | 'Non-member';
-  variant: 'default' | 'primary' | 'outline';
-} {
-  if (!customer) return { label: 'Guest', variant: 'default' };
-  if (customer.membership) return { label: 'Member', variant: 'primary' };
-  return { label: 'Non-member', variant: 'outline' };
+function customerDisplayDetail(customer: SaleCustomer | null): string | null {
+  return customer && customer.phoneE164.trim() ? customer.phoneE164 : null;
 }
 
-function serviceWorkKey(line: SaleLine): string {
-  return `${line.saleId}:${line.id}`;
+function customerStatus(customer: SaleCustomer | null): {
+  label: 'Member' | 'Non-member';
+  variant: 'primary' | 'outline';
+} | null {
+  if (!customer) return null;
+  return customer.type === 'MEMBER'
+    ? { label: 'Member', variant: 'primary' }
+    : { label: 'Non-member', variant: 'outline' };
 }
 
-function serviceWorkUnitCount(line: SaleLine): number {
-  try {
-    const quantity = createDecimal(line.quantity);
-    if (!quantity.isInteger() || quantity.lessThanOrEqualTo(createDecimal('1'))) return 1;
-    const count = quantity.toNumber();
-    return Number.isSafeInteger(count) ? count : 1;
-  } catch {
-    return 1;
-  }
+interface PerformerCredit {
+  employeeId: string;
+  name: string;
+  /** Shown only when the split was set by hand; an even split needs no numbers. */
+  percent: string | null;
 }
 
-function defaultWorkContributors(line: SaleLine): ServiceWorkContributor[] {
-  return line.participations
-    .filter((participation) => participation.assigned)
-    .map((participation) => ({
-      employeeId: participation.employeeId,
-      shareRate: participation.shareRate ?? '0.0000',
-    }));
+interface PerformerGroup {
+  /** Units this setting covers, e.g. "1–2, 4–7"; null when it covers the whole line. */
+  units: string | null;
+  performers: PerformerCredit[];
 }
 
-function serviceWorkUnitsFor(
-  line: SaleLine,
-  storedUnits: readonly ServiceWorkUnit[] | undefined,
-): ServiceWorkUnit[] {
-  const count = serviceWorkUnitCount(line);
-  const storedByIndex = new Map(storedUnits?.map((unit) => [unit.index, unit]));
-  const fallbackContributors = defaultWorkContributors(line);
-
-  return Array.from({ length: count }, (value, index) => {
-    void value;
-    const stored = storedByIndex.get(index);
-    return {
-      index,
-      contributors: stored?.contributors ?? fallbackContributors,
-    };
-  });
-}
-
-function contributionTotal(contributors: readonly ServiceWorkContributor[]) {
-  return contributors.reduce(
-    (total, contributor) => total.plus(createDecimal(contributor.shareRate || '0')),
-    createDecimal('0'),
-  );
-}
-
-function hasValidWorkAssignment(line: SaleLine, unit: ServiceWorkUnit): boolean {
-  if (
-    line.employeeAssignmentModeSnapshot === 'REQUIRED' &&
-    !unit.contributors.some((contributor) => contributor.employeeId)
-  ) {
-    return false;
-  }
-  if (line.allowEmployeeContributionSnapshot) {
-    return (
-      unit.contributors.length > 0 &&
-      unit.contributors.every((contributor) => Boolean(contributor.employeeId)) &&
-      contributionTotal(unit.contributors).equals(createDecimal('1'))
-    );
-  }
-  return true;
-}
-
-function serviceWorkAssignmentSummary(
-  units: readonly ServiceWorkUnit[],
-  employees: readonly Employee[],
-  locale: string,
-): string {
-  const assignments = units.map((unit) =>
-    unit.contributors
-      .filter((contributor) => contributor.employeeId)
-      .map((contributor) => `${contributor.employeeId}:${contributor.shareRate}`)
-      .join('|'),
-  );
-  const firstAssignment = assignments[0] ?? '';
-  if (!firstAssignment || assignments.some((assignment) => !assignment))
-    return copyFor('No employees assigned', locale);
-  const configurationCount = new Set(assignments).size;
-  if (configurationCount > 1) return `${configurationCount} ${copyFor('configurations', locale)}`;
-
-  const names = (units[0]?.contributors ?? [])
-    .filter((contributor) => contributor.employeeId)
-    .map(
-      (contributor) =>
-        employees.find((employee) => employee.id === contributor.employeeId)?.displayName ??
-        copyFor('Employee unavailable', locale),
-    );
-  return `${names.join(', ')} ${copyFor('for all work units', locale)}`;
-}
-
-function employeeWorkSummary(
+/**
+ * Who performs a service line. Units with an identical assignment collapse
+ * into one group, so a line reads as one setting unless units really differ.
+ */
+function servicePerformerSummary(
   line: SaleLine,
   employees: readonly Employee[],
   locale: string,
-): string {
-  const assigned = line.participations.filter((participation) => participation.assigned);
-  if (!assigned.length) return copyFor('Not assigned', locale);
-  return assigned
-    .map((participation) => {
-      const displayName = employeeDisplayName(
+): { unitCount: number; groups: PerformerGroup[] } {
+  const units = serviceWorkUnitAllocations(line);
+  const credits = (allocation: PerformerAllocation): PerformerCredit[] => {
+    const { shares } = resolveAllocation(allocation);
+    const custom = shares.some((share) => share.manual);
+    return shares.map((share) => ({
+      employeeId: share.employeeId,
+      name: employeeDisplayName(
         line,
-        participation.employeeId,
+        share.employeeId,
         employees,
         copyFor('Employee unavailable', locale),
-      );
-      const share = participation.shareRate
-        ? `${createDecimal(participation.shareRate).times(100).toFixed(0)}%`
-        : null;
-      return share ? `${displayName} ${share}` : displayName;
-    })
-    .join(', ');
+      ),
+      percent: custom ? `${formatPercent(share.basisPoints, locale)}%` : null,
+    }));
+  };
+  const grouped = groupAllocations(units);
+  return {
+    unitCount: units.length,
+    groups: grouped.map((group) => ({
+      units: grouped.length > 1 ? formatUnitRanges(group.unitNumbers) : null,
+      performers: credits(group.allocation),
+    })),
+  };
 }
 
-function queueStatus(sale: Sale): QueueStatus | null {
+/** Distinct settings listed before the rest folds away, keeping long lines scannable. */
+const VISIBLE_PERFORMER_GROUPS = 3;
+
+function PerformerNames({ performers }: { performers: readonly PerformerCredit[] }) {
+  const { copy } = useOperationalLocalization();
+  if (!performers.length)
+    return (
+      <span className="font-medium text-[var(--color-warning)]">{copy('No employee yet')}</span>
+    );
+  return (
+    // Bold name + muted share already separate people; a wrapped name keeps its
+    // share right after its last word.
+    <ul className="m-0 flex min-w-0 list-none flex-wrap gap-x-3 gap-y-0.5 p-0">
+      {performers.map((performer) => (
+        <li key={performer.employeeId} className="min-w-0 break-words">
+          <span className="font-medium text-[var(--color-text)]">{performer.name}</span>
+          {performer.percent ? (
+            <span className="ml-1 whitespace-nowrap tabular-nums text-[var(--color-text-muted)]">
+              {performer.percent}
+            </span>
+          ) : null}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * The performers of one service line as a compact, self-contained block: who,
+ * which services it covers, and the one action that changes it.
+ */
+function ServicePerformerSummary({
+  itemName,
+  summary,
+  needsAttention,
+  editable,
+  disabled,
+  onEdit,
+}: {
+  itemName: string;
+  summary: ReturnType<typeof servicePerformerSummary>;
+  needsAttention: boolean;
+  editable: boolean;
+  disabled: boolean;
+  onEdit: () => void;
+}) {
+  const { copy } = useOperationalLocalization();
+  const [expanded, setExpanded] = useState(false);
+  const { unitCount, groups } = summary;
+  const varied = groups.length > 1;
+  const foldable = groups.length > VISIBLE_PERFORMER_GROUPS;
+  const shown = foldable && !expanded ? groups.slice(0, VISIBLE_PERFORMER_GROUPS - 1) : groups;
+  const hiddenCount = groups.length - shown.length;
+  const scope = varied
+    ? copy('Different for each service')
+    : unitCount > 1
+      ? `${copy('Applies to')} ${unitCount} ${copy('services')}`
+      : null;
+
+  return (
+    <section
+      aria-label={`${copy('Performed by')}: ${itemName}`}
+      className={`mt-2 rounded-[var(--radius-control)] px-3 py-2 text-xs ${
+        needsAttention
+          ? 'bg-[var(--color-warning)]/10 ring-1 ring-inset ring-[var(--color-warning)]/25'
+          : 'bg-[var(--color-surface-muted)]/70'
+      }`}
+    >
+      <div className="flex min-h-7 items-center justify-between gap-2">
+        <p className="flex min-w-0 flex-wrap items-baseline gap-x-1.5">
+          <span className="font-semibold text-[var(--color-text)]">{copy('Performed by')}</span>
+          {scope ? <span className="text-[var(--color-text-muted)]">· {scope}</span> : null}
+        </p>
+        {editable ? (
+          <DButton
+            size="sm"
+            variant={needsAttention ? 'outline' : 'ghost'}
+            disabled={disabled}
+            leftIcon={
+              needsAttention ? <UserPlus className="size-3.5" /> : <Pencil className="size-3.5" />
+            }
+            aria-label={`${copy(needsAttention ? 'Choose employee' : 'Change employee')}: ${itemName}`}
+            className="-mr-1.5 h-7 shrink-0 px-2 text-xs"
+            onClick={onEdit}
+          >
+            {copy(needsAttention ? 'Choose employee' : 'Edit employee')}
+          </DButton>
+        ) : null}
+      </div>
+
+      {varied ? (
+        <>
+          <dl className="mt-0.5 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3">
+            {shown.map((group, index) => (
+              <div
+                key={group.units}
+                className={`col-span-2 grid grid-cols-subgrid py-1.5 ${
+                  index > 0 ? 'border-t border-[var(--color-border)]' : ''
+                }`}
+              >
+                <dt className="max-w-[7.5rem] break-words tabular-nums text-[var(--color-text-muted)]">
+                  {copy('Service')} {group.units}
+                </dt>
+                <dd className="m-0 min-w-0">
+                  <PerformerNames performers={group.performers} />
+                </dd>
+              </div>
+            ))}
+          </dl>
+          {foldable ? (
+            <button
+              type="button"
+              aria-expanded={expanded}
+              onClick={() => setExpanded((current) => !current)}
+              className="inline-flex min-h-7 items-center gap-1 rounded-md font-semibold text-[var(--color-brand)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/30"
+            >
+              {expanded ? copy('Show less') : `${copy('Show')} ${hiddenCount} ${copy('more')}`}
+              <ChevronDown
+                className={`size-3.5 transition-transform motion-reduce:transition-none ${expanded ? 'rotate-180' : ''}`}
+                aria-hidden="true"
+              />
+            </button>
+          ) : null}
+        </>
+      ) : (
+        <div className="pb-0.5">
+          <PerformerNames performers={groups[0]?.performers ?? []} />
+        </div>
+      )}
+    </section>
+  );
+}
+
+function queueStatus(sale: Pick<QueueSale, 'status' | 'operationalState'>): QueueStatus | null {
   if (sale.status === 'FINALIZED') return 'COMPLETED';
   if (sale.status === 'VOIDED') return 'CANCELED';
   if (sale.operationalState === 'IN_PROGRESS') return 'PROGRESS';
@@ -428,7 +512,7 @@ function employeeAssignmentIssues(line: SaleLine, locale: string): string[] {
   return issues;
 }
 
-function workflowIssues(sale: Sale, serviceWorkUnits: ServiceWorkUnitsByLine = {}, locale: string) {
+function workflowIssues(sale: Sale, locale: string) {
   const issues: string[] = [];
   const active = sale.lines.filter((line) => line.removedAt === null);
   if (!active.length) issues.push(copyFor('Add at least one item.', locale));
@@ -454,13 +538,11 @@ function workflowIssues(sale: Sale, serviceWorkUnits: ServiceWorkUnitsByLine = {
       line.itemTypeSnapshot === 'SERVICE' && line.fulfillmentBehaviorSnapshot === 'TRACKED';
     if (!requiresTrackedServiceAssignment) continue;
 
-    const units = serviceWorkUnitsFor(line, serviceWorkUnits[serviceWorkKey(line)]);
-    if (units.length > 1) {
-      if (units.some((unit) => !hasValidWorkAssignment(line, unit))) {
-        issues.push(
-          `${line.itemNameSnapshot}: ${copyFor('Each service unit must have employee contribution totaling 100%.', locale)}`,
-        );
-      }
+    const plannedUnits = line.workUnits?.length ?? 0;
+    if (plannedUnits > 0 && plannedUnits !== serviceWorkUnitCount(line)) {
+      issues.push(
+        `${line.itemNameSnapshot}: ${copyFor('Every work unit needs at least one employee.', locale)}`,
+      );
       continue;
     }
 
@@ -558,9 +640,13 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     () => createCashierTransactionAdapter(runtime, authPort.getAccessToken?.bind(authPort)),
     [authPort, runtime],
   );
+  // The queue is shared operational reality, so it polls — but only while this
+  // tab is focused, and it keeps serving the last answer while refetching.
   const transactionsQuery = useQuery({
     queryKey: cashierTransactionKeys.sales(),
     queryFn: ({ signal }) => adapter.listSales(signal),
+    ...liveQueryPolicy,
+    refetchInterval: QUEUE_REFRESH_INTERVAL_MS,
   });
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -580,9 +666,6 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const [queuePaymentTarget, setQueuePaymentTarget] = useState<Sale | null>(null);
   const [queuePaymentAmount, setQueuePaymentAmount] = useState<string | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
-  const [cartCustomer, setCartCustomer] = useState<PosCustomer | null>(() =>
-    readStoredCustomer(CURRENT_CUSTOMER_KEY),
-  );
   const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [payNow, setPayNow] = useState(true);
@@ -592,25 +675,22 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const [completionConfirmationTarget, setCompletionConfirmationTarget] = useState<Sale | null>(
     null,
   );
-  const [assignmentLine, setAssignmentLine] = useState<SaleLine | null>(null);
-  const [queueAssignmentTarget, setQueueAssignmentTarget] = useState<{
+  const [performerTarget, setPerformerTarget] = useState<{
     sale: Sale;
     line: SaleLine;
   } | null>(null);
-  const [serviceWorkTarget, setServiceWorkTarget] = useState<{
-    sale: Sale;
-    line: SaleLine;
-  } | null>(null);
-  const [serviceWorkUnits, setServiceWorkUnits] = useState<ServiceWorkUnitsByLine>({});
+  const [isSavingPerformers, setSavingPerformers] = useState(false);
   const [receiptSaleId, setReceiptSaleId] = useState<string | null>(null);
+  const [isSendingReceipt, setSendingReceipt] = useState(false);
+  const [sendingReceiptId, setSendingReceiptId] = useState<string | null>(null);
+  // Effective permission, never a role name: without it completed transactions
+  // show no amount, detail or receipt, and can only be sent to the customer.
+  const canReadCompleted = useCanReadCompletedSaleDetails();
 
   const sale = workspace.viewModel.sale;
   const lines = workspace.cart.lines;
   const total = workspace.cart.totalAmount;
-
-  useEffect(() => {
-    writeStoredCustomer(CURRENT_CUSTOMER_KEY, cartCustomer);
-  }, [cartCustomer]);
+  const activeCustomer = workspace.customer;
 
   const displayedQueueDetail =
     receiptSaleId && sale?.id === receiptSaleId && hasSuccessfulPayment(sale) ? sale : queueDetail;
@@ -659,6 +739,20 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   };
 
   const openCheckout = async () => {
+    // A transaction belongs to a customer. Without one there is nothing to
+    // check out, so the selector is opened instead of creating a Sale.
+    if (!activeCustomer) {
+      showToast({
+        title: copy('Choose the customer first'),
+        description: copy(
+          'A transaction belongs to a customer. Fill in the name and WhatsApp number, or choose a member.',
+        ),
+        variant: 'warning',
+      });
+      setCartOpen(false);
+      setCustomerPickerOpen(true);
+      return;
+    }
     const issues = processIssues(sale, lines, workspace.locale);
     if (issues.length) {
       showToast({
@@ -700,12 +794,38 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     setCheckoutOpen(true);
   };
 
+  /**
+   * Requests receipt delivery for a captured transaction. Delivery is separate
+   * from the transaction: a provider that is absent or failing is reported as a
+   * delivery outcome and never touches the Sale, its payment or its queue state.
+   */
+  const sendReceipt = async (target: Pick<QueueSale, 'id' | 'saleNumber'>) => {
+    setSendingReceipt(true);
+    setSendingReceiptId(target.id);
+    try {
+      await adapter.requestReceiptDelivery(target.id, 'WHATSAPP');
+      showToast({
+        title: copy('Receipt is being sent to the customer'),
+        description: transactionNumber(target, workspace.locale),
+        variant: 'success',
+      });
+    } catch (error) {
+      showToast({
+        title: copy('Not available yet'),
+        description: cashierTransactionErrorMessage(error),
+        variant: 'warning',
+      });
+    } finally {
+      setSendingReceipt(false);
+      setSendingReceiptId(null);
+    }
+  };
+
   const commitCheckoutToQueue = (
     completedSale: Sale,
     wasPaid: boolean,
     destination: FulfillmentDestination,
   ) => {
-    writeStoredCustomer(saleCustomerKey(completedSale.id), cartCustomer);
     if (isLocalDemo) {
       const committedEntry: QueuedSaleEntry = {
         saleId: completedSale.id,
@@ -728,7 +848,6 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     setQueueTab('QUEUED');
     setQueueOpen(true);
     setCartOpen(false);
-    setCartCustomer(null);
     setCheckoutOpen(false);
 
     workspace.clearProcessedDraft();
@@ -745,10 +864,10 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       title: wasPaid ? copy('Payment successful') : copy('Transaction created'),
       description:
         destination === 'START_PROCESS'
-          ? `${transactionNumber(completedSale.id, workspace.locale)} ${copy('Added to queue and ready to start.')}`
+          ? `${transactionNumber(completedSale, workspace.locale)} ${copy('Added to queue and ready to start.')}`
           : wasPaid
-            ? `${transactionNumber(completedSale.id, workspace.locale)} ${copy('Paid and added to queue.')}`
-            : `${transactionNumber(completedSale.id, workspace.locale)} ${copy('Added to queue. Payment has not been received.')}`,
+            ? `${transactionNumber(completedSale, workspace.locale)} ${copy('Paid and added to queue.')}`
+            : `${transactionNumber(completedSale, workspace.locale)} ${copy('Added to queue. Payment has not been received.')}`,
       variant: 'success',
     });
   };
@@ -777,7 +896,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       setQueueTab('PROGRESS');
       showToast({
         title: copy('Work started'),
-        description: `${transactionNumber(transaction.id, workspace.locale)} ${copy('is now being worked on.')}`,
+        description: `${transactionNumber(transaction, workspace.locale)} ${copy('is now being worked on.')}`,
         variant: 'success',
       });
       return true;
@@ -791,50 +910,33 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     }
   };
 
-  const saveServiceWorkUnits = async (
+  const savePerformers = async (
     target: { sale: Sale; line: SaleLine },
-    units: readonly ServiceWorkUnit[],
+    plans: ServiceLineWorkPlan[],
   ) => {
-    if (units.some((unit) => !hasValidWorkAssignment(target.line, unit))) {
-      showToast({
-        title: copy('Complete employee assignment'),
-        description: copy('Each service unit must have employee contribution totaling 100%.'),
-        variant: 'warning',
-      });
-      return;
-    }
-
-    const representative = units[0];
-    if (!representative) return;
+    setSavingPerformers(true);
     try {
-      const updated = await workspace.setQueuedAssignments(
-        target.sale,
-        target.line,
-        representative.contributors.map((contributor) => contributor.employeeId),
-        representative.contributors.map((contributor) => ({
-          employeeId: contributor.employeeId,
-          shareRate: contributor.shareRate,
-        })),
-      );
-      setServiceWorkUnits((current) => ({ ...current, [serviceWorkKey(target.line)]: units }));
+      const updated = await workspace.setQueuedWorkUnits(target.sale, plans);
       setQueueDetail(updated);
-      setServiceWorkTarget(null);
+      setPerformerTarget(null);
       showToast({
-        title: copy('Work assignment updated'),
-        description: copy('Employee assignments were saved for each service unit.'),
+        title: copy('Employee updated'),
+        description: copy('Service assignment saved for this transaction.'),
         variant: 'success',
       });
     } catch {
       showToast({
-        title: copy('Could not update work assignment'),
-        description: copy('Employee assignments were not changed. Try again.'),
+        title: copy('Could not update employee'),
+        description: copy('Assignment was not changed. Try again.'),
         variant: 'danger',
       });
+    } finally {
+      setSavingPerformers(false);
     }
   };
 
   const completeQueuedTransaction = (transaction: Sale) => {
-    const issues = workflowIssues(transaction, serviceWorkUnits, workspace.locale);
+    const issues = workflowIssues(transaction, workspace.locale);
     if (issues.length) return;
     setCompletionConfirmationTarget(transaction);
   };
@@ -842,19 +944,29 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const confirmQueuedCompletion = async () => {
     if (
       !completionConfirmationTarget ||
-      workflowIssues(completionConfirmationTarget, serviceWorkUnits, workspace.locale).length
+      workflowIssues(completionConfirmationTarget, workspace.locale).length
     ) {
       return;
     }
     try {
+      // The finalize response is the immediate completion result, so its receipt
+      // is shown to every operator who completed it. Without sales:read-completed
+      // it opens as the receipt only (no detail) and is gone once closed: later
+      // reads of the completed transaction are history, which Runtime forbids.
       const finalized = await workspace.finalizeQueuedSale(completionConfirmationTarget);
-      setQueueDetail(finalized);
       setQueueTab('COMPLETED');
-      setReceiptSaleId(hasSuccessfulPayment(finalized) ? finalized.id : null);
+      const paid = hasSuccessfulPayment(finalized);
+      if (canReadCompleted || paid) {
+        setQueueDetail(finalized);
+        setReceiptSaleId(paid ? finalized.id : null);
+      } else {
+        setQueueDetail(null);
+        setReceiptSaleId(null);
+      }
       setCompletionConfirmationTarget(null);
       showToast({
         title: copy('Transaction completed'),
-        description: `${transactionNumber(finalized.id, workspace.locale)} ${copy('has been completed.')}`,
+        description: `${transactionNumber(finalized, workspace.locale)} ${copy('has been completed.')}`,
         variant: 'success',
       });
     } catch {
@@ -1094,6 +1206,9 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
             setQueueDetail(transaction);
             setReceiptSaleId(transaction.id);
           }}
+          canReadCompleted={canReadCompleted}
+          onSendReceipt={(transaction) => void sendReceipt(transaction)}
+          sendingReceiptId={sendingReceiptId}
         />
       )}
 
@@ -1109,7 +1224,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
               />
               <ReferenceTypeButton
                 active={workspace.itemType === 'SERVICE'}
-                icon={<Wrench className="size-3.5" />}
+                icon={<Sparkles className="size-3.5" />}
                 label={copy('Service')}
                 onClick={() => selectType('SERVICE')}
               />
@@ -1129,7 +1244,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
                 <button
                   type="button"
                   onClick={() => setSelectedCategory('')}
-                  className={`inline-flex h-9 shrink-0 items-center rounded-lg px-2.5 text-xs font-semibold transition-colors ${selectedCategory ? 'bg-(--color-surface-muted) text-(--color-text-muted)' : 'bg-[var(--color-brand)] text-white'}`}
+                  className={`inline-flex h-9 shrink-0 items-center rounded-lg px-2.5 text-xs font-semibold transition-colors ${selectedCategory ? 'bg-(--color-surface-muted) text-(--color-text-muted)' : 'bg-(--color-brand) text-white'}`}
                 >
                   {copy('All')}
                 </button>
@@ -1138,7 +1253,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
                     key={category.id}
                     type="button"
                     onClick={() => setSelectedCategory(category.id)}
-                    className={`inline-flex h-9 shrink-0 items-center rounded-lg px-2.5 text-xs font-semibold transition-colors ${selectedCategory === category.id ? 'bg-(--color-brand) text-white' : 'bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]'}`}
+                    className={`inline-flex h-9 shrink-0 items-center rounded-lg px-2.5 text-xs font-semibold transition-colors ${selectedCategory === category.id ? 'bg-(--color-brand) text-white' : 'bg-(--color-surface-muted) text-(--color-text-muted)'}`}
                   >
                     {category.name}
                   </button>
@@ -1151,7 +1266,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           {workspace.isLoadingCatalog ? (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
               {Array.from({ length: 10 }).map((item, index) => (
-                <Skeleton key={`${String(item)}-${index}`} className="h-40 rounded-2xl" />
+                <Skeleton key={`${String(item)}-${index}`} className="aspect-[3/4] rounded-2xl" />
               ))}
             </div>
           ) : visibleItems.length === 0 ? (
@@ -1191,7 +1306,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         taxLabel={sale ? saleTaxLabel(sale, copy('Tax')) : copy('Tax')}
         isEstimate={workspace.cart.isLocalDraft}
         locale={workspace.locale}
-        customer={cartCustomer}
+        customer={activeCustomer}
         onChooseCustomer={() => setCustomerPickerOpen(true)}
         onQuantity={(line, next) => {
           if (workspace.cart.isLocalDraft) workspace.changeDraftQuantity(line.id, next);
@@ -1212,17 +1327,22 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
 
       <ReferenceCustomerDialog
         open={customerPickerOpen}
-        customer={cartCustomer}
+        customer={activeCustomer}
+        isSaving={workspace.isCustomerPending}
         onClose={() => setCustomerPickerOpen(false)}
-        onChoose={(customer) => {
-          setCartCustomer(customer);
-          if (sale?.id) writeStoredCustomer(saleCustomerKey(sale.id), customer);
-          setCustomerPickerOpen(false);
-        }}
-        onUseGeneralCustomer={() => {
-          setCartCustomer(null);
-          if (sale?.id) writeStoredCustomer(saleCustomerKey(sale.id), null);
-          setCustomerPickerOpen(false);
+        onChoose={(selection) => {
+          // Runtime validates and normalizes the identity; the dialog closes
+          // only once the change is accepted.
+          void workspace
+            .changeCustomer(selection)
+            .then(() => setCustomerPickerOpen(false))
+            .catch((error: unknown) => {
+              showToast({
+                title: copy('Could not save the customer'),
+                description: cashierTransactionErrorMessage(error),
+                variant: 'danger',
+              });
+            });
         }}
       />
 
@@ -1244,7 +1364,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         taxAmount={workspace.cart.taxAmount}
         taxLabel={sale ? saleTaxLabel(sale, copy('Tax')) : copy('Tax')}
         locale={workspace.locale}
-        customer={cartCustomer}
+        customer={activeCustomer}
         method={paymentMethod}
         provider={provider}
         tender={tender}
@@ -1261,10 +1381,11 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         quickTender={quickTender}
         isSubmitting={workspace.isCoreMutating}
         onQueue={() => void completeCheckout('QUEUE')}
+        adjustmentSlot={<SaleAdjustmentControls workspace={workspace} placement="payment" />}
       />
 
       <ReferenceTransactionDetail
-        sale={displayedQueueDetail}
+        sale={presentableTransaction(displayedQueueDetail, canReadCompleted, receiptSaleId)}
         locale={workspace.locale}
         employees={workspace.employees}
         businessName={runtime.branding.businessName ?? runtime.branding.productName}
@@ -1281,8 +1402,6 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         onNewSale={() => {
           setQueueDetail(null);
           setReceiptSaleId(null);
-          setCartCustomer(null);
-          writeStoredCustomer(CURRENT_CUSTOMER_KEY, null);
           setCartOpen(false);
           workspace.newSale();
         }}
@@ -1290,16 +1409,12 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           setQueueDetail(transaction);
           setReceiptSaleId(transaction.id);
         }}
+        onSendReceipt={(transaction) => void sendReceipt(transaction)}
+        isSendingReceipt={isSendingReceipt}
         onAssign={(line) => {
           if (!displayedQueueDetail) return;
           workspace.requestEmployeeOptions();
-          setQueueAssignmentTarget({ sale: displayedQueueDetail, line });
-        }}
-        serviceWorkUnits={serviceWorkUnits}
-        onManageServiceWork={(line) => {
-          if (!displayedQueueDetail) return;
-          workspace.requestEmployeeOptions();
-          setServiceWorkTarget({ sale: displayedQueueDetail, line });
+          setPerformerTarget({ sale: displayedQueueDetail, line });
         }}
         onComplete={() => {
           if (displayedQueueDetail) void completeQueuedTransaction(displayedQueueDetail);
@@ -1308,6 +1423,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       />
 
       <ReferenceOrderAdjustmentDialog
+        key={displayedAdjustmentTarget?.id ?? 'adjustment-closed'}
         sale={displayedAdjustmentTarget}
         items={workspace.items}
         locale={workspace.locale}
@@ -1357,7 +1473,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         title={copy('Complete transaction')}
         message={
           completionConfirmationTarget
-            ? `${copy('Complete transaction')} ${transactionNumber(completionConfirmationTarget.id, workspace.locale)}? ${copy('Completing this transaction closes finished work.')}`
+            ? `${copy('Complete transaction')} ${transactionNumber(completionConfirmationTarget, workspace.locale)}? ${copy('Completing this transaction closes finished work.')}`
             : undefined
         }
         confirmLabel={copy('Complete transaction')}
@@ -1378,77 +1494,17 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         onConfirm={confirmCancel}
       />
 
-      <ReferenceEmployeeDialog
-        key={assignmentLine?.id ?? 'closed'}
-        line={assignmentLine}
-        employees={workspace.employees}
-        locale={workspace.locale}
-        onClose={() => setAssignmentLine(null)}
-        onSave={(employeeIds, contributors) => {
-          if (!assignmentLine) return;
-          workspace.setAssignments(assignmentLine, employeeIds);
-          if (assignmentLine.allowEmployeeContributionSnapshot)
-            workspace.setContributions(assignmentLine, contributors);
-          setAssignmentLine(null);
-        }}
-      />
-
-      <ReferenceServiceWorkDialog
-        key={
-          serviceWorkTarget
-            ? `${serviceWorkTarget.sale.id}:${serviceWorkTarget.line.id}`
-            : 'service-work-closed'
-        }
-        line={serviceWorkTarget?.line ?? null}
-        employees={workspace.employees}
-        locale={workspace.locale}
-        units={
-          serviceWorkTarget
-            ? serviceWorkUnitsFor(
-                serviceWorkTarget.line,
-                serviceWorkUnits[serviceWorkKey(serviceWorkTarget.line)],
-              )
-            : []
-        }
-        onClose={() => setServiceWorkTarget(null)}
-        onSave={(units) => {
-          if (serviceWorkTarget) void saveServiceWorkUnits(serviceWorkTarget, units);
-        }}
-      />
-
-      <ReferenceEmployeeDialog
-        key={
-          queueAssignmentTarget
-            ? `${queueAssignmentTarget.sale.id}:${queueAssignmentTarget.line.id}`
-            : 'queue-assignment-closed'
-        }
-        line={queueAssignmentTarget?.line ?? null}
-        employees={workspace.employees}
-        locale={workspace.locale}
-        onClose={() => setQueueAssignmentTarget(null)}
-        onSave={(employeeIds, contributors) => {
-          const target = queueAssignmentTarget;
-          if (!target) return;
-          void workspace
-            .setQueuedAssignments(target.sale, target.line, employeeIds, contributors)
-            .then((updated) => {
-              setQueueDetail(updated);
-              setQueueAssignmentTarget(null);
-              showToast({
-                title: copy('Employee updated'),
-                description: copy('Service assignment saved for this transaction.'),
-                variant: 'success',
-              });
-            })
-            .catch(() => {
-              showToast({
-                title: copy('Could not update employee'),
-                description: copy('Assignment was not changed. Try again.'),
-                variant: 'danger',
-              });
-            });
-        }}
-      />
+      {performerTarget ? (
+        <ServicePerformersDialog
+          key={`${performerTarget.sale.id}:${performerTarget.line.id}`}
+          sale={performerTarget.sale}
+          lineId={performerTarget.line.id}
+          employees={workspace.employees}
+          isSaving={isSavingPerformers}
+          onClose={() => setPerformerTarget(null)}
+          onSave={(plans) => void savePerformers(performerTarget, plans)}
+        />
+      ) : null}
 
       {workspace.lineTask ? (
         <SaleLineTaskDialog
@@ -1497,6 +1553,52 @@ function ReferenceTypeButton({
   );
 }
 
+/** Initials that stand in for an item photo, e.g. "Hair Spa" -> "HS", "Manicure" -> "Ma". */
+function itemMonogram(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length > 1) return `${words[0]![0]}${words[1]![0]}`.toUpperCase();
+  const word = words[0] ?? '';
+  return `${word.charAt(0).toUpperCase()}${word.charAt(1).toLowerCase()}`;
+}
+
+/**
+ * The card's media band: the item photo edge to edge, or its initials on a
+ * soft tint filling the same band, so every card keeps one height and one
+ * rhythm whether or not a photo exists.
+ */
+function CatalogItemMedia({ item }: { item: CatalogItem }) {
+  const isService = item.type === 'SERVICE';
+  const imageUrl = item.image?.url;
+  return (
+    <span
+      aria-hidden="true"
+      className={`relative block aspect-[4/3] w-full overflow-hidden border-b sm:aspect-[3/2] border-[var(--color-border)] ${
+        imageUrl
+          ? 'bg-[var(--color-surface-muted)]'
+          : isService
+            ? 'bg-[linear-gradient(135deg,color-mix(in_srgb,var(--color-brand)_14%,var(--color-surface))_0%,color-mix(in_srgb,var(--color-brand)_5%,var(--color-surface))_100%)] text-[var(--color-brand)]'
+            : 'bg-[linear-gradient(135deg,color-mix(in_srgb,var(--color-accent-mint)_70%,var(--color-surface))_0%,color-mix(in_srgb,var(--color-accent-mint)_30%,var(--color-surface))_100%)] text-[var(--color-text)]'
+      }`}
+    >
+      {imageUrl ? (
+        <img
+          src={imageUrl}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          className="size-full object-cover transition-transform duration-300 group-hover:scale-[1.04] motion-reduce:transition-none"
+        />
+      ) : (
+        <span className="absolute inset-0 grid place-items-center">
+          <span className="grid size-14 place-items-center rounded-full bg-[var(--color-surface)]/70 text-lg font-semibold tracking-wide shadow-sm ring-1 ring-inset ring-current/10 sm:size-16 sm:text-xl">
+            {itemMonogram(item.name)}
+          </span>
+        </span>
+      )}
+    </span>
+  );
+}
+
 function ReferenceCatalogCard({
   item,
   price,
@@ -1511,43 +1613,76 @@ function ReferenceCatalogCard({
   onAdd: () => void;
 }) {
   const { copy } = useOperationalLocalization();
-  const isService = item.type === 'SERVICE';
   const displayPrice = item.displayPrice;
+  const variantCount = item.variants?.length ?? 0;
+  const needsVariantChoice = variantCount > 0;
+  const duration = formatDurationMinutes(item.serviceDefinition?.defaultDurationMinutes, locale);
   return (
     <button
       type="button"
-      aria-label={`${copy('Add')} ${item.name}`}
+      aria-label={`${copy(needsVariantChoice ? 'Choose variant' : 'Add')} ${item.name}`}
       disabled={disabled}
       onClick={onAdd}
-      className="group rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-left transition-all hover:border-[var(--color-brand)]/40 hover:shadow-md active:scale-[.98] disabled:opacity-50"
+      className="group flex h-full flex-col overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] text-left transition-all hover:border-[var(--color-brand)]/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/40 active:scale-[.98] disabled:opacity-50"
     >
-      <div
-        className={`mb-2 flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl ${isService ? 'bg-cyan-500/10 text-cyan-600' : 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]'}`}
-      >
-        {item.image?.url ? (
-          <img src={item.image.url} alt="" loading="lazy" className="size-full object-cover" />
-        ) : isService ? (
-          <Wrench className="size-7" />
-        ) : (
-          <ShoppingBag className="size-7" />
-        )}
-      </div>
-      <p className="truncate font-mono text-[10px] text-[var(--color-text-muted)]">{item.code}</p>
-      <p className="mt-1 line-clamp-2 min-h-10 text-sm font-semibold leading-tight">{item.name}</p>
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold text-[var(--color-text-muted)]">
-          {price
-            ? displayPrice?.kind === 'FROM'
-              ? `${copy('From')} ${money(price, locale)}`
-              : money(price, locale)
-            : copy('Price available when selected')}
-        </p>
-        <span
-          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${isService ? 'bg-cyan-500/10 text-cyan-700' : 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]'}`}
-        >
-          {copy(isService ? 'Service' : 'Product')}
+      <CatalogItemMedia item={item} />
+      <span className="flex min-w-0 flex-1 flex-col gap-3 p-3">
+        {/* Identity: a quiet reference line (code, plus duration when the item has one) over the name. */}
+        <span className="block min-w-0">
+          <span className="flex min-w-0 items-center gap-1.5 text-[11px] leading-4 text-[var(--color-text-muted)]">
+            <span className="truncate font-mono tracking-tight">{item.code}</span>
+            {duration ? (
+              <span className="flex shrink-0 items-center gap-1">
+                <span aria-hidden="true">·</span>
+                <Clock className="size-3" aria-hidden="true" />
+                {duration}
+              </span>
+            ) : null}
+          </span>
+          <span className="mt-1 line-clamp-2 text-sm font-semibold leading-snug text-[var(--color-text)]">
+            {item.name}
+          </span>
         </span>
-      </div>
+        {/* Commerce: price and action stay anchored to the bottom, so they line up across a grid row. */}
+        <span className="mt-auto block border-t border-[var(--color-border)]/70 pt-2.5">
+          {price ? (
+            <span className="flex items-baseline gap-1 tabular-nums">
+              {displayPrice?.kind === 'FROM' ? (
+                <span className="text-[11px] font-medium text-[var(--color-text-muted)]">
+                  {copy('From')}
+                </span>
+              ) : null}
+              <span className="text-sm font-bold text-[var(--color-text)]">
+                {money(price, locale)}
+              </span>
+            </span>
+          ) : (
+            <span className="block text-[11px] leading-5 text-[var(--color-text-muted)]">
+              {copy('Price available when selected')}
+            </span>
+          )}
+          {/* Both outcomes share one treatment; the wording and icon say whether a picker opens first. */}
+          <span className="mt-1 flex items-center gap-1 text-[11px] font-semibold leading-4 text-[var(--color-brand)]">
+            {needsVariantChoice ? (
+              <>
+                {copy('Choose variant')}
+                <ChevronRight
+                  className="size-3.5 shrink-0 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
+                  aria-hidden="true"
+                />
+              </>
+            ) : (
+              <>
+                <Plus
+                  className="size-3.5 shrink-0 transition-transform group-hover:rotate-90 motion-reduce:transition-none"
+                  aria-hidden="true"
+                />
+                {copy('Add')}
+              </>
+            )}
+          </span>
+        </span>
+      </span>
     </button>
   );
 }
@@ -1566,12 +1701,15 @@ function ReferenceQueueBoard({
   onCancel,
   onView,
   onViewReceipt,
+  canReadCompleted,
+  onSendReceipt,
+  sendingReceiptId,
 }: {
   open: boolean;
   onOpenChange: (value: boolean) => void;
   active: QueueStatus;
   onChangeTab: (status: QueueStatus) => void;
-  groups: Record<QueueStatus, Sale[]>;
+  groups: Record<QueueStatus, QueueSale[]>;
   issues: Record<string, string[]>;
   locale: string;
   onStartWork: (sale: Sale) => void;
@@ -1580,6 +1718,9 @@ function ReferenceQueueBoard({
   onCancel: (sale: Sale) => void;
   onView: (sale: Sale) => void;
   onViewReceipt: (sale: Sale) => void;
+  canReadCompleted: boolean;
+  onSendReceipt: (sale: Pick<QueueSale, 'id' | 'saleNumber'>) => void;
+  sendingReceiptId: string | null;
 }) {
   const { copy, label } = useOperationalLocalization();
   const statuses = Object.keys(statusMeta) as QueueStatus[];
@@ -1615,7 +1756,7 @@ function ReferenceQueueBoard({
               </p>
             </div>
           </div>
-          <div className="hidden items-center gap-2 md:flex">
+          <div className="pos-queue-status-summary items-center gap-2">
             {statuses.map((status) => (
               <span
                 key={status}
@@ -1634,9 +1775,7 @@ function ReferenceQueueBoard({
             className={`size-[18px] text-[var(--color-text-muted)] transition-transform md:hidden ${open ? 'rotate-180' : ''}`}
           />
         </button>
-        <div
-          className={`grid transition-all duration-300 ease-out ${open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
-        >
+        <div className={`pos-collapsible grid ${open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
           <div className="overflow-hidden">
             <DTabs
               value={active}
@@ -1654,7 +1793,7 @@ function ReferenceQueueBoard({
               {statuses.map((status) => {
                 const list = groups[status];
                 const contentKey = `${status}:${list
-                  .map((sale) => `${sale.id}:${sale.version}`)
+                  .map((sale) => `${sale.id}:${sale.updatedAt}`)
                   .join('|')}`;
                 return (
                   <DTabsContent key={status} value={status} className="mt-3">
@@ -1662,21 +1801,39 @@ function ReferenceQueueBoard({
                       {list.length ? (
                         <div className="no-scrollbar cursor-grab overflow-x-auto overflow-y-hidden pb-3 select-none">
                           <div className="flex w-max gap-4 px-0.5">
-                            {list.map((sale) => (
-                              <ReferenceQueueCard
-                                key={sale.id}
-                                sale={sale}
-                                status={status}
-                                locale={locale}
-                                issues={issues[sale.id] ?? []}
-                                onStartWork={onStartWork}
-                                onAdjust={onAdjust}
-                                onPay={onPay}
-                                onCancel={onCancel}
-                                onView={onView}
-                                onViewReceipt={onViewReceipt}
-                              />
-                            ))}
+                            {list.map((sale) => {
+                              // A completed transaction without the permission is
+                              // shown from its summary alone, even if a full copy is cached.
+                              const summary = restrictedQueueSummary(sale, canReadCompleted);
+                              if (summary)
+                                return (
+                                  <RestrictedCompletedQueueCard
+                                    key={sale.id}
+                                    summary={summary}
+                                    locale={locale}
+                                    isSending={sendingReceiptId === sale.id}
+                                    onSendReceipt={onSendReceipt}
+                                  />
+                                );
+                              // Every summary entry was presented above; what remains is a full Sale.
+                              if (isCompletedSaleSummary(sale)) return null;
+                              return (
+                                <ReferenceQueueCard
+                                  key={sale.id}
+                                  sale={sale}
+                                  status={status}
+                                  locale={locale}
+                                  issues={issues[sale.id] ?? []}
+                                  onStartWork={onStartWork}
+                                  onAdjust={onAdjust}
+                                  onPay={onPay}
+                                  onCancel={onCancel}
+                                  onView={onView}
+                                  onViewReceipt={onViewReceipt}
+                                  onSendReceipt={onSendReceipt}
+                                />
+                              );
+                            })}
                           </div>
                         </div>
                       ) : (
@@ -1701,7 +1858,69 @@ function ReferenceQueueBoard({
   );
 }
 
-function ReferenceQueueCard({
+/**
+ * A completed transaction for an operator without `sales:read-completed`: it
+ * stays recognizable for follow-up, carries no amount, detail or receipt, and
+ * offers the one action left, sending the receipt to the customer.
+ */
+export function RestrictedCompletedQueueCard({
+  summary,
+  locale,
+  isSending,
+  onSendReceipt,
+}: {
+  summary: CompletedSaleSummary;
+  locale: string;
+  isSending: boolean;
+  onSendReceipt: (sale: Pick<QueueSale, 'id' | 'saleNumber'>) => void;
+}) {
+  const { copy, label } = useOperationalLocalization();
+  const meta = statusMeta.COMPLETED;
+  const number = transactionNumber(summary, locale);
+  return (
+    <article
+      className={`w-[360px] shrink-0 rounded-2xl border border-[var(--color-border)] p-4 transition-shadow hover:shadow-sm ${meta.soft}`}
+    >
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-[11px] text-[var(--color-text-muted)]">{number}</p>
+          <p className="mt-0.5 truncate text-sm font-bold">
+            {customerDisplayName(summary.customer, locale)}
+          </p>
+        </div>
+        <span
+          className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold ${meta.tone}`}
+        >
+          {meta.icon}
+          {label(meta.value)}
+        </span>
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <p className="min-w-0 text-xs text-[var(--color-text-muted)]">
+          {summary.itemCount} {copy('items')},{' '}
+          {new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(
+            new Date(summary.finalizedAt ?? summary.createdAt),
+          )}
+        </p>
+        <DButton
+          size="sm"
+          variant="outline"
+          className="h-8 shrink-0 px-3 text-[11px]"
+          leftIcon={<Send className="size-3.5" />}
+          loading={isSending}
+          disabled={isSending || !summary.customer}
+          aria-label={`${copy('Send receipt to customer')} ${number}`}
+          {...(summary.customer ? {} : { title: copy('Customer data is not available') })}
+          onClick={() => onSendReceipt(summary)}
+        >
+          {copy('Send receipt')}
+        </DButton>
+      </div>
+    </article>
+  );
+}
+
+export function ReferenceQueueCard({
   sale,
   status,
   locale,
@@ -1712,6 +1931,7 @@ function ReferenceQueueCard({
   onCancel,
   onView,
   onViewReceipt,
+  onSendReceipt,
 }: {
   sale: Sale;
   status: QueueStatus;
@@ -1723,13 +1943,14 @@ function ReferenceQueueCard({
   onCancel: (sale: Sale) => void;
   onView: (sale: Sale) => void;
   onViewReceipt: (sale: Sale) => void;
+  onSendReceipt: (sale: Sale) => void;
 }) {
   const { copy, label } = useOperationalLocalization();
   const meta = statusMeta[status];
   const { balanceDue } = financialSummary(sale);
   const hasPayment = hasSuccessfulPayment(sale);
   const paid = hasSuccessfulCheckout(sale);
-  const customer = saleCustomer(sale.id, locale);
+  const customer = sale.customer ?? null;
   const canStartWork = hasStartableQueuedWork(sale);
   const actionItems = [
     {
@@ -1743,6 +1964,15 @@ function ReferenceQueueCard({
             label: copy('View receipt'),
             icon: <Printer className="size-3.5" />,
             onSelect: () => onViewReceipt(sale),
+          },
+        ]
+      : []),
+    ...(status === 'COMPLETED' && sale.customer
+      ? [
+          {
+            label: copy('Send receipt to customer'),
+            icon: <Send className="size-3.5" />,
+            onSelect: () => onSendReceipt(sale),
           },
         ]
       : []),
@@ -1812,9 +2042,11 @@ function ReferenceQueueCard({
       <div className="mb-2 flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="font-mono text-[11px] text-[var(--color-text-muted)]">
-            {transactionNumber(sale.id, locale)}
+            {transactionNumber(sale, locale)}
           </p>
-          <p className="mt-0.5 truncate text-sm font-bold">{customer.name}</p>
+          <p className="mt-0.5 truncate text-sm font-bold">
+            {customerDisplayName(customer, locale)}
+          </p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <span
@@ -1861,7 +2093,7 @@ function ReferenceQueueCard({
             trigger={({ open }) => (
               <button
                 type="button"
-                aria-label={`${copy('Actions for')} ${transactionNumber(sale.id, locale)}`}
+                aria-label={`${copy('Actions for')} ${transactionNumber(sale, locale)}`}
                 aria-expanded={open}
                 className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 text-[11px] font-semibold text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand)]/20"
               >
@@ -1925,13 +2157,23 @@ function ReferenceFloatingCart({
   taxLabel: string;
   isEstimate: boolean;
   locale: string;
-  customer: PosCustomer | null;
+  customer: SaleCustomer | null;
   onChooseCustomer: () => void;
   onQuantity: (line: CartDisplayLine, quantity: string) => void;
   onRemove: (line: CartDisplayLine) => void;
   onCheckout: () => void;
 }) {
   const { copy } = useOperationalLocalization();
+  useEffect(() => {
+    if (!open) return undefined;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      if (document.querySelector('[aria-modal="true"]')) return;
+      onOpenChange(false);
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [onOpenChange, open]);
   const panel = (
     <ReferenceCartPanel
       lines={lines}
@@ -1959,7 +2201,7 @@ function ReferenceFloatingCart({
         type="button"
         aria-label={copy('Close active cart')}
         onClick={() => onOpenChange(false)}
-        className={`fixed inset-0 z-40 hidden bg-transparent md:block ${open ? '' : 'pointer-events-none opacity-0'}`}
+        className={`operational-cart-backdrop fixed inset-0 z-40 bg-transparent ${open ? '' : 'pointer-events-none'}`}
       />
       <button
         type="button"
@@ -1975,7 +2217,7 @@ function ReferenceFloatingCart({
             </span>
           ) : null}
         </div>
-        <div className="hidden text-left sm:block">
+        <div className="operational-cart-button-label text-left">
           <p className="text-xs font-bold leading-none">{copy('Cart')}</p>
           <p className="mt-1 text-[11px] opacity-90">{money(total, locale)}</p>
         </div>
@@ -2061,7 +2303,7 @@ function ReferenceCartPanel({
   taxLabel: string;
   isEstimate: boolean;
   locale: string;
-  customer: PosCustomer | null;
+  customer: SaleCustomer | null;
   onChooseCustomer: () => void;
   onQuantity: (line: CartDisplayLine, quantity: string) => void;
   onRemove: (line: CartDisplayLine) => void;
@@ -2094,14 +2336,17 @@ function ReferenceCartPanel({
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-1.5">
               <p className="truncate text-xs font-semibold">
-                {customer?.name ?? copy('General customer')}
+                {customer ? customer.name : copy('Choose customer')}
               </p>
-              <Badge variant={status.variant} className="shrink-0 px-2 py-0 text-[10px]">
-                {copy(status.label)}
-              </Badge>
+              {status ? (
+                <Badge variant={status.variant} className="shrink-0 px-2 py-0 text-[10px]">
+                  {copy(status.label)}
+                </Badge>
+              ) : null}
             </div>
             <p className="mt-0.5 truncate text-[11px] text-[var(--color-text-muted)]">
-              {customer?.phone ?? copy('Choose customer')}
+              {customerDisplayDetail(customer) ??
+                copy('Name and WhatsApp number are both required.')}
             </p>
           </div>
           <ChevronDown className="size-4 shrink-0 text-[var(--color-text-muted)]" />
@@ -2117,7 +2362,7 @@ function ReferenceCartPanel({
               return (
                 <div
                   key={line.id}
-                  className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 shadow-sm"
+                  className="pos-cart-line-enter rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 shadow-sm"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -2128,7 +2373,9 @@ function ReferenceCartPanel({
                         {money(line.effectiveUnitPrice, locale)}
                         {line.variantNameSnapshot ? `, ${line.variantNameSnapshot}` : ''}
                         {line.itemTypeSnapshot === 'SERVICE' ? (
-                          <span className="ml-1 font-semibold text-cyan-700">{copy('Service')}</span>
+                          <span className="ml-1 font-semibold text-cyan-700">
+                            {copy('Service')}
+                          </span>
                         ) : null}
                       </p>
                     </div>
@@ -2147,7 +2394,9 @@ function ReferenceCartPanel({
                         type="button"
                         aria-label={`${copy('Decrease quantity')} ${line.itemNameSnapshot}`}
                         onClick={() => increment(line, 'down')}
-                        disabled={createDecimal(line.quantity).lessThanOrEqualTo(createDecimal('1'))}
+                        disabled={createDecimal(line.quantity).lessThanOrEqualTo(
+                          createDecimal('1'),
+                        )}
                         className="flex h-9 items-center justify-center border-r border-[var(--color-border)] text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)] active:bg-[var(--color-surface-muted)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[var(--color-text-muted)]"
                       >
                         <Minus className="size-3.5" />
@@ -2224,10 +2473,18 @@ function ReferenceCartPanel({
             <span className="text-sm font-bold">
               {copy(isEstimate ? 'Estimated total' : 'Total')}
             </span>
-            <span className="text-lg font-bold text-[var(--color-brand)]">
+            <span
+              key={total}
+              className="pos-value-updated text-lg font-bold tabular-nums text-[var(--color-brand)]"
+            >
               {money(total, locale)}
             </span>
           </div>
+          {isEstimate && lines.length ? (
+            <p className="text-[11px] leading-4 text-[var(--color-text-muted)]">
+              {copy('Tax and promotions are finalized when the transaction is created.')}
+            </p>
+          ) : null}
           <Button
             fullWidth
             disabled={!lines.length}
@@ -2245,38 +2502,36 @@ function ReferenceCartPanel({
 function ReferenceCustomerDialog({
   open,
   customer,
+  isSaving,
   onClose,
   onChoose,
-  onUseGeneralCustomer,
 }: {
   open: boolean;
-  customer: PosCustomer | null;
+  customer: SaleCustomer | null;
+  isSaving: boolean;
   onClose: () => void;
-  onChoose: (customer: PosCustomer) => void;
-  onUseGeneralCustomer: () => void;
+  onChoose: (selection: SaleCustomerSelection) => void;
 }) {
   const { copy } = useOperationalLocalization();
-  const [mode, setMode] = useState<'MEMBER' | 'NON_MEMBER'>('MEMBER');
-  const [memberSearch, setMemberSearch] = useState('');
-  const [selectedMember, setSelectedMember] = useState<MemberCustomerLookupResult | null>(null);
+  const [mode, setMode] = useState<'NON_MEMBER' | 'MEMBER'>('NON_MEMBER');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const memberResults = useMemo(
-    () => customerMemberLookup.searchMembers(memberSearch),
-    [memberSearch],
-  );
-  const chooseNonMember = () => {
-    const normalizedName = name.trim();
-    const normalizedPhone = phone.trim();
-    if (!normalizedName || !normalizedPhone) return;
-    onChoose({ name: normalizedName, phone: normalizedPhone });
-    setName('');
-    setPhone('');
-  };
-  const changeMode = (nextMode: 'MEMBER' | 'NON_MEMBER') => {
-    setMode(nextMode);
-    setSelectedMember(null);
-    setMemberSearch('');
+  const [openedFor, setOpenedFor] = useState<string | null>(null);
+
+  // Each time the dialog opens it shows the identity the transaction currently
+  // carries, never what was typed for an earlier transaction.
+  const identityKey = open ? `${customer?.type ?? 'NONE'}:${customer?.phoneE164 ?? ''}` : null;
+  if (openedFor !== identityKey) {
+    setOpenedFor(identityKey);
+    setMode(customer?.type === 'MEMBER' ? 'MEMBER' : 'NON_MEMBER');
+    setName(customer?.type === 'NON_MEMBER' ? customer.name : '');
+    setPhone(customer?.type === 'NON_MEMBER' ? customer.phoneE164 : '');
+  }
+
+  const canSubmit = Boolean(name.trim() && phone.trim()) && !isSaving;
+  const submitNonMember = () => {
+    if (!canSubmit) return;
+    onChoose({ type: 'NON_MEMBER', name: name.trim(), phone: phone.trim() });
   };
 
   return (
@@ -2290,110 +2545,60 @@ function ReferenceCustomerDialog({
       className="pos-reference-dialog w-full max-w-md overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
     >
       <div className="min-h-0 space-y-3 overflow-y-auto">
-        <button
-          type="button"
-          onClick={onUseGeneralCustomer}
-          className={`flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left transition-colors ${customer === null ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/5' : 'border-[var(--color-border)] hover:bg-[var(--color-surface-muted)]'}`}
-        >
-          <div className="grid size-8 place-items-center rounded-lg bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]">
-            <User className="size-4" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">{copy('Use general customer')}</p>
-            <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
-              {copy('Continue without selecting a customer.')}
-            </p>
-          </div>
-          {customer === null ? <CheckCircle2 className="size-4 text-[var(--color-brand)]" /> : null}
-        </button>
-        <div className="border-t border-[var(--color-border)] pt-3">
-          <div className="flex gap-2" aria-label={copy('Customer')}>
-            <Button
-              size="sm"
-              variant={mode === 'MEMBER' ? 'primary' : 'secondary'}
-              onClick={() => changeMode('MEMBER')}
-            >
-              {copy('Member')}
-            </Button>
-            <Button
-              size="sm"
-              variant={mode === 'NON_MEMBER' ? 'primary' : 'secondary'}
-              onClick={() => changeMode('NON_MEMBER')}
-            >
-              {copy('Non-member')}
-            </Button>
-          </div>
-
-          {mode === 'MEMBER' ? (
-            <div className="mt-3 space-y-3">
-              <DCombobox
-                key="member-search"
-                ariaLabel={copy('Search name or phone number')}
-                value={selectedMember?.customerId ?? ''}
-                options={memberResults.map((member) => ({
-                  value: member.customerId,
-                  label: member.name,
-                  detail: `${member.phone}, ${member.membership.memberCode}`,
-                }))}
-                onChange={(customerId) => {
-                  setSelectedMember(
-                    memberResults.find((member) => member.customerId === customerId) ?? null,
-                  );
-                }}
-                onSearchChange={(query) => {
-                  setMemberSearch(query);
-                  setSelectedMember(null);
-                }}
-                placeholder={copy('Search name or phone number')}
-                idleMessage={copy('Search by name, phone number, or member code.')}
-                renderEmpty={() => copy('Member not found.')}
-                renderOption={(option) => {
-                  const member = memberResults.find(
-                    (result) => result.customerId === String(option.value),
-                  );
-                  return (
-                    <span className="min-w-0">
-                      <span className="block truncate">{option.label}</span>
-                      {member ? (
-                        <span className="mt-0.5 block truncate text-xs font-normal text-[var(--color-text-muted)]">
-                          {member.phone}, {member.membership.memberCode}
-                        </span>
-                      ) : null}
-                    </span>
-                  );
-                }}
-              />
-              <Button
-                fullWidth
-                disabled={!selectedMember}
-                onClick={() => selectedMember && onChoose(selectedMember)}
-              >
-                {copy('Use customer')}
-              </Button>
-            </div>
-          ) : (
-            <div className="mt-3 space-y-3">
-              <DInput
-                aria-label={copy('Customer name')}
-                label={copy('Name')}
-                value={name}
-                onChange={setName}
-                placeholder={copy('Customer name')}
-              />
-              <DInput
-                aria-label={copy('Phone number')}
-                label={copy('Phone number')}
-                value={phone}
-                onChange={setPhone}
-                placeholder={copy('Phone number')}
-                inputMode="tel"
-              />
-              <Button fullWidth disabled={!name.trim() || !phone.trim()} onClick={chooseNonMember}>
-                {copy('Use customer')}
-              </Button>
-            </div>
+        <p className="text-xs text-[var(--color-text-muted)]">
+          {copy(
+            'A transaction belongs to a customer. Fill in the name and WhatsApp number, or choose a member.',
           )}
+        </p>
+        <div className="flex gap-2" aria-label={copy('Customer')}>
+          <Button
+            size="sm"
+            variant={mode === 'NON_MEMBER' ? 'primary' : 'secondary'}
+            onClick={() => setMode('NON_MEMBER')}
+          >
+            {copy('Non-member')}
+          </Button>
+          <Button
+            size="sm"
+            variant={mode === 'MEMBER' ? 'primary' : 'secondary'}
+            onClick={() => setMode('MEMBER')}
+          >
+            {copy('Member')}
+          </Button>
         </div>
+
+        {mode === 'NON_MEMBER' ? (
+          <div className="space-y-3">
+            <DInput
+              aria-label={copy('Customer name')}
+              label={copy('Name')}
+              value={name}
+              onChange={setName}
+              placeholder={copy('Customer name')}
+            />
+            <DInput
+              aria-label={copy('WhatsApp number')}
+              label={copy('WhatsApp number')}
+              value={phone}
+              onChange={setPhone}
+              placeholder={copy('WhatsApp number')}
+              inputMode="tel"
+              hint={copy('Name and WhatsApp number are both required.')}
+            />
+            <Button fullWidth disabled={!canSubmit} onClick={submitNonMember}>
+              {copy('Use customer')}
+            </Button>
+          </div>
+        ) : (
+          // Member identity is owned by the canonical Customer authority. Until
+          // that directory is connected there is nothing truthful to search, so
+          // the state says so instead of offering invented members.
+          <DAlert variant="info" title={copy('Member lookup is not available yet')}>
+            {copy(
+              'Member identity comes from the customer directory, which is not connected to this installation yet.',
+            )}
+          </DAlert>
+        )}
       </div>
     </DDialog>
   );
@@ -2424,6 +2629,7 @@ function ReferencePaymentDialog({
   quickTender,
   isSubmitting,
   onQueue,
+  adjustmentSlot,
 }: {
   open: boolean;
   onClose: () => void;
@@ -2435,7 +2641,7 @@ function ReferencePaymentDialog({
   taxAmount: string;
   taxLabel: string;
   locale: string;
-  customer: PosCustomer | null;
+  customer: SaleCustomer | null;
   method: PaymentMethod;
   provider: string;
   tender: string;
@@ -2449,6 +2655,8 @@ function ReferencePaymentDialog({
   quickTender: readonly string[];
   isSubmitting: boolean;
   onQueue: () => void;
+  /** Applied promotions and discounts for the authoritative Sale being paid. */
+  adjustmentSlot?: ReactNode;
 }) {
   const { copy, label } = useOperationalLocalization();
   const { routes: paymentRoutes, isPending: isPaymentRoutesPending } = useCachedPaymentRoutes();
@@ -2460,6 +2668,7 @@ function ReferencePaymentDialog({
   const needsProvider = method === 'BANK_TRANSFER' || method === 'WALLET';
   const hasDiscount = !createDecimal(discountAmount).equals(createDecimal('0'));
   const hasTax = !createDecimal(taxAmount).equals(createDecimal('0'));
+  const customerBadge = customerStatus(customer);
   const canPay =
     lines.length > 0 &&
     Boolean(activeRoute) &&
@@ -2489,12 +2698,12 @@ function ReferencePaymentDialog({
       closeOnOverlay
       className="pos-reference-dialog w-full max-w-lg overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
       footer={
-        <div className="flex shrink-0 flex-col-reverse justify-end gap-2 sm:flex-row">
+        <div className="flex flex-col-reverse justify-end gap-2 sm:flex-row">
           <DButton variant="ghost" onClick={onClose}>
             {copy('Cancel')}
           </DButton>
           <DButton disabled={!canConfirm} loading={isSubmitting} onClick={onQueue}>
-            {copy('Add to queue')}
+            {copy(payNow ? 'Pay and add to queue' : 'Add to queue')}
           </DButton>
         </div>
       }
@@ -2504,21 +2713,23 @@ function ReferencePaymentDialog({
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs text-[var(--color-text-muted)]">{copy('Payment total')}</p>
-              <h3 className="mt-0.5 text-2xl font-bold leading-tight text-[var(--color-brand)]">
+              <h3
+                key={total}
+                className="pos-value-updated mt-0.5 text-2xl font-bold leading-tight tabular-nums text-[var(--color-brand)]"
+              >
                 {money(total, locale)}
               </h3>
             </div>
             <div className="min-w-0 text-right">
               <p className="text-xs text-[var(--color-text-muted)]">{copy('Customer')}</p>
               <p className="max-w-[170px] truncate text-sm font-semibold">
-                {customer?.name ?? copy('General customer')}
+                {customerDisplayName(customer, locale)}
               </p>
-              <Badge
-                variant={customerStatus(customer).variant}
-                className="mt-1 px-2 py-0 text-[10px]"
-              >
-                {copy(customerStatus(customer).label)}
-              </Badge>
+              {customerBadge ? (
+                <Badge variant={customerBadge.variant} className="mt-1 px-2 py-0 text-[10px]">
+                  {copy(customerBadge.label)}
+                </Badge>
+              ) : null}
               <p className="text-[11px] text-[var(--color-text-muted)]">
                 {lines.length} {copy('items')}
               </p>
@@ -2550,25 +2761,7 @@ function ReferencePaymentDialog({
           </div>
         </div>
 
-        <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
-          <div className="flex items-start justify-between gap-3">
-            <p className="text-sm font-semibold">{copy('Promotion')}</p>
-            <span className="shrink-0 rounded-full bg-[var(--color-surface-muted)] px-2 py-1 text-[10px] font-semibold text-[var(--color-text-muted)]">
-              {copy('Not available')}
-            </span>
-          </div>
-        </div>
-
-        {customer?.membership ? (
-          <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
-            <div className="flex items-start justify-between gap-3">
-              <p className="text-sm font-semibold">{copy('Use member points')}</p>
-              <span className="shrink-0 rounded-full bg-[var(--color-surface-muted)] px-2 py-1 text-[10px] font-semibold text-[var(--color-text-muted)]">
-                {label('OPTIONAL')}
-              </span>
-            </div>
-          </div>
-        ) : null}
+        {adjustmentSlot}
 
         <div className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)]">
           <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-2.5">
@@ -2611,24 +2804,44 @@ function ReferencePaymentDialog({
           </div>
         </div>
 
-        <label className="flex cursor-pointer items-start gap-2.5 px-1 py-1.5">
-          <span className="mt-0.5 shrink-0">
-            <DCheckbox
-              checked={payNow}
-              onChange={(event) => onPayNowChange(event.target.checked)}
-            />
-          </span>
-          <span className="min-w-0">
-            <span className="block text-sm font-semibold">{copy('Pay now')}</span>
-            <span className="mt-0.5 block text-xs leading-4 text-[var(--color-text-muted)]">
-              {copy(
-                payNow
-                  ? 'Choose a payment method before continuing.'
-                  : 'Payment can be recorded after transaction creation.',
-              )}
-            </span>
-          </span>
-        </label>
+        {/* Two named outcomes, because this choice changes the checkout flow instead of toggling a setting. */}
+        <fieldset className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-3">
+          <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+            {copy('Payment timing')}
+          </legend>
+          <div className="mt-1 grid gap-2 sm:grid-cols-2">
+            {[
+              {
+                value: true,
+                title: copy('Pay now'),
+                description: copy('Choose a payment method before continuing.'),
+              },
+              {
+                value: false,
+                title: copy('Pay later'),
+                description: copy('Payment can be recorded after transaction creation.'),
+              },
+            ].map((option) => (
+              <label
+                key={String(option.value)}
+                className={`pos-choice ${payNow === option.value ? 'pos-choice--selected' : ''}`}
+              >
+                <DRadio
+                  name="pos-payment-timing"
+                  className="mt-0.5 shrink-0"
+                  checked={payNow === option.value}
+                  onChange={() => onPayNowChange(option.value)}
+                />
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold">{option.title}</span>
+                  <span className="mt-0.5 block text-xs leading-4 text-[var(--color-text-muted)]">
+                    {option.description}
+                  </span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
 
         {payNow ? (
           <>
@@ -2646,10 +2859,10 @@ function ReferencePaymentDialog({
                       type="button"
                       disabled={disabled}
                       onClick={() => onMethod(option.value)}
-                      className={`flex h-10 items-center justify-center gap-1.5 rounded-xl border text-xs font-semibold transition-all active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-40 ${method === option.value ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white shadow-sm' : 'border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)]'}`}
+                      className={`flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-xl border px-2 text-xs font-semibold transition-all active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-40 ${method === option.value ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white shadow-sm' : 'border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)]'}`}
                     >
                       {option.icon}
-                      <span className="hidden sm:inline">{label(option.value)}</span>
+                      <span className="pos-payment-method-label">{label(option.value)}</span>
                     </button>
                   );
                 })}
@@ -2753,8 +2966,30 @@ function ReferencePaymentDialog({
   );
 }
 
+function useRetainedValue<T>(value: T | null): T | null {
+  // Keep the last value while a DS dialog plays its close transition.
+  const [retained, setRetained] = useState<T | null>(value);
+  if (value !== null && value !== retained) setRetained(value);
+  return value ?? retained;
+}
+
+const fulfillmentTone: Record<string, 'neutral' | 'brand' | 'success' | 'warning' | 'danger'> = {
+  WAITING: 'warning',
+  IN_PROGRESS: 'brand',
+  COMPLETED: 'success',
+  CANCELED: 'danger',
+};
+
+function queueStatusTone(status: QueueStatus | null) {
+  if (status === 'QUEUED') return 'warning' as const;
+  if (status === 'PROGRESS') return 'brand' as const;
+  if (status === 'COMPLETED') return 'success' as const;
+  if (status === 'CANCELED') return 'danger' as const;
+  return 'neutral' as const;
+}
+
 function ReferenceTransactionDetail({
-  sale,
+  sale: currentSale,
   locale,
   employees,
   businessName,
@@ -2764,9 +2999,9 @@ function ReferenceTransactionDetail({
   showPaymentReceipt,
   onClose,
   onViewReceipt,
+  onSendReceipt,
+  isSendingReceipt,
   onAssign,
-  serviceWorkUnits,
-  onManageServiceWork,
   onComplete,
   isMutating,
 }: {
@@ -2781,18 +3016,19 @@ function ReferenceTransactionDetail({
   onClose: () => void;
   onNewSale: () => void;
   onViewReceipt: (sale: Sale) => void;
+  onSendReceipt?: (sale: Sale) => void;
+  isSendingReceipt?: boolean;
   onAssign: (line: SaleLine) => void;
-  serviceWorkUnits: ServiceWorkUnitsByLine;
-  onManageServiceWork: (line: SaleLine) => void;
   onComplete: () => void;
   isMutating: boolean;
 }) {
   const { copy, label } = useOperationalLocalization();
   const [receiptPaper, setReceiptPaper] = useState<'58' | '80'>('80');
+  const sale = useRetainedValue(currentSale);
   if (!sale) return null;
+  const open = currentSale !== null;
   const status = queueStatus(sale);
-  const customerContext = readStoredCustomer(saleCustomerKey(sale.id));
-  const customer = customerContext ?? saleCustomer(sale.id, locale);
+  const customer = sale.customer ?? null;
   const activeLines = sale.lines.filter((line) => !line.removedAt);
   const payments = successfulPayments(sale).filter((payment) =>
     createDecimal(payment.appliedAmount).greaterThan(createDecimal('0')),
@@ -2801,58 +3037,114 @@ function ReferenceTransactionDetail({
   const receiptAvailable = payments.length > 0;
   const showReceipt = showPaymentReceipt && receiptAvailable;
   const { totalPaid } = financialSummary(sale);
+  const settlement = saleSettlement(sale);
   const hasDiscount = !createDecimal(sale.discountAmount).equals(createDecimal('0'));
   const hasTax = !createDecimal(sale.taxAmount).equals(createDecimal('0'));
-  const completionIssues =
-    status === 'PROGRESS' ? workflowIssues(sale, serviceWorkUnits, locale) : [];
+  const completionIssues = status === 'PROGRESS' ? workflowIssues(sale, locale) : [];
   const completionIssueGroups = groupWorkflowIssues(sale, completionIssues, locale);
   const transactionDate = new Intl.DateTimeFormat(locale, {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(sale.finalizedAt ?? sale.updatedAt));
+  const identity = transactionNumber(sale, locale);
+  const format = (amount: string) => money(amount, locale);
+  const discountRows = saleDiscountRows(sale);
+  const summaryDiscounts =
+    discountRows.length === 0 && hasDiscount
+      ? [
+          {
+            id: 'sale-discount',
+            source: 'MANUAL_DISCOUNT' as const,
+            scope: 'TRANSACTION' as const,
+            saleLineId: null,
+            label: copy('Promotions and discounts'),
+            amount: sale.discountAmount,
+            percentage: null,
+            reason: null,
+          },
+        ]
+      : discountRows;
+  const paymentStateLabel =
+    settlement.paymentState === 'PAID'
+      ? 'Paid'
+      : settlement.paymentState === 'PARTIALLY_PAID'
+        ? 'Partially paid'
+        : 'Unpaid';
 
   return (
     <>
       <Dialog
-        open
+        open={open}
         onClose={onClose}
         title={copy(showReceipt ? 'Preview receipt' : 'Transaction details')}
-        description={transactionNumber(sale.id, locale)}
+        description={identity}
         ariaLabel={copy(showReceipt ? 'Preview receipt' : 'Transaction details')}
         closeOnEscape
         closeOnOverlay
         noPadding
-        className={`pos-reference-dialog max-h-[92dvh] w-full overflow-hidden rounded-t-2xl bg-(--color-surface) shadow-xl sm:rounded-xl ${showReceipt ? 'max-w-md' : 'max-w-lg'}`}
+        size="md"
+        className="pos-reference-dialog max-h-[92dvh] w-full overflow-hidden"
         footer={
-          <div className="flex shrink-0 flex-col-reverse justify-between items-center gap-2 sm:flex-row">
-            {showReceipt ? (
-              <div className="pos-receipt-preview-toolbar flex items-center justify-between gap-3">
-                <div className="flex items-center gap-1.5" aria-label={copy('Paper size')}>
-                  <DButton
-                    size="sm"
-                    variant={receiptPaper === '58' ? 'primary' : 'secondary'}
-                    onClick={() => setReceiptPaper('58')}
-                  >
-                    58 mm
-                  </DButton>
-                  <DButton
-                    size="sm"
-                    variant={receiptPaper === '80' ? 'primary' : 'secondary'}
-                    onClick={() => setReceiptPaper('80')}
-                  >
-                    80 mm
-                  </DButton>
+          showReceipt ? (
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between gap-3">
+                <span
+                  id="pos-receipt-paper-label"
+                  className="text-xs text-[var(--color-text-muted)]"
+                >
+                  {copy('Paper width')}
+                </span>
+                <div
+                  role="radiogroup"
+                  aria-labelledby="pos-receipt-paper-label"
+                  className="grid grid-cols-2 gap-1 rounded-[var(--radius-control)] bg-[var(--color-surface-muted)] p-1"
+                >
+                  {(['58', '80'] as const).map((paper) => (
+                    <button
+                      key={paper}
+                      type="button"
+                      role="radio"
+                      aria-checked={receiptPaper === paper}
+                      onClick={() => setReceiptPaper(paper)}
+                      className={`min-h-8 rounded-[calc(var(--radius-control)-2px)] px-3 text-xs font-semibold tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/30 ${
+                        receiptPaper === paper
+                          ? 'bg-[var(--color-surface)] text-[var(--color-text)] shadow-sm'
+                          : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
+                      }`}
+                    >
+                      {paper} mm
+                    </button>
+                  ))}
                 </div>
               </div>
-            ) : null}
-
-            <div
-              className={`flex shrink-0 flex-col-reverse justify-end items-center gap-2 sm:flex-row ${showReceipt ? 'pos-receipt-actions' : ''}`}
-            >
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+                <DButton variant="ghost" onClick={onClose}>
+                  {copy('Close')}
+                </DButton>
+                {onSendReceipt ? (
+                  <DButton
+                    variant="outline"
+                    loading={Boolean(isSendingReceipt)}
+                    onClick={() => onSendReceipt(sale)}
+                  >
+                    {copy('Send via WhatsApp')}
+                  </DButton>
+                ) : null}
+                <DButton
+                  variant="primary"
+                  leftIcon={<Printer className="size-3.5" />}
+                  onClick={() => window.print()}
+                >
+                  {copy('Print')}
+                </DButton>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
               <DButton variant="ghost" onClick={onClose}>
                 {copy('Close')}
               </DButton>
-              {!showReceipt && receiptAvailable ? (
+              {receiptAvailable ? (
                 <DButton
                   rightIcon={<Printer className="size-3.5" />}
                   variant="outline"
@@ -2861,7 +3153,7 @@ function ReferenceTransactionDetail({
                   {copy('View receipt')}
                 </DButton>
               ) : null}
-              {!showReceipt && status === 'PROGRESS' ? (
+              {status === 'PROGRESS' ? (
                 <DButton
                   variant="primary"
                   disabled={completionIssues.length > 0}
@@ -2872,23 +3164,15 @@ function ReferenceTransactionDetail({
                   {copy('Complete transaction')}
                 </DButton>
               ) : null}
-              {showReceipt ? (
-                <DButton
-                  rightIcon={<Printer className="size-3.5" />}
-                  variant="outline"
-                  onClick={() => window.print()}
-                >
-                  {copy('Print')}
-                </DButton>
-              ) : null}
             </div>
-          </div>
+          )
         }
       >
         {showReceipt ? (
-          <div className="flex max-h-[92dvh] min-h-0 flex-col px-5 py-4 sm:px-6">
+          // The receipt sits as paper on a muted desk; the dialog body is the only scroll region.
+          <div className="pos-receipt-desk">
             <div
-              className={`pos-receipt-preview pos-receipt-print--${receiptPaper} min-h-0 flex-1 overflow-y-auto bg-white text-slate-950`}
+              className={`pos-receipt-preview pos-receipt-print--${receiptPaper} bg-white text-slate-950`}
             >
               <ReceiptContent
                 sale={sale}
@@ -2907,186 +3191,231 @@ function ReferenceTransactionDetail({
             </div>
           </div>
         ) : (
-          <div className="flex min-h-0 flex-1 flex-col">
-            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4 sm:px-6">
-              <div className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)]">
-                <div className="bg-gradient-to-br from-[var(--color-brand)]/5 to-transparent px-5 py-4">
-                  <p className="font-mono text-xs text-[var(--color-text-muted)]">
-                    {transactionNumber(sale.id, locale)}
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-1">
-                    <span
-                      className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${status ? statusMeta[status].tone : 'bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]'}`}
-                    >
-                      {status ? label(statusMeta[status].value) : label('OPEN')}
+          <div className="pos-detail-story flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-5 sm:px-6">
+            <SaleDetailHeader
+              eyebrow={copy('Transaction')}
+              number={identity}
+              secondaryNumber={sale.invoiceNumber}
+              badges={
+                <>
+                  <StatusPill
+                    tone={queueStatusTone(status)}
+                    icon={status ? statusMeta[status].icon : null}
+                  >
+                    {status ? label(statusMeta[status].value) : label('OPEN')}
+                  </StatusPill>
+                  <StatusPill
+                    tone={
+                      settlement.paymentState === 'PAID'
+                        ? 'success'
+                        : settlement.paymentState === 'PARTIALLY_PAID'
+                          ? 'warning'
+                          : 'neutral'
+                    }
+                  >
+                    {copy(paymentStateLabel)}
+                  </StatusPill>
+                </>
+              }
+              totalLabel={copy('Total')}
+              total={format(sale.totalAmount)}
+              settlementNote={
+                settlement.balanceDue !== '0.0000' ? (
+                  <span className="text-[var(--color-warning)]">
+                    {copy('Balance due')} {format(settlement.balanceDue)}
+                  </span>
+                ) : null
+              }
+              meta={[
+                { label: copy('Date'), value: transactionDate },
+                {
+                  label: copy('Customer'),
+                  value: (
+                    <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+                      <span className="truncate">{customerDisplayName(customer, locale)}</span>
+                      {customerStatus(customer) ? (
+                        <Badge
+                          variant={customerStatus(customer)!.variant}
+                          className="shrink-0 text-[10px]"
+                        >
+                          {copy(customerStatus(customer)!.label)}
+                        </Badge>
+                      ) : null}
+                      {customerDisplayDetail(customer) ? (
+                        <span className="w-full text-xs font-normal text-[var(--color-text-muted)]">
+                          {customerDisplayDetail(customer)}
+                        </span>
+                      ) : null}
                     </span>
-                    <span
-                      className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${hasSuccessfulCheckout(sale) ? 'bg-[var(--color-success)]/10 text-[var(--color-success)]' : receiptAvailable ? 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]' : 'bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]'}`}
-                    >
-                      {copy(
-                        hasSuccessfulCheckout(sale)
-                          ? 'Paid'
-                          : receiptAvailable
-                            ? 'Partially paid'
-                            : 'Unpaid',
-                      )}
-                    </span>
-                  </div>
-                  <p className="mt-3 text-xs text-[var(--color-text-muted)]">{transactionDate}</p>
-                  <div className="mt-3 flex items-center gap-2 text-sm">
-                    <span className="truncate font-semibold">{customer.name}</span>
-                    <Badge
-                      variant={customerStatus(customerContext).variant}
-                      className="shrink-0 text-[10px]"
-                    >
-                      {copy(customerStatus(customerContext).label)}
-                    </Badge>
-                  </div>
-                  {customer.membership ? (
-                    <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                      {customer.membership.memberCode}, {label(customer.membership.status)}
-                    </p>
-                  ) : customer.phone ? (
-                    <p className="mt-1 text-xs text-[var(--color-text-muted)]">{customer.phone}</p>
-                  ) : null}
+                  ),
+                },
+              ]}
+            />
+
+            {sale.status === 'VOIDED' && cancellationReason ? (
+              <div className="rounded-[var(--radius-control)] border border-[var(--color-danger)]/25 bg-[var(--color-danger)]/10 px-3 py-2 text-xs">
+                <p className="font-semibold text-[var(--color-danger)]">
+                  {copy('Cancellation reason')}
+                </p>
+                <p className="mt-1 text-[var(--color-text-muted)]">{cancellationReason}</p>
+              </div>
+            ) : null}
+
+            {completionIssues.length ? (
+              <div className="rounded-[var(--radius-control)] border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 px-3 py-2 text-xs">
+                <p className="font-semibold text-[var(--color-warning)]">
+                  {copy('Not ready to complete')}
+                </p>
+                <div className="mt-2 space-y-2 text-[var(--color-text-muted)]">
+                  {completionIssueGroups.map((group) => (
+                    <div key={group.id}>
+                      <p className="font-semibold text-[var(--color-text)]">{group.label}</p>
+                      <ul className="mt-0.5 list-disc space-y-0.5 pl-4">
+                        {group.issues.map((issue) => (
+                          <li key={issue}>{issue}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
                 </div>
               </div>
+            ) : null}
 
-              {sale.status === 'VOIDED' && cancellationReason ? (
-                <div className="rounded-xl border border-[var(--color-danger)]/25 bg-[var(--color-danger)]/10 px-3 py-2 text-xs">
-                  <p className="font-semibold text-[var(--color-danger)]">
-                    {copy('Cancellation reason')}
-                  </p>
-                  <p className="mt-1 text-[var(--color-text-muted)]">{cancellationReason}</p>
-                </div>
-              ) : null}
-
-              {completionIssues.length ? (
-                <div className="rounded-xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 px-3 py-2 text-xs">
-                  <p className="font-semibold text-[var(--color-warning)]">
-                    {copy('Not ready to complete')}
-                  </p>
-                  <div className="mt-2 space-y-2 text-[var(--color-text-muted)]">
-                    {completionIssueGroups.map((group) => (
-                      <div key={group.id}>
-                        <p className="font-semibold text-[var(--color-text)]">{group.label}</p>
-                        <ul className="mt-0.5 list-disc space-y-0.5 pl-4">
-                          {group.issues.map((issue) => (
-                            <li key={issue}>{issue}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-
-              <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)]">
-                <header className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-3">
-                  <h3 className="text-sm font-semibold">{copy('Order')}</h3>
-                  <span className="text-xs text-[var(--color-text-muted)]">
-                    {activeLines.length} {copy('items')}
-                  </span>
-                </header>
-                <div className="min-h-[144px] max-h-[min(38dvh,360px)] flex-1 divide-y divide-[var(--color-border)] overflow-y-auto overscroll-contain">
-                  {activeLines.map((line) => {
-                    const isMultiUnitService =
-                      line.itemTypeSnapshot === 'SERVICE' &&
-                      line.fulfillmentBehaviorSnapshot === 'TRACKED' &&
-                      serviceWorkUnitCount(line) > 1;
-                    const isTrackedService =
-                      line.itemTypeSnapshot === 'SERVICE' &&
-                      line.fulfillmentBehaviorSnapshot === 'TRACKED' &&
-                      line.fulfillment !== null;
-                    const canEditServiceWork = isTrackedService && status === 'PROGRESS';
-                    const requiresEmployeeAttribution =
-                      line.employeeAssignmentModeSnapshot !== 'NONE' ||
-                      line.allowEmployeeContributionSnapshot;
-                    const employeeIssues = employeeAssignmentIssues(line, locale);
-                    const discountPercentage = lineDiscountPercentage(line);
-                    if (isMultiUnitService) {
-                      return (
-                        <ReferenceServiceWorkLine
-                          key={line.id}
-                          line={line}
-                          employees={employees}
-                          locale={locale}
-                          units={serviceWorkUnitsFor(line, serviceWorkUnits[serviceWorkKey(line)])}
-                          active={status === 'PROGRESS'}
-                          isMutating={isMutating}
-                          onManage={() => onManageServiceWork(line)}
-                        />
-                      );
-                    }
-                    return (
-                      <div key={line.id} className="p-4">
-                        <div className="flex justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-semibold">{line.itemNameSnapshot}</p>
-                            <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                              {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
-                              {line.variantNameSnapshot ? `, ${line.variantNameSnapshot}` : ''}
-                            </p>
-                            {isPositiveDecimal(line.lineDiscountAmount) ? (
-                              <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
-                                {copy('Item discount')}
-                                {discountPercentage ? ` (${discountPercentage}%)` : ''}: −
-                                {money(line.lineDiscountAmount, locale)}
-                              </p>
-                            ) : null}
+            <SaleDetailSection
+              title={copy('Order')}
+              aside={`${activeLines.length} ${copy('items')}`}
+            >
+              <SaleLineItemList>
+                {activeLines.map((line) => {
+                  const isTrackedService =
+                    line.itemTypeSnapshot === 'SERVICE' &&
+                    line.fulfillmentBehaviorSnapshot === 'TRACKED' &&
+                    line.fulfillment !== null;
+                  const requiresEmployeeAttribution =
+                    line.employeeAssignmentModeSnapshot !== 'NONE' ||
+                    line.allowEmployeeContributionSnapshot;
+                  const attributed = isTrackedService && requiresEmployeeAttribution;
+                  const plannedUnits = line.workUnits?.length ?? 0;
+                  const needsAttention =
+                    attributed &&
+                    (employeeAssignmentIssues(line, locale).length > 0 ||
+                      (plannedUnits > 0 && plannedUnits !== serviceWorkUnitCount(line)));
+                  const durationLabel = formatDurationMinutes(
+                    line.defaultDurationMinutesSnapshot,
+                    locale,
+                  );
+                  const workSummary = attributed
+                    ? servicePerformerSummary(line, employees, locale)
+                    : null;
+                  const editable = attributed && status === 'PROGRESS';
+                  return (
+                    <SaleLineItem
+                      key={line.id}
+                      name={line.itemNameSnapshot}
+                      variant={line.variantNameSnapshot}
+                      pricing={`${quantity(line.quantity)} × ${format(line.effectiveUnitPrice)}`}
+                      amount={format(line.grossAmount)}
+                      discounts={lineDiscountRows(sale, line, copy('Discount')).map((row) => ({
+                        ...row,
+                        amount: format(row.amount),
+                      }))}
+                      context={
+                        line.fulfillment || durationLabel ? (
+                          <>
                             {line.fulfillment ? (
-                              <p className="mt-1 text-[11px] font-medium text-[var(--color-text-muted)]">
+                              <StatusPill
+                                tone={fulfillmentTone[line.fulfillment.status] ?? 'neutral'}
+                              >
                                 {label(line.fulfillment.status)}
-                              </p>
+                              </StatusPill>
                             ) : null}
-                            {isTrackedService && requiresEmployeeAttribution ? (
-                              <div className="mt-2 flex min-w-0 items-center gap-2 text-xs">
-                                <span className="shrink-0 font-medium text-[var(--color-text-muted)]">
-                                  {copy('Work')}
-                                </span>
-                                <span className="min-w-0 flex-1 truncate text-[var(--color-text-muted)]">
-                                  {employeeWorkSummary(line, employees, locale)}
-                                </span>
-                                {canEditServiceWork ? (
-                                  employeeIssues.length > 0 ? (
-                                    <DButton
-                                      size="sm"
-                                      variant="outline"
-                                      disabled={isMutating}
-                                      className="h-7 px-2 text-[11px]"
-                                      onClick={() => onAssign(line)}
-                                    >
-                                      {copy('Configure')}
-                                    </DButton>
-                                  ) : (
-                                    <DButton
-                                      size="icon"
-                                      variant="ghost"
-                                      disabled={isMutating}
-                                      aria-label={`${copy('Configure')} ${line.itemNameSnapshot}`}
-                                      onClick={() => onAssign(line)}
-                                    >
-                                      <Pencil className="size-3.5" />
-                                    </DButton>
-                                  )
-                                ) : null}
-                              </div>
-                            ) : null}
-                          </div>
-                          <p className="text-sm font-bold">{money(line.grossAmount, locale)}</p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-            </div>
-            <ReferenceFinancialSummary sale={sale} locale={locale} />
+                            {durationLabel ? <span>{durationLabel}</span> : null}
+                          </>
+                        ) : null
+                      }
+                      detail={
+                        workSummary ? (
+                          <ServicePerformerSummary
+                            itemName={line.itemNameSnapshot}
+                            summary={workSummary}
+                            needsAttention={needsAttention}
+                            editable={editable}
+                            disabled={isMutating}
+                            onEdit={() => onAssign(line)}
+                          />
+                        ) : null
+                      }
+                    />
+                  );
+                })}
+              </SaleLineItemList>
+            </SaleDetailSection>
+
+            <SaleDetailSection title={copy('Order summary')} surface="muted">
+              <SaleFinancialSummary
+                labels={{
+                  subtotal: copy('Subtotal'),
+                  total: copy('Total'),
+                  paid: copy('Paid amount'),
+                  balance: copy('Balance due'),
+                  settled: copy('Paid'),
+                  cashReceived: copy('Cash received'),
+                  change: copy('Change'),
+                  discount: copy('Discount'),
+                  discountContext: (row) =>
+                    `${copy(row.source === 'PROMOTION' ? 'Promotion' : 'Manual discount')} · ${copy(
+                      row.scope === 'TRANSACTION'
+                        ? 'Whole transaction'
+                        : row.scope === 'ITEM'
+                          ? 'Item-level'
+                          : 'Category-level',
+                    )}`,
+                }}
+                gross={sale.grossAmount}
+                discounts={summaryDiscounts}
+                tax={
+                  hasTax ? { label: saleTaxLabel(sale, copy('Tax')), amount: sale.taxAmount } : null
+                }
+                total={sale.totalAmount}
+                settlement={settlement}
+                format={format}
+              />
+            </SaleDetailSection>
+
+            {sale.payments.length ? (
+              <SaleDetailSection title={copy('Payment history')}>
+                <SalePaymentList
+                  emptyLabel={copy('No payment recorded yet.')}
+                  payments={sale.payments.map((item) => ({
+                    id: item.id,
+                    method: label(item.method),
+                    status: (
+                      <StatusPill
+                        tone={
+                          item.status === 'SUCCEEDED'
+                            ? 'success'
+                            : item.status === 'PENDING'
+                              ? 'warning'
+                              : 'danger'
+                        }
+                      >
+                        {label(item.status)}
+                      </StatusPill>
+                    ),
+                    detail: new Intl.DateTimeFormat(locale, {
+                      dateStyle: 'medium',
+                      timeStyle: 'short',
+                    }).format(new Date(item.terminalAt ?? item.updatedAt)),
+                    amount: format(item.appliedAmount),
+                  }))}
+                />
+              </SaleDetailSection>
+            ) : null}
           </div>
         )}
       </Dialog>
 
-      {showReceipt
+      {open && showReceipt
         ? createPortal(
             <div className={`pos-receipt-print pos-receipt-print--${receiptPaper}`}>
               <ReceiptContent
@@ -3127,7 +3456,7 @@ function ReceiptContent({
 }: {
   sale: Sale;
   activeLines: readonly SaleLine[];
-  customer: PosCustomer;
+  customer: SaleCustomer | null;
   locale: string;
   businessName: string;
   branchName: string;
@@ -3146,7 +3475,7 @@ function ReceiptContent({
         <h2 className="text-lg font-black tracking-tight">{businessName}</h2>
         <p className="mt-1 text-xs text-slate-500">{branchName}</p>
         <div className="my-4 border-t border-dashed border-slate-300" />
-        <p className="font-mono text-xs font-semibold">{transactionNumber(sale.id, locale)}</p>
+        <p className="font-mono text-xs font-semibold">{transactionNumber(sale, locale)}</p>
         <p className="mt-1 text-[11px] text-slate-500">{transactionDate}</p>
         <p className="mt-1 text-[11px] text-slate-500">
           {copy('Cashier')}: {cashierName}
@@ -3155,15 +3484,17 @@ function ReceiptContent({
 
       <section className="mt-4 text-xs">
         <p className="font-semibold">{copy('Customer')}</p>
-        <p className="mt-1">{customer.name}</p>
-        {customer.phone ? <p className="text-slate-500">{customer.phone}</p> : null}
+        <p className="mt-1">{customerDisplayName(customer, locale)}</p>
+        {customerDisplayDetail(customer) ? (
+          <p className="text-slate-500">{customerDisplayDetail(customer)}</p>
+        ) : null}
       </section>
 
       <div className="my-4 border-t border-dashed border-slate-300" />
 
       <section className="space-y-2.5">
         {activeLines.map((line) => {
-          const discountPercentage = lineDiscountPercentage(line);
+          const lineDiscounts = lineDiscountRows(sale, line, copy('Discount'));
           return (
             <div key={line.id} className="text-xs leading-4">
               <div className="flex items-start justify-between gap-3">
@@ -3178,15 +3509,22 @@ function ReceiptContent({
               <p className="mt-1 text-slate-500">
                 {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
               </p>
-              {isPositiveDecimal(line.lineDiscountAmount) ? (
-                <div className="mt-1 flex justify-between gap-3 text-slate-500">
-                  <span>
-                    {copy('Item discount')}
-                    {discountPercentage ? ` (${discountPercentage}%)` : ''}
+              {lineDiscounts.map((discount) => (
+                <div
+                  key={discount.id}
+                  className="mt-1 flex items-start justify-between gap-3 text-slate-500"
+                >
+                  <span className="min-w-0">
+                    {discount.title}
+                    {discount.note ? (
+                      <span className="block break-words text-[10px] leading-3">
+                        {discount.note}
+                      </span>
+                    ) : null}
                   </span>
-                  <span>−{money(line.lineDiscountAmount, locale)}</span>
+                  <span className="shrink-0">−{money(discount.amount, locale)}</span>
                 </div>
-              ) : null}
+              ))}
             </div>
           );
         })}
@@ -3199,15 +3537,20 @@ function ReceiptContent({
           <dt className="text-slate-500">{copy('Subtotal')}</dt>
           <dd>{money(sale.grossAmount, locale)}</dd>
         </div>
-        {discountRows.map((row) => (
-          <div key={row.id} className="flex justify-between gap-3">
-            <dt className="text-slate-500">
-              {row.label || copy('Discount')}
-              {row.percentage ? ` (${row.percentage}%)` : ''}
-            </dt>
-            <dd>−{money(row.amount, locale)}</dd>
-          </div>
-        ))}
+        {discountRows.map((row) => {
+          const text = discountPresentation(row, copy('Discount'));
+          return (
+            <div key={row.id} className="flex items-start justify-between gap-3">
+              <dt className="min-w-0 text-slate-500">
+                {text.title}
+                {text.note ? (
+                  <span className="block break-words text-[10px] leading-3">{text.note}</span>
+                ) : null}
+              </dt>
+              <dd className="shrink-0">−{money(row.amount, locale)}</dd>
+            </div>
+          );
+        })}
         {hasDiscount && discountRows.length === 0 ? (
           <div className="flex justify-between gap-3">
             <dt className="text-slate-500">{copy('Discount')}</dt>
@@ -3260,170 +3603,6 @@ function ReceiptContent({
   );
 }
 
-function ReferenceServiceWorkLine({
-  line,
-  employees,
-  locale,
-  units,
-  active,
-  isMutating,
-  onManage,
-}: {
-  line: SaleLine;
-  employees: readonly Employee[];
-  locale: string;
-  units: readonly ServiceWorkUnit[];
-  active: boolean;
-  isMutating: boolean;
-  onManage: () => void;
-}) {
-  const { copy } = useOperationalLocalization();
-  const workSummary = serviceWorkAssignmentSummary(units, employees, locale);
-  const discountPercentage = lineDiscountPercentage(line);
-
-  return (
-    <div className="p-4">
-      <div className="flex justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold">{line.itemNameSnapshot}</p>
-          <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-            {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
-            {line.variantNameSnapshot ? `, ${line.variantNameSnapshot}` : ''}
-          </p>
-          {isPositiveDecimal(line.lineDiscountAmount) ? (
-            <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
-              {copy('Item discount')}
-              {discountPercentage ? ` (${discountPercentage}%)` : ''}: −
-              {money(line.lineDiscountAmount, locale)}
-            </p>
-          ) : null}
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
-            <span className="min-w-0 flex-1 truncate text-[var(--color-text-muted)]">
-              {units.length} {copy('work units')}, {workSummary}
-            </span>
-            {active ? (
-              <DButton
-                size="icon"
-                variant="ghost"
-                disabled={isMutating}
-                aria-label={`${copy('Configure')} ${line.itemNameSnapshot}`}
-                onClick={onManage}
-              >
-                <Pencil className="size-3.5" />
-              </DButton>
-            ) : null}
-          </div>
-        </div>
-        <p className="shrink-0 text-sm font-bold">{money(line.grossAmount, locale)}</p>
-      </div>
-    </div>
-  );
-}
-
-function ReferenceFinancialSummary({ sale, locale }: { sale: Sale; locale: string }) {
-  const { copy } = useOperationalLocalization();
-  const [expanded, setExpanded] = useState(false);
-  const { totalPaid, balanceDue } = financialSummary(sale);
-  const hasDiscount = !createDecimal(sale.discountAmount).equals(createDecimal('0'));
-  const hasTax = !createDecimal(sale.taxAmount).equals(createDecimal('0'));
-  const cashPayments = successfulPayments(sale).filter((payment) => payment.method === 'CASH');
-  const cashTendered = cashPayments.reduce(
-    (total, payment) => total.plus(createDecimal(payment.tenderedAmount ?? '0')),
-    createDecimal('0'),
-  );
-  const cashChange = cashPayments.reduce(
-    (total, payment) => total.plus(createDecimal(payment.changeAmount ?? '0')),
-    createDecimal('0'),
-  );
-  const hasCashTendered = cashPayments.some((payment) => payment.tenderedAmount !== null);
-  const hasCashChange = !cashChange.equals(createDecimal('0'));
-
-  return (
-    <section className="sticky bottom-0 z-10 flex shrink-0 flex-col border-t border-[var(--color-border)] bg-[var(--color-surface)]">
-      <div
-        className={`order-2 grid transition-[grid-template-rows] duration-200 ease-out ${expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
-      >
-        <div className="overflow-hidden">
-          <dl className="space-y-1.5 border-b border-[var(--color-border)] px-5 py-3 text-xs">
-            <div className="flex justify-between gap-3">
-              <dt className="text-[var(--color-text-muted)]">{copy('Subtotal')}</dt>
-              <dd>{money(sale.grossAmount, locale)}</dd>
-            </div>
-            {hasDiscount ? (
-              <div className="flex justify-between gap-3">
-                <dt className="text-[var(--color-text-muted)]">
-                  {transactionDiscountLabel(sale, copy('Promotions and discounts'))}
-                </dt>
-                <dd>−{money(sale.discountAmount, locale)}</dd>
-              </div>
-            ) : null}
-            {hasTax ? (
-              <div className="flex justify-between gap-3">
-                <dt className="text-[var(--color-text-muted)]">{saleTaxLabel(sale, copy('Tax'))}</dt>
-                <dd>{money(sale.taxAmount, locale)}</dd>
-              </div>
-            ) : null}
-            <div className="flex justify-between gap-3 border-t border-[var(--color-border)] pt-2 font-semibold">
-              <dt>{copy('Total')}</dt>
-              <dd>{money(sale.totalAmount, locale)}</dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt className="text-[var(--color-text-muted)]">{copy('Paid amount')}</dt>
-              <dd>{money(totalPaid, locale)}</dd>
-            </div>
-            <div className="flex justify-between gap-3 font-semibold text-[var(--color-brand)]">
-              <dt>{copy('Balance')}</dt>
-              <dd>{money(balanceDue, locale)}</dd>
-            </div>
-            {hasCashTendered ? (
-              <div className="flex justify-between gap-3">
-                <dt className="text-[var(--color-text-muted)]">{copy('Cash received')}</dt>
-                <dd>{money(cashTendered.toFixed(4), locale)}</dd>
-              </div>
-            ) : null}
-            {hasCashChange ? (
-              <div className="flex justify-between gap-3">
-                <dt className="text-[var(--color-text-muted)]">{copy('Change')}</dt>
-                <dd>{money(cashChange.toFixed(4), locale)}</dd>
-              </div>
-            ) : null}
-          </dl>
-        </div>
-      </div>
-      <button
-        type="button"
-        aria-expanded={expanded}
-        onClick={() => setExpanded((current) => !current)}
-        className="order-1 grid w-full grid-cols-[1fr_1fr_1fr_auto] items-center gap-3 px-5 py-3 text-left text-xs transition-colors duration-200 hover:bg-[var(--color-surface-muted)]"
-      >
-        <span>
-          <span className="block text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]">
-            {copy('Total')}
-          </span>
-          <span className="mt-0.5 block font-semibold">{money(sale.totalAmount, locale)}</span>
-        </span>
-        <span>
-          <span className="block text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]">
-            {copy('Paid amount')}
-          </span>
-          <span className="mt-0.5 block font-semibold">{money(totalPaid, locale)}</span>
-        </span>
-        <span className="text-right">
-          <span className="block text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]">
-            {copy('Balance')}
-          </span>
-          <span className="mt-0.5 block font-semibold text-[var(--color-brand)]">
-            {money(balanceDue, locale)}
-          </span>
-        </span>
-        <ChevronDown
-          className={`size-4 text-[var(--color-text-muted)] transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
-        />
-      </button>
-    </section>
-  );
-}
-
 function ReferenceOrderAdjustmentDialog({
   sale,
   items,
@@ -3449,6 +3628,16 @@ function ReferenceOrderAdjustmentDialog({
 }) {
   const { copy } = useOperationalLocalization();
   const [catalogSearch, setCatalogSearch] = useState('');
+  const [catalogOpen, setCatalogOpen] = useState(false);
+  // Quantities when the dialog opened; only rows that differ show what changed.
+  const [baseline] = useState<ReadonlyMap<string, string>>(
+    () =>
+      new Map(
+        (sale?.lines ?? [])
+          .filter((line) => line.removedAt === null)
+          .map((line) => [line.id, line.quantity]),
+      ),
+  );
   const [variantSelection, setVariantSelection] = useState<{
     itemId: string;
     variantId: string;
@@ -3460,11 +3649,33 @@ function ReferenceOrderAdjustmentDialog({
 
   if (!sale) return null;
 
-  const paid = hasSuccessfulPayment(sale);
-  const { totalPaid } = financialSummary(sale);
-  const paidAmount = createDecimal(totalPaid);
-  const saleTotal = createDecimal(sale.totalAmount);
   const activeLines = sale.lines.filter((line) => line.removedAt === null);
+  const removedCount = [...baseline.keys()].filter(
+    (lineId) => !activeLines.some((line) => line.id === lineId),
+  ).length;
+  const changed =
+    removedCount > 0 ||
+    activeLines.some((line) => {
+      const before = baseline.get(line.id);
+      return before === undefined || !createDecimal(before).equals(createDecimal(line.quantity));
+    });
+  // Both figures come from the Runtime-returned Sale after each command.
+  const settlement = saleSettlement(sale);
+  const paidAmount = createDecimal(settlement.totalPaid);
+  const saleTotal = createDecimal(sale.totalAmount);
+  const consequence = paidAmount.greaterThan(saleTotal)
+    ? {
+        label: copy('Refund'),
+        amount: paidAmount.minus(saleTotal).toFixed(4),
+        tone: 'text-[var(--color-warning)]',
+      }
+    : paidAmount.greaterThan(createDecimal('0')) && saleTotal.greaterThan(paidAmount)
+      ? {
+          label: copy('Additional payment'),
+          amount: settlement.balanceDue,
+          tone: 'text-[var(--color-brand)]',
+        }
+      : { label: copy('Total'), amount: sale.totalAmount, tone: 'text-[var(--color-text)]' };
   const options = items
     .filter((item) => {
       const query = catalogSearch.trim().toLocaleLowerCase();
@@ -3475,70 +3686,83 @@ function ReferenceOrderAdjustmentDialog({
       value: item.id,
       label: `${item.name} (${item.code})`,
     }));
+  const stepperClass =
+    'flex size-8 items-center justify-center rounded-lg border border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] disabled:cursor-not-allowed disabled:opacity-40';
 
   return (
     <Dialog
       open
       onClose={onClose}
       title={copy('Adjust order')}
-      description={`${transactionNumber(sale.id, locale)}. ${copy('Changes apply to this transaction.')}`}
+      description={transactionNumber(sale, locale)}
       ariaLabel={copy('Adjust order')}
       closeOnEscape
       closeOnOverlay
       className="pos-reference-dialog w-full max-w-xl overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
       footer={
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={onClose}>
-            {copy('Cancel')}
-          </Button>
-          <Button disabled={isMutating} onClick={onClose}>
-            {copy('Confirm adjustment')}
-          </Button>
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0" aria-live="polite">
+            <p className="text-[11px] text-[var(--color-text-muted)]">{consequence.label}</p>
+            <p className={`text-base font-semibold tabular-nums ${consequence.tone}`}>
+              {money(consequence.amount, locale)}
+            </p>
+          </div>
+          <div className="flex shrink-0 gap-2">
+            {changed ? null : (
+              <Button variant="ghost" onClick={onClose}>
+                {copy('Cancel')}
+              </Button>
+            )}
+            <Button disabled={isMutating} onClick={onClose}>
+              {copy('Save adjustment')}
+            </Button>
+          </div>
         </div>
       }
     >
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
-        {paid ? (
-          <div className="rounded-xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 px-3 py-2 text-xs">
-            <p className="font-semibold text-[var(--color-warning)]">
-              {copy('Previous payment remains recorded')}
-            </p>
-            <p className="mt-1 text-[var(--color-text-muted)]">
-              {copy('You can add items. Reducing or removing paid items requires a refund.')}
-            </p>
-          </div>
-        ) : (
-          <p className="text-xs text-[var(--color-text-muted)]">
-            {copy('Change quantity or remove items that have not started, then confirm.')}
-          </p>
-        )}
-        <div className="divide-y divide-[var(--color-border)] overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-background)]">
+      <div className="space-y-3">
+        <p className="text-xs text-[var(--color-text-muted)]">
+          {copy(
+            hasSuccessfulPayment(sale)
+              ? 'Each change is recorded right away. Items already paid stay on the payment record.'
+              : 'Each change is recorded right away.',
+          )}
+        </p>
+        <ul className="divide-y divide-[var(--color-border)] rounded-xl border border-[var(--color-border)]">
           {activeLines.map((line) => {
             const lineMutable = !line.fulfillment || line.fulfillment.status === 'WAITING';
             const canDecrease =
               lineMutable && createDecimal(line.quantity).greaterThan(createDecimal('1'));
-            const canRemove = lineMutable;
-            const projectedTotalAfterRemoval = saleTotal.minus(createDecimal(line.totalAmount));
-            const removalRefund = paidAmount.greaterThan(projectedTotalAfterRemoval)
-              ? paidAmount.minus(projectedTotalAfterRemoval)
-              : createDecimal('0');
+            const before = baseline.get(line.id);
+            const lineChange =
+              before === undefined
+                ? copy('New')
+                : createDecimal(before).equals(createDecimal(line.quantity))
+                  ? null
+                  : `${copy('Was')} ${quantity(before)}`;
             return (
-              <div key={line.id} className="flex items-center justify-between gap-3 p-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold">{line.itemNameSnapshot}</p>
-                  {line.variantNameSnapshot ? (
-                    <p className="mt-0.5 truncate text-xs font-medium text-[var(--color-text-muted)]">
-                      {line.variantNameSnapshot}
-                    </p>
-                  ) : null}
-                  <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
-                    {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
+              <li key={line.id} className="flex items-center gap-3 px-3 py-2">
+                <div className="min-w-0 flex-1">
+                  <p
+                    className="truncate text-sm"
+                    title={`${line.itemNameSnapshot}${line.variantNameSnapshot ? ` · ${line.variantNameSnapshot}` : ''}`}
+                  >
+                    <span className="font-semibold">{line.itemNameSnapshot}</span>
+                    {line.variantNameSnapshot ? (
+                      <span className="text-[var(--color-text-muted)]">
+                        {' '}
+                        · {line.variantNameSnapshot}
+                      </span>
+                    ) : null}
                   </p>
-                  {paid && removalRefund.greaterThan(createDecimal('0')) ? (
-                    <p className="mt-1 text-[11px] font-semibold text-[var(--color-warning)]">
-                      {copy('Refund required')}: {money(removalRefund.toFixed(4), locale)}
-                    </p>
-                  ) : null}
+                  <p className="flex items-center gap-2 text-xs tabular-nums text-[var(--color-text-muted)]">
+                    {money(line.effectiveUnitPrice, locale)}
+                    {lineChange ? (
+                      <span className="rounded-full bg-[var(--color-brand)]/10 px-1.5 text-[10px] font-semibold text-[var(--color-brand)]">
+                        {lineChange}
+                      </span>
+                    ) : null}
+                  </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
                   <button
@@ -3551,11 +3775,11 @@ function ReferenceOrderAdjustmentDialog({
                         createDecimal(line.quantity).minus(createDecimal('1')).toFixed(4),
                       )
                     }
-                    className="flex size-8 items-center justify-center rounded-lg border border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] disabled:cursor-not-allowed disabled:opacity-40"
+                    className={stepperClass}
                   >
                     <Minus className="size-3.5" />
                   </button>
-                  <span className="w-8 text-center text-xs font-semibold">
+                  <span className="w-7 text-center text-xs font-semibold tabular-nums">
                     {quantity(line.quantity)}
                   </span>
                   <button
@@ -3568,46 +3792,60 @@ function ReferenceOrderAdjustmentDialog({
                         createDecimal(line.quantity).plus(createDecimal('1')).toFixed(4),
                       )
                     }
-                    className="flex size-8 items-center justify-center rounded-lg border border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] disabled:cursor-not-allowed disabled:opacity-40"
+                    className={stepperClass}
                   >
                     <Plus className="size-3.5" />
                   </button>
                   <button
                     type="button"
                     aria-label={`${copy('Remove')} ${line.itemNameSnapshot}`}
-                    disabled={!canRemove || isMutating}
+                    disabled={!lineMutable || isMutating}
                     onClick={() => onRemove(line)}
-                    className="ml-1 flex size-8 items-center justify-center rounded-lg text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="ml-0.5 flex size-8 items-center justify-center rounded-lg text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <Trash2 className="size-3.5" />
                   </button>
                 </div>
-              </div>
+              </li>
             );
           })}
-        </div>
-
-        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] p-3">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
-            {copy('Add item from catalog')}
+        </ul>
+        {removedCount ? (
+          <p className="text-xs text-[var(--color-text-muted)]">
+            {removedCount} {copy('items removed')}
           </p>
-          <Combobox
-            ariaLabel={copy('Add item from catalog')}
-            value={null}
-            placeholder={copy('Search product or service')}
-            options={options}
-            onSearchChange={setCatalogSearch}
-            onChange={(itemId) => {
-              const item = items.find((candidate) => candidate.id === itemId);
-              if (item) onAdd(item);
-            }}
+        ) : null}
+
+        {catalogOpen || variantPicker ? (
+          <div className="space-y-2">
+            <Combobox
+              ariaLabel={copy('Add item from catalog')}
+              value={null}
+              placeholder={copy('Search product or service')}
+              options={options}
+              onSearchChange={setCatalogSearch}
+              onChange={(itemId) => {
+                const item = items.find((candidate) => candidate.id === itemId);
+                if (item) onAdd(item);
+              }}
+              disabled={isMutating}
+              idleMessage={copy('Search by item name or code.')}
+            />
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setCatalogOpen(true)}
             disabled={isMutating}
-            idleMessage={copy('Search by item name or code.')}
-          />
-        </div>
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-semibold text-[var(--color-brand)] hover:bg-[var(--color-brand)]/10 disabled:opacity-50"
+          >
+            <Plus className="size-3.5" aria-hidden="true" />
+            {copy('Add item from catalog')}
+          </button>
+        )}
 
         {variantPicker ? (
-          <section className="border-t border-[var(--color-border)] pt-3">
+          <section className="rounded-xl border border-[var(--color-border)] p-3">
             <div className="space-y-3">
               <p className="text-sm font-semibold text-[var(--color-text)]">
                 {variantPicker.item.name}
@@ -3719,7 +3957,7 @@ function ReferenceBalancePaymentDialog({
       open
       onClose={onClose}
       title={copy(hasSuccessfulPayment(sale) ? 'Pay balance' : 'Pay')}
-      description={transactionNumber(sale.id, locale)}
+      description={transactionNumber(sale, locale)}
       ariaLabel={copy('Payment')}
       closeOnEscape
       closeOnOverlay
@@ -3759,7 +3997,7 @@ function ReferenceBalancePaymentDialog({
                 className={`flex h-10 items-center justify-center gap-1 rounded-xl border text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${method === option.value ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white' : 'border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]'}`}
               >
                 {option.icon}
-                <span className="hidden sm:inline">{label(option.value)}</span>
+                <span className="pos-payment-method-label">{label(option.value)}</span>
               </button>
             );
           })}
@@ -3831,61 +4069,15 @@ function ReferenceCancelDialog({
   return (
     <Dialog
       open={Boolean(sale)}
+      title={copy('Cancel transaction')}
+      description={sale ? transactionNumber(sale, locale) : ''}
       onClose={onClose}
       ariaLabel={copy('Cancel transaction')}
       closeOnEscape={!isMutating}
       closeOnOverlay={!isMutating}
-      className="pos-reference-dialog w-full max-w-md rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
-    >
-      <div className="p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-danger)]">
-              {copy('Cancel transaction')}
-            </p>
-            <h2 className="mt-1 text-lg font-semibold">{copy('Cancel this transaction?')}</h2>
-            <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-              {sale ? transactionNumber(sale.id, locale) : ''}.{' '}
-              {copy('The transaction remains recorded in today queue.')}
-            </p>
-          </div>
-          <button
-            type="button"
-            aria-label={copy('Close')}
-            disabled={isMutating}
-            onClick={onClose}
-            className="rounded-lg p-2 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] disabled:opacity-40"
-          >
-            <X className="size-[18px]" />
-          </button>
-        </div>
-        {hasRefund ? (
-          <div className="mt-4 rounded-xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 px-3 py-3">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-sm font-semibold text-[var(--color-warning)]">
-                {copy('Refund required')}
-              </span>
-              <span className="text-sm font-bold text-[var(--color-warning)]">
-                {money(refundAmount, locale)}
-              </span>
-            </div>
-            <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-              {copy('Previous payment remains recorded')}
-            </p>
-          </div>
-        ) : null}
-        <label className="mt-5 block text-sm font-medium">
-          {copy('Cancellation reason')}
-          <Input
-            className="mt-1.5 h-10 rounded-lg"
-            autoFocus
-            value={reason}
-            disabled={isMutating}
-            onChange={onReasonChange}
-            placeholder={copy('Example: Customer request')}
-          />
-        </label>
-        <div className="mt-5 flex justify-end gap-2">
+      className="pos-reference-dialog w-full max-w-md rounded-t-2xl bg-(--color-surface) shadow-xl sm:rounded-xl"
+      footer={
+        <div className="flex justify-end gap-2">
           <Button variant="outline" disabled={isMutating} onClick={onClose}>
             {copy('Back')}
           </Button>
@@ -3898,457 +4090,36 @@ function ReferenceCancelDialog({
             {copy('Confirm cancellation')}
           </Button>
         </div>
-      </div>
-    </Dialog>
-  );
-}
-
-function ReferenceEmployeeDialog({
-  line,
-  employees,
-  locale,
-  onClose,
-  onSave,
-}: {
-  line: SaleLine | null;
-  employees: readonly Employee[];
-  locale: string;
-  onClose: () => void;
-  onSave: (
-    employeeIds: string[],
-    contributors: Array<{ employeeId: string; shareRate: string }>,
-  ) => void;
-}) {
-  const { copy } = useOperationalLocalization();
-  const initialRows =
-    line?.participations
-      .filter((participation) => participation.assigned)
-      .map((participation) => ({
-        employeeId: participation.employeeId,
-        shareRate: participation.shareRate
-          ? createDecimal(participation.shareRate).times(100).toFixed(0)
-          : '100',
-        locked: true,
-      })) ?? [];
-  const [rows, setRows] = useState<
-    Array<{ employeeId: string; shareRate: string; locked: boolean }>
-  >([]);
-  const isOpen = Boolean(line);
-  const activeRows = rows.length
-    ? rows
-    : initialRows.length
-      ? initialRows
-      : [{ employeeId: '', shareRate: '100', locked: false }];
-  const distribute = (
-    source: Array<{ employeeId: string; shareRate: string; locked: boolean }>,
-  ) => {
-    const locked = source
-      .filter((row) => row.locked)
-      .reduce((sum, row) => sum.plus(createDecimal(row.shareRate || '0')), createDecimal('0'));
-    const openRows = source.filter((row) => !row.locked);
-    if (!openRows.length) return source;
-    const remaining = createDecimal('100').minus(locked).greaterThan(createDecimal('0'))
-      ? createDecimal('100').minus(locked)
-      : createDecimal('0');
-    const base = remaining.dividedBy(openRows.length).toFixed(0);
-    let placed = createDecimal('0');
-    return source.map((row) => {
-      if (row.locked) return row;
-      placed = placed.plus(createDecimal(base));
-      const isLast = openRows.indexOf(row) === openRows.length - 1;
-      return {
-        ...row,
-        shareRate: isLast ? remaining.minus(placed.minus(createDecimal(base))).toFixed(0) : base,
-      };
-    });
-  };
-  const total = activeRows.reduce(
-    (sum, row) => sum.plus(createDecimal(row.shareRate || '0')),
-    createDecimal('0'),
-  );
-  const valid =
-    activeRows.length > 0 &&
-    activeRows.every((row) => row.employeeId) &&
-    total.equals(createDecimal('100'));
-  if (!line) return null;
-
-  return (
-    <Dialog
-      open={isOpen}
-      title={copy('Employees for service')}
-      description={copy('Set employees and contribution shares before completing the transaction.')}
-      onClose={() => {
-        setRows([]);
-        onClose();
-      }}
-      ariaLabel={copy('Employees for service')}
-      closeOnEscape
-      closeOnOverlay
-      className="pos-reference-dialog w-full max-w-2xl overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
-      footer={
-        <footer className="flex shrink-0 items-center justify-between gap-2">
-          <span className="text-[11px] text-[var(--color-text-muted)]">
-            {copy(valid ? 'All shares total 100%' : 'Complete employee shares')}
-          </span>
-          <div className="flex gap-2">
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setRows([]);
-                onClose();
-              }}
-            >
-              {copy('Cancel')}
-            </Button>
-            <Button
-              disabled={!valid}
-              onClick={() =>
-                onSave(
-                  activeRows.map((row) => row.employeeId),
-                  activeRows.map((row) => ({
-                    employeeId: row.employeeId,
-                    shareRate: createDecimal(row.shareRate).dividedBy(100).toFixed(4),
-                  })),
-                )
-              }
-            >
-              {copy('Save')}
-            </Button>
-          </div>
-        </footer>
       }
     >
-      <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)]/20 p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <div>
-            <p className="text-sm font-semibold">{line.itemNameSnapshot}</p>
-            <p className="text-xs text-[var(--color-text-muted)]">
-              {copy('Quantity')} {quantity(line.quantity)}, {money(line.grossAmount, locale)}
-            </p>
-          </div>
-          <span
-            className={`rounded-full px-2.5 py-1 text-xs font-semibold ${valid ? 'bg-[var(--color-success)]/10 text-[var(--color-success)]' : 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]'}`}
-          >
-            {copy('Total')} {total.toFixed(0)}%
-          </span>
-        </div>
-        <div className="space-y-2">
-          {activeRows.map((row, index) => (
-            <div key={`${row.employeeId}-${index}`} className="grid grid-cols-12 items-end gap-2">
-              <label className="col-span-6 text-xs font-medium">
-                {copy('Employee')}
-                <div className="mt-1">
-                  <Combobox
-                    ariaLabel={`${copy('Employee')} ${index + 1}`}
-                    value={row.employeeId}
-                    placeholder={copy('Select an employee.')}
-                    options={employees.map((employee) => ({
-                      value: employee.id,
-                      label: employee.displayName,
-                    }))}
-                    onChange={(employeeId) => {
-                      if (typeof employeeId !== 'string') return;
-                      const next = [...activeRows];
-                      next[index] = { ...next[index]!, employeeId };
-                      setRows(next);
-                    }}
-                  />
-                </div>
-              </label>
-              <label className="col-span-3 text-xs font-medium">
-                {copy('Share')}
-                <div className="mt-1">
-                  <PosNumericInput
-                    aria-label={`${copy('Share')} ${index + 1}`}
-                    className="h-9 rounded-lg text-sm"
-                    disabled={activeRows.length === 1}
-                    value={row.shareRate}
-                    integer
-                    min="0"
-                    max="100"
-                    suffix="%"
-                    onChange={(shareRate) => {
-                      const next = [...activeRows];
-                      next[index] = {
-                        ...next[index]!,
-                        shareRate,
-                        locked: true,
-                      };
-                      setRows(distribute(next));
-                    }}
-                  />
-                </div>
-              </label>
-              <div className="col-span-3 flex h-9 items-center justify-end gap-1">
-                <button
-                  type="button"
-                  title={copy('Split evenly')}
-                  disabled={activeRows.length === 1}
-                  onClick={() => {
-                    const next = [...activeRows];
-                    next[index] = { ...next[index]!, locked: !next[index]!.locked };
-                    setRows(distribute(next));
-                  }}
-                  className={`rounded-lg p-2 transition-colors ${row.locked ? 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]'}`}
-                >
-                  %
-                </button>
-                <button
-                  type="button"
-                  aria-label={`${copy('Remove')} ${copy('Employee')} ${index + 1}`}
-                  disabled={activeRows.length === 1}
-                  onClick={() =>
-                    setRows(
-                      distribute(
-                        activeRows.filter((row, rowIndex) => Boolean(row) && rowIndex !== index),
-                      ),
-                    )
-                  }
-                  className="rounded-lg p-2 text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10"
-                >
-                  <Trash2 className="size-3.5" />
-                </button>
-              </div>
+      <>
+        {hasRefund ? (
+          <div className="mt-4 rounded-xl border border-(--color-warning)/30 bg-(--color-warning)/10 px-3 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm font-semibold text-(--color-warning)">
+                {copy('Refund required')}
+              </span>
+              <span className="text-sm font-bold text-(--color-warning)">
+                {money(refundAmount, locale)}
+              </span>
             </div>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={() =>
-            setRows(distribute([...activeRows, { employeeId: '', shareRate: '0', locked: false }]))
-          }
-          className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-[var(--color-brand)] hover:underline"
-        >
-          <UserPlus className="size-3" />
-          {copy('Add employee')}
-        </button>
-        {!valid ? (
-          <p className="mt-2 text-xs text-[var(--color-warning)]">
-            {copy('Complete employees and make sure total share is 100%.')}
-          </p>
-        ) : null}
-      </div>
-    </Dialog>
-  );
-}
-
-function editableWorkContributors(
-  contributors: readonly ServiceWorkContributor[],
-): ServiceWorkContributor[] {
-  return contributors.length
-    ? contributors.map((contributor) => ({ ...contributor }))
-    : [{ employeeId: '', shareRate: '1.0000' }];
-}
-
-function ServiceWorkContributorEditor({
-  contributors,
-  employees,
-  onChange,
-}: {
-  contributors: readonly ServiceWorkContributor[];
-  employees: readonly Employee[];
-  onChange: (contributors: ServiceWorkContributor[]) => void;
-}) {
-  const { copy } = useOperationalLocalization();
-  const rows = editableWorkContributors(contributors);
-  const total = contributionTotal(rows).times(100).toFixed(0);
-
-  return (
-    <div className="space-y-2">
-      {rows.map((row, index) => (
-        <div
-          key={`${row.employeeId}-${index}`}
-          className="grid grid-cols-[minmax(0,1fr)_74px_28px] items-end gap-2"
-        >
-          <label className="text-[11px] font-medium text-[var(--color-text-muted)]">
-            {copy('Employee')}
-            <Combobox
-              ariaLabel={`${copy('Employee')} ${index + 1}`}
-              value={row.employeeId}
-              placeholder={copy('Select an employee.')}
-              options={employees.map((employee) => ({
-                value: employee.id,
-                label: employee.displayName,
-              }))}
-              onChange={(employeeId) => {
-                if (typeof employeeId !== 'string') return;
-                const next = [...rows];
-                next[index] = { ...next[index]!, employeeId };
-                onChange(next);
-              }}
-            />
-          </label>
-          <label className="text-[11px] font-medium text-[var(--color-text-muted)]">
-            {copy('Share')}
-            <PosNumericInput
-              aria-label={`${copy('Share')} ${index + 1}`}
-              className="h-9 rounded-lg text-sm"
-              value={createDecimal(row.shareRate).times(100).toFixed(0)}
-              integer
-              min="0"
-              max="100"
-              suffix="%"
-              onChange={(shareRate) => {
-                const next = [...rows];
-                next[index] = {
-                  ...next[index]!,
-                  shareRate: createDecimal(shareRate || '0')
-                    .dividedBy(100)
-                    .toFixed(4),
-                };
-                onChange(next);
-              }}
-            />
-          </label>
-          <button
-            type="button"
-            disabled={rows.length === 1}
-            aria-label={`${copy('Remove')} ${copy('Employee')} ${index + 1}`}
-            onClick={() => onChange([...rows.slice(0, index), ...rows.slice(index + 1)])}
-            className="mb-0.5 rounded-lg p-2 text-[var(--color-danger)] transition-colors hover:bg-[var(--color-danger)]/10 disabled:opacity-40"
-          >
-            <Trash2 className="size-3.5" />
-          </button>
-        </div>
-      ))}
-      <div className="flex items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={() => onChange([...rows, { employeeId: '', shareRate: '0.0000' }])}
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--color-brand)] hover:underline"
-        >
-          <UserPlus className="size-3" />
-          {copy('Add employee')}
-        </button>
-        <span
-          className={`text-xs font-semibold ${total === '100' ? 'text-[var(--color-success)]' : 'text-[var(--color-warning)]'}`}
-        >
-          {copy('Total')} {total}%
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function ReferenceServiceWorkDialog({
-  line,
-  employees,
-  locale,
-  units,
-  onClose,
-  onSave,
-}: {
-  line: SaleLine | null;
-  employees: readonly Employee[];
-  locale: string;
-  units: readonly ServiceWorkUnit[];
-  onClose: () => void;
-  onSave: (units: readonly ServiceWorkUnit[]) => void;
-}) {
-  const { copy } = useOperationalLocalization();
-  const [mode, setMode] = useState<'SAME' | 'PER_UNIT'>('SAME');
-  const [sharedContributors, setSharedContributors] = useState<ServiceWorkContributor[]>(() =>
-    editableWorkContributors(units[0]?.contributors ?? []),
-  );
-  const [unitPlans, setUnitPlans] = useState<ServiceWorkUnit[]>(() =>
-    units.map((unit) => ({
-      ...unit,
-      contributors: editableWorkContributors(unit.contributors),
-    })),
-  );
-
-  if (!line) return null;
-  const plannedUnits =
-    mode === 'SAME'
-      ? units.map((unit) => ({ ...unit, contributors: sharedContributors }))
-      : unitPlans;
-  const valid = plannedUnits.every((unit) => hasValidWorkAssignment(line, unit));
-
-  return (
-    <Dialog
-      open
-      title={copy('Manage work')}
-      description={`${line.itemNameSnapshot}, ${quantity(line.quantity)} ${copy('work units')}`}
-      onClose={onClose}
-      ariaLabel={copy('Manage work')}
-      closeOnEscape
-      closeOnOverlay
-      className="pos-reference-dialog w-full max-w-2xl overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
-      footer={
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-[11px] text-[var(--color-text-muted)]">
-            {copy(valid ? 'Each work unit totals 100%' : 'Each work unit must total 100%')}
-          </span>
-          <div className="flex gap-2">
-            <Button variant="ghost" onClick={onClose}>
-              {copy('Cancel')}
-            </Button>
-            <Button disabled={!valid} onClick={() => onSave(plannedUnits)}>
-              {copy('Save work')}
-            </Button>
-          </div>
-        </div>
-      }
-    >
-      <div className="space-y-4">
-        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)]/20 p-3">
-          <p className="text-sm font-semibold">{line.itemNameSnapshot}</p>
-          <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-            {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
-          </p>
-        </div>
-        <div className="flex gap-2" aria-label={copy('Work mode')}>
-          <DButton
-            size="sm"
-            variant={mode === 'SAME' ? 'primary' : 'secondary'}
-            onClick={() => setMode('SAME')}
-          >
-            {copy('Same for all')}
-          </DButton>
-          <DButton
-            size="sm"
-            variant={mode === 'PER_UNIT' ? 'primary' : 'secondary'}
-            onClick={() => setMode('PER_UNIT')}
-          >
-            {copy('Set per work unit')}
-          </DButton>
-        </div>
-        {mode === 'SAME' ? (
-          <div className="rounded-xl border border-[var(--color-border)] p-3">
-            <p className="mb-3 text-xs text-[var(--color-text-muted)]">
-              {copy('Apply this configuration to all work units.')}
+            <p className="mt-1 text-xs text-(--color-text-muted)">
+              {copy('Previous payment remains recorded')}
             </p>
-            <ServiceWorkContributorEditor
-              contributors={sharedContributors}
-              employees={employees}
-              onChange={setSharedContributors}
-            />
           </div>
-        ) : (
-          <div className="max-h-[52dvh] space-y-2 overflow-y-auto pr-1">
-            {unitPlans.map((unit) => (
-              <div key={unit.index} className="rounded-xl border border-[var(--color-border)] p-3">
-                <div className="mb-3">
-                  <p className="text-sm font-semibold">
-                    {copy('Work unit')} #{unit.index + 1}
-                  </p>
-                </div>
-                <ServiceWorkContributorEditor
-                  contributors={unit.contributors}
-                  employees={employees}
-                  onChange={(contributors) =>
-                    setUnitPlans((current) =>
-                      current.map((candidate) =>
-                        candidate.index === unit.index ? { ...candidate, contributors } : candidate,
-                      ),
-                    )
-                  }
-                />
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+        ) : null}
+        <label className="mt-5 block text-sm font-medium">
+          {copy('Cancellation reason')}
+          <DTextarea
+            className="mt-1.5 h-10 rounded-lg"
+            autoFocus
+            value={reason}
+            disabled={isMutating}
+            onChange={onReasonChange}
+            placeholder={copy('Example: Customer request')}
+          />
+        </label>
+      </>
     </Dialog>
   );
 }

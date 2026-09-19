@@ -1,16 +1,33 @@
 import { ApiClient } from '@digvation/business-api';
 import { useAuth } from '@digvation/business-auth';
 import { useConnectivity, useDeploymentBootstrap } from '@digvation/business-runtime';
-import { DAvatar, DButton, DDialog, DDropdown, useToast } from '@digvation/ui';
+import { DAlert, DAvatar, DButton, DDialog, DDropdown, useToast } from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
-import { Building2, Check, ChevronDown, LogOut, MapPin, Menu, UserRound } from 'lucide-react';
+import {
+  Building2,
+  Check,
+  ChevronDown,
+  ChevronsUpDown,
+  KeyRound,
+  LogOut,
+  MapPin,
+  Menu,
+  MessageCircle,
+  UserRound,
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 
+import { referenceQueryPolicy } from '../../app/data/operational-cache-policy';
 import { useOperationalLocalization } from '../../app/localization/operational-localization';
 import { getAppVersion } from '../../app/version/app-version';
 import { OperationalNotificationBell } from '../notifications/operational-notification-bell';
 import { OperationalAccessApi, operationalAccessKeys } from './operational-access-api';
+import {
+  PasswordChangeUnavailableError,
+  unavailablePasswordChange,
+  type OperationalPasswordChangePort,
+} from './operational-password-change';
 import type { OperationalNavigationSection } from './operational-navigation';
 import { resolveOperationalLocationSelection } from './operational-location-selection';
 import { useOperationalSession } from './operational-session-provider';
@@ -37,9 +54,14 @@ function identityInitials(displayName: string): string | null {
 
 interface OperationalShellProps {
   navigationSections: readonly OperationalNavigationSection[];
+  /** Integration point for the Runtime-backed WhatsApp password-reset engine. */
+  passwordChange?: OperationalPasswordChangePort;
 }
 
-export function OperationalShell({ navigationSections }: OperationalShellProps) {
+export function OperationalShell({
+  navigationSections,
+  passwordChange = unavailablePasswordChange,
+}: OperationalShellProps) {
   const bootstrap = useDeploymentBootstrap();
   const connectivity = useConnectivity();
   const { copy, label } = useOperationalLocalization();
@@ -47,6 +69,9 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
   const { showToast } = useToast();
   const [isLoggingOut, setLoggingOut] = useState(false);
   const [isAccountDialogOpen, setAccountDialogOpen] = useState(false);
+  const [resetLinkState, setResetLinkState] = useState<
+    { kind: 'idle' | 'pending' | 'sent' } | { kind: 'failed'; reason: 'unavailable' | 'failed' }
+  >({ kind: 'idle' });
   const {
     selectedLocationId,
     selectLocation,
@@ -72,6 +97,7 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
   const operationalAccessQuery = useQuery({
     queryKey: operationalAccessKeys.context(),
     queryFn: ({ signal }) => operationalAccess.context(signal),
+    ...referenceQueryPolicy,
   });
   const locations = useMemo(
     () => operationalAccessQuery.data?.locations ?? [],
@@ -150,6 +176,57 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
     }
   };
 
+  const requestPasswordResetLink = async () => {
+    if (resetLinkState.kind === 'pending') return;
+    setResetLinkState({ kind: 'pending' });
+    try {
+      await passwordChange.requestResetLink();
+      setResetLinkState({ kind: 'sent' });
+    } catch (error) {
+      setResetLinkState({
+        kind: 'failed',
+        reason: error instanceof PasswordChangeUnavailableError ? 'unavailable' : 'failed',
+      });
+    }
+  };
+
+  const openAccountDialog = () => {
+    setResetLinkState({ kind: 'idle' });
+    setAccountDialogOpen(true);
+  };
+
+  // The single account entry point: sidebar on desktop, navigation menu on mobile.
+  const profileButton = (
+    <button
+      type="button"
+      onClick={openAccountDialog}
+      aria-label={copy('Open account information')}
+      aria-haspopup="dialog"
+      aria-expanded={isAccountDialogOpen}
+      className="flex w-full min-w-0 items-center gap-3 rounded-[var(--radius-control)] px-2 py-2 text-left transition-colors duration-150 hover:bg-[var(--color-surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/25"
+    >
+      <DAvatar
+        alt=""
+        name={session.identity.displayName}
+        fallback={userInitials ?? <UserRound className="size-4" aria-label={copy('Account')} />}
+        size="sm"
+        className="shrink-0 bg-[var(--color-brand)]/10 text-xs font-bold text-[var(--color-brand)]"
+      />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-medium leading-5 text-[var(--color-text)]">
+          {session.identity.displayName}
+        </span>
+        <span className="block truncate text-xs leading-4 text-[var(--color-text-muted)]">
+          {usernameLabel ?? primaryRole?.name ?? copy('Account')}
+        </span>
+      </span>
+      <ChevronsUpDown
+        className="size-4 shrink-0 text-[var(--color-text-muted)]"
+        aria-hidden="true"
+      />
+    </button>
+  );
+
   const branchLabel =
     selectedLocation?.name ??
     copy(operationalAccessQuery.isLoading ? 'Loading branch' : 'Choose branch');
@@ -191,41 +268,7 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
           <OperationalNavigationGroups navigationSections={navigationSections} />
         </nav>
 
-        <div className="mt-auto border-t border-[var(--color-border)]">
-          <div className="px-4 py-3">
-            <div className="flex min-w-0 items-center gap-3">
-              <DAvatar
-                alt=""
-                name={session.identity.displayName}
-                fallback={
-                  userInitials ?? <UserRound className="size-4" aria-label={copy('Account')} />
-                }
-                size="sm"
-                className="shrink-0 bg-[var(--color-brand)]/10 text-xs font-bold text-[var(--color-brand)]"
-              />
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-medium leading-5 text-[var(--color-text)]">
-                  {session.identity.displayName}
-                </span>
-                <span className="block truncate text-xs leading-4 text-[var(--color-text-muted)]">
-                  {primaryRole?.name ?? `${copy('Version')} ${version.version}`}
-                </span>
-              </span>
-            </div>
-          </div>
-          <div className="border-t border-[var(--color-border)] px-3 py-2">
-            <DButton
-              variant="ghost"
-              type="button"
-              leftIcon={<LogOut className="size-4 shrink-0" />}
-              loading={isLoggingOut}
-              onClick={() => void handleLogout()}
-              className="flex h-9 w-full items-center justify-start gap-2.5 px-3 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)]"
-            >
-              {copy('Logout')}
-            </DButton>
-          </div>
-        </div>
+        <div className="mt-auto border-t border-[var(--color-border)] p-2">{profileButton}</div>
       </aside>
 
       <main className="operational-shell__main flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden">
@@ -254,6 +297,7 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
                 <nav className="p-3">
                   <OperationalNavigationGroups navigationSections={navigationSections} />
                 </nav>
+                <div className="border-t border-[var(--color-border)] p-2">{profileButton}</div>
               </DDropdown>
             </div>
             <span
@@ -272,32 +316,6 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
 
           <div className="flex min-w-0 items-center gap-1.5">
             <OperationalNotificationBell />
-            <button
-              type="button"
-              onClick={() => setAccountDialogOpen(true)}
-              aria-label={copy('Open account information')}
-              aria-haspopup="dialog"
-              aria-expanded={isAccountDialogOpen}
-              className="flex h-[42px] min-w-0 max-w-[min(50vw,340px)] items-center gap-3 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface-muted)]/45 px-2.5 text-left transition-colors duration-150 hover:bg-[var(--color-surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/20"
-            >
-              <span className="hidden min-w-0 flex-1 flex-col justify-center sm:flex">
-                <span className="truncate text-sm font-semibold leading-5 text-[var(--color-text)]">
-                  {session.identity.displayName}
-                </span>
-                <span className="truncate text-xs leading-4 text-[var(--color-text-muted)]">
-                  {headerIdentityContext}
-                </span>
-              </span>
-              <DAvatar
-                alt=""
-                name={session.identity.displayName}
-                fallback={
-                  userInitials ?? <UserRound className="size-4" aria-label={copy('Account')} />
-                }
-                size="sm"
-                className="shrink-0 bg-[var(--color-brand)]/10 text-xs font-bold text-[var(--color-brand)]"
-              />
-            </button>
           </div>
         </header>
 
@@ -383,25 +401,25 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
         ariaLabel={copy('Account information')}
         closeOnEscape
         closeOnOverlay
-        className="w-full max-w-md rounded-[var(--radius-panel)] bg-[var(--color-surface)]"
+        className="w-full max-w-md"
         footer={
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
             <DButton
               variant="ghost"
               leftIcon={<LogOut className="size-4" />}
               loading={isLoggingOut}
               onClick={() => void handleLogout()}
+              className="text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10"
             >
               {copy('Logout')}
             </DButton>
             <DButton variant="secondary" onClick={() => setAccountDialogOpen(false)}>
               {copy('Close')}
             </DButton>
-            <DButton disabled>{copy('Request password change')}</DButton>
           </div>
         }
       >
-        <div>
+        <div className="space-y-5">
           <div className="flex min-w-0 items-center gap-3.5">
             <DAvatar
               alt=""
@@ -421,16 +439,91 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
               </p>
             </div>
           </div>
-          {selectedLocation ? (
-            <div className="mt-5 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface-muted)]/45 p-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">
-                {copy('Active branch')}
-              </p>
-              <p className="mt-1 text-sm font-semibold text-[var(--color-text)]">
-                {selectedLocation.name}
-              </p>
+
+          <dl className="divide-y divide-[var(--color-border)] rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface-muted)]/35">
+            <div className="flex items-center justify-between gap-3 px-3 py-2.5">
+              <dt className="text-xs text-[var(--color-text-muted)]">{copy('Active branch')}</dt>
+              <dd className="flex min-w-0 items-center gap-2">
+                <span className="truncate text-sm font-semibold">{branchLabel}</span>
+                {locations.length > 1 ? (
+                  <DButton
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 text-[11px]"
+                    onClick={() => {
+                      setAccountDialogOpen(false);
+                      openBranchPicker();
+                    }}
+                  >
+                    {copy('Switch branch')}
+                  </DButton>
+                ) : null}
+              </dd>
             </div>
-          ) : null}
+            {primaryRole ? (
+              <div className="flex items-center justify-between gap-3 px-3 py-2.5">
+                <dt className="text-xs text-[var(--color-text-muted)]">{copy('Role')}</dt>
+                <dd className="truncate text-sm font-medium">{primaryRole.name}</dd>
+              </div>
+            ) : null}
+            <div className="flex items-center justify-between gap-3 px-3 py-2.5">
+              <dt className="text-xs text-[var(--color-text-muted)]">{copy('App version')}</dt>
+              <dd className="font-mono text-xs text-[var(--color-text-muted)]">
+                {version.version}
+              </dd>
+            </div>
+          </dl>
+
+          <section className="rounded-[var(--radius-control)] border border-[var(--color-border)] p-3">
+            <div className="flex items-start gap-2.5">
+              <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full bg-[var(--color-brand)]/10 text-[var(--color-brand)]">
+                <KeyRound className="size-4" aria-hidden="true" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold">{copy('Request password change')}</p>
+                <p className="mt-0.5 text-xs leading-5 text-[var(--color-text-muted)]">
+                  {copy(
+                    'A link to set a new password will be sent to the WhatsApp number registered on your account.',
+                  )}
+                </p>
+              </div>
+            </div>
+            {resetLinkState.kind === 'sent' ? (
+              <div
+                className="operational-view-enter mt-3 flex items-center gap-2 rounded-[var(--radius-control)] bg-[var(--color-success)]/10 px-3 py-2 text-xs font-semibold text-[var(--color-success)]"
+                aria-live="polite"
+              >
+                <MessageCircle className="size-4 shrink-0" aria-hidden="true" />
+                {copy('Link sent to your WhatsApp.')}
+              </div>
+            ) : (
+              <>
+                {resetLinkState.kind === 'failed' ? (
+                  <DAlert
+                    variant={resetLinkState.reason === 'unavailable' ? 'warning' : 'danger'}
+                    role="alert"
+                    className="mt-3"
+                  >
+                    {copy(
+                      resetLinkState.reason === 'unavailable'
+                        ? 'Password change is not available yet. Contact your administrator.'
+                        : 'The request could not be sent. Try again.',
+                    )}
+                  </DAlert>
+                ) : null}
+                <div className="mt-3 flex justify-end">
+                  <DButton
+                    size="sm"
+                    variant="outline"
+                    loading={resetLinkState.kind === 'pending'}
+                    onClick={() => void requestPasswordResetLink()}
+                  >
+                    {copy('Send reset link via WhatsApp')}
+                  </DButton>
+                </div>
+              </>
+            )}
+          </section>
         </div>
       </DDialog>
     </div>

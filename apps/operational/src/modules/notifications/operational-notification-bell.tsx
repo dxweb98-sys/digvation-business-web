@@ -7,11 +7,14 @@ import { Bell } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 
+import {
+  NOTIFICATION_REFRESH_INTERVAL_MS,
+  liveQueryPolicy,
+} from '../../app/data/operational-cache-policy';
 import { useOperationalLocalization } from '../../app/localization/operational-localization';
 import { NotificationApi, type BusinessNotification } from './notification-api';
 
 const recentLimit = 6;
-const refreshIntervalMs = 60_000;
 
 export function OperationalNotificationBell() {
   const bootstrap = useDeploymentBootstrap();
@@ -35,17 +38,20 @@ export function OperationalNotificationBell() {
       ),
     [authPort, bootstrap.apiBaseUrl],
   );
+  // Only the badge counter needs to arrive on its own. The list behind it is
+  // fetched when the operator opens the bell, not every minute in the
+  // background for a panel nobody has open.
   const unread = useQuery({
     queryKey: ['notifications', notificationScope, 'unread-count'],
     queryFn: () => api.unreadCount(),
-    refetchInterval: refreshIntervalMs,
-    refetchOnWindowFocus: true,
+    ...liveQueryPolicy,
+    refetchInterval: NOTIFICATION_REFRESH_INTERVAL_MS,
   });
   const recent = useQuery({
     queryKey: ['notifications', notificationScope, 'recent'],
     queryFn: () => api.list(recentLimit, 0),
-    refetchInterval: refreshIntervalMs,
-    refetchOnWindowFocus: true,
+    enabled: open,
+    staleTime: 30_000,
   });
 
   const [previousLocationKey, setPreviousLocationKey] = useState(location.key);
@@ -265,7 +271,8 @@ function notificationContext(
 }
 
 function safeOperationalNotificationPath(path: string | null): string | null {
-  return path === '/expenses' || path === '/transactions' ? path : null;
+  // Transaction history lives in Backoffice, so only Operational routes are linked here.
+  return path === '/expenses' ? path : null;
 }
 
 function stringValue(value: unknown): string | null {

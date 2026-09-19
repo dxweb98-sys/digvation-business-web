@@ -9,6 +9,18 @@ function copyForLocale(value: string, locale?: string): string {
   return operationalCopy(value, resolveOperationalLocale(locale));
 }
 
+/** Runtime promotion eligibility codes returned when a promo code is submitted. */
+const PROMOTION_ERROR_COPY: Record<string, string> = {
+  PROMOTION_NOT_FOUND: 'Promo code was not found.',
+  PROMOTION_DISABLED: 'This promotion is currently disabled.',
+  PROMOTION_NOT_STARTED: 'This promotion has not started yet.',
+  PROMOTION_EXPIRED: 'This promotion has ended.',
+  PROMOTION_LOCATION_MISMATCH: 'This promo code is not valid at this location.',
+  PROMOTION_CURRENCY_MISMATCH: 'This promo code is not valid for the transaction currency.',
+  PROMOTION_MINIMUM_NOT_MET: 'The minimum purchase has not been met.',
+  PROMOTION_TARGET_NOT_ELIGIBLE: 'This promo code does not apply to the items in this transaction.',
+};
+
 export function cashierTransactionErrorMessage(error: unknown, locale?: string): string {
   if (
     isApiErrorCode(error, 'PRICE_NOT_FOUND') ||
@@ -31,6 +43,8 @@ export function cashierTransactionErrorMessage(error: unknown, locale?: string):
   if (isApiErrorCode(error, 'SALE_LINE_NOT_MUTABLE')) {
     return copyForLocale('This item can no longer be reduced or removed because work has already started.', locale);
   }
+  const promotionCopy = error instanceof ApiError ? PROMOTION_ERROR_COPY[error.code] : undefined;
+  if (promotionCopy) return copyForLocale(promotionCopy, locale);
   return copyForLocale('Transaction could not be processed. Try again.', locale);
 }
 

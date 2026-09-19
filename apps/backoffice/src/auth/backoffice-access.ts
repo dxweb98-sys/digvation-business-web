@@ -93,7 +93,8 @@ const capabilityPermissions: Record<BackofficeCapability, PermissionRequirement>
       'locations:read',
     ],
   },
-  transactions: { allOf: ['sales:read'] },
+  // History shows completed transactions in full, which Runtime grants only with sales:read-completed.
+  transactions: { allOf: ['sales:read', 'sales:read-completed'] },
   configuration: { anyOf: ['business-profile:read', 'locations:read'] },
   tax: { allOf: ['tax:read'] },
   accessControl: { allOf: ['roles:read'] },

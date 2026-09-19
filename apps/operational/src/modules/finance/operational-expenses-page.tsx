@@ -17,6 +17,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
+import {
+  historyQueryPolicy,
+  referenceQueryPolicy,
+} from '../../app/data/operational-cache-policy';
 import { useOperationalLocalization } from '../../app/localization/operational-localization';
 import { useOperationalSession } from '../operational/operational-session-provider';
 import { OperationalExpenseApi, type OperationalExpense } from './operational-expense-api';
@@ -63,11 +67,13 @@ export function OperationalExpensesPage() {
         offset,
         sellingLocationId: selectedLocationId ?? undefined,
       }),
+    ...historyQueryPolicy,
   });
   const accounts = useQuery({
     queryKey: ['operational-expense-accounts', selectedLocationId],
     enabled: Boolean(selectedLocationId && canCreate && isCreateOpen),
     queryFn: () => api.listEligibleAccounts(selectedLocationId!),
+    ...referenceQueryPolicy,
   });
   const eligibleAccounts = accounts.data?.items ?? [];
   const createExpense = useMutation({

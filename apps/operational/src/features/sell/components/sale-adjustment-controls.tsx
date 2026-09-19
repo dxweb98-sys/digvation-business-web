@@ -1,22 +1,22 @@
 import { useAuth } from '@digvation/pos-auth';
 import { createDecimal, formatMoney } from '@digvation/pos-money';
 import { useRuntime } from '@digvation/pos-runtime';
-import { DButton, DDialog, DInput, DSelect, useToast } from '@digvation-labs/ui';
+import { DAlert, DButton, DDialog, DInput, DSelect, useToast } from '@digvation-labs/ui';
 import { useQueryClient } from '@tanstack/react-query';
-import { BadgePercent, Tag, X } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { BadgePercent, CheckCircle2, Tag, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 import { useOperationalLocalization } from '../../../app/localization/operational-localization';
 import { createCashierTransactionAdapter } from '../cashier-transaction-adapter-factory';
 import { cashierTransactionErrorMessage } from '../cashier-transaction-errors';
 import { cashierTransactionKeys } from '../cashier-transaction-keys';
-import type { ApiPage, DiscountType, Sale } from '../cashier-transaction.types';
+import type { ApiPage, DiscountType, Sale, SaleAdjustment } from '../cashier-transaction.types';
 import type { useCashierTransactionWorkspace } from '../use-cashier-transaction-workspace';
 import { actionBlockMessage } from '../sale-workspace-view-model';
 
 interface SaleAdjustmentControlsProps {
   workspace: ReturnType<typeof useCashierTransactionWorkspace>;
+  /** `payment` renders the applied-adjustment card inside the checkout dialog. */
   placement?: 'inline' | 'payment';
 }
 
@@ -69,11 +69,15 @@ const localCopy: Record<string, { 'id-ID': string; 'en-US': string }> = {
     'en-US': 'The transaction total has been recalculated.',
   },
   'Remove promo code': { 'id-ID': 'Hapus kode promo', 'en-US': 'Remove promo code' },
-  'Applied discounts': { 'id-ID': 'Diskon yang diterapkan', 'en-US': 'Applied discounts' },
   'Manual discount': { 'id-ID': 'Diskon manual', 'en-US': 'Manual discount' },
   'Could not prepare transaction': {
     'id-ID': 'Transaksi belum dapat disiapkan',
     'en-US': 'Could not prepare transaction',
+  },
+  'Automatic promotion': { 'id-ID': 'Promo otomatis', 'en-US': 'Automatic promotion' },
+  'Code applied to this transaction': {
+    'id-ID': 'Kode diterapkan ke transaksi ini',
+    'en-US': 'Code applied to this transaction',
   },
 };
 
@@ -107,18 +111,6 @@ function commitSaleToCache(queryClient: ReturnType<typeof useQueryClient>, sale:
   });
 }
 
-function findPaymentPromotionCard(labels: readonly string[]): HTMLElement | null {
-  const dialogs = Array.from(document.querySelectorAll<HTMLElement>('.pos-reference-dialog'));
-  for (const dialog of dialogs.reverse()) {
-    const paragraph = Array.from(dialog.querySelectorAll<HTMLParagraphElement>('p')).find((node) =>
-      labels.includes(node.textContent?.trim() ?? ''),
-    );
-    const card = paragraph?.parentElement?.parentElement;
-    if (card instanceof HTMLElement) return card;
-  }
-  return null;
-}
-
 export function SaleAdjustmentControls({
   workspace,
   placement = 'inline',
@@ -136,10 +128,7 @@ export function SaleAdjustmentControls({
   const [discountReason, setDiscountReason] = useState('');
   const [promoCode, setPromoCode] = useState('');
   const [promoBusy, setPromoBusy] = useState(false);
-
-  const [paymentPromoTarget, setPaymentPromoTarget] = useState<HTMLElement | null>(null);
-
-  const [paymentPromoCard, setPaymentPromoCard] = useState<HTMLElement | null>(null);
+  const [promoError, setPromoError] = useState<string | null>(null);
 
   const adapter = useMemo(
     () => createCashierTransactionAdapter(runtime, authPort.getAccessToken?.bind(authPort)),
@@ -153,88 +142,31 @@ export function SaleAdjustmentControls({
       ? actionBlockMessage(workspace.viewModel.monetaryMutation.reason, runtime.locale)
       : null;
 
-  useEffect(() => {
-    if (placement !== 'payment') {
-      return undefined;
-    }
-
-    let hiddenStatus: HTMLElement | null = null;
-    const syncTarget = () => {
-      if (hiddenStatus) hiddenStatus.hidden = false;
-      hiddenStatus = null;
-      const card = findPaymentPromotionCard([copy('Promotion'), 'Promo', 'Promotion']);
-
-      if (card) {
-        setPaymentPromoCard((current) => (current === card ? current : card));
-
-        const row = card.firstElementChild;
-        const status = row?.querySelector('span');
-
-        if (status instanceof HTMLElement) {
-          status.hidden = true;
-          hiddenStatus = status;
-        }
-
-        if (row instanceof HTMLElement) {
-          setPaymentPromoTarget((current) => (current === row ? current : row));
-          return;
-        }
-      }
-
-      setPaymentPromoTarget(null);
-      setPaymentPromoCard(null);
-    };
-
-    syncTarget();
-    const observer = new MutationObserver(syncTarget);
-    observer.observe(document.body, { childList: true, subtree: true });
-    return () => {
-      observer.disconnect();
-      if (hiddenStatus) hiddenStatus.hidden = false;
-    };
-  }, [copy, placement]);
-
   if ((!sale && workspace.cart.lines.length === 0) || (sale && sale.status !== 'OPEN')) return null;
 
-  const adjustments = sale?.adjustments ?? [];
-
+  const adjustments = (sale?.adjustments ?? []).filter((adjustment) =>
+    createDecimal(adjustment.actualAmount).greaterThan(0),
+  );
   const promotionAdjustments = adjustments.filter((item) => item.source === 'PROMOTION');
-
   const manualAdjustments = adjustments.filter((item) => item.source === 'MANUAL_DISCOUNT');
+  const appliedAdjustments = [...promotionAdjustments, ...manualAdjustments];
+  const money = (amount: string) => formatMoney(amount, sale?.currency ?? 'IDR', runtime.locale);
 
-  const visibleAdjustments = [...promotionAdjustments, ...manualAdjustments];
-
-  const appliedAdjustmentSummary =
-    sale && visibleAdjustments.length > 0 ? (
-      <div className="mt-3 space-y-2">
-        {visibleAdjustments.map((adjustment) => (
-          <div
-            key={adjustment.id}
-            className="flex items-center justify-between gap-3 rounded-xl bg-(--color-surface-muted)/60 px-3 py-2"
-          >
-            <div className="min-w-0">
-              <p className="truncate text-xs font-semibold">
-                {adjustment.source === 'PROMOTION'
-                  ? sale.promotionCode
-                    ? `${text('Promotion')} · ${sale.promotionCode}`
-                    : text('Promotion')
-                  : text('Manual discount')}
-              </p>
-
-              {adjustment.label ? (
-                <p className="mt-0.5 truncate text-[11px] text-(--color-text-muted)">
-                  {adjustment.label}
-                </p>
-              ) : null}
-            </div>
-
-            <span className="shrink-0 text-xs font-bold tabular-nums text-(--color-brand)">
-              −{formatMoney(adjustment.actualAmount, sale.currency, runtime.locale)}
-            </span>
-          </div>
-        ))}
-      </div>
-    ) : null;
+  const adjustmentTitle = (adjustment: SaleAdjustment) =>
+    adjustment.source === 'PROMOTION'
+      ? adjustment.label || (sale?.promotionCode ?? text('Automatic promotion'))
+      : adjustment.label || text('Manual discount');
+  const adjustmentSource = (adjustment: SaleAdjustment) =>
+    adjustment.source === 'PROMOTION'
+      ? sale?.promotionCode && adjustment.promotionId
+        ? `${copy('Promotion')} · ${sale.promotionCode}`
+        : copy('Promotion')
+      : [
+          text('Manual discount'),
+          adjustment.reason !== adjustmentTitle(adjustment) ? adjustment.reason : null,
+        ]
+          .filter(Boolean)
+          .join(' · ');
 
   const discountApiValue = discountValueForApi(discountType, discountValue);
   const canSaveDiscount =
@@ -248,7 +180,8 @@ export function SaleAdjustmentControls({
     setDiscountType(nextType);
     setDiscountValue(discountValueForForm(nextType, currentSale.orderDiscountValue));
     setDiscountReason(currentSale.orderDiscountReason ?? '');
-    setPromoCode(currentSale.promotionCode ?? '');
+    setPromoCode('');
+    setPromoError(null);
   };
 
   const prepareAndOpen = async () => {
@@ -274,11 +207,20 @@ export function SaleAdjustmentControls({
     }
   };
 
+  const refreshAfterFailure = async (saleId: string) => {
+    try {
+      commitSaleToCache(queryClient, await adapter.getSale(saleId));
+    } catch {
+      // Keep the current authoritative cache when refresh is unavailable.
+    }
+  };
+
   const applyPromoCode = async () => {
     if (!sale) return;
     const code = promoCode.trim().toUpperCase();
     if (!promotionsEnabled || !monetaryAvailable || !code || promoBusy) return;
     setPromoBusy(true);
+    setPromoError(null);
     try {
       const updated = await adapter.setPromotionCode(
         sale.id,
@@ -286,26 +228,15 @@ export function SaleAdjustmentControls({
         `cashier-promo-code-${crypto.randomUUID()}`,
       );
       commitSaleToCache(queryClient, updated);
-      setPromoCode(updated.promotionCode ?? code);
-      setOpen(false);
-
+      setPromoCode('');
       showToast({
         variant: 'success',
         title: text('Promotion applied'),
         description: text('The transaction total has been recalculated.'),
       });
     } catch (error) {
-      try {
-        const latest = await adapter.getSale(sale.id);
-        commitSaleToCache(queryClient, latest);
-      } catch {
-        // Keep the current authoritative cache when refresh is unavailable.
-      }
-      showToast({
-        variant: 'danger',
-        title: text('Promotion could not be applied'),
-        description: cashierTransactionErrorMessage(error, runtime.locale),
-      });
+      await refreshAfterFailure(sale.id);
+      setPromoError(cashierTransactionErrorMessage(error, runtime.locale));
     } finally {
       setPromoBusy(false);
     }
@@ -315,6 +246,7 @@ export function SaleAdjustmentControls({
     if (!sale) return;
     if (!promotionsEnabled || !monetaryAvailable || !sale.promotionCode || promoBusy) return;
     setPromoBusy(true);
+    setPromoError(null);
     try {
       const updated = await adapter.clearPromotionCode(
         sale.id,
@@ -322,19 +254,13 @@ export function SaleAdjustmentControls({
         `cashier-promo-code-remove-${crypto.randomUUID()}`,
       );
       commitSaleToCache(queryClient, updated);
-      setPromoCode('');
       showToast({
         variant: 'success',
         title: text('Promotion removed'),
         description: text('The transaction total has been recalculated.'),
       });
     } catch (error) {
-      try {
-        const latest = await adapter.getSale(sale.id);
-        commitSaleToCache(queryClient, latest);
-      } catch {
-        // Keep the current authoritative cache when refresh is unavailable.
-      }
+      await refreshAfterFailure(sale.id);
       showToast({
         variant: 'danger',
         title: text('Promotion could not be removed'),
@@ -347,46 +273,99 @@ export function SaleAdjustmentControls({
 
   const saveOrderDiscount = async () => {
     if (!discountApiValue || !discountReason.trim() || !canSaveDiscount) return;
-
     try {
       await workspace.setOrderDiscount({
         type: discountType,
         value: discountApiValue,
         reason: discountReason.trim(),
       });
-
-      setOpen(false);
     } catch {
-      // Error sudah ditangani oleh sale core controller.
-      // Dialog tetap terbuka agar user bisa memperbaiki input / mencoba lagi.
+      // The sale core controller reports the failure; keep the form available for correction.
     }
   };
+
+  const appliedList = (
+    <ul className="space-y-2">
+      {appliedAdjustments.map((adjustment) => {
+        const removable =
+          adjustment.scope === 'TRANSACTION' &&
+          (adjustment.source === 'MANUAL_DISCOUNT'
+            ? Boolean(sale?.orderDiscountType)
+            : Boolean(sale?.promotionCode && adjustment.promotionId));
+        return (
+          <li
+            key={adjustment.id}
+            className="pos-adjustment-enter flex items-center gap-3 rounded-[var(--radius-control)] border border-[var(--color-success)]/20 bg-[var(--color-success)]/[.06] px-3 py-2"
+          >
+            <CheckCircle2
+              className="size-4 shrink-0 text-[var(--color-success)]"
+              aria-hidden="true"
+            />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-semibold text-[var(--color-text)]">
+                {adjustmentTitle(adjustment)}
+              </p>
+              <p className="mt-0.5 truncate text-[11px] text-[var(--color-text-muted)]">
+                {adjustmentSource(adjustment)}
+              </p>
+            </div>
+            <span className="shrink-0 text-xs font-semibold tabular-nums text-[var(--color-danger)]">
+              −{money(adjustment.actualAmount)}
+            </span>
+            {open && removable ? (
+              <DButton
+                size="icon"
+                variant="ghost"
+                aria-label={`${copy('Remove')} ${adjustmentTitle(adjustment)}`}
+                disabled={!monetaryAvailable || workspace.isCoreMutating || promoBusy}
+                onClick={() =>
+                  adjustment.source === 'PROMOTION'
+                    ? void clearPromoCode()
+                    : workspace.clearOrderDiscount()
+                }
+              >
+                <X className="size-3.5" />
+              </DButton>
+            ) : null}
+          </li>
+        );
+      })}
+    </ul>
+  );
 
   const trigger = (
     <DButton
       size="sm"
-      variant="primary"
+      variant={placement === 'payment' ? 'outline' : 'primary'}
       disabled={preparing}
       loading={preparing}
       leftIcon={<BadgePercent className="size-4" />}
       onClick={() => void prepareAndOpen()}
     >
-      {text('Discounts & promotions')}
+      {placement === 'payment'
+        ? copy(appliedAdjustments.length ? 'Manage adjustments' : 'Add adjustment')
+        : text('Discounts & promotions')}
     </DButton>
   );
 
   return (
-    <div className="flex justify-between">
+    <>
       {placement === 'payment' ? (
-        <>
-          {paymentPromoTarget
-            ? createPortal(<div className="ml-auto shrink-0">{trigger}</div>, paymentPromoTarget)
-            : null}
-
-          {paymentPromoCard && appliedAdjustmentSummary
-            ? createPortal(appliedAdjustmentSummary, paymentPromoCard)
-            : null}
-        </>
+        <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-semibold">{copy('Promotions & discounts')}</p>
+            {trigger}
+          </div>
+          <div className="mt-3">
+            {appliedAdjustments.length ? (
+              appliedList
+            ) : (
+              <p className="text-xs text-[var(--color-text-muted)]">
+                {copy('No promotion or discount applied yet.')}
+              </p>
+            )}
+          </div>
+        </section>
       ) : (
         trigger
       )}
@@ -398,42 +377,111 @@ export function SaleAdjustmentControls({
           title={text('Discounts & promotions')}
           description={text('Manage transaction discounts and promo codes before payment.')}
           ariaLabel={text('Discounts & promotions')}
-          className="w-full max-w-lg overflow-hidden rounded-t-2xl bg-(--color-surface) shadow-xl sm:rounded-xl"
+          className="w-full"
           footer={
-            <div className="flex justify-end">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[11px] text-[var(--color-text-muted)]">
+                  {copy('Total after adjustments')}
+                </p>
+                <p
+                  key={`${sale.version}:${sale.totalAmount}`}
+                  className="pos-value-updated text-base font-bold tabular-nums"
+                >
+                  {money(sale.totalAmount)}
+                </p>
+              </div>
               <DButton variant="ghost" onClick={() => setOpen(false)}>
                 {copy('Close')}
               </DButton>
             </div>
           }
         >
-          <div className="space-y-4">
-            {disabledMessage ? (
-              <div className="rounded-xl bg-(--color-surface-muted) px-3 py-2 text-xs text-(--color-text-muted)">
-                {disabledMessage}
-              </div>
+          <div className="pos-dialog-stack">
+            {disabledMessage ? <DAlert variant="neutral">{disabledMessage}</DAlert> : null}
+
+            {appliedAdjustments.length ? (
+              <section>
+                <h3 className="mb-2 text-sm font-semibold">{copy('Applied adjustments')}</h3>
+                {appliedList}
+              </section>
             ) : null}
 
-            <section className="rounded-2xl border border-(--color-border) bg-(--color-background) p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-bold">{text('Manual transaction discount')}</h3>
-                  <p className="mt-1 text-xs text-(--color-text-muted)">
-                    {text('A reason is required and the server recalculates the final amount.')}
-                  </p>
-                </div>
-                {sale.orderDiscountType ? (
-                  <DButton
-                    size="sm"
-                    variant="ghost"
-                    disabled={!monetaryAvailable || workspace.isCoreMutating}
-                    onClick={workspace.clearOrderDiscount}
-                  >
-                    <X className="mr-1 size-3.5" /> {copy('Remove')}
-                  </DButton>
-                ) : null}
-              </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {promotionsEnabled ? (
+              <section>
+                <h3 className="text-sm font-semibold">{text('Promo code')}</h3>
+                <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
+                  {text('Eligibility and the applied amount are validated by the server.')}
+                </p>
+                {sale.promotionCode ? (
+                  <div className="pos-adjustment-enter mt-3 flex items-center gap-3 rounded-[var(--radius-control)] border border-[var(--color-brand)]/25 bg-[var(--color-brand)]/[.06] px-3 py-2.5">
+                    <Tag className="size-4 shrink-0 text-[var(--color-brand)]" aria-hidden="true" />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-mono text-sm font-bold text-[var(--color-brand)]">
+                        {sale.promotionCode}
+                      </p>
+                      <p className="text-[11px] text-[var(--color-text-muted)]">
+                        {text('Code applied to this transaction')}
+                      </p>
+                    </div>
+                    <DButton
+                      size="sm"
+                      variant="ghost"
+                      disabled={!monetaryAvailable || promoBusy}
+                      loading={promoBusy}
+                      onClick={() => void clearPromoCode()}
+                    >
+                      {text('Remove promo code')}
+                    </DButton>
+                  </div>
+                ) : (
+                  <>
+                    <div className="mt-3 flex items-end gap-2">
+                      <div className="min-w-0 flex-1">
+                        <DInput
+                          aria-label={text('Promo code')}
+                          value={promoCode}
+                          disabled={!monetaryAvailable || promoBusy}
+                          onChange={(value) => {
+                            setPromoCode(value.toUpperCase());
+                            if (promoError) setPromoError(null);
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') void applyPromoCode();
+                          }}
+                          placeholder="WELCOME10"
+                          autoCapitalize="characters"
+                          spellCheck={false}
+                        />
+                      </div>
+                      <DButton
+                        disabled={!monetaryAvailable || promoBusy || !promoCode.trim()}
+                        loading={promoBusy}
+                        leftIcon={<Tag className="size-3.5" />}
+                        onClick={() => void applyPromoCode()}
+                      >
+                        {copy('Apply')}
+                      </DButton>
+                    </div>
+                    {promoError ? (
+                      <DAlert variant="danger" role="alert" className="mt-3">
+                        <span className="font-semibold">
+                          {text('Promotion could not be applied')}
+                        </span>
+                        <span className="block text-xs">{promoError}</span>
+                      </DAlert>
+                    ) : null}
+                  </>
+                )}
+              </section>
+            ) : null}
+
+            <section>
+              <h3 className="text-sm font-semibold">{text('Manual transaction discount')}</h3>
+              <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
+                {text('A reason is required and the server recalculates the final amount.')}
+              </p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 <DSelect
                   label={text('Discount type')}
                   value={discountType}
@@ -465,6 +513,7 @@ export function SaleAdjustmentControls({
               <div className="mt-3 flex justify-end">
                 <DButton
                   size="sm"
+                  variant="outline"
                   disabled={!canSaveDiscount}
                   loading={workspace.isCoreMutating}
                   onClick={saveOrderDiscount}
@@ -473,84 +522,9 @@ export function SaleAdjustmentControls({
                 </DButton>
               </div>
             </section>
-
-            {promotionsEnabled ? (
-              <section className="rounded-2xl border border-(--color-border) bg-(--color-background) p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="text-sm font-bold">{text('Promo code')}</h3>
-                    <p className="mt-1 text-xs text-(--color-text-muted)">
-                      {text('Eligibility and the applied amount are validated by the server.')}
-                    </p>
-                  </div>
-                  {sale.promotionCode ? (
-                    <span className="rounded-full bg-(--color-brand)/10 px-2 py-1 text-[10px] font-bold text-(--color-brand)">
-                      {sale.promotionCode}
-                    </span>
-                  ) : null}
-                </div>
-                <div className="mt-4 flex items-end gap-2">
-                  <div className="min-w-0 flex-1">
-                    <DInput
-                      label={text('Promo code')}
-                      value={promoCode}
-                      disabled={!monetaryAvailable || promoBusy}
-                      onChange={(value) => setPromoCode(value.toUpperCase())}
-                      placeholder="WELCOME10"
-                    />
-                  </div>
-                  <DButton
-                    disabled={!monetaryAvailable || promoBusy || !promoCode.trim()}
-                    loading={promoBusy}
-                    onClick={() => void applyPromoCode()}
-                  >
-                    <Tag className="mr-1.5 size-3.5" /> {copy('Apply')}
-                  </DButton>
-                </div>
-                {sale.promotionCode ? (
-                  <div className="mt-2 flex justify-end">
-                    <DButton
-                      size="sm"
-                      variant="ghost"
-                      disabled={!monetaryAvailable || promoBusy}
-                      onClick={() => void clearPromoCode()}
-                    >
-                      {text('Remove promo code')}
-                    </DButton>
-                  </div>
-                ) : null}
-              </section>
-            ) : null}
-
-            {adjustments.length ? (
-              <section className="rounded-2xl border border-(--color-border) bg-(--color-background) p-4">
-                <h3 className="text-sm font-bold">{text('Applied discounts')}</h3>
-                <div className="mt-3 space-y-2">
-                  {[...promotionAdjustments, ...manualAdjustments].map((adjustment) => (
-                    <div
-                      key={adjustment.id}
-                      className="flex items-start justify-between gap-3 rounded-xl bg-(--color-surface-muted)/60 px-3 py-2"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-xs font-semibold">{adjustment.label}</p>
-                        <p className="mt-0.5 text-[11px] text-(--color-text-muted)">
-                          {text(
-                            adjustment.source === 'PROMOTION' ? 'Promotion' : 'Manual discount',
-                          )}
-                          {adjustment.reason ? ` · ${adjustment.reason}` : ''}
-                        </p>
-                      </div>
-                      <span className="shrink-0 text-xs font-bold tabular-nums text-(--color-brand)">
-                        −{formatMoney(adjustment.actualAmount, sale.currency, runtime.locale)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            ) : null}
           </div>
         </DDialog>
       ) : null}
-    </div>
+    </>
   );
 }

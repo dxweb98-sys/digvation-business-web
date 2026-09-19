@@ -6,11 +6,7 @@ import { useOperationalLocalization } from '../localization/operational-localiza
 import { SellPage } from '../../routes/sell/sell-page';
 import { OperationalShell } from '../../modules/operational/operational-shell';
 import type { OperationalNavigationSection } from '../../modules/operational/operational-navigation';
-import {
-  posHistoryOperationalNavigation,
-  posSellOperationalNavigation,
-} from '../../modules/pos/pos-operational-navigation';
-import { OperationalTransactionHistoryPage } from '../../modules/pos/operational-transaction-history-page';
+import { posSellOperationalNavigation } from '../../modules/pos/pos-operational-navigation';
 import { financeOperationalNavigation } from '../../modules/finance/finance-operational-navigation';
 import { OperationalExpensesPage } from '../../modules/finance/operational-expenses-page';
 
@@ -21,7 +17,6 @@ function useOperationalSurfaceAccess() {
   const hasFinance = session.access.capabilities.includes('FINANCE_OPERATIONS');
   return {
     canSell: hasPos && permissions.includes('sales:create'),
-    canReadSales: hasPos && permissions.includes('sales:read'),
     canReadExpenses:
       hasFinance &&
       (permissions.includes('expenses:read') || permissions.includes('expenses:read-own')),
@@ -31,10 +26,8 @@ function useOperationalSurfaceAccess() {
 function OperationalLayout() {
   const access = useOperationalSurfaceAccess();
   const { copy } = useOperationalLocalization();
-  const salesItems = [
-    ...(access.canSell ? posSellOperationalNavigation.items : []),
-    ...(access.canReadSales ? posHistoryOperationalNavigation.items : []),
-  ];
+  // Transaction history belongs to Backoffice; Operational only runs the sale.
+  const salesItems = access.canSell ? posSellOperationalNavigation.items : [];
   const navigationSections: OperationalNavigationSection[] = [
     ...(salesItems.length
       ? [
@@ -62,7 +55,6 @@ function OperationalLayout() {
 function OperationalHome() {
   const access = useOperationalSurfaceAccess();
   if (access.canSell) return <Navigate to="/sell" replace />;
-  if (access.canReadSales) return <Navigate to="/transactions" replace />;
   if (access.canReadExpenses) return <Navigate to="/expenses" replace />;
   return <Navigate to="/login" replace />;
 }
@@ -76,15 +68,6 @@ function SellRoute() {
   return (
     <SurfaceGate allowed={canSell}>
       <SellPage />
-    </SurfaceGate>
-  );
-}
-
-function TransactionHistoryRoute() {
-  const { canReadSales } = useOperationalSurfaceAccess();
-  return (
-    <SurfaceGate allowed={canReadSales}>
-      <OperationalTransactionHistoryPage />
     </SurfaceGate>
   );
 }
@@ -106,8 +89,9 @@ export const operationalRouter = createBrowserRouter([
       { index: true, element: <OperationalHome /> },
       { path: '/sell', element: <SellRoute /> },
       { path: '/sell/:saleId', element: <SellRoute /> },
-      { path: '/transactions', element: <TransactionHistoryRoute /> },
       { path: '/expenses', element: <ExpensesRoute /> },
+      // Retired or unknown paths, such as the former transaction history, land on the home redirect.
+      { path: '*', element: <OperationalHome /> },
     ],
   },
 ]);

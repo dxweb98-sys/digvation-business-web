@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
+import { referenceQueryPolicy } from '../../app/data/operational-cache-policy';
 import type { EmployeeQuery } from './cashier-transaction.adapter';
 import { cashierTransactionKeys } from './cashier-transaction-keys';
 
@@ -7,8 +8,7 @@ export function useEmployeeOptions(query: EmployeeQuery, enabled: boolean) {
   const employeesQuery = useQuery({
     queryKey: cashierTransactionKeys.employees(),
     queryFn: ({ signal }) => query.listEmployees(signal),
-    staleTime: 0,
-    refetchOnMount: 'always',
+    ...referenceQueryPolicy,
     enabled,
   });
 

@@ -8,6 +8,7 @@ import {
   attachOperationalProjection,
   type OperationalProjectionQuery,
   type OperationalPromotionCommands,
+  type OperationalReceiptDeliveryCommands,
 } from './operational-projection-client';
 
 type PerformerCapableTransactionPort = SaleTransactionPort & {
@@ -15,7 +16,8 @@ type PerformerCapableTransactionPort = SaleTransactionPort & {
 };
 type OperationalCashierTransactionPort = PerformerCapableTransactionPort &
   OperationalProjectionQuery &
-  OperationalPromotionCommands;
+  OperationalPromotionCommands &
+  OperationalReceiptDeliveryCommands;
 
 type ApiTarget = string | { readonly apiBaseUrl: string };
 
