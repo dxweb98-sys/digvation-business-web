@@ -1,10 +1,11 @@
-import { DButton, DInput, useToast } from '@digvation/ui';
+import { DAlert, DButton, DCard, DInput, useToast } from '@digvation/ui';
 import { Building2 } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent, type TransitionEvent } from 'react';
 
 import type { AuthPort, AuthSession } from '@digvation/business-auth';
 import { useDeploymentBootstrap } from '@digvation/business-runtime';
 import { useOperationalLocalization } from '../../app/localization/operational-localization';
+import './operational-login-page.css';
 
 interface OperationalLoginPageProps {
   authPort: AuthPort;
@@ -18,15 +19,84 @@ function loginFailureMessage(error: unknown, copy: (value: string) => string) {
   return copy('Sign in failed. Try again.');
 }
 
-/** Operational-owned login composition using the canonical shared field, button, and toast primitives. */
+function prefersImmediateFocus(): boolean {
+  // Focusing on touch devices would open the keyboard over the brand before the user acts.
+  return typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches;
+}
+
+/** The runtime logo, or the product mark on the brand tile, as used by the Operational shell. */
+function BrandTile({ logoUrl, className }: { logoUrl?: string | undefined; className: string }) {
+  return (
+    <span
+      className={`${className} grid shrink-0 place-items-center overflow-hidden rounded-[var(--radius-control)] ${
+        logoUrl
+          ? 'border border-[var(--color-border)] bg-[var(--color-surface)]'
+          : 'bg-[var(--color-brand)] text-[var(--color-brand-foreground)]'
+      }`}
+    >
+      {logoUrl ? (
+        <img src={logoUrl} alt="" className="size-full object-contain p-1" />
+      ) : (
+        <Building2 className="size-5" strokeWidth={2.1} aria-hidden="true" />
+      )}
+    </span>
+  );
+}
+
+/**
+ * Abstract composition from the Operational selling vocabulary: a catalog item,
+ * a queue ticket in progress and a receipt slip. Purely presentational.
+ */
+function OperationalMotif() {
+  return (
+    <div className="operational-login__motif" aria-hidden="true">
+      <div className="operational-login__tile operational-login__tile--item">
+        <span className="operational-login__media" />
+        <span className="operational-login__bar operational-login__bar--wide" />
+        <span className="operational-login__item-footer">
+          <span className="operational-login__bar operational-login__bar--short operational-login__bar--strong" />
+          <span className="operational-login__add" />
+        </span>
+      </div>
+      <div className="operational-login__tile operational-login__tile--ticket">
+        <span className="operational-login__status" />
+        <span className="operational-login__bar operational-login__bar--wide" />
+        <span className="operational-login__bar operational-login__bar--short" />
+      </div>
+      <div className="operational-login__tile operational-login__tile--receipt">
+        <span className="operational-login__bar operational-login__bar--wide" />
+        <span className="operational-login__bar operational-login__bar--short" />
+        <span className="operational-login__rule" />
+        <span className="operational-login__total">
+          <span className="operational-login__bar operational-login__bar--short" />
+          <span className="operational-login__bar operational-login__bar--amount" />
+        </span>
+      </div>
+    </div>
+  );
+}
+
+type FieldErrors = { identifier?: string; password?: string };
+
+/**
+ * Operational sign-in. It shares the Backoffice product-family structure (split
+ * card, brand identity, form proportions) with an Operational identity drawn
+ * from live selling: counter, queue and receipt.
+ */
 export function OperationalLoginPage({ authPort, onAuthenticated }: OperationalLoginPageProps) {
-  const bootstrap = useDeploymentBootstrap();
+  const { branding } = useDeploymentBootstrap();
   const { copy } = useOperationalLocalization();
   const { showToast } = useToast();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setSubmitting] = useState(false);
   const [isLeaving, setLeaving] = useState(false);
+  const [failedAttempt, setFailedAttempt] = useState(0);
+  const [autoFocusIdentifier] = useState(prefersImmediateFocus);
+  const identifierInput = useRef<HTMLInputElement>(null);
+  const passwordInput = useRef<HTMLInputElement>(null);
   const authenticatedSession = useRef<AuthSession | null>(null);
   const hasCompletedTransition = useRef(false);
 
@@ -48,19 +118,28 @@ export function OperationalLoginPage({ authPort, onAuthenticated }: OperationalL
     return () => window.clearTimeout(timer);
   }, [isLeaving, onAuthenticated]);
 
+  useEffect(() => {
+    // Return focus to the password once the form is interactive again after a failed attempt.
+    if (failedAttempt > 0) passwordInput.current?.focus();
+  }, [failedAttempt]);
+
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (isSubmitting || isLeaving) return;
 
-    if (!identifier.trim() || !password) {
-      showToast({
-        title: copy('Complete account details'),
-        description: copy('Enter user ID and password.'),
-        variant: 'danger',
-      });
+    const missing: FieldErrors = {
+      ...(identifier.trim() ? {} : { identifier: copy('Enter your user ID.') }),
+      ...(password ? {} : { password: copy('Enter your password.') }),
+    };
+    if (missing.identifier || missing.password) {
+      setError(null);
+      setFieldErrors(missing);
+      (missing.identifier ? identifierInput : passwordInput).current?.focus();
       return;
     }
 
+    setFieldErrors({});
+    setError(null);
     setSubmitting(true);
     try {
       const session = await authPort.login({ identifier: identifier.trim(), password });
@@ -70,77 +149,136 @@ export function OperationalLoginPage({ authPort, onAuthenticated }: OperationalL
         variant: 'success',
       });
       setLeaving(true);
-    } catch (error) {
+    } catch (failure) {
       setSubmitting(false);
-      showToast({
-        title: copy('Sign in failed'),
-        description: loginFailureMessage(error, copy),
-        variant: 'danger',
-      });
+      setError(loginFailureMessage(failure, copy));
+      setFailedAttempt((attempt) => attempt + 1);
     }
   };
 
+  const update = (field: keyof FieldErrors, set: (value: string) => void) => (value: string) => {
+    set(value);
+    if (error) setError(null);
+    if (fieldErrors[field]) setFieldErrors((current) => ({ ...current, [field]: undefined }));
+  };
+
+  const busy = isSubmitting || isLeaving;
+
   return (
     <main
-      className={`operational-view-enter grid min-h-screen place-items-center overflow-hidden bg-[var(--color-background)] px-4 py-8 transition-[opacity,transform] duration-200 ease-out sm:px-6 ${
+      className={`operational-login operational-view-enter h-full overflow-y-auto transition-[opacity,transform] duration-200 ease-out ${
         isLeaving ? 'pointer-events-none -translate-y-1 opacity-0' : 'translate-y-0 opacity-100'
       }`}
       onTransitionEnd={completeTransition}
     >
-      <div className="pointer-events-none absolute left-[12%] top-[18%] size-64 rounded-full bg-[var(--color-brand)]/[0.035] blur-3xl" />
-      <div className="pointer-events-none absolute bottom-[12%] right-[14%] size-56 rounded-full bg-[var(--color-accent-lavender)]/25 blur-3xl" />
+      <div className="operational-login__viewport grid min-h-full place-items-center">
+        <DCard className="operational-login__card w-full max-w-[880px]">
+          <aside className="operational-login__identity">
+            <div className="operational-login__compact-identity flex min-w-0 items-center gap-3">
+              <BrandTile logoUrl={branding.logoUrl} className="size-10" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold leading-5 text-[var(--color-text)]">
+                  {branding.productName}
+                </p>
+                <p className="truncate text-xs leading-4 text-[var(--color-text-muted)]">
+                  {branding.companyName ?? copy('Operational')}
+                </p>
+              </div>
+              <span className="operational-login__app-label shrink-0">{copy('Operational')}</span>
+            </div>
 
-      <section className="relative w-full max-w-sm">
-        <header className="mb-8 text-center">
-          <div className="relative mx-auto mb-4 grid size-14 place-items-center rounded-2xl bg-[var(--color-brand)] text-white shadow-lg shadow-[var(--color-brand)]/20">
-            <Building2 className="size-6" aria-hidden="true" />
-            <span className="absolute inset-0 -z-10 rounded-2xl bg-[var(--color-brand)]/20 animate-ping [animation-duration:2s]" />
-          </div>
-          <h1 className="text-3xl font-bold tracking-[-0.04em] text-[var(--color-text)]">
-            {bootstrap.branding.productName}
-          </h1>
-          <p className="mt-2 text-sm text-[var(--color-text-muted)]">{copy('Operational')}</p>
-        </header>
+            <div className="operational-login__brand items-center gap-3">
+              <BrandTile logoUrl={branding.logoUrl} className="size-10" />
+              <p className="min-w-0 truncate text-sm font-semibold text-[var(--color-text)]">
+                {branding.productName}
+              </p>
+            </div>
 
-        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-[var(--shadow-panel)]">
-          <h2 className="text-lg font-semibold text-[var(--color-text)]">
-            {copy('Sign in to Operational')}
-          </h2>
+            <OperationalMotif />
 
-          <form autoComplete="on" className="mt-6 space-y-4" onSubmit={submit}>
-            <DInput
-              id="operational-identifier"
-              name="username"
-              label={copy('User ID')}
-              value={identifier}
-              disabled={isSubmitting}
-              onChange={setIdentifier}
-              placeholder={copy('Username or email')}
-              autoComplete="username"
-              autoCapitalize="none"
-              spellCheck={false}
-            />
-            <DInput
-              id="operational-password"
-              name="password"
-              label={copy('Password')}
-              type="password"
-              value={password}
-              disabled={isSubmitting}
-              onChange={setPassword}
-              placeholder={copy('Password')}
-              autoComplete="current-password"
-            />
-            <DButton type="submit" fullWidth loading={isSubmitting} className="mt-2">
-              {isLeaving
-                ? copy('Opening Operational...')
-                : isSubmitting
-                  ? copy('Signing in...')
-                  : copy('Sign in')}
-            </DButton>
-          </form>
-        </div>
-      </section>
+            <div className="operational-login__caption relative">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--color-brand)]">
+                {copy('Operational')}
+              </p>
+              <p className="mt-2 text-[1.375rem] font-semibold leading-7 tracking-[-0.02em] text-[var(--color-text)]">
+                {copy('Run the business today.')}
+              </p>
+              <p className="mt-1.5 text-sm leading-6 text-[var(--color-text-muted)]">
+                {copy('Selling, queue and service work in one place.')}
+              </p>
+            </div>
+          </aside>
+
+          <section className="operational-login__form">
+            <div className="operational-login__form-content mx-auto w-full max-w-[380px]">
+              <h1 className="text-2xl font-bold leading-8 tracking-[-0.02em] text-[var(--color-text)]">
+                {copy('Sign in to Operational')}
+              </h1>
+              <p className="mt-1.5 text-sm leading-6 text-[var(--color-text-muted)]">
+                {copy('Use your account to start working.')}
+              </p>
+
+              <form className="mt-7" autoComplete="on" onSubmit={submit} noValidate>
+                <div className="space-y-4">
+                  <DInput
+                    ref={identifierInput}
+                    id="operational-identifier"
+                    name="username"
+                    label={copy('User ID')}
+                    value={identifier}
+                    disabled={busy}
+                    onChange={update('identifier', setIdentifier)}
+                    placeholder={copy('Username or email')}
+                    autoComplete="username"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    autoFocus={autoFocusIdentifier}
+                    error={fieldErrors.identifier}
+                  />
+                  <DInput
+                    ref={passwordInput}
+                    id="operational-password"
+                    name="password"
+                    label={copy('Password')}
+                    type="password"
+                    value={password}
+                    disabled={busy}
+                    onChange={update('password', setPassword)}
+                    placeholder={copy('Enter your password')}
+                    autoComplete="current-password"
+                    error={fieldErrors.password}
+                  />
+                </div>
+                {/* Field errors are shown under each field; this announces them together. */}
+                <p role="alert" className="sr-only">
+                  {[fieldErrors.identifier, fieldErrors.password].filter(Boolean).join(' ')}
+                </p>
+                {error ? (
+                  <DAlert variant="danger" role="alert" className="mt-4">
+                    {error}
+                  </DAlert>
+                ) : null}
+                <div aria-live="polite">
+                  <DButton
+                    type="submit"
+                    size="lg"
+                    fullWidth
+                    className="mt-6"
+                    loading={busy}
+                    disabled={busy}
+                  >
+                    {isLeaving
+                      ? copy('Opening Operational...')
+                      : isSubmitting
+                        ? copy('Signing in...')
+                        : copy('Sign in')}
+                  </DButton>
+                </div>
+              </form>
+            </div>
+          </section>
+        </DCard>
+      </div>
     </main>
   );
 }

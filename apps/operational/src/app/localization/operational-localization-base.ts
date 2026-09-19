@@ -109,6 +109,21 @@ const copy: Record<string, LocalizedLabel> = {
   'Request password change': { 'id-ID': 'Ubah kata sandi', 'en-US': 'Change password' },
   Branch: { 'id-ID': 'Cabang', 'en-US': 'Branch' },
   'Sign in to Operational': { 'id-ID': 'Masuk ke Operational', 'en-US': 'Sign in to Operational' },
+  'Use your account to start working.': {
+    'id-ID': 'Gunakan akun Anda untuk mulai bekerja.',
+    'en-US': 'Use your account to start working.',
+  },
+  'Run the business today.': {
+    'id-ID': 'Jalankan bisnis hari ini.',
+    'en-US': 'Run the business today.',
+  },
+  'Selling, queue and service work in one place.': {
+    'id-ID': 'Penjualan, antrian, dan pengerjaan layanan dalam satu tempat.',
+    'en-US': 'Selling, queue and service work in one place.',
+  },
+  'Enter your user ID.': { 'id-ID': 'Isi ID pengguna.', 'en-US': 'Enter your user ID.' },
+  'Enter your password.': { 'id-ID': 'Isi kata sandi.', 'en-US': 'Enter your password.' },
+  'Enter your password': { 'id-ID': 'Masukkan kata sandi', 'en-US': 'Enter your password' },
   'User ID': { 'id-ID': 'ID pengguna', 'en-US': 'User ID' },
   'Username or email': { 'id-ID': 'Nama pengguna atau email', 'en-US': 'Username or email' },
   Password: { 'id-ID': 'Kata sandi', 'en-US': 'Password' },
@@ -237,12 +252,13 @@ const copy: Record<string, LocalizedLabel> = {
     'id-ID': 'Pilih pelanggan terlebih dahulu',
     'en-US': 'Choose the customer first',
   },
-  'A transaction belongs to a customer. Fill in the name and WhatsApp number, or choose a member.': {
-    'id-ID':
-      'Transaksi selalu milik seorang pelanggan. Isi nama dan nomor WhatsApp, atau pilih member.',
-    'en-US':
-      'A transaction belongs to a customer. Fill in the name and WhatsApp number, or choose a member.',
-  },
+  'A transaction belongs to a customer. Fill in the name and WhatsApp number, or choose a member.':
+    {
+      'id-ID':
+        'Transaksi selalu milik seorang pelanggan. Isi nama dan nomor WhatsApp, atau pilih member.',
+      'en-US':
+        'A transaction belongs to a customer. Fill in the name and WhatsApp number, or choose a member.',
+    },
   'WhatsApp number': { 'id-ID': 'Nomor WhatsApp', 'en-US': 'WhatsApp number' },
   'Name and WhatsApp number are both required.': {
     'id-ID': 'Nama dan nomor WhatsApp wajib diisi.',
