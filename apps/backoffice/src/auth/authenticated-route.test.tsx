@@ -2,7 +2,9 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const useBackofficeAuth = vi.fn();
+const { useBackofficeAuth } = vi.hoisted(() => ({
+  useBackofficeAuth: vi.fn(),
+}));
 
 vi.mock('./backoffice-auth-context', () => ({
   useBackofficeAuth: () => useBackofficeAuth(),
