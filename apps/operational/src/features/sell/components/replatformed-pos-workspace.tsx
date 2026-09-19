@@ -58,7 +58,7 @@ import {
   resolveOperationalLocale,
   useOperationalLocalization,
 } from '../../../app/localization/operational-localization';
-import { useCashierSession } from '../../../app/providers/cashier-session-paymentReference';
+import { useCashierSession } from '../../../app/providers/cashier-session-provider';
 import { cashierTransactionKeys } from '../cashier-transaction-keys';
 import { cashierTransactionErrorMessage } from '../cashier-transaction-errors';
 import type { CartDisplayLine } from '../cart-draft';
