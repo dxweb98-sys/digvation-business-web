@@ -85,6 +85,31 @@ describe('completed sale visibility', () => {
     expect(JSON.stringify(summary)).not.toMatch(/350000|628123456789/);
   });
 
+  it('never carries a split payment breakdown into the restricted summary', () => {
+    const split = {
+      ...completedSale(),
+      payments: [
+        {
+          id: 'payment-1',
+          status: 'SUCCEEDED',
+          method: 'BANK_TRANSFER',
+          appliedAmount: '200000.0000',
+          financeFinancialAccountNameSnapshot: 'BCA',
+        },
+        {
+          id: 'payment-2',
+          status: 'SUCCEEDED',
+          method: 'CASH',
+          appliedAmount: '150000.0000',
+          financeFinancialAccountNameSnapshot: 'Kas Utama',
+        },
+      ],
+    } as unknown as Sale;
+    const summary = restrictedQueueSummary(split, false);
+    expect(summary).toEqual(completedSaleSummary(split));
+    expect(JSON.stringify(summary)).not.toMatch(/BCA|Kas Utama|BANK_TRANSFER|200000|150000/);
+  });
+
   it('keeps only the summary in the queue cache for a restricted reader', () => {
     const sale = completedSale();
     expect(queueEntryFor(sale, true)).toBe(sale);
