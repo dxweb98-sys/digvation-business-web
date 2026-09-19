@@ -798,13 +798,14 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       }
     }
 
+    const latestPaymentRoutes = await workspace.refreshPaymentRoutes();
     const normalizedCheckoutTotal = normalizeCurrencyPresentationInput(checkoutTotal);
     setPaymentAmount(normalizedCheckoutTotal);
     setTender(normalizedCheckoutTotal);
     setPayNow(true);
     setPaymentMethod('CASH');
     setPaymentRouteId(
-      workspace.paymentRoutes.find((route) => route.paymentMethod === 'CASH')?.id ?? '',
+      latestPaymentRoutes.find((route) => route.paymentMethod === 'CASH')?.id ?? '',
     );
     setPaymentReference('');
     setCartOpen(false);
@@ -1016,10 +1017,11 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         transaction.id,
       );
       setQueueDetail(null);
+      const latestPaymentRoutes = await workspace.refreshPaymentRoutes();
       const normalizedAvailable = normalizeCurrencyPresentationInput(availableToPay);
       setPaymentMethod('CASH');
       setPaymentRouteId(
-        workspace.paymentRoutes.find((route) => route.paymentMethod === 'CASH')?.id ?? '',
+        latestPaymentRoutes.find((route) => route.paymentMethod === 'CASH')?.id ?? '',
       );
       setPaymentAmount(normalizedAvailable);
       setPaymentReference('');
