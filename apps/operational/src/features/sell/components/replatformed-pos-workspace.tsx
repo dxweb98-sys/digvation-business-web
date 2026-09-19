@@ -1568,7 +1568,10 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         taxLabel={sale ? saleTaxLabel(sale, copy('Tax')) : copy('Tax')}
         locale={workspace.locale}
         customer={activeCustomer}
+        paymentRoutes={workspace.paymentRoutes}
+        isPaymentRoutesLoading={workspace.isLoadingPaymentRoutes}
         method={paymentMethod}
+        paymentRouteId={paymentRouteId}
         appliedAmount={paymentAmount}
         paymentReference={paymentReference}
         tender={tender}
@@ -1576,9 +1579,13 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         onPayNowChange={setPayNow}
         onMethod={(next) => {
           setPaymentMethod(next);
+          setPaymentRouteId(
+            workspace.paymentRoutes.find((route) => route.paymentMethod === next)?.id ?? '',
+          );
           setPaymentReference('');
           if (next === 'CASH') setTender(paymentAmount);
         }}
+        onPaymentRoute={setPaymentRouteId}
         onAppliedAmount={(amount) => {
           setPaymentAmount(amount);
           if (paymentMethod === 'CASH') setTender(amount);
@@ -1656,7 +1663,10 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         sale={displayedQueuePaymentTarget}
         availableToPay={queuePaymentAmount}
         locale={workspace.locale}
+        paymentRoutes={workspace.paymentRoutes}
+        isPaymentRoutesLoading={workspace.isLoadingPaymentRoutes}
         method={paymentMethod}
+        paymentRouteId={paymentRouteId}
         appliedAmount={paymentAmount}
         paymentReference={paymentReference}
         tender={tender}
@@ -1668,9 +1678,13 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         }}
         onMethod={(next) => {
           setPaymentMethod(next);
+          setPaymentRouteId(
+            workspace.paymentRoutes.find((route) => route.paymentMethod === next)?.id ?? '',
+          );
           setPaymentReference('');
           if (next === 'CASH') setTender(paymentAmount);
         }}
+        onPaymentRoute={setPaymentRouteId}
         onAppliedAmount={(amount) => {
           setPaymentAmount(amount);
           if (paymentMethod === 'CASH') setTender(amount);
