@@ -522,6 +522,15 @@ const posCopy: Record<string, LocalizedCopy> = {
   'Edit employee': { 'id-ID': 'Ubah', 'en-US': 'Edit employee' },
   'Change employee': { 'id-ID': 'Ubah karyawan', 'en-US': 'Change employee' },
   'Paper width': { 'id-ID': 'Lebar kertas', 'en-US': 'Paper width' },
+  'Send receipt': { 'id-ID': 'Kirim struk', 'en-US': 'Send receipt' },
+  'Send receipt to customer': {
+    'id-ID': 'Kirim struk ke customer',
+    'en-US': 'Send receipt to customer',
+  },
+  'Receipt is being sent to the customer': {
+    'id-ID': 'Struk sedang dikirim ke customer',
+    'en-US': 'Receipt is being sent to the customer',
+  },
 };
 
 export function operationalPosCopy(value: string, locale: OperationalLocale): string | undefined {

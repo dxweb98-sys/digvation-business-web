@@ -24,9 +24,11 @@ import type {
   CatalogItem,
   CatalogVariant,
   PaymentMethod,
+  QueueSale,
   Sale,
   SaleLine,
 } from './cashier-transaction.types';
+import { isCompletedSaleSummary } from './completed-sale-visibility';
 import { fetchResolvedPrice, fetchResolvedVariantPrices } from './resolved-price-query';
 import type { ServiceLineWorkPlan } from './service-performer-allocation';
 import { createSaleWorkspaceViewModel } from './sale-workspace-view-model';
@@ -138,8 +140,10 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
   const findCachedQueueSale = (saleId: string): Sale | null => {
     const direct = queryClient.getQueryData<Sale>(cashierTransactionKeys.sale(saleId));
     if (direct) return direct;
-    const queue = queryClient.getQueryData<{ items: Sale[] }>(cashierTransactionKeys.sales());
-    return queue?.items.find((candidate) => candidate.id === saleId) ?? null;
+    const queue = queryClient.getQueryData<{ items: QueueSale[] }>(cashierTransactionKeys.sales());
+    const entry = queue?.items.find((candidate) => candidate.id === saleId);
+    // A completed-sale summary is not a Sale; the authoritative read decides access.
+    return entry && !isCompletedSaleSummary(entry) ? entry : null;
   };
 
   const loadQueueContext = async (saleId: string) => {

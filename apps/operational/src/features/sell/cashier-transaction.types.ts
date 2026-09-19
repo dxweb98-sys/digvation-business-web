@@ -341,3 +341,26 @@ export interface OpenSaleSummaryViewModel {
   activeLineCount: number;
   updatedAt: string;
 }
+
+/**
+ * A completed transaction as Runtime shows it to a caller without
+ * `sales:read-completed`: recognizable for follow-up, with no amounts, lines,
+ * payments or receipt content.
+ */
+export interface CompletedSaleSummary {
+  visibility: 'SUMMARY';
+  id: string;
+  saleNumber: string;
+  invoiceNumber: string | null;
+  sellingLocationId: string;
+  status: 'FINALIZED';
+  operationalState: SaleOperationalState;
+  customer: Pick<SaleCustomer, 'type' | 'name'> | null;
+  itemCount: number;
+  finalizedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** One entry of the Operational queue: a full Sale, or a completed-sale summary. */
+export type QueueSale = Sale | CompletedSaleSummary;

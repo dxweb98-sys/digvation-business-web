@@ -16,6 +16,7 @@ import type {
   Employee,
   OperationalCatalogProjection,
   PaymentRoute,
+  QueueSale,
   Sale,
 } from './cashier-transaction.types';
 
@@ -97,7 +98,7 @@ export function attachOperationalProjection(
     const query = new URLSearchParams();
     if (sellingLocationId) query.set('sellingLocationId', sellingLocationId);
     const suffix = query.size ? `?${query.toString()}` : '';
-    return client.get<ApiPage<Sale>>(`${OPERATIONAL_PREFIX}/queue${suffix}`, { signal });
+    return client.get<ApiPage<QueueSale>>(`${OPERATIONAL_PREFIX}/queue${suffix}`, { signal });
   };
 
   operational.createSale = (input: CreateSaleInput, idempotencyKey: string) =>

@@ -35,6 +35,7 @@ import {
   PlayCircle,
   Plus,
   Printer,
+  Send,
   QrCode,
   RotateCcw,
   ShoppingBag,
@@ -79,10 +80,12 @@ import {
 } from '../sale-presentation';
 import type {
   CatalogItem,
+  CompletedSaleSummary,
   Employee,
   Payment,
   PaymentMethod,
   PaymentRoute,
+  QueueSale,
   Sale,
   SaleCustomer,
   SaleCustomerSelection,
@@ -117,6 +120,12 @@ import {
   type ServiceLineWorkPlan,
 } from '../service-performer-allocation';
 import type { VariantPickerState } from './variant-picker';
+import {
+  isCompletedSaleSummary,
+  presentableTransaction,
+  restrictedQueueSummary,
+  useCanReadCompletedSaleDetails,
+} from '../completed-sale-visibility';
 import './replatformed-pos-workspace.css';
 
 type Workspace = ReturnType<typeof useCashierTransactionWorkspace>;
@@ -248,7 +257,7 @@ function transactionNumber(sale: Pick<Sale, 'id' | 'saleNumber'>, locale: string
  * the Sale. A Sale captured before the customer contract carries no identity:
  * it stays neutral and is never shown as a general or anonymous customer.
  */
-function customerDisplayName(customer: SaleCustomer | null, locale: string): string {
+function customerDisplayName(customer: Pick<SaleCustomer, 'name'> | null, locale: string): string {
   return customer && customer.name.trim()
     ? customer.name
     : copyFor('Customer data is not available', locale);
@@ -448,7 +457,7 @@ function ServicePerformerSummary({
   );
 }
 
-function queueStatus(sale: Sale): QueueStatus | null {
+function queueStatus(sale: Pick<QueueSale, 'status' | 'operationalState'>): QueueStatus | null {
   if (sale.status === 'FINALIZED') return 'COMPLETED';
   if (sale.status === 'VOIDED') return 'CANCELED';
   if (sale.operationalState === 'IN_PROGRESS') return 'PROGRESS';
@@ -673,6 +682,10 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const [isSavingPerformers, setSavingPerformers] = useState(false);
   const [receiptSaleId, setReceiptSaleId] = useState<string | null>(null);
   const [isSendingReceipt, setSendingReceipt] = useState(false);
+  const [sendingReceiptId, setSendingReceiptId] = useState<string | null>(null);
+  // Effective permission, never a role name: without it completed transactions
+  // show no amount, detail or receipt, and can only be sent to the customer.
+  const canReadCompleted = useCanReadCompletedSaleDetails();
 
   const sale = workspace.viewModel.sale;
   const lines = workspace.cart.lines;
@@ -786,13 +799,15 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
    * from the transaction: a provider that is absent or failing is reported as a
    * delivery outcome and never touches the Sale, its payment or its queue state.
    */
-  const sendReceipt = async (target: Sale) => {
+  const sendReceipt = async (target: Pick<QueueSale, 'id' | 'saleNumber'>) => {
     setSendingReceipt(true);
+    setSendingReceiptId(target.id);
     try {
       await adapter.requestReceiptDelivery(target.id, 'WHATSAPP');
       showToast({
-        title: copy('Send via WhatsApp'),
+        title: copy('Receipt is being sent to the customer'),
         description: transactionNumber(target, workspace.locale),
+        variant: 'success',
       });
     } catch (error) {
       showToast({
@@ -802,6 +817,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       });
     } finally {
       setSendingReceipt(false);
+      setSendingReceiptId(null);
     }
   };
 
@@ -933,10 +949,20 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       return;
     }
     try {
+      // The finalize response is the immediate completion result, so its receipt
+      // is shown to every operator who completed it. Without sales:read-completed
+      // it opens as the receipt only (no detail) and is gone once closed: later
+      // reads of the completed transaction are history, which Runtime forbids.
       const finalized = await workspace.finalizeQueuedSale(completionConfirmationTarget);
-      setQueueDetail(finalized);
       setQueueTab('COMPLETED');
-      setReceiptSaleId(hasSuccessfulPayment(finalized) ? finalized.id : null);
+      const paid = hasSuccessfulPayment(finalized);
+      if (canReadCompleted || paid) {
+        setQueueDetail(finalized);
+        setReceiptSaleId(paid ? finalized.id : null);
+      } else {
+        setQueueDetail(null);
+        setReceiptSaleId(null);
+      }
       setCompletionConfirmationTarget(null);
       showToast({
         title: copy('Transaction completed'),
@@ -1180,6 +1206,9 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
             setQueueDetail(transaction);
             setReceiptSaleId(transaction.id);
           }}
+          canReadCompleted={canReadCompleted}
+          onSendReceipt={(transaction) => void sendReceipt(transaction)}
+          sendingReceiptId={sendingReceiptId}
         />
       )}
 
@@ -1356,7 +1385,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       />
 
       <ReferenceTransactionDetail
-        sale={displayedQueueDetail}
+        sale={presentableTransaction(displayedQueueDetail, canReadCompleted, receiptSaleId)}
         locale={workspace.locale}
         employees={workspace.employees}
         businessName={runtime.branding.businessName ?? runtime.branding.productName}
@@ -1672,12 +1701,15 @@ function ReferenceQueueBoard({
   onCancel,
   onView,
   onViewReceipt,
+  canReadCompleted,
+  onSendReceipt,
+  sendingReceiptId,
 }: {
   open: boolean;
   onOpenChange: (value: boolean) => void;
   active: QueueStatus;
   onChangeTab: (status: QueueStatus) => void;
-  groups: Record<QueueStatus, Sale[]>;
+  groups: Record<QueueStatus, QueueSale[]>;
   issues: Record<string, string[]>;
   locale: string;
   onStartWork: (sale: Sale) => void;
@@ -1686,6 +1718,9 @@ function ReferenceQueueBoard({
   onCancel: (sale: Sale) => void;
   onView: (sale: Sale) => void;
   onViewReceipt: (sale: Sale) => void;
+  canReadCompleted: boolean;
+  onSendReceipt: (sale: Pick<QueueSale, 'id' | 'saleNumber'>) => void;
+  sendingReceiptId: string | null;
 }) {
   const { copy, label } = useOperationalLocalization();
   const statuses = Object.keys(statusMeta) as QueueStatus[];
@@ -1758,7 +1793,7 @@ function ReferenceQueueBoard({
               {statuses.map((status) => {
                 const list = groups[status];
                 const contentKey = `${status}:${list
-                  .map((sale) => `${sale.id}:${sale.version}`)
+                  .map((sale) => `${sale.id}:${sale.updatedAt}`)
                   .join('|')}`;
                 return (
                   <DTabsContent key={status} value={status} className="mt-3">
@@ -1766,21 +1801,39 @@ function ReferenceQueueBoard({
                       {list.length ? (
                         <div className="no-scrollbar cursor-grab overflow-x-auto overflow-y-hidden pb-3 select-none">
                           <div className="flex w-max gap-4 px-0.5">
-                            {list.map((sale) => (
-                              <ReferenceQueueCard
-                                key={sale.id}
-                                sale={sale}
-                                status={status}
-                                locale={locale}
-                                issues={issues[sale.id] ?? []}
-                                onStartWork={onStartWork}
-                                onAdjust={onAdjust}
-                                onPay={onPay}
-                                onCancel={onCancel}
-                                onView={onView}
-                                onViewReceipt={onViewReceipt}
-                              />
-                            ))}
+                            {list.map((sale) => {
+                              // A completed transaction without the permission is
+                              // shown from its summary alone, even if a full copy is cached.
+                              const summary = restrictedQueueSummary(sale, canReadCompleted);
+                              if (summary)
+                                return (
+                                  <RestrictedCompletedQueueCard
+                                    key={sale.id}
+                                    summary={summary}
+                                    locale={locale}
+                                    isSending={sendingReceiptId === sale.id}
+                                    onSendReceipt={onSendReceipt}
+                                  />
+                                );
+                              // Every summary entry was presented above; what remains is a full Sale.
+                              if (isCompletedSaleSummary(sale)) return null;
+                              return (
+                                <ReferenceQueueCard
+                                  key={sale.id}
+                                  sale={sale}
+                                  status={status}
+                                  locale={locale}
+                                  issues={issues[sale.id] ?? []}
+                                  onStartWork={onStartWork}
+                                  onAdjust={onAdjust}
+                                  onPay={onPay}
+                                  onCancel={onCancel}
+                                  onView={onView}
+                                  onViewReceipt={onViewReceipt}
+                                  onSendReceipt={onSendReceipt}
+                                />
+                              );
+                            })}
                           </div>
                         </div>
                       ) : (
@@ -1805,7 +1858,69 @@ function ReferenceQueueBoard({
   );
 }
 
-function ReferenceQueueCard({
+/**
+ * A completed transaction for an operator without `sales:read-completed`: it
+ * stays recognizable for follow-up, carries no amount, detail or receipt, and
+ * offers the one action left, sending the receipt to the customer.
+ */
+export function RestrictedCompletedQueueCard({
+  summary,
+  locale,
+  isSending,
+  onSendReceipt,
+}: {
+  summary: CompletedSaleSummary;
+  locale: string;
+  isSending: boolean;
+  onSendReceipt: (sale: Pick<QueueSale, 'id' | 'saleNumber'>) => void;
+}) {
+  const { copy, label } = useOperationalLocalization();
+  const meta = statusMeta.COMPLETED;
+  const number = transactionNumber(summary, locale);
+  return (
+    <article
+      className={`w-[360px] shrink-0 rounded-2xl border border-[var(--color-border)] p-4 transition-shadow hover:shadow-sm ${meta.soft}`}
+    >
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-[11px] text-[var(--color-text-muted)]">{number}</p>
+          <p className="mt-0.5 truncate text-sm font-bold">
+            {customerDisplayName(summary.customer, locale)}
+          </p>
+        </div>
+        <span
+          className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold ${meta.tone}`}
+        >
+          {meta.icon}
+          {label(meta.value)}
+        </span>
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <p className="min-w-0 text-xs text-[var(--color-text-muted)]">
+          {summary.itemCount} {copy('items')},{' '}
+          {new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(
+            new Date(summary.finalizedAt ?? summary.createdAt),
+          )}
+        </p>
+        <DButton
+          size="sm"
+          variant="outline"
+          className="h-8 shrink-0 px-3 text-[11px]"
+          leftIcon={<Send className="size-3.5" />}
+          loading={isSending}
+          disabled={isSending || !summary.customer}
+          aria-label={`${copy('Send receipt to customer')} ${number}`}
+          {...(summary.customer ? {} : { title: copy('Customer data is not available') })}
+          onClick={() => onSendReceipt(summary)}
+        >
+          {copy('Send receipt')}
+        </DButton>
+      </div>
+    </article>
+  );
+}
+
+export function ReferenceQueueCard({
   sale,
   status,
   locale,
@@ -1816,6 +1931,7 @@ function ReferenceQueueCard({
   onCancel,
   onView,
   onViewReceipt,
+  onSendReceipt,
 }: {
   sale: Sale;
   status: QueueStatus;
@@ -1827,6 +1943,7 @@ function ReferenceQueueCard({
   onCancel: (sale: Sale) => void;
   onView: (sale: Sale) => void;
   onViewReceipt: (sale: Sale) => void;
+  onSendReceipt: (sale: Sale) => void;
 }) {
   const { copy, label } = useOperationalLocalization();
   const meta = statusMeta[status];
@@ -1847,6 +1964,15 @@ function ReferenceQueueCard({
             label: copy('View receipt'),
             icon: <Printer className="size-3.5" />,
             onSelect: () => onViewReceipt(sale),
+          },
+        ]
+      : []),
+    ...(status === 'COMPLETED' && sale.customer
+      ? [
+          {
+            label: copy('Send receipt to customer'),
+            icon: <Send className="size-3.5" />,
+            onSelect: () => onSendReceipt(sale),
           },
         ]
       : []),

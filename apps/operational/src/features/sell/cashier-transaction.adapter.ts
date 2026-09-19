@@ -13,6 +13,7 @@ import type {
   PaymentRoute,
   PaymentStatus,
   ResolvedPrice,
+  QueueSale,
   Sale,
   SaleCustomerSelection,
   SellingLocation,
@@ -145,7 +146,7 @@ export interface PaymentRouteQuery {
 }
 
 export interface OpenSalesQuery {
-  listSales(signal?: AbortSignal): Promise<ApiPage<Sale>>;
+  listSales(signal?: AbortSignal): Promise<ApiPage<QueueSale>>;
 }
 
 export interface SaleTransactionClient {
@@ -326,8 +327,8 @@ export class HttpCashierTransactionAdapter
     return this.client.get<ApiPage<Employee>>(pagePath(`${API_PREFIX}/employees`), { signal });
   }
 
-  public listSales(signal?: AbortSignal): Promise<ApiPage<Sale>> {
-    return this.client.get<ApiPage<Sale>>(pagePath(`${API_PREFIX}/sales`), { signal });
+  public listSales(signal?: AbortSignal): Promise<ApiPage<QueueSale>> {
+    return this.client.get<ApiPage<QueueSale>>(pagePath(`${API_PREFIX}/sales`), { signal });
   }
 
   public getSale(saleId: string, signal?: AbortSignal): Promise<Sale> {
