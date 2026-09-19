@@ -687,9 +687,13 @@ function RouteEditor({
           limit: 100,
           offset: 0,
         });
-        const sameScope = existing.items.find((item) => item.currency === account?.currency);
-        if (sameScope)
-          await api.updateRoute(sameScope, { financialAccountId: accountId, status: 'ACTIVE' });
+        const sameAccountRoute = existing.items.find(
+          (item) =>
+            item.currency === account?.currency &&
+            item.financialAccountId === accountId,
+        );
+        if (sameAccountRoute)
+          await api.updateRoute(sameAccountRoute, { status: 'ACTIVE' });
         else
           await api.createRoute({
             sellingLocationId: locationId,
