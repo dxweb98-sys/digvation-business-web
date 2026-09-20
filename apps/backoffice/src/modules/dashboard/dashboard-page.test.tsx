@@ -82,7 +82,11 @@ vi.mock('./dashboard-api', () => ({
     report(type: string) {
       if (type === 'business-performance') {
         return Promise.resolve({
-          summary: { finalRevenue: '100000.0000', transactionCount: 4 },
+          summary: {
+            finalRevenue: '8849780.0000',
+            netRevenue: '-18690220.0000',
+            transactionCount: 25,
+          },
           analytics: {
             trend: [{ label: '2026-09-20', value: '100000.0000', count: 4 }],
             breakdown: [],
@@ -95,7 +99,7 @@ vi.mock('./dashboard-api', () => ({
       }
       if (type === 'expenses') {
         return Promise.resolve({
-          summary: { approvedExpenseTotal: '25000.0000' },
+          summary: { approvedExpenseTotal: '27540000.0000' },
           analytics: {
             trend: [{ label: '2026-09-20', value: '25000.0000', count: 1 }],
             breakdown: [],
@@ -159,6 +163,7 @@ describe('DashboardPage daily summary', () => {
     expect(screen.getByText('IDR -18690220.0000')).toBeTruthy();
     expect(screen.getByRole('img', { name: 'Aktivitas' })).toBeTruthy();
     expect(screen.getByText('Pemasukan')).toBeTruthy();
+    expect(screen.getByText('Revenue')).toBeTruthy();
     expect(screen.getByText('Pengeluaran')).toBeTruthy();
     expect(screen.getByText('Transaksi')).toBeTruthy();
   });

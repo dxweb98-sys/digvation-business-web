@@ -240,6 +240,16 @@ export function DashboardPage() {
   const previousActivityExpenseData = previousActivityExpenses.data;
   const activityRevenue = numberValue(activityData?.summary.finalRevenue);
   const previousActivityRevenue = numberValue(previousActivityData?.summary.finalRevenue);
+  const activityNetRevenueValue = activityData?.summary.netRevenue;
+  const activityNetRevenue =
+    activityNetRevenueValue === undefined || activityNetRevenueValue === null
+      ? undefined
+      : numberValue(activityNetRevenueValue);
+  const previousActivityNetRevenueValue = previousActivityData?.summary.netRevenue;
+  const previousActivityNetRevenue =
+    previousActivityNetRevenueValue === undefined || previousActivityNetRevenueValue === null
+      ? undefined
+      : numberValue(previousActivityNetRevenueValue);
   const activityTransactions = numberValue(activityData?.summary.transactionCount);
   const previousActivityTransactions = numberValue(previousActivityData?.summary.transactionCount);
   const approvedExpenses = numberValue(activityExpenseData?.summary.approvedExpenseTotal);
@@ -391,6 +401,10 @@ export function DashboardPage() {
               revenue={activityRevenue}
               transactions={activityTransactions}
               previousRevenue={previousActivityRevenue}
+              {...(activityNetRevenue === undefined ? {} : { netRevenue: activityNetRevenue })}
+              {...(previousActivityNetRevenue === undefined
+                ? {}
+                : { previousNetRevenue: previousActivityNetRevenue })}
               previousTransactions={previousActivityTransactions}
               trend={activityData?.analytics.trend ?? []}
               expenses={approvedExpenses}

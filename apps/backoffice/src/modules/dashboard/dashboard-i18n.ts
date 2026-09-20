@@ -20,6 +20,7 @@ const dashboardCopy = {
   thisYear: { id: 'Tahun ini', en: 'This year' },
   revenue: { id: 'Pemasukan', en: 'Income' },
   expenses: { id: 'Pengeluaran', en: 'Expenses' },
+  netRevenue: { id: 'Revenue', en: 'Revenue' },
   transactions: { id: 'Transaksi', en: 'Transactions' },
   sold: { id: 'terjual', en: 'sold' },
   txShort: { id: 'trx', en: 'tx' },
