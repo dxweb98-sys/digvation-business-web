@@ -3258,11 +3258,11 @@ function ReferencePaymentDialog({
                     {line.promotion?.name ? (
                       <p className="font-semibold">{line.promotion.name}</p>
                     ) : null}
-                    <p>
-                      {copy('Item discount')}
-                      {discountPercentage ? ` (${discountPercentage}%)` : ''}: −
-                      {format(line.lineDiscountAmount)}
-                    </p>
+                    {discountPercentage ? (
+                      <p>
+                        {copy('Discount')}: {discountPercentage}%
+                      </p>
+                    ) : null}
                     {line.promotion?.effectiveFrom ? (
                       <p>
                         {copy('Start')}:{' '}
@@ -3292,11 +3292,14 @@ function ReferencePaymentDialog({
                           {quantity(line.quantity)} × {format(line.effectiveUnitPrice)}
                         </p>
                         {discounted ? (
-                          <div className="mt-1 flex items-center">
+                          <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-[var(--color-danger)]">
                             <DiscountInfoTooltip
                               label={copy('Discount information')}
                               content={promotionTooltip}
                             />
+                            <span>
+                              {copy('Discount')} −{format(line.lineDiscountAmount)}
+                            </span>
                           </div>
                         ) : null}
                       </div>

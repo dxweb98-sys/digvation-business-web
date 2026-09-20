@@ -458,6 +458,7 @@ const copy: Record<string, LocalizedLabel> = {
   'Unit price': { 'id-ID': 'Harga per unit', 'en-US': 'Unit price' },
   Reason: { 'id-ID': 'Alasan', 'en-US': 'Reason' },
   'Item discount': { 'id-ID': 'Diskon item', 'en-US': 'Item discount' },
+  Discount: { 'id-ID': 'Diskon', 'en-US': 'Discount' },
   'Discount information': { 'id-ID': 'Informasi diskon', 'en-US': 'Discount information' },
   Start: { 'id-ID': 'Mulai', 'en-US': 'Start' },
   End: { 'id-ID': 'Berakhir', 'en-US': 'End' },
