@@ -23,4 +23,19 @@ describe('DashboardApi daily summary', () => {
       '/api/v1/reports/dashboard-summary?sellingLocationId=00000000-0000-4000-8000-000000000010',
     );
   });
+  it('requests only approved expenses for the Activity chart', async () => {
+    const get = vi.fn().mockResolvedValue({});
+    const api = new DashboardApi({ get } as unknown as ApiClient);
+
+    await api.report('expenses', {
+      from: '2026-09-01',
+      to: '2026-09-20',
+      locationId: '00000000-0000-4000-8000-000000000010',
+      status: 'APPROVED',
+    });
+
+    expect(get).toHaveBeenCalledWith(
+      '/api/v1/reports/expenses?dateFrom=2026-09-01&dateTo=2026-09-20&page=1&pageSize=100&sellingLocationId=00000000-0000-4000-8000-000000000010&status=APPROVED',
+    );
+  });
 });

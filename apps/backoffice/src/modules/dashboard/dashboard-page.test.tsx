@@ -70,34 +70,47 @@ vi.mock('./dashboard-api', () => ({
       return Promise.resolve({
         date: '2026-09-20',
         currency: 'IDR',
-        income: '100000.0000',
-        expenses: '25000.0000',
-        netRevenue: '75000.0000',
+        income: '8849780.0000',
+        expenses: '27540000.0000',
+        netRevenue: '-18690220.0000',
         totalTransactions: 4,
         financeAvailable: true,
         transactionCompletion: { total: 5, finalized: 4, voided: 1 },
       });
     }
 
-    report() {
+    report(type: string) {
+      if (type === 'business-performance') {
+        return Promise.resolve({
+          summary: { finalRevenue: '100000.0000', transactionCount: 4 },
+          analytics: {
+            trend: [{ label: '2026-09-20', value: '100000.0000', count: 4 }],
+            breakdown: [],
+            breakdowns: {},
+            ranking: [],
+          },
+          items: [],
+          total: 0,
+        });
+      }
+      if (type === 'expenses') {
+        return Promise.resolve({
+          summary: { approvedExpenseTotal: '25000.0000' },
+          analytics: {
+            trend: [{ label: '2026-09-20', value: '25000.0000', count: 1 }],
+            breakdown: [],
+            breakdowns: {},
+            ranking: [],
+          },
+          items: [],
+          total: 0,
+        });
+      }
       return Promise.resolve({
         summary: {},
         analytics: { trend: [], breakdown: [], breakdowns: {}, ranking: [] },
         items: [],
         total: 0,
-      });
-    }
-  },
-}));
-
-vi.mock('../activity/activity-api', () => ({
-  ActivityApi: class {
-    list() {
-      return Promise.resolve({
-        items: [],
-        total: 0,
-        limit: 5,
-        offset: 0,
       });
     }
   },
@@ -110,10 +123,6 @@ vi.mock('./components/dashboard-kpi-card', () => ({
       <strong>{value}</strong>
     </div>
   ),
-}));
-
-vi.mock('./components/dashboard-activity-card', () => ({
-  DashboardActivityCard: ({ title }: { title: string }) => <section>{title}</section>,
 }));
 
 vi.mock('./components/transaction-completion-card', () => ({
@@ -143,11 +152,14 @@ describe('DashboardPage daily summary', () => {
 
     expect(await screen.findByText('Pemasukan hari ini')).toBeTruthy();
     expect(screen.getByText('Pengeluaran hari ini')).toBeTruthy();
-    expect(screen.getByText('Pendapatan bersih hari ini')).toBeTruthy();
+    expect(screen.getByText('Revenue hari ini')).toBeTruthy();
     expect(screen.getByText('Total transaksi hari ini')).toBeTruthy();
-    expect(screen.getByText('IDR 100000.0000')).toBeTruthy();
-    expect(screen.getByText('IDR 25000.0000')).toBeTruthy();
-    expect(screen.getByText('IDR 75000.0000')).toBeTruthy();
-    expect(screen.getByText('Aktivitas')).toBeTruthy();
+    expect(screen.getByText('IDR 8849780.0000')).toBeTruthy();
+    expect(screen.getByText('IDR 27540000.0000')).toBeTruthy();
+    expect(screen.getByText('IDR -18690220.0000')).toBeTruthy();
+    expect(screen.getByRole('img', { name: 'Aktivitas' })).toBeTruthy();
+    expect(screen.getByText('Pemasukan')).toBeTruthy();
+    expect(screen.getByText('Pengeluaran')).toBeTruthy();
+    expect(screen.getByText('Transaksi')).toBeTruthy();
   });
 });

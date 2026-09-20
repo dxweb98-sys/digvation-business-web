@@ -2,7 +2,7 @@ import { useRuntime } from '@digvation/business-runtime';
 import { DCard } from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
 import { CircleDollarSign, ReceiptText, TrendingUp, WalletCards } from 'lucide-react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 import { BackofficePage } from '../../app/layout/backoffice-page';
 import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
@@ -13,9 +13,8 @@ import {
   canShowDashboardWidget,
   isReportAvailable,
 } from '../reporting/report-availability';
-import { ActivityApi } from '../activity/activity-api';
 import { BusinessInsightWidget } from './components/business-insight-widget';
-import { DashboardActivityCard } from './components/dashboard-activity-card';
+import { BusinessPerformanceCard } from './components/business-performance-card';
 import { DashboardKpiCard } from './components/dashboard-kpi-card';
 import { PaymentMixCard } from './components/payment-mix-card';
 import { RankingCard } from './components/ranking-card';
@@ -127,12 +126,9 @@ export function DashboardPage() {
     isReady: locationReady,
     isDenied: locationDenied,
   } = useBusinessLocation();
+  const [activityPeriod, setActivityPeriod] = useState<ActivityPeriod>('month');
   const api = useMemo(
     () => new DashboardApi(createApiClient(runtime.apiBaseUrl)),
-    [createApiClient, runtime.apiBaseUrl],
-  );
-  const activityApi = useMemo(
-    () => new ActivityApi(createApiClient(runtime.apiBaseUrl)),
     [createApiClient, runtime.apiBaseUrl],
   );
 
@@ -141,7 +137,6 @@ export function DashboardPage() {
   const canReadExpenses = isReportAvailable(session, 'expenses');
   const canReadCatalog = isReportAvailable(session, 'catalog-performance');
   const canReadEmployees = isReportAvailable(session, 'employee-performance');
-  const canReadActivity = Boolean(session?.access.permissions.includes('activity:read'));
 
   const showTopItems = canShowDashboardWidget(session, 'TOP_ITEMS');
   const showPaymentMix = canShowDashboardWidget(session, 'PAYMENT_MIX');
@@ -149,10 +144,19 @@ export function DashboardPage() {
   const showTopEmployees = canShowDashboardWidget(session, 'TOP_EMPLOYEES');
   const showBusinessInsight = canShowDashboardWidget(session, 'BUSINESS_INSIGHT');
 
+  const activity = periodRange(activityPeriod);
+  const previousActivity = previousRange(activity.from, activity.to);
   const month = periodRange('month');
   const previousMonth = previousRange(month.from, month.to);
   const recent = recentRange(30);
 
+  const activityFilters: DashboardFilterState = { ...activity, locationId };
+  const previousActivityFilters: DashboardFilterState = { ...previousActivity, locationId };
+  const expenseActivityFilters: DashboardFilterState = { ...activityFilters, status: 'APPROVED' };
+  const previousExpenseActivityFilters: DashboardFilterState = {
+    ...previousActivityFilters,
+    status: 'APPROVED',
+  };
   const monthFilters: DashboardFilterState = { ...month, locationId };
   const previousMonthFilters: DashboardFilterState = { ...previousMonth, locationId };
   const recentFilters: DashboardFilterState = { ...recent, locationId };
@@ -163,10 +167,25 @@ export function DashboardPage() {
     queryFn: () => api.dailySummary(locationId),
     enabled: reportEnabled,
   });
-  const recentActivity = useQuery({
-    queryKey: ['dashboard', 'activity', locationId],
-    queryFn: () => activityApi.list({ offset: 0, limit: 5, locationId }),
-    enabled: Boolean(session && canReadActivity && locationReady),
+  const activityPerformance = useQuery({
+    queryKey: ['dashboard', 'business-performance', activityFilters],
+    queryFn: () => api.report('business-performance', activityFilters),
+    enabled: reportEnabled,
+  });
+  const previousActivityPerformance = useQuery({
+    queryKey: ['dashboard', 'business-performance', 'previous-activity', previousActivityFilters],
+    queryFn: () => api.report('business-performance', previousActivityFilters),
+    enabled: reportEnabled,
+  });
+  const activityExpenses = useQuery({
+    queryKey: ['dashboard', 'expenses', expenseActivityFilters],
+    queryFn: () => api.report('expenses', expenseActivityFilters),
+    enabled: Boolean(session && canReadExpenses && locationReady),
+  });
+  const previousActivityExpenses = useQuery({
+    queryKey: ['dashboard', 'expenses', 'previous-activity', previousExpenseActivityFilters],
+    queryFn: () => api.report('expenses', previousExpenseActivityFilters),
+    enabled: Boolean(session && canReadExpenses && locationReady),
   });
   const lastTransactions = useQuery({
     queryKey: ['dashboard', 'last-transactions', recentFilters],
@@ -215,6 +234,18 @@ export function DashboardPage() {
     formatMoney(String(value ?? '0'), summary?.currency ?? runtime.currency);
 
   const summary = dailySummary.data;
+  const activityData = activityPerformance.data;
+  const previousActivityData = previousActivityPerformance.data;
+  const activityExpenseData = activityExpenses.data;
+  const previousActivityExpenseData = previousActivityExpenses.data;
+  const activityRevenue = numberValue(activityData?.summary.finalRevenue);
+  const previousActivityRevenue = numberValue(previousActivityData?.summary.finalRevenue);
+  const activityTransactions = numberValue(activityData?.summary.transactionCount);
+  const previousActivityTransactions = numberValue(previousActivityData?.summary.transactionCount);
+  const approvedExpenses = numberValue(activityExpenseData?.summary.approvedExpenseTotal);
+  const previousApprovedExpenses = numberValue(
+    previousActivityExpenseData?.summary.approvedExpenseTotal,
+  );
   const monthData = monthPerformance.data;
   const previousMonthData = previousMonthPerformance.data;
 
@@ -346,30 +377,36 @@ export function DashboardPage() {
             </section>
           )}
 
-          {canReadActivity || summary ? (
-            <section className="mt-4 grid items-start gap-4 xl:grid-cols-[minmax(0,1.9fr)_minmax(280px,0.72fr)]">
-              {canReadActivity ? (
-                <DashboardActivityCard
-                  title={text('activity')}
-                  events={recentActivity.data?.items ?? []}
-                  loading={recentActivity.isPending}
-                  error={recentActivity.isError}
-                  emptyMessage={text('noActivity')}
-                  errorMessage={text('activityError')}
-                  seeAllLabel={text('seeAll')}
-                  locale={locale}
-                  formatDateTime={(value) => formatDateTime(value)}
-                />
-              ) : null}
-              {summary ? (
-                <TransactionCompletionCard
-                  finalized={summary.transactionCompletion.finalized}
-                  total={summary.transactionCompletion.total}
-                  voided={summary.transactionCompletion.voided}
-                />
-              ) : null}
-            </section>
-          ) : null}
+          <section className="mt-4 grid items-start gap-4 xl:grid-cols-[minmax(0,1.9fr)_minmax(280px,0.72fr)]">
+            <BusinessPerformanceCard
+              title={text('activity')}
+              period={activityPeriod}
+              periodOptions={[
+                { value: 'today', label: text('today') },
+                { value: '7d', label: text('last7Days') },
+                { value: 'month', label: text('thisMonth') },
+                { value: 'year', label: text('thisYear') },
+              ]}
+              onPeriodChange={(value) => setActivityPeriod(value as ActivityPeriod)}
+              revenue={activityRevenue}
+              transactions={activityTransactions}
+              previousRevenue={previousActivityRevenue}
+              previousTransactions={previousActivityTransactions}
+              trend={activityData?.analytics.trend ?? []}
+              expenses={approvedExpenses}
+              previousExpenses={previousApprovedExpenses}
+              expenseTrend={activityExpenseData?.analytics.trend ?? []}
+              showExpenses={canReadExpenses}
+              formatMoney={moneyNumber}
+            />
+            {summary ? (
+              <TransactionCompletionCard
+                finalized={summary.transactionCompletion.finalized}
+                total={summary.transactionCompletion.total}
+                voided={summary.transactionCompletion.voided}
+              />
+            ) : null}
+          </section>
 
           {showTopItems || showPaymentMix || showRecentTransactions ? (
             <section className="mt-4 grid items-stretch gap-4 lg:grid-cols-2 xl:grid-cols-3">

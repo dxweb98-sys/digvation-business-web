@@ -33,6 +33,7 @@ export class DashboardApi {
       page: '1',
       pageSize: String(pageSize),
       ...(filters.locationId ? { sellingLocationId: filters.locationId } : {}),
+      ...(filters.status ? { status: filters.status } : {}),
     });
 
     return this.api.get<DashboardDataset>(`/api/v1/reports/${type}?${params.toString()}`);
