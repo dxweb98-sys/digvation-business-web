@@ -77,6 +77,8 @@ export class LocalCashierTransactionAdapter implements SaleTransactionPort {
       id: `demo-employee-00${index + 1}`,
       code: `EMP-00${index + 1}`,
       displayName,
+      servicePerformerEligible: true,
+      canPerformServices: true,
       status: 'ACTIVE',
       version: 1,
       createdAt: time,

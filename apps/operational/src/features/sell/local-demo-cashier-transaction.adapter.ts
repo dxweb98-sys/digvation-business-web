@@ -179,6 +179,8 @@ function employee(id: string, code: string, displayName: string): Employee {
     id,
     code,
     displayName,
+    servicePerformerEligible: true,
+    canPerformServices: true,
     status: 'ACTIVE',
     version: 1,
     createdAt: DEMO_CREATED_AT,
