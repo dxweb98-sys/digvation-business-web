@@ -783,10 +783,12 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       return;
     }
 
+    let checkoutSale = sale;
     let checkoutTotal = total;
     if (workspace.cart.isLocalDraft) {
       try {
         const committed = await workspace.commitDraft();
+        checkoutSale = committed;
         checkoutTotal = committed.totalAmount;
       } catch (error) {
         showToast({
@@ -798,11 +800,25 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       }
     }
 
+    if (checkoutSale?.status === 'OPEN') {
+      try {
+        checkoutSale = await workspace.refreshPromotionEligibility(checkoutSale);
+        checkoutTotal = checkoutSale.totalAmount;
+      } catch (error) {
+        showToast({
+          title: copy('Could not prepare transaction'),
+          description: cashierTransactionErrorMessage(error),
+          variant: 'danger',
+        });
+        return;
+      }
+    }
+
     const latestPaymentRoutes = await workspace.refreshPaymentRoutes();
     // Returning to a checkout that already has payments resumes with what is still open.
     const openAmount =
-      sale && !workspace.cart.isLocalDraft && sale.payments.length
-        ? paymentProgress(sale).remainingAmount
+      checkoutSale && checkoutSale.payments.length
+        ? paymentProgress(checkoutSale).remainingAmount
         : checkoutTotal;
     const normalizedCheckoutTotal = normalizeCurrencyPresentationInput(openAmount);
     setPaymentAmount(normalizedCheckoutTotal);
@@ -3187,6 +3203,31 @@ function ReferencePaymentDialog({
             <div className="max-h-[120px] divide-y divide-[var(--color-border)] overflow-y-auto">
               {lines.map((line) => {
                 const discountPercentage = lineDiscountPercentage(line);
+                const discounted = isPositiveDecimal(line.lineDiscountAmount);
+                const discountedLineAmount = discounted
+                  ? createDecimal(line.totalAmount)
+                      .minus(createDecimal(line.lineDiscountAmount))
+                      .toFixed(4)
+                  : line.totalAmount;
+                const promotionTooltip = line.promotion
+                  ? [
+                      line.promotion.name,
+                      line.promotion.effectiveFrom
+                        ? `${copy('Start')}: ${new Intl.DateTimeFormat(locale, {
+                            dateStyle: 'medium',
+                            timeStyle: 'short',
+                          }).format(new Date(line.promotion.effectiveFrom))}`
+                        : null,
+                      line.promotion.effectiveUntil
+                        ? `${copy('End')}: ${new Intl.DateTimeFormat(locale, {
+                            dateStyle: 'medium',
+                            timeStyle: 'short',
+                          }).format(new Date(line.promotion.effectiveUntil))}`
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')
+                  : copy('Item discount');
                 return (
                   <div key={line.id} className="px-4 py-2.5">
                     <div className="flex items-start justify-between gap-3">
@@ -3195,15 +3236,34 @@ function ReferencePaymentDialog({
                         <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
                           {quantity(line.quantity)} × {format(line.effectiveUnitPrice)}
                         </p>
-                        {isPositiveDecimal(line.lineDiscountAmount) ? (
-                          <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
-                            {copy('Item discount')}
-                            {discountPercentage ? ` (${discountPercentage}%)` : ''}: −
-                            {format(line.lineDiscountAmount)}
-                          </p>
+                        {discounted ? (
+                          <div className="mt-1 flex items-center gap-1 text-[11px] font-medium text-[var(--color-danger)]">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              aria-label={promotionTooltip}
+                              title={promotionTooltip}
+                              className="inline-flex size-4 shrink-0 text-[var(--color-danger)]"
+                            >
+                              <Info className="size-3" />
+                            </Button>
+                            <span>
+                              {line.promotion?.name || copy('Item discount')}
+                              {discountPercentage ? ` (${discountPercentage}%)` : ''}: −
+                              {format(line.lineDiscountAmount)}
+                            </span>
+                          </div>
                         ) : null}
                       </div>
-                      <p className="shrink-0 text-sm font-bold">{format(line.totalAmount)}</p>
+                      <div className="shrink-0 text-right tabular-nums">
+                        {discounted ? (
+                          <p className="text-[11px] text-[var(--color-text-muted)] line-through">
+                            {format(line.totalAmount)}
+                          </p>
+                        ) : null}
+                        <p className="text-sm font-bold">{format(discountedLineAmount)}</p>
+                      </div>
                     </div>
                   </div>
                 );

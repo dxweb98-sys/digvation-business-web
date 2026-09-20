@@ -163,9 +163,9 @@ export function lineDiscountRows(
 }
 
 /**
- * Automatic item promotions are explained on the affected line; they are not
- * repeated in the checkout-level Promo & diskon card. Code promotions remain
- * visible there because the cashier explicitly applied the code.
+ * Item-scoped promotions are explained on the affected line and are never
+ * repeated in the checkout-level Promo & diskon card. A code promotion still
+ * remains discoverable through the applied promo-code control itself.
  */
 export function checkoutAdjustmentRows(
   sale: Pick<Sale, 'adjustments' | 'promotionCode'>,
@@ -173,7 +173,7 @@ export function checkoutAdjustmentRows(
   return (sale.adjustments ?? []).filter(
     (adjustment) =>
       positive(adjustment.actualAmount) &&
-      !(adjustment.source === 'PROMOTION' && adjustment.scope === 'ITEM' && !sale.promotionCode),
+      !(adjustment.source === 'PROMOTION' && adjustment.scope === 'ITEM'),
   );
 }
 export function saleDiscountRows(sale: DiscountPresentationSale): DiscountPresentationRow[] {

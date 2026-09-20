@@ -144,6 +144,30 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     command.clearAttention();
   };
 
+  /**
+   * Promotion eligibility is time-sensitive. Every explicit refresh uses a new
+   * idempotency key so an earlier successful refresh can never freeze a later
+   * eligibility decision, while Runtime remains the monetary authority.
+   */
+  const refreshPromotionEligibility = async (targetSale: Sale) => {
+    command.clearNotice();
+    try {
+      const updated = await command.runMutation(() =>
+        transactionAdapter.refreshPromotionEligibility(
+          targetSale.id,
+          targetSale.version,
+          `cashier-promotion-refresh-${crypto.randomUUID()}`,
+        ),
+      );
+      command.commitSale(updated);
+      if (queueContextSale?.id === updated.id) setQueueContextSale(updated);
+      return updated;
+    } catch (error) {
+      command.reportError(error);
+      throw error;
+    }
+  };
+
   const findCachedQueueSale = (saleId: string): Sale | null => {
     const direct = queryClient.getQueryData<Sale>(cashierTransactionKeys.sale(saleId));
     if (direct) return direct;
@@ -334,8 +358,10 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
 
   const hydrateQueuedPayment = async (saleId: string) => {
     const hydrated = await hydrateQueuedSale(saleId);
+    const current =
+      hydrated.status === 'OPEN' ? await refreshPromotionEligibility(hydrated) : hydrated;
     const readiness = createSaleWorkspaceViewModel(
-      hydrated,
+      current,
       effectiveConnectivity,
       'CLEAN',
       runtime.locale,
@@ -343,7 +369,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     if (readiness.paymentMutation.state !== 'AVAILABLE') {
       throw new Error(copy('The latest transaction cannot accept another payment.'));
     }
-    return { sale: hydrated, availableToPay: readiness.availableToPay };
+    return { sale: current, availableToPay: readiness.availableToPay };
   };
 
   const cachedCardDisplayPrice = (itemId: string) =>
@@ -713,6 +739,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
       (route) => route.status === 'ACTIVE',
     ),
     refreshPaymentRoutes,
+    refreshPromotionEligibility,
     selectedLocationId: selectedLocationId ?? '',
     search: catalog.search,
     itemType: catalog.itemType,

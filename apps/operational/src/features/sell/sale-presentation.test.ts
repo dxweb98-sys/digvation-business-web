@@ -65,7 +65,7 @@ describe('sale presentation', () => {
     );
     expect(
       checkoutAdjustmentRows({ adjustments: [itemPromotion], promotionCode: 'WELCOME10' }),
-    ).toEqual([itemPromotion]);
+    ).toEqual([]);
   });
   it('uses configured percentage metadata instead of deriving percentage from money amounts', () => {
     expect(percentageFromRate('0.1')).toBe('10');
