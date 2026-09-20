@@ -23,7 +23,6 @@ const item: CatalogItem = {
   name: 'Item one',
   type: 'PRODUCT',
   categoryId: null,
-  taxCategoryId: null,
   description: null,
   lifecycle: 'ACTIVE',
   fulfillmentBehavior: 'INSTANT',
