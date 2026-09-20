@@ -18,7 +18,7 @@ import {
   DSkeleton as Skeleton,
   useToast,
 } from '@digvation-labs/ui';
-import { DTabs, DTabsContent, DTabsList, DTabsTrigger, DTextarea } from '@digvation/ui';
+import { DDropdown as PortalDropdown, DTabs, DTabsContent, DTabsList, DTabsTrigger, DTextarea } from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
 import {
   AlertCircle,
@@ -29,6 +29,7 @@ import {
   Clock,
   CreditCard,
   Eye,
+  Info,
   Minus,
   MoreHorizontal,
   Pencil,
@@ -782,10 +783,12 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       return;
     }
 
+    let checkoutSale = sale;
     let checkoutTotal = total;
     if (workspace.cart.isLocalDraft) {
       try {
         const committed = await workspace.commitDraft();
+        checkoutSale = committed;
         checkoutTotal = committed.totalAmount;
       } catch (error) {
         showToast({
@@ -797,11 +800,25 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       }
     }
 
+    if (checkoutSale?.status === 'OPEN') {
+      try {
+        checkoutSale = await workspace.refreshPromotionEligibility(checkoutSale);
+        checkoutTotal = checkoutSale.totalAmount;
+      } catch (error) {
+        showToast({
+          title: copy('Could not prepare transaction'),
+          description: cashierTransactionErrorMessage(error),
+          variant: 'danger',
+        });
+        return;
+      }
+    }
+
     const latestPaymentRoutes = await workspace.refreshPaymentRoutes();
     // Returning to a checkout that already has payments resumes with what is still open.
     const openAmount =
-      sale && !workspace.cart.isLocalDraft && sale.payments.length
-        ? paymentProgress(sale).remainingAmount
+      checkoutSale && checkoutSale.payments.length
+        ? paymentProgress(checkoutSale).remainingAmount
         : checkoutTotal;
     const normalizedCheckoutTotal = normalizeCurrencyPresentationInput(openAmount);
     setPaymentAmount(normalizedCheckoutTotal);
@@ -2591,15 +2608,37 @@ function ReferenceCartPanel({
                       <p className="truncate text-sm font-semibold leading-tight">
                         {line.itemNameSnapshot}
                       </p>
-                      <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
+                      <div className="mt-1 text-[11px] text-[var(--color-text-muted)]">
                         {money(line.effectiveUnitPrice, locale)}
                         {line.variantNameSnapshot ? `, ${line.variantNameSnapshot}` : ''}
+                        {line.promotion ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-label={`${copy('Promotion')}: ${line.promotion.name}`}
+                            title={[
+                              line.promotion.name,
+                              line.promotion.effectiveFrom
+                                ? `${copy('Start')}: ${new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(line.promotion.effectiveFrom))}`
+                                : null,
+                              line.promotion.effectiveUntil
+                                ? `${copy('End')}: ${new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(line.promotion.effectiveUntil))}`
+                                : null,
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')}
+                            className="ml-1 inline-flex size-4 align-text-bottom text-[var(--color-text-muted)]"
+                          >
+                            <Info className="size-3" />
+                          </Button>
+                        ) : null}
                         {line.itemTypeSnapshot === 'SERVICE' ? (
                           <span className="ml-1 font-semibold text-cyan-700">
                             {copy('Service')}
                           </span>
                         ) : null}
-                      </p>
+                      </div>
                     </div>
                     <button
                       type="button"
@@ -2840,6 +2879,50 @@ function usePaymentDialogStep(open: boolean) {
     if (open) setStep('edit');
   }
   return [step, setStep] as const;
+}
+
+function DiscountInfoTooltip({
+  label,
+  content,
+}: {
+  label: string;
+  content: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <PortalDropdown
+      open={open}
+      onOpenChange={setOpen}
+      placement="top-start"
+      offset={6}
+      minWidth={220}
+      contentRole="dialog"
+      contentPadding={false}
+      contentClassName="max-w-72 border-0 bg-[var(--color-tooltip)] px-3 py-2 text-xs leading-relaxed text-white shadow-lg"
+      trigger={() => (
+        <button
+          type="button"
+          aria-label={label}
+          aria-expanded={open}
+          onMouseEnter={() => setOpen(true)}
+          onMouseLeave={() => setOpen(false)}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setOpen(false)}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            setOpen((current) => !current);
+          }}
+          className="grid size-4 shrink-0 place-items-center rounded-full text-[var(--color-danger)] outline-none transition-colors hover:bg-red-50 focus-visible:ring-2 focus-visible:ring-red-200"
+        >
+          <Info className="size-3.5" />
+        </button>
+      )}
+    >
+      {content}
+    </PortalDropdown>
+  );
 }
 
 function ReferencePaymentDialog({
@@ -3164,6 +3247,42 @@ function ReferencePaymentDialog({
             <div className="max-h-[120px] divide-y divide-[var(--color-border)] overflow-y-auto">
               {lines.map((line) => {
                 const discountPercentage = lineDiscountPercentage(line);
+                const discounted = isPositiveDecimal(line.lineDiscountAmount);
+                const discountedLineAmount = discounted
+                  ? createDecimal(line.totalAmount)
+                      .minus(createDecimal(line.lineDiscountAmount))
+                      .toFixed(4)
+                  : line.totalAmount;
+                const promotionTooltip = (
+                  <div className="space-y-1">
+                    {line.promotion?.name ? (
+                      <p className="font-semibold">{line.promotion.name}</p>
+                    ) : null}
+                    {discountPercentage ? (
+                      <p>
+                        {copy('Discount')}: {discountPercentage}%
+                      </p>
+                    ) : null}
+                    {line.promotion?.effectiveFrom ? (
+                      <p>
+                        {copy('Start')}:{' '}
+                        {new Intl.DateTimeFormat(locale, {
+                          dateStyle: 'medium',
+                          timeStyle: 'short',
+                        }).format(new Date(line.promotion.effectiveFrom))}
+                      </p>
+                    ) : null}
+                    {line.promotion?.effectiveUntil ? (
+                      <p>
+                        {copy('End')}:{' '}
+                        {new Intl.DateTimeFormat(locale, {
+                          dateStyle: 'medium',
+                          timeStyle: 'short',
+                        }).format(new Date(line.promotion.effectiveUntil))}
+                      </p>
+                    ) : null}
+                  </div>
+                );
                 return (
                   <div key={line.id} className="px-4 py-2.5">
                     <div className="flex items-start justify-between gap-3">
@@ -3172,15 +3291,26 @@ function ReferencePaymentDialog({
                         <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
                           {quantity(line.quantity)} × {format(line.effectiveUnitPrice)}
                         </p>
-                        {isPositiveDecimal(line.lineDiscountAmount) ? (
-                          <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
-                            {copy('Item discount')}
-                            {discountPercentage ? ` (${discountPercentage}%)` : ''}: −
-                            {format(line.lineDiscountAmount)}
-                          </p>
+                        {discounted ? (
+                          <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-[var(--color-danger)]">
+                            <DiscountInfoTooltip
+                              label={copy('Discount information')}
+                              content={promotionTooltip}
+                            />
+                            <span>
+                              {copy('Discount')} −{format(line.lineDiscountAmount)}
+                            </span>
+                          </div>
                         ) : null}
                       </div>
-                      <p className="shrink-0 text-sm font-bold">{format(line.totalAmount)}</p>
+                      <div className="shrink-0 text-right tabular-nums">
+                        {discounted ? (
+                          <p className="text-[11px] font-medium text-[var(--color-danger)] line-through decoration-[1.5px]">
+                            {format(line.totalAmount)}
+                          </p>
+                        ) : null}
+                        <p className="text-sm font-bold">{format(discountedLineAmount)}</p>
+                      </div>
                     </div>
                   </div>
                 );
