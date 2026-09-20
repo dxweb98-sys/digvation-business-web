@@ -36,8 +36,6 @@ const keys = {
   items: ['catalog', 'items'] as const,
   categories: ['catalog', 'categories'] as const,
   categoryOptions: ['catalog', 'category-options'] as const,
-  taxCategories: ['catalog', 'tax-categories'] as const,
-  taxProfile: ['catalog', 'tax-profile'] as const,
   defaults: (itemIds: string[], currency: string, effectiveAt: string) =>
     ['catalog', 'default-prices', itemIds, currency, effectiveAt] as const,
 };
@@ -69,7 +67,6 @@ export function CatalogPage() {
 
   const can = (action: BackofficeAction) =>
     Boolean(session && canPerformBackofficeAction(session, action));
-  const canViewTax = can('viewTax');
 
   const categoryOptions = useQuery({
     queryKey: keys.categoryOptions,
@@ -96,16 +93,6 @@ export function CatalogPage() {
       }),
     enabled: Boolean(session),
   });
-  const taxCategories = useQuery({
-    queryKey: keys.taxCategories,
-    queryFn: () => api.listTaxCategories(),
-    enabled: Boolean(session && canViewTax),
-  });
-  const taxProfile = useQuery({
-    queryKey: keys.taxProfile,
-    queryFn: () => api.getTaxProfile(),
-    enabled: Boolean(session && canViewTax),
-  });
   const itemRows = items.data?.items ?? [];
   const defaultPrices = useQuery({
     queryKey: keys.defaults(
@@ -125,6 +112,8 @@ export function CatalogPage() {
   if (!session) return null;
 
   const refreshItems = () => {
+    // Item saves can append prices effective now; read prices at a fresh instant.
+    setPricingEffectiveAt(new Date().toISOString());
     void client.invalidateQueries({ queryKey: keys.items });
     void client.invalidateQueries({ queryKey: ['catalog', 'default-prices'] });
     void client.invalidateQueries({ queryKey: ['catalog', 'image'] });
@@ -163,14 +152,23 @@ export function CatalogPage() {
     },
     {
       key: 'defaultPrice',
-      label: copy('Default Price'),
-      render: (candidate) => (
-        <PriceLabel
-          price={defaultPriceByItemId.get(candidate.id)}
-          loading={defaultPrices.isLoading}
-          available={can('viewPricing')}
-        />
-      ),
+      label: copy('Price'),
+      // Follow the selling model: an item that requires a variant has no price of its own to sell.
+      render: (candidate) =>
+        candidate.variantCount > 0 && candidate.variantSelectionMode === 'REQUIRED' ? (
+          <span className="text-sm text-[var(--color-text-muted)]">Harga per varian</span>
+        ) : (
+          <div>
+            <PriceLabel
+              price={defaultPriceByItemId.get(candidate.id)}
+              loading={defaultPrices.isLoading}
+              available={can('viewPricing')}
+            />
+            {candidate.variantCount > 0 ? (
+              <p className="text-xs text-[var(--color-text-muted)]">+ pilihan varian</p>
+            ) : null}
+          </div>
+        ),
     },
     { key: 'variants', label: copy('Variants'), render: (candidate) => candidate.variantCount },
     {
@@ -200,7 +198,7 @@ export function CatalogPage() {
         eyebrow={copy('Master Data')}
         title={copy('Catalog')}
         description={copy(
-          'Manage items, categories, pricing, variants, and tax assignment from one catalog workspace.',
+          'Manage items, categories, pricing, and variants from one catalog workspace.',
         )}
       />
 
@@ -363,11 +361,8 @@ export function CatalogPage() {
         key={item?.id ?? (item === null ? 'new' : 'closed')}
         item={item}
         categories={allCategories}
-        taxCategories={taxCategories.data?.items ?? []}
-        {...(taxProfile.data ? { taxProfile: taxProfile.data } : {})}
         currency={currency}
         api={api}
-        canViewTax={canViewTax}
         canViewPricing={can('viewPricing')}
         canCreatePricing={can('createPricing')}
         canCreateVariants={can('createCatalog')}
@@ -379,7 +374,6 @@ export function CatalogPage() {
         key={detailItem?.id ?? 'closed'}
         item={detailItem}
         categories={allCategories}
-        taxCategories={taxCategories.data?.items ?? []}
         defaultPrice={detailItem ? defaultPriceByItemId.get(detailItem.id) : undefined}
         defaultPriceLoading={defaultPrices.isLoading}
         currency={currency}
@@ -390,7 +384,6 @@ export function CatalogPage() {
         canViewPricing={can('viewPricing')}
         canCreatePricing={can('createPricing')}
         canCancelPricing={can('cancelPricing')}
-        canViewTax={canViewTax}
         onPricingChanged={() => {
           setPricingEffectiveAt(new Date().toISOString());
           void client.invalidateQueries({ queryKey: ['catalog', 'prices', detailItem?.id ?? ''] });

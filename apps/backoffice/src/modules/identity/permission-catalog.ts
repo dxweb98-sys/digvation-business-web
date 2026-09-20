@@ -1,88 +1,92 @@
 import type { AccessPermission } from './access-control-api';
 
 type Locale = 'id' | 'en';
+export type PermissionExperience = 'BACKOFFICE' | 'OPERATIONAL';
 
-export interface AccessPermissionAreaView {
+export interface AccessPermissionModuleView {
   key: string;
   label: string;
   order: number;
   permissions: AccessPermission[];
 }
 
-export interface AccessPermissionSectionView {
-  key: string;
+export interface AccessPermissionExperienceView {
+  key: PermissionExperience;
   label: string;
   order: number;
-  areas: AccessPermissionAreaView[];
+  modules: AccessPermissionModuleView[];
 }
 
 export function groupAccessPermissions(
   permissions: readonly AccessPermission[],
   locale: Locale,
   search: string,
-): AccessPermissionSectionView[] {
+): AccessPermissionExperienceView[] {
   const keyword = search.trim().toLocaleLowerCase(locale);
-  const configurable = permissions.filter((permission) => permission.configurable);
-  const filtered = configurable.filter((permission) =>
-    matchesPermission(permission, locale, keyword),
-  );
-  const sections = new Map<string, AccessPermissionSectionView>();
+  const experiences = new Map<PermissionExperience, AccessPermissionExperienceView>();
 
-  for (const permission of filtered) {
-    let currentSection = sections.get(permission.section.key);
-    if (!currentSection) {
-      currentSection = {
-        key: permission.section.key,
-        label: permission.section.label[locale],
-        order: permission.section.order,
-        areas: [],
-      };
-      sections.set(permission.section.key, currentSection);
+  for (const permission of permissions.filter(
+    (item) => item.configurable && matchesPermission(item, locale, keyword),
+  )) {
+    for (const experience of presentationExperiences(permission.surface)) {
+      let currentExperience = experiences.get(experience);
+      if (!currentExperience) {
+        currentExperience = {
+          key: experience,
+          label: experience === 'BACKOFFICE' ? 'Backoffice' : 'Operational',
+          order: experience === 'BACKOFFICE' ? 10 : 20,
+          modules: [],
+        };
+        experiences.set(experience, currentExperience);
+      }
+      let module = currentExperience.modules.find(
+        (item) => item.key === permission.businessArea.key,
+      );
+      if (!module) {
+        module = {
+          key: permission.businessArea.key,
+          label: permission.businessArea.label[locale],
+          order: permission.businessArea.order,
+          permissions: [],
+        };
+        currentExperience.modules.push(module);
+      }
+      module.permissions.push(permission);
     }
-
-    let currentArea = currentSection.areas.find(
-      (area) => area.key === permission.businessArea.key,
-    );
-    if (!currentArea) {
-      currentArea = {
-        key: permission.businessArea.key,
-        label: permission.businessArea.label[locale],
-        order: permission.businessArea.order,
-        permissions: [],
-      };
-      currentSection.areas.push(currentArea);
-    }
-    currentArea.permissions.push(permission);
   }
 
-  return [...sections.values()]
-    .map((currentSection) => ({
-      ...currentSection,
-      areas: currentSection.areas
-        .map((currentArea) => ({
-          ...currentArea,
-          permissions: currentArea.permissions.sort(
+  return [...experiences.values()]
+    .map((experience) => ({
+      ...experience,
+      modules: experience.modules
+        .map((module) => ({
+          ...module,
+          permissions: module.permissions.sort(
             (left, right) => left.order - right.order || left.key.localeCompare(right.key),
           ),
         }))
         .sort((left, right) => left.order - right.order || left.key.localeCompare(right.key)),
     }))
-    .sort((left, right) => left.order - right.order || left.key.localeCompare(right.key));
+    .sort((left, right) => left.order - right.order);
 }
 
-function matchesPermission(
-  permission: AccessPermission,
-  locale: Locale,
-  keyword: string,
-): boolean {
-  if (!keyword) return true;
+function presentationExperiences(
+  surface: AccessPermission['surface'],
+): readonly PermissionExperience[] {
+  if (surface === 'BOTH') return ['BACKOFFICE', 'OPERATIONAL'];
+  return surface === 'BACKOFFICE'
+    ? ['BACKOFFICE']
+    : surface === 'OPERATIONAL'
+      ? ['OPERATIONAL']
+      : [];
+}
 
+function matchesPermission(permission: AccessPermission, locale: Locale, keyword: string): boolean {
+  if (!keyword) return true;
   return [
     permission.label[locale],
-    permission.section.label[locale],
     permission.businessArea.label[locale],
-    permission.capability ?? '',
-    permission.product ?? '',
+    permission.section.label[locale],
     permission.key,
   ].some((value) => value.toLocaleLowerCase(locale).includes(keyword));
 }

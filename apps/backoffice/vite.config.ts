@@ -7,6 +7,7 @@ export default defineConfig({
   server: {
     port: 5174,
     strictPort: true,
+    allowedHosts: ['exam-confident-achieving-fuel.trycloudflare.com'],
   },
   preview: {
     port: 4174,

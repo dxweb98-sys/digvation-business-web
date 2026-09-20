@@ -19,10 +19,12 @@ import { humanReadableLabel } from '../../app/localization/human-readable-labels
 import {
   TransactionHistoryApi,
   type FulfillmentStatus,
+  type Payment,
   type PaymentStatus,
   type Sale,
   type SaleStatus,
 } from './transaction-history-api';
+import { transactionPaymentComposition } from './transaction-payment-composition';
 
 const defaultPageSize = 20;
 
@@ -38,6 +40,12 @@ const transactionCopy = {
     noWork: 'Belum ada pengerjaan yang dicatat.',
     saleInformation: 'Informasi transaksi',
     paymentInformation: 'Informasi pembayaran',
+    splitPayment: 'Split Payment',
+    methods: 'metode',
+    totalPaid: 'Total dibayar',
+    balanceDue: 'Sisa tagihan',
+    otherAttempts: 'Percobaan pembayaran lain',
+    otherAttemptsNote: 'Tidak dihitung dalam pembayaran transaksi.',
     workInformation: 'Informasi pengerjaan',
     tendered: 'Uang diterima',
     change: 'Kembalian',
@@ -56,6 +64,12 @@ const transactionCopy = {
     noWork: 'No work has been recorded yet.',
     saleInformation: 'Transaction information',
     paymentInformation: 'Payment information',
+    splitPayment: 'Split Payment',
+    methods: 'methods',
+    totalPaid: 'Total paid',
+    balanceDue: 'Balance due',
+    otherAttempts: 'Other payment attempts',
+    otherAttemptsNote: 'Not counted toward the transaction payment.',
     workInformation: 'Work information',
     tendered: 'Cash received',
     change: 'Change',
@@ -401,53 +415,7 @@ function TransactionDetail({
             </dl>
           </section>
 
-          <section className="border-b border-[var(--color-border)] py-5">
-            <div className="flex items-center gap-2">
-              <h3 className="text-base font-semibold">{text.paymentInformation}</h3>
-              <DBadge variant="secondary">{item.payments.length}</DBadge>
-            </div>
-            {item.payments.length ? (
-              <div className="mt-4 divide-y divide-[var(--color-border)] border-y border-[var(--color-border)]">
-                {item.payments.map((payment) => (
-                  <div
-                    key={payment.id}
-                    className="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:justify-between"
-                  >
-                    <div className="min-w-0">
-                      <p className="font-medium text-[var(--color-text)]">
-                        {humanReadableLabel(payment.method, locale)}
-                      </p>
-                      {payment.providerReference ? (
-                        <p className="mt-1 break-words font-mono text-xs text-[var(--color-text-muted)]">
-                          {payment.providerReference}
-                        </p>
-                      ) : null}
-                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--color-text-muted)]">
-                        {payment.tenderedAmount ? (
-                          <span>
-                            {text.tendered}: {formatMoney(payment.tenderedAmount, payment.currency)}
-                          </span>
-                        ) : null}
-                        {payment.changeAmount ? (
-                          <span>
-                            {text.change}: {formatMoney(payment.changeAmount, payment.currency)}
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-start gap-2 sm:items-end">
-                      <StatusBadge status={payment.status} />
-                      <p className="font-semibold text-[var(--color-text)]">
-                        {formatMoney(payment.appliedAmount, payment.currency)}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="mt-4 text-sm text-[var(--color-text-muted)]">{text.noPayments}</p>
-            )}
-          </section>
+          <TransactionPayments item={item} />
 
           <section className="pt-5">
             <div className="flex items-center gap-2">
@@ -486,6 +454,104 @@ function TransactionDetail({
         </div>
       )}
     </DDialog>
+  );
+}
+
+/**
+ * How the transaction was actually paid. Only succeeded payments settle a sale, so a failed or
+ * cancelled attempt never turns a single payment into a split one; attempts stay listed apart.
+ */
+function TransactionPayments({ item }: { item: Sale }) {
+  const { formatMoney, locale } = useBackofficeLocalization();
+  const text = transactionCopy[locale];
+  const composition = transactionPaymentComposition(item);
+  const accountName = (payment: Payment) =>
+    payment.financeFinancialAccountNameSnapshot?.trim() ||
+    humanReadableLabel(payment.method, locale);
+  return (
+    <section className="border-b border-[var(--color-border)] py-5">
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="text-base font-semibold">{text.paymentInformation}</h3>
+        {composition.isSplit ? (
+          <DBadge variant="info">
+            {text.splitPayment} · {composition.applied.length} {text.methods}
+          </DBadge>
+        ) : null}
+      </div>
+      {composition.applied.length ? (
+        <dl className="mt-4 divide-y divide-[var(--color-border)] border-y border-[var(--color-border)]">
+          {composition.applied.map((payment) => {
+            const name = accountName(payment);
+            const method = humanReadableLabel(payment.method, locale);
+            const detail = [
+              name === method ? null : method,
+              payment.providerReference,
+              payment.tenderedAmount
+                ? `${text.tendered}: ${formatMoney(payment.tenderedAmount, payment.currency)}`
+                : null,
+              payment.changeAmount && /[1-9]/.test(payment.changeAmount)
+                ? `${text.change}: ${formatMoney(payment.changeAmount, payment.currency)}`
+                : null,
+            ].filter(Boolean);
+            return (
+              <div key={payment.id} className="flex items-start justify-between gap-4 py-3">
+                <dt className="min-w-0">
+                  <span className="block break-words font-medium text-[var(--color-text)]">
+                    {name}
+                  </span>
+                  {detail.length ? (
+                    <span className="mt-0.5 block break-words text-xs text-[var(--color-text-muted)]">
+                      {detail.join(' · ')}
+                    </span>
+                  ) : null}
+                </dt>
+                <dd className="shrink-0 font-semibold tabular-nums text-[var(--color-text)]">
+                  {formatMoney(payment.appliedAmount, payment.currency)}
+                </dd>
+              </div>
+            );
+          })}
+          {composition.isSplit || !composition.settled ? (
+            <div className="flex items-baseline justify-between gap-4 py-3 text-sm font-semibold">
+              <dt>{text.totalPaid}</dt>
+              <dd className="tabular-nums">{formatMoney(composition.totalPaid, item.currency)}</dd>
+            </div>
+          ) : null}
+          {composition.balanceDue !== '0.0000' ? (
+            <div className="flex items-baseline justify-between gap-4 py-3 text-sm font-semibold text-[var(--color-warning)]">
+              <dt>{text.balanceDue}</dt>
+              <dd className="tabular-nums">{formatMoney(composition.balanceDue, item.currency)}</dd>
+            </div>
+          ) : null}
+        </dl>
+      ) : (
+        <p className="mt-4 text-sm text-[var(--color-text-muted)]">{text.noPayments}</p>
+      )}
+      {composition.notApplied.length ? (
+        <div className="mt-5">
+          <p className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+            {text.otherAttempts}
+          </p>
+          <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">{text.otherAttemptsNote}</p>
+          <ul className="mt-2 divide-y divide-[var(--color-border)]">
+            {composition.notApplied.map((payment) => (
+              <li
+                key={payment.id}
+                className="flex items-center justify-between gap-4 py-2 text-sm text-[var(--color-text-muted)]"
+              >
+                <span className="flex min-w-0 flex-wrap items-center gap-2">
+                  <span className="break-words">{accountName(payment)}</span>
+                  <StatusBadge status={payment.status} />
+                </span>
+                <span className="shrink-0 tabular-nums line-through">
+                  {formatMoney(payment.appliedAmount, payment.currency)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </section>
   );
 }
 

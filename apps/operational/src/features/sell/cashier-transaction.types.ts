@@ -90,10 +90,11 @@ export interface CatalogItem {
   name: string;
   type: 'PRODUCT' | 'SERVICE';
   categoryId: string | null;
-  taxCategoryId: string | null;
   description: string | null;
   lifecycle: CatalogLifecycle;
   fulfillmentBehavior: 'INSTANT' | 'TRACKED';
+  /** With active variants: REQUIRED sells variants only; OPTIONAL also sells the item itself. */
+  variantSelectionMode?: 'REQUIRED' | 'OPTIONAL';
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -145,6 +146,14 @@ export interface SaleParticipation {
   shareRate: string | null;
 }
 
+/** One unit of a service line's quantity and the employees who perform it. */
+export interface SaleLineWorkUnit {
+  unitNumber: number;
+  employeeIds: string[];
+  /** Contribution share of the unit per employee; null share means an equal split. */
+  performers?: Array<{ employeeId: string; shareRate: string | null }>;
+}
+
 export interface EmployeeContribution {
   saleId: string;
   saleLineId: string;
@@ -167,6 +176,10 @@ export interface Payment {
   tenderedAmount: string | null;
   changeAmount: string | null;
   providerReference: string | null;
+  financePaymentRouteId?: string | null;
+  financeFinancialAccountId?: string | null;
+  financeFinancialAccountCodeSnapshot?: string | null;
+  financeFinancialAccountNameSnapshot?: string | null;
   idempotencyKey: string;
   createdByActorId: string;
   createdByActorKind: string;
@@ -259,7 +272,30 @@ export interface SaleLine {
   fulfillment: SaleLineFulfillment | null;
   participations: SaleParticipation[];
   contributions: EmployeeContribution[];
+  /** Runtime per-quantity plan; empty or absent when assigned at line level. */
+  workUnits?: SaleLineWorkUnit[];
 }
+
+export type SaleCustomerType = 'MEMBER' | 'NON_MEMBER';
+
+/**
+ * The Customer a Sale belongs to, as captured on the Sale itself.
+ *
+ * This is the only authority for who a transaction belongs to. It survives
+ * reload, cashier change and tab change because it lives on the Sale, never in
+ * browser storage. `null` on a Sale means the Sale was captured before this
+ * contract existed: unknown history, never a general customer.
+ */
+export interface SaleCustomer {
+  type: SaleCustomerType;
+  referenceId: string | null;
+  name: string;
+  phoneE164: string;
+}
+
+/** Customer identity requested from Runtime, which resolves and normalizes it. */
+export type SaleCustomerSelection =
+  { type: 'NON_MEMBER'; name: string; phone: string } | { type: 'MEMBER'; referenceId: string };
 
 export interface Sale {
   id: string;
@@ -290,6 +326,7 @@ export interface Sale {
   transactionTaxAmount?: string;
   promotionCode?: string | null;
   adjustments?: SaleAdjustment[];
+  customer?: SaleCustomer | null;
   createdByActorId?: string;
   createdByActorKind?: string;
   finalizedAt: string | null;
@@ -309,3 +346,26 @@ export interface OpenSaleSummaryViewModel {
   activeLineCount: number;
   updatedAt: string;
 }
+
+/**
+ * A completed transaction as Runtime shows it to a caller without
+ * `sales:read-completed`: recognizable for follow-up, with no amounts, lines,
+ * payments or receipt content.
+ */
+export interface CompletedSaleSummary {
+  visibility: 'SUMMARY';
+  id: string;
+  saleNumber: string;
+  invoiceNumber: string | null;
+  sellingLocationId: string;
+  status: 'FINALIZED';
+  operationalState: SaleOperationalState;
+  customer: Pick<SaleCustomer, 'type' | 'name'> | null;
+  itemCount: number;
+  finalizedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** One entry of the Operational queue: a full Sale, or a completed-sale summary. */
+export type QueueSale = Sale | CompletedSaleSummary;

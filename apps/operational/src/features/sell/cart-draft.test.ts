@@ -7,6 +7,7 @@ import {
   emptyCartDraft,
   removeCartDraftLine,
   saleDisplayLines,
+  setCartDraftCustomer,
   setCartDraftQuantity,
 } from './cart-draft';
 import type {
@@ -56,14 +57,28 @@ describe('CartDraft local mutations', () => {
 
   it('changes quantity, removes lines, and emits selection-only atomic start input', () => {
     const added = addCartDraftSelection(emptyCartDraft('location-1', 'IDR'), item, null, price);
-    const changed = setCartDraftQuantity(added, added.lines[0]!.id, '1.5');
+    const changed = setCartDraftCustomer(
+      setCartDraftQuantity(added, added.lines[0]!.id, '1.5'),
+      { type: 'NON_MEMBER', name: 'Siti Aminah', phone: '081234567890' },
+    );
 
     expect(cartDraftStartInput(changed)).toEqual({
       sellingLocationId: 'location-1',
       currency: 'IDR',
+      customer: { type: 'NON_MEMBER', name: 'Siti Aminah', phone: '081234567890' },
       lines: [{ catalogItemId: 'item-1', quantity: '1.5000' }],
     });
     expect(removeCartDraftLine(changed, changed.lines[0]!.id).lines).toEqual([]);
+  });
+
+  it('refuses to create a Sale without the customer it belongs to', () => {
+    const added = addCartDraftSelection(emptyCartDraft('location-1', 'IDR'), item, null, price);
+
+    expect(() => cartDraftStartInput(added)).toThrow(/customer/i);
+  });
+
+  it('starts every new cart without inheriting a customer', () => {
+    expect(emptyCartDraft('location-1', 'IDR').customer).toBeNull();
   });
 
   it('shows the Runtime promotion snapshot without replacing the base line subtotal', () => {

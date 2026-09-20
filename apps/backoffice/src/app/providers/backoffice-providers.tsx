@@ -10,8 +10,9 @@ import { useEffect } from 'react';
 import type { RouterProviderProps } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 
-import { AuthenticationLoading } from '../../auth/authentication-loading';
 import { BackofficeAuthProvider, useBackofficeAuth } from '../../auth/backoffice-auth-context';
+import { PasswordRecoveryProvider, type PasswordRecoveryPort } from '../../auth/password-recovery';
+import { useBackofficeStartupReady } from '../bootstrap/backoffice-startup';
 import { resolveBackofficeLocale } from '../localization/backoffice-locale';
 import {
   BackofficeLocalizationProvider,
@@ -29,14 +30,22 @@ const queryClient = new QueryClient({
 interface BackofficeProvidersProps {
   bootstrap: DeploymentBootstrapConfig;
   auth: AuthPort;
+  passwordRecovery: PasswordRecoveryPort;
   router: RouterProviderProps['router'];
 }
 
-export function BackofficeProviders({ bootstrap, auth, router }: BackofficeProvidersProps) {
+export function BackofficeProviders({
+  bootstrap,
+  auth,
+  passwordRecovery,
+  router,
+}: BackofficeProvidersProps) {
   return (
     <DeploymentBootstrapProvider config={bootstrap}>
       <BackofficeLocalizationProvider>
-        <BackofficeDesignSystemProviders auth={auth} router={router} />
+        <PasswordRecoveryProvider port={passwordRecovery}>
+          <BackofficeDesignSystemProviders auth={auth} router={router} />
+        </PasswordRecoveryProvider>
       </BackofficeLocalizationProvider>
     </DeploymentBootstrapProvider>
   );
@@ -45,7 +54,7 @@ export function BackofficeProviders({ bootstrap, auth, router }: BackofficeProvi
 function BackofficeDesignSystemProviders({
   auth,
   router,
-}: Omit<BackofficeProvidersProps, 'bootstrap'>) {
+}: Pick<BackofficeProvidersProps, 'auth' | 'router'>) {
   const { locale } = useBackofficeLocalization();
 
   return (
@@ -62,13 +71,19 @@ function BackofficeDesignSystemProviders({
 function AuthenticatedBackofficeProviders({ router }: Pick<BackofficeProvidersProps, 'router'>) {
   const { session, status } = useBackofficeAuth();
   const { setLocale } = useBackofficeLocalization();
+  const markStartupReady = useBackofficeStartupReady();
 
   useEffect(() => {
     if (!session) return;
     setLocale(resolveBackofficeLocale(session.preferences.locale));
   }, [session, setLocale]);
 
-  if (status === 'hydrating') return <AuthenticationLoading />;
+  useEffect(() => {
+    if (status !== 'hydrating') markStartupReady();
+  }, [markStartupReady, status]);
+
+  // The startup splash overlay stays visible until session restore settles.
+  if (status === 'hydrating') return null;
 
   const content = (
     <QueryClientProvider client={queryClient}>

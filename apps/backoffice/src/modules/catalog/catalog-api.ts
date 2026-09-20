@@ -32,14 +32,6 @@ export interface NamedRecord {
   version: number;
 }
 export type Category = NamedRecord;
-export type TaxCategory = NamedRecord;
-export interface TaxProfile {
-  itemTaxEnabled: boolean;
-  transactionTaxEnabled: boolean;
-  version: number;
-  createdAt: string | null;
-  updatedAt: string | null;
-}
 export interface Variant extends NamedRecord {
   catalogItemId: string;
 }
@@ -49,10 +41,11 @@ export interface Item {
   name: string;
   type: 'PRODUCT' | 'SERVICE';
   categoryId: string | null;
-  taxCategoryId: string | null;
   description: string | null;
   lifecycle: 'DRAFT' | 'ACTIVE' | 'INACTIVE';
   fulfillmentBehavior: 'INSTANT' | 'TRACKED';
+  /** With active variants: REQUIRED sells variants only; OPTIONAL also sells the item itself. */
+  variantSelectionMode: VariantSelectionMode;
   version: number;
   serviceDefinition: {
     defaultDurationMinutes: number | null;
@@ -79,6 +72,19 @@ export interface Price {
   effectiveFrom: string;
   effectiveUntil: string | null;
   cancelledAt: string | null;
+  createdAt: string;
+}
+/** Item price history row: item price and variant price changes share one Catalog-owned history. */
+export interface PriceHistoryEntry extends Price {
+  catalogVariantCode: string | null;
+  catalogVariantName: string | null;
+  previousAmount: string | null;
+  changedBy: { id: string; kind: string; displayName: string | null } | null;
+}
+export interface VariantPriceChange {
+  catalogVariantId: string;
+  changed: boolean;
+  price: Price;
 }
 export interface DefaultPrice {
   catalogItemId: string;
@@ -97,12 +103,14 @@ export interface ResolvedPrice {
   sourceScope: { catalogVariantId: string | null; locationId: string | null };
 }
 
+export type VariantSelectionMode = 'REQUIRED' | 'OPTIONAL';
+
 export interface CreateCatalogItemInput extends Omit<
   Item,
-  'id' | 'version' | 'code' | 'serviceDefinition' | 'taxCategoryId'
+  'id' | 'version' | 'code' | 'serviceDefinition' | 'variantSelectionMode'
 > {
+  variantSelectionMode?: VariantSelectionMode;
   code?: string;
-  taxCategoryId?: string | null;
   serviceDefinition?: Item['serviceDefinition'];
 }
 
@@ -179,12 +187,6 @@ export class CatalogApi {
       ...input,
     });
   }
-  listTaxCategories() {
-    return this.client.get<Page<TaxCategory>>('/api/v1/tax/categories?limit=100&offset=0');
-  }
-  getTaxProfile() {
-    return this.client.get<TaxProfile>('/api/v1/tax/profile');
-  }
   listVariants(itemId: string) {
     return this.client.get<Page<Variant>>(`/api/v1/catalog/items/${itemId}/variants${page}`);
   }
@@ -201,8 +203,8 @@ export class CatalogApi {
     });
   }
   listPrices(itemId: string) {
-    return this.client.get<Page<Price>>(
-      `/api/v1/pricing/prices?catalogItemId=${itemId}&limit=50&offset=0`,
+    return this.client.get<Page<PriceHistoryEntry>>(
+      `/api/v1/pricing/prices?catalogItemId=${itemId}&limit=100&offset=0`,
     );
   }
   listDefaultPrices(catalogItemIds: string[], currency: string, effectiveAt: string) {
@@ -241,6 +243,19 @@ export class CatalogApi {
     effectiveFrom: string;
   }) {
     return this.client.post<Price>('/api/v1/pricing/prices/change', input);
+  }
+  /** Runtime applies the amount to every active variant (or the listed ones) in one transaction. */
+  changeVariantPrices(input: {
+    catalogItemId: string;
+    catalogVariantIds?: string[];
+    currency: string;
+    amount: string;
+    effectiveFrom: string;
+  }) {
+    return this.client.post<{ items: VariantPriceChange[] }>(
+      '/api/v1/pricing/prices/change-variants',
+      input,
+    );
   }
   cancelPrice(id: string) {
     return this.client.post<Price>(`/api/v1/pricing/prices/${id}/cancel`, {});

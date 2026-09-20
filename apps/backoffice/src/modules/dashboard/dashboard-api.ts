@@ -1,6 +1,7 @@
 import type { ApiClient } from '@digvation/business-api';
 
 import type {
+  DashboardDailySummary,
   DashboardDataset,
   DashboardFilterState,
   DashboardOperationalAccess,
@@ -14,6 +15,13 @@ export class DashboardApi {
     return this.api.get<DashboardOperationalAccess>('/api/v1/operational-access/context');
   }
 
+  dailySummary(locationId: string): Promise<DashboardDailySummary> {
+    const params = new URLSearchParams({ sellingLocationId: locationId });
+    return this.api.get<DashboardDailySummary>(
+      `/api/v1/reports/dashboard-summary?${params.toString()}`,
+    );
+  }
+
   report(
     type: DashboardReportType,
     filters: DashboardFilterState,
@@ -25,6 +33,7 @@ export class DashboardApi {
       page: '1',
       pageSize: String(pageSize),
       ...(filters.locationId ? { sellingLocationId: filters.locationId } : {}),
+      ...(filters.status ? { status: filters.status } : {}),
     });
 
     return this.api.get<DashboardDataset>(`/api/v1/reports/${type}?${params.toString()}`);

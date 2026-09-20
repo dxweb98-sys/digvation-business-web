@@ -18,7 +18,10 @@ import { withLegacySessionAliases } from '@digvation/business-auth';
 import { useToast } from '@digvation/ui';
 import { ApiClient } from '@digvation/business-api';
 
-import { isBackofficeSessionExpired } from '../app/api/backoffice-api-error';
+import {
+  isBackofficeSessionExpired,
+  normalizeBackofficeApiError,
+} from '../app/api/backoffice-api-error';
 import { useBackofficeLocalization } from '../app/localization/backoffice-localization-base';
 
 type AuthenticationStatus =
@@ -78,16 +81,23 @@ export function BackofficeAuthProvider({
         setSession(restored ? withLegacySessionAliases(restored) : null);
         setStatus(restored ? 'authenticated' : 'unauthenticated');
       },
-      () => {
+      (error: unknown) => {
         if (!isMounted || sessionExpired.current) return;
         setSession(null);
+        const normalized = normalizeBackofficeApiError(error);
+        if (normalized.code === 'BACKOFFICE_ACCESS_DENIED') {
+          setStatus('unauthenticated');
+          showToast({ variant: 'warning', title: normalized.safeMessage });
+          void auth.logout();
+          return;
+        }
         setStatus('unavailable');
       },
     );
     return () => {
       isMounted = false;
     };
-  }, [auth]);
+  }, [auth, showToast]);
 
   const login = useCallback(
     async (input: AuthLoginInput) => {

@@ -63,7 +63,31 @@ function Delta({ value }: { value: number | null }) {
   );
 }
 
-function axisLabels(trend: readonly DashboardAnalyticsPoint[]): string[] {
+function mergeTrend(
+  revenueTrend: readonly DashboardAnalyticsPoint[],
+  expenseTrend: readonly DashboardAnalyticsPoint[],
+) {
+  const points = new Map<string, { revenue: number; transactions: number; expenses: number }>();
+  for (const point of revenueTrend) {
+    points.set(point.label, {
+      revenue: numeric(point.value),
+      transactions: Number(point.count ?? 0),
+      expenses: points.get(point.label)?.expenses ?? 0,
+    });
+  }
+  for (const point of expenseTrend) {
+    const current = points.get(point.label) ?? {
+      revenue: 0,
+      transactions: 0,
+      expenses: 0,
+    };
+    points.set(point.label, { ...current, expenses: numeric(point.value) });
+  }
+  return [...points.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([label, point]) => ({ label, ...point }));
+}
+function axisLabels(trend: readonly Pick<DashboardAnalyticsPoint, 'label'>[]): string[] {
   if (!trend.length) return [];
   if (trend.length <= 4) return trend.map((point) => point.label);
   const oneThird = Math.floor((trend.length - 1) / 3);
@@ -86,6 +110,12 @@ export function BusinessPerformanceCard({
   previousRevenue,
   previousTransactions,
   trend,
+  expenses = 0,
+  previousExpenses = 0,
+  netRevenue,
+  previousNetRevenue,
+  expenseTrend = [],
+  showExpenses = false,
   formatMoney,
 }: {
   title: string;
@@ -97,20 +127,36 @@ export function BusinessPerformanceCard({
   previousRevenue: number;
   previousTransactions: number;
   trend: readonly DashboardAnalyticsPoint[];
+  expenses?: number;
+  previousExpenses?: number;
+  netRevenue?: number;
+  previousNetRevenue?: number;
+  expenseTrend?: readonly DashboardAnalyticsPoint[];
+  showExpenses?: boolean;
   formatMoney(value: number): string;
 }) {
   const { locale, text } = useDashboardI18n();
+  const chartTrend = mergeTrend(trend, expenseTrend);
   const revenueChange = change(revenue, previousRevenue);
+  const expenseChange = change(expenses, previousExpenses);
+  const netRevenueChange =
+    netRevenue === undefined || previousNetRevenue === undefined
+      ? null
+      : change(netRevenue, previousNetRevenue);
   const transactionChange = change(transactions, previousTransactions);
-  const revenueValues = trend.map((point) => numeric(point.value));
-  const transactionValues = trend.map((point) => Number(point.count ?? 0));
+  const revenueValues = chartTrend.map((point) => point.revenue);
+  const expenseValues = chartTrend.map((point) => point.expenses);
+  const transactionValues = chartTrend.map((point) => point.transactions);
   const revenuePath = smoothPath(revenueValues);
   const revenueArea = areaPath(revenueValues);
+  const expensePath = smoothPath(expenseValues);
+  const expenseArea = areaPath(expenseValues);
   const transactionPath = smoothPath(transactionValues);
   const transactionArea = areaPath(transactionValues);
   const revenuePoints = pointCoordinates(revenueValues);
+  const expensePoints = pointCoordinates(expenseValues);
   const transactionPoints = pointCoordinates(transactionValues);
-  const labels = axisLabels(trend);
+  const labels = axisLabels(chartTrend);
   const integer = new Intl.NumberFormat(locale === 'id' ? 'id-ID' : 'en-US');
 
   return (
@@ -153,7 +199,7 @@ export function BusinessPerformanceCard({
         </div>
       </div>
 
-      <div className="mt-3 flex items-center gap-7 border-t border-[var(--color-border)] pt-3">
+      <div className="mt-3 flex flex-wrap items-center gap-5 border-t border-[var(--color-border)] pt-3">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
             <span className="size-2 rounded-full bg-blue-500" />
@@ -168,6 +214,38 @@ export function BusinessPerformanceCard({
             <Delta value={revenueChange} />
           </div>
         </div>
+        {showExpenses ? (
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="size-2 rounded-full bg-amber-500" />
+              <p className="text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+                {text('expenses')}
+              </p>
+            </div>
+            <div className="mt-1 flex items-center gap-2">
+              <p className="truncate text-[18px] font-semibold tracking-tight tabular-nums">
+                {formatMoney(expenses)}
+              </p>
+              <Delta value={expenseChange} />
+            </div>
+          </div>
+        ) : null}
+        {showExpenses && netRevenue !== undefined ? (
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="size-2 rounded-full bg-violet-500" />
+              <p className="text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+                {text('netRevenue')}
+              </p>
+            </div>
+            <div className="mt-1 flex items-center gap-2">
+              <p className="truncate text-[18px] font-semibold tracking-tight tabular-nums">
+                {formatMoney(netRevenue)}
+              </p>
+              <Delta value={netRevenueChange} />
+            </div>
+          </div>
+        ) : null}
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
             <span className="size-2 rounded-full bg-emerald-500" />
@@ -194,7 +272,7 @@ export function BusinessPerformanceCard({
           ))}
         </div>
 
-        {trend.length ? (
+        {chartTrend.length ? (
           <svg
             viewBox="0 0 100 36"
             preserveAspectRatio="none"
@@ -207,12 +285,19 @@ export function BusinessPerformanceCard({
                 <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.18" />
                 <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
               </linearGradient>
+              <linearGradient id="dashboardExpenseArea" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.14" />
+                <stop offset="100%" stopColor="#f59e0b" stopOpacity="0" />
+              </linearGradient>{' '}
               <linearGradient id="dashboardTransactionArea" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#10b981" stopOpacity="0.12" />
                 <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
               </linearGradient>
             </defs>
             {revenueArea ? <path d={revenueArea} fill="url(#dashboardRevenueArea)" /> : null}
+            {showExpenses && expenseArea ? (
+              <path d={expenseArea} fill="url(#dashboardExpenseArea)" />
+            ) : null}
             {transactionArea ? (
               <path d={transactionArea} fill="url(#dashboardTransactionArea)" />
             ) : null}
@@ -222,6 +307,17 @@ export function BusinessPerformanceCard({
                 fill="none"
                 stroke="#3b82f6"
                 strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                vectorEffect="non-scaling-stroke"
+              />
+            ) : null}
+            {showExpenses && expensePath ? (
+              <path
+                d={expensePath}
+                fill="none"
+                stroke="#f59e0b"
+                strokeWidth="1.7"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 vectorEffect="non-scaling-stroke"
@@ -241,6 +337,11 @@ export function BusinessPerformanceCard({
             {revenuePoints.map((point, index) => (
               <circle key={`r:${index}`} cx={point.x} cy={point.y} r="0.9" fill="#3b82f6" />
             ))}
+            {showExpenses
+              ? expensePoints.map((point, index) => (
+                  <circle key={`e:${index}`} cx={point.x} cy={point.y} r="0.85" fill="#f59e0b" />
+                ))
+              : null}
             {transactionPoints.map((point, index) => (
               <circle key={`t:${index}`} cx={point.x} cy={point.y} r="0.8" fill="#10b981" />
             ))}

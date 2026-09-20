@@ -109,6 +109,21 @@ const copy: Record<string, LocalizedLabel> = {
   'Request password change': { 'id-ID': 'Ubah kata sandi', 'en-US': 'Change password' },
   Branch: { 'id-ID': 'Cabang', 'en-US': 'Branch' },
   'Sign in to Operational': { 'id-ID': 'Masuk ke Operational', 'en-US': 'Sign in to Operational' },
+  'Use your account to start working.': {
+    'id-ID': 'Gunakan akun Anda untuk mulai bekerja.',
+    'en-US': 'Use your account to start working.',
+  },
+  'Run the business today.': {
+    'id-ID': 'Jalankan bisnis hari ini.',
+    'en-US': 'Run the business today.',
+  },
+  'Selling, queue and service work in one place.': {
+    'id-ID': 'Penjualan, antrian, dan pengerjaan layanan dalam satu tempat.',
+    'en-US': 'Selling, queue and service work in one place.',
+  },
+  'Enter your user ID.': { 'id-ID': 'Isi ID pengguna.', 'en-US': 'Enter your user ID.' },
+  'Enter your password.': { 'id-ID': 'Isi kata sandi.', 'en-US': 'Enter your password.' },
+  'Enter your password': { 'id-ID': 'Masukkan kata sandi', 'en-US': 'Enter your password' },
   'User ID': { 'id-ID': 'ID pengguna', 'en-US': 'User ID' },
   'Username or email': { 'id-ID': 'Nama pengguna atau email', 'en-US': 'Username or email' },
   Password: { 'id-ID': 'Kata sandi', 'en-US': 'Password' },
@@ -225,17 +240,43 @@ const copy: Record<string, LocalizedLabel> = {
     'en-US': 'Select products or services from the catalog.',
   },
   'Cart is empty': { 'id-ID': 'Keranjang kosong', 'en-US': 'Cart is empty' },
-  'General customer': { 'id-ID': 'Pelanggan umum', 'en-US': 'General customer' },
-  Guest: { 'id-ID': 'Umum', 'en-US': 'Guest' },
   Member: { 'id-ID': 'Member', 'en-US': 'Member' },
   'Non-member': { 'id-ID': 'Non-member', 'en-US': 'Non-member' },
   Customer: { 'id-ID': 'Pelanggan', 'en-US': 'Customer' },
   'Choose customer': { 'id-ID': 'Pilih pelanggan', 'en-US': 'Choose customer' },
-  'Use general customer': { 'id-ID': 'Gunakan pelanggan umum', 'en-US': 'Use general customer' },
-  'Continue without selecting a customer.': {
-    'id-ID': 'Lanjutkan tanpa memilih pelanggan.',
-    'en-US': 'Continue without selecting a customer.',
+  'Customer data is not available': {
+    'id-ID': 'Data pelanggan tidak tersedia',
+    'en-US': 'Customer data is not available',
   },
+  'Choose the customer first': {
+    'id-ID': 'Pilih pelanggan terlebih dahulu',
+    'en-US': 'Choose the customer first',
+  },
+  'A transaction belongs to a customer. Fill in the name and WhatsApp number, or choose a member.':
+    {
+      'id-ID':
+        'Transaksi selalu milik seorang pelanggan. Isi nama dan nomor WhatsApp, atau pilih member.',
+      'en-US':
+        'A transaction belongs to a customer. Fill in the name and WhatsApp number, or choose a member.',
+    },
+  'WhatsApp number': { 'id-ID': 'Nomor WhatsApp', 'en-US': 'WhatsApp number' },
+  'Name and WhatsApp number are both required.': {
+    'id-ID': 'Nama dan nomor WhatsApp wajib diisi.',
+    'en-US': 'Name and WhatsApp number are both required.',
+  },
+  'Member lookup is not available yet': {
+    'id-ID': 'Pencarian member belum tersedia',
+    'en-US': 'Member lookup is not available yet',
+  },
+  'Member identity comes from the customer directory, which is not connected to this installation yet.':
+    {
+      'id-ID':
+        'Identitas member berasal dari direktori pelanggan, yang belum terhubung pada instalasi ini.',
+      'en-US':
+        'Member identity comes from the customer directory, which is not connected to this installation yet.',
+    },
+  'Send via WhatsApp': { 'id-ID': 'Kirim via WhatsApp', 'en-US': 'Send via WhatsApp' },
+  'Not available yet': { 'id-ID': 'Belum tersedia', 'en-US': 'Not available yet' },
   'Search name or phone number': {
     'id-ID': 'Cari nama atau nomor telepon',
     'en-US': 'Search name or phone number',
@@ -259,6 +300,27 @@ const copy: Record<string, LocalizedLabel> = {
   'Estimated total': { 'id-ID': 'Estimasi total', 'en-US': 'Estimated total' },
   Payment: { 'id-ID': 'Pembayaran', 'en-US': 'Payment' },
   'Payment method': { 'id-ID': 'Metode pembayaran', 'en-US': 'Payment method' },
+  'Payment amount': { 'id-ID': 'Nominal pembayaran', 'en-US': 'Payment amount' },
+  'Settlement account': { 'id-ID': 'Akun penerimaan', 'en-US': 'Settlement account' },
+  'Split payment': { 'id-ID': 'Pembayaran terbagi', 'en-US': 'Split payment' },
+  'Add another payment method for the remaining balance.': {
+    'id-ID': 'Tambahkan metode pembayaran lain untuk sisa tagihan.',
+    'en-US': 'Add another payment method for the remaining balance.',
+  },
+  'Change the payment amount below to split this transaction across multiple payment methods.': {
+    'id-ID':
+      'Ubah nominal pembayaran di bawah untuk membagi transaksi ke beberapa metode pembayaran.',
+    'en-US':
+      'Change the payment amount below to split this transaction across multiple payment methods.',
+  },
+  'Payment method unavailable': {
+    'id-ID': 'Metode pembayaran tidak tersedia',
+    'en-US': 'Payment method unavailable',
+  },
+  'Configure an active settlement account for this payment method.': {
+    'id-ID': 'Konfigurasikan akun penerimaan aktif untuk metode pembayaran ini.',
+    'en-US': 'Configure an active settlement account for this payment method.',
+  },
   Cash: { 'id-ID': 'Tunai', 'en-US': 'Cash' },
   Transfer: { 'id-ID': 'Transfer', 'en-US': 'Transfer' },
   'Digital wallet': { 'id-ID': 'Dompet digital', 'en-US': 'Digital wallet' },
@@ -326,6 +388,22 @@ const copy: Record<string, LocalizedLabel> = {
     'en-US': 'Employee contribution must total 100%.',
   },
   'Select variant': { 'id-ID': 'Pilih varian', 'en-US': 'Select variant' },
+  'Select option': { 'id-ID': 'Pilih opsi', 'en-US': 'Select option' },
+  'Choose option': { 'id-ID': 'Pilih opsi', 'en-US': 'Choose option' },
+  Option: { 'id-ID': 'Opsi', 'en-US': 'Option' },
+  'Without variant': { 'id-ID': 'Tanpa varian', 'en-US': 'Without variant' },
+  'Sold as the item itself': {
+    'id-ID': 'Dijual tanpa memilih varian',
+    'en-US': 'Sold as the item itself',
+  },
+  'Select one option to add to the cart.': {
+    'id-ID': 'Pilih satu opsi untuk ditambahkan ke keranjang.',
+    'en-US': 'Select one option to add to the cart.',
+  },
+  'Select one option to add to the transaction.': {
+    'id-ID': 'Pilih satu opsi untuk ditambahkan ke transaksi.',
+    'en-US': 'Select one option to add to the transaction.',
+  },
   'Select one variant to add to the transaction.': {
     'id-ID': 'Pilih satu varian untuk ditambahkan ke transaksi.',
     'en-US': 'Select one variant to add to the transaction.',
@@ -346,7 +424,7 @@ const copy: Record<string, LocalizedLabel> = {
     'id-ID': 'Atur harga atau diskon item ini.',
     'en-US': 'Configure price or item discount.',
   },
-  'Service workers': { 'id-ID': 'Pelaksana jasa', 'en-US': 'Service workers' },
+  'Service workers': { 'id-ID': 'Karyawan yang mengerjakan', 'en-US': 'Service workers' },
   'Select employees who perform this service. Leave shares blank to split evenly.': {
     'id-ID': 'Pilih karyawan yang mengerjakan jasa ini. Kosongkan porsi untuk membagi rata.',
     'en-US': 'Select employees who perform this service. Leave shares blank to split evenly.',
@@ -357,7 +435,7 @@ const copy: Record<string, LocalizedLabel> = {
     'id-ID': 'Belum ada karyawan aktif yang dapat mengerjakan jasa.',
     'en-US': 'No active employees can perform this service.',
   },
-  'Save workers': { 'id-ID': 'Simpan pelaksana', 'en-US': 'Save workers' },
+  'Save workers': { 'id-ID': 'Simpan karyawan', 'en-US': 'Save workers' },
   'No workers selected': { 'id-ID': 'Belum ada pelaksana dipilih', 'en-US': 'No workers selected' },
   'workers selected': { 'id-ID': 'pelaksana dipilih', 'en-US': 'workers selected' },
   'Service value allocation': {

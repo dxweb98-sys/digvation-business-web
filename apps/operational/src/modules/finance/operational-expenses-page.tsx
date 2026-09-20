@@ -17,11 +17,16 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
+import { historyQueryPolicy, referenceQueryPolicy } from '../../app/data/operational-cache-policy';
 import { useOperationalLocalization } from '../../app/localization/operational-localization';
 import { useOperationalSession } from '../operational/operational-session-provider';
 import { OperationalExpenseApi, type OperationalExpense } from './operational-expense-api';
 
 const PAGE_SIZE = 20;
+
+export function canCreateOperationalExpense(permissions: readonly string[]) {
+  return permissions.includes('expenses:create');
+}
 
 export function OperationalExpensesPage() {
   const bootstrap = useDeploymentBootstrap();
@@ -50,24 +55,27 @@ export function OperationalExpensesPage() {
       ),
     [authPort, bootstrap.apiBaseUrl],
   );
-  const canCreate =
-    session.access.permissions.includes('expenses:create') &&
-    session.access.permissions.includes('financial-accounts:read');
+  const canCreate = canCreateOperationalExpense(session.access.permissions);
+  const canRead =
+    session.access.permissions.includes('expenses:read') ||
+    session.access.permissions.includes('expenses:read-own');
 
   const expenses = useQuery({
     queryKey: ['operational-expenses', selectedLocationId, offset],
-    enabled: Boolean(selectedLocationId),
+    enabled: Boolean(selectedLocationId && canRead),
     queryFn: () =>
       api.list({
         limit: PAGE_SIZE,
         offset,
         sellingLocationId: selectedLocationId ?? undefined,
       }),
+    ...historyQueryPolicy,
   });
   const accounts = useQuery({
     queryKey: ['operational-expense-accounts', selectedLocationId],
     enabled: Boolean(selectedLocationId && canCreate && isCreateOpen),
     queryFn: () => api.listEligibleAccounts(selectedLocationId!),
+    ...referenceQueryPolicy,
   });
   const eligibleAccounts = accounts.data?.items ?? [];
   const createExpense = useMutation({
@@ -174,7 +182,7 @@ export function OperationalExpensesPage() {
         <DDataTable
           columns={columns}
           data={expenses.data?.items ?? []}
-          loading={expenses.isLoading || !selectedLocationId}
+          loading={canRead && (expenses.isLoading || !selectedLocationId)}
           rowKey="id"
           pagination={{
             page: Math.floor(offset / PAGE_SIZE) + 1,

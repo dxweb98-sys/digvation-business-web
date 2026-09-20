@@ -99,7 +99,6 @@ const navigationSections: ReadonlyArray<{
     label: 'configuration',
     items: [
       { label: 'business', to: '/business', icon: Building2, capability: 'configuration' },
-      { label: 'tax', to: '/tax', icon: BadgePercent, capability: 'tax' },
       {
         label: 'accessControl',
         to: '/access-control',

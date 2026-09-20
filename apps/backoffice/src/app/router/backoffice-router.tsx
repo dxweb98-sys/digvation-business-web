@@ -2,7 +2,8 @@ import { createBrowserRouter } from 'react-router';
 
 import { AuthenticatedRoute } from '../../auth/authenticated-route';
 import { AuthorizedRoute } from '../../auth/authorized-route';
-import { BackofficeLoginPage } from '../../auth/backoffice-login-page';
+import { BackofficeLoginPage, PASSWORD_RECOVERY_PATH } from '../../auth/backoffice-login-page';
+import { BackofficePasswordRecoveryPage } from '../../auth/backoffice-password-recovery-page';
 import { UnauthorizedPage } from '../../routes/authorization/unauthorized-page';
 import { DashboardPage } from '../../modules/dashboard/dashboard-page';
 import { BackofficeShell } from '../shell/backoffice-shell';
@@ -10,7 +11,6 @@ import { AccessControlPage } from '../../modules/identity';
 import { BusinessSettingsPage } from '../../modules/organization';
 import { CatalogPage } from '../../modules/catalog';
 import { PromotionsPage } from '../../modules/promotions';
-import { TaxPage } from '../../modules/tax';
 import { EmployeesPage } from '../../modules/workforce';
 import { ExpensesPage, FinancialAccountsPage } from '../../modules/finance';
 import { TransactionHistoryPage } from '../../modules/pos';
@@ -20,6 +20,7 @@ import { NotificationsPage } from '../../modules/notifications';
 
 export const backofficeRouter = createBrowserRouter([
   { path: '/login', element: <BackofficeLoginPage /> },
+  { path: PASSWORD_RECOVERY_PATH, element: <BackofficePasswordRecoveryPage /> },
   {
     element: <AuthenticatedRoute />,
     children: [
@@ -66,10 +67,6 @@ export const backofficeRouter = createBrowserRouter([
           {
             element: <AuthorizedRoute capability="configuration" />,
             children: [{ path: '/business', element: <BusinessSettingsPage /> }],
-          },
-          {
-            element: <AuthorizedRoute capability="tax" />,
-            children: [{ path: '/tax', element: <TaxPage /> }],
           },
           {
             element: <AuthorizedRoute capability="activity" />,

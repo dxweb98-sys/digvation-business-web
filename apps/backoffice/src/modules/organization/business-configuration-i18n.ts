@@ -10,6 +10,39 @@ const configurationCopy: Record<string, { id: string; en: string }> = {
       en: 'Manage the business profile, locations, language, and numbering.',
     },
   Profile: { id: 'Profil', en: 'Profile' },
+  Tax: { id: 'Pajak', en: 'Tax' },
+  'Enable tax': { id: 'Aktifkan pajak', en: 'Enable tax' },
+  'Tax percentage': { id: 'Persentase pajak', en: 'Tax percentage' },
+  'Edit tax': { id: 'Ubah pajak', en: 'Edit tax' },
+  'Save tax': { id: 'Simpan pajak', en: 'Save tax' },
+  'Tax is configured once for the business and applied by Runtime to transaction totals.': {
+    id: 'Pajak diatur satu kali untuk bisnis dan dihitung oleh Runtime pada total transaksi.',
+    en: 'Tax is configured once for the business and applied by Runtime to transaction totals.',
+  },
+  'New transactions use this business tax. Existing finalized transactions keep their recorded tax.': {
+    id: 'Transaksi baru menggunakan pajak bisnis ini. Transaksi yang sudah selesai tetap menyimpan pajak yang tercatat.',
+    en: 'New transactions use this business tax. Existing finalized transactions keep their recorded tax.',
+  },
+  'When disabled, new transactions have zero tax.': {
+    id: 'Jika dinonaktifkan, pajak transaksi baru adalah nol.',
+    en: 'When disabled, new transactions have zero tax.',
+  },
+  'Enter a percentage from 0 to 100.': {
+    id: 'Masukkan persentase dari 0 sampai 100.',
+    en: 'Enter a percentage from 0 to 100.',
+  },
+  'Tax percentage must be between 0 and 100.': {
+    id: 'Persentase pajak harus antara 0 dan 100.',
+    en: 'Tax percentage must be between 0 and 100.',
+  },
+  'Tax configuration updated.': {
+    id: 'Pengaturan pajak diperbarui.',
+    en: 'Tax configuration updated.',
+  },
+  'Could not update tax configuration.': {
+    id: 'Pengaturan pajak tidak dapat diperbarui.',
+    en: 'Could not update tax configuration.',
+  },
   Locations: { id: 'Lokasi', en: 'Locations' },
   Localization: { id: 'Bahasa dan waktu', en: 'Language and time' },
   Numbering: { id: 'Penomoran', en: 'Numbering' },

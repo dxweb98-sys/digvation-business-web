@@ -13,7 +13,9 @@ import type {
   PaymentRoute,
   PaymentStatus,
   ResolvedPrice,
+  QueueSale,
   Sale,
+  SaleCustomerSelection,
   SellingLocation,
 } from './cashier-transaction.types';
 
@@ -26,11 +28,18 @@ export interface CreateSaleInput {
 }
 
 export interface StartSaleInput extends CreateSaleInput {
+  /** The Sale is created together with the Customer it belongs to. */
+  customer: SaleCustomerSelection;
   lines: Array<{
     catalogItemId: string;
     catalogVariantId?: string;
     quantity: string;
   }>;
+}
+
+export interface SetSaleCustomerInput {
+  expectedVersion: number;
+  customer: SaleCustomerSelection;
 }
 
 export interface AddSaleLineInput {
@@ -73,6 +82,12 @@ export interface ServicePerformersInput {
   performers: Array<{ employeeId: string; shareRate?: string }>;
 }
 
+export interface ServiceWorkUnitsInput {
+  expectedVersion: number;
+  /** One entry per unit of quantity, in unit order; shares are fractions summing to 1. */
+  units: Array<{ performers: Array<{ employeeId: string; shareRate: string }> }>;
+}
+
 export interface FulfillmentInput {
   expectedVersion: number;
   status: Exclude<FulfillmentStatus, 'WAITING'>;
@@ -81,6 +96,7 @@ export interface FulfillmentInput {
 export interface CreatePaymentInput {
   expectedVersion: number;
   method: PaymentMethod;
+  paymentRouteId?: string;
   appliedAmount: string;
   tenderedAmount?: string;
   providerReference?: string;
@@ -131,13 +147,18 @@ export interface PaymentRouteQuery {
 }
 
 export interface OpenSalesQuery {
-  listSales(signal?: AbortSignal): Promise<ApiPage<Sale>>;
+  listSales(signal?: AbortSignal): Promise<ApiPage<QueueSale>>;
 }
 
 export interface SaleTransactionClient {
   getSale(saleId: string, signal?: AbortSignal): Promise<Sale>;
   createSale(input: CreateSaleInput, idempotencyKey: string): Promise<Sale>;
   startSale(input: StartSaleInput, idempotencyKey: string): Promise<Sale>;
+  setSaleCustomer(
+    saleId: string,
+    input: SetSaleCustomerInput,
+    idempotencyKey: string,
+  ): Promise<Sale>;
   addSaleLine(saleId: string, input: AddSaleLineInput, idempotencyKey: string): Promise<Sale>;
   setSaleLineQuantity(
     saleId: string,
@@ -163,6 +184,11 @@ export interface SaleTransactionClient {
     saleId: string,
     saleLineId: string,
     input: ServicePerformersInput,
+  ): Promise<Sale>;
+  setSaleLineWorkUnits?(
+    saleId: string,
+    saleLineId: string,
+    input: ServiceWorkUnitsInput,
   ): Promise<Sale>;
   setSaleLineAssignments(saleId: string, saleLineId: string, input: AssignmentInput): Promise<Sale>;
   setSaleLineContributions(
@@ -302,8 +328,8 @@ export class HttpCashierTransactionAdapter
     return this.client.get<ApiPage<Employee>>(pagePath(`${API_PREFIX}/employees`), { signal });
   }
 
-  public listSales(signal?: AbortSignal): Promise<ApiPage<Sale>> {
-    return this.client.get<ApiPage<Sale>>(pagePath(`${API_PREFIX}/sales`), { signal });
+  public listSales(signal?: AbortSignal): Promise<ApiPage<QueueSale>> {
+    return this.client.get<ApiPage<QueueSale>>(pagePath(`${API_PREFIX}/sales`), { signal });
   }
 
   public getSale(saleId: string, signal?: AbortSignal): Promise<Sale> {
@@ -318,6 +344,16 @@ export class HttpCashierTransactionAdapter
 
   public startSale(input: StartSaleInput, idempotencyKey: string): Promise<Sale> {
     return this.client.post<Sale>(`${API_PREFIX}/sales/start`, input, {
+      headers: { 'Idempotency-Key': idempotencyKey },
+    });
+  }
+
+  public setSaleCustomer(
+    saleId: string,
+    input: SetSaleCustomerInput,
+    idempotencyKey: string,
+  ): Promise<Sale> {
+    return this.client.post<Sale>(`${API_PREFIX}/sales/${saleId}/customer`, input, {
       headers: { 'Idempotency-Key': idempotencyKey },
     });
   }
@@ -414,6 +450,17 @@ export class HttpCashierTransactionAdapter
   ): Promise<Sale> {
     return this.client.post<Sale>(
       `${API_PREFIX}/sales/${saleId}/lines/${saleLineId}/performers`,
+      input,
+    );
+  }
+
+  public setSaleLineWorkUnits(
+    saleId: string,
+    saleLineId: string,
+    input: ServiceWorkUnitsInput,
+  ): Promise<Sale> {
+    return this.client.post<Sale>(
+      `${API_PREFIX}/sales/${saleId}/lines/${saleLineId}/work-units`,
       input,
     );
   }

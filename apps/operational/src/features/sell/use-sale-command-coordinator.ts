@@ -14,7 +14,8 @@ import {
   isSaleVersionConflict,
 } from './cashier-transaction-errors';
 import { cashierTransactionKeys } from './cashier-transaction-keys';
-import type { ApiPage, Sale } from './cashier-transaction.types';
+import type { ApiPage, QueueSale, Sale } from './cashier-transaction.types';
+import { queueEntryFor, useCanReadCompletedSaleDetails } from './completed-sale-visibility';
 import type { SynchronizationState } from './sale-workspace-view-model';
 
 interface UseSaleCommandCoordinatorOptions {
@@ -37,14 +38,21 @@ export function useSaleCommandCoordinator({
     [locale],
   );
 
+  const canReadCompleted = useCanReadCompletedSaleDetails();
+
   const commitSale = useCallback(
     (sale: Sale) => {
-      queryClient.setQueryData(cashierTransactionKeys.sale(sale.id), sale);
-      queryClient.setQueryData<ApiPage<Sale>>(cashierTransactionKeys.sales(), (page) => {
+      // A just-completed Sale is kept only as its summary when the operator may
+      // not read completed detail, so no amount lingers in the shared cache.
+      const entry: QueueSale = queueEntryFor(sale, canReadCompleted);
+      if (entry === sale) queryClient.setQueryData(cashierTransactionKeys.sale(sale.id), sale);
+      else
+        queryClient.removeQueries({ queryKey: cashierTransactionKeys.sale(sale.id), exact: true });
+      queryClient.setQueryData<ApiPage<QueueSale>>(cashierTransactionKeys.sales(), (page) => {
         if (!page) {
           if (sale.operationalState === 'UNSUBMITTED') return page;
           return {
-            items: [sale],
+            items: [entry],
             limit: 100,
             offset: 0,
           };
@@ -55,23 +63,23 @@ export function useSaleCommandCoordinator({
           if (sale.operationalState === 'UNSUBMITTED') return page;
           return {
             ...page,
-            items: [sale, ...page.items].slice(0, page.limit),
+            items: [entry, ...page.items].slice(0, page.limit),
           };
         }
 
         const existing = page.items[existingIndex];
-        if (existing && existing.version > sale.version) return page;
+        if (existing && 'version' in existing && existing.version > sale.version) return page;
 
         return {
           ...page,
-          items: page.items.map((item) => (item.id === sale.id ? sale : item)),
+          items: page.items.map((item) => (item.id === sale.id ? entry : item)),
         };
       });
       rememberSale(sale.id);
       setSynchronization('CLEAN');
       setNotice(null);
     },
-    [queryClient, rememberSale],
+    [canReadCompleted, queryClient, rememberSale],
   );
 
   const refetchSale = useCallback(

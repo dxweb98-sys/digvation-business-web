@@ -1,8 +1,9 @@
-import { formatMoney } from '@digvation/pos-money';
+import { createDecimal, formatMoney } from '@digvation/pos-money';
 import { DButton, DSkeleton } from '@digvation-labs/ui';
 import { ArrowRight, BadgeCheck, CircleAlert, Plus, ShoppingBag, UserRound } from 'lucide-react';
 
 import type { SaleLine } from '../cashier-transaction.types';
+import { saleTaxLabel } from '../sale-presentation';
 import { actionBlockMessage, type SaleWorkspaceViewModel } from '../sale-workspace-view-model';
 import { SaleLineRow } from './sale-line-row';
 
@@ -114,6 +115,7 @@ export function CurrentSalePane({
       : null;
   const statusMessage = workspaceMessage(viewModel);
   const isTerminal = sale.status !== 'OPEN';
+  const hasTax = !createDecimal(sale.taxAmount).equals(0);
 
   return (
     <section
@@ -205,17 +207,21 @@ export function CurrentSalePane({
               </dd>
             </div>
           ) : null}
-          <div className="flex justify-between gap-4 text-[var(--color-text-muted)]">
-            <dt>Tax</dt>
-            <dd className="tabular-nums">{formatMoney(sale.taxAmount, sale.currency, locale)}</dd>
-          </div>
+          {hasTax ? (
+            <div className="flex justify-between gap-4 text-[var(--color-text-muted)]">
+              <dt>{saleTaxLabel(sale, 'Tax')}</dt>
+              <dd className="tabular-nums">{formatMoney(sale.taxAmount, sale.currency, locale)}</dd>
+            </div>
+          ) : null}
           <div className="flex justify-between gap-4 border-t border-[var(--color-border)] pt-2 text-base font-bold">
             <dt>Total</dt>
             <dd className="tabular-nums">{formatMoney(sale.totalAmount, sale.currency, locale)}</dd>
           </div>
         </dl>
 
-        <div className="mt-3 grid grid-cols-3 gap-2 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface-muted)]/60 p-2.5 text-center">
+        <div
+          className={`mt-3 grid ${hasTax ? 'grid-cols-3' : 'grid-cols-2'} gap-2 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface-muted)]/60 p-2.5 text-center`}
+        >
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--color-text-muted)]">
               Items
@@ -230,14 +236,16 @@ export function CurrentSalePane({
               {formatMoney(sale.discountAmount, sale.currency, locale)}
             </p>
           </div>
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--color-text-muted)]">
-              Tax
-            </p>
-            <p className="mt-1 text-xs font-bold tabular-nums">
-              {formatMoney(sale.taxAmount, sale.currency, locale)}
-            </p>
-          </div>
+          {hasTax ? (
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--color-text-muted)]">
+                {saleTaxLabel(sale, 'Tax')}
+              </p>
+              <p className="mt-1 text-xs font-bold tabular-nums">
+                {formatMoney(sale.taxAmount, sale.currency, locale)}
+              </p>
+            </div>
+          ) : null}
         </div>
 
         <DButton className="mt-3 w-full" onClick={onContinue}>

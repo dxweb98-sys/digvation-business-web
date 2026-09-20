@@ -13,7 +13,6 @@ export type BackofficeCapability =
   | 'reports'
   | 'transactions'
   | 'configuration'
-  | 'tax'
   | 'accessControl'
   | 'activity';
 
@@ -39,10 +38,6 @@ export type BackofficeAction =
   | 'cancelPricing'
   | 'createPromotion'
   | 'updatePromotion'
-  | 'viewTax'
-  | 'createTax'
-  | 'updateTax'
-  | 'cancelTax'
   | 'createEmployee'
   | 'updateEmployee'
   | 'manageAttendance'
@@ -58,6 +53,8 @@ export type BackofficeAction =
   | 'updateSettlement'
   | 'createReconciliation'
   | 'updateReconciliation';
+
+export const BACKOFFICE_ACCESS_PERMISSION = 'backoffice:access';
 
 interface PermissionRequirement {
   allOf?: readonly string[];
@@ -89,13 +86,12 @@ const capabilityPermissions: Record<BackofficeCapability, PermissionRequirement>
       'cash:read',
       'settlements:read',
       'reconciliations:read',
-      'tax:read',
       'locations:read',
     ],
   },
-  transactions: { allOf: ['sales:read'] },
+  // History shows completed transactions in full, which Runtime grants only with sales:read-completed.
+  transactions: { allOf: ['sales:read', 'sales:read-completed'] },
   configuration: { anyOf: ['business-profile:read', 'locations:read'] },
-  tax: { allOf: ['tax:read'] },
   accessControl: { allOf: ['roles:read'] },
   activity: { allOf: ['activity:read'] },
 };
@@ -122,10 +118,6 @@ const actionPermissions: Record<BackofficeAction, readonly string[]> = {
   cancelPricing: ['pricing:cancel'],
   createPromotion: ['promotions:create'],
   updatePromotion: ['promotions:update'],
-  viewTax: ['tax:read'],
-  createTax: ['tax:create'],
-  updateTax: ['tax:update'],
-  cancelTax: ['tax:cancel'],
   createEmployee: ['employees:create'],
   updateEmployee: ['employees:update'],
   manageAttendance: ['attendance:manage'],
@@ -147,6 +139,8 @@ export function canAccessBackoffice(
   session: AuthSession,
   capability: BackofficeCapability,
 ): boolean {
+  if (!session.access.permissions.includes(BACKOFFICE_ACCESS_PERMISSION))
+    return false;
   const requirement = capabilityPermissions[capability];
   const permissions = session.access.permissions;
   const hasAll = (requirement.allOf ?? []).every((permission) => permissions.includes(permission));
@@ -159,6 +153,8 @@ export function canPerformBackofficeAction(
   session: AuthSession,
   action: BackofficeAction,
 ): boolean {
+  if (!session.access.permissions.includes(BACKOFFICE_ACCESS_PERMISSION))
+    return false;
   return actionPermissions[action].every((permission) =>
     session.access.permissions.includes(permission),
   );
