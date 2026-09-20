@@ -509,9 +509,7 @@ function LifecycleHistory({
       key: 'actor',
       label: copy('Changed by'),
       render: (event) =>
-        event.actorId
-          ? `${copy(event.actorKind === 'machine' ? 'Machine' : 'User')} · ${event.actorId}`
-          : copy('Not set'),
+        event.actorDisplayName ?? copy(event.actorKind === 'machine' ? 'System' : 'Not set'),
     },
   ];
   return (
@@ -531,6 +529,7 @@ interface LifecycleEvent {
   reason: string | null;
   actorId: string | null;
   actorKind: string | null;
+  actorDisplayName: string | null;
 }
 
 function lifecycleEvents(employee: EmployeeDetail): LifecycleEvent[] {
@@ -543,13 +542,14 @@ function lifecycleEvents(employee: EmployeeDetail): LifecycleEvent[] {
           reason: null,
           actorId: null,
           actorKind: null,
+          actorDisplayName: null,
         },
       ]
     : [];
   return [...joined, ...employee.statusHistory.map(historyEvent)];
 }
 
-function historyEvent(entry: EmployeeStatusHistoryEntry): LifecycleEvent {
+export function historyEvent(entry: EmployeeStatusHistoryEntry): LifecycleEvent {
   return {
     id: entry.id,
     event: entry.newStatus === 'INACTIVE' ? 'DEACTIVATED' : 'REACTIVATED',
@@ -557,6 +557,7 @@ function historyEvent(entry: EmployeeStatusHistoryEntry): LifecycleEvent {
     reason: entry.reason,
     actorId: entry.actorId,
     actorKind: entry.actorKind,
+    actorDisplayName: entry.actor?.displayName ?? null,
   };
 }
 

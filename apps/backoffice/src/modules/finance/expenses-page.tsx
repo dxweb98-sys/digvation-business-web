@@ -33,6 +33,9 @@ function ExpenseFact({ fact }: { fact: [string, string] }) {
     </div>
   );
 }
+export function actorDisplayName(actor: Expense['createdBy'], fallback: string) {
+  return actor?.displayName ?? fallback;
+}
 export function ExpensesPage() {
   const { session, createApiClient } = useBackofficeAuth();
   const runtime = useRuntime();
@@ -274,7 +277,9 @@ function ExpenseDetail({ item, onClose }: { item: Expense | null; onClose: () =>
             </h3>
             <dl className="mt-4 grid gap-x-6 gap-y-5 sm:grid-cols-2">
               <ExpenseFact fact={[copy('Origin'), copy(item.origin)]} />
-              <ExpenseFact fact={[copy('Requested by'), item.createdByActorId]} />
+              <ExpenseFact
+                fact={[copy('Requested by'), actorDisplayName(item.createdBy, copy('Not set'))]}
+              />
             </dl>
           </section>
 
@@ -286,7 +291,12 @@ function ExpenseDetail({ item, onClose }: { item: Expense | null; onClose: () =>
               <dl className="mt-4 grid gap-x-6 gap-y-5 sm:grid-cols-2">
                 {item.approvedAt ? (
                   <>
-                    <ExpenseFact fact={[copy('Approved by'), item.approvedByActorId || '—']} />
+                    <ExpenseFact
+                      fact={[
+                        copy('Approved by'),
+                        actorDisplayName(item.approvedBy, copy('Not set')),
+                      ]}
+                    />
                     <ExpenseFact
                       fact={[
                         copy('Decision time'),
@@ -300,7 +310,12 @@ function ExpenseDetail({ item, onClose }: { item: Expense | null; onClose: () =>
                 ) : null}
                 {item.rejectedAt ? (
                   <>
-                    <ExpenseFact fact={[copy('Rejected by'), item.rejectedByActorId || '—']} />
+                    <ExpenseFact
+                      fact={[
+                        copy('Rejected by'),
+                        actorDisplayName(item.rejectedBy, copy('Not set')),
+                      ]}
+                    />
                     <ExpenseFact
                       fact={[
                         copy('Decision time'),
