@@ -322,13 +322,9 @@ function PromotionDialog({
     return parentIds;
   }, [itemIds, options.variants, variantIds]);
 
-  const visibleItemTargets = useMemo(
-    () =>
-      selectedItemGroups.size > 0
-        ? options.items.filter((item) => selectedItemGroups.has(item.id))
-        : options.items,
-    [options.items, selectedItemGroups],
-  );
+  // Search is now the only discovery affordance, so the target workspace must
+  // always keep the full catalog visible. Selection changes state, not visibility.
+  const visibleItemTargets = options.items;
 
   const numericValue = Number(discountValue);
   const numericMaximum = maximumDiscount ? Number(maximumDiscount) : null;
