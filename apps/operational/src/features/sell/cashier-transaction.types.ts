@@ -199,6 +199,8 @@ export interface SaleAdjustment {
   requestedValue: string | null;
   actualAmount: string;
   promotionId: string | null;
+  promotionEffectiveFrom?: string | null;
+  promotionEffectiveUntil?: string | null;
   label: string;
   saleLineId: string | null;
   actorId: string | null;

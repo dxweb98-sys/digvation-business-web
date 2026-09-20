@@ -1,6 +1,11 @@
 import type { ApiClient } from '@digvation/business-api';
 export type ExpenseStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 export type ExpenseOrigin = 'BACKOFFICE' | 'OPERATIONAL';
+export interface ExpenseActor {
+  id: string;
+  kind: string;
+  displayName: string | null;
+}
 export interface Expense {
   id: string;
   sellingLocationId: string;
@@ -17,10 +22,13 @@ export interface Expense {
   occurredAt: string;
   version: number;
   createdByActorId: string;
+  createdBy: ExpenseActor | null;
   approvedAt: string | null;
   approvedByActorId: string | null;
+  approvedBy: ExpenseActor | null;
   rejectedAt: string | null;
   rejectedByActorId: string | null;
+  rejectedBy: ExpenseActor | null;
   rejectionNote: string | null;
 }
 export interface Page<T> {

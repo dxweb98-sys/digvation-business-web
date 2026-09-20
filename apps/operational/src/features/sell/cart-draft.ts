@@ -49,6 +49,11 @@ export interface CartDisplayLine {
   lineDiscountAmount: string;
   discountType: DiscountType | null;
   discountValue: string | null;
+  promotion?: {
+    name: string;
+    effectiveFrom: string | null;
+    effectiveUntil: string | null;
+  } | null;
 }
 
 export function isPositiveCartQuantity(value: string): boolean {
@@ -191,6 +196,13 @@ export function saleDisplayLines(
       discountValue: hasSeveralLineAdjustments
         ? null
         : (singleLineAdjustment?.configuredValue ?? line.discountValue),
+      promotion: promotion
+        ? {
+            name: promotion.label,
+            effectiveFrom: promotion.promotionEffectiveFrom ?? null,
+            effectiveUntil: promotion.promotionEffectiveUntil ?? null,
+          }
+        : null,
     };
   });
 }

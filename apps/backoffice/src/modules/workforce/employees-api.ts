@@ -49,6 +49,7 @@ export interface EmployeeStatusHistoryEntry {
   transitionedAt: string;
   actorId: string;
   actorKind: string;
+  actor: { id: string; kind: string; displayName: string | null } | null;
 }
 
 export interface EmployeeDetail extends Employee {

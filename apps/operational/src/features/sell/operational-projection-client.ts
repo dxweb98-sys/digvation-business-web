@@ -39,6 +39,11 @@ export interface OperationalPromotionCommands {
     input: { expectedVersion: number; code: string },
     idempotencyKey: string,
   ): Promise<Sale>;
+  refreshPromotionEligibility(
+    saleId: string,
+    expectedVersion: number,
+    idempotencyKey: string,
+  ): Promise<Sale>;
   clearPromotionCode(
     saleId: string,
     expectedVersion: number,
@@ -194,6 +199,13 @@ export function attachOperationalProjection(
     client.post<Sale>(`${OPERATIONAL_PREFIX}/transactions/${saleId}/promo-code`, input, {
       headers: { 'Idempotency-Key': idempotencyKey },
     });
+
+  operational.refreshPromotionEligibility = (saleId, expectedVersion, idempotencyKey) =>
+    client.post<Sale>(
+      `${OPERATIONAL_PREFIX}/transactions/${saleId}/promotions/refresh`,
+      { expectedVersion },
+      { headers: { 'Idempotency-Key': idempotencyKey } },
+    );
 
   operational.clearPromotionCode = (saleId, expectedVersion, idempotencyKey) =>
     client.post<Sale>(
