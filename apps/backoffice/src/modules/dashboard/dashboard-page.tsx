@@ -1,7 +1,7 @@
 import { useRuntime } from '@digvation/business-runtime';
 import { DCard } from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
-import { CircleDollarSign, Hash, PackageCheck, ReceiptText } from 'lucide-react';
+import { CircleDollarSign, ReceiptText, TrendingUp, WalletCards } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { BackofficePage } from '../../app/layout/backoffice-page';
@@ -89,11 +89,6 @@ function numberValue(value: DashboardRow[string] | undefined): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function percentageChange(current: number, previous: number): number | null {
-  if (previous === 0) return current === 0 ? 0 : null;
-  return ((current - previous) / Math.abs(previous)) * 100;
-}
-
 function welcomeCopy(locale: 'id' | 'en', name: string, hour: number) {
   if (locale === 'id') {
     const greeting =
@@ -132,7 +127,6 @@ export function DashboardPage() {
     isDenied: locationDenied,
   } = useBusinessLocation();
   const [activityPeriod, setActivityPeriod] = useState<ActivityPeriod>('month');
-
   const api = useMemo(
     () => new DashboardApi(createApiClient(runtime.apiBaseUrl)),
     [createApiClient, runtime.apiBaseUrl],
@@ -140,6 +134,7 @@ export function DashboardPage() {
 
   // Core dashboard availability is independent from report hide preferences.
   const canReadSales = isReportAvailable(session, 'business-performance');
+  const canReadExpenses = isReportAvailable(session, 'expenses');
   const canReadCatalog = isReportAvailable(session, 'catalog-performance');
   const canReadEmployees = isReportAvailable(session, 'employee-performance');
 
@@ -149,39 +144,27 @@ export function DashboardPage() {
   const showTopEmployees = canShowDashboardWidget(session, 'TOP_EMPLOYEES');
   const showBusinessInsight = canShowDashboardWidget(session, 'BUSINESS_INSIGHT');
 
-  const today = periodRange('today');
-  const yesterday = previousRange(today.from, today.to);
-  const month = periodRange('month');
-  const previousMonth = previousRange(month.from, month.to);
   const activity = periodRange(activityPeriod);
   const previousActivity = previousRange(activity.from, activity.to);
+  const month = periodRange('month');
+  const previousMonth = previousRange(month.from, month.to);
   const recent = recentRange(30);
 
-  const todayFilters: DashboardFilterState = { ...today, locationId };
-  const yesterdayFilters: DashboardFilterState = { ...yesterday, locationId };
+  const activityFilters: DashboardFilterState = { ...activity, locationId };
+  const previousActivityFilters: DashboardFilterState = { ...previousActivity, locationId };
+  const expenseActivityFilters: DashboardFilterState = { ...activityFilters, status: 'APPROVED' };
+  const previousExpenseActivityFilters: DashboardFilterState = {
+    ...previousActivityFilters,
+    status: 'APPROVED',
+  };
   const monthFilters: DashboardFilterState = { ...month, locationId };
   const previousMonthFilters: DashboardFilterState = { ...previousMonth, locationId };
-  const activityFilters: DashboardFilterState = { ...activity, locationId };
-  const previousActivityFilters: DashboardFilterState = {
-    ...previousActivity,
-    locationId,
-  };
   const recentFilters: DashboardFilterState = { ...recent, locationId };
   const reportEnabled = Boolean(session && canReadSales && locationReady);
 
-  const todayPerformance = useQuery({
-    queryKey: ['dashboard', 'business-performance', todayFilters],
-    queryFn: () => api.report('business-performance', todayFilters),
-    enabled: reportEnabled,
-  });
-  const yesterdayPerformance = useQuery({
-    queryKey: ['dashboard', 'business-performance', yesterdayFilters],
-    queryFn: () => api.report('business-performance', yesterdayFilters),
-    enabled: reportEnabled,
-  });
-  const todayTransactions = useQuery({
-    queryKey: ['dashboard', 'today-transaction-summary', todayFilters],
-    queryFn: () => api.report('transactions', todayFilters, 1),
+  const dailySummary = useQuery({
+    queryKey: ['dashboard', 'daily-summary', locationId],
+    queryFn: () => api.dailySummary(locationId),
     enabled: reportEnabled,
   });
   const activityPerformance = useQuery({
@@ -193,6 +176,16 @@ export function DashboardPage() {
     queryKey: ['dashboard', 'business-performance', 'previous-activity', previousActivityFilters],
     queryFn: () => api.report('business-performance', previousActivityFilters),
     enabled: reportEnabled,
+  });
+  const activityExpenses = useQuery({
+    queryKey: ['dashboard', 'expenses', expenseActivityFilters],
+    queryFn: () => api.report('expenses', expenseActivityFilters),
+    enabled: Boolean(session && canReadExpenses && locationReady),
+  });
+  const previousActivityExpenses = useQuery({
+    queryKey: ['dashboard', 'expenses', 'previous-activity', previousExpenseActivityFilters],
+    queryFn: () => api.report('expenses', previousExpenseActivityFilters),
+    enabled: Boolean(session && canReadExpenses && locationReady),
   });
   const lastTransactions = useQuery({
     queryKey: ['dashboard', 'last-transactions', recentFilters],
@@ -237,30 +230,24 @@ export function DashboardPage() {
   const money = (value: DashboardRow[string] | undefined) =>
     formatMoney(String(value ?? 0), runtime.currency);
   const moneyNumber = (value: number) => formatMoney(String(value), runtime.currency);
+  const dailyMoney = (value: string | undefined) =>
+    formatMoney(String(value ?? '0'), summary?.currency ?? runtime.currency);
 
-  const todayData = todayPerformance.data;
-  const yesterdayData = yesterdayPerformance.data;
-  const todayTransactionData = todayTransactions.data;
+  const summary = dailySummary.data;
   const activityData = activityPerformance.data;
   const previousActivityData = previousActivityPerformance.data;
-  const monthData = monthPerformance.data;
-  const previousMonthData = previousMonthPerformance.data;
-
-  const revenueToday = numberValue(todayData?.summary.finalRevenue);
-  const revenueYesterday = numberValue(yesterdayData?.summary.finalRevenue);
-  const transactionsToday = numberValue(todayData?.summary.transactionCount);
-  const transactionsYesterday = numberValue(yesterdayData?.summary.transactionCount);
-  const averageToday = numberValue(todayData?.summary.averageTransactionValue);
-  const averageYesterday = numberValue(yesterdayData?.summary.averageTransactionValue);
-  const quantityToday = numberValue(todayData?.summary.quantitySold);
-  const quantityYesterday = numberValue(yesterdayData?.summary.quantitySold);
+  const activityExpenseData = activityExpenses.data;
+  const previousActivityExpenseData = previousActivityExpenses.data;
   const activityRevenue = numberValue(activityData?.summary.finalRevenue);
   const previousActivityRevenue = numberValue(previousActivityData?.summary.finalRevenue);
   const activityTransactions = numberValue(activityData?.summary.transactionCount);
   const previousActivityTransactions = numberValue(previousActivityData?.summary.transactionCount);
-  const transactionTotalToday = numberValue(todayTransactionData?.summary.transactionCount);
-  const finalizedToday = numberValue(todayTransactionData?.summary.finalizedCount);
-  const voidedToday = numberValue(todayTransactionData?.summary.voidedCount);
+  const approvedExpenses = numberValue(activityExpenseData?.summary.approvedExpenseTotal);
+  const previousApprovedExpenses = numberValue(
+    previousActivityExpenseData?.summary.approvedExpenseTotal,
+  );
+  const monthData = monthPerformance.data;
+  const previousMonthData = previousMonthPerformance.data;
 
   const paymentMix =
     monthData?.analytics.breakdowns?.paymentMethod ?? monthData?.analytics.breakdown ?? [];
@@ -336,52 +323,63 @@ export function DashboardPage() {
 
       {canReadSales && locationReady ? (
         <>
-          <section className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <DashboardKpiCard
-              label={text('revenueToday')}
-              value={money(todayData?.summary.finalRevenue)}
-              context={text('vsYesterday')}
-              delta={percentageChange(revenueToday, revenueYesterday)}
-              trendStart={revenueYesterday}
-              trendEnd={revenueToday}
-              tone="sky"
-              icon={<CircleDollarSign aria-hidden="true" className="size-4" />}
-            />
-            <DashboardKpiCard
-              label={text('transactionsToday')}
-              value={formatInteger(transactionsToday)}
-              context={text('vsYesterday')}
-              delta={percentageChange(transactionsToday, transactionsYesterday)}
-              trendStart={transactionsYesterday}
-              trendEnd={transactionsToday}
-              tone="mint"
-              icon={<ReceiptText aria-hidden="true" className="size-4" />}
-            />
-            <DashboardKpiCard
-              label={text('averageTransactionToday')}
-              value={money(todayData?.summary.averageTransactionValue)}
-              context={text('vsYesterday')}
-              delta={percentageChange(averageToday, averageYesterday)}
-              trendStart={averageYesterday}
-              trendEnd={averageToday}
-              tone="violet"
-              icon={<Hash aria-hidden="true" className="size-4" />}
-            />
-            <DashboardKpiCard
-              label={text('quantitySoldToday')}
-              value={formatInteger(quantityToday)}
-              context={text('vsYesterday')}
-              delta={percentageChange(quantityToday, quantityYesterday)}
-              trendStart={quantityYesterday}
-              trendEnd={quantityToday}
-              tone="warm"
-              icon={<PackageCheck aria-hidden="true" className="size-4" />}
-            />
-          </section>
+          {dailySummary.isPending ? (
+            <DCard
+              variant="elevated"
+              className="mt-5 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5"
+            >
+              <p className="text-sm text-[var(--color-text-muted)]">{text('summaryLoading')}</p>
+            </DCard>
+          ) : dailySummary.isError || !summary ? (
+            <DCard
+              variant="elevated"
+              className="mt-5 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5"
+            >
+              <p className="text-sm font-semibold">{text('summaryError')}</p>
+            </DCard>
+          ) : (
+            <section className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <DashboardKpiCard
+                label={text('incomeToday')}
+                value={dailyMoney(summary.income)}
+                context={text('today')}
+                tone="sky"
+                icon={<CircleDollarSign aria-hidden="true" className="size-4" />}
+              />
+              {canReadExpenses &&
+              summary.financeAvailable &&
+              summary.expenses !== undefined &&
+              summary.netRevenue !== undefined ? (
+                <>
+                  <DashboardKpiCard
+                    label={text('expensesToday')}
+                    value={dailyMoney(summary.expenses)}
+                    context={text('today')}
+                    tone="warm"
+                    icon={<WalletCards aria-hidden="true" className="size-4" />}
+                  />
+                  <DashboardKpiCard
+                    label={text('netRevenueToday')}
+                    value={dailyMoney(summary.netRevenue)}
+                    context={text('today')}
+                    tone="violet"
+                    icon={<TrendingUp aria-hidden="true" className="size-4" />}
+                  />
+                </>
+              ) : null}
+              <DashboardKpiCard
+                label={text('transactionsToday')}
+                value={formatInteger(summary.totalTransactions)}
+                context={text('today')}
+                tone="mint"
+                icon={<ReceiptText aria-hidden="true" className="size-4" />}
+              />
+            </section>
+          )}
 
           <section className="mt-4 grid items-start gap-4 xl:grid-cols-[minmax(0,1.9fr)_minmax(280px,0.72fr)]">
             <BusinessPerformanceCard
-              title={text('transactionActivity')}
+              title={text('activity')}
               period={activityPeriod}
               periodOptions={[
                 { value: 'today', label: text('today') },
@@ -395,13 +393,19 @@ export function DashboardPage() {
               previousRevenue={previousActivityRevenue}
               previousTransactions={previousActivityTransactions}
               trend={activityData?.analytics.trend ?? []}
+              expenses={approvedExpenses}
+              previousExpenses={previousApprovedExpenses}
+              expenseTrend={activityExpenseData?.analytics.trend ?? []}
+              showExpenses={canReadExpenses}
               formatMoney={moneyNumber}
             />
-            <TransactionCompletionCard
-              finalized={finalizedToday}
-              total={transactionTotalToday}
-              voided={voidedToday}
-            />
+            {summary ? (
+              <TransactionCompletionCard
+                finalized={summary.transactionCompletion.finalized}
+                total={summary.transactionCompletion.total}
+                voided={summary.transactionCompletion.voided}
+              />
+            ) : null}
           </section>
 
           {showTopItems || showPaymentMix || showRecentTransactions ? (
