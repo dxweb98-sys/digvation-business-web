@@ -304,7 +304,6 @@ function PromotionDialog({
   const [locationIds, setLocationIds] = useState<string[]>(promotion?.locationIds ?? []);
   const [saving, setSaving] = useState(false);
   const [step, setStep] = useState<'INFORMATION' | 'TARGET'>('INFORMATION');
-  const [showAllItemTargets, setShowAllItemTargets] = useState(promotion === null);
 
   const categoryItemOptions = useMemo(() => {
     const selectedCategories = new Set(categoryIds);
@@ -325,10 +324,10 @@ function PromotionDialog({
 
   const visibleItemTargets = useMemo(
     () =>
-      showAllItemTargets
-        ? options.items
-        : options.items.filter((item) => selectedItemGroups.has(item.id)),
-    [options.items, selectedItemGroups, showAllItemTargets],
+      selectedItemGroups.size > 0
+        ? options.items.filter((item) => selectedItemGroups.has(item.id))
+        : options.items,
+    [options.items, selectedItemGroups],
   );
 
   const numericValue = Number(discountValue);
@@ -879,28 +878,16 @@ function PromotionDialog({
 
             {scope === 'ITEM' ? (
               <section>
-                <div className="mb-2 flex items-end justify-between gap-3">
-                  <div>
-                    <h3 className="text-xs font-semibold">
-                      {copy('targetItems')}
-                      <span className="ml-2 text-[10px] font-medium text-[var(--color-text-muted)]">
-                        {selectedItemGroups.size} {copy('selectedActive')}
-                      </span>
-                    </h3>
-                    <p className="mt-0.5 text-[10px] text-[var(--color-text-muted)]">
-                      {copy('targetWorkspaceHint')}
-                    </p>
-                  </div>
-                  <DButton
-                    size="sm"
-                    variant="ghost"
-                    className="text-[var(--color-brand)]"
-                    leftIcon={<Plus className="size-3.5" />}
-                    onClick={() => setShowAllItemTargets(true)}
-                    disabled={showAllItemTargets || options.items.length === 0}
-                  >
-                    {copy('addItem')}
-                  </DButton>
+                <div className="mb-2">
+                  <h3 className="text-xs font-semibold">
+                    {copy('targetItems')}
+                    <span className="ml-2 text-[10px] font-medium text-[var(--color-text-muted)]">
+                      {selectedItemGroups.size} {copy('selectedActive')}
+                    </span>
+                  </h3>
+                  <p className="mt-0.5 text-[10px] text-[var(--color-text-muted)]">
+                    {copy('targetWorkspaceHint')}
+                  </p>
                 </div>
 
                 <ItemVariantTargetSelector
