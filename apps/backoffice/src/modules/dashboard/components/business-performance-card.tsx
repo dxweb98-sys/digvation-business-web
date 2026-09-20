@@ -112,6 +112,8 @@ export function BusinessPerformanceCard({
   trend,
   expenses = 0,
   previousExpenses = 0,
+  netRevenue,
+  previousNetRevenue,
   expenseTrend = [],
   showExpenses = false,
   formatMoney,
@@ -127,6 +129,8 @@ export function BusinessPerformanceCard({
   trend: readonly DashboardAnalyticsPoint[];
   expenses?: number;
   previousExpenses?: number;
+  netRevenue?: number;
+  previousNetRevenue?: number;
   expenseTrend?: readonly DashboardAnalyticsPoint[];
   showExpenses?: boolean;
   formatMoney(value: number): string;
@@ -135,6 +139,10 @@ export function BusinessPerformanceCard({
   const chartTrend = mergeTrend(trend, expenseTrend);
   const revenueChange = change(revenue, previousRevenue);
   const expenseChange = change(expenses, previousExpenses);
+  const netRevenueChange =
+    netRevenue === undefined || previousNetRevenue === undefined
+      ? null
+      : change(netRevenue, previousNetRevenue);
   const transactionChange = change(transactions, previousTransactions);
   const revenueValues = chartTrend.map((point) => point.revenue);
   const expenseValues = chartTrend.map((point) => point.expenses);
@@ -221,7 +229,23 @@ export function BusinessPerformanceCard({
               <Delta value={expenseChange} />
             </div>
           </div>
-        ) : null}{' '}
+        ) : null}
+        {showExpenses && netRevenue !== undefined ? (
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="size-2 rounded-full bg-violet-500" />
+              <p className="text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+                {text('netRevenue')}
+              </p>
+            </div>
+            <div className="mt-1 flex items-center gap-2">
+              <p className="truncate text-[18px] font-semibold tracking-tight tabular-nums">
+                {formatMoney(netRevenue)}
+              </p>
+              <Delta value={netRevenueChange} />
+            </div>
+          </div>
+        ) : null}
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
             <span className="size-2 rounded-full bg-emerald-500" />
