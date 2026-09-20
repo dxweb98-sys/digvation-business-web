@@ -13,7 +13,7 @@ import {
   type TableColumn,
 } from '@digvation/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, ChevronRight, Info, LockKeyhole, Pencil, Plus, Tag, Trash2 } from 'lucide-react';
+import { Check, ChevronRight, Info, List, LockKeyhole, Pencil, Plus, Tag, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
@@ -478,9 +478,7 @@ function PromotionDialog({
                   : 'text-slate-600 hover:text-slate-900',
               ].join(' ')}
             >
-              <span className="grid size-3.5 place-items-center">
-                <span className="h-2.5 w-3 border-y border-current before:block before:mt-[3px] before:border-t before:border-current" />
-              </span>
+              <List className="size-3.5" />
               <span>{copy('targetStep')}</span>
               <span
                 className={[
