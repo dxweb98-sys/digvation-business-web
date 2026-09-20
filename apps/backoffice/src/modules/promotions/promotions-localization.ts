@@ -14,6 +14,9 @@ const messages = {
     codeLabel: 'Kode',
     scope: 'Cakupan',
     item: 'Item',
+    variants: 'Varian tertentu',
+    variantHint:
+      'Target item induk berlaku untuk semua varian. Pilih varian tertentu untuk membatasi promo.',
     category: 'Kategori',
     transaction: 'Transaksi',
     discountType: 'Jenis diskon',
@@ -73,6 +76,9 @@ const messages = {
     codeLabel: 'Code',
     scope: 'Scope',
     item: 'Item',
+    variants: 'Specific variants',
+    variantHint:
+      'A parent item target applies to all variants. Select specific variants to limit the promotion.',
     category: 'Category',
     transaction: 'Transaction',
     discountType: 'Discount type',

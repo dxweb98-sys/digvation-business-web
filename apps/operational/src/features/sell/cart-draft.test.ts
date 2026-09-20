@@ -56,10 +56,11 @@ describe('CartDraft local mutations', () => {
 
   it('changes quantity, removes lines, and emits selection-only atomic start input', () => {
     const added = addCartDraftSelection(emptyCartDraft('location-1', 'IDR'), item, null, price);
-    const changed = setCartDraftCustomer(
-      setCartDraftQuantity(added, added.lines[0]!.id, '1.5'),
-      { type: 'NON_MEMBER', name: 'Siti Aminah', phone: '081234567890' },
-    );
+    const changed = setCartDraftCustomer(setCartDraftQuantity(added, added.lines[0]!.id, '1.5'), {
+      type: 'NON_MEMBER',
+      name: 'Siti Aminah',
+      phone: '081234567890',
+    });
 
     expect(cartDraftStartInput(changed)).toEqual({
       sellingLocationId: 'location-1',
@@ -103,6 +104,8 @@ describe('CartDraft local mutations', () => {
       requestedValue: null,
       actualAmount: '1250.0000',
       promotionId: 'promotion-1',
+      promotionEffectiveFrom: '2026-09-16T00:00:00.000Z',
+      promotionEffectiveUntil: '2026-09-16T18:20:00.000Z',
       label: 'Promo September',
       saleLineId: 'line-1',
       actorId: null,
@@ -118,6 +121,11 @@ describe('CartDraft local mutations', () => {
     expect(displayed?.totalAmount).toBe('12500.0000');
     expect(displayed?.discountType).toBe('PERCENTAGE');
     expect(displayed?.discountValue).toBe('0.1');
+    expect(displayed?.promotion).toEqual({
+      name: 'Promo September',
+      effectiveFrom: '2026-09-16T00:00:00.000Z',
+      effectiveUntil: '2026-09-16T18:20:00.000Z',
+    });
   });
 
   it('keeps a line-specific discount explicit while preserving its base line subtotal', () => {
@@ -167,6 +175,8 @@ describe('CartDraft local mutations', () => {
       requestedValue: null,
       actualAmount: '15000.0000',
       promotionId: 'promotion-1',
+      promotionEffectiveFrom: '2026-09-16T00:00:00.000Z',
+      promotionEffectiveUntil: '2026-09-16T18:20:00.000Z',
       label: 'Promo September',
       saleLineId: 'line-3',
       actorId: null,

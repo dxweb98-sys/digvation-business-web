@@ -45,6 +45,25 @@ function percentageDisplay(value: string) {
   return Number.isFinite(amount) ? `${amount.toLocaleString()}%` : value;
 }
 
+export type PromotionCopy = (
+  key: 'transaction' | 'category' | 'item' | 'variants' | 'selected',
+) => string;
+
+export function promotionTargetSummary(row: Promotion, copy: PromotionCopy) {
+  if (row.scope === 'TRANSACTION') return copy('transaction');
+  if (row.scope === 'CATEGORY' && row.itemIds.length > 0) {
+    return `${row.categoryIds.length} ${copy('category')} · ${row.itemIds.length} ${copy('item')}`;
+  }
+  if (row.scope === 'ITEM') {
+    const targets = [
+      row.itemIds.length ? `${row.itemIds.length} ${copy('item')}` : null,
+      row.variantIds.length ? `${row.variantIds.length} ${copy('variants')}` : null,
+    ].filter((value): value is string => value !== null);
+    return targets.join(' · ') || `0 ${copy('selected')}`;
+  }
+  return `${row.categoryIds.length} ${copy('selected')}`;
+}
+
 export function PromotionsPage() {
   const { session, createApiClient } = useBackofficeAuth();
   const runtime = useRuntime();
@@ -101,14 +120,7 @@ export function PromotionsPage() {
     {
       key: 'itemIds',
       label: promotionCopy('targetSummary'),
-      render: (row) => {
-        if (row.scope === 'TRANSACTION') return promotionCopy('transaction');
-        if (row.scope === 'CATEGORY' && row.itemIds.length > 0) {
-          return `${row.categoryIds.length} ${promotionCopy('category')} · ${row.itemIds.length} ${promotionCopy('item')}`;
-        }
-        const count = row.scope === 'ITEM' ? row.itemIds.length : row.categoryIds.length;
-        return `${count} ${promotionCopy('selected')}`;
-      },
+      render: (row) => promotionTargetSummary(row, promotionCopy),
     },
     {
       key: 'effectiveFrom',
@@ -143,7 +155,12 @@ export function PromotionsPage() {
   ];
 
   const loading = promotions.isLoading || options.isLoading;
-  const referenceOptions = options.data ?? { items: [], categories: [], locations: [] };
+  const referenceOptions = options.data ?? {
+    items: [],
+    variants: [],
+    categories: [],
+    locations: [],
+  };
 
   return (
     <BackofficePage>
@@ -237,6 +254,7 @@ function PromotionDialog({
   const [effectiveFrom, setEffectiveFrom] = useState(promotion?.effectiveFrom ?? '');
   const [effectiveUntil, setEffectiveUntil] = useState(promotion?.effectiveUntil ?? '');
   const [itemIds, setItemIds] = useState<string[]>(promotion?.itemIds ?? []);
+  const [variantIds, setVariantIds] = useState<string[]>(promotion?.variantIds ?? []);
   const [categoryIds, setCategoryIds] = useState<string[]>(promotion?.categoryIds ?? []);
   const [categoryItemScope, setCategoryItemScope] = useState<CategoryItemScope>(
     promotion?.scope === 'CATEGORY' && promotion.itemIds.length > 0 ? 'SELECTED' : 'ALL',
@@ -259,7 +277,7 @@ function PromotionDialog({
   const currencyValid = !needsCurrency || /^[A-Z]{3}$/.test(currency.trim().toUpperCase());
   const targetValid =
     scope === 'TRANSACTION' ||
-    (scope === 'ITEM' && itemIds.length > 0) ||
+    (scope === 'ITEM' && (itemIds.length > 0 || variantIds.length > 0)) ||
     (scope === 'CATEGORY' &&
       categoryIds.length > 0 &&
       (categoryItemScope === 'ALL' || itemIds.length > 0));
@@ -290,6 +308,7 @@ function PromotionDialog({
     setScope(value);
     if (value === 'TRANSACTION') {
       setItemIds([]);
+      setVariantIds([]);
       setCategoryIds([]);
       setCategoryItemScope('ALL');
     } else if (value === 'ITEM') {
@@ -297,6 +316,7 @@ function PromotionDialog({
       setCategoryItemScope('ALL');
     } else {
       setItemIds([]);
+      setVariantIds([]);
       setCategoryItemScope('ALL');
     }
   };
@@ -338,6 +358,7 @@ function PromotionDialog({
         scope === 'ITEM' || (scope === 'CATEGORY' && categoryItemScope === 'SELECTED')
           ? itemIds
           : [],
+      variantIds: scope === 'ITEM' ? variantIds : [],
       categoryIds: scope === 'CATEGORY' ? categoryIds : [],
       locationIds,
     };
@@ -501,14 +522,25 @@ function PromotionDialog({
       </div>
 
       {scope === 'ITEM' ? (
-        <TargetSelector
-          className="mt-5"
-          label={copy('targets')}
-          options={options.items}
-          selected={itemIds}
-          onChange={setItemIds}
-          emptyLabel={copy('noOptions')}
-        />
+        <div className="mt-5 space-y-4">
+          <TargetSelector
+            label={copy('targets')}
+            options={options.items}
+            selected={itemIds}
+            onChange={setItemIds}
+            emptyLabel={copy('noOptions')}
+          />
+          <div>
+            <TargetSelector
+              label={copy('variants')}
+              options={options.variants}
+              selected={variantIds}
+              onChange={setVariantIds}
+              emptyLabel={copy('noOptions')}
+            />
+            <p className="mt-2 text-xs text-[var(--color-text-muted)]">{copy('variantHint')}</p>
+          </div>
+        </div>
       ) : null}
 
       {scope === 'CATEGORY' ? (

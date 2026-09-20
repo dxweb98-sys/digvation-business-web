@@ -162,6 +162,20 @@ export function lineDiscountRows(
   ];
 }
 
+/**
+ * Automatic item promotions are explained on the affected line; they are not
+ * repeated in the checkout-level Promo & diskon card. Code promotions remain
+ * visible there because the cashier explicitly applied the code.
+ */
+export function checkoutAdjustmentRows(
+  sale: Pick<Sale, 'adjustments' | 'promotionCode'>,
+): SaleAdjustment[] {
+  return (sale.adjustments ?? []).filter(
+    (adjustment) =>
+      positive(adjustment.actualAmount) &&
+      !(adjustment.source === 'PROMOTION' && adjustment.scope === 'ITEM' && !sale.promotionCode),
+  );
+}
 export function saleDiscountRows(sale: DiscountPresentationSale): DiscountPresentationRow[] {
   const rows = (sale.adjustments ?? [])
     .filter((adjustment) => positive(adjustment.actualAmount))

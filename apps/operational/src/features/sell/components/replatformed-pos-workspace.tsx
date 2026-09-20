@@ -29,6 +29,7 @@ import {
   Clock,
   CreditCard,
   Eye,
+  Info,
   Minus,
   MoreHorizontal,
   Pencil,
@@ -2591,15 +2592,37 @@ function ReferenceCartPanel({
                       <p className="truncate text-sm font-semibold leading-tight">
                         {line.itemNameSnapshot}
                       </p>
-                      <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
+                      <div className="mt-1 text-[11px] text-[var(--color-text-muted)]">
                         {money(line.effectiveUnitPrice, locale)}
                         {line.variantNameSnapshot ? `, ${line.variantNameSnapshot}` : ''}
+                        {line.promotion ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-label={`${copy('Promotion')}: ${line.promotion.name}`}
+                            title={[
+                              line.promotion.name,
+                              line.promotion.effectiveFrom
+                                ? `${copy('Start')}: ${new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(line.promotion.effectiveFrom))}`
+                                : null,
+                              line.promotion.effectiveUntil
+                                ? `${copy('End')}: ${new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(line.promotion.effectiveUntil))}`
+                                : null,
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')}
+                            className="ml-1 inline-flex size-4 align-text-bottom text-[var(--color-text-muted)]"
+                          >
+                            <Info className="size-3" />
+                          </Button>
+                        ) : null}
                         {line.itemTypeSnapshot === 'SERVICE' ? (
                           <span className="ml-1 font-semibold text-cyan-700">
                             {copy('Service')}
                           </span>
                         ) : null}
-                      </p>
+                      </div>
                     </div>
                     <button
                       type="button"

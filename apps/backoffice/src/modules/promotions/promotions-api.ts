@@ -10,10 +10,12 @@ export interface PromotionReferenceOption {
   code: string;
   name: string;
   categoryId?: string | null;
+  catalogItemId?: string | null;
 }
 
 export interface PromotionReferenceOptions {
   items: PromotionReferenceOption[];
+  variants: PromotionReferenceOption[];
   categories: PromotionReferenceOption[];
   locations: PromotionReferenceOption[];
 }
@@ -35,6 +37,7 @@ export interface Promotion {
   effectiveUntil: string | null;
   version: number;
   itemIds: string[];
+  variantIds: string[];
   categoryIds: string[];
   locationIds: string[];
   status: PromotionStatus;
@@ -56,6 +59,7 @@ export interface PromotionWriteInput {
   effectiveFrom: string | null;
   effectiveUntil: string | null;
   itemIds: string[];
+  variantIds: string[];
   categoryIds: string[];
   locationIds: string[];
 }
