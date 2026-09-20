@@ -130,7 +130,15 @@ vi.mock('./components/dashboard-kpi-card', () => ({
 }));
 
 vi.mock('./components/transaction-completion-card', () => ({
-  TransactionCompletionCard: () => null,
+  TransactionCompletionCard: ({
+    finalized,
+    total,
+    voided,
+  }: {
+    finalized: number;
+    total: number;
+    voided: number;
+  }) => <div data-testid="transaction-completion">{`${finalized}/${total}/${voided}`}</div>,
 }));
 
 vi.mock('./components/ranking-card', () => ({ RankingCard: () => null }));
@@ -161,6 +169,7 @@ describe('DashboardPage daily summary', () => {
     expect(screen.getByText('IDR 8849780.0000')).toBeTruthy();
     expect(screen.getByText('IDR 27540000.0000')).toBeTruthy();
     expect(screen.getByText('IDR -18690220.0000')).toBeTruthy();
+    expect(screen.getByTestId('transaction-completion').textContent).toBe('4/5/1');
     expect(screen.getByRole('img', { name: 'Aktivitas' })).toBeTruthy();
     expect(screen.getByText('Pemasukan')).toBeTruthy();
     expect(screen.getByText('Revenue')).toBeTruthy();
