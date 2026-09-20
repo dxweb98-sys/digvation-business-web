@@ -1073,9 +1073,12 @@ function ItemVariantTargetSelector({
       <div className="max-h-72 space-y-2 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2">
         {targetGroups.length ? (
           targetGroups.map(({ item, variants: children }) => {
-        const parentSelected = itemSet.has(item.id);
-        const explicitVariantCount = children.filter((variant) => variantSet.has(variant.id)).length;
-        const groupActive = parentSelected || explicitVariantCount > 0;
+            const parentSelected = itemSet.has(item.id);
+            const allChildren = variants.filter((variant) => variant.catalogItemId === item.id);
+            const explicitVariantCount = allChildren.filter((variant) =>
+              variantSet.has(variant.id),
+            ).length;
+            const groupActive = parentSelected || explicitVariantCount > 0;
 
         return (
           <div
