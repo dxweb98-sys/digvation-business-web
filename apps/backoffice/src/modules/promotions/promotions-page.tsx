@@ -13,7 +13,7 @@ import {
   type TableColumn,
 } from '@digvation/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Pencil, Plus } from 'lucide-react';
+import { Check, ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
@@ -261,6 +261,8 @@ function PromotionDialog({
   );
   const [locationIds, setLocationIds] = useState<string[]>(promotion?.locationIds ?? []);
   const [saving, setSaving] = useState(false);
+  const [step, setStep] = useState<'INFORMATION' | 'TARGET'>('INFORMATION');
+  const [showAllItemTargets, setShowAllItemTargets] = useState(promotion === null);
 
   const categoryItemOptions = useMemo(() => {
     const selectedCategories = new Set(categoryIds);
@@ -268,6 +270,24 @@ function PromotionDialog({
       (option) => option.categoryId && selectedCategories.has(option.categoryId),
     );
   }, [categoryIds, options.items]);
+
+  const selectedItemGroups = useMemo(() => {
+    const parentIds = new Set(itemIds);
+    for (const variant of options.variants) {
+      if (variantIds.includes(variant.id) && variant.catalogItemId) {
+        parentIds.add(variant.catalogItemId);
+      }
+    }
+    return parentIds;
+  }, [itemIds, options.variants, variantIds]);
+
+  const visibleItemTargets = useMemo(
+    () =>
+      showAllItemTargets
+        ? options.items
+        : options.items.filter((item) => selectedItemGroups.has(item.id)),
+    [options.items, selectedItemGroups, showAllItemTargets],
+  );
 
   const numericValue = Number(discountValue);
   const numericMaximum = maximumDiscount ? Number(maximumDiscount) : null;
@@ -384,207 +404,621 @@ function PromotionDialog({
     }
   };
 
+  const targetStepSummary =
+    scope === 'TRANSACTION'
+      ? copy('allTransactions')
+      : scope === 'CATEGORY'
+        ? String(categoryIds.length) + ' ' + copy('category')
+        : String(selectedItemGroups.size) + ' ' + copy('selected');
+
   return (
     <DDialog
       open
       onClose={onClose}
       title={promotion ? copy('edit') : copy('add')}
+      description={copy('description')}
       size="lg"
       footer={
-        <div className="flex justify-end gap-2">
-          <DButton variant="secondary" onClick={onClose}>
-            {copy('cancel')}
-          </DButton>
-          <DButton onClick={() => void save()} disabled={!valid || saving} loading={saving}>
-            {copy('save')}
-          </DButton>
+        <div className="flex w-full items-center justify-between gap-3">
+          <div>
+            {promotion ? (
+              <DButton
+                variant="outline"
+                size="sm"
+                disabled
+                title={copy('deleteUnavailable')}
+                className="border-[var(--color-danger)]/35 text-[var(--color-danger)]"
+                leftIcon={<Trash2 className="size-3.5" />}
+              >
+                {copy('deletePromotion')}
+              </DButton>
+            ) : (
+              <span className="text-[11px] font-medium text-[var(--color-danger)]">
+                {copy('requiredHint')}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <DButton variant="secondary" onClick={onClose}>
+              {copy('cancel')}
+            </DButton>
+            <DButton onClick={() => void save()} disabled={!valid || saving} loading={saving}>
+              {promotion ? copy('saveChanges') : copy('savePromotion')}
+            </DButton>
+          </div>
         </div>
       }
     >
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="sm:col-span-2">
-          <DInput label={copy('name')} value={name} onChange={setName} />
-        </div>
-        <DSelect
-          label={copy('mode')}
-          value={mode}
-          clearable={false}
-          options={[
-            { value: 'AUTOMATIC', label: copy('automatic') },
-            { value: 'CODE', label: copy('code') },
-          ]}
-          onValueChange={(value) => {
-            const next = value as PromotionMode;
-            setMode(next);
-            if (next === 'AUTOMATIC') setCode('');
-          }}
-        />
-        {mode === 'CODE' ? (
-          <DInput
-            label={copy('codeLabel')}
-            value={code}
-            onChange={(value) => setCode(value.toUpperCase())}
-            placeholder="WELCOME10"
-          />
-        ) : (
-          <div className="flex items-end justify-between rounded-[var(--radius-control)] border border-[var(--color-border)] px-3 py-2.5">
-            <span className="text-sm font-medium">{copy('enabled')}</span>
-            <DToggle checked={enabled} onChange={setEnabled} ariaLabel={copy('enabled')} />
-          </div>
-        )}
-        {mode === 'CODE' ? (
-          <div className="flex items-end justify-between rounded-[var(--radius-control)] border border-[var(--color-border)] px-3 py-2.5 sm:col-span-2">
-            <span className="text-sm font-medium">{copy('enabled')}</span>
-            <DToggle checked={enabled} onChange={setEnabled} ariaLabel={copy('enabled')} />
-          </div>
-        ) : null}
-
-        <DSelect
-          label={copy('scope')}
-          value={scope}
-          clearable={false}
-          options={[
-            { value: 'TRANSACTION', label: copy('transaction') },
-            { value: 'ITEM', label: copy('item') },
-            { value: 'CATEGORY', label: copy('category') },
-          ]}
-          onValueChange={(value) => changeScope(value as PromotionScope)}
-        />
-        <DSelect
-          label={copy('discountType')}
-          value={discountType}
-          clearable={false}
-          options={[
-            { value: 'PERCENTAGE', label: copy('percentage') },
-            { value: 'FIXED_AMOUNT', label: copy('fixed') },
-          ]}
-          onValueChange={(value) => {
-            const next = value as PromotionDiscountType;
-            setDiscountType(next);
-            if (next === 'FIXED_AMOUNT') setMaximumDiscount('');
-          }}
-        />
-
-        <div>
-          <DInput
-            label={copy('value')}
-            inputMode="decimal"
-            value={discountValue}
-            onChange={setDiscountValue}
-          />
-          <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-            {copy(discountType === 'PERCENTAGE' ? 'percentageHint' : 'fixedHint')}
-          </p>
-        </div>
-        <div>
-          <DInput
-            label={`${copy('currency')} (${needsCurrency ? copy('enabled') : copy('optional')})`}
-            value={currency}
-            maxLength={3}
-            onChange={(value) => setCurrency(value.toUpperCase())}
-            placeholder="IDR"
-          />
-          <p className="mt-1 text-xs text-[var(--color-text-muted)]">{copy('currencyHint')}</p>
-        </div>
-
-        {discountType === 'PERCENTAGE' ? (
-          <DInput
-            label={`${copy('maximum')} (${copy('optional')})`}
-            inputMode="decimal"
-            value={maximumDiscount}
-            onChange={setMaximumDiscount}
-          />
-        ) : null}
-        <DInput
-          label={`${copy('minimum')} (${copy('optional')})`}
-          inputMode="decimal"
-          value={minimumPurchase}
-          onChange={setMinimumPurchase}
-        />
-
-        <DDatePicker
-          label={`${copy('effectiveFrom')} (${copy('optional')})`}
-          variant="date-time"
-          value={effectiveFrom}
-          onChange={(value) => setEffectiveFrom(value == null ? '' : String(value))}
-          onClear={() => setEffectiveFrom('')}
-          clearable
-        />
-        <DDatePicker
-          label={`${copy('effectiveUntil')} (${copy('optional')})`}
-          variant="date-time"
-          value={effectiveUntil}
-          onChange={(value) => setEffectiveUntil(value == null ? '' : String(value))}
-          onClear={() => setEffectiveUntil('')}
-          clearable
-          error={periodValid ? undefined : copy('invalid')}
-        />
-      </div>
-
-      {scope === 'ITEM' ? (
-        <div className="mt-5 space-y-4">
-          <TargetSelector
-            label={copy('targets')}
-            options={options.items}
-            selected={itemIds}
-            onChange={setItemIds}
-            emptyLabel={copy('noOptions')}
-          />
-          <div>
-            <TargetSelector
-              label={copy('variants')}
-              options={options.variants}
-              selected={variantIds}
-              onChange={setVariantIds}
-              emptyLabel={copy('noOptions')}
-            />
-            <p className="mt-2 text-xs text-[var(--color-text-muted)]">{copy('variantHint')}</p>
-          </div>
-        </div>
-      ) : null}
-
-      {scope === 'CATEGORY' ? (
-        <div className="mt-5 space-y-4">
-          <TargetSelector
-            label={copy('targets')}
-            options={options.categories}
-            selected={categoryIds}
-            onChange={changeCategories}
-            emptyLabel={copy('noOptions')}
-          />
-
-          <DSelect
-            label={copy('categoryItemScope')}
-            value={categoryItemScope}
-            clearable={false}
-            options={[
-              { value: 'ALL', label: copy('allCategoryItems') },
-              { value: 'SELECTED', label: copy('selectedCategoryItems') },
-            ]}
-            onValueChange={(value) => changeCategoryItemScope(value as CategoryItemScope)}
-          />
-
-          {categoryItemScope === 'SELECTED' ? (
-            <TargetSelector
-              label={copy('selectCategoryItems')}
-              options={categoryItemOptions}
-              selected={itemIds}
-              onChange={setItemIds}
-              emptyLabel={copy('noCategoryItems')}
-            />
+      <div className="mx-auto w-full max-w-[620px] space-y-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <DBadge variant="secondary">{promotion?.code || copy('newBadge')}</DBadge>
+          {promotion ? (
+            <DBadge variant={enabled ? 'success' : 'secondary'}>
+              {enabled ? copy('active') : copy('disabled')}
+            </DBadge>
           ) : null}
         </div>
-      ) : null}
 
-      <TargetSelector
-        className="mt-5"
-        label={`${copy('locations')} · ${locationIds.length ? `${locationIds.length} ${copy('selected')}` : copy('allLocations')}`}
-        options={options.locations}
-        selected={locationIds}
-        onChange={setLocationIds}
-        emptyLabel={copy('noOptions')}
-      />
+        <div className="grid grid-cols-2 gap-1 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-1">
+          <button
+            type="button"
+            aria-pressed={step === 'INFORMATION'}
+            onClick={() => setStep('INFORMATION')}
+            className={[
+              'rounded-[calc(var(--radius-control)-2px)] px-3 py-2 text-xs font-semibold transition-colors',
+              step === 'INFORMATION'
+                ? 'bg-[var(--color-surface)] text-[var(--color-brand)] shadow-sm'
+                : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]',
+            ].join(' ')}
+          >
+            {copy('informationStep')}
+          </button>
+          <button
+            type="button"
+            aria-pressed={step === 'TARGET'}
+            onClick={() => setStep('TARGET')}
+            className={[
+              'rounded-[calc(var(--radius-control)-2px)] px-3 py-2 text-xs font-semibold transition-colors',
+              step === 'TARGET'
+                ? 'bg-[var(--color-surface)] text-[var(--color-brand)] shadow-sm'
+                : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]',
+            ].join(' ')}
+          >
+            {copy('targetStep')}
+            <span className="ml-1 text-[10px] font-medium text-[var(--color-text-muted)]">
+              ({targetStepSummary})
+            </span>
+          </button>
+        </div>
+
+        {step === 'INFORMATION' ? (
+          <div className="space-y-4">
+            <section>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <h3 className="text-[11px] font-bold uppercase tracking-wide">
+                  {copy('promotionInfo')}
+                </h3>
+                <span className="text-[10px] text-[var(--color-text-muted)]">
+                  {copy('cashierVisibility')}
+                </span>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <DInput
+                    label={copy('name') + ' *'}
+                    value={name}
+                    onChange={setName}
+                    placeholder={copy('namePlaceholder')}
+                  />
+                </div>
+
+                <DSelect
+                  label={copy('mode')}
+                  value={mode}
+                  clearable={false}
+                  options={[
+                    { value: 'AUTOMATIC', label: copy('automatic') },
+                    { value: 'CODE', label: copy('code') },
+                  ]}
+                  onValueChange={(value) => {
+                    const next = value as PromotionMode;
+                    setMode(next);
+                    if (next === 'AUTOMATIC') setCode('');
+                  }}
+                />
+
+                <DInput
+                  label={copy('codeLabel')}
+                  value={code}
+                  disabled={mode === 'AUTOMATIC'}
+                  onChange={(value) => setCode(value.toUpperCase())}
+                  placeholder={mode === 'AUTOMATIC' ? copy('automaticCodeHint') : 'SEP10'}
+                />
+
+                <div className="sm:col-span-2 flex items-center justify-between rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5">
+                  <div>
+                    <p className="text-xs font-semibold">{copy('operationalStatus')}</p>
+                    <p className="mt-0.5 text-[10px] text-[var(--color-text-muted)]">
+                      {copy('operationalStatusHint')}
+                    </p>
+                  </div>
+                  <DToggle checked={enabled} onChange={setEnabled} ariaLabel={copy('enabled')} />
+                </div>
+              </div>
+            </section>
+
+            <section>
+              <h3 className="mb-2 text-[11px] font-bold uppercase tracking-wide">
+                {copy('termsAndDiscount')}
+              </h3>
+
+              <div className="grid gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  aria-pressed={discountType === 'PERCENTAGE'}
+                  onClick={() => setDiscountType('PERCENTAGE')}
+                  className={[
+                    'rounded-[var(--radius-control)] border p-3 text-left transition-colors',
+                    discountType === 'PERCENTAGE'
+                      ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/[.04]'
+                      : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-brand)]/35',
+                  ].join(' ')}
+                >
+                  <div className="flex items-start gap-2">
+                    <span
+                      className={[
+                        'mt-0.5 grid size-4 shrink-0 place-items-center rounded-full border',
+                        discountType === 'PERCENTAGE'
+                          ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white'
+                          : 'border-[var(--color-border)]',
+                      ].join(' ')}
+                    >
+                      {discountType === 'PERCENTAGE' ? <Check className="size-2.5" /> : null}
+                    </span>
+                    <span>
+                      <span className="block text-xs font-semibold">{copy('percentageCard')}</span>
+                      <span className="mt-0.5 block text-[10px] leading-4 text-[var(--color-text-muted)]">
+                        {copy('percentageCardHint')}
+                      </span>
+                    </span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  aria-pressed={discountType === 'FIXED_AMOUNT'}
+                  onClick={() => {
+                    setDiscountType('FIXED_AMOUNT');
+                    setMaximumDiscount('');
+                  }}
+                  className={[
+                    'rounded-[var(--radius-control)] border p-3 text-left transition-colors',
+                    discountType === 'FIXED_AMOUNT'
+                      ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/[.04]'
+                      : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-brand)]/35',
+                  ].join(' ')}
+                >
+                  <div className="flex items-start gap-2">
+                    <span
+                      className={[
+                        'mt-0.5 grid size-4 shrink-0 place-items-center rounded-full border',
+                        discountType === 'FIXED_AMOUNT'
+                          ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white'
+                          : 'border-[var(--color-border)]',
+                      ].join(' ')}
+                    >
+                      {discountType === 'FIXED_AMOUNT' ? <Check className="size-2.5" /> : null}
+                    </span>
+                    <span>
+                      <span className="block text-xs font-semibold">{copy('fixedCard')}</span>
+                      <span className="mt-0.5 block text-[10px] leading-4 text-[var(--color-text-muted)]">
+                        {copy('fixedCardHint')}
+                      </span>
+                    </span>
+                  </div>
+                </button>
+              </div>
+
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div>
+                  <DInput
+                    label={copy('value') + ' *'}
+                    inputMode="decimal"
+                    value={discountValue}
+                    onChange={setDiscountValue}
+                  />
+                  <p className="mt-1 text-[10px] text-[var(--color-text-muted)]">
+                    {copy(discountType === 'PERCENTAGE' ? 'percentageHint' : 'fixedHint')}
+                  </p>
+                </div>
+
+                <div>
+                  <DInput
+                    label={copy('currency')}
+                    value={currency}
+                    maxLength={3}
+                    onChange={(value) => setCurrency(value.toUpperCase())}
+                    placeholder="IDR"
+                  />
+                  <p className="mt-1 text-[10px] text-[var(--color-text-muted)]">
+                    {copy('currencyHint')}
+                  </p>
+                </div>
+
+                {discountType === 'PERCENTAGE' ? (
+                  <DInput
+                    label={copy('maximum') + ' (' + copy('optional') + ')'}
+                    inputMode="decimal"
+                    value={maximumDiscount}
+                    onChange={setMaximumDiscount}
+                  />
+                ) : (
+                  <div />
+                )}
+
+                <DInput
+                  label={copy('minimum') + ' (' + copy('optional') + ')'}
+                  inputMode="decimal"
+                  value={minimumPurchase}
+                  onChange={setMinimumPurchase}
+                />
+
+                <DDatePicker
+                  label={copy('effectiveFrom') + ' (' + copy('optional') + ')'}
+                  variant="date-time"
+                  value={effectiveFrom}
+                  onChange={(value) => setEffectiveFrom(value == null ? '' : String(value))}
+                  onClear={() => setEffectiveFrom('')}
+                  clearable
+                />
+                <DDatePicker
+                  label={copy('effectiveUntil') + ' (' + copy('optional') + ')'}
+                  variant="date-time"
+                  value={effectiveUntil}
+                  onChange={(value) => setEffectiveUntil(value == null ? '' : String(value))}
+                  onClear={() => setEffectiveUntil('')}
+                  clearable
+                  error={periodValid ? undefined : copy('invalid')}
+                />
+              </div>
+            </section>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <section>
+              <h3 className="mb-2 text-[11px] font-bold uppercase tracking-wide">
+                {copy('scopePromo')}
+              </h3>
+              <div className="grid gap-2 sm:grid-cols-3">
+                {[
+                  {
+                    value: 'TRANSACTION' as const,
+                    title: copy('allTransactions'),
+                    hint: copy('allTransactionsHint'),
+                  },
+                  {
+                    value: 'CATEGORY' as const,
+                    title: copy('perCategory'),
+                    hint: copy('perCategoryHint'),
+                  },
+                  {
+                    value: 'ITEM' as const,
+                    title: copy('perItemVariant'),
+                    hint: copy('perItemVariantHint'),
+                  },
+                ].map((option) => {
+                  const active = scope === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => changeScope(option.value)}
+                      className={[
+                        'rounded-[var(--radius-control)] border px-3 py-2.5 text-left transition-colors',
+                        active
+                          ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/[.05]'
+                          : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-brand)]/35',
+                      ].join(' ')}
+                    >
+                      <div className="flex items-start gap-2">
+                        <span
+                          className={[
+                            'mt-0.5 grid size-4 shrink-0 place-items-center rounded-full border',
+                            active
+                              ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white'
+                              : 'border-[var(--color-border)]',
+                          ].join(' ')}
+                        >
+                          {active ? <Check className="size-2.5" /> : null}
+                        </span>
+                        <span>
+                          <span className="block text-xs font-semibold">{option.title}</span>
+                          <span className="mt-0.5 block text-[10px] text-[var(--color-text-muted)]">
+                            {option.hint}
+                          </span>
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+
+            {scope === 'ITEM' ? (
+              <section>
+                <div className="mb-2 flex items-end justify-between gap-3">
+                  <div>
+                    <h3 className="text-xs font-semibold">
+                      {copy('targetItems')}
+                      <span className="ml-2 text-[10px] font-medium text-[var(--color-text-muted)]">
+                        {selectedItemGroups.size} {copy('selectedActive')}
+                      </span>
+                    </h3>
+                    <p className="mt-0.5 text-[10px] text-[var(--color-text-muted)]">
+                      {copy('targetWorkspaceHint')}
+                    </p>
+                  </div>
+                  <DButton
+                    size="sm"
+                    variant="outline"
+                    leftIcon={<Plus className="size-3.5" />}
+                    onClick={() => setShowAllItemTargets(true)}
+                    disabled={showAllItemTargets || options.items.length === 0}
+                  >
+                    {copy('addItem')}
+                  </DButton>
+                </div>
+
+                <ItemVariantTargetSelector
+                  items={visibleItemTargets}
+                  variants={options.variants}
+                  itemIds={itemIds}
+                  variantIds={variantIds}
+                  onItemsChange={setItemIds}
+                  onVariantsChange={setVariantIds}
+                  emptyLabel={copy('noOptions')}
+                  specificLabel={copy('specificVariants')}
+                  includedLabel={copy('includedViaParent')}
+                  notIncludedLabel={copy('notIncluded')}
+                  parentIncludesVariantsLabel={copy('parentIncludesVariants')}
+                  activeLabel={copy('active')}
+                />
+              </section>
+            ) : null}
+
+            {scope === 'CATEGORY' ? (
+              <section className="space-y-3">
+                <TargetSelector
+                  label={copy('targets')}
+                  options={options.categories}
+                  selected={categoryIds}
+                  onChange={changeCategories}
+                  emptyLabel={copy('noOptions')}
+                />
+
+                <div className="flex items-center justify-between rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5">
+                  <span className="text-xs font-medium">{copy('selectedCategoriesAllItems')}</span>
+                  <DToggle
+                    checked={categoryItemScope === 'ALL'}
+                    onChange={(checked) => changeCategoryItemScope(checked ? 'ALL' : 'SELECTED')}
+                    ariaLabel={copy('selectedCategoriesAllItems')}
+                  />
+                </div>
+
+                {categoryItemScope === 'SELECTED' ? (
+                  <TargetSelector
+                    label={copy('selectCategoryItems')}
+                    options={categoryItemOptions}
+                    selected={itemIds}
+                    onChange={setItemIds}
+                    emptyLabel={copy('noCategoryItems')}
+                  />
+                ) : null}
+              </section>
+            ) : null}
+
+            {scope === 'TRANSACTION' ? (
+              <div className="rounded-[var(--radius-control)] border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)]/55 px-4 py-5 text-center">
+                <p className="text-sm font-semibold">{copy('allTransactions')}</p>
+                <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                  {copy('allTransactionsHint')}
+                </p>
+              </div>
+            ) : null}
+
+            <TargetSelector
+              label={
+                copy('locations') +
+                ' · ' +
+                (locationIds.length
+                  ? String(locationIds.length) + ' ' + copy('selected')
+                  : copy('allLocations'))
+              }
+              options={options.locations}
+              selected={locationIds}
+              onChange={setLocationIds}
+              emptyLabel={copy('noOptions')}
+            />
+          </div>
+        )}
+      </div>
     </DDialog>
+  );
+}
+
+function ItemVariantTargetSelector({
+  items,
+  variants,
+  itemIds,
+  variantIds,
+  onItemsChange,
+  onVariantsChange,
+  emptyLabel,
+  specificLabel,
+  includedLabel,
+  notIncludedLabel,
+  parentIncludesVariantsLabel,
+  activeLabel,
+}: {
+  items: PromotionReferenceOption[];
+  variants: PromotionReferenceOption[];
+  itemIds: string[];
+  variantIds: string[];
+  onItemsChange: (ids: string[]) => void;
+  onVariantsChange: (ids: string[]) => void;
+  emptyLabel: string;
+  specificLabel: string;
+  includedLabel: string;
+  notIncludedLabel: string;
+  parentIncludesVariantsLabel: string;
+  activeLabel: string;
+}) {
+  const itemSet = new Set(itemIds);
+  const variantSet = new Set(variantIds);
+
+  const toggleParent = (itemId: string) => {
+    onItemsChange(
+      itemSet.has(itemId) ? itemIds.filter((id) => id !== itemId) : [...itemIds, itemId],
+    );
+  };
+
+  const toggleVariant = (variantId: string, parentSelected: boolean) => {
+    if (parentSelected) return;
+    onVariantsChange(
+      variantSet.has(variantId)
+        ? variantIds.filter((id) => id !== variantId)
+        : [...variantIds, variantId],
+    );
+  };
+
+  if (!items.length) {
+    return (
+      <div className="rounded-[var(--radius-control)] border border-[var(--color-border)] px-3 py-4 text-sm text-[var(--color-text-muted)]">
+        {emptyLabel}
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-h-72 space-y-2 overflow-y-auto rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2">
+      {items.map((item) => {
+        const parentSelected = itemSet.has(item.id);
+        const children = variants.filter((variant) => variant.catalogItemId === item.id);
+        const explicitVariantCount = children.filter((variant) => variantSet.has(variant.id)).length;
+        const groupActive = parentSelected || explicitVariantCount > 0;
+
+        return (
+          <div
+            key={item.id}
+            className={[
+              'rounded-[var(--radius-control)] border',
+              groupActive
+                ? 'border-[var(--color-brand)]/25 bg-[var(--color-brand)]/[.025]'
+                : 'border-[var(--color-border)]',
+            ].join(' ')}
+          >
+            <button
+              type="button"
+              aria-pressed={parentSelected}
+              onClick={() => toggleParent(item.id)}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left"
+            >
+              <span
+                className={[
+                  'grid size-4 shrink-0 place-items-center rounded border',
+                  parentSelected
+                    ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white'
+                    : 'border-[var(--color-border)] bg-[var(--color-surface)]',
+                ].join(' ')}
+              >
+                {parentSelected ? <Check className="size-3" /> : null}
+              </span>
+
+              <div className="min-w-0 flex-1">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="truncate text-xs font-semibold">{item.name}</span>
+                  <span className="shrink-0 text-[9px] text-[var(--color-text-muted)]">
+                    {item.code}
+                  </span>
+                </div>
+                {parentSelected ? (
+                  <p className="mt-0.5 text-[9px] text-[var(--color-text-muted)]">
+                    {parentIncludesVariantsLabel}
+                  </p>
+                ) : null}
+              </div>
+
+              {explicitVariantCount > 0 ? (
+                <DBadge variant="secondary">
+                  {explicitVariantCount} {specificLabel}
+                </DBadge>
+              ) : null}
+              <ChevronRight className="size-3.5 shrink-0 text-[var(--color-text-muted)]" />
+            </button>
+
+            {children.length ? (
+              <div className="space-y-1 border-t border-[var(--color-border)] px-3 py-2 pl-7">
+                {children.map((variant) => {
+                  const explicitlySelected = variantSet.has(variant.id);
+                  const effectiveSelected = parentSelected || explicitlySelected;
+
+                  return (
+                    <button
+                      key={variant.id}
+                      type="button"
+                      aria-pressed={effectiveSelected}
+                      onClick={() => toggleVariant(variant.id, parentSelected)}
+                      className={[
+                        'flex w-full items-center gap-2 rounded-[var(--radius-control)] border px-2.5 py-1.5 text-left transition-colors',
+                        effectiveSelected
+                          ? 'border-[var(--color-brand)]/20 bg-[var(--color-brand)]/[.04]'
+                          : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-muted)]',
+                        parentSelected ? 'cursor-default' : '',
+                      ].join(' ')}
+                    >
+                      <span
+                        className={[
+                          'grid size-4 shrink-0 place-items-center rounded border',
+                          effectiveSelected
+                            ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white'
+                            : 'border-[var(--color-border)]',
+                        ].join(' ')}
+                      >
+                        {effectiveSelected ? <Check className="size-3" /> : null}
+                      </span>
+
+                      <span className="min-w-0 flex-1 truncate text-[11px] font-medium">
+                        {variant.name}
+                        <span className="ml-2 text-[9px] font-normal text-[var(--color-text-muted)]">
+                          {variant.code}
+                        </span>
+                      </span>
+
+                      <span
+                        className={[
+                          'shrink-0 text-[9px] font-medium',
+                          effectiveSelected
+                            ? 'text-[var(--color-success)]'
+                            : 'text-[var(--color-text-muted)]',
+                        ].join(' ')}
+                      >
+                        {parentSelected
+                          ? includedLabel
+                          : explicitlySelected
+                            ? activeLabel
+                            : notIncludedLabel}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
