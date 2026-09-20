@@ -13,7 +13,18 @@ import {
   type TableColumn,
 } from '@digvation/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, ChevronRight, Info, List, LockKeyhole, Pencil, Plus, Tag, Trash2 } from 'lucide-react';
+import {
+  Check,
+  ChevronRight,
+  Info,
+  List,
+  LockKeyhole,
+  Pencil,
+  Plus,
+  Tag,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
@@ -418,35 +429,45 @@ function PromotionDialog({
       open
       onClose={onClose}
       title={
-        <span className="inline-flex flex-wrap items-center gap-2">
-          <span>{promotion ? copy('edit') : copy('add')}</span>
-          {!promotion ? (
-            <span className="rounded-md border border-[var(--color-brand)]/25 bg-[var(--color-brand)]/[.06] px-2 py-0.5 text-[11px] font-semibold text-[var(--color-brand)]">
-              {copy('newBadge')}
-            </span>
-          ) : promotion.code ? (
-            <span className="rounded-md border border-[var(--color-brand)]/25 bg-[var(--color-brand)]/[.06] px-2 py-0.5 font-mono text-[11px] font-semibold text-[var(--color-brand)]">
-              {promotion.code}
-            </span>
-          ) : null}
-          {promotion ? (
-            <span
-              className={[
-                'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-semibold',
-                enabled
-                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                  : 'border-[var(--color-border)] bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]',
-              ].join(' ')}
-            >
+        <span className="flex w-full items-center justify-between gap-3">
+          <span className="inline-flex min-w-0 flex-wrap items-center gap-2">
+            <span>{promotion ? copy('edit') : copy('add')}</span>
+            {!promotion ? (
+              <span className="rounded-md border border-[var(--color-brand)]/25 bg-[var(--color-brand)]/[.06] px-2 py-0.5 text-[11px] font-semibold text-[var(--color-brand)]">
+                {copy('newBadge')}
+              </span>
+            ) : promotion.code ? (
+              <span className="rounded-md border border-[var(--color-brand)]/25 bg-[var(--color-brand)]/[.06] px-2 py-0.5 font-mono text-[11px] font-semibold text-[var(--color-brand)]">
+                {promotion.code}
+              </span>
+            ) : null}
+            {promotion ? (
               <span
                 className={[
-                  'size-1.5 rounded-full',
-                  enabled ? 'bg-emerald-500' : 'bg-[var(--color-text-muted)]',
+                  'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-semibold',
+                  enabled
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                    : 'border-[var(--color-border)] bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]',
                 ].join(' ')}
-              />
-              {enabled ? copy('active') : copy('disabled')}
-            </span>
-          ) : null}
+              >
+                <span
+                  className={[
+                    'size-1.5 rounded-full',
+                    enabled ? 'bg-emerald-500' : 'bg-[var(--color-text-muted)]',
+                  ].join(' ')}
+                />
+                {enabled ? copy('active') : copy('disabled')}
+              </span>
+            ) : null}
+          </span>
+          <button
+            type="button"
+            aria-label={copy('cancel')}
+            onClick={onClose}
+            className="grid size-8 shrink-0 place-items-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand)]/20"
+          >
+            <X className="size-4" />
+          </button>
         </span>
       }
       description={
@@ -495,6 +516,8 @@ function PromotionDialog({
         </span>
       }
       size="md"
+      showClose={false}
+      overlayClassName="bg-slate-900/40"
       className="sm:max-h-[calc(100vh-24px)] sm:max-w-[540px] sm:rounded-2xl"
       footer={
         <div className="flex w-full items-center justify-between gap-3">
