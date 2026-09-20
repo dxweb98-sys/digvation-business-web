@@ -523,23 +523,23 @@ function RoleEditor({
   const canEditPermissions = !isSystemRole && (isNew || canManagePermissions);
   const canSave = isNew || (!isSystemRole && (canUpdate || canManagePermissions));
 
-  const filteredPermissionSections = useMemo(
+  const filteredPermissionExperiences = useMemo(
     () => groupAccessPermissions(permissions, locale, permissionSearch),
     [permissions, locale, permissionSearch],
   );
 
   const filteredPermissionCount = useMemo(
     () =>
-      filteredPermissionSections.reduce(
+      filteredPermissionExperiences.reduce(
         (sectionTotal, currentSection) =>
           sectionTotal +
-          currentSection.areas.reduce(
+          currentSection.modules.reduce(
             (areaTotal, currentArea) => areaTotal + currentArea.permissions.length,
             0,
           ),
         0,
       ),
-    [filteredPermissionSections],
+    [filteredPermissionExperiences],
   );
 
   const selectedVisibleCount = useMemo(
@@ -674,24 +674,24 @@ function RoleEditor({
             />
           </div>
 
-          {filteredPermissionSections.length > 0 ? (
+          {filteredPermissionExperiences.length > 0 ? (
             <div className="max-h-[440px] space-y-5 overflow-y-auto pr-1">
-              {filteredPermissionSections.map((permissionSection) => {
-                const sectionPermissions = permissionSection.areas.flatMap(
-                  (permissionArea) => permissionArea.permissions,
+              {filteredPermissionExperiences.map((permissionExperience) => {
+                const experiencePermissions = permissionExperience.modules.flatMap(
+                  (permissionModule) => permissionModule.permissions,
                 );
-                const sectionSelectedCount = sectionPermissions.filter((permission) =>
+                const experienceSelectedCount = experiencePermissions.filter((permission) =>
                   selected.includes(permission.key),
                 ).length;
 
                 return (
-                  <div key={permissionSection.key} className="space-y-2">
+                  <div key={permissionExperience.key} className="space-y-2">
                     <div className="flex items-center justify-between gap-3 px-1">
                       <p className="text-sm font-semibold text-[var(--color-text)]">
-                        {permissionSection.label}
+                        {permissionExperience.label}
                       </p>
                       <span className="text-xs tabular-nums text-[var(--color-text-muted)]">
-                        {sectionSelectedCount}/{sectionPermissions.length}
+                        {experienceSelectedCount}/{experiencePermissions.length}
                       </span>
                     </div>
 
@@ -701,11 +701,11 @@ function RoleEditor({
                       value={expandedGroups}
                       onValueChange={setExpandedGroups}
                     >
-                      {permissionSection.areas.map((permissionArea) => {
-                        const selectedCount = permissionArea.permissions.filter((permission) =>
+                      {permissionExperience.modules.map((permissionModule) => {
+                        const selectedCount = permissionModule.permissions.filter((permission) =>
                           selected.includes(permission.key),
                         ).length;
-                        const groupKey = `${permissionSection.key}:${permissionArea.key}`;
+                        const groupKey = `${permissionExperience.key}:${permissionModule.key}`;
 
                         return (
                           <DAccordionItem
@@ -713,15 +713,15 @@ function RoleEditor({
                             value={groupKey}
                             title={
                               <span className="flex items-center gap-2">
-                                <span>{permissionArea.label}</span>
+                                <span>{permissionModule.label}</span>
                                 <span className="text-xs font-normal tabular-nums text-[var(--color-text-muted)]">
-                                  {selectedCount}/{permissionArea.permissions.length}
+                                  {selectedCount}/{permissionModule.permissions.length}
                                 </span>
                               </span>
                             }
                           >
                             <div className="grid gap-x-4 gap-y-1 sm:grid-cols-2">
-                              {permissionArea.permissions.map((permission) => {
+                              {permissionModule.permissions.map((permission) => {
                                 const checked = selected.includes(permission.key);
 
                                 return (

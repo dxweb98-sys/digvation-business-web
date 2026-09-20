@@ -26,6 +26,7 @@ export interface AccessPermission {
   label: AccessPermissionLabel;
   product: string | null;
   capability: string | null;
+  foundation: string | null;
   section: AccessPermissionGroupMetadata;
   businessArea: AccessPermissionGroupMetadata;
   surface: 'BACKOFFICE' | 'OPERATIONAL' | 'BOTH' | 'SYSTEM';
