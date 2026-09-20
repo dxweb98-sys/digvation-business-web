@@ -58,6 +58,8 @@ export interface Employee {
   displayName: string;
   positionId?: string | null;
   position?: EmployeePosition | null;
+  servicePerformerEligible: boolean;
+  canPerformServices: boolean;
   status: RecordStatus;
   version: number;
   createdAt: string;
