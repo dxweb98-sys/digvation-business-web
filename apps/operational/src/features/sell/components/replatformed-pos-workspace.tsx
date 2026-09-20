@@ -18,7 +18,7 @@ import {
   DSkeleton as Skeleton,
   useToast,
 } from '@digvation-labs/ui';
-import { DTabs, DTabsContent, DTabsList, DTabsTrigger, DTextarea, DTooltip } from '@digvation/ui';
+import { DDropdown as PortalDropdown, DTabs, DTabsContent, DTabsList, DTabsTrigger, DTextarea } from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
 import {
   AlertCircle,
@@ -2881,6 +2881,50 @@ function usePaymentDialogStep(open: boolean) {
   return [step, setStep] as const;
 }
 
+function DiscountInfoTooltip({
+  label,
+  content,
+}: {
+  label: string;
+  content: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <PortalDropdown
+      open={open}
+      onOpenChange={setOpen}
+      placement="top-start"
+      offset={6}
+      minWidth={220}
+      contentRole="dialog"
+      contentPadding={false}
+      contentClassName="max-w-72 border-0 bg-[var(--color-tooltip)] px-3 py-2 text-xs leading-relaxed text-white shadow-lg"
+      trigger={() => (
+        <button
+          type="button"
+          aria-label={label}
+          aria-expanded={open}
+          onMouseEnter={() => setOpen(true)}
+          onMouseLeave={() => setOpen(false)}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setOpen(false)}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            setOpen((current) => !current);
+          }}
+          className="grid size-4 shrink-0 place-items-center rounded-full text-[var(--color-danger)] outline-none transition-colors hover:bg-red-50 focus-visible:ring-2 focus-visible:ring-red-200"
+        >
+          <Info className="size-3.5" />
+        </button>
+      )}
+    >
+      {content}
+    </PortalDropdown>
+  );
+}
+
 function ReferencePaymentDialog({
   open,
   onClose,
@@ -3209,10 +3253,17 @@ function ReferencePaymentDialog({
                       .minus(createDecimal(line.lineDiscountAmount))
                       .toFixed(4)
                   : line.totalAmount;
-                const promotionTooltip = line.promotion ? (
+                const promotionTooltip = (
                   <div className="space-y-1">
-                    <p className="font-semibold">{line.promotion.name}</p>
-                    {line.promotion.effectiveFrom ? (
+                    {line.promotion?.name ? (
+                      <p className="font-semibold">{line.promotion.name}</p>
+                    ) : null}
+                    <p>
+                      {copy('Item discount')}
+                      {discountPercentage ? ` (${discountPercentage}%)` : ''}: −
+                      {format(line.lineDiscountAmount)}
+                    </p>
+                    {line.promotion?.effectiveFrom ? (
                       <p>
                         {copy('Start')}:{' '}
                         {new Intl.DateTimeFormat(locale, {
@@ -3221,7 +3272,7 @@ function ReferencePaymentDialog({
                         }).format(new Date(line.promotion.effectiveFrom))}
                       </p>
                     ) : null}
-                    {line.promotion.effectiveUntil ? (
+                    {line.promotion?.effectiveUntil ? (
                       <p>
                         {copy('End')}:{' '}
                         {new Intl.DateTimeFormat(locale, {
@@ -3231,8 +3282,6 @@ function ReferencePaymentDialog({
                       </p>
                     ) : null}
                   </div>
-                ) : (
-                  <span>{copy('Item discount')}</span>
                 );
                 return (
                   <div key={line.id} className="px-4 py-2.5">
@@ -3243,21 +3292,11 @@ function ReferencePaymentDialog({
                           {quantity(line.quantity)} × {format(line.effectiveUnitPrice)}
                         </p>
                         {discounted ? (
-                          <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-[var(--color-danger)]">
-                            <DTooltip content={promotionTooltip} placement="top">
-                              <button
-                                type="button"
-                                aria-label={copy('Discount information')}
-                                className="grid size-4 shrink-0 place-items-center rounded-full text-[var(--color-danger)] outline-none transition-colors hover:bg-red-50 focus-visible:ring-2 focus-visible:ring-red-200"
-                              >
-                                <Info className="size-3.5" />
-                              </button>
-                            </DTooltip>
-                            <span>
-                              {copy('Item discount')}
-                              {discountPercentage ? ` (${discountPercentage}%)` : ''}: −
-                              {format(line.lineDiscountAmount)}
-                            </span>
+                          <div className="mt-1 flex items-center">
+                            <DiscountInfoTooltip
+                              label={copy('Discount information')}
+                              content={promotionTooltip}
+                            />
                           </div>
                         ) : null}
                       </div>
