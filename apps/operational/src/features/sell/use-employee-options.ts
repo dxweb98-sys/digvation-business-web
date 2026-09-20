@@ -5,9 +5,7 @@ import type { EmployeeQuery } from './cashier-transaction.adapter';
 import { cashierTransactionKeys } from './cashier-transaction-keys';
 import type { Employee } from './cashier-transaction.types';
 
-export function selectableServicePerformers(
-  employees: readonly Employee[],
-): Employee[] {
+export function selectableServicePerformers(employees: readonly Employee[]): Employee[] {
   return employees.filter((employee) => employee.canPerformServices);
 }
 

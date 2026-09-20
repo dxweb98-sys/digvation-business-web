@@ -3,9 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { Employee } from './cashier-transaction.types';
 import { selectableServicePerformers } from './use-employee-options';
 
-function employee(
-  overrides: Partial<Employee> = {},
-): Employee {
+function employee(overrides: Partial<Employee> = {}): Employee {
   return {
     id: 'employee-1',
     code: 'EMP-001',
