@@ -48,6 +48,9 @@ const messages = {
     selectedCategoriesAllItems: 'Terapkan ke semua item pada kategori terpilih',
     targetWorkspaceHint:
       'Pilih item induk untuk mencakup semua varian, atau pilih varian tertentu.',
+    searchTargets: 'Cari target promo',
+    searchTargetsPlaceholder: 'Cari item, varian, atau kode...',
+    noTargetSearchResults: 'Item atau varian tidak ditemukan.',
     namePlaceholder: 'Contoh: Promo Diskon Kilat',
     automaticCodeHint: 'OPSIONAL JIKA OTOMATIS',
     name: 'Nama',
@@ -153,6 +156,9 @@ const messages = {
     selectedCategoriesAllItems: 'Apply to every item in selected categories',
     targetWorkspaceHint:
       'Select a parent item to include every variant, or select specific variants.',
+    searchTargets: 'Search promotion targets',
+    searchTargetsPlaceholder: 'Search item, variant, or code...',
+    noTargetSearchResults: 'No matching item or variant found.',
     namePlaceholder: 'Example: Flash Discount',
     automaticCodeHint: 'OPTIONAL WHEN AUTOMATIC',
     name: 'Name',

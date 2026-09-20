@@ -21,6 +21,7 @@ import {
   LockKeyhole,
   Pencil,
   Plus,
+  Search,
   Tag,
   Trash2,
   X,
@@ -73,6 +74,36 @@ export function promotionTargetSummary(row: Promotion, copy: PromotionCopy) {
     return targets.join(' · ') || `0 ${copy('selected')}`;
   }
   return `${row.categoryIds.length} ${copy('selected')}`;
+}
+
+export interface PromotionItemTargetGroup {
+  item: PromotionReferenceOption;
+  variants: PromotionReferenceOption[];
+}
+
+export function filterPromotionItemTargets(
+  items: PromotionReferenceOption[],
+  variants: PromotionReferenceOption[],
+  query: string,
+): PromotionItemTargetGroup[] {
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+
+  return items.flatMap((item) => {
+    const children = variants.filter((variant) => variant.catalogItemId === item.id);
+    if (!normalizedQuery) return [{ item, variants: children }];
+
+    const itemMatches = [item.name, item.code]
+      .filter(Boolean)
+      .some((value) => value.toLocaleLowerCase().includes(normalizedQuery));
+    const matchingVariants = children.filter((variant) =>
+      [variant.name, variant.code]
+        .filter(Boolean)
+        .some((value) => value.toLocaleLowerCase().includes(normalizedQuery)),
+    );
+
+    if (!itemMatches && matchingVariants.length === 0) return [];
+    return [{ item, variants: itemMatches ? children : matchingVariants }];
+  });
 }
 
 export function PromotionsPage() {
@@ -874,6 +905,7 @@ function PromotionDialog({
 
                 <ItemVariantTargetSelector
                   items={visibleItemTargets}
+                  searchItems={options.items}
                   variants={options.variants}
                   itemIds={itemIds}
                   variantIds={variantIds}
@@ -885,6 +917,9 @@ function PromotionDialog({
                   notIncludedLabel={copy('notIncluded')}
                   parentIncludesVariantsLabel={copy('parentIncludesVariants')}
                   activeLabel={copy('active')}
+                  searchLabel={copy('searchTargets')}
+                  searchPlaceholder={copy('searchTargetsPlaceholder')}
+                  noSearchResults={copy('noTargetSearchResults')}
                 />
               </section>
             ) : null}
@@ -951,6 +986,7 @@ function PromotionDialog({
 
 function ItemVariantTargetSelector({
   items,
+  searchItems,
   variants,
   itemIds,
   variantIds,
@@ -962,8 +998,12 @@ function ItemVariantTargetSelector({
   notIncludedLabel,
   parentIncludesVariantsLabel,
   activeLabel,
+  searchLabel,
+  searchPlaceholder,
+  noSearchResults,
 }: {
   items: PromotionReferenceOption[];
+  searchItems: PromotionReferenceOption[];
   variants: PromotionReferenceOption[];
   itemIds: string[];
   variantIds: string[];
@@ -975,9 +1015,23 @@ function ItemVariantTargetSelector({
   notIncludedLabel: string;
   parentIncludesVariantsLabel: string;
   activeLabel: string;
+  searchLabel: string;
+  searchPlaceholder: string;
+  noSearchResults: string;
 }) {
+  const [searchQuery, setSearchQuery] = useState('');
   const itemSet = new Set(itemIds);
   const variantSet = new Set(variantIds);
+  const searchActive = searchQuery.trim().length > 0;
+  const targetGroups = useMemo(
+    () =>
+      filterPromotionItemTargets(
+        searchActive ? searchItems : items,
+        variants,
+        searchQuery,
+      ),
+    [items, searchActive, searchItems, searchQuery, variants],
+  );
 
   const toggleParent = (itemId: string) => {
     onItemsChange(
@@ -994,7 +1048,7 @@ function ItemVariantTargetSelector({
     );
   };
 
-  if (!items.length) {
+  if (!searchItems.length) {
     return (
       <div className="rounded-[var(--radius-control)] border border-[var(--color-border)] px-3 py-4 text-sm text-[var(--color-text-muted)]">
         {emptyLabel}
@@ -1003,10 +1057,23 @@ function ItemVariantTargetSelector({
   }
 
   return (
-    <div className="max-h-72 space-y-2 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2">
-      {items.map((item) => {
+    <div className="space-y-2">
+      <DInput
+        size="sm"
+        type="search"
+        value={searchQuery}
+        onChange={setSearchQuery}
+        leftIcon={<Search className="size-3.5" />}
+        aria-label={searchLabel}
+        placeholder={searchPlaceholder}
+        autoComplete="off"
+        containerClassName="w-full"
+      />
+
+      <div className="max-h-72 space-y-2 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2">
+        {targetGroups.length ? (
+          targetGroups.map(({ item, variants: children }) => {
         const parentSelected = itemSet.has(item.id);
-        const children = variants.filter((variant) => variant.catalogItemId === item.id);
         const explicitVariantCount = children.filter((variant) => variantSet.has(variant.id)).length;
         const groupActive = parentSelected || explicitVariantCount > 0;
 
@@ -1120,7 +1187,16 @@ function ItemVariantTargetSelector({
             ) : null}
           </div>
         );
-      })}
+          })
+        ) : (
+          <div className="px-3 py-6 text-center">
+            <p className="text-xs font-medium text-[var(--color-text)]">{noSearchResults}</p>
+            <p className="mt-1 text-[10px] text-[var(--color-text-muted)]">
+              “{searchQuery.trim()}”
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
