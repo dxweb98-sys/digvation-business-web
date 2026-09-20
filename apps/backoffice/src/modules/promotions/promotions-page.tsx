@@ -13,7 +13,7 @@ import {
   type TableColumn,
 } from '@digvation/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Check, ChevronRight, Info, LockKeyhole, Pencil, Plus, Tag, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
@@ -248,7 +248,7 @@ function PromotionDialog({
       ? String(Number(promotion.discountValue) * 100)
       : (promotion?.discountValue ?? ''),
   );
-  const [currency, setCurrency] = useState(promotion?.currency ?? 'IDR');
+  const [currency] = useState(promotion?.currency ?? 'IDR');
   const [maximumDiscount, setMaximumDiscount] = useState(promotion?.maximumDiscount ?? '');
   const [minimumPurchase, setMinimumPurchase] = useState(promotion?.minimumPurchase ?? '');
   const [effectiveFrom, setEffectiveFrom] = useState(promotion?.effectiveFrom ?? '');
@@ -406,18 +406,98 @@ function PromotionDialog({
 
   const targetStepSummary =
     scope === 'TRANSACTION'
-      ? copy('allTransactions')
+      ? copy('allItems')
       : scope === 'CATEGORY'
         ? String(categoryIds.length) + ' ' + copy('category')
-        : String(selectedItemGroups.size) + ' ' + copy('selected');
+        : selectedItemGroups.size > 0
+          ? String(selectedItemGroups.size) + ' ' + copy('activeShort')
+          : copy('allItems');
 
   return (
     <DDialog
       open
       onClose={onClose}
-      title={promotion ? copy('edit') : copy('add')}
-      description={copy('description')}
-      size="lg"
+      title={
+        <span className="inline-flex flex-wrap items-center gap-2">
+          <span>{promotion ? copy('edit') : copy('add')}</span>
+          {!promotion ? (
+            <span className="rounded-md border border-[var(--color-brand)]/25 bg-[var(--color-brand)]/[.06] px-2 py-0.5 text-[11px] font-semibold text-[var(--color-brand)]">
+              {copy('newBadge')}
+            </span>
+          ) : promotion.code ? (
+            <span className="rounded-md border border-[var(--color-brand)]/25 bg-[var(--color-brand)]/[.06] px-2 py-0.5 font-mono text-[11px] font-semibold text-[var(--color-brand)]">
+              {promotion.code}
+            </span>
+          ) : null}
+          {promotion ? (
+            <span
+              className={[
+                'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-semibold',
+                enabled
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                  : 'border-[var(--color-border)] bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]',
+              ].join(' ')}
+            >
+              <span
+                className={[
+                  'size-1.5 rounded-full',
+                  enabled ? 'bg-emerald-500' : 'bg-[var(--color-text-muted)]',
+                ].join(' ')}
+              />
+              {enabled ? copy('active') : copy('disabled')}
+            </span>
+          ) : null}
+        </span>
+      }
+      description={
+        <span className="block">
+          <span className="block">{copy('description')}</span>
+          <span className="mt-3 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1">
+            <button
+              type="button"
+              aria-pressed={step === 'INFORMATION'}
+              onClick={() => setStep('INFORMATION')}
+              className={[
+                'flex min-h-9 items-center justify-center gap-2 rounded-lg px-3 text-xs font-semibold transition-all',
+                step === 'INFORMATION'
+                  ? 'border border-slate-200 bg-white text-[var(--color-brand)] shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900',
+              ].join(' ')}
+            >
+              <Info className="size-3.5" />
+              <span>{copy('informationStep')}</span>
+            </button>
+            <button
+              type="button"
+              aria-pressed={step === 'TARGET'}
+              onClick={() => setStep('TARGET')}
+              className={[
+                'flex min-h-9 items-center justify-center gap-2 rounded-lg px-3 text-xs font-semibold transition-all',
+                step === 'TARGET'
+                  ? 'border border-slate-200 bg-white text-[var(--color-brand)] shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900',
+              ].join(' ')}
+            >
+              <span className="grid size-3.5 place-items-center">
+                <span className="h-2.5 w-3 border-y border-current before:block before:mt-[3px] before:border-t before:border-current" />
+              </span>
+              <span>{copy('targetStep')}</span>
+              <span
+                className={[
+                  'rounded-full px-1.5 py-0.5 text-[9px] font-semibold',
+                  step === 'TARGET'
+                    ? 'bg-blue-50 text-[var(--color-brand)]'
+                    : 'text-slate-400',
+                ].join(' ')}
+              >
+                {targetStepSummary}
+              </span>
+            </button>
+          </span>
+        </span>
+      }
+      size="md"
+      className="sm:max-h-[calc(100vh-24px)] sm:max-w-[540px] sm:rounded-2xl"
       footer={
         <div className="flex w-full items-center justify-between gap-3">
           <div>
@@ -439,73 +519,43 @@ function PromotionDialog({
             )}
           </div>
           <div className="flex items-center gap-2">
-            <DButton variant="secondary" onClick={onClose}>
+            <DButton size="sm" variant="secondary" onClick={onClose}>
               {copy('cancel')}
             </DButton>
-            <DButton onClick={() => void save()} disabled={!valid || saving} loading={saving}>
+            <DButton
+              size="sm"
+              leftIcon={<Check className="size-3.5" />}
+              onClick={() => void save()}
+              disabled={!valid || saving}
+              loading={saving}
+            >
               {promotion ? copy('saveChanges') : copy('savePromotion')}
             </DButton>
           </div>
         </div>
       }
     >
-      <div className="mx-auto w-full max-w-[620px] space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <DBadge variant="secondary">{promotion?.code || copy('newBadge')}</DBadge>
-          {promotion ? (
-            <DBadge variant={enabled ? 'success' : 'secondary'}>
-              {enabled ? copy('active') : copy('disabled')}
-            </DBadge>
-          ) : null}
-        </div>
-
-        <div className="grid grid-cols-2 gap-1 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-1">
-          <button
-            type="button"
-            aria-pressed={step === 'INFORMATION'}
-            onClick={() => setStep('INFORMATION')}
-            className={[
-              'rounded-[calc(var(--radius-control)-2px)] px-3 py-2 text-xs font-semibold transition-colors',
-              step === 'INFORMATION'
-                ? 'bg-[var(--color-surface)] text-[var(--color-brand)] shadow-sm'
-                : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]',
-            ].join(' ')}
-          >
-            {copy('informationStep')}
-          </button>
-          <button
-            type="button"
-            aria-pressed={step === 'TARGET'}
-            onClick={() => setStep('TARGET')}
-            className={[
-              'rounded-[calc(var(--radius-control)-2px)] px-3 py-2 text-xs font-semibold transition-colors',
-              step === 'TARGET'
-                ? 'bg-[var(--color-surface)] text-[var(--color-brand)] shadow-sm'
-                : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]',
-            ].join(' ')}
-          >
-            {copy('targetStep')}
-            <span className="ml-1 text-[10px] font-medium text-[var(--color-text-muted)]">
-              ({targetStepSummary})
-            </span>
-          </button>
-        </div>
-
+      <div className="mx-auto w-full max-w-[500px] space-y-5">
         {step === 'INFORMATION' ? (
           <div className="space-y-4">
             <section>
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <h3 className="text-[11px] font-bold uppercase tracking-wide">
-                  {copy('promotionInfo')}
-                </h3>
-                <span className="text-[10px] text-[var(--color-text-muted)]">
-                  {copy('cashierVisibility')}
-                </span>
+              <div className="mb-3 flex items-center justify-between gap-3 border-b border-slate-100 pb-2">
+                <div className="flex items-center gap-2">
+                  <span className="grid size-5 place-items-center rounded-full bg-blue-50 text-[var(--color-brand)]">
+                    <Info className="size-3" />
+                  </span>
+                  <h3 className="text-[11px] font-bold uppercase tracking-wide text-slate-700">
+                    {copy('promotionInfo')}
+                  </h3>
+                </div>
+                <span className="text-[10px] text-slate-400">{copy('cashierVisibility')}</span>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="sm:col-span-2">
                   <DInput
+                    size="sm"
+                    clearable={false}
                     label={copy('name') + ' *'}
                     value={name}
                     onChange={setName}
@@ -514,6 +564,7 @@ function PromotionDialog({
                 </div>
 
                 <DSelect
+                  size="sm"
                   label={copy('mode')}
                   value={mode}
                   clearable={false}
@@ -529,14 +580,17 @@ function PromotionDialog({
                 />
 
                 <DInput
+                  size="sm"
+                  clearable={false}
                   label={copy('codeLabel')}
                   value={code}
-                  disabled={mode === 'AUTOMATIC'}
+                  readOnly={mode === 'AUTOMATIC'}
+                  className={mode === 'AUTOMATIC' ? 'read-only:bg-white read-only:text-slate-400' : undefined}
                   onChange={(value) => setCode(value.toUpperCase())}
                   placeholder={mode === 'AUTOMATIC' ? copy('automaticCodeHint') : 'SEP10'}
                 />
 
-                <div className="sm:col-span-2 flex items-center justify-between rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5">
+                <div className="sm:col-span-2 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/40 px-3.5 py-3">
                   <div>
                     <p className="text-xs font-semibold">{copy('operationalStatus')}</p>
                     <p className="mt-0.5 text-[10px] text-[var(--color-text-muted)]">
@@ -549,9 +603,14 @@ function PromotionDialog({
             </section>
 
             <section>
-              <h3 className="mb-2 text-[11px] font-bold uppercase tracking-wide">
-                {copy('termsAndDiscount')}
-              </h3>
+              <div className="mb-3 flex items-center gap-2 border-b border-slate-100 pb-2">
+                <span className="grid size-5 place-items-center rounded-full bg-blue-50 text-[var(--color-brand)]">
+                  <Tag className="size-3" />
+                </span>
+                <h3 className="text-[11px] font-bold uppercase tracking-wide text-slate-700">
+                  {copy('termsAndDiscount')}
+                </h3>
+              </div>
 
               <div className="grid gap-2 sm:grid-cols-2">
                 <button
@@ -559,9 +618,9 @@ function PromotionDialog({
                   aria-pressed={discountType === 'PERCENTAGE'}
                   onClick={() => setDiscountType('PERCENTAGE')}
                   className={[
-                    'rounded-[var(--radius-control)] border p-3 text-left transition-colors',
+                    'min-h-[72px] rounded-xl border px-3 py-2.5 text-left transition-all',
                     discountType === 'PERCENTAGE'
-                      ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/[.04]'
+                      ? 'border-2 border-[var(--color-brand)] bg-blue-50/30'
                       : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-brand)]/35',
                   ].join(' ')}
                 >
@@ -593,9 +652,9 @@ function PromotionDialog({
                     setMaximumDiscount('');
                   }}
                   className={[
-                    'rounded-[var(--radius-control)] border p-3 text-left transition-colors',
+                    'min-h-[72px] rounded-xl border px-3 py-2.5 text-left transition-all',
                     discountType === 'FIXED_AMOUNT'
-                      ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/[.04]'
+                      ? 'border-2 border-[var(--color-brand)] bg-blue-50/30'
                       : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-brand)]/35',
                   ].join(' ')}
                 >
@@ -623,9 +682,13 @@ function PromotionDialog({
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 <div>
                   <DInput
+                    size="sm"
+                    clearable={false}
                     label={copy('value') + ' *'}
                     inputMode="decimal"
                     value={discountValue}
+                    prefix={discountType === 'FIXED_AMOUNT' ? 'Rp' : undefined}
+                    suffix={discountType === 'PERCENTAGE' ? '%' : undefined}
                     onChange={setDiscountValue}
                   />
                   <p className="mt-1 text-[10px] text-[var(--color-text-muted)]">
@@ -633,24 +696,40 @@ function PromotionDialog({
                   </p>
                 </div>
 
-                <div>
-                  <DInput
-                    label={copy('currency')}
-                    value={currency}
-                    maxLength={3}
-                    onChange={(value) => setCurrency(value.toUpperCase())}
-                    placeholder="IDR"
-                  />
-                  <p className="mt-1 text-[10px] text-[var(--color-text-muted)]">
-                    {copy('currencyHint')}
-                  </p>
+                <div className="flex min-w-0 flex-col gap-1.5">
+                  <label className="text-xs font-medium text-[var(--color-text)]">
+                    {copy('currency')}
+                  </label>
+                  <div
+                    aria-label={copy('currencyLocked')}
+                    className="flex h-8 min-w-0 items-center justify-between gap-2 rounded-[var(--radius-control)] border border-slate-200 bg-slate-100/80 px-3"
+                  >
+                    <span className="truncate text-xs font-semibold text-slate-700">
+                      {currency === 'IDR' ? 'IDR (Rupiah)' : currency}
+                    </span>
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-slate-200/70 px-1.5 py-0.5 text-[9px] font-semibold text-slate-500">
+                      <LockKeyhole className="size-2.5" />
+                      {copy('defaultLocked')}
+                    </span>
+                  </div>
                 </div>
 
                 {discountType === 'PERCENTAGE' ? (
                   <DInput
-                    label={copy('maximum') + ' (' + copy('optional') + ')'}
+                    size="sm"
+                    clearable={false}
+                    prefix="Rp"
+                    label={
+                      <span>
+                        {copy('maximum')}{' '}
+                        <span className="font-normal text-[var(--color-text-muted)]">
+                          ({copy('optional')})
+                        </span>
+                      </span>
+                    }
                     inputMode="decimal"
                     value={maximumDiscount}
+                    placeholder={copy('maximumPlaceholder')}
                     onChange={setMaximumDiscount}
                   />
                 ) : (
@@ -658,9 +737,20 @@ function PromotionDialog({
                 )}
 
                 <DInput
-                  label={copy('minimum') + ' (' + copy('optional') + ')'}
+                  size="sm"
+                  clearable={false}
+                  prefix="Rp"
+                  label={
+                    <span>
+                      {copy('minimum')}{' '}
+                      <span className="font-normal text-[var(--color-text-muted)]">
+                        ({copy('optional')})
+                      </span>
+                    </span>
+                  }
                   inputMode="decimal"
                   value={minimumPurchase}
+                  placeholder={copy('minimumPlaceholder')}
                   onChange={setMinimumPurchase}
                 />
 
@@ -687,9 +777,7 @@ function PromotionDialog({
         ) : (
           <div className="space-y-4">
             <section>
-              <h3 className="mb-2 text-[11px] font-bold uppercase tracking-wide">
-                {copy('scopePromo')}
-              </h3>
+              <h3 className="mb-2 text-xs font-semibold text-slate-700">{copy('scopePromo')}</h3>
               <div className="grid gap-2 sm:grid-cols-3">
                 {[
                   {
@@ -716,30 +804,21 @@ function PromotionDialog({
                       aria-pressed={active}
                       onClick={() => changeScope(option.value)}
                       className={[
-                        'rounded-[var(--radius-control)] border px-3 py-2.5 text-left transition-colors',
+                        'flex min-h-[68px] flex-col items-center justify-center rounded-xl border px-3 py-2.5 text-center transition-all',
                         active
-                          ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/[.05]'
-                          : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-brand)]/35',
+                          ? 'border-2 border-[var(--color-brand)] bg-blue-50/30 text-[var(--color-brand)]'
+                          : 'border-slate-200 bg-white text-slate-700 hover:border-[var(--color-brand)]/35',
                       ].join(' ')}
                     >
-                      <div className="flex items-start gap-2">
-                        <span
-                          className={[
-                            'mt-0.5 grid size-4 shrink-0 place-items-center rounded-full border',
-                            active
-                              ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white'
-                              : 'border-[var(--color-border)]',
-                          ].join(' ')}
-                        >
-                          {active ? <Check className="size-2.5" /> : null}
-                        </span>
-                        <span>
-                          <span className="block text-xs font-semibold">{option.title}</span>
-                          <span className="mt-0.5 block text-[10px] text-[var(--color-text-muted)]">
-                            {option.hint}
-                          </span>
-                        </span>
-                      </div>
+                      <span className="block text-xs font-semibold">{option.title}</span>
+                      <span
+                        className={[
+                          'mt-1 block text-[10px]',
+                          active ? 'text-[var(--color-brand)]/80' : 'text-slate-400',
+                        ].join(' ')}
+                      >
+                        {option.hint}
+                      </span>
                     </button>
                   );
                 })}
@@ -762,7 +841,8 @@ function PromotionDialog({
                   </div>
                   <DButton
                     size="sm"
-                    variant="outline"
+                    variant="ghost"
+                    className="text-[var(--color-brand)]"
                     leftIcon={<Plus className="size-3.5" />}
                     onClick={() => setShowAllItemTargets(true)}
                     disabled={showAllItemTargets || options.items.length === 0}
@@ -902,7 +982,7 @@ function ItemVariantTargetSelector({
   }
 
   return (
-    <div className="max-h-72 space-y-2 overflow-y-auto rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2">
+    <div className="max-h-72 space-y-2 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2">
       {items.map((item) => {
         const parentSelected = itemSet.has(item.id);
         const children = variants.filter((variant) => variant.catalogItemId === item.id);
@@ -913,7 +993,7 @@ function ItemVariantTargetSelector({
           <div
             key={item.id}
             className={[
-              'rounded-[var(--radius-control)] border',
+              'rounded-lg border',
               groupActive
                 ? 'border-[var(--color-brand)]/25 bg-[var(--color-brand)]/[.025]'
                 : 'border-[var(--color-border)]',
@@ -955,7 +1035,9 @@ function ItemVariantTargetSelector({
                   {explicitVariantCount} {specificLabel}
                 </DBadge>
               ) : null}
-              <ChevronRight className="size-3.5 shrink-0 text-[var(--color-text-muted)]" />
+              {children.length ? (
+                <ChevronRight className="size-3.5 shrink-0 text-[var(--color-text-muted)]" />
+              ) : null}
             </button>
 
             {children.length ? (
@@ -998,10 +1080,10 @@ function ItemVariantTargetSelector({
 
                       <span
                         className={[
-                          'shrink-0 text-[9px] font-medium',
+                          'shrink-0 rounded-full px-2 py-0.5 text-[9px] font-semibold',
                           effectiveSelected
-                            ? 'text-[var(--color-success)]'
-                            : 'text-[var(--color-text-muted)]',
+                            ? 'border border-emerald-200 bg-emerald-50 text-emerald-700'
+                            : 'text-slate-400',
                         ].join(' ')}
                       >
                         {parentSelected
