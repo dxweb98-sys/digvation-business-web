@@ -1,15 +1,33 @@
-import type { CatalogItem, VariantSelectionMode } from '@digvation/business-catalog';
+import type {
+  CatalogItemType,
+  CatalogLifecycle,
+  VariantSelectionMode,
+} from '@digvation/business-catalog';
 
 import type { VariantPriceDraft } from './variant-price-draft';
 import type { LoyaltyEarningBehavior } from '../../../modules/loyalty/loyalty-api';
 
+export interface CatalogItemEditorSource {
+  id: string;
+  code: string;
+  name: string;
+  type: CatalogItemType;
+  categoryId: string | null;
+  description: string | null;
+  lifecycle: CatalogLifecycle;
+  variantSelectionMode: VariantSelectionMode;
+  serviceDefinition: {
+    defaultDurationMinutes: number | null;
+  } | null;
+}
+
 export interface CatalogItemEditorForm {
   code: string;
   name: string;
-  type: CatalogItem['type'];
+  type: CatalogItemType;
   categoryId: string | null;
   description: string;
-  lifecycle: CatalogItem['lifecycle'];
+  lifecycle: CatalogLifecycle;
   defaultDurationMinutes: string;
   variantSelectionMode: VariantSelectionMode;
   defaultPrice: string;
@@ -40,7 +58,7 @@ export interface CatalogItemEditorState {
 }
 
 export function createCatalogItemEditorState(
-  item: CatalogItem | null | undefined,
+  item: CatalogItemEditorSource | null | undefined,
 ): CatalogItemEditorState {
   return {
     form: {
