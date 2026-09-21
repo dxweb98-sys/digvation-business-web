@@ -39,7 +39,7 @@ ROUTES
     v
 FEATURES / USER USE CASES
     |
-    +------> CROSS-APP BUSINESS PACKAGES
+    +------> PROVEN SHARED PACKAGES / APP SHARED PRIMITIVES
     |
     +------> QUERY / COMMAND ADAPTERS
     |
@@ -89,7 +89,6 @@ Code intentionally reused by Backoffice and Operational belongs under a narrowly
 packages/
   api/
   auth/
-  catalog/
   money/
   runtime/
   testing/
@@ -247,6 +246,19 @@ Use the smallest state owner that matches the responsibility.
 TanStack Query owns server-state caching.
 
 Do not create a second authoritative Catalog, Sale, Payment, Loyalty, or other server-state store with Redux, Zustand, Context, or custom global state.
+
+For ordinary entity/detail queries, use TanStack Query directly. Do not wrap `useQuery` only for visual consistency.
+
+For collection endpoints that follow the Runtime `limit/offset` contract, application shared code may provide a small list-query/pagination primitive:
+
+```text
+UI page/pageSize
+  -> shared pagination adapter
+  -> backend limit/offset
+  -> backend response stays unchanged
+```
+
+The shared wrapper must not invent another response contract or hide feature-specific filters.
 
 ### Local UI state
 
