@@ -10,6 +10,7 @@ import type {
   FulfillmentInput,
   PaymentTransitionInput,
   PriceOverrideInput,
+  SaleTaxConfiguration,
   SaleTransactionPort,
   SetSaleCustomerInput,
   SetSaleLineQuantityInput,
@@ -162,6 +163,16 @@ export class LocalCashierTransactionAdapter implements SaleTransactionPort {
     return page(
       [...this.sales.values()].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)),
     );
+  }
+
+  public async getTaxConfiguration(): Promise<SaleTaxConfiguration> {
+    return {
+      enabled: false,
+      rate: '0',
+      version: 0,
+      createdAt: null,
+      updatedAt: null,
+    };
   }
 
   public async getSale(saleId: string): Promise<Sale> {
