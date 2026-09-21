@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 
-import { backofficeCopy } from './backoffice-localization.copy';
-import { backofficeMessages } from './backoffice-localization.messages';
+import { backofficeCopy } from './backoffice-localization-copy';
+import { backofficeMessages } from './backoffice-localization-messages';
 
 export type BackofficeLocale = 'id' | 'en';
 
