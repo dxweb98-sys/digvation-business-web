@@ -1,4 +1,5 @@
 import { DBadge, DDialog } from '@digvation/ui';
+import { BadgeDollarSign } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import { useCatalogItemEditorData } from '../api/use-catalog-item-editor-data';
 import { useCatalogItemEditorSave } from '../api/use-catalog-item-editor-save';
@@ -13,7 +14,7 @@ import { CatalogItemSaveSummarySection } from './catalog-item-save-summary-secti
 import { CatalogItemVariantsSection } from './catalog-item-variants-section';
 import { useCatalogLocalization } from '../../localization/use-catalog-localization';
 import { variantPriceState } from '../../model/catalog-price-history';
-import { DialogFooter, Status } from '../../ui/catalog-shared';
+import { CatalogSection, DialogFooter, Status } from '../../ui/catalog-shared';
 import { editableAmount } from '../model/variant-price-draft';
 
 export function CatalogItemDialog({
@@ -141,6 +142,11 @@ export function CatalogItemDialog({
       ? 'Isi harga tanpa varian.'
       : undefined;
   const showPrice = canViewPricing || (fresh && canCreatePricing);
+  const showSellingSection =
+    showPrice ||
+    (fresh
+      ? canCreateVariants
+      : canViewPricing && (hasVariants || variantPricesLoading));
   const inactiveVariantCount = (existingVariants.data?.items ?? []).length - activeVariants.length;
   const loyaltyDraftChanged = loyaltyRule
     ? loyaltyBehavior !== loyaltyRule.behavior || loyaltyPoints !== loyaltyRule.fixedPointsPerUnit
@@ -213,32 +219,40 @@ export function CatalogItemDialog({
           validDefaultDuration={validDefaultDuration}
         />
 
-        {showPrice ? (
-          <CatalogItemPricingSection
-            editor={editor}
-            model={model}
-            currency={currency}
-            fresh={fresh}
-            hasVariants={hasVariants}
-            canEditPrice={canEditPrice}
-            currentPriceLoading={currentPrice.isLoading}
-            itemPriceError={itemPriceError}
-            storedItemPrice={storedItemPrice}
-            formatMoney={formatMoney}
-          />
-        ) : null}
+        {showSellingSection ? (
+          <CatalogSection
+            title="Penjualan & Penentuan Harga"
+            icon={<BadgeDollarSign className="size-4" aria-hidden="true" />}
+            actions={hasVariants ? <DBadge variant="info">Mode Varian</DBadge> : undefined}
+          >
+            {showPrice ? (
+              <CatalogItemPricingSection
+                editor={editor}
+                model={model}
+                currency={currency}
+                fresh={fresh}
+                hasVariants={hasVariants}
+                canEditPrice={canEditPrice}
+                currentPriceLoading={currentPrice.isLoading}
+                itemPriceError={itemPriceError}
+                storedItemPrice={storedItemPrice}
+                formatMoney={formatMoney}
+              />
+            ) : null}
 
-        <CatalogItemVariantsSection
-          editor={editor}
-          model={model}
-          currency={currency}
-          fresh={fresh}
-          canViewPricing={canViewPricing}
-          canEditPrice={canEditPrice}
-          canCreateVariants={canCreateVariants}
-          variantPricesLoading={variantPricesLoading}
-          inactiveVariantCount={inactiveVariantCount}
-        />
+            <CatalogItemVariantsSection
+              editor={editor}
+              model={model}
+              currency={currency}
+              fresh={fresh}
+              canViewPricing={canViewPricing}
+              canEditPrice={canEditPrice}
+              canCreateVariants={canCreateVariants}
+              variantPricesLoading={variantPricesLoading}
+              inactiveVariantCount={inactiveVariantCount}
+            />
+          </CatalogSection>
+        ) : null}
 
         {!fresh && canViewLoyalty ? (
           <CatalogItemLoyaltySection
