@@ -6,7 +6,7 @@ import {
 import {
   isValidSellingPrice,
   variantDraftIssue,
-} from '../../../modules/catalog/catalog-variant-price-draft';
+} from './variant-price-draft';
 import type {
   CatalogItemEditorForm,
   CatalogItemEditorLoyaltyDraft,
