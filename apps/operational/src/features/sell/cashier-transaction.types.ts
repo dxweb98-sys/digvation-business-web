@@ -299,6 +299,13 @@ export interface SaleCustomer {
 export type SaleCustomerSelection =
   { type: 'NON_MEMBER'; name: string; phone: string } | { type: 'MEMBER'; referenceId: string };
 
+export interface SaleLoyaltyRedemption {
+  membershipId: string;
+  points: string;
+  pointValue: string;
+  amount: string;
+}
+
 export interface Sale {
   id: string;
   saleNumber?: string;
@@ -328,6 +335,7 @@ export interface Sale {
   transactionTaxAmount?: string;
   promotionCode?: string | null;
   adjustments?: SaleAdjustment[];
+  loyaltyRedemption?: SaleLoyaltyRedemption | null;
   customer?: SaleCustomer | null;
   createdByActorId?: string;
   createdByActorKind?: string;

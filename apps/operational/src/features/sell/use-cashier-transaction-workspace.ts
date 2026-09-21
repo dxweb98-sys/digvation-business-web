@@ -668,20 +668,14 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     command.clearNotice();
     try {
       const authoritative = await transactionAdapter.getSale(targetSale.id);
-      const livePayment = authoritative.payments.find(
-        (candidate) => candidate.id === payment.id,
-      );
+      const livePayment = authoritative.payments.find((candidate) => candidate.id === payment.id);
       if (!livePayment || livePayment.status !== 'PENDING')
         throw new Error(copy('The pending payment is no longer available.'));
       const updated = await command.runMutation(() =>
-        transactionAdapter.transitionSalePayment(
-          authoritative.id,
-          livePayment.id,
-          {
-            expectedVersion: authoritative.version,
-            status,
-          },
-        ),
+        transactionAdapter.transitionSalePayment(authoritative.id, livePayment.id, {
+          expectedVersion: authoritative.version,
+          status,
+        }),
       );
       cacheQueueContext(updated);
       return updated;
@@ -697,14 +691,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     tenderedAmount?: string,
     providerReference?: string,
     paymentRouteId?: string,
-  ) =>
-    core.createPayment(
-      method,
-      appliedAmount,
-      tenderedAmount,
-      providerReference,
-      paymentRouteId,
-    );
+  ) => core.createPayment(method, appliedAmount, tenderedAmount, providerReference, paymentRouteId);
 
   const voidQueuedSale = async (targetSale: Sale) => {
     command.clearNotice();
@@ -777,6 +764,9 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     commitDraft: saleWorkspace.commitDraft,
     customer: saleWorkspace.customer,
     isCustomerPending: saleWorkspace.isCustomerPending,
+    isLoyaltyRedemptionPending: saleWorkspace.isLoyaltyRedemptionPending,
+    applyLoyaltyRedemption: saleWorkspace.applyLoyaltyRedemption,
+    removeLoyaltyRedemption: saleWorkspace.removeLoyaltyRedemption,
     changeCustomer: saleWorkspace.changeCustomer,
     cart: saleWorkspace.cart,
     openLineTask,
