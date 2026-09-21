@@ -1,4 +1,4 @@
-import type { CatalogItemEditorForm } from './catalog-item-editor.state';
+import type { CatalogItemEditorForm } from './catalog-item-editor-state';
 
 export function buildCatalogItemBaseInput({
   form,
