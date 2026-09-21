@@ -57,17 +57,22 @@ export function CatalogItemLoyaltySection({
                 <p className="text-sm font-semibold text-[var(--color-text)]">
                   Poin loyalitas khusus item
                 </p>
-                <p className="mt-0.5 text-xs leading-5 text-[var(--color-text-muted)]">
-                  {loyaltyRule
-                    ? 'Item memiliki aturan poin tersendiri.'
-                    : 'Saat ini item mengikuti aturan default bisnis sampai aturan khusus disimpan.'}
-                </p>
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  <DBadge variant="secondary">
+                    {loyaltyRule ? 'Aturan khusus' : 'Mengikuti default'}
+                  </DBadge>
+                  <p className="text-xs leading-5 text-[var(--color-text-muted)]">
+                    {loyaltyRule
+                      ? 'Item memiliki aturan poin tersendiri.'
+                      : 'Aturan khusus baru disimpan jika Anda melakukan perubahan.'}
+                  </p>
+                </div>
               </div>
             </div>
             <div className="shrink-0 text-left sm:text-right">
               <p className="text-xs text-[var(--color-text-muted)]">Hasil efektif</p>
               <p className="mt-0.5 text-sm font-semibold text-[var(--color-text)]">
-                {active ? `+${effectivePoints} poin / unit` : 'Tidak dapat poin'}
+                {active ? `${effectivePoints} poin / unit` : 'Tidak dapat poin'}
               </p>
             </div>
           </div>
