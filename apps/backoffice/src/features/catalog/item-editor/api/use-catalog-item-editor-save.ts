@@ -90,7 +90,6 @@ export function useCatalogItemEditorSave({
     try {
       const baseInput = buildCatalogItemBaseInput({
         form: editor.form,
-        hasVariants,
         parsedDefaultDuration,
       });
       const effectiveFrom = new Date().toISOString();
