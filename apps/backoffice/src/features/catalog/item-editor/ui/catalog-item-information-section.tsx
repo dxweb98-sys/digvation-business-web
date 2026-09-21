@@ -21,6 +21,7 @@ export function CatalogItemInformationSection({
   existingImage,
   model,
   currency,
+  showPricing,
   canEditPrice,
   currentPriceLoading,
   itemPriceError,
@@ -34,6 +35,7 @@ export function CatalogItemInformationSection({
   existingImage: CatalogItemImage | null | undefined;
   model: SellingModel;
   currency: string;
+  showPricing: boolean;
   canEditPrice: boolean;
   currentPriceLoading: boolean;
   itemPriceError: string | undefined;
@@ -51,7 +53,13 @@ export function CatalogItemInformationSection({
 
   return (
     <CatalogPanel className="p-5" ariaLabel="Informasi Item">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-stretch">
+      <div
+        className={
+          showPricing
+            ? 'grid gap-5 lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-stretch'
+            : 'grid gap-5'
+        }
+      >
         <div className="flex min-w-0 gap-5">
           {canManageImage ? (
             <CatalogItemImageField
@@ -102,6 +110,7 @@ export function CatalogItemInformationSection({
           </div>
         </div>
 
+        {showPricing ? (
         <div className="flex min-h-36 flex-col justify-center rounded-xl border border-[var(--color-brand)]/20 bg-[var(--color-brand)]/[0.035] px-4 py-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs font-medium text-[var(--color-text-muted)]">
@@ -148,6 +157,7 @@ export function CatalogItemInformationSection({
             {sellingModelCopy[model].description}
           </p>
         </div>
+        ) : null}
       </div>
     </CatalogPanel>
   );
