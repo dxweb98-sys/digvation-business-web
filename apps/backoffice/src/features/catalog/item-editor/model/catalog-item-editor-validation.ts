@@ -1,4 +1,7 @@
-import { sellingModel, sellsItemItself } from '../../model/catalog-selling';
+import {
+  editorSellingModel,
+  sellsItemItself,
+} from '../../model/catalog-selling';
 
 import {
   isValidSellingPrice,
@@ -31,15 +34,22 @@ export function deriveCatalogItemEditorValidation({
     (Number.isInteger(parsedDefaultDuration) && parsedDefaultDuration > 0);
 
   const hasVariants = form.variants.length > 0;
-  const model = sellingModel(hasVariants, form.variantSelectionMode);
+  const model = editorSellingModel(form.variantSelectionMode);
+  const requiredVariantMissing =
+    form.variantSelectionMode === 'REQUIRED' && !hasVariants;
 
-  const itemPriceRequired = model === 'ITEM_AND_VARIANTS';
-  const itemPriceMissing = itemPriceRequired && !isValidSellingPrice(form.defaultPrice);
+  // Preserve the accepted price rule: the parent price becomes mandatory when it is
+  // sold alongside actual variants. A no-variant draft may still be saved without price.
+  const itemPriceRequired =
+    form.variantSelectionMode === 'OPTIONAL' && hasVariants;
+  const itemPriceMissing =
+    itemPriceRequired && !isValidSellingPrice(form.defaultPrice);
 
   const validPrice =
     !sellsItemItself(model) || validOptionalMoney(form.defaultPrice);
 
   const variantsHaveIssues =
+    requiredVariantMissing ||
     form.variants.some((draft) => variantDraftIssue(draft, canEditPrice)) ||
     (canEditPrice && itemPriceMissing);
 
@@ -51,6 +61,7 @@ export function deriveCatalogItemEditorValidation({
     validDefaultDuration,
     hasVariants,
     model,
+    requiredVariantMissing,
     itemPriceMissing,
     validPrice,
     variantsHaveIssues,
