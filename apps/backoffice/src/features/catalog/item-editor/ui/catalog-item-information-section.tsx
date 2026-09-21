@@ -111,52 +111,52 @@ export function CatalogItemInformationSection({
         </div>
 
         {showPricing ? (
-        <div className="flex min-h-36 flex-col justify-center rounded-xl border border-[var(--color-brand)]/20 bg-[var(--color-brand)]/[0.035] px-4 py-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-xs font-medium text-[var(--color-text-muted)]">
-              {sellsItemItself(model) ? 'Harga default' : 'Harga per varian'}
-            </span>
-            <SellingModelBadge model={model} />
-          </div>
-
-          {sellsItemItself(model) ? (
-            canEditPrice ? (
-              <div className="mt-3">
-                <DCurrencyInput
-                  label="Harga default"
-                  aria-label={`Harga tanpa varian (${currency})`}
-                  value={defaultPrice}
-                  onValueChange={(value) => setFormField('defaultPrice', value)}
-                  placeholder="Contoh: 100000"
-                  error={itemPriceError}
-                  hint={!fresh && currentPriceLoading ? 'Memuat harga saat ini...' : undefined}
-                />
-              </div>
-            ) : (
-              <p className="mt-3 text-2xl font-semibold tabular-nums tracking-tight text-[var(--color-text)]">
-                {defaultPrice
-                  ? formatMoney(defaultPrice, currency)
-                  : storedItemPrice
-                    ? formatMoney(storedItemPrice, currency)
-                    : 'Belum diatur'}
-              </p>
-            )
-          ) : (
-            <div className="mt-3">
-              <p className="text-xl font-semibold text-[var(--color-text)]">Mengikuti varian</p>
-              {storedItemPrice ? (
-                <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
-                  Harga default {formatMoney(storedItemPrice, currency)} tetap tersimpan, tetapi
-                  tidak dipakai selama mode ini aktif.
-                </p>
-              ) : null}
+          <div className="flex min-h-32 flex-col justify-center border-t border-[var(--color-border)] pt-4 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--color-text-muted)]">
+                {sellsItemItself(model) ? 'Harga Default' : 'Harga per Varian'}
+              </span>
+              <SellingModelBadge model={model} />
             </div>
-          )}
 
-          <p className="mt-2 text-[11px] leading-4 text-[var(--color-text-muted)]">
-            {sellingModelCopy[model].description}
-          </p>
-        </div>
+            {sellsItemItself(model) ? (
+              canEditPrice ? (
+                <div className="mt-2.5">
+                  <DCurrencyInput
+                    label="Harga default"
+                    aria-label={`Harga tanpa varian (${currency})`}
+                    value={defaultPrice}
+                    onValueChange={(value) => setFormField('defaultPrice', value)}
+                    placeholder="Contoh: 100000"
+                    error={itemPriceError}
+                    hint={!fresh && currentPriceLoading ? 'Memuat harga saat ini...' : undefined}
+                  />
+                </div>
+              ) : (
+                <p className="mt-2 text-2xl font-semibold tabular-nums tracking-tight text-[var(--color-text)]">
+                  {defaultPrice
+                    ? formatMoney(defaultPrice, currency)
+                    : storedItemPrice
+                      ? formatMoney(storedItemPrice, currency)
+                      : 'Belum diatur'}
+                </p>
+              )
+            ) : (
+              <div className="mt-2">
+                <p className="text-xl font-semibold text-[var(--color-text)]">Mengikuti varian</p>
+                {storedItemPrice ? (
+                  <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
+                    Harga default {formatMoney(storedItemPrice, currency)} tetap tersimpan, tetapi
+                    tidak dipakai selama mode ini aktif.
+                  </p>
+                ) : null}
+              </div>
+            )}
+
+            <p className="mt-1.5 max-w-xs text-xs leading-5 text-[var(--color-text-muted)]">
+              {sellingModelCopy[model].description}
+            </p>
+          </div>
         ) : null}
       </div>
     </CatalogPanel>
