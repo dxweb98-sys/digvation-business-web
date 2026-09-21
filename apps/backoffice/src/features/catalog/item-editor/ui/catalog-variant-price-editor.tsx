@@ -1,7 +1,7 @@
 import { DBadge, DButton, DCurrencyInput, DInput } from '@digvation/ui';
 import { Layers, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { useCatalogLocalization } from '../../../../modules/catalog/catalog-localization';
+import { useCatalogLocalization } from '../../localization/use-catalog-localization';
 import {
   applyPriceToAllVariants,
   isValidSellingPrice,
