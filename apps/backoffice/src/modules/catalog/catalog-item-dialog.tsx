@@ -23,7 +23,6 @@ import {
   editableAmount,
   isValidSellingPrice,
   sameAmount,
-  variantDraftIssue,
   variantPriceSubmissions,
 } from './catalog-variant-price-draft';
 import { VariantPriceEditor } from './catalog-variant-price-editor';
