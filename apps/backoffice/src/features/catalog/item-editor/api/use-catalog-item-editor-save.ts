@@ -31,7 +31,6 @@ export function useCatalogItemEditorSave({
   currency,
   model,
   parsedDefaultDuration,
-  hasVariants,
   canCreateVariants,
   canCreatePricing,
   canEditPrice,
@@ -52,7 +51,6 @@ export function useCatalogItemEditorSave({
   currency: string;
   model: SellingModel;
   parsedDefaultDuration: number | null;
-  hasVariants: boolean;
   canCreateVariants: boolean;
   canCreatePricing: boolean;
   canEditPrice: boolean;
@@ -104,18 +102,6 @@ export function useCatalogItemEditorSave({
         });
         createdItem = true;
 
-        if (canCreateVariants) {
-          for (const draft of editor.form.variants) {
-            const normalizedVariantCode = normalizeOptionalCatalogCode(draft.code);
-            const created = await api.createVariant(persistedItem.id, {
-              ...(normalizedVariantCode ? { code: normalizedVariantCode } : {}),
-              name: draft.name.trim(),
-              status: 'ACTIVE',
-            });
-            createdVariantIds.set(draft.key, created.id);
-          }
-        }
-
         if (
           canCreatePricing &&
           sellsItemItself(model) &&
@@ -152,6 +138,20 @@ export function useCatalogItemEditorSave({
           };
 
           await (initialItemPrice ? api.changePrice(input) : api.createPrice(input));
+        }
+      }
+
+      if (persistedItem && canCreateVariants) {
+        for (const draft of editor.form.variants) {
+          if (draft.id) continue;
+
+          const normalizedVariantCode = normalizeOptionalCatalogCode(draft.code);
+          const created = await api.createVariant(persistedItem.id, {
+            ...(normalizedVariantCode ? { code: normalizedVariantCode } : {}),
+            name: draft.name.trim(),
+            status: 'ACTIVE',
+          });
+          createdVariantIds.set(draft.key, created.id);
         }
       }
 
@@ -246,7 +246,6 @@ export function useCatalogItemEditorSave({
     disabled,
     editor,
     existingImagePresent,
-    hasVariants,
     item,
     loyaltyApi,
     loyaltyPoints,
