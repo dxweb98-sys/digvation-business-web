@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 
 import type { VariantPriceDraft } from './variant-price-draft';
 import type { LoyaltyEarningBehavior } from '../../../../modules/loyalty/loyalty-api';
@@ -27,9 +27,8 @@ export function useCatalogItemEditor(item: CatalogItemEditorSource | null | unde
   const initialPriceRef = useRef<string | null | undefined>(undefined);
   const variantsLoadedRef = useRef(false);
   const loyaltyRuleLoadedRef = useRef(false);
-  const effectiveAtRef = useRef(new Date().toISOString());
-
   const identity = editorIdentity(item);
+  const effectiveAt = useMemo(() => new Date().toISOString(), [identity]);
   const previousIdentityRef = useRef(identity);
 
   useEffect(() => {
@@ -39,7 +38,6 @@ export function useCatalogItemEditor(item: CatalogItemEditorSource | null | unde
     initialPriceRef.current = undefined;
     variantsLoadedRef.current = false;
     loyaltyRuleLoadedRef.current = false;
-    effectiveAtRef.current = new Date().toISOString();
 
     dispatch({ type: 'RESET', item });
   }, [identity, item]);
@@ -58,24 +56,41 @@ export function useCatalogItemEditor(item: CatalogItemEditorSource | null | unde
     [],
   );
 
-  const hydrateDefaultPrice = useCallback((value: string) => {
-    dispatch({ type: 'DEFAULT_PRICE_HYDRATED', value });
-  }, []);
+  const hydrateDefaultPriceOnce = useCallback(
+    (persistedAmount: string | null, editableValue: string) => {
+      if (initialPriceRef.current !== undefined) return false;
 
-  const hydrateVariants = useCallback((variants: VariantPriceDraft[]) => {
+      initialPriceRef.current = persistedAmount;
+      dispatch({ type: 'DEFAULT_PRICE_HYDRATED', value: editableValue });
+      return true;
+    },
+    [],
+  );
+
+  const hydrateVariantsOnce = useCallback((variants: VariantPriceDraft[]) => {
+    if (variantsLoadedRef.current) return false;
+
+    variantsLoadedRef.current = true;
     dispatch({ type: 'VARIANTS_HYDRATED', variants });
+    return true;
   }, []);
 
-  const hydrateLoyalty = useCallback(
+  const hydrateLoyaltyOnce = useCallback(
     (behavior: LoyaltyEarningBehavior, pointsPerUnit: string) => {
+      if (loyaltyRuleLoadedRef.current) return false;
+
+      loyaltyRuleLoadedRef.current = true;
       dispatch({
         type: 'LOYALTY_HYDRATED',
         behavior,
         pointsPerUnit,
       });
+      return true;
     },
     [],
   );
+
+  const getInitialPrice = useCallback(() => initialPriceRef.current ?? null, []);
 
   const setLoyaltyBehavior = useCallback((behavior: LoyaltyEarningBehavior) => {
     dispatch({
@@ -112,17 +127,13 @@ export function useCatalogItemEditor(item: CatalogItemEditorSource | null | unde
     loyalty: state.loyalty,
     image: state.image,
     ui: state.ui,
-    effectiveAt: effectiveAtRef.current,
-    refs: {
-      initialPrice: initialPriceRef,
-      variantsLoaded: variantsLoadedRef,
-      loyaltyRuleLoaded: loyaltyRuleLoadedRef,
-    },
+    effectiveAt,
     actions: {
       setFormField,
-      hydrateDefaultPrice,
-      hydrateVariants,
-      hydrateLoyalty,
+      hydrateDefaultPriceOnce,
+      hydrateVariantsOnce,
+      hydrateLoyaltyOnce,
+      getInitialPrice,
       setLoyaltyBehavior,
       setLoyaltyPointsPerUnit,
       selectImage,
