@@ -134,6 +134,51 @@ Do not invent backend/domain contracts.
 
 `contracts/contract-lock.json`, where present, records verified backend reconciliation facts; historical naming does not change its authority rules.
 
+## Current Backoffice structure
+
+Backoffice frontend work must follow the current feature/shared structure.
+
+Reference implementation:
+
+```text
+apps/backoffice/src/
+├── features/
+│   └── catalog/
+│       ├── api/
+│       ├── model/
+│       ├── localization/
+│       ├── ui/
+│       └── item-editor/
+│           ├── api/
+│           ├── model/
+│           └── ui/
+│
+└── shared/
+    ├── api/
+    ├── forms/
+    └── query/
+```
+
+Rules:
+
+- `apps/backoffice/src/features/<feature>` owns feature/domain-specific frontend behavior;
+- `apps/backoffice/src/shared/<concern>` owns generic primitives reusable across Backoffice features;
+- do not recreate `apps/backoffice/src/modules/catalog`; Catalog implementation now lives under `features/catalog`;
+- do not move feature-specific reducers, validation, selling rules, Loyalty rules, or domain behavior into `shared/`;
+- use existing shared primitives before creating another equivalent helper;
+- simple related form state may use Backoffice shared form helpers;
+- complex editors with hydration, coordinated transitions, validation, or multiple persistence boundaries use feature-specific reducer/custom hooks;
+- collection UI pagination may use shared `page/pageSize` state, but Runtime API contracts remain `limit/offset`;
+- ordinary detail/entity fetching continues to use TanStack Query directly;
+- UI/editor state must be mapped to Runtime API DTOs at the command boundary rather than becoming the transport contract.
+
+For architecture-sensitive frontend work, read:
+
+- `docs/architecture/FRONTEND_ARCHITECTURE_BASELINE.md`
+- `docs/engineering/FRONTEND_ENGINEERING_CONSISTENCY_STANDARD.md`
+
+Catalog is the current reference implementation for this pattern. Reuse the architecture principles, not Catalog-specific business logic.
+
 ## Frontend invariants
 
 - No `businessType` or client-name source branching as feature authority.
