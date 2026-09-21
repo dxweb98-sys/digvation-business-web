@@ -16,6 +16,7 @@ import { useMemo, useState } from 'react';
 
 import { BackofficePage, BackofficePageHeader } from '../../../app/layout/backoffice-page';
 import { CatalogItemDialog } from '../item-editor';
+import { useFormState } from '../../../shared/forms/use-form-state';
 import { useListQuery } from '../../../shared/query/use-list-query';
 import { usePaginationState } from '../../../shared/query/use-pagination-state';
 import { canPerformBackofficeAction, type BackofficeAction } from '../../../auth/backoffice-access';
@@ -60,13 +61,15 @@ export function CatalogPage() {
   const [item, setItem] = useState<Item | null | undefined>();
   const [detailItem, setDetailItem] = useState<CatalogManagementItem | null>(null);
   const [category, setCategory] = useState<Category | null | undefined>();
-  const [itemQuery, setItemQuery] = useState<ItemFilterState>({
+  const itemFilters = useFormState<ItemFilterState>({
     q: '',
     type: '',
     lifecycle: '',
     categoryId: '',
   });
-  const [categoryQuery, setCategoryQuery] = useState<CategoryFilterState>({ q: '', status: '' });
+  const categoryFilters = useFormState<CategoryFilterState>({ q: '', status: '' });
+  const itemQuery = itemFilters.values;
+  const categoryQuery = categoryFilters.values;
   const itemPagination = usePaginationState({ initialPageSize: 10 });
   const categoryPagination = usePaginationState({ initialPageSize: 10 });
   const [pricingEffectiveAt, setPricingEffectiveAt] = useState(() => new Date().toISOString());
@@ -200,11 +203,11 @@ export function CatalogPage() {
 
   const changeItemFilter = (change: Partial<ItemFilterState>) => {
     itemPagination.resetPage();
-    setItemQuery((current) => ({ ...current, ...change }));
+    itemFilters.patch(change);
   };
   const changeCategoryFilter = (change: Partial<CategoryFilterState>) => {
     categoryPagination.resetPage();
-    setCategoryQuery((current) => ({ ...current, ...change }));
+    categoryFilters.patch(change);
   };
 
   return (
