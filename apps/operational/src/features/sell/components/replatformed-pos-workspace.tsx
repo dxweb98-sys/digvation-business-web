@@ -729,7 +729,6 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     [authPort, runtime.apiBaseUrl],
   );
   const canReadMembers = session.access.permissions.includes('membership:read');
-  const canReadCustomers = session.access.permissions.includes('customers:read');
   const canEnrollMember = session.access.permissions.includes('membership:enroll');
   const canReadLoyalty =
     session.access.capabilities.includes('LOYALTY_POINTS') &&
@@ -737,6 +736,40 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const canRedeemLoyalty =
     session.access.capabilities.includes('LOYALTY_POINTS') &&
     session.access.permissions.includes('loyalty:redeem');
+
+  const memberIdentityQuery = useQuery({
+    queryKey: [
+      'operational-member-by-customer',
+      activeCustomer?.type === 'MEMBER' ? activeCustomer.referenceId : null,
+      activeCustomer?.phoneE164 ?? null,
+    ],
+    queryFn: ({ signal }) => customerMemberApi.searchMembers(activeCustomer!.phoneE164, signal),
+    enabled: Boolean(
+      canReadMembers &&
+        activeCustomer?.type === 'MEMBER' &&
+        activeCustomer.referenceId &&
+        selectedMember?.customerId !== activeCustomer.referenceId,
+    ),
+    staleTime: 30_000,
+  });
+
+  useEffect(() => {
+    if (activeCustomer?.type !== 'MEMBER') {
+      if (selectedMember) setSelectedMember(null);
+      return;
+    }
+    if (selectedMember?.customerId === activeCustomer.referenceId) return;
+    const matched = memberIdentityQuery.data?.items.find(
+      (member) => member.customerId === activeCustomer.referenceId,
+    );
+    if (matched) setSelectedMember(matched);
+  }, [
+    activeCustomer?.referenceId,
+    activeCustomer?.type,
+    memberIdentityQuery.data,
+    selectedMember,
+  ]);
+
   const memberBalanceQuery = useQuery({
     queryKey: ['operational-member-balance', selectedMember?.id],
     queryFn: ({ signal }) => customerMemberApi.getPointBalance(selectedMember!.id, signal),
@@ -1580,8 +1613,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         isSaving={workspace.isCustomerPending}
         api={customerMemberApi}
         canReadMembers={canReadMembers}
-        canReadCustomers={canReadCustomers}
         canEnrollMember={canEnrollMember}
+        canReadLoyalty={canReadLoyalty}
         onClose={() => setCustomerPickerOpen(false)}
         onChoose={(selection, member) => {
           void workspace
