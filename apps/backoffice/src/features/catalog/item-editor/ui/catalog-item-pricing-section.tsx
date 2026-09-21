@@ -67,7 +67,8 @@ export function CatalogItemPricingSection({
           <div
             className={
               hasVariants
-                ? 'flex flex-col gap-3 rounded-xl border border-(--color-border) px-4 py-3 sm:flex-row sm:items-center sm:justify-between'
+                ? 'flex flex-col gap-3 rounded-xl border border-(--color-border) px-4 py-3 ' +
+                  'sm:flex-row sm:items-center sm:justify-between'
                 : ''
             }
           >
@@ -109,7 +110,10 @@ export function CatalogItemPricingSection({
           <p className="text-sm text-(--color-text-muted)">
             Harga ditentukan oleh setiap varian di bawah.
             {storedItemPrice
-              ? ` Harga item ${formatMoney(storedItemPrice, currency)} tetap tersimpan di riwayat, tetapi tidak dijual.`
+              ? ` Harga item ${formatMoney(
+                  storedItemPrice,
+                  currency,
+                )} tetap tersimpan di riwayat, tetapi tidak dijual.`
               : ''}
           </p>
         )}
