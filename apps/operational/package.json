@@ -12,7 +12,6 @@
   "dependencies": {
     "@digvation/business-api": "workspace:*",
     "@digvation/business-auth": "workspace:*",
-    "@digvation/business-catalog": "workspace:*",
     "@digvation/business-money": "workspace:*",
     "@digvation/business-runtime": "workspace:*",
     "@digvation/ui": "1.1.0",
