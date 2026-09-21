@@ -1,6 +1,9 @@
 import { DInput, DSelect } from '@digvation/ui';
 
-import type { LoyaltyConfiguration, LoyaltyEarningRule } from '../../../../modules/loyalty/loyalty-api';
+import type {
+  LoyaltyConfiguration,
+  LoyaltyEarningRule,
+} from '../../../../modules/loyalty/loyalty-api';
 import { CatalogSection } from '../../ui/catalog-shared';
 import type { useCatalogItemEditor } from '../model/use-catalog-item-editor';
 
@@ -61,7 +64,11 @@ export function CatalogItemLoyaltySection({
               <p className="mt-1 font-medium">
                 {(loyaltyRule?.behavior ?? configuration?.defaultEarningBehavior) === 'EXCLUDED'
                   ? 'Tidak dapat poin'
-                  : `${loyaltyRule?.fixedPointsPerUnit ?? configuration?.defaultFixedPointsPerUnit ?? 0} poin / unit`}
+                  : `${
+                      loyaltyRule?.fixedPointsPerUnit ??
+                      configuration?.defaultFixedPointsPerUnit ??
+                      0
+                    } poin / unit`}
               </p>
             </div>
           </div>
