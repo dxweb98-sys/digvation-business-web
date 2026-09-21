@@ -1,4 +1,5 @@
 import { useAuth } from '@digvation/pos-auth';
+import { ApiClient } from '@digvation/business-api';
 import { createDecimal, formatMoney } from '@digvation/pos-money';
 import { useRuntime } from '@digvation/pos-runtime';
 import {
@@ -61,6 +62,7 @@ import {
 } from '../../../app/localization/operational-localization';
 import { cashierTransactionKeys } from '../cashier-transaction-keys';
 import { cashierTransactionErrorMessage } from '../cashier-transaction-errors';
+import { CustomerMemberApi, type MemberLookupResult } from '../customer-member-api';
 import type { CartDisplayLine } from '../cart-draft';
 import {
   createCashierTransactionAdapter,
@@ -139,6 +141,7 @@ import {
   useCanReadCompletedSaleDetails,
 } from '../completed-sale-visibility';
 import './replatformed-pos-workspace.css';
+import { CustomerMemberDialog } from './customer-member-dialog';
 
 type Workspace = ReturnType<typeof useCashierTransactionWorkspace>;
 type QueueStatus = 'QUEUED' | 'PROGRESS' | 'COMPLETED' | 'CANCELED';
@@ -674,6 +677,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const [queuePaymentAmount, setQueuePaymentAmount] = useState<string | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
   const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<MemberLookupResult | null>(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [payNow, setPayNow] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
@@ -703,6 +707,24 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const lines = workspace.cart.lines;
   const total = workspace.cart.totalAmount;
   const activeCustomer = workspace.customer;
+  const customerMemberApi = useMemo(
+    () => new CustomerMemberApi(new ApiClient({
+      baseUrl: runtime.apiBaseUrl,
+      applicationSurface: 'operational',
+      ...(authPort.getAccessToken ? { getAccessToken: authPort.getAccessToken.bind(authPort) } : {}),
+    })),
+    [authPort, runtime.apiBaseUrl],
+  );
+  const canReadMembers = session.access.permissions.includes('membership:read');
+  const canReadCustomers = session.access.permissions.includes('customers:read');
+  const canEnrollMember = session.access.permissions.includes('membership:enroll');
+  const canReadLoyalty = session.access.capabilities.includes('LOYALTY_POINTS') && session.access.permissions.includes('loyalty:read');
+  const memberBalanceQuery = useQuery({
+    queryKey: ['operational-member-balance', selectedMember?.id],
+    queryFn: ({ signal }) => customerMemberApi.getPointBalance(selectedMember!.id, signal),
+    enabled: Boolean(selectedMember && activeCustomer?.type === 'MEMBER' && canReadLoyalty),
+    staleTime: 15_000,
+  });
 
   const displayedQueueDetail =
     receiptSaleId && sale?.id === receiptSaleId && hasSuccessfulPayment(sale) ? sale : queueDetail;
@@ -1503,6 +1525,9 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         isEstimate={workspace.cart.isLocalDraft}
         locale={workspace.locale}
         customer={activeCustomer}
+        memberNumber={selectedMember?.memberNumber ?? null}
+        pointBalance={memberBalanceQuery.data?.pointsBalance ?? null}
+        isPointBalanceLoading={memberBalanceQuery.isLoading}
         onChooseCustomer={() => setCustomerPickerOpen(true)}
         onQuantity={(line, next) => {
           if (workspace.cart.isLocalDraft) workspace.changeDraftQuantity(line.id, next);
@@ -1521,24 +1546,22 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         onCheckout={() => void openCheckout()}
       />
 
-      <ReferenceCustomerDialog
+      <CustomerMemberDialog
         open={customerPickerOpen}
         customer={activeCustomer}
         isSaving={workspace.isCustomerPending}
+        api={customerMemberApi}
+        canReadMembers={canReadMembers}
+        canReadCustomers={canReadCustomers}
+        canEnrollMember={canEnrollMember}
         onClose={() => setCustomerPickerOpen(false)}
-        onChoose={(selection) => {
-          // Runtime validates and normalizes the identity; the dialog closes
-          // only once the change is accepted.
-          void workspace
-            .changeCustomer(selection)
-            .then(() => setCustomerPickerOpen(false))
-            .catch((error: unknown) => {
-              showToast({
-                title: copy('Could not save the customer'),
-                description: cashierTransactionErrorMessage(error),
-                variant: 'danger',
-              });
-            });
+        onChoose={(selection, member) => {
+          void workspace.changeCustomer(selection).then(() => {
+            setSelectedMember(member ?? null);
+            setCustomerPickerOpen(false);
+          }).catch((error: unknown) => {
+            showToast({ title: copy('Could not save the customer'), description: cashierTransactionErrorMessage(error), variant: 'danger' });
+          });
         }}
       />
 
@@ -2380,6 +2403,9 @@ function ReferenceFloatingCart({
   isEstimate,
   locale,
   customer,
+  memberNumber,
+  pointBalance,
+  isPointBalanceLoading,
   onChooseCustomer,
   onQuantity,
   onRemove,
@@ -2397,6 +2423,9 @@ function ReferenceFloatingCart({
   isEstimate: boolean;
   locale: string;
   customer: SaleCustomer | null;
+  memberNumber: string | null;
+  pointBalance: string | null;
+  isPointBalanceLoading: boolean;
   onChooseCustomer: () => void;
   onQuantity: (line: CartDisplayLine, quantity: string) => void;
   onRemove: (line: CartDisplayLine) => void;
@@ -2425,6 +2454,9 @@ function ReferenceFloatingCart({
       isEstimate={isEstimate}
       locale={locale}
       customer={customer}
+      memberNumber={memberNumber}
+      pointBalance={pointBalance}
+      isPointBalanceLoading={isPointBalanceLoading}
       onChooseCustomer={onChooseCustomer}
       onQuantity={onQuantity}
       onRemove={onRemove}
@@ -2528,6 +2560,9 @@ function ReferenceCartPanel({
   isEstimate,
   locale,
   customer,
+  memberNumber,
+  pointBalance,
+  isPointBalanceLoading,
   onChooseCustomer,
   onQuantity,
   onRemove,
@@ -2543,6 +2578,9 @@ function ReferenceCartPanel({
   isEstimate: boolean;
   locale: string;
   customer: SaleCustomer | null;
+  memberNumber: string | null;
+  pointBalance: string | null;
+  isPointBalanceLoading: boolean;
   onChooseCustomer: () => void;
   onQuantity: (line: CartDisplayLine, quantity: string) => void;
   onRemove: (line: CartDisplayLine) => void;
@@ -2582,10 +2620,16 @@ function ReferenceCartPanel({
                   {copy(status.label)}
                 </Badge>
               ) : null}
+              {customer?.type === 'MEMBER' && memberNumber ? (
+                <Badge variant="outline" className="shrink-0 px-2 py-0 text-[10px]">{memberNumber}</Badge>
+              ) : null}
             </div>
             <p className="mt-0.5 truncate text-[11px] text-[var(--color-text-muted)]">
-              {customerDisplayDetail(customer) ??
-                copy('Name and WhatsApp number are both required.')}
+              {customer?.type === 'MEMBER' && isPointBalanceLoading
+                ? copy('Loading loyalty points…')
+                : customer?.type === 'MEMBER' && pointBalance !== null
+                  ? `${copy('Loyalty points')}: ${pointBalance}`
+                  : customerDisplayDetail(customer) ?? copy('Name and WhatsApp number are both required.')}
             </p>
           </div>
           <ChevronDown className="size-4 shrink-0 text-[var(--color-text-muted)]" />
@@ -2760,110 +2804,6 @@ function ReferenceCartPanel({
   );
 }
 
-function ReferenceCustomerDialog({
-  open,
-  customer,
-  isSaving,
-  onClose,
-  onChoose,
-}: {
-  open: boolean;
-  customer: SaleCustomer | null;
-  isSaving: boolean;
-  onClose: () => void;
-  onChoose: (selection: SaleCustomerSelection) => void;
-}) {
-  const { copy } = useOperationalLocalization();
-  const [mode, setMode] = useState<'NON_MEMBER' | 'MEMBER'>('NON_MEMBER');
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [openedFor, setOpenedFor] = useState<string | null>(null);
-
-  // Each time the dialog opens it shows the identity the transaction currently
-  // carries, never what was typed for an earlier transaction.
-  const identityKey = open ? `${customer?.type ?? 'NONE'}:${customer?.phoneE164 ?? ''}` : null;
-  if (openedFor !== identityKey) {
-    setOpenedFor(identityKey);
-    setMode(customer?.type === 'MEMBER' ? 'MEMBER' : 'NON_MEMBER');
-    setName(customer?.type === 'NON_MEMBER' ? customer.name : '');
-    setPhone(customer?.type === 'NON_MEMBER' ? customer.phoneE164 : '');
-  }
-
-  const canSubmit = Boolean(name.trim() && phone.trim()) && !isSaving;
-  const submitNonMember = () => {
-    if (!canSubmit) return;
-    onChoose({ type: 'NON_MEMBER', name: name.trim(), phone: phone.trim() });
-  };
-
-  return (
-    <DDialog
-      title={copy('Choose customer')}
-      open={open}
-      onClose={onClose}
-      ariaLabel={copy('Choose customer')}
-      closeOnEscape
-      closeOnOverlay
-      className="pos-reference-dialog w-full max-w-md overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
-    >
-      <div className="min-h-0 space-y-3 overflow-y-auto">
-        <p className="text-xs text-[var(--color-text-muted)]">
-          {copy(
-            'A transaction belongs to a customer. Fill in the name and WhatsApp number, or choose a member.',
-          )}
-        </p>
-        <div className="flex gap-2" aria-label={copy('Customer')}>
-          <Button
-            size="sm"
-            variant={mode === 'NON_MEMBER' ? 'primary' : 'secondary'}
-            onClick={() => setMode('NON_MEMBER')}
-          >
-            {copy('Non-member')}
-          </Button>
-          <Button
-            size="sm"
-            variant={mode === 'MEMBER' ? 'primary' : 'secondary'}
-            onClick={() => setMode('MEMBER')}
-          >
-            {copy('Member')}
-          </Button>
-        </div>
-
-        {mode === 'NON_MEMBER' ? (
-          <div className="space-y-3">
-            <DInput
-              aria-label={copy('Customer name')}
-              label={copy('Name')}
-              value={name}
-              onChange={setName}
-              placeholder={copy('Customer name')}
-            />
-            <DInput
-              aria-label={copy('WhatsApp number')}
-              label={copy('WhatsApp number')}
-              value={phone}
-              onChange={setPhone}
-              placeholder={copy('WhatsApp number')}
-              inputMode="tel"
-              hint={copy('Name and WhatsApp number are both required.')}
-            />
-            <Button fullWidth disabled={!canSubmit} onClick={submitNonMember}>
-              {copy('Use customer')}
-            </Button>
-          </div>
-        ) : (
-          // Member identity is owned by the canonical Customer authority. Until
-          // that directory is connected there is nothing truthful to search, so
-          // the state says so instead of offering invented members.
-          <DAlert variant="info" title={copy('Member lookup is not available yet')}>
-            {copy(
-              'Member identity comes from the customer directory, which is not connected to this installation yet.',
-            )}
-          </DAlert>
-        )}
-      </div>
-    </DDialog>
-  );
-}
 
 type PaymentDialogStep = 'edit' | 'review' | 'leave';
 
