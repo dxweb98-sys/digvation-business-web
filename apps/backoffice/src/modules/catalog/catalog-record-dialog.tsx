@@ -1,6 +1,7 @@
 import { DDialog, DInput, DSelect, useToast } from '@digvation/ui';
 import { useState } from 'react';
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
+import { useFormState } from '../../shared/forms/use-form-state';
 import { isSessionExpiredError } from '../../auth/backoffice-auth-context';
 import type { NamedRecord } from './catalog-api';
 import { useCatalogLocalization } from './catalog-localization';
@@ -25,9 +26,12 @@ export function CatalogNamedRecordDialog({
   const fresh = item === null;
   const { showToast } = useToast();
   const { copy } = useCatalogLocalization();
-  const [code, setCode] = useState(item?.code ?? '');
-  const [name, setName] = useState(item?.name ?? '');
-  const [status, setStatus] = useState(item?.status ?? 'ACTIVE');
+  const form = useFormState({
+    code: item?.code ?? '',
+    name: item?.name ?? '',
+    status: item?.status ?? ('ACTIVE' as 'ACTIVE' | 'INACTIVE'),
+  });
+  const { code, name, status } = form.values;
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
@@ -79,19 +83,19 @@ export function CatalogNamedRecordDialog({
               : copy('Code cannot be changed after creation.')
           }
           value={code}
-          onChange={setCode}
+          onChange={(value) => form.setField('code', value)}
           disabled={!fresh}
         />
         <DInput
           label={copy('Name')}
           value={name}
-          onChange={setName}
+          onChange={(value) => form.setField('name', value)}
           placeholder={copy('For example, Coffee Latte')}
         />
         <DSelect
           label={copy('Status')}
           value={status}
-          onChange={(value) => setStatus(value as 'ACTIVE' | 'INACTIVE')}
+          onChange={(value) => form.setField('status', value as 'ACTIVE' | 'INACTIVE')}
           options={[
             { label: copy('Active'), value: 'ACTIVE' },
             { label: copy('Inactive'), value: 'INACTIVE' },
