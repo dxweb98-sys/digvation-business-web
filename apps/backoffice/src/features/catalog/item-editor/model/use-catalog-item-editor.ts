@@ -28,7 +28,10 @@ export function useCatalogItemEditor(item: CatalogItemEditorSource | null | unde
   const variantsLoadedRef = useRef(false);
   const loyaltyRuleLoadedRef = useRef(false);
   const identity = editorIdentity(item);
-  const effectiveAt = useMemo(() => new Date().toISOString(), [identity]);
+  const effectiveAt = useMemo(() => {
+    void identity;
+    return new Date().toISOString();
+  }, [identity]);
   const previousIdentityRef = useRef(identity);
 
   useEffect(() => {
