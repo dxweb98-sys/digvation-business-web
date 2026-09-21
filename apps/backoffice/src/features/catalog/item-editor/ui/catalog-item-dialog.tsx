@@ -1,6 +1,5 @@
 import { DBadge, DDialog } from '@digvation/ui';
-import { BadgeDollarSign } from 'lucide-react';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useCatalogItemEditorData } from '../api/use-catalog-item-editor-data';
 import { useCatalogItemEditorSave } from '../api/use-catalog-item-editor-save';
 import { deriveCatalogItemEditorValidation } from '../model/catalog-item-editor-validation';
@@ -16,10 +15,10 @@ import { useCatalogLocalization } from '../../localization/use-catalog-localizat
 import { variantPriceState } from '../../model/catalog-price-history';
 import {
   CatalogPanel,
-  CatalogPanelHeader,
   DialogFooter,
   Status,
 } from '../../ui/catalog-shared';
+import { CatalogTabs } from '../../ui/catalog-tabs';
 import { editableAmount } from '../model/variant-price-draft';
 
 export function CatalogItemDialog({
@@ -52,6 +51,7 @@ export function CatalogItemDialog({
   onSaved: () => void;
 }) {
   const fresh = item === null;
+  const [activeEditorTab, setActiveEditorTab] = useState<'additional' | 'pricing'>('additional');
   const { formatMoney } = useCatalogLocalization();
   const editor = useCatalogItemEditor(item);
 
@@ -64,6 +64,10 @@ export function CatalogItemDialog({
     hydrateLoyaltyOnce,
   } = editor.actions;
   const effectiveAt = editor.effectiveAt;
+
+  useEffect(() => {
+    setActiveEditorTab('additional');
+  }, [item?.id, fresh]);
 
   const {
     existingImage,
@@ -211,38 +215,87 @@ export function CatalogItemDialog({
           ) : null}
         </div>
       }
-      footer={<DialogFooter onClose={onClose} onSave={() => void save()} disabled={disabled} />}
+      footer={
+        <DialogFooter
+          onClose={onClose}
+          onSave={() => {
+            const loyaltyInvalid =
+              canConfigureLoyalty && loyaltyTouched && !loyaltyDraftValid;
+
+            if (!validDefaultDuration || loyaltyInvalid) {
+              editor.actions.setShowIssues(true);
+              setActiveEditorTab('additional');
+              return;
+            }
+
+            if (!validPrice || variantsHaveIssues) {
+              editor.actions.setShowIssues(true);
+              setActiveEditorTab('pricing');
+              return;
+            }
+
+            void save();
+          }}
+          disabled={saving || !name.trim()}
+        />
+      }
     >
       <div className="space-y-5">
         <CatalogItemInformationSection
           editor={editor}
           fresh={fresh}
-          categoryOptions={categoryOptions}
           canManageImage={canManageImage}
           existingImage={existingImage.data}
-          model={model}
-          currency={currency}
-          showPricing={showPrice}
-          canEditPrice={canEditPrice}
-          currentPriceLoading={currentPrice.isLoading}
-          itemPriceError={itemPriceError}
-          storedItemPrice={storedItemPrice}
-          formatMoney={formatMoney}
         />
 
-        {showSellingSection ? (
-          <CatalogPanel ariaLabel="Penjualan & Penentuan Harga">
-            <CatalogPanelHeader
-              title="Penjualan & Penentuan Harga"
-              icon={<BadgeDollarSign className="size-4" aria-hidden="true" />}
-              description="Atur cara item dijual, harga default, dan varian dalam satu tempat."
-              actions={hasVariants ? <DBadge variant="info">Mode Varian</DBadge> : undefined}
-            />
-            <div className="p-5">
+        <CatalogPanel ariaLabel="Pengaturan Item">
+          <CatalogTabs
+            value={activeEditorTab}
+            ariaLabel="Pengaturan item"
+            tabs={[
+              { value: 'additional', label: 'Informasi Tambahan' },
+              ...(showSellingSection
+                ? [
+                    {
+                      value: 'pricing' as const,
+                      label: 'Harga & Varian',
+                      count: editor.form.variants.length,
+                    },
+                  ]
+                : []),
+            ]}
+            onChange={setActiveEditorTab}
+          />
+
+          {activeEditorTab === 'additional' || !showSellingSection ? (
+            <div role="tabpanel" aria-label="Informasi Tambahan">
+              <CatalogItemAdditionalInfoSection
+                editor={editor}
+                fresh={fresh}
+                categoryOptions={categoryOptions}
+                validDefaultDuration={validDefaultDuration}
+                model={model}
+                canViewLoyalty={canViewLoyalty}
+                loyaltyRule={loyaltyRule}
+                loyaltyConfiguration={loyaltyConfiguration.data}
+                loyaltyLoading={loyaltyRules.isLoading || loyaltyConfiguration.isLoading}
+                canConfigureLoyalty={canConfigureLoyalty}
+                loyaltyDraftValid={loyaltyDraftValid}
+              />
+            </div>
+          ) : (
+            <div role="tabpanel" aria-label="Harga & Varian" className="p-5">
               {showPrice ? (
                 <CatalogItemPricingSection
                   editor={editor}
+                  model={model}
+                  currency={currency}
+                  fresh={fresh}
                   canEditPrice={canEditPrice}
+                  currentPriceLoading={currentPrice.isLoading}
+                  itemPriceError={itemPriceError}
+                  storedItemPrice={storedItemPrice}
+                  formatMoney={formatMoney}
                 />
               ) : null}
 
@@ -257,32 +310,18 @@ export function CatalogItemDialog({
                 variantPricesLoading={variantPricesLoading}
                 inactiveVariantCount={inactiveVariantCount}
               />
+
+              {fresh && hasVariants && canEditPrice ? (
+                <CatalogItemSaveSummarySection
+                  editor={editor}
+                  model={model}
+                  currency={currency}
+                  formatMoney={formatMoney}
+                />
+              ) : null}
             </div>
-          </CatalogPanel>
-        ) : null}
-
-        <CatalogItemAdditionalInfoSection
-          editor={editor}
-          fresh={fresh}
-          categoryOptions={categoryOptions}
-          validDefaultDuration={validDefaultDuration}
-          model={model}
-          canViewLoyalty={canViewLoyalty}
-          loyaltyRule={loyaltyRule}
-          loyaltyConfiguration={loyaltyConfiguration.data}
-          loyaltyLoading={loyaltyRules.isLoading || loyaltyConfiguration.isLoading}
-          canConfigureLoyalty={canConfigureLoyalty}
-          loyaltyDraftValid={loyaltyDraftValid}
-        />
-
-        {fresh && hasVariants && canEditPrice ? (
-          <CatalogItemSaveSummarySection
-            editor={editor}
-            model={model}
-            currency={currency}
-            formatMoney={formatMoney}
-          />
-        ) : null}
+          )}
+        </CatalogPanel>
       </div>
     </DDialog>
   );
