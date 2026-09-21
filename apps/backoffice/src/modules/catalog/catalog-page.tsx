@@ -15,12 +15,12 @@ import { Eye, Pencil, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
+import { CatalogItemDialog } from '../../features/catalog-item-editor';
 import { canPerformBackofficeAction, type BackofficeAction } from '../../auth/backoffice-access';
 import { useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import { CatalogApi, type CatalogManagementItem, type Category, type Item } from './catalog-api';
 import { CatalogItemDetailDialog } from './catalog-item-detail-dialog';
 import { LoyaltyApi } from '../loyalty/loyalty-api';
-import { CatalogItemDialog } from './catalog-item-dialog';
 import { CatalogItemThumbnail } from './catalog-item-thumbnail';
 import { useCatalogLocalization } from './catalog-localization';
 import { CatalogNamedRecordDialog } from './catalog-record-dialog';
