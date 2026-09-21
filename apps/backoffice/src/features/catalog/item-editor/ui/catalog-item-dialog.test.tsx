@@ -148,8 +148,9 @@ describe('CatalogItemDialog variant pricing', () => {
     });
 
     const scope = () => within(dialog());
-    expect(await scope().findByText(/Mengikuti default bisnis:/)).toBeTruthy();
-    expect(scope().getByText(/Default bisnis: 1 poin per unit/)).toBeTruthy();
+    expect(
+      await scope().findByText(/Mengikuti default bisnis: 1 poin per unit/),
+    ).toBeTruthy();
     expect(scope().queryByLabelText('Poin per unit')).toBeNull();
   });
 
@@ -165,8 +166,9 @@ describe('CatalogItemDialog variant pricing', () => {
 
     await type(scope().getByLabelText('Nama Item'), 'Teh Member');
 
-    expect(await scope().findByText('Mengikuti default')).toBeTruthy();
-    expect(scope().getByText(/Default bisnis: 1 poin per unit/)).toBeTruthy();
+    expect(
+      await scope().findByText(/Mengikuti default bisnis: 1 poin per unit/),
+    ).toBeTruthy();
 
     await type(scope().getByLabelText('Poin per unit'), '5');
     await act(async () => fireEvent.click(scope().getByRole('button', { name: 'Simpan' })));
