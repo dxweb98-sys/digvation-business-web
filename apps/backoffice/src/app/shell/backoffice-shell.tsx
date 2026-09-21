@@ -17,6 +17,7 @@ import {
   UserCircle,
   UsersRound,
   ContactRound,
+  Gem,
   WalletCards,
   type LucideIcon,
 } from 'lucide-react';
@@ -71,6 +72,13 @@ const navigationSections: ReadonlyArray<{
       },
       { label: 'employees', to: '/employees', icon: UsersRound, capability: 'employees' },
       { label: 'catalog', localizedLabel: { id: 'Member', en: 'Members' }, to: '/memberships', icon: ContactRound, capability: 'memberships' },
+      {
+        label: 'catalog',
+        localizedLabel: { id: 'Loyalty', en: 'Loyalty' },
+        to: '/loyalty',
+        icon: Gem,
+        capability: 'loyalty',
+      },
     ],
   },
   {
