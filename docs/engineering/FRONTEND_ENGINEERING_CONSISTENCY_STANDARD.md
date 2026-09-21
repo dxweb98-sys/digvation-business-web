@@ -33,7 +33,7 @@ Feature-specific code stays close to its feature.
 
 Application-local reuse may live under that application's `src/shared`, but it is not cross-app shared code.
 
-Truly reusable Backoffice + Operational behavior belongs in a narrowly owned workspace package under `packages/`.
+Truly reusable Backoffice + Operational behavior belongs in an existing or deliberately created narrowly owned workspace package under `packages/`, but only after cross-application reuse is real and stable.
 
 Do not create a generic `packages/shared`, `packages/common`, or `packages/utils`.
 
@@ -87,8 +87,9 @@ Examples:
 
 - HTTP/query-string transport helper -> `packages/api`;
 - decimal/money primitive -> `packages/money`;
-- stable Catalog vocabulary/pure selling interpretation -> `packages/catalog`;
-- Catalog Item Editor reducer -> Backoffice Catalog editor feature, not a cross-app package.
+- backend-compatible query-string or list pagination helper -> application `shared/api` or `shared/query`;
+- lightweight generic form state -> application `shared/forms`;
+- Catalog Item Editor reducer -> Catalog editor feature, not generic shared state.
 
 ## Feature structure
 
