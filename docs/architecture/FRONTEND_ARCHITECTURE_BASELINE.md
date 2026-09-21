@@ -157,19 +157,28 @@ Reference shape:
 
 ```text
 features/
-  catalog-item-editor/
-    model/
-      catalog-item-editor.state.ts
-      catalog-item-editor.reducer.ts
-      catalog-item-editor.validation.ts
-      use-catalog-item-editor.ts
+  catalog/
     api/
+      catalog-api.ts
+    localization/
+      ...
+    model/
       ...
     ui/
-      catalog-item-dialog.tsx
+      catalog-page.tsx
       ...
-    lib/
-      ...
+    item-editor/
+      model/
+        catalog-item-editor.state.ts
+        catalog-item-editor.reducer.ts
+        catalog-item-editor.validation.ts
+        catalog-item-editor.mapper.ts
+        use-catalog-item-editor.ts
+      api/
+        use-catalog-item-editor-data.ts
+      ui/
+        catalog-item-dialog.tsx
+        ...
 ```
 
 Segments mean:
