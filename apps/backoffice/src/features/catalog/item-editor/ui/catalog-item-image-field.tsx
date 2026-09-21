@@ -58,8 +58,8 @@ export function CatalogItemImageField({
   };
 
   return (
-    <div className="w-20 shrink-0">
-      <div className="grid size-16 place-items-center overflow-hidden rounded-lg border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)]">
+    <div className="w-28 shrink-0">
+      <div className="grid size-24 place-items-center overflow-hidden rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)] shadow-sm">
         {visibleUrl ? (
           <img
             src={visibleUrl}
@@ -68,8 +68,8 @@ export function CatalogItemImageField({
           />
         ) : (
           <div className="text-center">
-            <ImageIcon className="mx-auto size-5 text-[var(--color-text-muted)]" aria-hidden="true" />
-            <span className="mt-1 block text-[10px] text-[var(--color-text-muted)]">Foto</span>
+            <ImageIcon className="mx-auto size-7 text-[var(--color-text-muted)]" aria-hidden="true" />
+            <span className="mt-1.5 block text-xs text-[var(--color-text-muted)]">Foto item</span>
           </div>
         )}
       </div>
@@ -86,7 +86,7 @@ export function CatalogItemImageField({
         }}
       />
 
-      <div className="mt-1.5 flex items-center justify-between gap-1">
+      <div className="mt-2 flex items-center justify-between gap-1">
         <DButton
           type="button"
           variant="link"
