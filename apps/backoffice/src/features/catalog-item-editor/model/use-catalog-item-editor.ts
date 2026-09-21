@@ -1,7 +1,7 @@
 import type { CatalogItem } from '@digvation/business-catalog';
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 
-import type { VariantPriceDraft } from '../../../modules/catalog/catalog-variant-price-draft';
+import type { VariantPriceDraft } from './variant-price-draft';
 import type { LoyaltyEarningBehavior } from '../../../modules/loyalty/loyalty-api';
 import {
   catalogItemEditorReducer,
