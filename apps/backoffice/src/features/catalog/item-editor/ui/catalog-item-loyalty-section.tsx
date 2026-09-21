@@ -65,11 +65,11 @@ export function CatalogItemLoyaltySection({
       ) : canConfigure ? (
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <DSelect
-            label="Aturan poin"
+            label="Perolehan poin"
             value={behavior}
             clearable={false}
             options={[
-              { value: 'FIXED', label: 'Poin khusus' },
+              { value: 'FIXED', label: 'Dapat poin' },
               { value: 'EXCLUDED', label: 'Tidak dapat poin' },
             ]}
             onChange={(value) => {
