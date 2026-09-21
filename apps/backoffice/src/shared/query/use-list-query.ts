@@ -42,13 +42,15 @@ export function useListQuery<TData>({
     ? toLimitOffsetPagination(pagination)
     : undefined;
 
-  const query = useQuery({
-    queryKey: requestPagination
-      ? [...queryKey, requestPagination.limit, requestPagination.offset]
-      : queryKey,
+  const resolvedQueryKey: QueryKey = requestPagination
+    ? [...queryKey, requestPagination.limit, requestPagination.offset]
+    : queryKey;
+
+  const query = useQuery<TData>({
+    queryKey: resolvedQueryKey,
     queryFn: () => queryFn(requestPagination),
     enabled,
-    staleTime,
+    ...(staleTime === undefined ? {} : { staleTime }),
   });
 
   return {
