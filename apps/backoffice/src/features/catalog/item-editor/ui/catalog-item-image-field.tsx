@@ -1,6 +1,7 @@
 import { DButton } from '@digvation/ui';
-import { Image as ImageIcon, Trash2, Upload } from 'lucide-react';
+import { Image as ImageIcon, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+
 import {
   CATALOG_IMAGE_CONTENT_TYPES,
   CATALOG_IMAGE_MAX_BYTES,
@@ -57,70 +58,63 @@ export function CatalogItemImageField({
   };
 
   return (
-    <div>
-      <div className="flex flex-row items-center gap-4 md:w-36 md:flex-col md:items-stretch">
-        <div className="grid size-24 shrink-0 place-items-center overflow-hidden rounded-2xl border border-(--color-border) bg-(--color-surface-muted) md:size-36">
-          {visibleUrl ? (
-            <img
-              src={visibleUrl}
-              alt={itemName || copy('Catalog item image')}
-              className="size-full object-cover"
-            />
-          ) : (
-            <ImageIcon className="size-8 text-(--color-text-muted)" aria-hidden="true" />
-          )}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-xs leading-5 text-(--color-text-muted)">
-            {copy('JPEG, PNG, or WebP. Maximum 1 MB. One primary image is kept per item.')}
-          </p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <input
-              ref={inputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              className="sr-only"
-              disabled={disabled}
-              onChange={(event) => {
-                choose(event.target.files?.[0]);
-                event.currentTarget.value = '';
-              }}
-            />
-            <DButton
-              type="button"
-              variant="secondary"
-              size="sm"
-              leftIcon={<Upload className="size-4" />}
-              disabled={disabled}
-              onClick={() => inputRef.current?.click()}
-            >
-              {visibleUrl ? copy('Replace image') : copy('Choose image')}
-            </DButton>
-            {visibleUrl ? (
-              <DButton
-                type="button"
-                variant="ghost"
-                size="sm"
-                leftIcon={<Trash2 className="size-4" />}
-                disabled={disabled}
-                onClick={() => {
-                  setError(null);
-                  onFileChange(null);
-                  onRemove();
-                }}
-              >
-                {copy('Remove image')}
-              </DButton>
-            ) : null}
+    <div className="w-20 shrink-0">
+      <div className="grid size-16 place-items-center overflow-hidden rounded-lg border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)]">
+        {visibleUrl ? (
+          <img
+            src={visibleUrl}
+            alt={itemName || copy('Catalog item image')}
+            className="size-full object-cover"
+          />
+        ) : (
+          <div className="text-center">
+            <ImageIcon className="mx-auto size-5 text-[var(--color-text-muted)]" aria-hidden="true" />
+            <span className="mt-1 block text-[10px] text-[var(--color-text-muted)]">Foto</span>
           </div>
-          {selectedFile ? (
-            <p className="mt-2 text-xs text-(--color-text-muted)">
-              {selectedFile.name} · {(selectedFile.size / 1024).toFixed(0)} KB
-            </p>
-          ) : null}
-          {error ? <p className="mt-2 text-sm text-(--color-danger)">{error}</p> : null}
-        </div>
+        )}
       </div>
+
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="sr-only"
+        disabled={disabled}
+        onChange={(event) => {
+          choose(event.target.files?.[0]);
+          event.currentTarget.value = '';
+        }}
+      />
+
+      <div className="mt-1.5 flex items-center justify-between gap-1">
+        <DButton
+          type="button"
+          variant="link"
+          size="sm"
+          disabled={disabled}
+          onClick={() => inputRef.current?.click()}
+        >
+          {visibleUrl ? 'Ganti' : 'Pilih'}
+        </DButton>
+        {visibleUrl ? (
+          <DButton
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label={copy('Remove image')}
+            disabled={disabled}
+            onClick={() => {
+              setError(null);
+              onFileChange(null);
+              onRemove();
+            }}
+          >
+            <Trash2 className="size-3.5" aria-hidden="true" />
+          </DButton>
+        ) : null}
+      </div>
+
+      {error ? <p className="mt-1 text-[10px] leading-4 text-[var(--color-danger)]">{error}</p> : null}
     </div>
   );
 }
