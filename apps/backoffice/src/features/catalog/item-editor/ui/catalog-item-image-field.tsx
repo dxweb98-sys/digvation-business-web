@@ -59,19 +59,63 @@ export function CatalogItemImageField({
 
   return (
     <div className="w-28 shrink-0">
-      <div className="grid size-24 place-items-center overflow-hidden rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)] shadow-sm">
-        {visibleUrl ? (
-          <img
-            src={visibleUrl}
-            alt={itemName || copy('Catalog item image')}
-            className="size-full object-cover"
-          />
-        ) : (
-          <div className="text-center">
-            <ImageIcon className="mx-auto size-7 text-[var(--color-text-muted)]" aria-hidden="true" />
-            <span className="mt-1.5 block text-xs text-[var(--color-text-muted)]">Foto item</span>
-          </div>
-        )}
+      <p className="mb-1.5 text-sm font-medium text-[var(--color-text)]">Foto Item</p>
+
+      <div className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm">
+        <button
+          type="button"
+          className="grid size-24 w-full place-items-center overflow-hidden bg-[var(--color-surface-muted)] text-left"
+          disabled={disabled}
+          onClick={() => inputRef.current?.click()}
+          aria-label={visibleUrl ? 'Ganti foto item' : 'Pilih foto item'}
+        >
+          {visibleUrl ? (
+            <img
+              src={visibleUrl}
+              alt={itemName || copy('Catalog item image')}
+              className="size-full object-cover"
+            />
+          ) : (
+            <div className="text-center">
+              <ImageIcon
+                className="mx-auto size-7 text-[var(--color-text-muted)]"
+                aria-hidden="true"
+              />
+              <span className="mt-1.5 block text-xs text-[var(--color-text-muted)]">
+                Pilih foto
+              </span>
+            </div>
+          )}
+        </button>
+
+        <div className="flex items-center justify-between gap-1 border-t border-[var(--color-border)] px-2 py-1.5">
+          <DButton
+            type="button"
+            variant="link"
+            size="sm"
+            disabled={disabled}
+            onClick={() => inputRef.current?.click()}
+          >
+            {visibleUrl ? 'Ganti' : 'Pilih'}
+          </DButton>
+
+          {visibleUrl ? (
+            <DButton
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={copy('Remove image')}
+              disabled={disabled}
+              onClick={() => {
+                setError(null);
+                onFileChange(null);
+                onRemove();
+              }}
+            >
+              <Trash2 className="size-3.5" aria-hidden="true" />
+            </DButton>
+          ) : null}
+        </div>
       </div>
 
       <input
@@ -86,35 +130,9 @@ export function CatalogItemImageField({
         }}
       />
 
-      <div className="mt-2 flex items-center justify-between gap-1">
-        <DButton
-          type="button"
-          variant="link"
-          size="sm"
-          disabled={disabled}
-          onClick={() => inputRef.current?.click()}
-        >
-          {visibleUrl ? 'Ganti' : 'Pilih'}
-        </DButton>
-        {visibleUrl ? (
-          <DButton
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label={copy('Remove image')}
-            disabled={disabled}
-            onClick={() => {
-              setError(null);
-              onFileChange(null);
-              onRemove();
-            }}
-          >
-            <Trash2 className="size-3.5" aria-hidden="true" />
-          </DButton>
-        ) : null}
-      </div>
-
-      {error ? <p className="mt-1 text-[10px] leading-4 text-[var(--color-danger)]">{error}</p> : null}
+      {error ? (
+        <p className="mt-1 text-[10px] leading-4 text-[var(--color-danger)]">{error}</p>
+      ) : null}
     </div>
   );
 }
