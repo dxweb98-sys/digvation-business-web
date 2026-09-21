@@ -1,4 +1,3 @@
-import { DButton } from '@digvation/ui';
 import { Image as ImageIcon, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -120,18 +119,15 @@ export function CatalogItemImageField({
         </button>
 
         {visibleUrl ? (
-          <div className="absolute right-1.5 top-1.5 z-20">
-            <DButton
-              type="button"
-              variant="secondary"
-              size="icon"
-              aria-label={copy('Remove image')}
-              disabled={disabled}
-              onClick={removeImage}
-            >
-              <Trash2 className="size-3.5" aria-hidden="true" />
-            </DButton>
-          </div>
+          <button
+            type="button"
+            aria-label={copy('Remove image')}
+            disabled={disabled}
+            onClick={removeImage}
+            className="absolute right-1.5 top-1.5 z-20 grid size-7 place-items-center rounded-full border border-white/70 bg-white/85 text-[var(--color-text-muted)] opacity-0 shadow-sm backdrop-blur-sm transition-all hover:border-[var(--color-danger)]/30 hover:bg-[var(--color-danger)]/10 hover:text-[var(--color-danger)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-danger)]/30 group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Trash2 className="size-3.5" aria-hidden="true" />
+          </button>
         ) : null}
       </div>
 
