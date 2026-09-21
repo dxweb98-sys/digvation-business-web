@@ -24,6 +24,11 @@ const localCopy: Record<string, { 'id-ID': string; 'en-US': string }> = {
   'Registered member': { 'id-ID': 'Member Terdaftar', 'en-US': 'Registered Member' },
   'Enroll member': { 'id-ID': 'Daftar Member Baru', 'en-US': 'Enroll Member' },
   'Non-loyalty customer': { 'id-ID': 'Pelanggan Non-Loyalty (Struk Digital)', 'en-US': 'Non-Loyalty Customer (Digital Receipt)' },
+  'Regular digital-receipt customer': { 'id-ID': 'Pelanggan Umum (Struk Digital)', 'en-US': 'Regular Customer (Digital Receipt)' },
+  'A regular customer records name and WhatsApp for the digital receipt for this transaction.': {
+    'id-ID': 'Customer biasa mencatat nama & WhatsApp untuk kebutuhan transaksi dan struk digital.',
+    'en-US': 'A regular customer records name and WhatsApp for the digital receipt for this transaction.',
+  },
   'A regular customer records name and WhatsApp for this transaction without accumulating loyalty points.': {
     'id-ID': 'Customer biasa mencatat nama & WhatsApp untuk transaksi ini tanpa program akumulasi poin loyalty.',
     'en-US': 'A regular customer records name and WhatsApp for this transaction without accumulating loyalty points.',
@@ -32,6 +37,7 @@ const localCopy: Record<string, { 'id-ID': string; 'en-US': string }> = {
   'WhatsApp / phone': { 'id-ID': 'Nomor WhatsApp / Telepon', 'en-US': 'WhatsApp / Phone' },
   'Required': { 'id-ID': 'Wajib diisi', 'en-US': 'Required' },
   'Want to earn points and rewards?': { 'id-ID': 'Ingin catat poin belanja & reward loyalty pelanggan?', 'en-US': 'Want to earn points and rewards?' },
+  'Want to register this customer as a member?': { 'id-ID': 'Ingin daftarkan pelanggan ini sebagai member?', 'en-US': 'Want to register this customer as a member?' },
   'Enroll as member': { 'id-ID': 'Daftar Member', 'en-US': 'Enroll as Member' },
   'Use customer': { 'id-ID': 'Gunakan Pelanggan', 'en-US': 'Use Customer' },
   'Regular customer status': { 'id-ID': 'Status: Pelanggan Umum (Walk-In)', 'en-US': 'Status: Regular Customer (Walk-In)' },
@@ -48,6 +54,11 @@ const localCopy: Record<string, { 'id-ID': string; 'en-US': string }> = {
   'Customer not found in the list?': { 'id-ID': 'Pelanggan tidak ditemukan dalam daftar?', 'en-US': 'Customer not found in the list?' },
   'Register a new member': { 'id-ID': 'Daftarkan Member Baru', 'en-US': 'Register a New Member' },
   'Membership activation': { 'id-ID': 'Aktivasi Member & Loyalty Point', 'en-US': 'Membership & Loyalty Activation' },
+  'Member activation': { 'id-ID': 'Aktivasi Member', 'en-US': 'Member Activation' },
+  'Enrollment creates an active membership for this customer.': {
+    'id-ID': 'Pendaftaran membuat keanggotaan aktif untuk pelanggan ini.',
+    'en-US': 'Enrollment creates an active membership for this customer.',
+  },
   'Enrollment creates an active membership for this customer. Loyalty points follow the current business configuration.': {
     'id-ID': 'Pendaftaran member membuat keanggotaan aktif. Poin loyalty mengikuti konfigurasi bisnis yang berlaku.',
     'en-US': 'Enrollment creates an active membership for this customer. Loyalty points follow the current business configuration.',
@@ -266,11 +277,13 @@ export function CustomerMemberDialog({
           <DTabsContent value="CUSTOMER" className="mt-4 space-y-4">
             <div className="rounded-xl border border-[var(--color-brand)]/15 bg-[var(--color-brand)]/[.06] px-4 py-3">
               <p className="text-sm font-semibold text-[var(--color-brand)]">
-                {text('Non-loyalty customer')}
+                {text(canReadLoyalty ? 'Non-loyalty customer' : 'Regular digital-receipt customer')}
               </p>
               <p className="mt-1 text-xs leading-5 text-[var(--color-text-muted)]">
                 {text(
-                  'A regular customer records name and WhatsApp for this transaction without accumulating loyalty points.',
+                  canReadLoyalty
+                    ? 'A regular customer records name and WhatsApp for this transaction without accumulating loyalty points.'
+                    : 'A regular customer records name and WhatsApp for the digital receipt for this transaction.',
                 )}
               </p>
             </div>
@@ -299,7 +312,13 @@ export function CustomerMemberDialog({
               >
                 <span className="flex min-w-0 items-center gap-2 text-xs font-medium text-[var(--color-text)]">
                   <UserPlus className="size-4 shrink-0 text-[var(--color-brand)]" />
-                  <span>{text('Want to earn points and rewards?')}</span>
+                  <span>
+                    {text(
+                      canReadLoyalty
+                        ? 'Want to earn points and rewards?'
+                        : 'Want to register this customer as a member?',
+                    )}
+                  </span>
                 </span>
                 <span className="shrink-0 text-xs font-semibold text-[var(--color-brand)]">
                   {text('Enroll as member')}
@@ -442,11 +461,13 @@ export function CustomerMemberDialog({
                   <UserPlus className="mt-0.5 size-4 shrink-0 text-[var(--color-brand)]" />
                   <div>
                     <p className="text-sm font-semibold text-[var(--color-brand)]">
-                      {text('Membership activation')}
+                      {text(canReadLoyalty ? 'Membership activation' : 'Member activation')}
                     </p>
                     <p className="mt-1 text-xs leading-5 text-[var(--color-text-muted)]">
                       {text(
-                        'Enrollment creates an active membership for this customer. Loyalty points follow the current business configuration.',
+                        canReadLoyalty
+                          ? 'Enrollment creates an active membership for this customer. Loyalty points follow the current business configuration.'
+                          : 'Enrollment creates an active membership for this customer.',
                       )}
                     </p>
                   </div>
