@@ -1,0 +1,55 @@
+name: Catalog Cleanup Validation
+
+on:
+  push:
+    branches:
+      - refactor/catalog-reference-architecture
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Prepare pnpm
+        run: corepack prepare pnpm@11.22.0 --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Contract and naming
+        run: pnpm contract:check && pnpm naming:check
+
+      - name: Catalog and shared lint
+        run: >-
+          pnpm exec eslint
+          apps/backoffice/src/features/catalog
+          apps/backoffice/src/shared
+          apps/backoffice/src/modules/workforce/employees-api.ts
+
+      - name: Backoffice typecheck
+        run: pnpm --filter @digvation/business-backoffice typecheck
+
+      - name: Catalog and shared tests
+        run: >-
+          pnpm exec vitest run
+          apps/backoffice/src/features/catalog
+          apps/backoffice/src/shared
+
+      - name: Backoffice build
+        env:
+          VITE_BUILD_REVISION: ${{ github.sha }}
+        run: pnpm build:backoffice
