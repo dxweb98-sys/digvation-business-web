@@ -3,6 +3,12 @@ export { BrowserSessionClient, BrowserSessionRequestError } from './browser-sess
 export { AuthenticationError, HttpAuthAdapter } from './http-auth.adapter';
 export { MockAuthAdapter } from './mock-auth.adapter';
 export { withLegacySessionAliases } from './session-compat';
+export {
+  hasSessionCapability,
+  hasSessionFoundation,
+  hasSessionPermission,
+  hasSessionProduct,
+} from './session-access';
 export type {
   AuthIdentity,
   AuthLoginInput,
