@@ -263,7 +263,6 @@ function ProfileSection({
   );
 }
 
-
 function percentageFromTaxRate(rate: string): string {
   const [whole = '0', fraction = ''] = rate.trim().split('.');
   if (whole === '1') return '100';
@@ -317,10 +316,7 @@ function TaxSection({
 
   const percent = Number(draftPercent);
   const validPercent =
-    draftPercent.trim().length > 0 &&
-    Number.isFinite(percent) &&
-    percent >= 0 &&
-    percent <= 100;
+    draftPercent.trim().length > 0 && Number.isFinite(percent) && percent >= 0 && percent <= 100;
 
   const save = async () => {
     if (!tax || saving || !validPercent) return;
@@ -337,10 +333,8 @@ function TaxSection({
       if (!isSessionExpiredError(error))
         showToast({
           variant: 'danger',
-          title: normalizeBackofficeApiError(
-            error,
-            copy('Could not update tax configuration.'),
-          ).safeMessage,
+          title: normalizeBackofficeApiError(error, copy('Could not update tax configuration.'))
+            .safeMessage,
         });
     } finally {
       setSaving(false);

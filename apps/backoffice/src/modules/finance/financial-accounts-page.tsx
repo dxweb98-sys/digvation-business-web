@@ -702,12 +702,9 @@ function RouteEditor({
           offset: 0,
         });
         const sameAccountRoute = existing.items.find(
-          (item) =>
-            item.currency === account?.currency &&
-            item.financialAccountId === accountId,
+          (item) => item.currency === account?.currency && item.financialAccountId === accountId,
         );
-        if (sameAccountRoute)
-          await api.updateRoute(sameAccountRoute, { status: 'ACTIVE' });
+        if (sameAccountRoute) await api.updateRoute(sameAccountRoute, { status: 'ACTIVE' });
         else
           await api.createRoute({
             sellingLocationId: locationId,
@@ -928,11 +925,7 @@ async function provisionDefaultCheckoutRoute(
 ): Promise<boolean> {
   if (account.status !== 'ACTIVE') return false;
   const method: PaymentMethod =
-    account.type === 'BANK'
-      ? 'BANK_TRANSFER'
-      : account.type === 'E_WALLET'
-        ? 'WALLET'
-        : 'CASH';
+    account.type === 'BANK' ? 'BANK_TRANSFER' : account.type === 'E_WALLET' ? 'WALLET' : 'CASH';
   const locations = await api.listLocations(100, 0);
   const activeLocations = locations.items.filter((location) => location.status === 'ACTIVE');
   if (activeLocations.length !== 1) return false;
@@ -945,9 +938,7 @@ async function provisionDefaultCheckoutRoute(
     offset: 0,
   });
   const sameAccountRoute = existing.items.find(
-    (route) =>
-      route.financialAccountId === account.id &&
-      route.currency === account.currency,
+    (route) => route.financialAccountId === account.id && route.currency === account.currency,
   );
   if (sameAccountRoute) {
     if (sameAccountRoute.status !== 'ACTIVE')

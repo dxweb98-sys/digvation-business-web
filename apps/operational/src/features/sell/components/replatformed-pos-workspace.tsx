@@ -18,7 +18,14 @@ import {
   DSkeleton as Skeleton,
   useToast,
 } from '@digvation-labs/ui';
-import { DDropdown as PortalDropdown, DTabs, DTabsContent, DTabsList, DTabsTrigger, DTextarea } from '@digvation/ui';
+import {
+  DDropdown as PortalDropdown,
+  DTabs,
+  DTabsContent,
+  DTabsList,
+  DTabsTrigger,
+  DTextarea,
+} from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
 import {
   AlertCircle,
@@ -2881,13 +2888,7 @@ function usePaymentDialogStep(open: boolean) {
   return [step, setStep] as const;
 }
 
-function DiscountInfoTooltip({
-  label,
-  content,
-}: {
-  label: string;
-  content: ReactNode;
-}) {
+function DiscountInfoTooltip({ label, content }: { label: string; content: ReactNode }) {
   const [open, setOpen] = useState(false);
 
   return (

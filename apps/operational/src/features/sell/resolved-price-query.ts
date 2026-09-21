@@ -3,10 +3,7 @@ import type { QueryClient } from '@tanstack/react-query';
 import { isApiErrorCode } from './cashier-transaction-errors';
 import type { SellingCatalogQuery } from './cashier-transaction.adapter';
 import { cashierTransactionKeys } from './cashier-transaction-keys';
-import type {
-  OperationalCatalogProjection,
-  ResolvedPrice,
-} from './cashier-transaction.types';
+import type { OperationalCatalogProjection, ResolvedPrice } from './cashier-transaction.types';
 import type { OperationalProjectionQuery } from './operational-projection-client';
 
 const RESOLVED_PRICE_STALE_TIME_MS = 90_000;
@@ -71,7 +68,9 @@ export function fetchResolvedPrice(
       );
       return Promise.resolve(price);
     }
-    return Promise.reject(new Error('Operational catalog has no current price for this selection.'));
+    return Promise.reject(
+      new Error('Operational catalog has no current price for this selection.'),
+    );
   }
 
   return queryClient.fetchQuery({
@@ -107,7 +106,9 @@ export async function fetchResolvedVariantPrices(
     const projection = operationalCatalog(queryClient, input);
     const item = projection?.items.find((candidate) => candidate.id === input.catalogItemId);
     const entries = input.catalogVariantIds.map((catalogVariantId) => {
-      const price = item?.variants?.find((variant) => variant.id === catalogVariantId)?.resolvedPrice;
+      const price = item?.variants?.find(
+        (variant) => variant.id === catalogVariantId,
+      )?.resolvedPrice;
       return { catalogVariantId, amount: price?.amount ?? null } as const;
     });
     return {

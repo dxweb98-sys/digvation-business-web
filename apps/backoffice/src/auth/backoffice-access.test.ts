@@ -44,7 +44,10 @@ function backofficeSessionWith(...permissions: string[]): AuthSession {
 describe('Backoffice effective permission access', () => {
   it('shows a contribution when Runtime projected its read permission', () => {
     expect(
-      canAccessBackoffice(backofficeSessionWith('sales:read', 'sales:read-completed'), 'transactions'),
+      canAccessBackoffice(
+        backofficeSessionWith('sales:read', 'sales:read-completed'),
+        'transactions',
+      ),
     ).toBe(true);
     // Without completed-transaction access the history would only hold summaries.
     expect(canAccessBackoffice(backofficeSessionWith('sales:read'), 'transactions')).toBe(false);
@@ -112,5 +115,4 @@ describe('Backoffice effective permission access', () => {
     ];
     expect(canAccessBackoffice(operationalOnly, 'dashboard')).toBe(false);
   });
-
 });

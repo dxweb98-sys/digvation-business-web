@@ -37,11 +37,7 @@ export class HttpAuthAdapter implements AuthPort {
     const workspace = input.workspace ?? this.workspace;
     if (!workspace) throw new Error('AUTH_WORKSPACE_REQUIRED');
 
-    const accessToken = await this.sessionClient.login(
-      workspace,
-      input.identifier,
-      input.password,
-    );
+    const accessToken = await this.sessionClient.login(workspace, input.identifier, input.password);
     try {
       return await this.currentSession(accessToken);
     } catch (error) {

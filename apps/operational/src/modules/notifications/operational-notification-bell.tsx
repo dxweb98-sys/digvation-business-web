@@ -216,10 +216,7 @@ export function OperationalNotificationBell() {
   );
 }
 
-function notificationTitle(
-  locale: 'id-ID' | 'en-US',
-  notification: BusinessNotification,
-): string {
+function notificationTitle(locale: 'id-ID' | 'en-US', notification: BusinessNotification): string {
   const id = locale === 'id-ID';
   switch (notification.type) {
     case 'EXPENSE_APPROVAL_REQUIRED':

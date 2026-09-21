@@ -38,10 +38,16 @@ export function cashierTransactionErrorMessage(error: unknown, locale?: string):
     return copyForLocale('Refund required', locale);
   }
   if (isApiErrorCode(error, 'SALE_NOT_SETTLED')) {
-    return copyForLocale('Complete the remaining payment before finishing this transaction.', locale);
+    return copyForLocale(
+      'Complete the remaining payment before finishing this transaction.',
+      locale,
+    );
   }
   if (isApiErrorCode(error, 'SALE_LINE_NOT_MUTABLE')) {
-    return copyForLocale('This item can no longer be reduced or removed because work has already started.', locale);
+    return copyForLocale(
+      'This item can no longer be reduced or removed because work has already started.',
+      locale,
+    );
   }
   const promotionCopy = error instanceof ApiError ? PROMOTION_ERROR_COPY[error.code] : undefined;
   if (promotionCopy) return copyForLocale(promotionCopy, locale);

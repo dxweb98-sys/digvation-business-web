@@ -46,7 +46,6 @@ describe('Promotion variant target presentation', () => {
   });
 });
 
-
 describe('Promotion target search', () => {
   const items: PromotionReferenceOption[] = [
     { id: 'item-body', name: 'Body Bleaching', code: 'SVC-000008', categoryId: null },

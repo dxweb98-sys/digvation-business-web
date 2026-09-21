@@ -24,11 +24,7 @@ import {
 } from '../app/api/backoffice-api-error';
 import { useBackofficeLocalization } from '../app/localization/backoffice-localization-base';
 
-type AuthenticationStatus =
-  | 'hydrating'
-  | 'authenticated'
-  | 'unauthenticated'
-  | 'unavailable';
+type AuthenticationStatus = 'hydrating' | 'authenticated' | 'unauthenticated' | 'unavailable';
 
 interface BackofficeAuthContextValue {
   status: AuthenticationStatus;
@@ -68,10 +64,7 @@ export function BackofficeAuthProvider({
     [auth, showToast, t],
   );
 
-  useEffect(
-    () => auth.subscribeSessionEnded?.(expireSession),
-    [auth, expireSession],
-  );
+  useEffect(() => auth.subscribeSessionEnded?.(expireSession), [auth, expireSession]);
 
   useEffect(() => {
     let isMounted = true;
@@ -175,21 +168,9 @@ export function BackofficeAuthProvider({
       getAccessToken,
       createApiClient,
     }),
-    [
-      createApiClient,
-      getAccessToken,
-      login,
-      logout,
-      refreshSessionContext,
-      session,
-      status,
-    ],
+    [createApiClient, getAccessToken, login, logout, refreshSessionContext, session, status],
   );
-  return (
-    <BackofficeAuthContext.Provider value={value}>
-      {children}
-    </BackofficeAuthContext.Provider>
-  );
+  return <BackofficeAuthContext.Provider value={value}>{children}</BackofficeAuthContext.Provider>;
 }
 
 export function useBackofficeAuth(): BackofficeAuthContextValue {

@@ -20,7 +20,7 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
-    allowedHosts: ['precious-powerpoint-transmitted-flashing.trycloudflare.com']
+    allowedHosts: ['precious-powerpoint-transmitted-flashing.trycloudflare.com'],
   },
   preview: {
     port: 4173,

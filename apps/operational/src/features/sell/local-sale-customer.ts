@@ -19,7 +19,9 @@ export function localSaleCustomerSnapshot(selection: SaleCustomerSelection): Sal
   const compact = selection.phone.replace(/[\s().-]/g, '');
   const phoneE164 = compact.startsWith('00') ? `+${compact.slice(2)}` : compact;
   if (!/^\+[1-9]\d{7,14}$/.test(phoneE164))
-    throw new Error('Write the WhatsApp number in international format, for example +628xxxxxxxxx.');
+    throw new Error(
+      'Write the WhatsApp number in international format, for example +628xxxxxxxxx.',
+    );
 
   return { type: 'NON_MEMBER', referenceId: null, name, phoneE164 };
 }

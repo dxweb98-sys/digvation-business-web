@@ -11,11 +11,7 @@ import {
   type OperationalLocale,
 } from './operational-localization-base';
 
-export {
-  operationalCopy,
-  operationalLabel,
-  resolveOperationalLocale,
-};
+export { operationalCopy, operationalLabel, resolveOperationalLocale };
 export type { OperationalLocale };
 
 export function useOperationalLocalization() {

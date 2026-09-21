@@ -20,10 +20,10 @@ function sessionResponse(accessToken = 'fresh-access'): Response {
 }
 
 function failureResponse(status: number): Response {
-  return new Response(
-    JSON.stringify({ success: false, error: { code: 'AUTH_SESSION_INVALID' } }),
-    { status, headers: { 'content-type': 'application/json' } },
-  );
+  return new Response(JSON.stringify({ success: false, error: { code: 'AUTH_SESSION_INVALID' } }), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  });
 }
 
 function seedActiveSession(): void {
@@ -92,10 +92,7 @@ describe('BrowserSessionClient', () => {
 
   it('ends an inactive session after one hour exactly once', () => {
     seedActiveSession();
-    window.localStorage.setItem(
-      `${prefix}.last-activity`,
-      String(Date.now() - 60 * 60 * 1000 - 1),
-    );
+    window.localStorage.setItem(`${prefix}.last-activity`, String(Date.now() - 60 * 60 * 1000 - 1));
     const client = new BrowserSessionClient('https://runtime.example.test', 'operational');
     const listener = vi.fn();
     client.subscribeSessionEnded(listener);

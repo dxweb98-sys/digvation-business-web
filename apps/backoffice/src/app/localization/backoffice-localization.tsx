@@ -12,10 +12,7 @@ import {
 } from './backoffice-localization-base';
 
 export { BackofficeLocalizationProvider, readStoredBackofficeLocale };
-export type {
-  BackofficeLocale,
-  BackofficeMessageKey,
-} from './backoffice-localization-base';
+export type { BackofficeLocale, BackofficeMessageKey } from './backoffice-localization-base';
 
 export function useBackofficeLocalization() {
   const localization = useLegacyBackofficeLocalization();

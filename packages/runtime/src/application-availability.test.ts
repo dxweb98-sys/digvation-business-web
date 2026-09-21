@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { assertApplicationEnabled } from './application-availability';
 import type { DeploymentBootstrapConfig } from './runtime-config.types';
 
-function bootstrap(applications: DeploymentBootstrapConfig['applications']): DeploymentBootstrapConfig {
+function bootstrap(
+  applications: DeploymentBootstrapConfig['applications'],
+): DeploymentBootstrapConfig {
   return {
     apiBaseUrl: '',
     deploymentProfile: 'SHARED',

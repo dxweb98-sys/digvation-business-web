@@ -15,11 +15,7 @@ export type ReportType =
   | 'locations';
 
 export type DashboardWidget =
-  | 'TOP_ITEMS'
-  | 'PAYMENT_MIX'
-  | 'RECENT_TRANSACTIONS'
-  | 'TOP_EMPLOYEES'
-  | 'BUSINESS_INSIGHT';
+  'TOP_ITEMS' | 'PAYMENT_MIX' | 'RECENT_TRANSACTIONS' | 'TOP_EMPLOYEES' | 'BUSINESS_INSIGHT';
 
 const REPORT_PERMISSION: Record<ReportType, string> = {
   'business-performance': 'sales:read',

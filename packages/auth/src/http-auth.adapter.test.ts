@@ -8,7 +8,14 @@ const SESSION: AuthSession = {
     userId: '11111111-1111-4111-8111-111111111111',
     displayName: 'Operator',
     username: 'operator',
-    roles: [{ id: '22222222-2222-4222-8222-222222222222', code: 'OPERATOR', name: 'Operator', systemKey: null }],
+    roles: [
+      {
+        id: '22222222-2222-4222-8222-222222222222',
+        code: 'OPERATOR',
+        name: 'Operator',
+        systemKey: null,
+      },
+    ],
   },
   business: {
     tenantId: '33333333-3333-4333-8333-333333333333',
@@ -62,9 +69,9 @@ describe('HttpAuthAdapter session hydration', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const adapter = new HttpAuthAdapter('https://runtime.test', 'workspace-a', 'operational');
-    await expect(
-      adapter.login({ identifier: 'operator', password: 'secret' }),
-    ).resolves.toEqual(SESSION);
+    await expect(adapter.login({ identifier: 'operator', password: 'secret' })).resolves.toEqual(
+      SESSION,
+    );
 
     const urls = fetchMock.mock.calls.map(([input]) => String(input));
     expect(urls).toEqual([
@@ -91,10 +98,7 @@ describe('HttpAuthAdapter session hydration', () => {
         }),
       )
       .mockResolvedValueOnce(
-        jsonResponse(
-          { success: false, error: { code: 'SESSION_CONTEXT_UNAVAILABLE' } },
-          503,
-        ),
+        jsonResponse({ success: false, error: { code: 'SESSION_CONTEXT_UNAVAILABLE' } }, 503),
       );
     vi.stubGlobal('fetch', fetchMock);
 
@@ -108,9 +112,9 @@ describe('HttpAuthAdapter session hydration', () => {
 
   it('requires explicit workspace resolution before authentication when no default exists', async () => {
     const adapter = new HttpAuthAdapter('https://runtime.test', undefined, 'backoffice');
-    await expect(
-      adapter.login({ identifier: 'operator', password: 'secret' }),
-    ).rejects.toThrow('AUTH_WORKSPACE_REQUIRED');
+    await expect(adapter.login({ identifier: 'operator', password: 'secret' })).rejects.toThrow(
+      'AUTH_WORKSPACE_REQUIRED',
+    );
   });
 
   it('fails Backoffice login closed and revokes the browser session when Runtime denies application access', async () => {
@@ -138,16 +142,10 @@ describe('HttpAuthAdapter session hydration', () => {
           403,
         ),
       )
-      .mockResolvedValueOnce(
-        jsonResponse({ success: true, data: { completed: true } }),
-      );
+      .mockResolvedValueOnce(jsonResponse({ success: true, data: { completed: true } }));
     vi.stubGlobal('fetch', fetchMock);
 
-    const adapter = new HttpAuthAdapter(
-      'https://runtime.test',
-      'workspace-a',
-      'backoffice',
-    );
+    const adapter = new HttpAuthAdapter('https://runtime.test', 'workspace-a', 'backoffice');
 
     await expect(
       adapter.login({ identifier: 'operator', password: 'secret' }),
@@ -168,5 +166,4 @@ describe('HttpAuthAdapter session hydration', () => {
       expect(headers.get('X-Digvation-Session-Channel')).toBe('backoffice');
     }
   });
-
 });
