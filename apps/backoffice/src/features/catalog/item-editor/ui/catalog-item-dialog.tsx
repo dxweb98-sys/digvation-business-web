@@ -149,9 +149,8 @@ export function CatalogItemDialog({
   const showPrice = canViewPricing || (fresh && canCreatePricing);
   const showSellingSection =
     showPrice ||
-    (fresh
-      ? canCreateVariants
-      : canViewPricing && (hasVariants || variantPricesLoading));
+    canCreateVariants ||
+    (!fresh && canViewPricing && (hasVariants || variantPricesLoading));
   const inactiveVariantCount = (existingVariants.data?.items ?? []).length - activeVariants.length;
   const loyaltyDraftChanged = loyaltyRule
     ? loyaltyBehavior !== loyaltyRule.behavior || loyaltyPoints !== loyaltyRule.fixedPointsPerUnit
