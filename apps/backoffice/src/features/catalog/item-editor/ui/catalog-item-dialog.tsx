@@ -7,8 +7,8 @@ import { deriveCatalogItemEditorValidation } from '../model/catalog-item-editor-
 import { useCatalogItemEditor } from '../model/use-catalog-item-editor';
 import type { LoyaltyApi } from '../../../../modules/loyalty/loyalty-api';
 import type { CatalogApi, Category, Item } from '../../api/catalog-api';
+import { CatalogItemAdditionalInfoSection } from './catalog-item-additional-info-section';
 import { CatalogItemInformationSection } from './catalog-item-information-section';
-import { CatalogItemLoyaltySection } from './catalog-item-loyalty-section';
 import { CatalogItemPricingSection } from './catalog-item-pricing-section';
 import { CatalogItemSaveSummarySection } from './catalog-item-save-summary-section';
 import { CatalogItemVariantsSection } from './catalog-item-variants-section';
@@ -220,7 +220,14 @@ export function CatalogItemDialog({
           categoryOptions={categoryOptions}
           canManageImage={canManageImage}
           existingImage={existingImage.data}
-          validDefaultDuration={validDefaultDuration}
+          model={model}
+          currency={currency}
+          showPricing={showPrice}
+          canEditPrice={canEditPrice}
+          currentPriceLoading={currentPrice.isLoading}
+          itemPriceError={itemPriceError}
+          storedItemPrice={storedItemPrice}
+          formatMoney={formatMoney}
         />
 
         {showSellingSection ? (
@@ -235,15 +242,7 @@ export function CatalogItemDialog({
               {showPrice ? (
                 <CatalogItemPricingSection
                   editor={editor}
-                  model={model}
-                  currency={currency}
-                  fresh={fresh}
-                  hasVariants={hasVariants}
                   canEditPrice={canEditPrice}
-                  currentPriceLoading={currentPrice.isLoading}
-                  itemPriceError={itemPriceError}
-                  storedItemPrice={storedItemPrice}
-                  formatMoney={formatMoney}
                 />
               ) : null}
 
@@ -262,16 +261,19 @@ export function CatalogItemDialog({
           </CatalogPanel>
         ) : null}
 
-        {!fresh && canViewLoyalty ? (
-          <CatalogItemLoyaltySection
-            editor={editor}
-            loyaltyRule={loyaltyRule}
-            configuration={loyaltyConfiguration.data}
-            loading={loyaltyRules.isLoading || loyaltyConfiguration.isLoading}
-            canConfigure={canConfigureLoyalty}
-            loyaltyDraftValid={loyaltyDraftValid}
-          />
-        ) : null}
+        <CatalogItemAdditionalInfoSection
+          editor={editor}
+          fresh={fresh}
+          categoryOptions={categoryOptions}
+          validDefaultDuration={validDefaultDuration}
+          model={model}
+          canViewLoyalty={canViewLoyalty}
+          loyaltyRule={loyaltyRule}
+          loyaltyConfiguration={loyaltyConfiguration.data}
+          loyaltyLoading={loyaltyRules.isLoading || loyaltyConfiguration.isLoading}
+          canConfigureLoyalty={canConfigureLoyalty}
+          loyaltyDraftValid={loyaltyDraftValid}
+        />
 
         {fresh && hasVariants && canEditPrice ? (
           <CatalogItemSaveSummarySection
