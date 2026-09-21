@@ -11,7 +11,7 @@ import { deriveCatalogItemEditorValidation } from '../model/catalog-item-editor.
 import { useCatalogItemEditor } from '../model/use-catalog-item-editor';
 import { isSessionExpiredError } from '../../../../auth/backoffice-auth-context';
 import type { LoyaltyApi } from '../../../../modules/loyalty/loyalty-api';
-import type { CatalogApi, Category, Item } from '../../../../modules/catalog/catalog-api';
+import type { CatalogApi, Category, Item } from '../../api/catalog-api';
 import { CatalogItemImageField } from './catalog-item-image-field';
 import { CatalogItemThumbnail } from '../../../../modules/catalog/catalog-item-thumbnail';
 import { useCatalogLocalization } from '../../../../modules/catalog/catalog-localization';
