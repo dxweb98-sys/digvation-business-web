@@ -2,11 +2,9 @@ import type { CatalogItemEditorForm } from './catalog-item-editor-state';
 
 export function buildCatalogItemBaseInput({
   form,
-  hasVariants,
   parsedDefaultDuration,
 }: {
   form: CatalogItemEditorForm;
-  hasVariants: boolean;
   parsedDefaultDuration: number | null;
 }) {
   const serviceDefinition =
@@ -15,7 +13,7 @@ export function buildCatalogItemBaseInput({
       : undefined;
 
   return {
-    ...(hasVariants ? { variantSelectionMode: form.variantSelectionMode } : {}),
+    variantSelectionMode: form.variantSelectionMode,
     name: form.name.trim(),
     categoryId: form.categoryId,
     description: form.description.trim() || null,
