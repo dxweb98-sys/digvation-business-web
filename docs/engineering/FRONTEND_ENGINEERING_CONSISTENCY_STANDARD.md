@@ -85,9 +85,9 @@ A reusable function should have one coherent purpose and an ownership-compatible
 
 Examples:
 
-- HTTP/query-string transport helper -> `packages/api`;
-- decimal/money primitive -> `packages/money`;
-- backend-compatible query-string or list pagination helper -> application `shared/api` or `shared/query`;
+- application-generic query-string helper -> application `shared/api`;
+- backend-compatible list pagination/query helper -> application `shared/query`;
+- decimal/money primitive already shared across applications -> `packages/money`;
 - lightweight generic form state -> application `shared/forms`;
 - Catalog Item Editor reducer -> Catalog editor feature, not generic shared state.
 
@@ -169,6 +169,12 @@ TanStack Query owns asynchronous server state.
 Do not mirror authoritative server collections into Redux/Zustand/Context merely for reuse.
 
 Feature editor draft state may be hydrated from query results, but the draft is temporary user input, not a second authoritative server cache.
+
+Use TanStack `useQuery` directly for ordinary detail/entity queries.
+
+Use the shared list-query abstraction only when the endpoint is a collection whose backend contract uses `limit/offset`. UI pagination may expose `page/pageSize`, but conversion happens at the query boundary and the backend response shape is preserved.
+
+Do not make every query go through a custom wrapper.
 
 ## API and commands
 
