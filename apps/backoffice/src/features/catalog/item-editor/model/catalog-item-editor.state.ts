@@ -1,4 +1,4 @@
-import type { Item, VariantSelectionMode } from '../../../../modules/catalog/catalog-api';
+import type { Item, VariantSelectionMode } from '../../api/catalog-api';
 
 import type { VariantPriceDraft } from './variant-price-draft';
 import type { LoyaltyEarningBehavior } from '../../../../modules/loyalty/loyalty-api';
