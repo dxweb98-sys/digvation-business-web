@@ -731,6 +731,15 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       : total;
   const isTaxPreviewLoading =
     !sale && workspace.cart.isLocalDraft && taxConfigurationQuery.isLoading;
+  const isTaxPreviewUnavailable =
+    !sale && workspace.cart.isLocalDraft && taxConfigurationQuery.isError;
+  const draftTaxLabel =
+    taxConfigurationQuery.data?.enabled
+      ? `${copy('Tax')} (${createDecimal(taxConfigurationQuery.data.rate)
+          .times(100)
+          .toFixed(2)
+          .replace(/\.?0+$/, '')}%)`
+      : copy('Tax');
   const activeCustomer = workspace.customer;
   const customerMemberApi = useMemo(
     () =>
@@ -1594,9 +1603,10 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
             : copy('Promotions and discounts')
         }
         taxAmount={draftTaxAmount}
-        taxLabel={sale ? saleTaxLabel(sale, copy('Tax')) : copy('Tax')}
+        taxLabel={sale ? saleTaxLabel(sale, copy('Tax')) : draftTaxLabel}
         isEstimate={workspace.cart.isLocalDraft}
         isTaxPreviewLoading={isTaxPreviewLoading}
+        isTaxPreviewUnavailable={isTaxPreviewUnavailable}
         locale={workspace.locale}
         customer={activeCustomer}
         memberNumber={activeSelectedMember?.memberNumber ?? null}
@@ -2497,6 +2507,7 @@ function ReferenceFloatingCart({
   taxLabel,
   isEstimate,
   isTaxPreviewLoading,
+  isTaxPreviewUnavailable,
   locale,
   customer,
   memberNumber,
@@ -2518,6 +2529,7 @@ function ReferenceFloatingCart({
   taxLabel: string;
   isEstimate: boolean;
   isTaxPreviewLoading: boolean;
+  isTaxPreviewUnavailable: boolean;
   locale: string;
   customer: SaleCustomer | null;
   memberNumber: string | null;
@@ -2550,6 +2562,7 @@ function ReferenceFloatingCart({
       taxLabel={taxLabel}
       isEstimate={isEstimate}
       isTaxPreviewLoading={isTaxPreviewLoading}
+      isTaxPreviewUnavailable={isTaxPreviewUnavailable}
       locale={locale}
       customer={customer}
       memberNumber={memberNumber}
@@ -2657,6 +2670,7 @@ function ReferenceCartPanel({
   taxLabel,
   isEstimate,
   isTaxPreviewLoading,
+  isTaxPreviewUnavailable,
   locale,
   customer,
   memberNumber,
@@ -2676,6 +2690,7 @@ function ReferenceCartPanel({
   taxLabel: string;
   isEstimate: boolean;
   isTaxPreviewLoading: boolean;
+  isTaxPreviewUnavailable: boolean;
   locale: string;
   customer: SaleCustomer | null;
   memberNumber: string | null;
@@ -2871,11 +2886,15 @@ function ReferenceCartPanel({
               </span>
             </div>
           ) : null}
-          {hasTax || isTaxPreviewLoading ? (
+          {hasTax || isTaxPreviewLoading || isTaxPreviewUnavailable ? (
             <div className="flex items-center justify-between text-xs">
               <span className="text-[var(--color-text-muted)]">{taxLabel}</span>
               <span className="font-medium">
-                {isTaxPreviewLoading ? copy('Calculating…') : money(taxAmount, locale)}
+                {isTaxPreviewLoading
+                  ? copy('Calculating…')
+                  : isTaxPreviewUnavailable
+                    ? copy('Not available')
+                    : money(taxAmount, locale)}
               </span>
             </div>
           ) : null}
