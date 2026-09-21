@@ -48,7 +48,6 @@ import {
   VariantPriceLabel,
 } from './catalog-pricing';
 import { CatalogNamedRecordDialog } from './catalog-record-dialog';
-import { SellingModelBadge } from './catalog-selling';
 import {
   CatalogInfoTile,
   CatalogPanel,
@@ -362,14 +361,8 @@ export function CatalogItemDetailDialog({
             </div>
 
             {canViewPricing ? (
-              <div className="flex min-h-28 flex-col justify-center border-t border-[var(--color-border)] pt-4 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--color-text-muted)]">
-                    {model === 'DIRECT' ? 'Harga Jual' : 'Ringkasan Harga'}
-                  </span>
-                  {variants.isLoading ? null : <SellingModelBadge model={model} />}
-                </div>
-                <div className="mt-1.5 text-2xl font-semibold tabular-nums tracking-tight text-[var(--color-text)]">
+              <div className="flex min-h-28 flex-col justify-center lg:items-end lg:text-right">
+                <div className="text-4xl font-semibold tabular-nums tracking-tight text-[var(--color-text)]">
                   {model === 'DIRECT' ? (
                     <PriceLabel
                       price={defaultPrice}
@@ -380,13 +373,17 @@ export function CatalogItemDetailDialog({
                     displayPrice
                   )}
                 </div>
-                <p className="mt-1 max-w-xs text-xs leading-5 text-[var(--color-text-muted)]">
-                  {sellingModelCopy[model].description}
+                <p className="mt-2 max-w-xs text-xs leading-5 text-[var(--color-text-muted)]">
+                  {model === 'VARIANT_REQUIRED'
+                    ? 'Kasir wajib memilih varian. Item utama tidak dijual.'
+                    : model === 'ITEM_AND_VARIANTS'
+                      ? 'Item utama dapat dijual langsung; varian menjadi pilihan tambahan.'
+                      : 'Harga jual item utama.'}
                 </p>
                 {canCreatePricing && model === 'DIRECT' ? (
-                  <div className="mt-3">
+                  <div className="mt-2">
                     <DButton
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
                       leftIcon={<BadgeDollarSign className="size-4" />}
                       onClick={() => setPricingTarget('default')}
