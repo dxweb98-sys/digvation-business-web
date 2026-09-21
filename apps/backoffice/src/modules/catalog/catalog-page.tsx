@@ -18,6 +18,7 @@ import { canPerformBackofficeAction, type BackofficeAction } from '../../auth/ba
 import { useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import { CatalogApi, type CatalogManagementItem, type Category, type Item } from './catalog-api';
 import { CatalogItemDetailDialog } from './catalog-item-detail-dialog';
+import { LoyaltyApi } from '../loyalty/loyalty-api';
 import { CatalogItemDialog } from './catalog-item-dialog';
 import { CatalogItemThumbnail } from './catalog-item-thumbnail';
 import { useCatalogLocalization } from './catalog-localization';
@@ -48,6 +49,10 @@ export function CatalogPage() {
     () => new CatalogApi(createApiClient(apiBaseUrl)),
     [apiBaseUrl, createApiClient],
   );
+  const loyaltyApi = useMemo(
+    () => new LoyaltyApi(createApiClient(apiBaseUrl)),
+    [apiBaseUrl, createApiClient],
+  );
   const client = useQueryClient();
   const [item, setItem] = useState<Item | null | undefined>();
   const [detailItem, setDetailItem] = useState<CatalogManagementItem | null>(null);
@@ -67,6 +72,11 @@ export function CatalogPage() {
 
   const can = (action: BackofficeAction) =>
     Boolean(session && canPerformBackofficeAction(session, action));
+  const hasLoyaltyCapability = Boolean(
+    session?.effectiveEntitlements.capabilities.includes('LOYALTY_POINTS'),
+  );
+  const canViewLoyalty = hasLoyaltyCapability && can('viewLoyalty');
+  const canConfigureLoyalty = hasLoyaltyCapability && can('configureLoyalty');
 
   const categoryOptions = useQuery({
     queryKey: keys.categoryOptions,
@@ -363,6 +373,9 @@ export function CatalogPage() {
         categories={allCategories}
         currency={currency}
         api={api}
+        loyaltyApi={loyaltyApi}
+        canViewLoyalty={canViewLoyalty}
+        canConfigureLoyalty={canConfigureLoyalty}
         canViewPricing={can('viewPricing')}
         canCreatePricing={can('createPricing')}
         canCreateVariants={can('createCatalog')}
@@ -379,6 +392,8 @@ export function CatalogPage() {
         currency={currency}
         effectiveAt={pricingEffectiveAt}
         api={api}
+        loyaltyApi={loyaltyApi}
+        canViewLoyalty={canViewLoyalty}
         canCreate={can('createCatalog')}
         canUpdate={can('updateCatalog')}
         canViewPricing={can('viewPricing')}

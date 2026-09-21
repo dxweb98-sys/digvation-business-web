@@ -3,6 +3,7 @@ import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
 import { isSessionExpiredError } from '../../auth/backoffice-auth-context';
+import type { LoyaltyApi, LoyaltyEarningBehavior } from '../loyalty/loyalty-api';
 import type { CatalogApi, Category, Item, VariantSelectionMode } from './catalog-api';
 import { CatalogItemImageField } from './catalog-item-image-field';
 import { CatalogItemThumbnail } from './catalog-item-thumbnail';
@@ -35,6 +36,9 @@ export function CatalogItemDialog({
   categories,
   currency,
   api,
+  loyaltyApi,
+  canViewLoyalty,
+  canConfigureLoyalty,
   canViewPricing,
   canCreatePricing,
   canCreateVariants,
@@ -46,6 +50,9 @@ export function CatalogItemDialog({
   categories: Category[];
   currency: string;
   api: CatalogApi;
+  loyaltyApi: LoyaltyApi;
+  canViewLoyalty: boolean;
+  canConfigureLoyalty: boolean;
   canViewPricing: boolean;
   canCreatePricing: boolean;
   canCreateVariants: boolean;
@@ -77,6 +84,10 @@ export function CatalogItemDialog({
     item?.serviceDefinition?.defaultDurationMinutes?.toString() ?? '',
   );
   const [saving, setSaving] = useState(false);
+  const [loyaltyBehavior, setLoyaltyBehavior] = useState<LoyaltyEarningBehavior>('FIXED');
+  const [loyaltyPointsPerUnit, setLoyaltyPointsPerUnit] = useState('');
+  const [loyaltyTouched, setLoyaltyTouched] = useState(false);
+  const loyaltyRuleLoadedRef = useRef(false);
   const [effectiveAt] = useState(() => new Date().toISOString());
 
   const existingImage = useQuery({
@@ -114,6 +125,24 @@ export function CatalogItemDialog({
   });
   const variantPricesLoading =
     existingVariants.isLoading || variantPrices.some((query) => query.isLoading);
+  const loyaltyConfiguration = useQuery({
+    queryKey: ['loyalty', 'configuration'],
+    queryFn: () => loyaltyApi.getConfiguration(),
+    enabled: Boolean(item && canViewLoyalty),
+  });
+  const loyaltyRules = useQuery({
+    queryKey: ['loyalty', 'earning-rules'],
+    queryFn: () => loyaltyApi.listEarningRules(),
+    enabled: Boolean(item && canViewLoyalty),
+  });
+  const loyaltyRule = loyaltyRules.data?.find((candidate) => candidate.catalogItemId === item?.id);
+
+  useEffect(() => {
+    if (!item || !canViewLoyalty || loyaltyRules.isLoading || loyaltyRuleLoadedRef.current) return;
+    loyaltyRuleLoadedRef.current = true;
+    setLoyaltyBehavior(loyaltyRule?.behavior ?? 'FIXED');
+    setLoyaltyPointsPerUnit(loyaltyRule ? String(loyaltyRule.fixedPointsPerUnit) : '');
+  }, [canViewLoyalty, item, loyaltyRule, loyaltyRules.isLoading]);
 
   useEffect(() => {
     if (fresh || initialPriceRef.current !== undefined || currentPrice.isLoading) return;
@@ -169,8 +198,20 @@ export function CatalogItemDialog({
   const variantsHaveIssues =
     variants.some((draft) => variantDraftIssue(draft, canEditPrice)) ||
     (canEditPrice && itemPriceMissing);
-  const disabled = !name.trim() || !validDefaultDuration || !validPrice || saving;
   const inactiveVariantCount = (existingVariants.data?.items ?? []).length - activeVariants.length;
+  const loyaltyPoints = Number(loyaltyPointsPerUnit);
+  const loyaltyDraftValid = Number.isInteger(loyaltyPoints) && loyaltyPoints >= 0;
+  const loyaltyDraftChanged = loyaltyRule
+    ? loyaltyBehavior !== loyaltyRule.behavior || loyaltyPoints !== loyaltyRule.fixedPointsPerUnit
+    : loyaltyTouched;
+  const shouldSaveLoyalty =
+    !fresh && canConfigureLoyalty && loyaltyTouched && loyaltyDraftValid && loyaltyDraftChanged;
+  const disabled =
+    !name.trim() ||
+    !validDefaultDuration ||
+    !validPrice ||
+    (canConfigureLoyalty && loyaltyTouched && !loyaltyDraftValid) ||
+    saving;
 
   const categoryOptions = useMemo(
     () =>
@@ -261,6 +302,26 @@ export function CatalogItemDialog({
             amount: submission.amount,
             effectiveFrom,
           });
+
+      if (persistedItem && shouldSaveLoyalty) {
+        try {
+          await loyaltyApi.updateEarningRule(persistedItem.id, {
+            expectedVersion: loyaltyRule?.version ?? 0,
+            behavior: loyaltyBehavior,
+            fixedPointsPerUnit: loyaltyBehavior === 'FIXED' ? loyaltyPoints : 0,
+          });
+          void client.invalidateQueries({ queryKey: ['loyalty', 'earning-rules'] });
+        } catch (error) {
+          if (!isSessionExpiredError(error))
+            showToast({
+              variant: 'danger',
+              title: normalizeBackofficeApiError(
+                error,
+                'Item tersimpan, tetapi aturan poin belum diperbarui.',
+              ).safeMessage,
+            });
+        }
+      }
 
       if (persistedItem && canManageImage) {
         if (selectedImage) {
@@ -436,6 +497,81 @@ export function CatalogItemDialog({
                 }
               />
             </div>
+          </CatalogSection>
+        ) : null}
+
+        {!fresh && canViewLoyalty ? (
+          <CatalogSection
+            title="Loyalty"
+            tone="secondary"
+            description={
+              loyaltyRule
+                ? 'Aturan khusus ini dapat diubah antara poin khusus dan tidak dapat poin.'
+                : 'Item ini mengikuti aturan default sampai aturan khusus disimpan.'
+            }
+          >
+            {loyaltyRules.isLoading || loyaltyConfiguration.isLoading ? (
+              <p className="text-sm text-(--color-text-muted)">Memuat aturan poin...</p>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid gap-4 text-sm sm:grid-cols-2">
+                  <div>
+                    <p className="text-(--color-text-muted)">Aturan poin</p>
+                    <p className="mt-1 font-medium">
+                      {loyaltyRule
+                        ? loyaltyRule.behavior === 'FIXED'
+                          ? 'Poin khusus'
+                          : 'Tidak dapat poin'
+                        : 'Mengikuti default'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-(--color-text-muted)">Hasil efektif</p>
+                    <p className="mt-1 font-medium">
+                      {(loyaltyRule?.behavior ??
+                        loyaltyConfiguration.data?.defaultEarningBehavior) === 'EXCLUDED'
+                        ? 'Tidak dapat poin'
+                        : `${loyaltyRule?.fixedPointsPerUnit ?? loyaltyConfiguration.data?.defaultFixedPointsPerUnit ?? 0} poin / unit`}
+                    </p>
+                  </div>
+                </div>
+                {canConfigureLoyalty ? (
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <DSelect
+                      label="Aturan poin"
+                      value={loyaltyBehavior}
+                      clearable={false}
+                      options={[
+                        { value: 'FIXED', label: 'Poin khusus' },
+                        { value: 'EXCLUDED', label: 'Tidak dapat poin' },
+                      ]}
+                      onChange={(value) => {
+                        if (value === 'FIXED' || value === 'EXCLUDED') {
+                          setLoyaltyBehavior(value);
+                          setLoyaltyTouched(true);
+                        }
+                      }}
+                    />
+                    {loyaltyBehavior === 'FIXED' ? (
+                      <DInput
+                        label="Poin per unit"
+                        inputMode="numeric"
+                        value={loyaltyPointsPerUnit}
+                        onChange={(value) => {
+                          setLoyaltyPointsPerUnit(value);
+                          setLoyaltyTouched(true);
+                        }}
+                        error={
+                          loyaltyTouched && !loyaltyDraftValid
+                            ? 'Gunakan angka bulat nol atau lebih.'
+                            : undefined
+                        }
+                      />
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            )}
           </CatalogSection>
         ) : null}
 
