@@ -149,8 +149,36 @@ describe('CatalogItemDialog variant pricing', () => {
 
     const scope = () => within(dialog());
     expect(await scope().findByText('Mengikuti default')).toBeTruthy();
-    expect(scope().getByText('1 poin / unit')).toBeTruthy();
+    expect(scope().getByText(/Default bisnis: 1 poin per unit/)).toBeTruthy();
     expect(scope().queryByLabelText('Poin per unit')).toBeNull();
+  });
+
+  it('shows business loyalty defaults during Add Item and saves an override after item creation', async () => {
+    const api = fakeApi();
+    const loyaltyApi = fakeLoyaltyApi();
+    const { dialog } = renderDialog(api, null, {
+      api: loyaltyApi,
+      canView: true,
+      canConfigure: true,
+    });
+    const scope = () => within(dialog());
+
+    await type(scope().getByLabelText('Nama Item'), 'Teh Member');
+
+    expect(await scope().findByText('Mengikuti default')).toBeTruthy();
+    expect(scope().getByText(/Default bisnis: 1 poin per unit/)).toBeTruthy();
+
+    await type(scope().getByLabelText('Poin per unit'), '5');
+    await act(async () => fireEvent.click(scope().getByRole('button', { name: 'Simpan' })));
+
+    await waitFor(() =>
+      expect(loyaltyApi.updateEarningRule).toHaveBeenCalledWith('item-1', {
+        expectedVersion: 0,
+        behavior: 'FIXED',
+        fixedPointsPerUnit: 5,
+      }),
+    );
+    expect(api.createItem).toHaveBeenCalledTimes(1);
   });
 
   it('creates an item without variants as the default sellable option', async () => {
