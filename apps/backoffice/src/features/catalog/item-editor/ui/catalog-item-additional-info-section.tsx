@@ -7,7 +7,7 @@ import type {
 } from '../../../../modules/loyalty/loyalty-api';
 import type { Category, Item } from '../../api/catalog-api';
 import { sellingModelCopy, type SellingModel } from '../../model/catalog-selling';
-import { CatalogPanel, CatalogInfoTile } from '../../ui/catalog-shared';
+import { CatalogInfoTile } from '../../ui/catalog-shared';
 import type { useCatalogItemEditor } from '../model/use-catalog-item-editor';
 import { CatalogItemLoyaltySection } from './catalog-item-loyalty-section';
 
@@ -47,12 +47,12 @@ export function CatalogItemAdditionalInfoSection({
   const { setFormField } = editor.actions;
 
   return (
-    <CatalogPanel className="p-5" ariaLabel="Informasi Tambahan">
-      <p className="text-xs font-semibold uppercase tracking-[0.04em] text-[var(--color-text-muted)]">
-        Informasi Tambahan
+    <section aria-label="Informasi Tambahan" className="p-5">
+      <p className="mb-4 text-xs leading-5 text-[var(--color-text-muted)]">
+        Lengkapi klasifikasi, detail layanan, Loyalty, dan deskripsi item.
       </p>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-2">
         <CatalogInfoTile
           label="Tipe Produk / Item"
           icon={<Briefcase className="size-3.5" aria-hidden="true" />}
@@ -151,6 +151,6 @@ export function CatalogItemAdditionalInfoSection({
           />
         </div>
       </div>
-    </CatalogPanel>
+    </section>
   );
 }
