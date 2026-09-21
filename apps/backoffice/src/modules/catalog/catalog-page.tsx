@@ -16,6 +16,8 @@ import { useMemo, useState } from 'react';
 
 import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
 import { CatalogItemDialog } from '../../features/catalog-item-editor';
+import { useListQuery } from '../../shared/query/use-list-query';
+import { usePaginationState } from '../../shared/query/use-pagination-state';
 import { canPerformBackofficeAction, type BackofficeAction } from '../../auth/backoffice-access';
 import { useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import { CatalogApi, type CatalogManagementItem, type Category, type Item } from './catalog-api';
@@ -65,10 +67,8 @@ export function CatalogPage() {
     categoryId: '',
   });
   const [categoryQuery, setCategoryQuery] = useState<CategoryFilterState>({ q: '', status: '' });
-  const [itemPage, setItemPage] = useState(1);
-  const [itemPageSize, setItemPageSize] = useState(10);
-  const [categoryPage, setCategoryPage] = useState(1);
-  const [categoryPageSize, setCategoryPageSize] = useState(10);
+  const itemPagination = usePaginationState({ initialPageSize: 10 });
+  const categoryPagination = usePaginationState({ initialPageSize: 10 });
   const [pricingEffectiveAt, setPricingEffectiveAt] = useState(() => new Date().toISOString());
 
   const can = (action: BackofficeAction) =>
@@ -82,23 +82,29 @@ export function CatalogPage() {
     queryFn: () => api.listCategories({ limit: 100, offset: 0 }),
     enabled: Boolean(session),
   });
-  const items = useQuery({
-    queryKey: [...keys.items, itemQuery, itemPage, itemPageSize],
-    queryFn: () =>
+  const items = useListQuery({
+    queryKey: [...keys.items, itemQuery],
+    pagination: {
+      page: itemPagination.page,
+      pageSize: itemPagination.pageSize,
+    },
+    queryFn: (pagination) =>
       api.listItems({
         ...toItemQuery(itemQuery),
-        limit: itemPageSize,
-        offset: (itemPage - 1) * itemPageSize,
+        ...(pagination ?? itemPagination.request),
       }),
     enabled: Boolean(session),
   });
-  const categories = useQuery({
-    queryKey: [...keys.categories, categoryQuery, categoryPage, categoryPageSize],
-    queryFn: () =>
+  const categories = useListQuery({
+    queryKey: [...keys.categories, categoryQuery],
+    pagination: {
+      page: categoryPagination.page,
+      pageSize: categoryPagination.pageSize,
+    },
+    queryFn: (pagination) =>
       api.listCategories({
         ...toCategoryQuery(categoryQuery),
-        limit: categoryPageSize,
-        offset: (categoryPage - 1) * categoryPageSize,
+        ...(pagination ?? categoryPagination.request),
       }),
     enabled: Boolean(session),
   });
@@ -193,11 +199,11 @@ export function CatalogPage() {
   ];
 
   const changeItemFilter = (change: Partial<ItemFilterState>) => {
-    setItemPage(1);
+    itemPagination.resetPage();
     setItemQuery((current) => ({ ...current, ...change }));
   };
   const changeCategoryFilter = (change: Partial<CategoryFilterState>) => {
-    setCategoryPage(1);
+    categoryPagination.resetPage();
     setCategoryQuery((current) => ({ ...current, ...change }));
   };
 
@@ -281,15 +287,12 @@ export function CatalogPage() {
                 : copy('No catalog items are available.')
             }
             pagination={{
-              page: itemPage,
-              pageSize: itemPageSize,
+              page: itemPagination.page,
+              pageSize: itemPagination.pageSize,
               total: items.data?.total ?? 0,
             }}
-            onPageChange={setItemPage}
-            onPageSizeChange={(size) => {
-              setItemPageSize(size);
-              setItemPage(1);
-            }}
+            onPageChange={itemPagination.setPage}
+            onPageSizeChange={itemPagination.setPageSize}
             actions={[
               {
                 label: copy('View details'),
@@ -345,15 +348,12 @@ export function CatalogPage() {
                 : copy('No catalog categories are available.')
             }
             pagination={{
-              page: categoryPage,
-              pageSize: categoryPageSize,
+              page: categoryPagination.page,
+              pageSize: categoryPagination.pageSize,
               total: categories.data?.total ?? 0,
             }}
-            onPageChange={setCategoryPage}
-            onPageSizeChange={(size) => {
-              setCategoryPageSize(size);
-              setCategoryPage(1);
-            }}
+            onPageChange={categoryPagination.setPage}
+            onPageSizeChange={categoryPagination.setPageSize}
             actions={[
               {
                 label: copy('Edit category'),
