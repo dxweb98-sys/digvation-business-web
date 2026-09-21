@@ -168,10 +168,10 @@ features/
       ...
     item-editor/
       model/
-        catalog-item-editor.state.ts
-        catalog-item-editor.reducer.ts
-        catalog-item-editor.validation.ts
-        catalog-item-editor.mapper.ts
+        catalog-item-editor-state.ts
+        catalog-item-editor-reducer.ts
+        catalog-item-editor-validation.ts
+        catalog-item-editor-mapper.ts
         use-catalog-item-editor.ts
       api/
         use-catalog-item-editor-data.ts
