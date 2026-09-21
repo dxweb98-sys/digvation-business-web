@@ -63,7 +63,7 @@ export function useCatalogItemEditorData({
   const loyaltyConfiguration = useQuery({
     queryKey: ['loyalty', 'configuration'],
     queryFn: () => loyaltyApi.getConfiguration(),
-    enabled: Boolean(item && canViewLoyalty),
+    enabled: canViewLoyalty,
   });
 
   const loyaltyRules = useQuery({
