@@ -7,7 +7,7 @@ import {
 import type {
   CatalogItemEditorForm,
   CatalogItemEditorLoyaltyDraft,
-} from './catalog-item-editor.state';
+} from './catalog-item-editor-state';
 
 function validOptionalMoney(value: string) {
   return !value.trim() || isValidSellingPrice(value);
