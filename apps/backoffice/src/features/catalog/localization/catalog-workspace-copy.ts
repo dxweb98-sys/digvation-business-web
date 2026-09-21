@@ -1,5 +1,4 @@
 export const catalogWorkspaceCopy: Record<string, { id: string; en: string }> = {
-id: string; en: string }> = {
   'Master Data': { id: 'Data utama', en: 'Master data' },
   Items: { id: 'Item', en: 'Items' },
   Categories: { id: 'Kategori', en: 'Categories' },
