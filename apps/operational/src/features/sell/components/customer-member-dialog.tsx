@@ -169,7 +169,7 @@ export function CustomerMemberDialog({
           <DTabsContent value="CUSTOMER" className="mt-4 space-y-3">
             <DAlert variant="neutral">
               {copy(
-                'Use a regular customer for this sale without creating Loyalty membership.',
+                'Use a regular customer for this sale without enrolling a membership.',
               )}
             </DAlert>
 
@@ -387,7 +387,7 @@ export function CustomerMemberDialog({
             <DTabsContent value="ENROLL" className="mt-4 space-y-3">
               <DAlert variant="neutral">
                 {copy(
-                  'Member enrollment activates Loyalty membership for the selected customer when available.',
+                  'Create a membership for this customer and select it for the sale.',
                 )}
               </DAlert>
 
