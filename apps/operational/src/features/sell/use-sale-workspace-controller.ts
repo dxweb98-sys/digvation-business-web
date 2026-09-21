@@ -199,6 +199,16 @@ export function useSaleWorkspaceController({
     },
   });
 
+  const commitPreparedDraft = (prepared: CartDraft): Promise<Sale> => {
+    const intent: CommitDraftIntent = {
+      draft: prepared,
+      idempotencyKey: createIdempotencyKey('start-sale'),
+    };
+    setDraft(prepared);
+    setRetryCommitIntent(intent);
+    return draftCommitGateRef.current.run(() => commitDraftMutation.mutateAsync(intent));
+  };
+
   const customerMutation = useMutation({
     mutationFn: (intent: {
       saleId: string;
@@ -296,15 +306,19 @@ export function useSaleWorkspaceController({
         command.reportError(new Error(copy('Resolve the selected price before adding this item.')));
         return;
       }
-      setRetryCommitIntent(null);
-      setDraft((current) =>
-        addCartDraftSelection(
-          current ?? emptyCartDraft(selectedLocationId, currency),
-          configuration.catalogItem,
-          configuration.catalogVariant,
-          configuration.resolvedPrice,
-        ),
+      if (commitDraftMutation.isPending) return;
+      const prepared = addCartDraftSelection(
+        draft ?? emptyCartDraft(selectedLocationId, currency),
+        configuration.catalogItem,
+        configuration.catalogVariant,
+        configuration.resolvedPrice,
       );
+      setRetryCommitIntent(null);
+      if (prepared.customer) {
+        void commitPreparedDraft(prepared).catch(() => undefined);
+      } else {
+        setDraft(prepared);
+      }
       return;
     }
     const compatibleLine = configuration
@@ -360,13 +374,13 @@ export function useSaleWorkspaceController({
   const changeCustomer = async (selection: SaleCustomerSelection) => {
     const sale = saleQuery.data;
     if (!sale) {
-      setDraft((current) =>
-        setCartDraftCustomer(
-          current ?? emptyCartDraft(selectedLocationId ?? '', currency),
-          selection,
-        ),
+      const prepared = setCartDraftCustomer(
+        draft ?? emptyCartDraft(selectedLocationId ?? '', currency),
+        selection,
       );
+      setDraft(prepared);
       setRetryCommitIntent(null);
+      if (prepared.lines.length) await commitPreparedDraft(prepared);
       return;
     }
     await customerMutation.mutateAsync({
@@ -408,6 +422,7 @@ export function useSaleWorkspaceController({
     viewModel,
     customer: activeCustomer,
     isCustomerPending: customerMutation.isPending,
+    isDraftCommitPending: commitDraftMutation.isPending,
     changeCustomer,
     isLoading: Boolean(routeSaleId) && saleQuery.isLoading,
     isLoyaltyRedemptionPending:
