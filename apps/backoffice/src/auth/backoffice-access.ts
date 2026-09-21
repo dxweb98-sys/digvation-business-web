@@ -6,7 +6,6 @@ export type BackofficeCapability =
   | 'promotions'
   | 'employees'
   | 'memberships'
-  | 'loyalty'
   | 'attendance'
   | 'finance'
   | 'expenses'
@@ -45,6 +44,7 @@ export type BackofficeAction =
   | 'manageAttendance'
   | 'enrollMember'
   | 'manageMember'
+  | 'viewLoyalty'
   | 'configureLoyalty'
   | 'createFinancialAccount'
   | 'updateFinancialAccount'
@@ -72,7 +72,6 @@ const capabilityPermissions: Record<BackofficeCapability, PermissionRequirement>
   promotions: { allOf: ['promotions:read'] },
   employees: { allOf: ['employees:read'] },
   memberships: { allOf: ['membership:read'] },
-  loyalty: { allOf: ['loyalty:read'] },
   attendance: { allOf: ['attendance:read'] },
   finance: { allOf: ['payments:read'] },
   expenses: { allOf: ['expenses:read'] },
@@ -130,6 +129,7 @@ const actionPermissions: Record<BackofficeAction, readonly string[]> = {
   manageAttendance: ['attendance:manage'],
   enrollMember: ['membership:enroll'],
   manageMember: ['customers:manage', 'membership:update'],
+  viewLoyalty: ['loyalty:read'],
   configureLoyalty: ['loyalty:configure'],
   createFinancialAccount: ['financial-accounts:create'],
   updateFinancialAccount: ['financial-accounts:update'],

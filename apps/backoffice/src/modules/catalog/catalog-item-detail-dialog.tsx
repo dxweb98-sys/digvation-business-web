@@ -20,6 +20,8 @@ import type {
   Variant,
 } from './catalog-api';
 import { CatalogItemThumbnail } from './catalog-item-thumbnail';
+import { CatalogLoyaltySection } from './catalog-loyalty-section';
+import type { LoyaltyApi } from '../loyalty/loyalty-api';
 import { useCatalogLocalization } from './catalog-localization';
 import {
   explicitVariantPriceRange,
@@ -57,6 +59,8 @@ export function CatalogItemDetailDialog({
   currency,
   effectiveAt,
   api,
+  loyaltyApi,
+  canViewLoyalty,
   canCreate,
   canUpdate,
   canViewPricing,
@@ -74,6 +78,8 @@ export function CatalogItemDetailDialog({
   currency: string;
   effectiveAt: string;
   api: CatalogApi;
+  loyaltyApi: LoyaltyApi;
+  canViewLoyalty: boolean;
   canCreate: boolean;
   canUpdate: boolean;
   canViewPricing: boolean;
@@ -419,6 +425,8 @@ export function CatalogItemDetailDialog({
             ]}
           />
         </CatalogSection>
+
+        {canViewLoyalty ? <CatalogLoyaltySection item={item} api={loyaltyApi} /> : null}
 
         <CatalogSection title="Informasi item" tone="secondary">
           <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">

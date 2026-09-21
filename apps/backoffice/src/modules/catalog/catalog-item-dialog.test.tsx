@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BackofficeLocalizationProvider } from '../../app/localization/backoffice-localization-base';
 import type { CatalogApi, Item, Variant } from './catalog-api';
 import { CatalogItemDialog } from './catalog-item-dialog';
+import type { LoyaltyApi } from '../loyalty/loyalty-api';
 
 vi.mock('../../auth/backoffice-auth-context', () => ({
   useBackofficeAuth: () => ({ status: 'authenticated', session: null }),
@@ -72,7 +73,30 @@ function fakeApi(overrides: Record<string, ReturnType<typeof vi.fn>> = {}) {
   };
 }
 
-function renderDialog(mocks: ReturnType<typeof fakeApi>, item: Item | null) {
+function fakeLoyaltyApi() {
+  return {
+    getConfiguration: vi.fn(async () => ({
+      configured: true,
+      defaultEarningBehavior: 'FIXED' as const,
+      defaultFixedPointsPerUnit: 1,
+      pointValue: '100.0000',
+      currency: 'IDR',
+      version: 1,
+    })),
+    listEarningRules: vi.fn(async () => []),
+    updateEarningRule: vi.fn(),
+  } as unknown as LoyaltyApi;
+}
+
+function renderDialog(
+  mocks: ReturnType<typeof fakeApi>,
+  item: Item | null,
+  loyalty: {
+    api?: LoyaltyApi;
+    canView?: boolean;
+    canConfigure?: boolean;
+  } = {},
+) {
   const api = mocks as unknown as CatalogApi;
   const onClose = vi.fn();
   render(
@@ -85,6 +109,9 @@ function renderDialog(mocks: ReturnType<typeof fakeApi>, item: Item | null) {
               categories={[]}
               currency="IDR"
               api={api}
+              loyaltyApi={loyalty.api ?? ({} as LoyaltyApi)}
+              canViewLoyalty={loyalty.canView ?? false}
+              canConfigureLoyalty={loyalty.canConfigure ?? false}
               canViewPricing
               canCreatePricing
               canCreateVariants
@@ -108,6 +135,19 @@ const type = (element: HTMLElement, value: string) =>
 afterEach(cleanup);
 
 describe('CatalogItemDialog variant pricing', () => {
+  it('shows the inherited loyalty rule in Edit Item without mutation controls for a read-only user', async () => {
+    const { dialog } = renderDialog(fakeApi(), existingItem, {
+      api: fakeLoyaltyApi(),
+      canView: true,
+      canConfigure: false,
+    });
+
+    const scope = () => within(dialog());
+    expect(await scope().findByText('Mengikuti default')).toBeTruthy();
+    expect(scope().getByText('1 poin / unit')).toBeTruthy();
+    expect(scope().queryByLabelText('Poin per unit')).toBeNull();
+  });
+
   it('creates an item without variants exactly as before', async () => {
     const api = fakeApi();
     const { dialog } = renderDialog(api, null);

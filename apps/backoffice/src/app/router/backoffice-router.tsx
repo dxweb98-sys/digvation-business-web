@@ -13,7 +13,6 @@ import { CatalogPage } from '../../modules/catalog';
 import { PromotionsPage } from '../../modules/promotions';
 import { EmployeesPage } from '../../modules/workforce';
 import { MembersPage } from '../../modules/membership';
-import { LoyaltyPage } from '../../modules/loyalty';
 import { ExpensesPage, FinancialAccountsPage } from '../../modules/finance';
 import { TransactionHistoryPage } from '../../modules/pos';
 import { ReportsPage } from '../../modules/reporting';
@@ -48,10 +47,6 @@ export const backofficeRouter = createBrowserRouter([
           {
             element: <AuthorizedRoute capability="memberships" />,
             children: [{ path: '/memberships', element: <MembersPage /> }],
-          },
-          {
-            element: <AuthorizedRoute capability="loyalty" />,
-            children: [{ path: '/loyalty', element: <LoyaltyPage /> }],
           },
           {
             element: <AuthorizedRoute capability="financialAccounts" />,
