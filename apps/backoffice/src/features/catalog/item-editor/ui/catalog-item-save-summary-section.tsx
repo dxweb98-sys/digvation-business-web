@@ -1,4 +1,4 @@
-import { CatalogSection } from '../../ui/catalog-shared';
+import { CatalogPanel, CatalogPanelHeader } from '../../ui/catalog-shared';
 import {
   sellingModelCopy,
   sellsItemItself,
@@ -23,12 +23,13 @@ export function CatalogItemSaveSummarySection({
   const { variants, defaultPrice } = editor.form;
 
   return (
-    <CatalogSection
-      title="Akan disimpan"
-      tone="secondary"
-      description={sellingModelCopy[model].description}
-    >
-      <dl className="grid gap-x-6 gap-y-1.5 text-sm sm:grid-cols-2">
+    <CatalogPanel ariaLabel="Akan disimpan">
+      <CatalogPanelHeader
+        title="Akan disimpan"
+        description={sellingModelCopy[model].description}
+        compact
+      />
+      <dl className="grid gap-x-6 gap-y-2 px-4 py-3 text-sm sm:grid-cols-2">
         {sellsItemItself(model) ? (
           <div
             className="flex justify-between gap-3 border-b border-(--color-border) pb-2 sm:col-span-2"
@@ -63,6 +64,6 @@ export function CatalogItemSaveSummarySection({
           </div>
         ))}
       </dl>
-    </CatalogSection>
+    </CatalogPanel>
   );
 }
