@@ -20,7 +20,6 @@ import { useListQuery } from '../../../shared/query/use-list-query';
 import { usePaginationState } from '../../../shared/query/use-pagination-state';
 import {
   canPerformBackofficeAction,
-  hasBackofficeRuntimeCapability,
   type BackofficeAction,
 } from '../../../auth/backoffice-access';
 import { useBackofficeAuth } from '../../../auth/backoffice-auth-context';
@@ -79,7 +78,9 @@ export function CatalogPage() {
 
   const can = (action: BackofficeAction) =>
     Boolean(session && canPerformBackofficeAction(session, action));
-  const hasLoyaltyCapability = hasBackofficeRuntimeCapability(session, 'LOYALTY_POINTS');
+  const hasLoyaltyCapability = Boolean(
+    session?.access.capabilities.includes('LOYALTY_POINTS'),
+  );
   const canViewLoyalty = hasLoyaltyCapability && can('viewLoyalty');
   const canConfigureLoyalty = hasLoyaltyCapability && can('configureLoyalty');
 
