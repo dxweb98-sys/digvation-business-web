@@ -76,6 +76,9 @@ importers:
       '@digvation/business-auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@digvation/business-catalog':
+        specifier: workspace:*
+        version: link:../../packages/catalog
       '@digvation/business-runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
@@ -152,6 +155,8 @@ importers:
       react:
         specifier: ^19.2.0
         version: 19.2.8
+
+  packages/catalog: {}
 
   packages/money:
     dependencies:
