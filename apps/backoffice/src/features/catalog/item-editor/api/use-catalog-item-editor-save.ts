@@ -222,7 +222,8 @@ export function useCatalogItemEditorSave({
           variant: 'danger',
           title: createdItem
             ? 'Item tersimpan, tetapi pengaturan awal belum lengkap.'
-            : 'Item tersimpan, tetapi harga, gambar, atau pengaturan terkait belum selesai diperbarui.',
+            : 'Item tersimpan, tetapi harga, gambar, atau pengaturan terkait belum selesai ' +
+              'diperbarui.',
         });
 
         onClose();
