@@ -202,6 +202,37 @@ misc/
 
 when those names hide feature ownership. Small local folders may use them when responsibility remains obvious, but they are not the default architecture.
 
+## Current Backoffice reference layout
+
+The current Catalog refactor is the concrete reference for Backoffice feature ownership:
+
+```text
+apps/backoffice/src/
+├── features/
+│   └── catalog/
+│       ├── api/
+│       ├── model/
+│       ├── localization/
+│       ├── ui/
+│       └── item-editor/
+│           ├── api/
+│           ├── model/
+│           └── ui/
+│
+└── shared/
+    ├── api/
+    │   └── build-query-string.ts
+    ├── forms/
+    │   └── use-form-state.ts
+    └── query/
+        ├── use-list-query.ts
+        └── use-pagination-state.ts
+```
+
+`apps/backoffice/src/modules/catalog` is no longer an accepted Catalog implementation path. New Catalog work belongs under `features/catalog`.
+
+The shared files above are Backoffice-wide primitives and may be reused by any Backoffice feature when their semantics match. Their existence does not require every feature to use them.
+
 ## Reuse without speculative abstraction
 
 Do not promote domain code across applications merely because two experiences happen to use similar vocabulary.
