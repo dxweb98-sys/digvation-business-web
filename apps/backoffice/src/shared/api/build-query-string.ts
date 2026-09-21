@@ -1,11 +1,9 @@
-export type QueryStringValue = string | number | boolean | null | undefined;
-
 /**
  * Build URL query parameters while omitting values that mean "not provided".
  *
  * Null, undefined, and empty strings are omitted. Zero and false are preserved.
  */
-export function buildQueryString(input: Record<string, QueryStringValue>) {
+export function buildQueryString<T extends object>(input: T) {
   const params = new URLSearchParams();
 
   for (const [key, value] of Object.entries(input)) {
