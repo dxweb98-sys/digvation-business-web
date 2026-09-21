@@ -39,6 +39,7 @@ export function CatalogItemInformationSection({
   return (
     <CatalogSection
       title="Informasi Item"
+      icon={<Info className="size-4" aria-hidden="true" />}
       actions={
         <span className="text-xs font-normal normal-case text-[var(--color-text-muted)]">
           Tampil di kasir POS
