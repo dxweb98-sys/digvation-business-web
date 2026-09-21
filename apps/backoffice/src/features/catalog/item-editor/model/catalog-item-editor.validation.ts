@@ -1,4 +1,4 @@
-import { sellingModel, sellsItemItself } from '../../../../modules/catalog/catalog-selling';
+import { sellingModel, sellsItemItself } from '../../model/catalog-selling';
 
 import {
   isValidSellingPrice,
