@@ -1,4 +1,4 @@
-import { DDialog } from '@digvation/ui';
+import { DBadge, DDialog } from '@digvation/ui';
 import { useEffect, useMemo } from 'react';
 import { useCatalogItemEditorData } from '../api/use-catalog-item-editor-data';
 import { useCatalogItemEditorSave } from '../api/use-catalog-item-editor-save';
@@ -6,16 +6,14 @@ import { deriveCatalogItemEditorValidation } from '../model/catalog-item-editor-
 import { useCatalogItemEditor } from '../model/use-catalog-item-editor';
 import type { LoyaltyApi } from '../../../../modules/loyalty/loyalty-api';
 import type { CatalogApi, Category, Item } from '../../api/catalog-api';
-import { CatalogItemEditorHeader } from './catalog-item-editor-header';
 import { CatalogItemInformationSection } from './catalog-item-information-section';
 import { CatalogItemLoyaltySection } from './catalog-item-loyalty-section';
 import { CatalogItemPricingSection } from './catalog-item-pricing-section';
 import { CatalogItemSaveSummarySection } from './catalog-item-save-summary-section';
-import { CatalogItemServiceSection } from './catalog-item-service-section';
 import { CatalogItemVariantsSection } from './catalog-item-variants-section';
 import { useCatalogLocalization } from '../../localization/use-catalog-localization';
 import { variantPriceState } from '../../model/catalog-price-history';
-import { DialogFooter } from '../../ui/catalog-shared';
+import { DialogFooter, Status } from '../../ui/catalog-shared';
 import { editableAmount } from '../model/variant-price-draft';
 
 export function CatalogItemDialog({
@@ -192,24 +190,19 @@ export function CatalogItemDialog({
       open={item !== undefined}
       onClose={onClose}
       size="xl"
-      title={fresh ? 'Tambah Item' : 'Edit Item'}
-      description={
-        fresh
-          ? 'Isi informasi item, lalu tentukan cara penjualan dan harganya.'
-          : 'Perbarui informasi, cara penjualan, dan harga.'
+      title={
+        <div className="flex flex-wrap items-center gap-2">
+          <span>{fresh ? 'Tambah Item' : 'Edit Item'}</span>
+          {!fresh && item ? (
+            <>
+              <DBadge variant="info">{item.code}</DBadge>
+              <Status value={item.lifecycle} />
+            </>
+          ) : null}
+        </div>
       }
       footer={<DialogFooter onClose={onClose} onSave={() => void save()} disabled={disabled} />}
     >
-      {item ? (
-        <CatalogItemEditorHeader
-          item={item}
-          api={api}
-          hasVariants={hasVariants}
-          canViewPricing={canViewPricing}
-          variantPricesLoading={variantPricesLoading}
-        />
-      ) : null}
-
       <div className="divide-y divide-(--color-border)">
         <CatalogItemInformationSection
           editor={editor}
@@ -217,14 +210,8 @@ export function CatalogItemDialog({
           categoryOptions={categoryOptions}
           canManageImage={canManageImage}
           existingImage={existingImage.data}
+          validDefaultDuration={validDefaultDuration}
         />
-
-        {type === 'SERVICE' ? (
-          <CatalogItemServiceSection
-            editor={editor}
-            validDefaultDuration={validDefaultDuration}
-          />
-        ) : null}
 
         {!fresh && canViewLoyalty ? (
           <CatalogItemLoyaltySection
