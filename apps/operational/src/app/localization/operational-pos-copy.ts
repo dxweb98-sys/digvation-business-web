@@ -295,6 +295,18 @@ const posCopy: Record<string, LocalizedCopy> = {
   'Promotions and discounts': { 'id-ID': 'Promo dan diskon', 'en-US': 'Promotions and discounts' },
   Promotion: { 'id-ID': 'Promo', 'en-US': 'Promotion' },
   'Use member points': { 'id-ID': 'Gunakan poin member', 'en-US': 'Use member points' },
+  'Loyalty points': { 'id-ID': 'Poin loyalty', 'en-US': 'Loyalty points' },
+  'Point balance': { 'id-ID': 'Saldo poin', 'en-US': 'Point balance' },
+  'Loyalty redemption': { 'id-ID': 'Penggunaan poin', 'en-US': 'Loyalty redemption' },
+  'points used': { 'id-ID': 'poin digunakan', 'en-US': 'points used' },
+  'Use loyalty points': { 'id-ID': 'Gunakan poin', 'en-US': 'Use loyalty points' },
+  'Change points': { 'id-ID': 'Ubah poin', 'en-US': 'Change points' },
+  Update: { 'id-ID': 'Perbarui', 'en-US': 'Update' },
+  'Use member points for this transaction. Points are consumed only when the sale is finalized.': {
+    'id-ID': 'Gunakan poin member untuk transaksi ini. Poin baru dipotong saat transaksi berhasil diselesaikan.',
+    'en-US': 'Use member points for this transaction. Points are consumed only when the sale is finalized.',
+  },
+  'Loading loyalty points…': { 'id-ID': 'Memuat poin loyalty…', 'en-US': 'Loading loyalty points…' },
   'Choose a payment method before continuing.': {
     'id-ID': 'Pilih metode pembayaran sebelum melanjutkan.',
     'en-US': 'Choose a payment method before continuing.',
