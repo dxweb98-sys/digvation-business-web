@@ -33,7 +33,7 @@ export function CatalogItemSaveSummarySection({
           <div
             className="flex justify-between gap-3 border-b border-(--color-border) pb-2 sm:col-span-2"
           >
-            <dt className="text-(--color-text-muted)">Tanpa varian</dt>
+            <dt className="text-(--color-text-muted)">Default / Item utama</dt>
             <dd
               className={`font-medium tabular-nums ${
                 isValidSellingPrice(defaultPrice) ? '' : 'text-(--color-danger)'
