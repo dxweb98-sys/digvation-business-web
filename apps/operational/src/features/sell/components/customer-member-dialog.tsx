@@ -509,17 +509,17 @@ export function CustomerMemberDialog({
                 <div className="space-y-3">
                   <DInput
                     label={text('Full name')}
-                  value={name}
-                  onChange={setName}
-                  disabled={isEnrolling}
-                />
-                <DInput
-                  label={text('WhatsApp / phone')}
-                  value={phone}
-                  onChange={setPhone}
-                  inputMode="tel"
-                  disabled={isEnrolling}
-                />
+                    value={name}
+                    onChange={setName}
+                    disabled={isEnrolling}
+                  />
+                  <DInput
+                    label={text('WhatsApp / phone')}
+                    value={phone}
+                    onChange={setPhone}
+                    inputMode="tel"
+                    disabled={isEnrolling}
+                  />
                   <DInput
                     label={text('NIK')}
                     value={nik}
