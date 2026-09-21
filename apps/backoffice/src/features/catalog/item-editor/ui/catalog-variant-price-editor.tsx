@@ -27,6 +27,7 @@ export function VariantPriceEditor({
   currency,
   canPrice,
   canAddVariants,
+  variantRequired = false,
   seed,
   showIssues,
 }: {
@@ -35,6 +36,7 @@ export function VariantPriceEditor({
   currency: string;
   canPrice: boolean;
   canAddVariants: boolean;
+  variantRequired?: boolean;
   seed?: { label: string; amount: string } | null;
   showIssues: boolean;
 }) {
@@ -47,11 +49,27 @@ export function VariantPriceEditor({
 
   if (!drafts.length) {
     return (
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)]/25 px-4 py-5">
+      <div
+        className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed px-4 py-5 ${
+          variantRequired && showIssues
+            ? 'border-[var(--color-danger)]/50 bg-[var(--color-danger)]/[0.03]'
+            : 'border-[var(--color-border)] bg-[var(--color-surface-muted)]/25'
+        }`}
+      >
         <div>
-          <p className="text-sm font-medium text-[var(--color-text)]">Belum ada varian.</p>
-          <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
-            Item dijual langsung dengan harga jual utama.
+          <p className="text-sm font-medium text-[var(--color-text)]">
+            {variantRequired ? 'Varian wajib belum ditambahkan.' : 'Belum ada varian tambahan.'}
+          </p>
+          <p
+            className={`mt-0.5 text-xs ${
+              variantRequired && showIssues
+                ? 'text-[var(--color-danger)]'
+                : 'text-[var(--color-text-muted)]'
+            }`}
+          >
+            {variantRequired
+              ? 'Tambahkan minimal satu varian dengan harga final.'
+              : 'Opsi Default / Item utama tetap dapat dijual tanpa varian.'}
           </p>
         </div>
         {canAddVariants ? (
