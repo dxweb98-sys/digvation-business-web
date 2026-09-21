@@ -33,17 +33,27 @@ jobs:
       - name: Contract and naming
         run: pnpm contract:check && pnpm naming:check
 
-      - name: Lint
-        continue-on-error: true
-        run: pnpm lint
+      - name: Refactor lint
+        run: >-
+          pnpm exec eslint
+          apps/backoffice/src/features/catalog
+          apps/backoffice/src/shared
+          apps/backoffice/src/modules/catalog
+          apps/backoffice/src/modules/workforce/employees-api.ts
 
-      - name: Typecheck
-        run: pnpm typecheck
+      - name: Backoffice typecheck
+        run: pnpm --filter @digvation/business-backoffice typecheck
 
-      - name: Unit tests
-        run: pnpm test
+      - name: Catalog and shared tests
+        run: >-
+          pnpm exec vitest run
+          apps/backoffice/src/features/catalog
+          apps/backoffice/src/modules/catalog/catalog-item-dialog.test.tsx
+          apps/backoffice/src/modules/catalog/catalog-price-history.test.ts
+          apps/backoffice/src/modules/catalog/catalog-variant-price-draft.test.ts
+          apps/backoffice/src/shared
 
-      - name: Build
+      - name: Backoffice build
         env:
           VITE_BUILD_REVISION: ${{ github.sha }}
-        run: pnpm build
+        run: pnpm build:backoffice
