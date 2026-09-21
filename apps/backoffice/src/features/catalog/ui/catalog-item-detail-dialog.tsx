@@ -404,11 +404,7 @@ export function CatalogItemDetailDialog({
           <p className="text-xs font-semibold uppercase tracking-[0.04em] text-[var(--color-text-muted)]">
             Informasi Tambahan
           </p>
-          <div
-            className={`mt-4 grid gap-3 sm:grid-cols-2 ${
-              canViewLoyalty ? 'lg:grid-cols-4' : 'lg:grid-cols-3'
-            }`}
-          >
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <CatalogInfoTile
               label="Tipe Produk / Item"
               icon={<Briefcase className="size-3.5" aria-hidden="true" />}
