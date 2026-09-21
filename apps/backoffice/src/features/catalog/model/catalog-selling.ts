@@ -10,6 +10,14 @@ export function sellingModel(
   return mode === 'OPTIONAL' ? 'ITEM_AND_VARIANTS' : 'VARIANT_REQUIRED';
 }
 
+/**
+ * Editor intent must remain stable before variants exist.
+ * Runtime/detail can still collapse an item with zero active variants to DIRECT.
+ */
+export function editorSellingModel(mode: VariantSelectionMode): SellingModel {
+  return mode === 'OPTIONAL' ? 'ITEM_AND_VARIANTS' : 'VARIANT_REQUIRED';
+}
+
 export function sellsItemItself(model: SellingModel) {
   return model !== 'VARIANT_REQUIRED';
 }
@@ -20,14 +28,14 @@ export const sellingModelCopy: Record<
 > = {
   DIRECT: {
     label: 'Dijual langsung',
-    description: 'Item dijual dengan satu harga, tanpa memilih varian.',
+    description: 'Item utama dijual langsung sebagai opsi default.',
   },
   VARIANT_REQUIRED: {
     label: 'Wajib pilih varian',
-    description: 'Kasir harus memilih salah satu varian. Item tidak dijual tanpa varian.',
+    description: 'Kasir wajib memilih varian. Opsi default / item utama tidak dijual.',
   },
   ITEM_AND_VARIANTS: {
     label: 'Bisa tanpa varian',
-    description: 'Item juga dijual tanpa varian dengan harganya sendiri, selain setiap varian.',
+    description: 'Item utama tetap dijual sebagai opsi default; varian menjadi pilihan tambahan.',
   },
 };
