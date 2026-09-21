@@ -1,4 +1,3 @@
-import { CatalogPanel, CatalogPanelHeader } from '../../ui/catalog-shared';
 import {
   sellingModelCopy,
   sellsItemItself,
@@ -23,21 +22,26 @@ export function CatalogItemSaveSummarySection({
   const { variants, defaultPrice } = editor.form;
 
   return (
-    <CatalogPanel ariaLabel="Akan disimpan">
-      <CatalogPanelHeader
-        title="Akan disimpan"
-        description={sellingModelCopy[model].description}
-        compact
-      />
-      <dl className="grid gap-x-6 gap-y-2 px-4 py-3 text-sm sm:grid-cols-2">
+    <section
+      aria-label="Akan disimpan"
+      className="mt-5 border-t border-[var(--color-border)] pt-4"
+    >
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.04em] text-[var(--color-text)]">
+          Akan disimpan
+        </p>
+        <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
+          {sellingModelCopy[model].description}
+        </p>
+      </div>
+
+      <dl className="mt-3 grid gap-x-6 gap-y-2 rounded-xl bg-[var(--color-surface-muted)]/35 p-3 text-sm sm:grid-cols-2">
         {sellsItemItself(model) ? (
-          <div
-            className="flex justify-between gap-3 border-b border-(--color-border) pb-2 sm:col-span-2"
-          >
-            <dt className="text-(--color-text-muted)">Default / Item utama</dt>
+          <div className="flex justify-between gap-3 border-b border-[var(--color-border)] pb-2 sm:col-span-2">
+            <dt className="text-[var(--color-text-muted)]">Default / Item utama</dt>
             <dd
               className={`font-medium tabular-nums ${
-                isValidSellingPrice(defaultPrice) ? '' : 'text-(--color-danger)'
+                isValidSellingPrice(defaultPrice) ? '' : 'text-[var(--color-danger)]'
               }`}
             >
               {isValidSellingPrice(defaultPrice)
@@ -49,12 +53,12 @@ export function CatalogItemSaveSummarySection({
 
         {variants.map((draft, index) => (
           <div key={draft.key} className="flex justify-between gap-3">
-            <dt className="truncate text-(--color-text-muted)">
+            <dt className="truncate text-[var(--color-text-muted)]">
               {draft.name.trim() || `Varian ${index + 1}`}
             </dt>
             <dd
               className={`font-medium tabular-nums ${
-                isValidSellingPrice(draft.price) ? '' : 'text-(--color-danger)'
+                isValidSellingPrice(draft.price) ? '' : 'text-[var(--color-danger)]'
               }`}
             >
               {isValidSellingPrice(draft.price)
@@ -64,6 +68,6 @@ export function CatalogItemSaveSummarySection({
           </div>
         ))}
       </dl>
-    </CatalogPanel>
+    </section>
   );
 }
