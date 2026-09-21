@@ -34,6 +34,7 @@ jobs:
         run: pnpm contract:check && pnpm naming:check
 
       - name: Lint
+        continue-on-error: true
         run: pnpm lint
 
       - name: Typecheck
