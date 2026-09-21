@@ -5,7 +5,7 @@ import type {
   LoyaltyConfiguration,
   LoyaltyEarningRule,
 } from '../../../../modules/loyalty/loyalty-api';
-import { CatalogSection } from '../../ui/catalog-shared';
+import { CatalogPanel, CatalogPanelHeader } from '../../ui/catalog-shared';
 import type { useCatalogItemEditor } from '../model/use-catalog-item-editor';
 
 type CatalogItemEditor = ReturnType<typeof useCatalogItemEditor>;
@@ -34,17 +34,20 @@ export function CatalogItemLoyaltySection({
   const active = effectiveBehavior === 'FIXED';
 
   return (
-    <CatalogSection
-      title="Poin Loyalitas Member"
-      icon={<Star className="size-4" aria-hidden="true" />}
-      actions={
-        loading ? null : (
-          <DBadge variant={active ? 'success' : 'secondary'}>
-            {active ? 'Aktif' : 'Nonaktif'}
-          </DBadge>
-        )
-      }
-    >
+    <CatalogPanel ariaLabel="Poin Loyalitas Member">
+      <CatalogPanelHeader
+        title="Poin Loyalitas Member"
+        icon={<Star className="size-4" aria-hidden="true" />}
+        description="Atur perilaku poin khusus item tanpa mengubah konfigurasi Loyalty bisnis."
+        actions={
+          loading ? null : (
+            <DBadge variant={active ? 'success' : 'secondary'}>
+              {active ? 'Aktif' : 'Nonaktif'}
+            </DBadge>
+          )
+        }
+      />
+      <div className="p-5">
       {loading ? (
         <div className="rounded-xl border border-[var(--color-border)] px-4 py-5 text-sm text-[var(--color-text-muted)]">
           Memuat aturan poin...
@@ -121,6 +124,7 @@ export function CatalogItemLoyaltySection({
           )}
         </div>
       )}
-    </CatalogSection>
+      </div>
+    </CatalogPanel>
   );
 }
