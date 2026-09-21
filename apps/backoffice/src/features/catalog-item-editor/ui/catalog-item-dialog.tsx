@@ -1,7 +1,12 @@
 import { DCurrencyInput, DDialog, DInput, DSelect, DTextarea, useToast } from '@digvation/ui';
-import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo } from 'react';
 import { normalizeBackofficeApiError } from '../../../app/api/backoffice-api-error';
+import { useCatalogItemEditorData } from '../api/use-catalog-item-editor-data';
+import {
+  buildCatalogItemBaseInput,
+  normalizeOptionalCatalogCode,
+} from '../model/catalog-item-editor.mapper';
 import { deriveCatalogItemEditorValidation } from '../model/catalog-item-editor.validation';
 import { useCatalogItemEditor } from '../model/use-catalog-item-editor';
 import { isSessionExpiredError } from '../../../auth/backoffice-auth-context';
@@ -99,52 +104,25 @@ export function CatalogItemDialog({
   } = editor.actions;
   const effectiveAt = editor.effectiveAt;
 
-  const existingImage = useQuery({
-    queryKey: ['catalog', 'image', item?.id ?? 'new'],
-    queryFn: () => api.getItemImage(item!.id),
-    enabled: Boolean(item),
-    staleTime: 60_000,
+  const {
+    existingImage,
+    currentPrice,
+    existingVariants,
+    activeVariants,
+    variantPrices,
+    variantPricesLoading,
+    loyaltyConfiguration,
+    loyaltyRules,
+    loyaltyRule,
+  } = useCatalogItemEditorData({
+    item,
+    currency,
+    effectiveAt,
+    api,
+    loyaltyApi,
+    canViewPricing,
+    canViewLoyalty,
   });
-  const currentPrice = useQuery({
-    queryKey: ['catalog', 'edit-price', item?.id ?? 'new', currency],
-    queryFn: () => api.listDefaultPrices([item!.id], currency, effectiveAt),
-    enabled: Boolean(item && canViewPricing),
-  });
-  // Edit: existing active variants and the explicit price Runtime currently holds for each.
-  const existingVariants = useQuery({
-    queryKey: ['catalog', 'variants', item?.id ?? 'new'],
-    queryFn: () => api.listVariants(item!.id),
-    enabled: Boolean(item && canViewPricing),
-  });
-  const activeVariants = (existingVariants.data?.items ?? []).filter(
-    (variant) => variant.status === 'ACTIVE',
-  );
-  const variantPrices = useQueries({
-    queries: activeVariants.map((variant) => ({
-      queryKey: ['catalog', 'edit-variant-price', item?.id ?? 'new', variant.id, currency],
-      queryFn: () =>
-        api.resolvePrice({
-          catalogItemId: item!.id,
-          catalogVariantId: variant.id,
-          currency,
-          effectiveAt,
-        }),
-      retry: false,
-    })),
-  });
-  const variantPricesLoading =
-    existingVariants.isLoading || variantPrices.some((query) => query.isLoading);
-  const loyaltyConfiguration = useQuery({
-    queryKey: ['loyalty', 'configuration'],
-    queryFn: () => loyaltyApi.getConfiguration(),
-    enabled: Boolean(item && canViewLoyalty),
-  });
-  const loyaltyRules = useQuery({
-    queryKey: ['loyalty', 'earning-rules'],
-    queryFn: () => loyaltyApi.listEarningRules(),
-    enabled: Boolean(item && canViewLoyalty),
-  });
-  const loyaltyRule = loyaltyRules.data?.find((candidate) => candidate.catalogItemId === item?.id);
 
   useEffect(() => {
     if (!item || !canViewLoyalty || loyaltyRules.isLoading || loyaltyRuleLoaded.current) return;
@@ -240,31 +218,29 @@ export function CatalogItemDialog({
     let persistedItem: Item | null = null;
     let createdItem = false;
     try {
-      const serviceDefinition =
-        type === 'SERVICE' ? { defaultDurationMinutes: parsedDefaultDuration } : undefined;
-      const baseInput = {
-        ...(hasVariants ? { variantSelectionMode } : {}),
-        name: name.trim(),
-        categoryId,
-        description: description.trim() || null,
-        lifecycle,
-        fulfillmentBehavior: type === 'SERVICE' ? ('TRACKED' as const) : ('INSTANT' as const),
-        ...(serviceDefinition ? { serviceDefinition } : {}),
-      };
+      const baseInput = buildCatalogItemBaseInput({
+        form: editor.form,
+        hasVariants,
+        parsedDefaultDuration,
+      });
       const effectiveFrom = new Date().toISOString();
       const createdVariantIds = new Map<string, string>();
 
       if (fresh) {
         persistedItem = await api.createItem({
           ...baseInput,
-          ...(code.trim() ? { code: code.trim().toUpperCase() } : {}),
+          ...(normalizeOptionalCatalogCode(code)
+            ? { code: normalizeOptionalCatalogCode(code)! }
+            : {}),
           type,
         });
         createdItem = true;
         if (canCreateVariants)
           for (const draft of variants) {
             const created = await api.createVariant(persistedItem.id, {
-              ...(draft.code.trim() ? { code: draft.code.trim().toUpperCase() } : {}),
+              ...(normalizeOptionalCatalogCode(draft.code)
+                ? { code: normalizeOptionalCatalogCode(draft.code)! }
+                : {}),
               name: draft.name.trim(),
               status: 'ACTIVE',
             });
