@@ -51,7 +51,19 @@ export function CatalogItemDialog({
   onSaved: () => void;
 }) {
   const fresh = item === null;
-  const [activeEditorTab, setActiveEditorTab] = useState<'additional' | 'pricing'>('additional');
+  const editorIdentity = item === undefined ? 'closed' : item === null ? 'new' : item.id;
+  const [editorTabState, setEditorTabState] = useState<{
+    identity: string;
+    value: 'additional' | 'pricing';
+  }>({
+    identity: editorIdentity,
+    value: 'additional',
+  });
+  const activeEditorTab =
+    editorTabState.identity === editorIdentity ? editorTabState.value : 'additional';
+  const setActiveEditorTab = (value: 'additional' | 'pricing') => {
+    setEditorTabState({ identity: editorIdentity, value });
+  };
   const { formatMoney } = useCatalogLocalization();
   const editor = useCatalogItemEditor(item);
 
@@ -64,10 +76,6 @@ export function CatalogItemDialog({
     hydrateLoyaltyOnce,
   } = editor.actions;
   const effectiveAt = editor.effectiveAt;
-
-  useEffect(() => {
-    setActiveEditorTab('additional');
-  }, [item?.id, fresh]);
 
   const {
     existingImage,
