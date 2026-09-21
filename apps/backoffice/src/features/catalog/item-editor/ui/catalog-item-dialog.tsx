@@ -49,7 +49,7 @@ export function CatalogItemDialog({
   const { formatMoney } = useCatalogLocalization();
   const editor = useCatalogItemEditor(item);
 
-  const { name, type } = editor.form;
+  const { name } = editor.form;
   const { touched: loyaltyTouched, behavior: loyaltyBehavior } = editor.loyalty;
   const { showIssues, saving } = editor.ui;
   const {
@@ -213,17 +213,6 @@ export function CatalogItemDialog({
           validDefaultDuration={validDefaultDuration}
         />
 
-        {!fresh && canViewLoyalty ? (
-          <CatalogItemLoyaltySection
-            editor={editor}
-            loyaltyRule={loyaltyRule}
-            configuration={loyaltyConfiguration.data}
-            loading={loyaltyRules.isLoading || loyaltyConfiguration.isLoading}
-            canConfigure={canConfigureLoyalty}
-            loyaltyDraftValid={loyaltyDraftValid}
-          />
-        ) : null}
-
         {showPrice ? (
           <CatalogItemPricingSection
             editor={editor}
@@ -250,6 +239,17 @@ export function CatalogItemDialog({
           variantPricesLoading={variantPricesLoading}
           inactiveVariantCount={inactiveVariantCount}
         />
+
+        {!fresh && canViewLoyalty ? (
+          <CatalogItemLoyaltySection
+            editor={editor}
+            loyaltyRule={loyaltyRule}
+            configuration={loyaltyConfiguration.data}
+            loading={loyaltyRules.isLoading || loyaltyConfiguration.isLoading}
+            canConfigure={canConfigureLoyalty}
+            loyaltyDraftValid={loyaltyDraftValid}
+          />
+        ) : null}
 
         {fresh && hasVariants && canEditPrice ? (
           <CatalogItemSaveSummarySection
