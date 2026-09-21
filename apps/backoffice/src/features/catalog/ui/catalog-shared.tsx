@@ -103,12 +103,15 @@ export function DetailField({
 export function CatalogPanel({
   children,
   className = '',
+  ariaLabel,
 }: {
   children: ReactNode;
   className?: string;
+  ariaLabel?: string;
 }) {
   return (
     <section
+      aria-label={ariaLabel}
       className={`overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm ${className}`}
     >
       {children}
