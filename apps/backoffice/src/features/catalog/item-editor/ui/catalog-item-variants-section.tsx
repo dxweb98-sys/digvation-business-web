@@ -29,7 +29,7 @@ export function CatalogItemVariantsSection({
   const { showIssues } = editor.ui;
   const { setFormField } = editor.actions;
   const hasVariants = variants.length > 0;
-  const showVariants = fresh ? canCreateVariants : canViewPricing && hasVariants;
+  const showVariants = canCreateVariants || (canViewPricing && hasVariants);
 
   if (!showVariants && !(!fresh && canViewPricing && variantPricesLoading)) {
     return null;
@@ -53,7 +53,8 @@ export function CatalogItemVariantsSection({
           onChange={(value) => setFormField('variants', value)}
           currency={currency}
           canPrice={canEditPrice}
-          canAddVariants={fresh && canCreateVariants}
+          canAddVariants={canCreateVariants}
+          variantRequired={model === 'VARIANT_REQUIRED'}
           seed={
             sellsItemItself(model) && hasVariants
               ? { label: 'Pakai harga tanpa varian', amount: defaultPrice }
