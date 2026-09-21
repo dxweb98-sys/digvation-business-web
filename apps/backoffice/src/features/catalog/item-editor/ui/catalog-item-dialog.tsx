@@ -54,11 +54,10 @@ export function CatalogItemDialog({
   const { name, type } = editor.form;
   const { touched: loyaltyTouched, behavior: loyaltyBehavior } = editor.loyalty;
   const { showIssues, saving } = editor.ui;
-  const { initialPrice, variantsLoaded, loyaltyRuleLoaded } = editor.refs;
   const {
-    hydrateDefaultPrice,
-    hydrateVariants,
-    hydrateLoyalty,
+    hydrateDefaultPriceOnce,
+    hydrateVariantsOnce,
+    hydrateLoyaltyOnce,
   } = editor.actions;
   const effectiveAt = editor.effectiveAt;
 
@@ -83,26 +82,25 @@ export function CatalogItemDialog({
   });
 
   useEffect(() => {
-    if (!item || !canViewLoyalty || loyaltyRules.isLoading || loyaltyRuleLoaded.current) return;
-    loyaltyRuleLoaded.current = true;
-    hydrateLoyalty(
+    if (!item || !canViewLoyalty || loyaltyRules.isLoading) return;
+
+    hydrateLoyaltyOnce(
       loyaltyRule?.behavior ?? 'FIXED',
       loyaltyRule ? String(loyaltyRule.fixedPointsPerUnit) : '',
     );
-  }, [canViewLoyalty, hydrateLoyalty, item, loyaltyRule, loyaltyRuleLoaded, loyaltyRules.isLoading]);
+  }, [canViewLoyalty, hydrateLoyaltyOnce, item, loyaltyRule, loyaltyRules.isLoading]);
 
   useEffect(() => {
-    if (fresh || initialPrice.current !== undefined || currentPrice.isLoading) return;
+    if (fresh || currentPrice.isLoading) return;
+
     const amount = currentPrice.data?.items[0]?.amount ?? null;
-    initialPrice.current = amount;
-    hydrateDefaultPrice(amount ? editableAmount(amount) : '');
-  }, [currentPrice.data, currentPrice.isLoading, fresh, hydrateDefaultPrice, initialPrice]);
+    hydrateDefaultPriceOnce(amount, amount ? editableAmount(amount) : '');
+  }, [currentPrice.data, currentPrice.isLoading, fresh, hydrateDefaultPriceOnce]);
 
   useEffect(() => {
-    if (fresh || variantsLoaded.current || variantPricesLoading || !existingVariants.data)
-      return;
-    variantsLoaded.current = true;
-    hydrateVariants(
+    if (fresh || variantPricesLoading || !existingVariants.data) return;
+
+    hydrateVariantsOnce(
       activeVariants.map((variant, index) => {
         const state = variantPriceState(variantPrices[index], variant.id);
         const persistedPrice = state.kind === 'explicit' ? state.amount : null;
@@ -118,8 +116,9 @@ export function CatalogItemDialog({
       }),
     );
     // Drafts are seeded once from the first complete read; later refetches must not reset edits.
+    // Drafts intentionally hydrate once per editor identity.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fresh, variantPricesLoading, existingVariants.data]);
+  }, [fresh, variantPricesLoading, existingVariants.data, hydrateVariantsOnce]);
 
   const canEditPrice = fresh ? canCreatePricing : canViewPricing && canCreatePricing;
   const {
