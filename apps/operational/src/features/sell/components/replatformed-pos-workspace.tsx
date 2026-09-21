@@ -1679,6 +1679,20 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         onConfirmPayment={recordCheckoutPayment}
         onQueue={() => void queueCheckout('QUEUE')}
         onQueueWithBalance={() => void queueCheckout('QUEUE')}
+        loyaltyRedemption={sale?.loyaltyRedemption ?? null}
+        loyaltyPointBalance={memberBalanceQuery.data?.pointsBalance ?? null}
+        isLoyaltyBalanceLoading={memberBalanceQuery.isLoading || memberIdentityQuery.isLoading}
+        canRedeemLoyalty={
+          Boolean(sale) && canRedeemLoyalty && activeCustomer?.type === 'MEMBER'
+        }
+        loyaltyPoints={loyaltyPoints}
+        isLoyaltyMutating={workspace.isLoyaltyRedemptionPending}
+        onLoyaltyPointsChange={setLoyaltyPoints}
+        onApplyLoyalty={() => workspace.applyLoyaltyRedemption(loyaltyPoints)}
+        onRemoveLoyalty={() => {
+          workspace.removeLoyaltyRedemption();
+          setLoyaltyPoints('');
+        }}
         adjustmentSlot={<SaleAdjustmentControls workspace={workspace} placement="payment" />}
       />
 
@@ -2953,6 +2967,15 @@ function ReferencePaymentDialog({
   onConfirmPayment,
   onQueue,
   onQueueWithBalance,
+  loyaltyRedemption,
+  loyaltyPointBalance,
+  isLoyaltyBalanceLoading,
+  canRedeemLoyalty,
+  loyaltyPoints,
+  isLoyaltyMutating,
+  onLoyaltyPointsChange,
+  onApplyLoyalty,
+  onRemoveLoyalty,
   adjustmentSlot,
 }: {
   open: boolean;
@@ -2991,6 +3014,15 @@ function ReferencePaymentDialog({
   onQueue: () => void;
   /** Queues a partly paid transaction so the rest is collected from the queue. */
   onQueueWithBalance: () => void;
+  loyaltyRedemption: Sale['loyaltyRedemption'];
+  loyaltyPointBalance: string | null;
+  isLoyaltyBalanceLoading: boolean;
+  canRedeemLoyalty: boolean;
+  loyaltyPoints: string;
+  isLoyaltyMutating: boolean;
+  onLoyaltyPointsChange: (value: string) => void;
+  onApplyLoyalty: () => void;
+  onRemoveLoyalty: () => void;
   /** Applied promotions and discounts for the authoritative Sale being paid. */
   adjustmentSlot?: ReactNode;
 }) {
@@ -3003,6 +3035,8 @@ function ReferencePaymentDialog({
   const isCash = method === 'CASH';
   const hasDiscount = !createDecimal(discountAmount).equals(createDecimal('0'));
   const hasTax = !createDecimal(taxAmount).equals(createDecimal('0'));
+  const canSubmitLoyalty =
+    canRedeemLoyalty && Boolean(loyaltyPoints.trim()) && !isLoyaltyMutating;
   const customerBadge = customerStatus(customer);
   const payments = sale?.payments ?? [];
   const progress = sale
@@ -3217,6 +3251,85 @@ function ReferencePaymentDialog({
           </div>
 
           {adjustmentSlot}
+
+          {customer?.type === 'MEMBER' && (canRedeemLoyalty || loyaltyRedemption) ? (
+            <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="size-4 text-[var(--color-brand)]" aria-hidden="true" />
+                    <p className="text-sm font-semibold">{copy('Loyalty points')}</p>
+                  </div>
+                  <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                    {copy('Use member points for this transaction. Points are consumed only when the sale is finalized.')}
+                  </p>
+                </div>
+                <div className="shrink-0 rounded-lg bg-[var(--color-brand)]/[.08] px-2.5 py-1.5 text-right">
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-text-muted)]">
+                    {copy('Point balance')}
+                  </p>
+                  <p className="mt-0.5 text-sm font-bold tabular-nums text-[var(--color-brand)]">
+                    {isLoyaltyBalanceLoading ? '…' : (loyaltyPointBalance ?? '0')}
+                  </p>
+                </div>
+              </div>
+
+              {loyaltyRedemption ? (
+                <div className="mt-3 flex items-center gap-3 rounded-[var(--radius-control)] border border-[var(--color-success)]/20 bg-[var(--color-success)]/[.06] px-3 py-2.5">
+                  <CheckCircle2
+                    className="size-4 shrink-0 text-[var(--color-success)]"
+                    aria-hidden="true"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold">{copy('Loyalty redemption')}</p>
+                    <p className="mt-0.5 text-[11px] text-[var(--color-text-muted)]">
+                      {loyaltyRedemption.points} {copy('points used')}
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-xs font-semibold tabular-nums text-[var(--color-danger)]">
+                    −{format(loyaltyRedemption.amount)}
+                  </span>
+                  {canRedeemLoyalty ? (
+                    <DButton
+                      size="sm"
+                      variant="ghost"
+                      disabled={isLoyaltyMutating}
+                      loading={isLoyaltyMutating}
+                      onClick={onRemoveLoyalty}
+                    >
+                      {copy('Remove')}
+                    </DButton>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {canRedeemLoyalty ? (
+                <div
+                  className={`mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2 ${
+                    loyaltyRedemption ? 'border-t border-[var(--color-border)] pt-3' : ''
+                  }`}
+                >
+                  <DInput
+                    label={copy(loyaltyRedemption ? 'Change points' : 'Use loyalty points')}
+                    value={loyaltyPoints}
+                    onChange={onLoyaltyPointsChange}
+                    inputMode="decimal"
+                    disabled={isLoyaltyMutating}
+                    placeholder="0"
+                  />
+                  <DButton
+                    size="sm"
+                    variant={loyaltyRedemption ? 'secondary' : 'primary'}
+                    disabled={!canSubmitLoyalty}
+                    loading={isLoyaltyMutating}
+                    onClick={onApplyLoyalty}
+                  >
+                    {copy(loyaltyRedemption ? 'Update' : 'Apply')}
+                  </DButton>
+                </div>
+              ) : null}
+            </section>
+          ) : null}
 
           {hasPaymentActivity && sale ? (
             <RecordedPaymentList
