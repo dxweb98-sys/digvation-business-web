@@ -1550,7 +1550,10 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
                   item={item}
                   price={workspace.cachedCardPrice(item.id)}
                   locale={workspace.locale}
-                  disabled={workspace.viewModel.monetaryMutation.state !== 'AVAILABLE'}
+                  disabled={
+                    workspace.viewModel.monetaryMutation.state !== 'AVAILABLE' ||
+                    workspace.isDraftCommitPending
+                  }
                   onAdd={() => void workspace.selectItem(item)}
                 />
               ))}
@@ -1581,6 +1584,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         isPointBalanceLoading={memberBalanceQuery.isLoading}
         onChooseCustomer={() => setCustomerPickerOpen(true)}
         onQuantity={(line, next) => {
+          if (workspace.isDraftCommitPending) return;
           if (workspace.cart.isLocalDraft) workspace.changeDraftQuantity(line.id, next);
           else {
             const serverLine = workspace.viewModel.activeLines.find((item) => item.id === line.id);
@@ -1588,6 +1592,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           }
         }}
         onRemove={(line) => {
+          if (workspace.isDraftCommitPending) return;
           if (workspace.cart.isLocalDraft) workspace.removeDraftLine(line.id);
           else {
             const serverLine = workspace.viewModel.activeLines.find((item) => item.id === line.id);
@@ -1600,7 +1605,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       <CustomerMemberDialog
         open={customerPickerOpen}
         customer={activeCustomer}
-        isSaving={workspace.isCustomerPending}
+        isSaving={workspace.isCustomerPending || workspace.isDraftCommitPending}
         api={customerMemberApi}
         canReadMembers={canReadMembers}
         canEnrollMember={canEnrollMember}
