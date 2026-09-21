@@ -5,7 +5,6 @@ import type {
   LoyaltyConfiguration,
   LoyaltyEarningRule,
 } from '../../../../modules/loyalty/loyalty-api';
-import { CatalogPanel, CatalogPanelHeader } from '../../ui/catalog-shared';
 import type { useCatalogItemEditor } from '../model/use-catalog-item-editor';
 
 type CatalogItemEditor = ReturnType<typeof useCatalogItemEditor>;
@@ -34,55 +33,39 @@ export function CatalogItemLoyaltySection({
   const active = effectiveBehavior === 'FIXED';
 
   return (
-    <CatalogPanel ariaLabel="Poin Loyalitas Member">
-      <CatalogPanelHeader
-        title="Poin Loyalitas Member"
-        icon={<Star className="size-4" aria-hidden="true" />}
-        description="Atur perilaku poin khusus item tanpa mengubah konfigurasi Loyalty bisnis."
-        actions={
-          loading ? null : (
-            <DBadge variant={active ? 'success' : 'secondary'}>
-              {active ? 'Aktif' : 'Nonaktif'}
-            </DBadge>
-          )
-        }
-      />
-      <div className="p-5">
-      {loading ? (
-        <div className="rounded-xl border border-[var(--color-border)] px-4 py-5 text-sm text-[var(--color-text-muted)]">
-          Memuat aturan poin...
+    <section
+      aria-label="Poin Loyalitas Member"
+      className="min-w-0 rounded-xl border border-[var(--color-brand)]/20 bg-[var(--color-brand)]/[0.035] p-3.5"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--color-text-muted)]">
+          <Star className="size-3.5 text-[var(--color-brand)]" aria-hidden="true" />
+          <span>Poin Loyalitas Member</span>
         </div>
+        {!loading ? (
+          <DBadge variant={active ? 'success' : 'secondary'}>
+            {active ? 'Aktif' : 'Nonaktif'}
+          </DBadge>
+        ) : null}
+      </div>
+
+      {loading ? (
+        <p className="mt-3 text-xs text-[var(--color-text-muted)]">Memuat aturan poin...</p>
       ) : (
-        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
-          <div className="flex flex-col gap-3 border-b border-[var(--color-border)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex min-w-0 gap-2.5">
-              <Star className="mt-0.5 size-4 shrink-0 text-[var(--color-brand)]" aria-hidden="true" />
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-[var(--color-text)]">
-                  Poin loyalitas khusus item
-                </p>
-                <div className="mt-1 flex flex-wrap items-center gap-2">
-                  <DBadge variant="secondary">
-                    {loyaltyRule ? 'Aturan khusus' : 'Mengikuti default'}
-                  </DBadge>
-                  <p className="text-xs leading-5 text-[var(--color-text-muted)]">
-                    {loyaltyRule
-                      ? 'Item memiliki aturan poin tersendiri.'
-                      : 'Aturan khusus baru disimpan jika Anda melakukan perubahan.'}
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="shrink-0 text-left sm:text-right">
-              <p className="text-xs text-[var(--color-text-muted)]">Hasil efektif</p>
-              <p className="mt-0.5 text-sm font-semibold text-[var(--color-text)]">
-                {active ? `${effectivePoints} poin / unit` : 'Tidak dapat poin'}
-              </p>
+        <>
+          <div className="mt-2">
+            <p className="text-sm font-semibold text-[var(--color-text)]">
+              {active ? `${effectivePoints} poin / unit` : 'Tidak dapat poin'}
+            </p>
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              <DBadge variant="secondary">
+                {loyaltyRule ? 'Aturan khusus' : 'Mengikuti default'}
+              </DBadge>
             </div>
           </div>
 
           {canConfigure ? (
-            <div className="grid gap-3 px-4 py-3 sm:grid-cols-2">
+            <div className="mt-3 space-y-2 border-t border-[var(--color-border)] pt-3">
               <DSelect
                 label="Aturan poin"
                 value={behavior}
@@ -110,21 +93,18 @@ export function CatalogItemLoyaltySection({
                   }
                 />
               ) : (
-                <div className="flex items-end">
-                  <p className="pb-2 text-xs text-[var(--color-text-muted)]">
-                    Member tidak memperoleh poin dari item ini.
-                  </p>
-                </div>
+                <p className="text-xs text-[var(--color-text-muted)]">
+                  Member tidak memperoleh poin dari item ini.
+                </p>
               )}
             </div>
           ) : (
-            <div className="px-4 py-3 text-xs text-[var(--color-text-muted)]">
+            <p className="mt-2 text-[11px] leading-4 text-[var(--color-text-muted)]">
               Anda memiliki akses baca untuk aturan Loyalty item ini.
-            </div>
+            </p>
           )}
-        </div>
+        </>
       )}
-      </div>
-    </CatalogPanel>
+    </section>
   );
 }
