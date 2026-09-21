@@ -162,6 +162,20 @@ export function lineDiscountRows(
   ];
 }
 
+/**
+ * Item-scoped promotions are explained on the affected line and are never
+ * repeated in the checkout-level Promo & diskon card. A code promotion still
+ * remains discoverable through the applied promo-code control itself.
+ */
+export function checkoutAdjustmentRows(
+  sale: Pick<Sale, 'adjustments' | 'promotionCode'>,
+): SaleAdjustment[] {
+  return (sale.adjustments ?? []).filter(
+    (adjustment) =>
+      positive(adjustment.actualAmount) &&
+      !(adjustment.source === 'PROMOTION' && adjustment.scope === 'ITEM'),
+  );
+}
 export function saleDiscountRows(sale: DiscountPresentationSale): DiscountPresentationRow[] {
   const rows = (sale.adjustments ?? [])
     .filter((adjustment) => positive(adjustment.actualAmount))

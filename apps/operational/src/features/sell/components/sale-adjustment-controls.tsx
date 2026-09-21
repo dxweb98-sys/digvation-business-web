@@ -12,6 +12,7 @@ import { cashierTransactionErrorMessage } from '../cashier-transaction-errors';
 import { cashierTransactionKeys } from '../cashier-transaction-keys';
 import type { ApiPage, DiscountType, Sale, SaleAdjustment } from '../cashier-transaction.types';
 import type { useCashierTransactionWorkspace } from '../use-cashier-transaction-workspace';
+import { checkoutAdjustmentRows } from '../sale-presentation';
 import { actionBlockMessage } from '../sale-workspace-view-model';
 
 interface SaleAdjustmentControlsProps {
@@ -144,9 +145,7 @@ export function SaleAdjustmentControls({
 
   if ((!sale && workspace.cart.lines.length === 0) || (sale && sale.status !== 'OPEN')) return null;
 
-  const adjustments = (sale?.adjustments ?? []).filter((adjustment) =>
-    createDecimal(adjustment.actualAmount).greaterThan(0),
-  );
+  const adjustments = sale ? checkoutAdjustmentRows(sale) : [];
   const promotionAdjustments = adjustments.filter((item) => item.source === 'PROMOTION');
   const manualAdjustments = adjustments.filter((item) => item.source === 'MANUAL_DISCOUNT');
   const appliedAdjustments = [...promotionAdjustments, ...manualAdjustments];
@@ -186,8 +185,28 @@ export function SaleAdjustmentControls({
 
   const prepareAndOpen = async () => {
     if (sale) {
-      populateForm(sale);
-      setOpen(true);
+      setPreparing(true);
+      try {
+        const refreshed = promotionsEnabled
+          ? await adapter.refreshPromotionEligibility(
+              sale.id,
+              sale.version,
+              `cashier-promotion-refresh-${crypto.randomUUID()}`,
+            )
+          : sale;
+        commitSaleToCache(queryClient, refreshed);
+        populateForm(refreshed);
+        setOpen(true);
+      } catch (error) {
+        await refreshAfterFailure(sale.id);
+        showToast({
+          variant: 'danger',
+          title: text('Could not prepare transaction'),
+          description: cashierTransactionErrorMessage(error, runtime.locale),
+        });
+      } finally {
+        setPreparing(false);
+      }
       return;
     }
     if (!workspace.cart.isLocalDraft || preparing) return;

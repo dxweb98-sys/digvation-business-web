@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { EmployeeContribution, SaleAdjustment } from './cashier-transaction.types';
 import {
   appliedPaymentComposition,
+  checkoutAdjustmentRows,
   discountPresentation,
   lineDiscountPresentation,
   employeeDisplayName,
@@ -53,6 +54,19 @@ describe('sale presentation', () => {
     ).toBeNull();
   });
 
+  it('keeps automatic item promotions on the item rather than duplicating them in checkout', () => {
+    const itemPromotion = {
+      ...percentageAdjustment,
+      scope: 'ITEM' as const,
+      saleLineId: 'line-1',
+    } satisfies SaleAdjustment;
+    expect(checkoutAdjustmentRows({ adjustments: [itemPromotion], promotionCode: null })).toEqual(
+      [],
+    );
+    expect(
+      checkoutAdjustmentRows({ adjustments: [itemPromotion], promotionCode: 'WELCOME10' }),
+    ).toEqual([]);
+  });
   it('uses configured percentage metadata instead of deriving percentage from money amounts', () => {
     expect(percentageFromRate('0.1')).toBe('10');
     expect(
