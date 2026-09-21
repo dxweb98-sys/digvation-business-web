@@ -36,6 +36,7 @@ export function CatalogItemLoyaltySection({
   return (
     <CatalogSection
       title="Poin Loyalitas Member"
+      icon={<Star className="size-4" aria-hidden="true" />}
       actions={
         loading ? null : (
           <DBadge variant={active ? 'success' : 'secondary'}>
