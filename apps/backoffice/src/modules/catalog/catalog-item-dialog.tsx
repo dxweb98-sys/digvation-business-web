@@ -1,10 +1,12 @@
 import { DCurrencyInput, DDialog, DInput, DSelect, DTextarea, useToast } from '@digvation/ui';
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
+import { deriveCatalogItemEditorValidation } from '../../features/catalog-item-editor/model/catalog-item-editor.validation';
+import { useCatalogItemEditor } from '../../features/catalog-item-editor/model/use-catalog-item-editor';
 import { isSessionExpiredError } from '../../auth/backoffice-auth-context';
-import type { LoyaltyApi, LoyaltyEarningBehavior } from '../loyalty/loyalty-api';
-import type { CatalogApi, Category, Item, VariantSelectionMode } from './catalog-api';
+import type { LoyaltyApi } from '../loyalty/loyalty-api';
+import type { CatalogApi, Category, Item } from './catalog-api';
 import { CatalogItemImageField } from './catalog-item-image-field';
 import { CatalogItemThumbnail } from './catalog-item-thumbnail';
 import { useCatalogLocalization } from './catalog-localization';
@@ -23,13 +25,8 @@ import {
   sameAmount,
   variantDraftIssue,
   variantPriceSubmissions,
-  type VariantPriceDraft,
 } from './catalog-variant-price-draft';
 import { VariantPriceEditor } from './catalog-variant-price-editor';
-
-function validOptionalMoney(value: string) {
-  return !value.trim() || isValidSellingPrice(value);
-}
 
 export function CatalogItemDialog({
   item,
@@ -64,31 +61,44 @@ export function CatalogItemDialog({
   const client = useQueryClient();
   const { showToast } = useToast();
   const { formatMoney } = useCatalogLocalization();
-  const [code, setCode] = useState(item?.code ?? '');
-  const [name, setName] = useState(item?.name ?? '');
-  const [type, setType] = useState<Item['type']>(item?.type ?? 'PRODUCT');
-  const [categoryId, setCategoryId] = useState(item?.categoryId ?? null);
-  const [description, setDescription] = useState(item?.description ?? '');
-  const [lifecycle, setLifecycle] = useState<Item['lifecycle']>(item?.lifecycle ?? 'DRAFT');
-  const [variantSelectionMode, setVariantSelectionMode] = useState<VariantSelectionMode>(
-    item?.variantSelectionMode ?? 'REQUIRED',
-  );
-  const [defaultPrice, setDefaultPrice] = useState('');
-  const initialPriceRef = useRef<string | null | undefined>(undefined);
-  const [variants, setVariants] = useState<VariantPriceDraft[]>([]);
-  const variantsLoadedRef = useRef(false);
-  const [showIssues, setShowIssues] = useState(false);
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [removeImageRequested, setRemoveImageRequested] = useState(false);
-  const [defaultDurationMinutes, setDefaultDurationMinutes] = useState(
-    item?.serviceDefinition?.defaultDurationMinutes?.toString() ?? '',
-  );
-  const [saving, setSaving] = useState(false);
-  const [loyaltyBehavior, setLoyaltyBehavior] = useState<LoyaltyEarningBehavior>('FIXED');
-  const [loyaltyPointsPerUnit, setLoyaltyPointsPerUnit] = useState('');
-  const [loyaltyTouched, setLoyaltyTouched] = useState(false);
-  const loyaltyRuleLoadedRef = useRef(false);
-  const [effectiveAt] = useState(() => new Date().toISOString());
+  const editor = useCatalogItemEditor(item);
+
+  const {
+    code,
+    name,
+    type,
+    categoryId,
+    description,
+    lifecycle,
+    defaultDurationMinutes,
+    variantSelectionMode,
+    defaultPrice,
+    variants,
+  } = editor.form;
+  const {
+    behavior: loyaltyBehavior,
+    pointsPerUnit: loyaltyPointsPerUnit,
+    touched: loyaltyTouched,
+  } = editor.loyalty;
+  const {
+    file: selectedImage,
+    removeRequested: removeImageRequested,
+  } = editor.image;
+  const { showIssues, saving } = editor.ui;
+  const { initialPrice, variantsLoaded, loyaltyRuleLoaded } = editor.refs;
+  const {
+    setFormField,
+    hydrateDefaultPrice,
+    hydrateVariants,
+    hydrateLoyalty,
+    setLoyaltyBehavior,
+    setLoyaltyPointsPerUnit,
+    selectImage,
+    requestImageRemoval,
+    setShowIssues,
+    setSaving,
+  } = editor.actions;
+  const effectiveAt = editor.effectiveAt;
 
   const existingImage = useQuery({
     queryKey: ['catalog', 'image', item?.id ?? 'new'],
@@ -138,24 +148,26 @@ export function CatalogItemDialog({
   const loyaltyRule = loyaltyRules.data?.find((candidate) => candidate.catalogItemId === item?.id);
 
   useEffect(() => {
-    if (!item || !canViewLoyalty || loyaltyRules.isLoading || loyaltyRuleLoadedRef.current) return;
-    loyaltyRuleLoadedRef.current = true;
-    setLoyaltyBehavior(loyaltyRule?.behavior ?? 'FIXED');
-    setLoyaltyPointsPerUnit(loyaltyRule ? String(loyaltyRule.fixedPointsPerUnit) : '');
-  }, [canViewLoyalty, item, loyaltyRule, loyaltyRules.isLoading]);
+    if (!item || !canViewLoyalty || loyaltyRules.isLoading || loyaltyRuleLoaded.current) return;
+    loyaltyRuleLoaded.current = true;
+    hydrateLoyalty(
+      loyaltyRule?.behavior ?? 'FIXED',
+      loyaltyRule ? String(loyaltyRule.fixedPointsPerUnit) : '',
+    );
+  }, [canViewLoyalty, hydrateLoyalty, item, loyaltyRule, loyaltyRuleLoaded, loyaltyRules.isLoading]);
 
   useEffect(() => {
-    if (fresh || initialPriceRef.current !== undefined || currentPrice.isLoading) return;
+    if (fresh || initialPrice.current !== undefined || currentPrice.isLoading) return;
     const amount = currentPrice.data?.items[0]?.amount ?? null;
-    initialPriceRef.current = amount;
-    setDefaultPrice(amount ? editableAmount(amount) : '');
-  }, [currentPrice.data, currentPrice.isLoading, fresh]);
+    initialPrice.current = amount;
+    hydrateDefaultPrice(amount ? editableAmount(amount) : '');
+  }, [currentPrice.data, currentPrice.isLoading, fresh, hydrateDefaultPrice, initialPrice]);
 
   useEffect(() => {
-    if (fresh || variantsLoadedRef.current || variantPricesLoading || !existingVariants.data)
+    if (fresh || variantsLoaded.current || variantPricesLoading || !existingVariants.data)
       return;
-    variantsLoadedRef.current = true;
-    setVariants(
+    variantsLoaded.current = true;
+    hydrateVariants(
       activeVariants.map((variant, index) => {
         const state = variantPriceState(variantPrices[index], variant.id);
         const persistedPrice = state.kind === 'explicit' ? state.amount : null;
@@ -174,33 +186,31 @@ export function CatalogItemDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fresh, variantPricesLoading, existingVariants.data]);
 
-  const parsedDefaultDuration = defaultDurationMinutes.trim()
-    ? Number(defaultDurationMinutes)
-    : null;
-  const validDefaultDuration =
-    parsedDefaultDuration === null ||
-    (Number.isInteger(parsedDefaultDuration) && parsedDefaultDuration > 0);
+  const canEditPrice = fresh ? canCreatePricing : canViewPricing && canCreatePricing;
+  const {
+    parsedDefaultDuration,
+    validDefaultDuration,
+    hasVariants,
+    model,
+    itemPriceMissing,
+    validPrice,
+    variantsHaveIssues,
+    loyaltyPoints,
+    loyaltyDraftValid,
+  } = deriveCatalogItemEditorValidation({
+    form: editor.form,
+    loyalty: editor.loyalty,
+    canEditPrice,
+  });
   const storedItemPrice = fresh ? null : (currentPrice.data?.items[0]?.amount ?? null);
-  const hasVariants = variants.length > 0;
-  const model = sellingModel(hasVariants, variantSelectionMode);
-  // The price without a variant is a real sellable option, so it is required in that model.
-  const itemPriceRequired = model === 'ITEM_AND_VARIANTS';
-  const itemPriceMissing = itemPriceRequired && !isValidSellingPrice(defaultPrice);
-  const validPrice = !sellsItemItself(model) || validOptionalMoney(defaultPrice);
   const itemPriceError = !validPrice
     ? 'Harga harus lebih dari nol.'
     : showIssues && itemPriceMissing
       ? 'Isi harga tanpa varian.'
       : undefined;
   const showPrice = canViewPricing || (fresh && canCreatePricing);
-  const canEditPrice = fresh ? canCreatePricing : canViewPricing && canCreatePricing;
   const showVariants = fresh ? canCreateVariants : canViewPricing && variants.length > 0;
-  const variantsHaveIssues =
-    variants.some((draft) => variantDraftIssue(draft, canEditPrice)) ||
-    (canEditPrice && itemPriceMissing);
   const inactiveVariantCount = (existingVariants.data?.items ?? []).length - activeVariants.length;
-  const loyaltyPoints = Number(loyaltyPointsPerUnit);
-  const loyaltyDraftValid = Number.isInteger(loyaltyPoints) && loyaltyPoints >= 0;
   const loyaltyDraftChanged = loyaltyRule
     ? loyaltyBehavior !== loyaltyRule.behavior || loyaltyPoints !== loyaltyRule.fixedPointsPerUnit
     : loyaltyTouched;
@@ -273,12 +283,12 @@ export function CatalogItemDialog({
       } else if (item) {
         persistedItem = await api.updateItem(item, baseInput);
         const nextPrice = defaultPrice.trim();
-        const initialPrice = initialPriceRef.current ?? null;
+        const initialItemPrice = initialPrice.current ?? null;
         if (
           canEditPrice &&
           sellsItemItself(model) &&
           nextPrice &&
-          !(initialPrice && sameAmount(nextPrice, initialPrice))
+          !(initialItemPrice && sameAmount(nextPrice, initialItemPrice))
         ) {
           const input = {
             catalogItemId: item.id,
@@ -288,7 +298,7 @@ export function CatalogItemDialog({
             amount: nextPrice,
             effectiveFrom,
           };
-          await (initialPrice ? api.changePrice(input) : api.createPrice(input));
+          await (initialItemPrice ? api.changePrice(input) : api.createPrice(input));
         }
       }
 
@@ -410,11 +420,8 @@ export function CatalogItemDialog({
                 selectedFile={selectedImage}
                 removeRequested={removeImageRequested}
                 disabled={saving}
-                onFileChange={(file) => {
-                  setSelectedImage(file);
-                  if (file) setRemoveImageRequested(false);
-                }}
-                onRemove={() => setRemoveImageRequested(true)}
+                onFileChange={selectImage}
+                onRemove={requestImageRemoval}
               />
             ) : null}
             <div className="grid min-w-0 content-start gap-4 sm:grid-cols-2">
@@ -422,14 +429,14 @@ export function CatalogItemDialog({
                 <DInput
                   label="Nama Item"
                   value={name}
-                  onChange={setName}
+                  onChange={(value) => setFormField('name', value)}
                   placeholder="Contoh: Coffee Latte"
                 />
               </div>
               <DInput
                 label="Kode Item"
                 value={code}
-                onChange={setCode}
+                onChange={(value) => setFormField('code', value)}
                 disabled={!fresh}
                 hint={
                   fresh
@@ -440,7 +447,7 @@ export function CatalogItemDialog({
               <DSelect
                 label="Tipe"
                 value={type}
-                onChange={(value) => setType(value as Item['type'])}
+                onChange={(value) => setFormField('type', value as Item['type'])}
                 disabled={!fresh}
                 options={[
                   { label: 'Produk', value: 'PRODUCT' },
@@ -450,7 +457,7 @@ export function CatalogItemDialog({
               <DSelect
                 label="Kategori"
                 value={categoryId}
-                onChange={(value) => setCategoryId(value as string | null)}
+                onChange={(value) => setFormField('categoryId', value as string | null)}
                 clearable
                 options={categoryOptions.map((category) => ({
                   label:
@@ -461,7 +468,7 @@ export function CatalogItemDialog({
               <DSelect
                 label="Status"
                 value={lifecycle}
-                onChange={(value) => setLifecycle(value as Item['lifecycle'])}
+                onChange={(value) => setFormField('lifecycle', value as Item['lifecycle'])}
                 options={[
                   { label: 'Draft', value: 'DRAFT' },
                   { label: 'Aktif', value: 'ACTIVE' },
@@ -472,7 +479,7 @@ export function CatalogItemDialog({
                 <DTextarea
                   label="Deskripsi"
                   value={description}
-                  onChange={setDescription}
+                  onChange={(value) => setFormField('description', value)}
                   placeholder="Deskripsi item (opsional)"
                   className="min-h-20"
                 />
@@ -488,7 +495,7 @@ export function CatalogItemDialog({
                 label="Durasi Layanan (menit)"
                 hint="Opsional."
                 value={defaultDurationMinutes}
-                onChange={setDefaultDurationMinutes}
+                onChange={(value) => setFormField('defaultDurationMinutes', value)}
                 type="number"
                 min={1}
                 placeholder="30"
@@ -548,7 +555,6 @@ export function CatalogItemDialog({
                       onChange={(value) => {
                         if (value === 'FIXED' || value === 'EXCLUDED') {
                           setLoyaltyBehavior(value);
-                          setLoyaltyTouched(true);
                         }
                       }}
                     />
@@ -557,10 +563,7 @@ export function CatalogItemDialog({
                         label="Poin per unit"
                         inputMode="numeric"
                         value={loyaltyPointsPerUnit}
-                        onChange={(value) => {
-                          setLoyaltyPointsPerUnit(value);
-                          setLoyaltyTouched(true);
-                        }}
+                        onChange={setLoyaltyPointsPerUnit}
                         error={
                           loyaltyTouched && !loyaltyDraftValid
                             ? 'Gunakan angka bulat nol atau lebih.'
@@ -589,7 +592,7 @@ export function CatalogItemDialog({
               {hasVariants ? (
                 <SellingModeChoice
                   value={variantSelectionMode}
-                  onChange={setVariantSelectionMode}
+                  onChange={(value) => setFormField('variantSelectionMode', value)}
                   disabled={!canEditPrice || saving}
                 />
               ) : null}
@@ -615,7 +618,7 @@ export function CatalogItemDialog({
                       <DCurrencyInput
                         label={`${hasVariants ? 'Harga tanpa varian' : 'Harga jual'} (${currency})`}
                         value={defaultPrice}
-                        onValueChange={setDefaultPrice}
+                        onValueChange={(value) => setFormField('defaultPrice', value)}
                         placeholder="Contoh: 100000"
                         error={itemPriceError}
                         hint={
@@ -668,7 +671,7 @@ export function CatalogItemDialog({
             ) : (
               <VariantPriceEditor
                 drafts={variants}
-                onChange={setVariants}
+                onChange={(value) => setFormField('variants', value)}
                 currency={currency}
                 canPrice={canEditPrice}
                 canAddVariants={fresh && canCreateVariants}
