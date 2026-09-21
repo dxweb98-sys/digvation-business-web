@@ -9,4 +9,4 @@ export {
   variantPriceSubmissions,
   type VariantDraftIssue,
   type VariantPriceDraft,
-} from '../../features/catalog-item-editor/model/variant-price-draft';
+} from '../../features/catalog/item-editor/model/variant-price-draft';
