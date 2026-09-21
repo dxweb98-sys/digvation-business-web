@@ -1,12 +1,4 @@
 import type { ApiClient } from '@digvation/business-api';
-import type {
-  CatalogItemType,
-  CatalogLifecycle,
-  CatalogRecordStatus,
-  VariantSelectionMode,
-} from '@digvation/business-catalog';
-
-export type { VariantSelectionMode } from '@digvation/business-catalog';
 
 export const CATALOG_IMAGE_MAX_BYTES = 1024 * 1024;
 export const CATALOG_IMAGE_CONTENT_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
@@ -36,25 +28,23 @@ export interface NamedRecord {
   id: string;
   code: string;
   name: string;
-  status: CatalogRecordStatus;
+  status: 'ACTIVE' | 'INACTIVE';
   version: number;
 }
-
 export type Category = NamedRecord;
-
 export interface Variant extends NamedRecord {
   catalogItemId: string;
 }
-
 export interface Item {
   id: string;
   code: string;
   name: string;
-  type: CatalogItemType;
+  type: 'PRODUCT' | 'SERVICE';
   categoryId: string | null;
   description: string | null;
-  lifecycle: CatalogLifecycle;
+  lifecycle: 'DRAFT' | 'ACTIVE' | 'INACTIVE';
   fulfillmentBehavior: 'INSTANT' | 'TRACKED';
+  /** With active variants: REQUIRED sells variants only; OPTIONAL also sells the item itself. */
   variantSelectionMode: VariantSelectionMode;
   version: number;
   serviceDefinition: {
@@ -112,6 +102,8 @@ export interface ResolvedPrice {
   effectiveAt: string;
   sourceScope: { catalogVariantId: string | null; locationId: string | null };
 }
+
+export type VariantSelectionMode = 'REQUIRED' | 'OPTIONAL';
 
 export interface CreateCatalogItemInput extends Omit<
   Item,
