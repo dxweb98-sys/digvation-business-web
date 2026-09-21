@@ -148,7 +148,7 @@ describe('CatalogItemDialog variant pricing', () => {
     });
 
     const scope = () => within(dialog());
-    expect(await scope().findByText('Mengikuti default')).toBeTruthy();
+    expect(await scope().findByText(/Mengikuti default bisnis:/)).toBeTruthy();
     expect(scope().getByText(/Default bisnis: 1 poin per unit/)).toBeTruthy();
     expect(scope().queryByLabelText('Poin per unit')).toBeNull();
   });
