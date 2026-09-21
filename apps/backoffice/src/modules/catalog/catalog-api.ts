@@ -1,5 +1,7 @@
 import type { ApiClient } from '@digvation/business-api';
 
+import { buildQueryString } from '../../shared/api/build-query-string';
+
 export const CATALOG_IMAGE_MAX_BYTES = 1024 * 1024;
 export const CATALOG_IMAGE_CONTENT_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
 export type CatalogImageContentType = (typeof CATALOG_IMAGE_CONTENT_TYPES)[number];
@@ -114,14 +116,6 @@ export interface CreateCatalogItemInput extends Omit<
   serviceDefinition?: Item['serviceDefinition'];
 }
 
-function queryString(input: Record<string, unknown>) {
-  return new URLSearchParams(
-    Object.entries(input)
-      .filter(([, value]) => value !== undefined && value !== '')
-      .map(([key, value]) => [key, String(value)]),
-  ).toString();
-}
-
 const page = '?limit=50&offset=0';
 export class CatalogApi {
   private readonly itemImages = new Map<string, CatalogItemImage | null>();
@@ -129,7 +123,7 @@ export class CatalogApi {
   constructor(private readonly client: ApiClient) {}
   async listItems(query: ItemQuery = {}) {
     const result = await this.client.get<Page<CatalogManagementItem>>(
-      `/api/v1/catalog/items?${queryString({ limit: 50, offset: 0, ...query })}`,
+      `/api/v1/catalog/items?${buildQueryString({ limit: 50, offset: 0, ...query })}`,
     );
     result.items.forEach((item) => {
       if (item.image !== undefined) this.itemImages.set(item.id, item.image);
@@ -175,7 +169,7 @@ export class CatalogApi {
   }
   listCategories(query: CategoryQuery = {}) {
     return this.client.get<Page<Category>>(
-      `/api/v1/catalog/categories?${queryString({ limit: 50, offset: 0, ...query })}`,
+      `/api/v1/catalog/categories?${buildQueryString({ limit: 50, offset: 0, ...query })}`,
     );
   }
   createCategory(input: { code?: string; name: string; status?: Category['status'] }) {
@@ -221,7 +215,7 @@ export class CatalogApi {
     currency: string;
     effectiveAt: string;
   }) {
-    return this.client.get<ResolvedPrice>(`/api/v1/pricing/resolve?${queryString(input)}`);
+    return this.client.get<ResolvedPrice>(`/api/v1/pricing/resolve?${buildQueryString(input)}`);
   }
   createPrice(input: {
     catalogItemId: string;
