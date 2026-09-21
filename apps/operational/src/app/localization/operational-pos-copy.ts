@@ -307,6 +307,7 @@ const posCopy: Record<string, LocalizedCopy> = {
     'en-US': 'Use member points for this transaction. Points are consumed only when the sale is finalized.',
   },
   'Loading loyalty points…': { 'id-ID': 'Memuat poin loyalty…', 'en-US': 'Loading loyalty points…' },
+  'Calculating…': { 'id-ID': 'Menghitung…', 'en-US': 'Calculating…' },
   'Choose a payment method before continuing.': {
     'id-ID': 'Pilih metode pembayaran sebelum melanjutkan.',
     'en-US': 'Choose a payment method before continuing.',
