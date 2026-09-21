@@ -2,7 +2,7 @@ import { DDialog } from '@digvation/ui';
 import { useEffect, useMemo } from 'react';
 import { useCatalogItemEditorData } from '../api/use-catalog-item-editor-data';
 import { useCatalogItemEditorSave } from '../api/use-catalog-item-editor-save';
-import { deriveCatalogItemEditorValidation } from '../model/catalog-item-editor.validation';
+import { deriveCatalogItemEditorValidation } from '../model/catalog-item-editor-validation';
 import { useCatalogItemEditor } from '../model/use-catalog-item-editor';
 import type { LoyaltyApi } from '../../../../modules/loyalty/loyalty-api';
 import type { CatalogApi, Category, Item } from '../../api/catalog-api';
