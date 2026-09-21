@@ -1,3 +1,4 @@
+import { hasSessionCapability } from '@digvation/business-auth';
 import { useRuntime } from '@digvation/business-runtime';
 import {
   DButton,
@@ -72,9 +73,7 @@ export function CatalogPage() {
 
   const can = (action: BackofficeAction) =>
     Boolean(session && canPerformBackofficeAction(session, action));
-  const hasLoyaltyCapability = Boolean(
-    session?.effectiveEntitlements.capabilities.includes('LOYALTY_POINTS'),
-  );
+  const hasLoyaltyCapability = hasSessionCapability(session, 'LOYALTY_POINTS');
   const canViewLoyalty = hasLoyaltyCapability && can('viewLoyalty');
   const canConfigureLoyalty = hasLoyaltyCapability && can('configureLoyalty');
 
