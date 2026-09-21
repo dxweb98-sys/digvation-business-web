@@ -48,9 +48,6 @@ jobs:
         run: >-
           pnpm exec vitest run
           apps/backoffice/src/features/catalog
-          apps/backoffice/src/modules/catalog/catalog-item-dialog.test.tsx
-          apps/backoffice/src/modules/catalog/catalog-price-history.test.ts
-          apps/backoffice/src/modules/catalog/catalog-variant-price-draft.test.ts
           apps/backoffice/src/shared
 
       - name: Backoffice build
