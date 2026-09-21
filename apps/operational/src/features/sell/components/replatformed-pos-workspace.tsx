@@ -2660,6 +2660,8 @@ function ReferenceCartPanel({
   const status = customerStatus(customer);
   const hasDiscount = !createDecimal(discountAmount).equals(createDecimal('0'));
   const hasTax = !createDecimal(taxAmount).equals(createDecimal('0'));
+  const canSubmitRedemption =
+    canRedeem && Boolean(requestedPoints.trim()) && !isRedeeming;
   const increment = (line: CartDisplayLine, direction: 'up' | 'down') => {
     const next =
       direction === 'up'
@@ -2839,6 +2841,62 @@ function ReferenceCartPanel({
               <span className="font-medium text-[var(--color-danger)]">
                 −{money(discountAmount, locale)}
               </span>
+            </div>
+          ) : null}
+          {redemption || canRedeem ? (
+            <div className="rounded-xl bg-[var(--color-surface-muted)]/55 p-2.5">
+              {redemption ? (
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold">{copy('Loyalty redemption')}</p>
+                    <p className="mt-0.5 text-[11px] text-[var(--color-text-muted)]">
+                      {redemption.points} {copy('points used')}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <span className="text-xs font-semibold text-[var(--color-brand)]">
+                      −{money(redemption.amount, locale)}
+                    </span>
+                    {canRedeem ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        loading={isRedeeming}
+                        disabled={isRedeeming}
+                        onClick={onRemoveRedemption}
+                      >
+                        {copy('Remove')}
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+              {canRedeem ? (
+                <div
+                  className={`grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2 ${
+                    redemption ? 'mt-2 border-t border-[var(--color-border)] pt-2' : ''
+                  }`}
+                >
+                  <DInput
+                    label={copy(redemption ? 'Change points' : 'Use loyalty points')}
+                    value={requestedPoints}
+                    onChange={onRequestedPointsChange}
+                    inputMode="decimal"
+                    disabled={isRedeeming}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={redemption ? 'secondary' : 'primary'}
+                    loading={isRedeeming}
+                    disabled={!canSubmitRedemption}
+                    onClick={onApplyRedemption}
+                  >
+                    {copy(redemption ? 'Update' : 'Apply')}
+                  </Button>
+                </div>
+              ) : null}
             </div>
           ) : null}
           {hasTax ? (
