@@ -17,12 +17,14 @@ import { CatalogItemThumbnail } from '../../../../modules/catalog/catalog-item-t
 import { useCatalogLocalization } from '../../../../modules/catalog/catalog-localization';
 import { variantPriceState } from '../../../../modules/catalog/catalog-price-history';
 import {
-  SellingModeChoice,
-  SellingModelBadge,
   sellingModel,
   sellingModelCopy,
   sellsItemItself,
-} from '../../../../modules/catalog/catalog-selling';
+} from '../../model/catalog-selling';
+import {
+  SellingModeChoice,
+  SellingModelBadge,
+} from '../../ui/catalog-selling';
 import { CatalogSection, DialogFooter, Status } from '../../../../modules/catalog/catalog-shared';
 import {
   editableAmount,
