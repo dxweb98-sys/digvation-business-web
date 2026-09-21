@@ -1,4 +1,5 @@
-import { DInput, DSelect } from '@digvation/ui';
+import { DBadge, DInput, DSelect } from '@digvation/ui';
+import { Star } from 'lucide-react';
 
 import type {
   LoyaltyConfiguration,
@@ -24,57 +25,55 @@ export function CatalogItemLoyaltySection({
   canConfigure: boolean;
   loyaltyDraftValid: boolean;
 }) {
-  const {
-    behavior,
-    pointsPerUnit,
-    touched,
-  } = editor.loyalty;
-  const {
-    setLoyaltyBehavior,
-    setLoyaltyPointsPerUnit,
-  } = editor.actions;
+  const { behavior, pointsPerUnit, touched } = editor.loyalty;
+  const { setLoyaltyBehavior, setLoyaltyPointsPerUnit } = editor.actions;
+
+  const effectiveBehavior = loyaltyRule?.behavior ?? configuration?.defaultEarningBehavior;
+  const effectivePoints =
+    loyaltyRule?.fixedPointsPerUnit ?? configuration?.defaultFixedPointsPerUnit ?? 0;
+  const active = effectiveBehavior !== 'EXCLUDED';
 
   return (
     <CatalogSection
-      title="Loyalty"
-      tone="secondary"
-      description={
-        loyaltyRule
-          ? 'Aturan khusus ini dapat diubah antara poin khusus dan tidak dapat poin.'
-          : 'Item ini mengikuti aturan default sampai aturan khusus disimpan.'
+      title="Poin Loyalitas Member"
+      actions={
+        loading ? null : (
+          <DBadge variant={active ? 'success' : 'secondary'}>
+            {active ? 'Aktif' : 'Nonaktif'}
+          </DBadge>
+        )
       }
     >
       {loading ? (
-        <p className="text-sm text-(--color-text-muted)">Memuat aturan poin...</p>
+        <div className="rounded-xl border border-[var(--color-border)] px-4 py-5 text-sm text-[var(--color-text-muted)]">
+          Memuat aturan poin...
+        </div>
       ) : (
-        <div className="space-y-4">
-          <div className="grid gap-4 text-sm sm:grid-cols-2">
-            <div>
-              <p className="text-(--color-text-muted)">Aturan poin</p>
-              <p className="mt-1 font-medium">
-                {loyaltyRule
-                  ? loyaltyRule.behavior === 'FIXED'
-                    ? 'Poin khusus'
-                    : 'Tidak dapat poin'
-                  : 'Mengikuti default'}
-              </p>
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
+          <div className="flex flex-col gap-3 border-b border-[var(--color-border)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 gap-2.5">
+              <Star className="mt-0.5 size-4 shrink-0 text-[var(--color-brand)]" aria-hidden="true" />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-[var(--color-text)]">
+                  Poin loyalitas khusus item
+                </p>
+                <p className="mt-0.5 text-xs leading-5 text-[var(--color-text-muted)]">
+                  {loyaltyRule
+                    ? 'Item memiliki aturan poin tersendiri.'
+                    : 'Saat ini item mengikuti aturan default bisnis sampai aturan khusus disimpan.'}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-(--color-text-muted)">Hasil efektif</p>
-              <p className="mt-1 font-medium">
-                {(loyaltyRule?.behavior ?? configuration?.defaultEarningBehavior) === 'EXCLUDED'
-                  ? 'Tidak dapat poin'
-                  : `${
-                      loyaltyRule?.fixedPointsPerUnit ??
-                      configuration?.defaultFixedPointsPerUnit ??
-                      0
-                    } poin / unit`}
+            <div className="shrink-0 text-left sm:text-right">
+              <p className="text-xs text-[var(--color-text-muted)]">Hasil efektif</p>
+              <p className="mt-0.5 text-sm font-semibold text-[var(--color-text)]">
+                {active ? `+${effectivePoints} poin / unit` : 'Tidak dapat poin'}
               </p>
             </div>
           </div>
 
           {canConfigure ? (
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-3 px-4 py-3 sm:grid-cols-2">
               <DSelect
                 label="Aturan poin"
                 value={behavior}
@@ -101,9 +100,19 @@ export function CatalogItemLoyaltySection({
                       : undefined
                   }
                 />
-              ) : null}
+              ) : (
+                <div className="flex items-end">
+                  <p className="pb-2 text-xs text-[var(--color-text-muted)]">
+                    Member tidak memperoleh poin dari item ini.
+                  </p>
+                </div>
+              )}
             </div>
-          ) : null}
+          ) : (
+            <div className="px-4 py-3 text-xs text-[var(--color-text-muted)]">
+              Anda memiliki akses baca untuk aturan Loyalty item ini.
+            </div>
+          )}
         </div>
       )}
     </CatalogSection>
