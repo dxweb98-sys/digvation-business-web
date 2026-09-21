@@ -194,32 +194,40 @@ misc/
 
 when those names hide feature ownership. Small local folders may use them when responsibility remains obvious, but they are not the default architecture.
 
-## Catalog cross-app reference
+## Reuse without speculative abstraction
 
-Catalog is a shared business foundation, so stable framework-free Catalog semantics may live in:
+Do not promote domain code across applications merely because two experiences happen to use similar vocabulary.
+
+Prefer the smallest correct owner:
 
 ```text
-packages/catalog
+feature-specific behavior
+-> feature
+
+reusable within one application
+-> apps/<app>/src/shared/<concern>
+
+proven reusable across applications
+-> existing narrowly owned packages/* concern
 ```
 
-The package may own stable cross-app vocabulary and pure interpretation helpers such as:
+Examples of appropriate application-level shared code:
 
-- Catalog item/product/service type vocabulary;
-- variant selection vocabulary;
-- stable Catalog identity/reference shapes;
-- pure selling-model interpretation shared by Backoffice and Operational.
+- generic form-state helpers;
+- backend-compatible limit/offset pagination helpers;
+- generic list-query wrappers;
+- query-string builders;
+- application-wide localization primitives.
 
-It must not own:
+Examples that should stay feature-owned until real reuse is proven:
 
-- Backoffice editor state;
-- React Query caches;
-- dialogs/forms;
-- Loyalty configuration;
-- POS cart/sale behavior;
-- Inventory stock;
-- Workshop execution.
+- Catalog Item Editor reducer;
+- Catalog selling rules;
+- Loyalty draft behavior;
+- Promotion targeting state;
+- Workforce attendance filters.
 
-Backoffice Catalog management remains application feature code. Operational consumes Catalog through its own operational feature/projection contract.
+Do not create a new workspace package simply to avoid two similar-looking local types.
 
 ## State ownership
 
