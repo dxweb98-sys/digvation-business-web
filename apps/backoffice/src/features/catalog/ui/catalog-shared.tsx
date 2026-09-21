@@ -201,6 +201,7 @@ export function CatalogSection({
   description,
   count,
   actions,
+  icon,
   tone = 'primary',
   children,
 }: {
@@ -208,6 +209,7 @@ export function CatalogSection({
   description?: ReactNode;
   count?: number;
   actions?: ReactNode;
+  icon?: ReactNode;
   tone?: 'primary' | 'secondary';
   children: ReactNode;
 }) {
@@ -216,6 +218,7 @@ export function CatalogSection({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
+            {icon ? <span className="text-[var(--color-brand)]">{icon}</span> : null}
             <h2
               className={
                 tone === 'primary'
