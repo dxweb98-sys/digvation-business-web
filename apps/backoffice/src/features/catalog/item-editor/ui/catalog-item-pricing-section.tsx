@@ -1,4 +1,4 @@
-import { DCurrencyInput } from '@digvation/ui';
+import { DBadge, DCurrencyInput } from '@digvation/ui';
 
 import { sellingModelCopy, sellsItemItself, type SellingModel } from '../../model/catalog-selling';
 import { SellingModeChoice } from '../../ui/catalog-selling';
@@ -35,37 +35,37 @@ export function CatalogItemPricingSection({
 
   return (
     <div className="space-y-3">
-      {hasVariants ? (
+      <div>
+        <p className="mb-2 text-xs font-medium text-[var(--color-text-muted)]">
+          Pilih cara item dijual
+        </p>
         <SellingModeChoice
           value={variantSelectionMode}
           onChange={(value) => setFormField('variantSelectionMode', value)}
           disabled={!canEditPrice || saving}
         />
-      ) : null}
+      </div>
 
       {sellsItemItself(model) ? (
-        <div
-          className={
-            hasVariants
-              ? 'flex flex-col gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)]/35 px-4 py-3 sm:flex-row sm:items-center sm:justify-between'
-              : 'rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4'
-          }
-        >
+        <div className="flex flex-col gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-[var(--color-text)]">
-              {hasVariants ? 'Harga tanpa varian' : 'Harga jual'}
-            </p>
-            <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
+            <div className="flex flex-wrap items-center gap-2">
+              <DBadge variant="secondary">Default</DBadge>
+              <p className="text-sm font-semibold text-[var(--color-text)]">Item utama</p>
+            </div>
+            <p className="mt-1 text-xs leading-5 text-[var(--color-text-muted)]">
+              Dijual tanpa memilih varian.
               {hasVariants
-                ? 'Harga dasar saat kasir menjual item tanpa memilih varian.'
-                : sellingModelCopy.DIRECT.description}
+                ? ' Varian di bawah menjadi pilihan tambahan.'
+                : ' Anda bisa menambahkan varian kapan saja tanpa menghilangkan opsi default ini.'}
             </p>
           </div>
 
           <div className="w-full sm:max-w-72">
             {canEditPrice ? (
               <DCurrencyInput
-                aria-label={`${hasVariants ? 'Harga tanpa varian' : 'Harga jual'} (${currency})`}
+                label="Harga default"
+                aria-label={`Harga tanpa varian (${currency})`}
                 value={defaultPrice}
                 onValueChange={(value) => setFormField('defaultPrice', value)}
                 placeholder="Contoh: 100000"
@@ -85,14 +85,22 @@ export function CatalogItemPricingSection({
           </div>
         </div>
       ) : (
-        <div className="rounded-lg bg-[var(--color-surface-muted)] px-3 py-2 text-xs text-[var(--color-text-muted)]">
-          Harga jual ditentukan oleh setiap varian.
-          {storedItemPrice
-            ? ` Harga item ${formatMoney(
-                storedItemPrice,
-                currency,
-              )} tetap tersimpan di riwayat dan tidak digunakan untuk penjualan saat mode ini aktif.`
-            : ''}
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)]/35 px-4 py-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <DBadge variant="info">Varian wajib</DBadge>
+            <p className="text-sm font-semibold text-[var(--color-text)]">
+              Opsi default tidak dijual
+            </p>
+          </div>
+          <p className="mt-1 text-xs leading-5 text-[var(--color-text-muted)]">
+            {sellingModelCopy.VARIANT_REQUIRED.description}
+            {storedItemPrice
+              ? ` Harga default ${formatMoney(
+                  storedItemPrice,
+                  currency,
+                )} tetap tersimpan di riwayat tetapi tidak digunakan selama mode ini aktif.`
+              : ''}
+          </p>
         </div>
       )}
     </div>
