@@ -1582,6 +1582,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         taxAmount={workspace.cart.taxAmount}
         taxLabel={sale ? saleTaxLabel(sale, copy('Tax')) : copy('Tax')}
         isEstimate={workspace.cart.isLocalDraft}
+        isPreparingTransaction={workspace.isDraftCommitPending}
         locale={workspace.locale}
         customer={activeCustomer}
         memberNumber={activeSelectedMember?.memberNumber ?? null}
@@ -2483,6 +2484,7 @@ function ReferenceFloatingCart({
   taxAmount,
   taxLabel,
   isEstimate,
+  isPreparingTransaction,
   locale,
   customer,
   memberNumber,
@@ -2503,6 +2505,7 @@ function ReferenceFloatingCart({
   taxAmount: string;
   taxLabel: string;
   isEstimate: boolean;
+  isPreparingTransaction: boolean;
   locale: string;
   customer: SaleCustomer | null;
   memberNumber: string | null;
@@ -2534,6 +2537,7 @@ function ReferenceFloatingCart({
       taxAmount={taxAmount}
       taxLabel={taxLabel}
       isEstimate={isEstimate}
+      isPreparingTransaction={isPreparingTransaction}
       locale={locale}
       customer={customer}
       memberNumber={memberNumber}
@@ -2640,6 +2644,7 @@ function ReferenceCartPanel({
   taxAmount,
   taxLabel,
   isEstimate,
+  isPreparingTransaction,
   locale,
   customer,
   memberNumber,
@@ -2658,6 +2663,7 @@ function ReferenceCartPanel({
   taxAmount: string;
   taxLabel: string;
   isEstimate: boolean;
+  isPreparingTransaction: boolean;
   locale: string;
   customer: SaleCustomer | null;
   memberNumber: string | null;
@@ -2853,10 +2859,12 @@ function ReferenceCartPanel({
               </span>
             </div>
           ) : null}
-          {hasTax ? (
+          {hasTax || isPreparingTransaction ? (
             <div className="flex items-center justify-between text-xs">
               <span className="text-[var(--color-text-muted)]">{taxLabel}</span>
-              <span className="font-medium">{money(taxAmount, locale)}</span>
+              <span className="font-medium">
+                {isPreparingTransaction ? copy('Calculating…') : money(taxAmount, locale)}
+              </span>
             </div>
           ) : null}
           <div className="flex items-center justify-between border-t border-[var(--color-border)] pt-2">
@@ -2877,7 +2885,8 @@ function ReferenceCartPanel({
           ) : null}
           <Button
             fullWidth
-            disabled={!lines.length}
+            disabled={!lines.length || isPreparingTransaction}
+            loading={isPreparingTransaction}
             onClick={onCheckout}
             leftIcon={<CreditCard className="size-3.5" />}
           >
