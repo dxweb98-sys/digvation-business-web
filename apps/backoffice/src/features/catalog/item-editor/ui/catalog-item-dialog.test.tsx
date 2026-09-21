@@ -132,6 +132,11 @@ const type = (element: HTMLElement, value: string) =>
     fireEvent.change(element, { target: { value } });
   });
 
+const openPricingTab = (scope: ReturnType<typeof within>) =>
+  act(() => {
+    fireEvent.click(scope.getByRole('tab', { name: /Harga & Varian/ }));
+  });
+
 afterEach(cleanup);
 
 describe('CatalogItemDialog variant pricing', () => {
@@ -151,10 +156,12 @@ describe('CatalogItemDialog variant pricing', () => {
   it('creates an item without variants as the default sellable option', async () => {
     const api = fakeApi();
     const { dialog } = renderDialog(api, null);
-    await type(within(dialog()).getByLabelText('Nama Item'), 'Teh');
-    await type(within(dialog()).getByLabelText('Harga tanpa varian (IDR)'), '10000');
+    const scope = within(dialog());
+    await type(scope.getByLabelText('Nama Item'), 'Teh');
+    await openPricingTab(scope);
+    await type(scope.getByLabelText('Harga tanpa varian (IDR)'), '10000');
     await act(async () =>
-      fireEvent.click(within(dialog()).getByRole('button', { name: 'Simpan' })),
+      fireEvent.click(scope.getByRole('button', { name: 'Simpan' })),
     );
 
     await waitFor(() => expect(api.createPrice).toHaveBeenCalledTimes(1));
@@ -173,6 +180,7 @@ describe('CatalogItemDialog variant pricing', () => {
     const { dialog } = renderDialog(api, null);
     const scope = () => within(dialog());
     await type(scope().getByLabelText('Nama Item'), 'Kopi');
+    await openPricingTab(scope());
     await act(async () => fireEvent.click(scope().getByLabelText(/Wajib pilih varian/)));
 
     await act(async () => fireEvent.click(scope().getByRole('button', { name: 'Tambah varian' })));
@@ -226,6 +234,7 @@ describe('CatalogItemDialog variant pricing', () => {
     const { dialog } = renderDialog(api, null);
     const scope = () => within(dialog());
     await type(scope().getByLabelText('Nama Item'), 'Es Teh');
+    await openPricingTab(scope());
     await act(async () => fireEvent.click(scope().getByLabelText(/Wajib pilih varian/)));
     await act(async () => fireEvent.click(scope().getByRole('button', { name: 'Tambah varian' })));
     await type(scope().getByLabelText('Nama varian 1'), 'Large');
@@ -260,6 +269,7 @@ describe('CatalogItemDialog variant pricing', () => {
     const scope = () => within(dialog());
 
     await type(scope().getByLabelText('Nama Item'), 'Kopi');
+    await openPricingTab(scope());
     await act(async () => fireEvent.click(scope().getByLabelText(/Wajib pilih varian/)));
     await act(async () => fireEvent.click(scope().getByRole('button', { name: 'Simpan' })));
 
@@ -271,6 +281,7 @@ describe('CatalogItemDialog variant pricing', () => {
     const api = fakeApi();
     const { dialog } = renderDialog(api, existingItem);
     const scope = () => within(dialog());
+    await openPricingTab(scope());
 
     expect(await scope().findByText('Varian wajib belum ditambahkan.')).toBeTruthy();
     await act(async () => fireEvent.click(scope().getByRole('button', { name: 'Tambah varian' })));
@@ -317,6 +328,7 @@ describe('CatalogItemDialog variant pricing', () => {
     });
     const { dialog } = renderDialog(api, { ...existingItem, variantSelectionMode: 'OPTIONAL' });
     const scope = () => within(dialog());
+    await openPricingTab(scope());
     await waitFor(() =>
       expect((scope().getByLabelText('Harga Large') as HTMLInputElement).value).not.toBe(''),
     );
@@ -339,6 +351,7 @@ describe('CatalogItemDialog variant pricing', () => {
     const { dialog } = renderDialog(api, null);
     const scope = () => within(dialog());
     await type(scope().getByLabelText('Nama Item'), 'Kopi');
+    await openPricingTab(scope());
     await act(async () => fireEvent.click(scope().getByRole('button', { name: 'Tambah varian' })));
     await type(scope().getByLabelText('Nama varian 1'), 'Large');
     await act(async () => fireEvent.click(scope().getByRole('button', { name: 'Simpan' })));
@@ -375,6 +388,7 @@ describe('CatalogItemDialog variant pricing', () => {
     });
     const { dialog } = renderDialog(api, existingItem);
     const scope = () => within(dialog());
+    await openPricingTab(scope());
     await waitFor(() =>
       expect((scope().getByLabelText('Harga Large') as HTMLInputElement).value).not.toBe(''),
     );
