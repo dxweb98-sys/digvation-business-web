@@ -1,3 +1,8 @@
+import type {
+  CatalogItemType,
+  VariantSelectionMode,
+} from '@digvation/business-catalog';
+
 export type RecordStatus = 'ACTIVE' | 'INACTIVE';
 export type CatalogLifecycle = 'DRAFT' | 'ACTIVE' | 'INACTIVE' | 'ARCHIVED';
 export type SaleStatus = 'OPEN' | 'FINALIZED' | 'VOIDED';
@@ -88,13 +93,13 @@ export interface CatalogItem {
   id: string;
   code: string;
   name: string;
-  type: 'PRODUCT' | 'SERVICE';
+  type: CatalogItemType;
   categoryId: string | null;
   description: string | null;
   lifecycle: CatalogLifecycle;
   fulfillmentBehavior: 'INSTANT' | 'TRACKED';
   /** With active variants: REQUIRED sells variants only; OPTIONAL also sells the item itself. */
-  variantSelectionMode?: 'REQUIRED' | 'OPTIONAL';
+  variantSelectionMode?: VariantSelectionMode;
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -231,7 +236,7 @@ export interface SaleLine {
   catalogPriceId: string;
   itemCodeSnapshot: string;
   itemNameSnapshot: string;
-  itemTypeSnapshot: 'PRODUCT' | 'SERVICE';
+  itemTypeSnapshot: CatalogItemType;
   variantCodeSnapshot: string | null;
   variantNameSnapshot: string | null;
   fulfillmentBehaviorSnapshot: 'INSTANT' | 'TRACKED';
