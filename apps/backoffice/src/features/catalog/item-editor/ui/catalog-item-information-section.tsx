@@ -2,7 +2,7 @@ import { DInput, DSelect, DTextarea } from '@digvation/ui';
 import { Info } from 'lucide-react';
 
 import type { CatalogItemImage, Category, Item } from '../../api/catalog-api';
-import { CatalogSection } from '../../ui/catalog-shared';
+import { CatalogPanel, CatalogPanelHeader } from '../../ui/catalog-shared';
 import type { useCatalogItemEditor } from '../model/use-catalog-item-editor';
 import { CatalogItemImageField } from './catalog-item-image-field';
 
@@ -37,16 +37,17 @@ export function CatalogItemInformationSection({
   const { setFormField, selectImage, requestImageRemoval } = editor.actions;
 
   return (
-    <CatalogSection
-      title="Informasi Item"
-      icon={<Info className="size-4" aria-hidden="true" />}
-      actions={
-        <span className="text-xs font-normal normal-case text-[var(--color-text-muted)]">
-          Tampil di kasir POS
-        </span>
-      }
-    >
-      <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+    <CatalogPanel ariaLabel="Informasi Item">
+      <CatalogPanelHeader
+        title="Informasi Item"
+        icon={<Info className="size-4" aria-hidden="true" />}
+        actions={
+          <span className="text-xs font-normal text-[var(--color-text-muted)]">
+            Tampil di kasir POS
+          </span>
+        }
+      />
+      <div className="p-5">
         <div
           className={
             canManageImage
@@ -175,6 +176,6 @@ export function CatalogItemInformationSection({
           </div>
         </div>
       </div>
-    </CatalogSection>
+    </CatalogPanel>
   );
 }
