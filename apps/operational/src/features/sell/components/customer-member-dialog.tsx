@@ -63,6 +63,11 @@ const localCopy: Record<string, { 'id-ID': string; 'en-US': string }> = {
     'id-ID': 'Pendaftaran member membuat keanggotaan aktif. Poin loyalty mengikuti konfigurasi bisnis yang berlaku.',
     'en-US': 'Enrollment creates an active membership for this customer. Loyalty points follow the current business configuration.',
   },
+  'New member information': { 'id-ID': 'Informasi Member Baru', 'en-US': 'New Member Information' },
+  'Member code': { 'id-ID': 'Kode Member', 'en-US': 'Member Code' },
+  'Automatic': { 'id-ID': 'Otomatis', 'en-US': 'Automatic' },
+  'Registration status': { 'id-ID': 'Status Pendaftaran', 'en-US': 'Registration Status' },
+  'Active immediately': { 'id-ID': 'Aktif Langsung', 'en-US': 'Active Immediately' },
   'Full name': { 'id-ID': 'Nama Lengkap', 'en-US': 'Full Name' },
   'NIK': { 'id-ID': 'NIK (Nomor Induk Kependudukan)', 'en-US': 'NIK (National ID Number)' },
   'NIK hint': { 'id-ID': '16 digit NIK digunakan hanya untuk verifikasi dan tidak ditampilkan setelah pendaftaran.', 'en-US': 'The 16-digit NIK is used only for verification and is never displayed after enrollment.' },
@@ -221,7 +226,7 @@ export function CustomerMemberDialog({
       ariaLabel={text('Choose customer')}
       closeOnEscape
       closeOnOverlay
-      className="pos-reference-dialog w-full max-w-[640px] overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-2xl"
+      className="pos-reference-dialog w-full max-w-xl overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-2xl"
       footer={footer}
     >
       <div className="space-y-4">
@@ -389,6 +394,9 @@ export function CustomerMemberDialog({
                                 <span className="shrink-0 rounded-md bg-[var(--color-surface-muted)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-text-muted)]">
                                   {member.memberNumber}
                                 </span>
+                                <span className="shrink-0 rounded-full bg-[var(--color-success)]/10 px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-success)]">
+                                  {text('Active')}
+                                </span>
                               </span>
                               <span className="mt-0.5 flex items-center gap-1 text-xs text-[var(--color-text-muted)]">
                                 <Phone className="size-3" />
@@ -474,9 +482,33 @@ export function CustomerMemberDialog({
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <DInput
-                  label={text('Full name')}
+              <div>
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+                    {text('New member information')}
+                  </p>
+                  <span className="text-[10px] text-[var(--color-text-muted)]">1 / 1</span>
+                </div>
+                <div className="mb-3 grid gap-2 sm:grid-cols-2">
+                  <div className="rounded-xl bg-[var(--color-surface-muted)] px-3 py-2.5">
+                    <p className="text-[10px] font-medium text-[var(--color-text-muted)]">
+                      {text('Member code')}
+                    </p>
+                    <p className="mt-1 text-xs font-semibold">{text('Automatic')}</p>
+                  </div>
+                  <div className="rounded-xl bg-[var(--color-surface-muted)] px-3 py-2.5">
+                    <p className="text-[10px] font-medium text-[var(--color-text-muted)]">
+                      {text('Registration status')}
+                    </p>
+                    <p className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-success)]">
+                      <CheckCircle2 className="size-3.5" aria-hidden="true" />
+                      {text('Active immediately')}
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <DInput
+                    label={text('Full name')}
                   value={name}
                   onChange={setName}
                   disabled={isEnrolling}
@@ -488,14 +520,15 @@ export function CustomerMemberDialog({
                   inputMode="tel"
                   disabled={isEnrolling}
                 />
-                <DInput
-                  label={text('NIK')}
-                  value={nik}
-                  onChange={setNik}
-                  inputMode="numeric"
-                  disabled={isEnrolling}
-                  hint={text('NIK hint')}
-                />
+                  <DInput
+                    label={text('NIK')}
+                    value={nik}
+                    onChange={setNik}
+                    inputMode="numeric"
+                    disabled={isEnrolling}
+                    hint={text('NIK hint')}
+                  />
+                </div>
               </div>
 
               {enrollError ? <DAlert variant="danger">{enrollError}</DAlert> : null}
