@@ -5,7 +5,7 @@ import {
   CATALOG_IMAGE_CONTENT_TYPES,
   CATALOG_IMAGE_MAX_BYTES,
   type CatalogItemImage,
-} from '../../../../modules/catalog/catalog-api';
+} from '../../api/catalog-api';
 import { useCatalogLocalization } from '../../../../modules/catalog/catalog-localization';
 
 export function CatalogItemImageField({
