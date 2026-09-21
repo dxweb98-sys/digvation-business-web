@@ -736,6 +736,11 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const canRedeemLoyalty =
     session.access.capabilities.includes('LOYALTY_POINTS') &&
     session.access.permissions.includes('loyalty:redeem');
+  const activeSelectedMember =
+    activeCustomer?.type === 'MEMBER' &&
+    selectedMember?.customerId === activeCustomer.referenceId
+      ? selectedMember
+      : null;
 
   const memberIdentityQuery = useQuery({
     queryKey: [
@@ -748,7 +753,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       canReadMembers &&
         activeCustomer?.type === 'MEMBER' &&
         activeCustomer.referenceId &&
-        selectedMember?.customerId !== activeCustomer.referenceId,
+        activeSelectedMember === null,
     ),
     staleTime: 30_000,
   });
@@ -771,9 +776,9 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   ]);
 
   const memberBalanceQuery = useQuery({
-    queryKey: ['operational-member-balance', selectedMember?.id],
-    queryFn: ({ signal }) => customerMemberApi.getPointBalance(selectedMember!.id, signal),
-    enabled: Boolean(selectedMember && activeCustomer?.type === 'MEMBER' && canReadLoyalty),
+    queryKey: ['operational-member-balance', activeSelectedMember?.id],
+    queryFn: ({ signal }) => customerMemberApi.getPointBalance(activeSelectedMember!.id, signal),
+    enabled: Boolean(activeSelectedMember && canReadLoyalty),
     staleTime: 15_000,
   });
 
@@ -1579,7 +1584,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         isEstimate={workspace.cart.isLocalDraft}
         locale={workspace.locale}
         customer={activeCustomer}
-        memberNumber={selectedMember?.memberNumber ?? null}
+        memberNumber={activeSelectedMember?.memberNumber ?? null}
         pointBalance={memberBalanceQuery.data?.pointsBalance ?? null}
         isPointBalanceLoading={memberBalanceQuery.isLoading}
         onChooseCustomer={() => setCustomerPickerOpen(true)}
