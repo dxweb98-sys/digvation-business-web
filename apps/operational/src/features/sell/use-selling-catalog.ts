@@ -1,3 +1,4 @@
+import type { CatalogItemType } from '@digvation/business-catalog';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
@@ -7,7 +8,7 @@ import { cashierTransactionKeys } from './cashier-transaction-keys';
 import type { CatalogItem, CatalogVariant } from './cashier-transaction.types';
 import type { OperationalProjectionQuery } from './operational-projection-client';
 
-export type CatalogItemTypeFilter = 'ALL' | 'PRODUCT' | 'SERVICE';
+export type CatalogItemTypeFilter = 'ALL' | CatalogItemType;
 
 type OperationalSellingCatalogQuery = SellingCatalogQuery & OperationalProjectionQuery;
 
