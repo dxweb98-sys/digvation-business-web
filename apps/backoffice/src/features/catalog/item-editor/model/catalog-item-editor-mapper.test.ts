@@ -16,15 +16,14 @@ describe('catalog item editor mapper', () => {
     const state = createCatalogItemEditorState(null);
     const product = buildCatalogItemBaseInput({
       form: state.form,
-      hasVariants: false,
       parsedDefaultDuration: null,
     });
     expect(product).not.toHaveProperty('serviceDefinition');
     expect(product.fulfillmentBehavior).toBe('INSTANT');
+    expect(product.variantSelectionMode).toBe('OPTIONAL');
 
     const service = buildCatalogItemBaseInput({
       form: { ...state.form, type: 'SERVICE' },
-      hasVariants: false,
       parsedDefaultDuration: 30,
     });
     expect(service).toEqual(
