@@ -1,5 +1,7 @@
 import type { ApiClient } from '@digvation/business-api';
 
+import { buildQueryString } from '../../shared/api/build-query-string';
+
 export type RecordStatus = 'ACTIVE' | 'INACTIVE';
 export type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'LEAVE' | 'SICK';
 
@@ -140,20 +142,12 @@ export interface UpsertAttendanceInput {
   note?: string | null;
 }
 
-function queryString(query: Record<string, string | number | undefined>) {
-  const params = new URLSearchParams();
-  Object.entries(query).forEach(([key, value]) => {
-    if (value !== undefined && value !== '') params.set(key, String(value));
-  });
-  return params.toString();
-}
-
 export class EmployeesApi {
   public constructor(private readonly client: ApiClient) {}
 
   list(query: EmployeeQuery) {
     return this.client.get<EmployeePage>(
-      `/api/v1/employees?${queryString(query as unknown as Record<string, string | number | undefined>)}`,
+      `/api/v1/employees?${buildQueryString(query)}`,
     );
   }
 
@@ -174,7 +168,7 @@ export class EmployeesApi {
 
   listPositions(query: EmployeePositionQuery) {
     return this.client.get<EmployeePositionPage>(
-      `/api/v1/employees/positions?${queryString(query as unknown as Record<string, string | number | undefined>)}`,
+      `/api/v1/employees/positions?${buildQueryString(query)}`,
     );
   }
 
@@ -191,7 +185,7 @@ export class EmployeesApi {
 
   listAttendance(query: AttendanceQuery) {
     return this.client.get<EmployeeAttendancePage>(
-      `/api/v1/employees/attendance?${queryString(query as unknown as Record<string, string | number | undefined>)}`,
+      `/api/v1/employees/attendance?${buildQueryString(query)}`,
     );
   }
 
