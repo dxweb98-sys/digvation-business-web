@@ -299,7 +299,12 @@ export function CatalogItemDetailDialog({
       open
       onClose={onClose}
       size="xl"
-      title="Detail Item & Layanan"
+      title={
+        <div className="flex items-center gap-2">
+          <span className="size-2 rounded-full bg-[var(--color-brand)]" aria-hidden="true" />
+          <span>Detail Item & Layanan</span>
+        </div>
+      }
       footer={
         <div className="flex justify-end gap-2">
           <DButton variant="secondary" onClick={onClose}>
