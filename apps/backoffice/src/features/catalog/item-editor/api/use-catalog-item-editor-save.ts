@@ -135,7 +135,7 @@ export function useCatalogItemEditorSave({
         persistedItem = await api.updateItem(item, baseInput);
 
         const nextPrice = editor.form.defaultPrice.trim();
-        const initialItemPrice = editor.refs.initialPrice.current ?? null;
+        const initialItemPrice = editor.actions.getInitialPrice();
 
         if (
           canEditPrice &&
