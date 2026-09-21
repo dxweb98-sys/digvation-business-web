@@ -1,12 +1,7 @@
 export type {
-  CatalogCategory,
-  CatalogItem,
   CatalogItemType,
   CatalogLifecycle,
-  CatalogNamedRecord,
   CatalogRecordStatus,
-  CatalogServiceDefinition,
-  CatalogVariant,
   VariantSelectionMode,
 } from './catalog.types';
 
