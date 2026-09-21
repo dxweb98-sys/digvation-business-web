@@ -4,12 +4,12 @@ import type { VariantPriceDraft } from './variant-price-draft';
 import type { LoyaltyEarningBehavior } from '../../../../modules/loyalty/loyalty-api';
 import {
   catalogItemEditorReducer,
-} from './catalog-item-editor.reducer';
+} from './catalog-item-editor-reducer';
 import {
   createCatalogItemEditorState,
   type CatalogItemEditorForm,
   type CatalogItemEditorSource,
-} from './catalog-item-editor.state';
+} from './catalog-item-editor-state';
 
 function editorIdentity(item: CatalogItemEditorSource | null | undefined) {
   if (item === undefined) return 'closed';
