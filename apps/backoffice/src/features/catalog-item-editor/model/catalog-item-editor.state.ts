@@ -1,8 +1,4 @@
-import type {
-  CatalogItemType,
-  CatalogLifecycle,
-  VariantSelectionMode,
-} from '@digvation/business-catalog';
+import type { Item, VariantSelectionMode } from '../../../modules/catalog/catalog-api';
 
 import type { VariantPriceDraft } from './variant-price-draft';
 import type { LoyaltyEarningBehavior } from '../../../modules/loyalty/loyalty-api';
@@ -11,10 +7,10 @@ export interface CatalogItemEditorSource {
   id: string;
   code: string;
   name: string;
-  type: CatalogItemType;
+  type: Item['type'];
   categoryId: string | null;
   description: string | null;
-  lifecycle: CatalogLifecycle;
+  lifecycle: Item['lifecycle'];
   variantSelectionMode: VariantSelectionMode;
   serviceDefinition: {
     defaultDurationMinutes: number | null;
@@ -24,10 +20,10 @@ export interface CatalogItemEditorSource {
 export interface CatalogItemEditorForm {
   code: string;
   name: string;
-  type: CatalogItemType;
+  type: Item['type'];
   categoryId: string | null;
   description: string;
-  lifecycle: CatalogLifecycle;
+  lifecycle: Item['lifecycle'];
   defaultDurationMinutes: string;
   variantSelectionMode: VariantSelectionMode;
   defaultPrice: string;
