@@ -5,6 +5,7 @@ import {
   BACKOFFICE_ACCESS_PERMISSION,
   canAccessBackoffice,
   canPerformBackofficeAction,
+  hasBackofficeRuntimeCapability,
 } from './backoffice-access';
 
 function sessionWith(...permissions: string[]): AuthSession {
@@ -78,6 +79,15 @@ describe('Backoffice effective permission access', () => {
     expect(canAccessBackoffice(backofficeSessionWith('employees:read'), 'reports')).toBe(true);
     expect(canAccessBackoffice(backofficeSessionWith('attendance:read'), 'reports')).toBe(true);
     expect(canAccessBackoffice(backofficeSessionWith(), 'reports')).toBe(false);
+  });
+
+  it('reads optional Runtime capabilities without turning them into permission authority', () => {
+    const session = backofficeSessionWith('catalog:read', 'loyalty:read');
+    session.access.capabilities = ['LOYALTY_POINTS'];
+
+    expect(hasBackofficeRuntimeCapability(session, 'LOYALTY_POINTS')).toBe(true);
+    expect(hasBackofficeRuntimeCapability(session, 'INVENTORY')).toBe(false);
+    expect(hasBackofficeRuntimeCapability(null, 'LOYALTY_POINTS')).toBe(false);
   });
 
   it('does not treat an Operational role name or its permissions as Backoffice authority', () => {
