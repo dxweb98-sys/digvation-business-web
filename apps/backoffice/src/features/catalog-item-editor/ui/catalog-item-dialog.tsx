@@ -7,7 +7,7 @@ import { useCatalogItemEditor } from '../model/use-catalog-item-editor';
 import { isSessionExpiredError } from '../../../auth/backoffice-auth-context';
 import type { LoyaltyApi } from '../../../modules/loyalty/loyalty-api';
 import type { CatalogApi, Category, Item } from '../../../modules/catalog/catalog-api';
-import { CatalogItemImageField } from '../../../modules/catalog/catalog-item-image-field';
+import { CatalogItemImageField } from './catalog-item-image-field';
 import { CatalogItemThumbnail } from '../../../modules/catalog/catalog-item-thumbnail';
 import { useCatalogLocalization } from '../../../modules/catalog/catalog-localization';
 import { variantPriceState } from '../../../modules/catalog/catalog-price-history';
@@ -24,8 +24,8 @@ import {
   isValidSellingPrice,
   sameAmount,
   variantPriceSubmissions,
-} from '../../../modules/catalog/catalog-variant-price-draft';
-import { VariantPriceEditor } from '../../../modules/catalog/catalog-variant-price-editor';
+} from '../model/variant-price-draft';
+import { VariantPriceEditor } from './catalog-variant-price-editor';
 
 export function CatalogItemDialog({
   item,
