@@ -5,7 +5,7 @@ import {
   type CatalogItemEditorForm,
   type CatalogItemEditorSource,
   type CatalogItemEditorState,
-} from './catalog-item-editor.state';
+} from './catalog-item-editor-state';
 
 export type CatalogItemEditorAction =
   | {
