@@ -1,7 +1,4 @@
-import {
-  catalogItemSellsDirectly,
-  resolveCatalogSellingModel,
-} from '@digvation/business-catalog';
+import { sellingModel, sellsItemItself } from '../../../modules/catalog/catalog-selling';
 
 import {
   isValidSellingPrice,
@@ -34,13 +31,13 @@ export function deriveCatalogItemEditorValidation({
     (Number.isInteger(parsedDefaultDuration) && parsedDefaultDuration > 0);
 
   const hasVariants = form.variants.length > 0;
-  const model = resolveCatalogSellingModel(hasVariants, form.variantSelectionMode);
+  const model = sellingModel(hasVariants, form.variantSelectionMode);
 
   const itemPriceRequired = model === 'ITEM_AND_VARIANTS';
   const itemPriceMissing = itemPriceRequired && !isValidSellingPrice(form.defaultPrice);
 
   const validPrice =
-    !catalogItemSellsDirectly(model) || validOptionalMoney(form.defaultPrice);
+    !sellsItemItself(model) || validOptionalMoney(form.defaultPrice);
 
   const variantsHaveIssues =
     form.variants.some((draft) => variantDraftIssue(draft, canEditPrice)) ||
