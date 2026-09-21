@@ -8,10 +8,22 @@ import {
   type TableColumn,
 } from '@digvation/ui';
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
-import { BadgeDollarSign, Layers, Pencil, Plus, Power, RotateCcw } from 'lucide-react';
+import {
+  BadgeDollarSign,
+  Briefcase,
+  Clock,
+  Layers,
+  Pencil,
+  Plus,
+  Power,
+  RotateCcw,
+  Tag,
+} from 'lucide-react';
 import { useState } from 'react';
+
 import { normalizeBackofficeApiError } from '../../../app/api/backoffice-api-error';
 import { isSessionExpiredError } from '../../../auth/backoffice-auth-context';
+import type { LoyaltyApi } from '../../../modules/loyalty/loyalty-api';
 import type {
   CatalogApi,
   CatalogManagementItem,
@@ -19,15 +31,16 @@ import type {
   DefaultPrice,
   Variant,
 } from '../api/catalog-api';
-import { CatalogItemThumbnail } from './catalog-item-thumbnail';
-import { CatalogLoyaltySection } from './catalog-loyalty-section';
-import type { LoyaltyApi } from '../../../modules/loyalty/loyalty-api';
 import { useCatalogLocalization } from '../localization/use-catalog-localization';
 import {
   explicitVariantPriceRange,
   variantPriceState,
   type VariantPriceState,
 } from '../model/catalog-price-history';
+import { sellingModel, sellingModelCopy } from '../model/catalog-selling';
+import { sameAmount } from '../item-editor/model/variant-price-draft';
+import { CatalogItemThumbnail } from './catalog-item-thumbnail';
+import { CatalogLoyaltyTile } from './catalog-loyalty-section';
 import {
   ItemPriceHistory,
   PriceChangeDialog,
@@ -35,21 +48,30 @@ import {
   VariantPriceLabel,
 } from './catalog-pricing';
 import { CatalogNamedRecordDialog } from './catalog-record-dialog';
-import { sellingModel, sellingModelCopy } from '../model/catalog-selling';
 import { SellingModelBadge } from './catalog-selling';
-import { CatalogSection, DetailField, PriceLabel, Status } from './catalog-shared';
-import { sameAmount } from '../item-editor/model/variant-price-draft';
+import {
+  CatalogInfoTile,
+  CatalogPanel,
+  CatalogPanelHeader,
+  PriceLabel,
+  Status,
+} from './catalog-shared';
 
 const HISTORY_PREVIEW = 5;
 
 type SellingOptionRow =
-  { kind: 'item'; id: string } | { kind: 'variant'; id: string; variant: Variant };
+  | { kind: 'item'; id: string }
+  | { kind: 'variant'; id: string; variant: Variant };
 
 const keys = {
   prices: (itemId: string) => ['catalog', 'prices', itemId] as const,
   variants: (itemId: string) => ['catalog', 'variants', itemId] as const,
-  variantPrice: (itemId: string, variantId: string, currency: string, effectiveAt: string) =>
-    ['catalog', 'variant-price', itemId, variantId, currency, effectiveAt] as const,
+  variantPrice: (
+    itemId: string,
+    variantId: string,
+    currency: string,
+    effectiveAt: string,
+  ) => ['catalog', 'variant-price', itemId, variantId, currency, effectiveAt] as const,
 };
 
 export function CatalogItemDetailDialog({
@@ -130,7 +152,6 @@ export function CatalogItemDetailDialog({
   const categoryName = item.categoryId
     ? (categories.find((candidate) => candidate.id === item.categoryId)?.name ?? item.categoryId)
     : 'Belum ditentukan';
-  // Location-specific prices are managed elsewhere; this history covers the item and its variants.
   const history = (priceHistory.data?.items ?? []).filter((price) => price.locationId === null);
   const variantStates = new Map<string, VariantPriceState>(
     (variants.data?.items ?? []).map((variant, index) => [
@@ -143,23 +164,22 @@ export function CatalogItemDetailDialog({
     (variant) => variant.status === 'ACTIVE',
   );
   const hasVariants = activeVariants.length > 0;
-  const variantsWithoutPrice = activeVariants.filter((variant) => {
-    return variantStates.get(variant.id)?.kind === 'missing';
-  }).length;
+  const variantsWithoutPrice = activeVariants.filter(
+    (variant) => variantStates.get(variant.id)?.kind === 'missing',
+  ).length;
+
   const refreshPricing = () => {
     onPricingChanged();
     void client.invalidateQueries({ queryKey: ['catalog', 'variant-price'] });
   };
-
-  const refreshVariants = () => void client.invalidateQueries({ queryKey: keys.variants(item.id) });
+  const refreshVariants = () =>
+    void client.invalidateQueries({ queryKey: keys.variants(item.id) });
   const refreshVariantsAndCount = () => {
     refreshVariants();
     onVariantsChanged();
   };
 
   const model = sellingModel(hasVariants, item.variantSelectionMode);
-  // Sellable options as the cashier sees them: the item itself (when it is sold without a
-  // variant) followed by every variant at its own price.
   const optionRows: SellingOptionRow[] = [
     ...(model === 'ITEM_AND_VARIANTS' ? [{ kind: 'item' as const, id: 'item' }] : []),
     ...(variants.data?.items ?? []).map((variant) => ({
@@ -168,20 +188,27 @@ export function CatalogItemDetailDialog({
       variant,
     })),
   ];
+
   const optionColumns: TableColumn<SellingOptionRow>[] = [
     {
       key: 'name',
-      label: model === 'ITEM_AND_VARIANTS' ? 'Pilihan' : 'Varian',
+      label: 'Varian & SKU',
       render: (row) =>
         row.kind === 'item' ? (
-          <div className="min-w-0">
-            <p className="font-medium text-[var(--color-text)]">Tanpa varian</p>
-            <p className="text-xs text-[var(--color-text-muted)]">Item dijual sendiri</p>
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="size-2.5 shrink-0 rounded-full bg-[var(--color-text-muted)]/35" />
+            <div className="min-w-0">
+              <p className="font-medium text-[var(--color-text)]">Tanpa varian</p>
+              <p className="text-xs text-[var(--color-text-muted)]">Item induk</p>
+            </div>
           </div>
         ) : (
-          <div className="min-w-0">
-            <p className="font-medium text-[var(--color-text)]">{row.variant.name}</p>
-            <p className="text-xs text-[var(--color-text-muted)]">SKU {row.variant.code}</p>
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="size-2.5 shrink-0 rounded-full bg-[var(--color-brand)]" />
+            <div className="min-w-0">
+              <p className="font-medium text-[var(--color-text)]">{row.variant.name}</p>
+              <p className="text-xs text-[var(--color-text-muted)]">SKU: {row.variant.code}</p>
+            </div>
           </div>
         ),
     },
@@ -215,6 +242,7 @@ export function CatalogItemDetailDialog({
         row.kind === 'item' ? <Status value="ACTIVE" /> : <Status value={row.variant.status} />,
     },
   ];
+
   const optionRange = explicitVariantPriceRange([
     ...(model === 'ITEM_AND_VARIANTS' && defaultPrice
       ? [
@@ -230,6 +258,18 @@ export function CatalogItemDetailDialog({
     ),
   ]);
   const visibleHistory = showAllHistory ? history : history.slice(0, HISTORY_PREVIEW);
+
+  const displayPrice =
+    model === 'DIRECT'
+      ? null
+      : optionRange
+        ? sameAmount(optionRange.min.amount, optionRange.max.amount)
+          ? formatMoney(optionRange.min.amount, optionRange.min.currency)
+          : `${formatMoney(optionRange.min.amount, optionRange.min.currency)} – ${formatMoney(
+              optionRange.max.amount,
+              optionRange.max.currency,
+            )}`
+        : '—';
 
   const confirmVariantStatus = async () => {
     if (!statusTarget || changingStatus) return;
@@ -259,7 +299,7 @@ export function CatalogItemDetailDialog({
       open
       onClose={onClose}
       size="xl"
-      title="Detail Item"
+      title="Detail Item & Layanan"
       footer={
         <div className="flex justify-end gap-2">
           <DButton variant="secondary" onClick={onClose}>
@@ -273,58 +313,72 @@ export function CatalogItemDetailDialog({
         </div>
       }
     >
-      <div className="divide-y divide-[var(--color-border)]">
-        <section className="pb-6" aria-label="Ringkasan item">
-          <div className="grid gap-5 md:grid-cols-[auto_minmax(0,1fr)]">
-            <CatalogItemThumbnail api={api} itemId={item.id} itemName={item.name} size="detail" />
-            <div className="min-w-0 space-y-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h2 className="break-words text-2xl font-semibold tracking-tight text-[var(--color-text)]">
+      <div className="space-y-5">
+        <CatalogPanel className="p-5">
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-stretch">
+            <div className="flex min-w-0 gap-4">
+              <CatalogItemThumbnail
+                api={api}
+                itemId={item.id}
+                itemName={item.name}
+                size="detail"
+              />
+              <div className="min-w-0 flex-1 self-center">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="break-words text-xl font-semibold tracking-tight text-[var(--color-text)]">
                     {item.name}
                   </h2>
-                  <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-                    {item.code} · {item.type === 'SERVICE' ? 'Jasa' : 'Produk'} · {categoryName}
-                  </p>
+                  <Status value={item.lifecycle} />
                 </div>
-                <Status value={item.lifecycle} />
-              </div>
-
-              {canViewPricing ? (
-                <div className="flex flex-wrap items-end justify-between gap-4 rounded-xl bg-[var(--color-surface-muted)] px-4 py-3">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-xs font-medium text-[var(--color-text-muted)]">
-                        {model === 'DIRECT'
-                          ? 'Harga jual'
-                          : model === 'ITEM_AND_VARIANTS'
-                            ? 'Pilihan harga'
-                            : 'Harga varian'}
-                      </p>
-                      {variants.isLoading ? null : <SellingModelBadge model={model} />}
-                    </div>
-                    <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight">
-                      {model === 'DIRECT' ? (
-                        <PriceLabel
-                          price={defaultPrice}
-                          loading={defaultPriceLoading}
-                          emptyLabel="Belum diatur"
-                        />
-                      ) : optionRange ? (
-                        sameAmount(optionRange.min.amount, optionRange.max.amount) ? (
-                          formatMoney(optionRange.min.amount, optionRange.min.currency)
-                        ) : (
-                          `${formatMoney(optionRange.min.amount, optionRange.min.currency)} – ${formatMoney(optionRange.max.amount, optionRange.max.currency)}`
-                        )
-                      ) : (
-                        '—'
-                      )}
-                    </p>
-                    <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
-                      {sellingModelCopy[model].description}
-                    </p>
+                <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--color-text-muted)]">
+                  <span className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-2 py-0.5 font-mono text-[11px] text-[var(--color-text)]">
+                    {item.code}
+                  </span>
+                  <span>•</span>
+                  <span>{item.type === 'SERVICE' ? 'Jasa' : 'Produk'}</span>
+                  <span>•</span>
+                  <span className="font-medium text-[var(--color-brand)]">{categoryName}</span>
+                </div>
+                {item.type === 'SERVICE' ? (
+                  <div className="mt-2 flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
+                    <Clock className="size-3.5" aria-hidden="true" />
+                    <span>
+                      Durasi:{' '}
+                      <strong className="font-medium text-[var(--color-text)]">
+                        {item.serviceDefinition?.defaultDurationMinutes != null
+                          ? `${item.serviceDefinition.defaultDurationMinutes} menit`
+                          : 'Belum diatur'}
+                      </strong>
+                    </span>
                   </div>
-                  {canCreatePricing && model === 'DIRECT' ? (
+                ) : null}
+              </div>
+            </div>
+
+            {canViewPricing ? (
+              <div className="flex min-h-28 flex-col justify-center rounded-xl border border-[var(--color-brand)]/20 bg-[var(--color-brand)]/[0.035] px-4 py-3 text-right">
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <span className="text-xs font-medium text-[var(--color-text-muted)]">
+                    {model === 'DIRECT' ? 'Harga jual' : 'Harga varian'}
+                  </span>
+                  {variants.isLoading ? null : <SellingModelBadge model={model} />}
+                </div>
+                <div className="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-[var(--color-text)]">
+                  {model === 'DIRECT' ? (
+                    <PriceLabel
+                      price={defaultPrice}
+                      loading={defaultPriceLoading}
+                      emptyLabel="Belum diatur"
+                    />
+                  ) : (
+                    displayPrice
+                  )}
+                </div>
+                <p className="mt-1 text-[11px] leading-4 text-[var(--color-text-muted)]">
+                  {sellingModelCopy[model].description}
+                </p>
+                {canCreatePricing && model === 'DIRECT' ? (
+                  <div className="mt-3 flex justify-end">
                     <DButton
                       variant="outline"
                       size="sm"
@@ -333,55 +387,58 @@ export function CatalogItemDetailDialog({
                     >
                       {defaultPrice ? 'Ubah harga' : 'Atur harga'}
                     </DButton>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </div>
-        </section>
+        </CatalogPanel>
 
-        <CatalogSection
-          title={model === 'ITEM_AND_VARIANTS' ? 'Pilihan harga' : 'Varian'}
-          count={model === 'ITEM_AND_VARIANTS' ? optionRows.length : variantCount}
-          description={
-            model === 'ITEM_AND_VARIANTS'
-              ? 'Kasir memilih salah satu: tanpa varian atau salah satu varian.'
-              : model === 'VARIANT_REQUIRED'
-                ? 'Kasir wajib memilih salah satu varian.'
-                : undefined
-          }
-          actions={
-            <>
-              {canCreatePricing && hasVariants ? (
-                <DButton
-                  variant="secondary"
-                  size="sm"
-                  leftIcon={<Layers className="size-4" />}
-                  onClick={() => setBulkPricing(true)}
-                >
-                  Terapkan harga ke semua varian
-                </DButton>
-              ) : null}
-              {canCreate ? (
-                <DButton
-                  variant="secondary"
-                  size="sm"
-                  leftIcon={<Plus className="size-4" />}
-                  onClick={() => setEditingVariant(null)}
-                >
-                  Tambah varian
-                </DButton>
-              ) : null}
-            </>
-          }
-        >
+        <CatalogPanel>
+          <CatalogPanelHeader
+            title="Daftar Varian"
+            count={model === 'ITEM_AND_VARIANTS' ? optionRows.length : variantCount}
+            description={
+              model === 'ITEM_AND_VARIANTS'
+                ? 'Kasir memilih salah satu: tanpa varian atau salah satu varian sebelum checkout.'
+                : model === 'VARIANT_REQUIRED'
+                  ? 'Kasir wajib memilih salah satu varian sebelum checkout.'
+                  : 'Item ini belum menggunakan varian.'
+            }
+            actions={
+              <>
+                {canCreatePricing && hasVariants ? (
+                  <DButton
+                    variant="secondary"
+                    size="sm"
+                    leftIcon={<Layers className="size-4" />}
+                    onClick={() => setBulkPricing(true)}
+                  >
+                    Terapkan harga ke semua
+                  </DButton>
+                ) : null}
+                {canCreate ? (
+                  <DButton
+                    variant="outline"
+                    size="sm"
+                    leftIcon={<Plus className="size-4" />}
+                    onClick={() => setEditingVariant(null)}
+                  >
+                    Tambah varian
+                  </DButton>
+                ) : null}
+              </>
+            }
+          />
           {canViewPricing && variantsWithoutPrice > 0 ? (
-            <DInfoNote variant="warning" className="mb-4">
-              {variantsWithoutPrice} varian aktif belum memiliki harga dan tidak bisa dijual.
-              {canCreatePricing
-                ? ' Terapkan satu harga ke semua varian atau atur harga tiap varian.'
-                : ''}
-            </DInfoNote>
+            <div className="px-4 pt-4">
+              <DInfoNote variant="warning">
+                {variantsWithoutPrice} varian aktif belum memiliki harga dan tidak bisa dijual.
+                {canCreatePricing
+                  ? ' Terapkan satu harga ke semua varian atau atur harga tiap varian.'
+                  : ''}
+              </DInfoNote>
+            </div>
           ) : null}
           <DDataTable
             columns={optionColumns}
@@ -425,40 +482,69 @@ export function CatalogItemDetailDialog({
               },
             ]}
           />
-        </CatalogSection>
+        </CatalogPanel>
 
-        {canViewLoyalty ? <CatalogLoyaltySection item={item} api={loyaltyApi} /> : null}
-
-        <CatalogSection title="Informasi item" tone="secondary">
-          <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
-            <DetailField label="Tipe" value={item.type === 'SERVICE' ? 'Jasa' : 'Produk'} />
-            <DetailField label="Kategori" value={categoryName} />
-            {item.type === 'SERVICE' ? (
-              <DetailField
-                label="Durasi Layanan"
-                value={
-                  item.serviceDefinition?.defaultDurationMinutes != null
+        <CatalogPanel className="p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.04em] text-[var(--color-text-muted)]">
+            Informasi Tambahan
+          </p>
+          <div
+            className={`mt-4 grid gap-3 sm:grid-cols-2 ${
+              canViewLoyalty ? 'lg:grid-cols-4' : 'lg:grid-cols-3'
+            }`}
+          >
+            <CatalogInfoTile
+              label="Tipe Produk / Item"
+              icon={<Briefcase className="size-3.5" aria-hidden="true" />}
+              value={item.type === 'SERVICE' ? 'Jasa (Layanan)' : 'Produk'}
+            />
+            <CatalogInfoTile
+              label="Kategori"
+              icon={<Tag className="size-3.5" aria-hidden="true" />}
+              value={categoryName}
+            />
+            <CatalogInfoTile
+              label={item.type === 'SERVICE' ? 'Durasi Pengerjaan' : 'Mode Penjualan'}
+              icon={<Clock className="size-3.5" aria-hidden="true" />}
+              value={
+                item.type === 'SERVICE'
+                  ? item.serviceDefinition?.defaultDurationMinutes != null
                     ? `${item.serviceDefinition.defaultDurationMinutes} menit`
                     : 'Belum diatur'
-                }
-              />
-            ) : null}
-            <div className="sm:col-span-2 lg:col-span-4">
-              <DetailField
-                label="Deskripsi"
-                value={item.description?.trim() || 'Tidak ada deskripsi'}
-              />
+                  : sellingModelCopy[model].label
+              }
+            />
+            {canViewLoyalty ? <CatalogLoyaltyTile item={item} api={loyaltyApi} /> : null}
+          </div>
+
+          <div className="mt-4 border-t border-[var(--color-border)] pt-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--color-text-muted)]">
+              Deskripsi Item
+            </p>
+            <div className="mt-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)]/40 px-3 py-2.5 text-sm">
+              {item.description?.trim() ? (
+                <p className="text-[var(--color-text)]">{item.description.trim()}</p>
+              ) : (
+                <p className="italic text-[var(--color-text-muted)]">
+                  Tidak ada deskripsi yang ditambahkan untuk item ini.
+                </p>
+              )}
             </div>
-          </dl>
-        </CatalogSection>
+          </div>
+        </CatalogPanel>
 
         {canViewPricing ? (
-          <CatalogSection
-            title="Riwayat Harga Item"
-            tone="secondary"
-            count={history.length}
-            description="Perubahan harga item dan semua varian, terbaru di atas."
-          >
+          <CatalogPanel>
+            <CatalogPanelHeader
+              title="Riwayat Perubahan Harga"
+              count={history.length}
+              trailing={
+                <span className="text-xs text-[var(--color-text-muted)]">log</span>
+              }
+              actions={
+                <span className="text-xs text-[var(--color-text-muted)]">Terbaru di atas</span>
+              }
+            />
             <ItemPriceHistory
               entries={visibleHistory}
               loading={priceHistory.isLoading}
@@ -470,7 +556,7 @@ export function CatalogItemDetailDialog({
               }}
             />
             {history.length > HISTORY_PREVIEW ? (
-              <div className="mt-3 flex justify-center">
+              <div className="flex justify-center border-t border-[var(--color-border)] px-4 py-3">
                 <DButton
                   variant="ghost"
                   size="sm"
@@ -482,12 +568,14 @@ export function CatalogItemDetailDialog({
                 </DButton>
               </div>
             ) : null}
-          </CatalogSection>
+          </CatalogPanel>
         ) : null}
       </div>
 
       <CatalogNamedRecordDialog
-        key={`detail-variant-${editingVariant?.id ?? (editingVariant === null ? 'new' : 'closed')}`}
+        key={`detail-variant-${
+          editingVariant?.id ?? (editingVariant === null ? 'new' : 'closed')
+        }`}
         entity="Variant"
         item={editingVariant}
         onClose={() => setEditingVariant(undefined)}
@@ -500,7 +588,9 @@ export function CatalogItemDetailDialog({
       />
 
       <PriceChangeDialog
-        key={`price-${pricingTarget === 'default' ? 'item' : (pricingTarget?.id ?? 'closed')}`}
+        key={`price-${
+          pricingTarget === 'default' ? 'item' : (pricingTarget?.id ?? 'closed')
+        }`}
         target={pricingTarget}
         item={item}
         currency={currency}
