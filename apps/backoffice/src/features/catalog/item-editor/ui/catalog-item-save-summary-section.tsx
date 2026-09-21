@@ -30,7 +30,9 @@ export function CatalogItemSaveSummarySection({
     >
       <dl className="grid gap-x-6 gap-y-1.5 text-sm sm:grid-cols-2">
         {sellsItemItself(model) ? (
-          <div className="flex justify-between gap-3 border-b border-(--color-border) pb-2 sm:col-span-2">
+          <div
+            className="flex justify-between gap-3 border-b border-(--color-border) pb-2 sm:col-span-2"
+          >
             <dt className="text-(--color-text-muted)">Tanpa varian</dt>
             <dd
               className={`font-medium tabular-nums ${
