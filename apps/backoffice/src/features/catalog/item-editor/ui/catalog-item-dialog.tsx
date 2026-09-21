@@ -177,7 +177,6 @@ export function CatalogItemDialog({
     currency,
     model,
     parsedDefaultDuration,
-    hasVariants,
     canCreateVariants,
     canCreatePricing,
     canEditPrice,
