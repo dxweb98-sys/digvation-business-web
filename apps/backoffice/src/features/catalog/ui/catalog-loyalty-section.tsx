@@ -1,16 +1,17 @@
-import { DSkeleton } from '@digvation/ui';
+import { DBadge, DSkeleton } from '@digvation/ui';
+import { Star } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 
 import type { LoyaltyApi } from '../../../modules/loyalty/loyalty-api';
 import type { CatalogManagementItem } from '../api/catalog-api';
-import { CatalogSection, DetailField } from './catalog-shared';
+import { CatalogInfoTile } from './catalog-shared';
 
 const keys = {
   configuration: ['loyalty', 'configuration'] as const,
   rules: ['loyalty', 'earning-rules'] as const,
 };
 
-export function CatalogLoyaltySection({
+export function CatalogLoyaltyTile({
   item,
   api,
 }: {
@@ -25,22 +26,45 @@ export function CatalogLoyaltySection({
   const rule = rules.data?.find((candidate) => candidate.catalogItemId === item.id);
   const behavior = rule?.behavior ?? configuration.data?.defaultEarningBehavior;
   const points = rule?.fixedPointsPerUnit ?? configuration.data?.defaultFixedPointsPerUnit;
-  const effective =
-    behavior === 'EXCLUDED'
-      ? 'Tidak dapat poin'
-      : points !== undefined
-        ? `${points} poin / unit`
-        : 'Memuat aturan poin...';
+  const excluded = behavior === 'EXCLUDED';
+  const effective = excluded
+    ? 'Tidak dapat poin'
+    : points !== undefined
+      ? `+${points} PTS`
+      : 'Belum diatur';
+
   return (
-    <CatalogSection title="Loyalty" tone="secondary">
+    <CatalogInfoTile
+      label="Poin Loyalitas Member"
+      icon={<Star className="size-3.5" aria-hidden="true" />}
+      className="border-[var(--color-brand)]/20 bg-[var(--color-brand)]/[0.035]"
+    >
       {configuration.isLoading || rules.isLoading ? (
-        <DSkeleton className="h-16" />
+        <DSkeleton className="mt-2 h-12" />
       ) : (
-        <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
-          <DetailField label="Sumber aturan" value={rule ? 'Aturan khusus' : 'Mengikuti default'} />
-          <DetailField label="Hasil efektif" value={effective} />
-        </dl>
+        <>
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-[var(--color-text)]">
+                {excluded ? effective : `${effective} `}
+                {!excluded ? (
+                  <span className="font-medium text-[var(--color-text-muted)]">/ unit</span>
+                ) : null}
+              </p>
+            </div>
+            <DBadge variant={excluded ? 'secondary' : 'success'}>
+              {excluded ? 'Nonaktif' : 'Aktif'}
+            </DBadge>
+          </div>
+          <p className="mt-1.5 text-[11px] leading-4 text-[var(--color-text-muted)]">
+            {excluded
+              ? 'Item ini tidak memberikan poin member.'
+              : rule
+                ? 'Menggunakan aturan poin khusus untuk item ini.'
+                : 'Mengikuti aturan poin default bisnis.'}
+          </p>
+        </>
       )}
-    </CatalogSection>
+    </CatalogInfoTile>
   );
 }
