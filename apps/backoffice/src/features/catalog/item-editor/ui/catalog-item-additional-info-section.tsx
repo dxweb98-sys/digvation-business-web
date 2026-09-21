@@ -52,11 +52,7 @@ export function CatalogItemAdditionalInfoSection({
         Informasi Tambahan
       </p>
 
-      <div
-        className={`mt-4 grid gap-3 sm:grid-cols-2 ${
-          canViewLoyalty && !fresh ? 'lg:grid-cols-4' : 'lg:grid-cols-3'
-        }`}
-      >
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <CatalogInfoTile
           label="Tipe Produk / Item"
           icon={<Briefcase className="size-3.5" aria-hidden="true" />}
