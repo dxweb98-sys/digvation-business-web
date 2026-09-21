@@ -250,6 +250,30 @@ Branding is runtime presentation configuration; deployment topology is a separat
 
 Neither concern authorizes client-specific source branches or client-specific application logic.
 
+## Current reusable Backoffice primitives
+
+The currently accepted application-level shared primitives are:
+
+```text
+apps/backoffice/src/shared/
+├── api/
+│   └── build-query-string.ts
+├── forms/
+│   └── use-form-state.ts
+└── query/
+    ├── use-list-query.ts
+    └── use-pagination-state.ts
+```
+
+Use them only where their contract fits:
+
+- `build-query-string` for generic REST query serialization;
+- `use-form-state` for simple coherent forms;
+- `use-pagination-state` for UI page/pageSize mapped to Runtime limit/offset;
+- `use-list-query` for collection queries that actually use that pagination contract.
+
+Do not recreate `modules/catalog`. Catalog is owned by `apps/backoffice/src/features/catalog`.
+
 ## Reference implementation
 
 The Backoffice Catalog Item Editor is the first reference implementation for this structure.
