@@ -13,7 +13,7 @@ import { sellsItemItself, type SellingModel } from '../../model/catalog-selling'
 import {
   buildCatalogItemBaseInput,
   normalizeOptionalCatalogCode,
-} from '../model/catalog-item-editor.mapper';
+} from '../model/catalog-item-editor-mapper';
 import {
   sameAmount,
   variantPriceSubmissions,
