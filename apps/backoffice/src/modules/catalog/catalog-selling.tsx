@@ -1,19 +1,21 @@
-import {
-  catalogItemSellsDirectly,
-  resolveCatalogSellingModel,
-  type CatalogSellingModel,
-  type VariantSelectionMode,
-} from '@digvation/business-catalog';
 import { DBadge, DRadio } from '@digvation/ui';
-
-export type SellingModel = CatalogSellingModel;
+import type { VariantSelectionMode } from './catalog-api';
 
 /**
- * Compatibility names retained for current Catalog callers while the shared Catalog
- * package becomes the cross-app owner of selling semantics.
+ * How an item can be chosen when it is sold. Runtime owns the rule (`variantSelectionMode` plus
+ * the item's active variants); this only names it consistently across Add, Edit and Detail.
  */
-export const sellingModel = resolveCatalogSellingModel;
-export const sellsItemItself = catalogItemSellsDirectly;
+export type SellingModel = 'DIRECT' | 'VARIANT_REQUIRED' | 'ITEM_AND_VARIANTS';
+
+export function sellingModel(hasActiveVariants: boolean, mode: VariantSelectionMode): SellingModel {
+  if (!hasActiveVariants) return 'DIRECT';
+  return mode === 'OPTIONAL' ? 'ITEM_AND_VARIANTS' : 'VARIANT_REQUIRED';
+}
+
+/** Whether the item itself (without a variant) is a sellable choice. */
+export function sellsItemItself(model: SellingModel) {
+  return model !== 'VARIANT_REQUIRED';
+}
 
 export const sellingModelCopy: Record<SellingModel, { label: string; description: string }> = {
   DIRECT: {
