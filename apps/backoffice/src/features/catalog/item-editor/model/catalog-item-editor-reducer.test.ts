@@ -8,6 +8,14 @@ import {
 } from './catalog-item-editor-state';
 
 describe('catalogItemEditorReducer', () => {
+  it('starts new items with a stable optional-variant selling intent', () => {
+    const initial = createCatalogItemEditorState(null);
+
+    expect(initial.form.variantSelectionMode).toBe('OPTIONAL');
+    expect(initial.form.variants).toEqual([]);
+  });
+
+
   it('keeps related loyalty draft changes together', () => {
     const initial = createCatalogItemEditorState(null);
 
