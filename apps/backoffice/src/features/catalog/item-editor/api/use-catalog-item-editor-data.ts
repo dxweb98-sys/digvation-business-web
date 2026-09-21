@@ -1,6 +1,6 @@
 import { useQueries, useQuery } from '@tanstack/react-query';
 
-import type { CatalogApi, Item } from '../../../../modules/catalog/catalog-api';
+import type { CatalogApi, Item } from '../../api/catalog-api';
 import type { LoyaltyApi } from '../../../../modules/loyalty/loyalty-api';
 
 export function useCatalogItemEditorData({
