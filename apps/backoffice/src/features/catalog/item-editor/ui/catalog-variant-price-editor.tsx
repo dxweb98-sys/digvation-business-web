@@ -1,6 +1,7 @@
 import { DBadge, DButton, DCurrencyInput, DInput } from '@digvation/ui';
-import { Layers, Plus, Trash2 } from 'lucide-react';
+import { Check, Layers, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+
 import { useCatalogLocalization } from '../../localization/use-catalog-localization';
 import {
   applyPriceToAllVariants,
@@ -18,13 +19,8 @@ const issueMessage: Record<VariantDraftIssue, string> = {
   PRICE_INVALID: 'Harga harus lebih dari nol, maksimal 4 angka desimal.',
 };
 
-/** Hides repeated field labels on wide screens, where the column header row labels them. */
 const tabular = 'md:[&_label]:sr-only';
 
-/**
- * Variant list with explicit per-variant prices for the Add and Edit item dialogs.
- * "Apply price to all variants" fills every row locally; each row stays editable.
- */
 export function VariantPriceEditor({
   drafts,
   onChange,
@@ -39,7 +35,6 @@ export function VariantPriceEditor({
   currency: string;
   canPrice: boolean;
   canAddVariants: boolean;
-  /** Optional explicit shortcut that fills the bulk price, e.g. the price without a variant. */
   seed?: { label: string; amount: string } | null;
   showIssues: boolean;
 }) {
@@ -50,15 +45,19 @@ export function VariantPriceEditor({
   const validBulk = isValidSellingPrice(bulkPrice);
   const priced = drafts.filter((draft) => isValidSellingPrice(draft.price)).length;
 
-  if (!drafts.length)
+  if (!drafts.length) {
     return (
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-[var(--color-border)] px-4 py-5">
-        <p className="text-sm text-[var(--color-text-muted)]">
-          Belum ada varian. Item dijual langsung dengan harga jual di atas.
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)]/25 px-4 py-5">
+        <div>
+          <p className="text-sm font-medium text-[var(--color-text)]">Belum ada varian.</p>
+          <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
+            Item dijual langsung dengan harga jual utama.
+          </p>
+        </div>
         {canAddVariants ? (
           <DButton
-            variant="secondary"
+            variant="outline"
+            size="sm"
             leftIcon={<Plus className="size-4" />}
             onClick={() => onChange([newVariantDraft()])}
           >
@@ -67,46 +66,71 @@ export function VariantPriceEditor({
         ) : null}
       </div>
     );
+  }
 
   return (
     <div className="space-y-3">
       {canPrice ? (
-        <div className="rounded-xl bg-[var(--color-surface-muted)] p-3 sm:p-4">
-          <div className="flex items-center gap-2 text-sm font-medium">
-            <Layers className="size-4 text-[var(--color-text-muted)]" aria-hidden="true" />
-            Terapkan harga ke semua varian
+        <div className="flex flex-col gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)]/50 px-3 py-3 sm:flex-row sm:items-center">
+          <div className="flex min-w-0 items-center gap-2 sm:mr-auto">
+            <Layers className="size-4 shrink-0 text-[var(--color-text-muted)]" aria-hidden="true" />
+            <div>
+              <p className="text-xs font-medium text-[var(--color-text)]">
+                Ubah Cepat Semua Harga
+              </p>
+              <p className="text-[11px] text-[var(--color-text-muted)]">
+                Isi sekali lalu tetap bisa diedit per varian.
+              </p>
+            </div>
           </div>
-          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-            <DCurrencyInput
-              aria-label="Harga untuk semua varian"
-              value={bulkPrice}
-              onValueChange={setBulkPrice}
-              placeholder="Contoh: 28000"
-              containerClassName="sm:max-w-56"
-            />
-            <DButton
-              variant="outline"
-              disabled={!validBulk}
-              onClick={() => onChange(applyPriceToAllVariants(drafts, bulkPrice))}
-            >
-              Terapkan ke {drafts.length} varian
+          <DCurrencyInput
+            aria-label="Harga untuk semua varian"
+            value={bulkPrice}
+            onValueChange={setBulkPrice}
+            placeholder="Rp 0"
+            containerClassName="sm:w-44"
+          />
+          <DButton
+            variant="outline"
+            size="sm"
+            disabled={!validBulk}
+            onClick={() => onChange(applyPriceToAllVariants(drafts, bulkPrice))}
+          >
+            Terapkan ke {drafts.length} varian
+          </DButton>
+          {seed && isValidSellingPrice(seed.amount) && !sameAmount(seed.amount, bulkPrice) ? (
+            <DButton variant="link" size="sm" onClick={() => setBulkPrice(seed.amount.trim())}>
+              {seed.label}
             </DButton>
-            {seed && isValidSellingPrice(seed.amount) && !sameAmount(seed.amount, bulkPrice) ? (
-              <DButton variant="link" onClick={() => setBulkPrice(seed.amount.trim())}>
-                {seed.label} ({formatMoney(seed.amount.trim(), currency)})
-              </DButton>
-            ) : null}
-          </div>
-          <p className="mt-2 text-xs text-[var(--color-text-muted)]">
-            Setiap varian menyimpan harganya sendiri dan tetap bisa diubah satu per satu.
-          </p>
+          ) : null}
         </div>
       ) : null}
 
-      <div className="rounded-xl border border-[var(--color-border)]">
+      <div className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
+        <div className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface-muted)]/35 px-3 py-2">
+          <div className="flex items-center gap-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.03em] text-[var(--color-text)]">
+              Daftar Varian Item
+            </p>
+            <DBadge variant="secondary">{drafts.length}</DBadge>
+          </div>
+          {canAddVariants ? (
+            <DButton
+              variant="link"
+              size="sm"
+              leftIcon={<Plus className="size-4" />}
+              onClick={() => onChange([...drafts, newVariantDraft()])}
+            >
+              Tambah varian
+            </DButton>
+          ) : null}
+        </div>
+
         <div
-          className={`gap-3 border-b border-[var(--color-border)] px-4 py-2 text-xs font-medium text-[var(--color-text-muted)] max-md:hidden md:grid ${
-            canPrice ? 'md:grid-cols-[1.3fr_1fr_1fr_2.25rem]' : 'md:grid-cols-[1.3fr_1fr_2.25rem]'
+          className={`gap-3 border-b border-[var(--color-border)] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.04em] text-[var(--color-text-muted)] max-md:hidden md:grid ${
+            canPrice
+              ? 'md:grid-cols-[1.3fr_1fr_1fr_2.25rem]'
+              : 'md:grid-cols-[1.3fr_1fr_2.25rem]'
           }`}
         >
           <span>Nama varian</span>
@@ -114,6 +138,7 @@ export function VariantPriceEditor({
           {canPrice ? <span>Harga final ({currency})</span> : null}
           <span className="sr-only">Aksi</span>
         </div>
+
         <ul className="divide-y divide-[var(--color-border)]">
           {drafts.map((draft, index) => {
             const issue = showIssues ? variantDraftIssue(draft, canPrice) : null;
@@ -121,7 +146,7 @@ export function VariantPriceEditor({
             return (
               <li
                 key={draft.key}
-                className={`relative grid grid-cols-2 gap-3 px-4 py-3 md:items-start ${
+                className={`relative grid grid-cols-2 gap-3 px-3 py-2.5 md:items-start ${
                   canPrice
                     ? 'md:grid-cols-[1.3fr_1fr_1fr_2.25rem]'
                     : 'md:grid-cols-[1.3fr_1fr_2.25rem]'
@@ -130,9 +155,9 @@ export function VariantPriceEditor({
                 {persisted ? (
                   <>
                     <div className="min-w-0 md:pt-2">
-                      <p className="truncate font-medium">{draft.name}</p>
+                      <p className="truncate text-sm font-medium">{draft.name}</p>
                     </div>
-                    <p className="text-sm text-[var(--color-text-muted)] md:pt-2">
+                    <p className="text-xs text-[var(--color-text-muted)] md:pt-2">
                       <span className="md:hidden">SKU </span>
                       {draft.code}
                     </p>
@@ -143,7 +168,7 @@ export function VariantPriceEditor({
                       label={`Nama varian ${index + 1}`}
                       value={draft.name}
                       onChange={(value) => update(draft.key, { name: value })}
-                      placeholder="Contoh: Large / Iced"
+                      placeholder="Contoh: Red Burgundy"
                       error={issue === 'NAME_REQUIRED' ? issueMessage[issue] : undefined}
                       containerClassName={`${tabular} col-span-2 max-md:pr-10 md:col-span-1`}
                     />
@@ -156,6 +181,7 @@ export function VariantPriceEditor({
                     />
                   </>
                 )}
+
                 {canPrice ? (
                   <div className={`min-w-0 ${persisted ? 'col-span-2 md:col-span-1' : ''}`}>
                     <DCurrencyInput
@@ -171,9 +197,9 @@ export function VariantPriceEditor({
                       containerClassName={tabular}
                     />
                     {persisted ? (
-                      <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                      <p className="mt-1 text-[10px] text-[var(--color-text-muted)]">
                         {draft.priceUnknown ? (
-                          'Harga saat ini tampil setelah item aktif.'
+                          'Harga tampil setelah item aktif.'
                         ) : draft.persistedPrice === null ? (
                           <DBadge variant="warning">Belum ada harga varian</DBadge>
                         ) : sameAmount(draft.persistedPrice, draft.price) ? (
@@ -185,6 +211,7 @@ export function VariantPriceEditor({
                     ) : null}
                   </div>
                 ) : null}
+
                 <div className="flex justify-end max-md:absolute max-md:right-2 max-md:top-2.5 md:pt-0.5">
                   {persisted ? null : (
                     <DButton
@@ -201,23 +228,20 @@ export function VariantPriceEditor({
             );
           })}
         </ul>
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--color-border)] px-4 py-2.5">
-          <p className="text-xs text-[var(--color-text-muted)]">
+
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--color-border)] bg-[var(--color-surface-muted)]/25 px-3 py-2">
+          <p className="text-[11px] text-[var(--color-text-muted)]">
             {canPrice
               ? priced === drafts.length
-                ? `Semua ${drafts.length} varian memiliki harga final.`
+                ? `${drafts.length} varian aktif dengan harga final.`
                 : `${drafts.length - priced} dari ${drafts.length} varian belum memiliki harga.`
               : `${drafts.length} varian.`}
           </p>
-          {canAddVariants ? (
-            <DButton
-              variant="ghost"
-              size="sm"
-              leftIcon={<Plus className="size-4" />}
-              onClick={() => onChange([...drafts, newVariantDraft()])}
-            >
-              Tambah varian
-            </DButton>
+          {canPrice && priced === drafts.length ? (
+            <span className="flex items-center gap-1 text-[11px] font-medium text-[var(--color-success)]">
+              <Check className="size-3.5" aria-hidden="true" />
+              Siap Dijual
+            </span>
           ) : null}
         </div>
       </div>
