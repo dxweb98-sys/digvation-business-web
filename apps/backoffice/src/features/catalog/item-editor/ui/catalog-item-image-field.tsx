@@ -1,4 +1,4 @@
-import { Image as ImageIcon, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ImagePlus, Pencil, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
@@ -80,7 +80,7 @@ export function CatalogItemImageField({
         className={`group relative size-28 overflow-hidden rounded-xl border bg-[var(--color-surface)] shadow-sm transition-colors ${
           visibleUrl
             ? 'border-[var(--color-border)]'
-            : 'border-dashed border-[var(--color-border)] hover:border-[var(--color-brand)]'
+            : 'border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)]/25 hover:border-[var(--color-brand)] hover:bg-[var(--color-brand)]/[0.025]'
         }`}
       >
         <button
@@ -103,17 +103,16 @@ export function CatalogItemImageField({
               </span>
             </>
           ) : (
-            <span className="flex flex-col items-center gap-1.5 px-2 text-center">
-              <span className="grid size-8 place-items-center rounded-full bg-[var(--color-brand)]/10 text-[var(--color-brand)]">
-                <Plus className="size-4" aria-hidden="true" />
+            <span className="flex flex-col items-center px-3 text-center">
+              <span className="grid size-10 place-items-center rounded-full bg-[var(--color-brand)]/8 text-[var(--color-brand)] transition-colors group-hover:bg-[var(--color-brand)]/12">
+                <ImagePlus className="size-5" aria-hidden="true" />
               </span>
-              <span className="text-[11px] font-medium leading-4 text-[var(--color-text)]">
-                Klik untuk menambah
+              <span className="mt-2 text-xs font-semibold leading-4 text-[var(--color-text)]">
+                Tambah foto
               </span>
-              <ImageIcon
-                className="size-3.5 text-[var(--color-text-muted)]"
-                aria-hidden="true"
-              />
+              <span className="mt-0.5 text-[10px] leading-4 text-[var(--color-text-muted)]">
+                JPG, PNG, atau WebP
+              </span>
             </span>
           )}
         </button>
