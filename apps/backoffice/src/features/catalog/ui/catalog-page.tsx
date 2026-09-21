@@ -1,4 +1,3 @@
-import { hasSessionCapability } from '@digvation/business-auth';
 import { useRuntime } from '@digvation/business-runtime';
 import {
   DButton,
@@ -19,7 +18,11 @@ import { CatalogItemDialog } from '../item-editor';
 import { useFormState } from '../../../shared/forms/use-form-state';
 import { useListQuery } from '../../../shared/query/use-list-query';
 import { usePaginationState } from '../../../shared/query/use-pagination-state';
-import { canPerformBackofficeAction, type BackofficeAction } from '../../../auth/backoffice-access';
+import {
+  canPerformBackofficeAction,
+  hasBackofficeRuntimeCapability,
+  type BackofficeAction,
+} from '../../../auth/backoffice-access';
 import { useBackofficeAuth } from '../../../auth/backoffice-auth-context';
 import { CatalogApi, type CatalogManagementItem, type Category, type Item } from '../api/catalog-api';
 import { CatalogItemDetailDialog } from './catalog-item-detail-dialog';
@@ -76,7 +79,7 @@ export function CatalogPage() {
 
   const can = (action: BackofficeAction) =>
     Boolean(session && canPerformBackofficeAction(session, action));
-  const hasLoyaltyCapability = hasSessionCapability(session, 'LOYALTY_POINTS');
+  const hasLoyaltyCapability = hasBackofficeRuntimeCapability(session, 'LOYALTY_POINTS');
   const canViewLoyalty = hasLoyaltyCapability && can('viewLoyalty');
   const canConfigureLoyalty = hasLoyaltyCapability && can('configureLoyalty');
 
