@@ -13,9 +13,9 @@ import { isSessionExpiredError } from '../../../../auth/backoffice-auth-context'
 import type { LoyaltyApi } from '../../../../modules/loyalty/loyalty-api';
 import type { CatalogApi, Category, Item } from '../../api/catalog-api';
 import { CatalogItemImageField } from './catalog-item-image-field';
-import { CatalogItemThumbnail } from '../../../../modules/catalog/catalog-item-thumbnail';
-import { useCatalogLocalization } from '../../../../modules/catalog/catalog-localization';
-import { variantPriceState } from '../../../../modules/catalog/catalog-price-history';
+import { CatalogItemThumbnail } from '../../ui/catalog-item-thumbnail';
+import { useCatalogLocalization } from '../../localization/use-catalog-localization';
+import { variantPriceState } from '../../model/catalog-price-history';
 import {
   sellingModel,
   sellingModelCopy,
@@ -25,7 +25,7 @@ import {
   SellingModeChoice,
   SellingModelBadge,
 } from '../../ui/catalog-selling';
-import { CatalogSection, DialogFooter, Status } from '../../../../modules/catalog/catalog-shared';
+import { CatalogSection, DialogFooter, Status } from '../../ui/catalog-shared';
 import {
   editableAmount,
   isValidSellingPrice,
