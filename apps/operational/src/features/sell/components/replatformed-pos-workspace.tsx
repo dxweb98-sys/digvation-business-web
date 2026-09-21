@@ -665,6 +665,11 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     ...liveQueryPolicy,
     refetchInterval: QUEUE_REFRESH_INTERVAL_MS,
   });
+  const taxConfigurationQuery = useQuery({
+    queryKey: cashierTransactionKeys.taxConfiguration(),
+    queryFn: ({ signal }) => adapter.getTaxConfiguration(signal),
+    staleTime: 60_000,
+  });
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [queueTab, setQueueTab] = useState<QueueStatus>('QUEUED');
@@ -714,6 +719,18 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const sale = workspace.viewModel.sale;
   const lines = workspace.cart.lines;
   const total = workspace.cart.totalAmount;
+  const draftTaxAmount =
+    !sale && workspace.cart.isLocalDraft && taxConfigurationQuery.data?.enabled
+      ? createDecimal(workspace.cart.grossAmount)
+          .times(createDecimal(taxConfigurationQuery.data.rate))
+          .toFixed(4)
+      : workspace.cart.taxAmount;
+  const cartPreviewTotal =
+    !sale && workspace.cart.isLocalDraft
+      ? createDecimal(workspace.cart.grossAmount).plus(createDecimal(draftTaxAmount)).toFixed(4)
+      : total;
+  const isTaxPreviewLoading =
+    !sale && workspace.cart.isLocalDraft && taxConfigurationQuery.isLoading;
   const activeCustomer = workspace.customer;
   const customerMemberApi = useMemo(
     () =>
@@ -1555,10 +1572,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
                   item={item}
                   price={workspace.cachedCardPrice(item.id)}
                   locale={workspace.locale}
-                  disabled={
-                    workspace.viewModel.monetaryMutation.state !== 'AVAILABLE' ||
-                    workspace.isDraftCommitPending
-                  }
+                  disabled={workspace.viewModel.monetaryMutation.state !== 'AVAILABLE'}
                   onAdd={() => void workspace.selectItem(item)}
                 />
               ))}
@@ -1571,7 +1585,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         open={cartOpen}
         onOpenChange={setCartOpen}
         lines={lines}
-        total={total}
+        total={cartPreviewTotal}
         gross={workspace.cart.grossAmount}
         discountAmount={workspace.cart.discountAmount}
         discountLabel={
@@ -1579,10 +1593,10 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
             ? transactionDiscountLabel(sale, copy('Promotions and discounts'))
             : copy('Promotions and discounts')
         }
-        taxAmount={workspace.cart.taxAmount}
+        taxAmount={draftTaxAmount}
         taxLabel={sale ? saleTaxLabel(sale, copy('Tax')) : copy('Tax')}
         isEstimate={workspace.cart.isLocalDraft}
-        isPreparingTransaction={workspace.isDraftCommitPending}
+        isTaxPreviewLoading={isTaxPreviewLoading}
         locale={workspace.locale}
         customer={activeCustomer}
         memberNumber={activeSelectedMember?.memberNumber ?? null}
@@ -1590,7 +1604,6 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         isPointBalanceLoading={memberBalanceQuery.isLoading}
         onChooseCustomer={() => setCustomerPickerOpen(true)}
         onQuantity={(line, next) => {
-          if (workspace.isDraftCommitPending) return;
           if (workspace.cart.isLocalDraft) workspace.changeDraftQuantity(line.id, next);
           else {
             const serverLine = workspace.viewModel.activeLines.find((item) => item.id === line.id);
@@ -1598,7 +1611,6 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           }
         }}
         onRemove={(line) => {
-          if (workspace.isDraftCommitPending) return;
           if (workspace.cart.isLocalDraft) workspace.removeDraftLine(line.id);
           else {
             const serverLine = workspace.viewModel.activeLines.find((item) => item.id === line.id);
@@ -1611,7 +1623,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       <CustomerMemberDialog
         open={customerPickerOpen}
         customer={activeCustomer}
-        isSaving={workspace.isCustomerPending || workspace.isDraftCommitPending}
+        isSaving={workspace.isCustomerPending}
         api={customerMemberApi}
         canReadMembers={canReadMembers}
         canEnrollMember={canEnrollMember}
@@ -2484,7 +2496,7 @@ function ReferenceFloatingCart({
   taxAmount,
   taxLabel,
   isEstimate,
-  isPreparingTransaction,
+  isTaxPreviewLoading,
   locale,
   customer,
   memberNumber,
@@ -2505,7 +2517,7 @@ function ReferenceFloatingCart({
   taxAmount: string;
   taxLabel: string;
   isEstimate: boolean;
-  isPreparingTransaction: boolean;
+  isTaxPreviewLoading: boolean;
   locale: string;
   customer: SaleCustomer | null;
   memberNumber: string | null;
@@ -2537,7 +2549,7 @@ function ReferenceFloatingCart({
       taxAmount={taxAmount}
       taxLabel={taxLabel}
       isEstimate={isEstimate}
-      isPreparingTransaction={isPreparingTransaction}
+      isTaxPreviewLoading={isTaxPreviewLoading}
       locale={locale}
       customer={customer}
       memberNumber={memberNumber}
@@ -2644,7 +2656,7 @@ function ReferenceCartPanel({
   taxAmount,
   taxLabel,
   isEstimate,
-  isPreparingTransaction,
+  isTaxPreviewLoading,
   locale,
   customer,
   memberNumber,
@@ -2663,7 +2675,7 @@ function ReferenceCartPanel({
   taxAmount: string;
   taxLabel: string;
   isEstimate: boolean;
-  isPreparingTransaction: boolean;
+  isTaxPreviewLoading: boolean;
   locale: string;
   customer: SaleCustomer | null;
   memberNumber: string | null;
@@ -2859,11 +2871,11 @@ function ReferenceCartPanel({
               </span>
             </div>
           ) : null}
-          {hasTax || isPreparingTransaction ? (
+          {hasTax || isTaxPreviewLoading ? (
             <div className="flex items-center justify-between text-xs">
               <span className="text-[var(--color-text-muted)]">{taxLabel}</span>
               <span className="font-medium">
-                {isPreparingTransaction ? copy('Calculating…') : money(taxAmount, locale)}
+                {isTaxPreviewLoading ? copy('Calculating…') : money(taxAmount, locale)}
               </span>
             </div>
           ) : null}
@@ -2885,8 +2897,7 @@ function ReferenceCartPanel({
           ) : null}
           <Button
             fullWidth
-            disabled={!lines.length || isPreparingTransaction}
-            loading={isPreparingTransaction}
+            disabled={!lines.length}
             onClick={onCheckout}
             leftIcon={<CreditCard className="size-3.5" />}
           >
