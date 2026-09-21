@@ -1,8 +1,5 @@
 import { CatalogSection } from '../../ui/catalog-shared';
-import {
-  sellsItemItself,
-  type SellingModel,
-} from '../../model/catalog-selling';
+import { sellsItemItself, type SellingModel } from '../../model/catalog-selling';
 import type { useCatalogItemEditor } from '../model/use-catalog-item-editor';
 import { VariantPriceEditor } from './catalog-variant-price-editor';
 
@@ -29,10 +26,7 @@ export function CatalogItemVariantsSection({
   variantPricesLoading: boolean;
   inactiveVariantCount: number;
 }) {
-  const {
-    variants,
-    defaultPrice,
-  } = editor.form;
+  const { variants, defaultPrice } = editor.form;
   const { showIssues } = editor.ui;
   const { setFormField } = editor.actions;
   const hasVariants = variants.length > 0;
@@ -44,20 +38,20 @@ export function CatalogItemVariantsSection({
 
   return (
     <CatalogSection
-      title="Varian"
+      title="Daftar Varian Item"
       count={variants.length}
       description={
         fresh
-          ? 'Opsional. Setiap varian dijual dengan harga finalnya sendiri.'
-          : `Setiap varian dijual dengan harga finalnya sendiri. Tambah atau nonaktifkan varian dari detail item.${
-              inactiveVariantCount
-                ? ` ${inactiveVariantCount} varian nonaktif tidak ditampilkan.`
-                : ''
-            }`
+          ? 'Setiap varian memiliki harga final dan dapat diedit satu per satu.'
+          : inactiveVariantCount
+            ? `${inactiveVariantCount} varian nonaktif tidak ditampilkan di editor ini.`
+            : 'Harga setiap varian tetap dikelola secara individual.'
       }
     >
       {variantPricesLoading && !fresh ? (
-        <p className="text-sm text-(--color-text-muted)">Memuat varian...</p>
+        <div className="rounded-xl border border-[var(--color-border)] px-4 py-5 text-sm text-[var(--color-text-muted)]">
+          Memuat varian...
+        </div>
       ) : (
         <VariantPriceEditor
           drafts={variants}
