@@ -66,7 +66,7 @@ export function createCatalogItemEditorState(
       lifecycle: item?.lifecycle ?? 'DRAFT',
       defaultDurationMinutes:
         item?.serviceDefinition?.defaultDurationMinutes?.toString() ?? '',
-      variantSelectionMode: item?.variantSelectionMode ?? 'REQUIRED',
+      variantSelectionMode: item?.variantSelectionMode ?? 'OPTIONAL',
       defaultPrice: '',
       variants: [],
     },
