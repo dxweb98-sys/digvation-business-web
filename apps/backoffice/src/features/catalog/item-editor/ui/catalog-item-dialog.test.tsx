@@ -196,7 +196,7 @@ describe('CatalogItemDialog variant pricing', () => {
     expect(scope().queryByLabelText('Harga tanpa varian (IDR)')).toBeNull();
     expect(scope().queryByLabelText('Harga jual (IDR)')).toBeNull();
     const review = scope().getByRole('region', { name: 'Akan disimpan' });
-    expect(review.textContent).not.toMatch(/Tanpa varian/);
+    expect(review.textContent).not.toMatch(/Default \/ Item utama/);
     expect(review.textContent).toMatch(/Large \/ Iced\s*Rp\s?28\.000/);
     expect(review.textContent).toMatch(/Small \/ Hot\s*Rp\s?26\.000/);
     expect(review.textContent).toMatch(/Regular\s*Rp\s?28\.000/);
@@ -238,7 +238,7 @@ describe('CatalogItemDialog variant pricing', () => {
 
     await type(scope().getByLabelText('Harga tanpa varian (IDR)'), '10000');
     const review = scope().getByRole('region', { name: 'Akan disimpan' });
-    expect(review.textContent).toMatch(/Tanpa varian\s*Rp\s?10\.000/);
+    expect(review.textContent).toMatch(/Default \/ Item utama\s*Rp\s?10\.000/);
     await act(async () => fireEvent.click(scope().getByRole('button', { name: 'Simpan' })));
 
     await waitFor(() => expect(api.changeVariantPrices).toHaveBeenCalledTimes(1));
