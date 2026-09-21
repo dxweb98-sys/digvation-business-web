@@ -61,13 +61,6 @@ export type BackofficeAction =
 
 export const BACKOFFICE_ACCESS_PERMISSION = 'backoffice:access';
 
-export function hasBackofficeRuntimeCapability(
-  session: AuthSession | null | undefined,
-  capability: string,
-): boolean {
-  return Boolean(session?.access.capabilities.includes(capability));
-}
-
 interface PermissionRequirement {
   allOf?: readonly string[];
   anyOf?: readonly string[];
