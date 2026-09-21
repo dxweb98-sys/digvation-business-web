@@ -1579,16 +1579,6 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         memberNumber={selectedMember?.memberNumber ?? null}
         pointBalance={memberBalanceQuery.data?.pointsBalance ?? null}
         isPointBalanceLoading={memberBalanceQuery.isLoading}
-        redemption={sale?.loyaltyRedemption ?? null}
-        canRedeem={canRedeemLoyalty && activeCustomer?.type === 'MEMBER'}
-        requestedPoints={loyaltyPoints}
-        isRedeeming={workspace.isLoyaltyRedemptionPending}
-        onRequestedPointsChange={setLoyaltyPoints}
-        onApplyRedemption={() => workspace.applyLoyaltyRedemption(loyaltyPoints)}
-        onRemoveRedemption={() => {
-          workspace.removeLoyaltyRedemption();
-          setLoyaltyPoints('');
-        }}
         onChooseCustomer={() => setCustomerPickerOpen(true)}
         onQuantity={(line, next) => {
           if (workspace.cart.isLocalDraft) workspace.changeDraftQuantity(line.id, next);
@@ -2474,13 +2464,6 @@ function ReferenceFloatingCart({
   memberNumber,
   pointBalance,
   isPointBalanceLoading,
-  redemption,
-  canRedeem,
-  requestedPoints,
-  isRedeeming,
-  onRequestedPointsChange,
-  onApplyRedemption,
-  onRemoveRedemption,
   onChooseCustomer,
   onQuantity,
   onRemove,
@@ -2501,13 +2484,6 @@ function ReferenceFloatingCart({
   memberNumber: string | null;
   pointBalance: string | null;
   isPointBalanceLoading: boolean;
-  redemption: Sale['loyaltyRedemption'];
-  canRedeem: boolean;
-  requestedPoints: string;
-  isRedeeming: boolean;
-  onRequestedPointsChange: (value: string) => void;
-  onApplyRedemption: () => void;
-  onRemoveRedemption: () => void;
   onChooseCustomer: () => void;
   onQuantity: (line: CartDisplayLine, quantity: string) => void;
   onRemove: (line: CartDisplayLine) => void;
@@ -2539,13 +2515,6 @@ function ReferenceFloatingCart({
       memberNumber={memberNumber}
       pointBalance={pointBalance}
       isPointBalanceLoading={isPointBalanceLoading}
-      redemption={redemption}
-      canRedeem={canRedeem}
-      requestedPoints={requestedPoints}
-      isRedeeming={isRedeeming}
-      onRequestedPointsChange={onRequestedPointsChange}
-      onApplyRedemption={onApplyRedemption}
-      onRemoveRedemption={onRemoveRedemption}
       onChooseCustomer={onChooseCustomer}
       onQuantity={onQuantity}
       onRemove={onRemove}
@@ -2652,13 +2621,6 @@ function ReferenceCartPanel({
   memberNumber,
   pointBalance,
   isPointBalanceLoading,
-  redemption,
-  canRedeem,
-  requestedPoints,
-  isRedeeming,
-  onRequestedPointsChange,
-  onApplyRedemption,
-  onRemoveRedemption,
   onChooseCustomer,
   onQuantity,
   onRemove,
@@ -2677,13 +2639,6 @@ function ReferenceCartPanel({
   memberNumber: string | null;
   pointBalance: string | null;
   isPointBalanceLoading: boolean;
-  redemption: Sale['loyaltyRedemption'];
-  canRedeem: boolean;
-  requestedPoints: string;
-  isRedeeming: boolean;
-  onRequestedPointsChange: (value: string) => void;
-  onApplyRedemption: () => void;
-  onRemoveRedemption: () => void;
   onChooseCustomer: () => void;
   onQuantity: (line: CartDisplayLine, quantity: string) => void;
   onRemove: (line: CartDisplayLine) => void;
@@ -2693,8 +2648,6 @@ function ReferenceCartPanel({
   const status = customerStatus(customer);
   const hasDiscount = !createDecimal(discountAmount).equals(createDecimal('0'));
   const hasTax = !createDecimal(taxAmount).equals(createDecimal('0'));
-  const canSubmitRedemption =
-    canRedeem && Boolean(requestedPoints.trim()) && !isRedeeming;
   const increment = (line: CartDisplayLine, direction: 'up' | 'down') => {
     const next =
       direction === 'up'
@@ -2874,62 +2827,6 @@ function ReferenceCartPanel({
               <span className="font-medium text-[var(--color-danger)]">
                 −{money(discountAmount, locale)}
               </span>
-            </div>
-          ) : null}
-          {redemption || canRedeem ? (
-            <div className="rounded-xl bg-[var(--color-surface-muted)]/55 p-2.5">
-              {redemption ? (
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold">{copy('Loyalty redemption')}</p>
-                    <p className="mt-0.5 text-[11px] text-[var(--color-text-muted)]">
-                      {redemption.points} {copy('points used')}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1.5">
-                    <span className="text-xs font-semibold text-[var(--color-brand)]">
-                      −{money(redemption.amount, locale)}
-                    </span>
-                    {canRedeem ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        loading={isRedeeming}
-                        disabled={isRedeeming}
-                        onClick={onRemoveRedemption}
-                      >
-                        {copy('Remove')}
-                      </Button>
-                    ) : null}
-                  </div>
-                </div>
-              ) : null}
-              {canRedeem ? (
-                <div
-                  className={`grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2 ${
-                    redemption ? 'mt-2 border-t border-[var(--color-border)] pt-2' : ''
-                  }`}
-                >
-                  <DInput
-                    label={copy(redemption ? 'Change points' : 'Use loyalty points')}
-                    value={requestedPoints}
-                    onChange={onRequestedPointsChange}
-                    inputMode="decimal"
-                    disabled={isRedeeming}
-                  />
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={redemption ? 'secondary' : 'primary'}
-                    loading={isRedeeming}
-                    disabled={!canSubmitRedemption}
-                    onClick={onApplyRedemption}
-                  >
-                    {copy(redemption ? 'Update' : 'Apply')}
-                  </Button>
-                </div>
-              ) : null}
             </div>
           ) : null}
           {hasTax ? (
