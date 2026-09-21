@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
   catalogItemEditorReducer,
-} from './catalog-item-editor.reducer';
+} from './catalog-item-editor-reducer';
 import {
   createCatalogItemEditorState,
-} from './catalog-item-editor.state';
+} from './catalog-item-editor-state';
 
 describe('catalogItemEditorReducer', () => {
   it('keeps related loyalty draft changes together', () => {
