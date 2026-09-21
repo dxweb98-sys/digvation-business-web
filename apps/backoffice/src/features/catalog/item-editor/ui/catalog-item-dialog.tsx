@@ -1,4 +1,4 @@
-import { DCurrencyInput, DDialog, DInput, DSelect, DTextarea, useToast } from '@digvation/ui';
+import { DDialog, useToast } from '@digvation/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo } from 'react';
 import { normalizeBackofficeApiError } from '../../../../app/api/backoffice-api-error';
@@ -12,27 +12,22 @@ import { useCatalogItemEditor } from '../model/use-catalog-item-editor';
 import { isSessionExpiredError } from '../../../../auth/backoffice-auth-context';
 import type { LoyaltyApi } from '../../../../modules/loyalty/loyalty-api';
 import type { CatalogApi, Category, Item } from '../../api/catalog-api';
-import { CatalogItemImageField } from './catalog-item-image-field';
-import { CatalogItemThumbnail } from '../../ui/catalog-item-thumbnail';
+import { CatalogItemEditorHeader } from './catalog-item-editor-header';
+import { CatalogItemInformationSection } from './catalog-item-information-section';
+import { CatalogItemLoyaltySection } from './catalog-item-loyalty-section';
+import { CatalogItemPricingSection } from './catalog-item-pricing-section';
+import { CatalogItemSaveSummarySection } from './catalog-item-save-summary-section';
+import { CatalogItemServiceSection } from './catalog-item-service-section';
+import { CatalogItemVariantsSection } from './catalog-item-variants-section';
 import { useCatalogLocalization } from '../../localization/use-catalog-localization';
 import { variantPriceState } from '../../model/catalog-price-history';
-import {
-  sellingModel,
-  sellingModelCopy,
-  sellsItemItself,
-} from '../../model/catalog-selling';
-import {
-  SellingModeChoice,
-  SellingModelBadge,
-} from '../../ui/catalog-selling';
-import { CatalogSection, DialogFooter, Status } from '../../ui/catalog-shared';
+import { sellsItemItself } from '../../model/catalog-selling';
+import { DialogFooter } from '../../ui/catalog-shared';
 import {
   editableAmount,
-  isValidSellingPrice,
   sameAmount,
   variantPriceSubmissions,
 } from '../model/variant-price-draft';
-import { VariantPriceEditor } from './catalog-variant-price-editor';
 
 export function CatalogItemDialog({
   item,
@@ -188,7 +183,6 @@ export function CatalogItemDialog({
       ? 'Isi harga tanpa varian.'
       : undefined;
   const showPrice = canViewPricing || (fresh && canCreatePricing);
-  const showVariants = fresh ? canCreateVariants : canViewPricing && variants.length > 0;
   const inactiveVariantCount = (existingVariants.data?.items ?? []).length - activeVariants.length;
   const loyaltyDraftChanged = loyaltyRule
     ? loyaltyBehavior !== loyaltyRule.behavior || loyaltyPoints !== loyaltyRule.fixedPointsPerUnit
@@ -368,340 +362,76 @@ export function CatalogItemDialog({
       footer={<DialogFooter onClose={onClose} onSave={() => void save()} disabled={disabled} />}
     >
       {item ? (
-        <div className="mb-6 flex items-center gap-3 rounded-xl bg-(--color-surface-muted) px-3 py-2.5">
-          <CatalogItemThumbnail api={api} itemId={item.id} itemName={item.name} />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold">{item.name}</p>
-            <p className="truncate text-xs text-(--color-text-muted)">
-              {item.code} · {item.type === 'SERVICE' ? 'Jasa' : 'Produk'}
-            </p>
-          </div>
-          <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
-            {canViewPricing && !variantPricesLoading ? (
-              <SellingModelBadge model={sellingModel(hasVariants, item.variantSelectionMode)} />
-            ) : null}
-            <Status value={item.lifecycle} />
-          </div>
-        </div>
+        <CatalogItemEditorHeader
+          item={item}
+          api={api}
+          hasVariants={hasVariants}
+          canViewPricing={canViewPricing}
+          variantPricesLoading={variantPricesLoading}
+        />
       ) : null}
+
       <div className="divide-y divide-(--color-border)">
-        <CatalogSection
-          title="Informasi item"
-          description="Nama dan klasifikasi yang tampil di katalog dan kasir."
-        >
-          <div className="grid gap-5 md:grid-cols-[auto_minmax(0,1fr)]">
-            {canManageImage ? (
-              <CatalogItemImageField
-                itemName={name}
-                existingImage={existingImage.data}
-                selectedFile={selectedImage}
-                removeRequested={removeImageRequested}
-                disabled={saving}
-                onFileChange={selectImage}
-                onRemove={requestImageRemoval}
-              />
-            ) : null}
-            <div className="grid min-w-0 content-start gap-4 sm:grid-cols-2">
-              <div className="sm:col-span-2">
-                <DInput
-                  label="Nama Item"
-                  value={name}
-                  onChange={(value) => setFormField('name', value)}
-                  placeholder="Contoh: Coffee Latte"
-                />
-              </div>
-              <DInput
-                label="Kode Item"
-                value={code}
-                onChange={(value) => setFormField('code', value)}
-                disabled={!fresh}
-                hint={
-                  fresh
-                    ? 'Kosongkan untuk membuat kode otomatis.'
-                    : 'Kode tidak dapat diubah setelah dibuat.'
-                }
-              />
-              <DSelect
-                label="Tipe"
-                value={type}
-                onChange={(value) => setFormField('type', value as Item['type'])}
-                disabled={!fresh}
-                options={[
-                  { label: 'Produk', value: 'PRODUCT' },
-                  { label: 'Jasa', value: 'SERVICE' },
-                ]}
-              />
-              <DSelect
-                label="Kategori"
-                value={categoryId}
-                onChange={(value) => setFormField('categoryId', value as string | null)}
-                clearable
-                options={categoryOptions.map((category) => ({
-                  label:
-                    category.status === 'ACTIVE' ? category.name : `${category.name} · Nonaktif`,
-                  value: category.id,
-                }))}
-              />
-              <DSelect
-                label="Status"
-                value={lifecycle}
-                onChange={(value) => setFormField('lifecycle', value as Item['lifecycle'])}
-                options={[
-                  { label: 'Draft', value: 'DRAFT' },
-                  { label: 'Aktif', value: 'ACTIVE' },
-                  { label: 'Nonaktif', value: 'INACTIVE' },
-                ]}
-              />
-              <div className="sm:col-span-2">
-                <DTextarea
-                  label="Deskripsi"
-                  value={description}
-                  onChange={(value) => setFormField('description', value)}
-                  placeholder="Deskripsi item (opsional)"
-                  className="min-h-20"
-                />
-              </div>
-            </div>
-          </div>
-        </CatalogSection>
+        <CatalogItemInformationSection
+          editor={editor}
+          fresh={fresh}
+          categoryOptions={categoryOptions}
+          canManageImage={canManageImage}
+          existingImage={existingImage.data}
+        />
 
         {type === 'SERVICE' ? (
-          <CatalogSection title="Pengaturan layanan" tone="secondary">
-            <div className="max-w-xs">
-              <DInput
-                label="Durasi Layanan (menit)"
-                hint="Opsional."
-                value={defaultDurationMinutes}
-                onChange={(value) => setFormField('defaultDurationMinutes', value)}
-                type="number"
-                min={1}
-                placeholder="30"
-                error={
-                  validDefaultDuration ? undefined : 'Durasi harus berupa angka bulat positif.'
-                }
-              />
-            </div>
-          </CatalogSection>
+          <CatalogItemServiceSection
+            editor={editor}
+            validDefaultDuration={validDefaultDuration}
+          />
         ) : null}
 
         {!fresh && canViewLoyalty ? (
-          <CatalogSection
-            title="Loyalty"
-            tone="secondary"
-            description={
-              loyaltyRule
-                ? 'Aturan khusus ini dapat diubah antara poin khusus dan tidak dapat poin.'
-                : 'Item ini mengikuti aturan default sampai aturan khusus disimpan.'
-            }
-          >
-            {loyaltyRules.isLoading || loyaltyConfiguration.isLoading ? (
-              <p className="text-sm text-(--color-text-muted)">Memuat aturan poin...</p>
-            ) : (
-              <div className="space-y-4">
-                <div className="grid gap-4 text-sm sm:grid-cols-2">
-                  <div>
-                    <p className="text-(--color-text-muted)">Aturan poin</p>
-                    <p className="mt-1 font-medium">
-                      {loyaltyRule
-                        ? loyaltyRule.behavior === 'FIXED'
-                          ? 'Poin khusus'
-                          : 'Tidak dapat poin'
-                        : 'Mengikuti default'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-(--color-text-muted)">Hasil efektif</p>
-                    <p className="mt-1 font-medium">
-                      {(loyaltyRule?.behavior ??
-                        loyaltyConfiguration.data?.defaultEarningBehavior) === 'EXCLUDED'
-                        ? 'Tidak dapat poin'
-                        : `${loyaltyRule?.fixedPointsPerUnit ?? loyaltyConfiguration.data?.defaultFixedPointsPerUnit ?? 0} poin / unit`}
-                    </p>
-                  </div>
-                </div>
-                {canConfigureLoyalty ? (
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <DSelect
-                      label="Aturan poin"
-                      value={loyaltyBehavior}
-                      clearable={false}
-                      options={[
-                        { value: 'FIXED', label: 'Poin khusus' },
-                        { value: 'EXCLUDED', label: 'Tidak dapat poin' },
-                      ]}
-                      onChange={(value) => {
-                        if (value === 'FIXED' || value === 'EXCLUDED') {
-                          setLoyaltyBehavior(value);
-                        }
-                      }}
-                    />
-                    {loyaltyBehavior === 'FIXED' ? (
-                      <DInput
-                        label="Poin per unit"
-                        inputMode="numeric"
-                        value={loyaltyPointsPerUnit}
-                        onChange={setLoyaltyPointsPerUnit}
-                        error={
-                          loyaltyTouched && !loyaltyDraftValid
-                            ? 'Gunakan angka bulat nol atau lebih.'
-                            : undefined
-                        }
-                      />
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
-            )}
-          </CatalogSection>
+          <CatalogItemLoyaltySection
+            editor={editor}
+            loyaltyRule={loyaltyRule}
+            configuration={loyaltyConfiguration.data}
+            loading={loyaltyRules.isLoading || loyaltyConfiguration.isLoading}
+            canConfigure={canConfigureLoyalty}
+            loyaltyDraftValid={loyaltyDraftValid}
+          />
         ) : null}
 
         {showPrice ? (
-          <CatalogSection
-            title="Penjualan & harga"
-            description={
-              hasVariants
-                ? 'Tentukan apakah item juga bisa dijual tanpa memilih varian.'
-                : sellingModelCopy.DIRECT.description
-            }
-            actions={hasVariants ? <SellingModelBadge model={model} /> : undefined}
-          >
-            <div className="space-y-4">
-              {hasVariants ? (
-                <SellingModeChoice
-                  value={variantSelectionMode}
-                  onChange={(value) => setFormField('variantSelectionMode', value)}
-                  disabled={!canEditPrice || saving}
-                />
-              ) : null}
-
-              {sellsItemItself(model) ? (
-                <div
-                  className={
-                    hasVariants
-                      ? 'flex flex-col gap-3 rounded-xl border border-(--color-border) px-4 py-3 sm:flex-row sm:items-center sm:justify-between'
-                      : ''
-                  }
-                >
-                  {hasVariants ? (
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold">Tanpa varian</p>
-                      <p className="text-xs text-(--color-text-muted)">
-                        Pilihan jual tersendiri, dengan harganya sendiri.
-                      </p>
-                    </div>
-                  ) : null}
-                  <div className="w-full sm:max-w-xs">
-                    {canEditPrice ? (
-                      <DCurrencyInput
-                        label={`${hasVariants ? 'Harga tanpa varian' : 'Harga jual'} (${currency})`}
-                        value={defaultPrice}
-                        onValueChange={(value) => setFormField('defaultPrice', value)}
-                        placeholder="Contoh: 100000"
-                        error={itemPriceError}
-                        hint={
-                          !fresh && currentPrice.isLoading ? 'Memuat harga saat ini...' : undefined
-                        }
-                      />
-                    ) : (
-                      <div>
-                        <p className="text-xs text-(--color-text-muted)">
-                          {hasVariants ? 'Harga tanpa varian' : 'Harga jual'}
-                        </p>
-                        <p className="mt-1 text-lg font-semibold tabular-nums">
-                          {defaultPrice ? formatMoney(defaultPrice, currency) : 'Belum diatur'}
-                        </p>
-                        <p className="mt-1 text-xs text-(--color-text-muted)">
-                          Anda tidak memiliki akses untuk mengubah harga.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <p className="text-sm text-(--color-text-muted)">
-                  Harga ditentukan oleh setiap varian di bawah.
-                  {storedItemPrice
-                    ? ` Harga item ${formatMoney(storedItemPrice, currency)} tetap tersimpan di riwayat, tetapi tidak dijual.`
-                    : ''}
-                </p>
-              )}
-            </div>
-          </CatalogSection>
+          <CatalogItemPricingSection
+            editor={editor}
+            model={model}
+            currency={currency}
+            fresh={fresh}
+            hasVariants={hasVariants}
+            canEditPrice={canEditPrice}
+            currentPriceLoading={currentPrice.isLoading}
+            itemPriceError={itemPriceError}
+            storedItemPrice={storedItemPrice}
+            formatMoney={formatMoney}
+          />
         ) : null}
 
-        {showVariants || (!fresh && canViewPricing && variantPricesLoading) ? (
-          <CatalogSection
-            title="Varian"
-            count={variants.length}
-            description={
-              fresh
-                ? 'Opsional. Setiap varian dijual dengan harga finalnya sendiri.'
-                : `Setiap varian dijual dengan harga finalnya sendiri. Tambah atau nonaktifkan varian dari detail item.${
-                    inactiveVariantCount
-                      ? ` ${inactiveVariantCount} varian nonaktif tidak ditampilkan.`
-                      : ''
-                  }`
-            }
-          >
-            {variantPricesLoading && !fresh ? (
-              <p className="text-sm text-(--color-text-muted)">Memuat varian...</p>
-            ) : (
-              <VariantPriceEditor
-                drafts={variants}
-                onChange={(value) => setFormField('variants', value)}
-                currency={currency}
-                canPrice={canEditPrice}
-                canAddVariants={fresh && canCreateVariants}
-                seed={
-                  sellsItemItself(model) && hasVariants
-                    ? { label: 'Pakai harga tanpa varian', amount: defaultPrice }
-                    : null
-                }
-                showIssues={showIssues}
-              />
-            )}
-          </CatalogSection>
-        ) : null}
+        <CatalogItemVariantsSection
+          editor={editor}
+          model={model}
+          currency={currency}
+          fresh={fresh}
+          canViewPricing={canViewPricing}
+          canEditPrice={canEditPrice}
+          canCreateVariants={canCreateVariants}
+          variantPricesLoading={variantPricesLoading}
+          inactiveVariantCount={inactiveVariantCount}
+        />
 
         {fresh && hasVariants && canEditPrice ? (
-          <CatalogSection
-            title="Akan disimpan"
-            tone="secondary"
-            description={sellingModelCopy[model].description}
-          >
-            <dl className="grid gap-x-6 gap-y-1.5 text-sm sm:grid-cols-2">
-              {sellsItemItself(model) ? (
-                <div className="flex justify-between gap-3 border-b border-(--color-border) pb-2 sm:col-span-2">
-                  <dt className="text-(--color-text-muted)">Tanpa varian</dt>
-                  <dd
-                    className={`font-medium tabular-nums ${
-                      isValidSellingPrice(defaultPrice) ? '' : 'text-(--color-danger)'
-                    }`}
-                  >
-                    {isValidSellingPrice(defaultPrice)
-                      ? formatMoney(defaultPrice.trim(), currency)
-                      : 'Belum ada harga'}
-                  </dd>
-                </div>
-              ) : null}
-              {variants.map((draft, index) => (
-                <div key={draft.key} className="flex justify-between gap-3">
-                  <dt className="truncate text-(--color-text-muted)">
-                    {draft.name.trim() || `Varian ${index + 1}`}
-                  </dt>
-                  <dd
-                    className={`font-medium tabular-nums ${
-                      isValidSellingPrice(draft.price) ? '' : 'text-(--color-danger)'
-                    }`}
-                  >
-                    {isValidSellingPrice(draft.price)
-                      ? formatMoney(draft.price.trim(), currency)
-                      : 'Belum ada harga'}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </CatalogSection>
+          <CatalogItemSaveSummarySection
+            editor={editor}
+            model={model}
+            currency={currency}
+            formatMoney={formatMoney}
+          />
         ) : null}
       </div>
     </DDialog>
