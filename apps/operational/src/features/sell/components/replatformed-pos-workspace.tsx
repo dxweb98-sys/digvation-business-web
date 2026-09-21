@@ -19,7 +19,14 @@ import {
   DSkeleton as Skeleton,
   useToast,
 } from '@digvation-labs/ui';
-import { DDropdown as PortalDropdown, DTabs, DTabsContent, DTabsList, DTabsTrigger, DTextarea } from '@digvation/ui';
+import {
+  DDropdown as PortalDropdown,
+  DTabs,
+  DTabsContent,
+  DTabsList,
+  DTabsTrigger,
+  DTextarea,
+} from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
 import {
   AlertCircle,
@@ -683,6 +690,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
   const [paymentRouteId, setPaymentRouteId] = useState('');
   const [paymentAmount, setPaymentAmount] = useState('');
+  const [loyaltyPoints, setLoyaltyPoints] = useState('');
   const [paymentReference, setPaymentReference] = useState('');
   const [tender, setTender] = useState('');
   const [paymentError, setPaymentError] = useState<string | null>(null);
@@ -708,17 +716,27 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const total = workspace.cart.totalAmount;
   const activeCustomer = workspace.customer;
   const customerMemberApi = useMemo(
-    () => new CustomerMemberApi(new ApiClient({
-      baseUrl: runtime.apiBaseUrl,
-      applicationSurface: 'operational',
-      ...(authPort.getAccessToken ? { getAccessToken: authPort.getAccessToken.bind(authPort) } : {}),
-    })),
+    () =>
+      new CustomerMemberApi(
+        new ApiClient({
+          baseUrl: runtime.apiBaseUrl,
+          applicationSurface: 'operational',
+          ...(authPort.getAccessToken
+            ? { getAccessToken: authPort.getAccessToken.bind(authPort) }
+            : {}),
+        }),
+      ),
     [authPort, runtime.apiBaseUrl],
   );
   const canReadMembers = session.access.permissions.includes('membership:read');
   const canReadCustomers = session.access.permissions.includes('customers:read');
   const canEnrollMember = session.access.permissions.includes('membership:enroll');
-  const canReadLoyalty = session.access.capabilities.includes('LOYALTY_POINTS') && session.access.permissions.includes('loyalty:read');
+  const canReadLoyalty =
+    session.access.capabilities.includes('LOYALTY_POINTS') &&
+    session.access.permissions.includes('loyalty:read');
+  const canRedeemLoyalty =
+    session.access.capabilities.includes('LOYALTY_POINTS') &&
+    session.access.permissions.includes('loyalty:redeem');
   const memberBalanceQuery = useQuery({
     queryKey: ['operational-member-balance', selectedMember?.id],
     queryFn: ({ signal }) => customerMemberApi.getPointBalance(selectedMember!.id, signal),
@@ -1528,6 +1546,16 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         memberNumber={selectedMember?.memberNumber ?? null}
         pointBalance={memberBalanceQuery.data?.pointsBalance ?? null}
         isPointBalanceLoading={memberBalanceQuery.isLoading}
+        redemption={sale?.loyaltyRedemption ?? null}
+        canRedeem={canRedeemLoyalty && activeCustomer?.type === 'MEMBER'}
+        requestedPoints={loyaltyPoints}
+        isRedeeming={workspace.isLoyaltyRedemptionPending}
+        onRequestedPointsChange={setLoyaltyPoints}
+        onApplyRedemption={() => workspace.applyLoyaltyRedemption(loyaltyPoints)}
+        onRemoveRedemption={() => {
+          workspace.removeLoyaltyRedemption();
+          setLoyaltyPoints('');
+        }}
         onChooseCustomer={() => setCustomerPickerOpen(true)}
         onQuantity={(line, next) => {
           if (workspace.cart.isLocalDraft) workspace.changeDraftQuantity(line.id, next);
@@ -1556,12 +1584,19 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         canEnrollMember={canEnrollMember}
         onClose={() => setCustomerPickerOpen(false)}
         onChoose={(selection, member) => {
-          void workspace.changeCustomer(selection).then(() => {
-            setSelectedMember(member ?? null);
-            setCustomerPickerOpen(false);
-          }).catch((error: unknown) => {
-            showToast({ title: copy('Could not save the customer'), description: cashierTransactionErrorMessage(error), variant: 'danger' });
-          });
+          void workspace
+            .changeCustomer(selection)
+            .then(() => {
+              setSelectedMember(member ?? null);
+              setCustomerPickerOpen(false);
+            })
+            .catch((error: unknown) => {
+              showToast({
+                title: copy('Could not save the customer'),
+                description: cashierTransactionErrorMessage(error),
+                variant: 'danger',
+              });
+            });
         }}
       />
 
@@ -2406,6 +2441,13 @@ function ReferenceFloatingCart({
   memberNumber,
   pointBalance,
   isPointBalanceLoading,
+  redemption,
+  canRedeem,
+  requestedPoints,
+  isRedeeming,
+  onRequestedPointsChange,
+  onApplyRedemption,
+  onRemoveRedemption,
   onChooseCustomer,
   onQuantity,
   onRemove,
@@ -2426,6 +2468,13 @@ function ReferenceFloatingCart({
   memberNumber: string | null;
   pointBalance: string | null;
   isPointBalanceLoading: boolean;
+  redemption: Sale['loyaltyRedemption'];
+  canRedeem: boolean;
+  requestedPoints: string;
+  isRedeeming: boolean;
+  onRequestedPointsChange: (value: string) => void;
+  onApplyRedemption: () => void;
+  onRemoveRedemption: () => void;
   onChooseCustomer: () => void;
   onQuantity: (line: CartDisplayLine, quantity: string) => void;
   onRemove: (line: CartDisplayLine) => void;
@@ -2457,6 +2506,13 @@ function ReferenceFloatingCart({
       memberNumber={memberNumber}
       pointBalance={pointBalance}
       isPointBalanceLoading={isPointBalanceLoading}
+      redemption={redemption}
+      canRedeem={canRedeem}
+      requestedPoints={requestedPoints}
+      isRedeeming={isRedeeming}
+      onRequestedPointsChange={onRequestedPointsChange}
+      onApplyRedemption={onApplyRedemption}
+      onRemoveRedemption={onRemoveRedemption}
       onChooseCustomer={onChooseCustomer}
       onQuantity={onQuantity}
       onRemove={onRemove}
@@ -2563,6 +2619,13 @@ function ReferenceCartPanel({
   memberNumber,
   pointBalance,
   isPointBalanceLoading,
+  redemption,
+  canRedeem,
+  requestedPoints,
+  isRedeeming,
+  onRequestedPointsChange,
+  onApplyRedemption,
+  onRemoveRedemption,
   onChooseCustomer,
   onQuantity,
   onRemove,
@@ -2581,6 +2644,13 @@ function ReferenceCartPanel({
   memberNumber: string | null;
   pointBalance: string | null;
   isPointBalanceLoading: boolean;
+  redemption: Sale['loyaltyRedemption'];
+  canRedeem: boolean;
+  requestedPoints: string;
+  isRedeeming: boolean;
+  onRequestedPointsChange: (value: string) => void;
+  onApplyRedemption: () => void;
+  onRemoveRedemption: () => void;
   onChooseCustomer: () => void;
   onQuantity: (line: CartDisplayLine, quantity: string) => void;
   onRemove: (line: CartDisplayLine) => void;
@@ -2621,7 +2691,9 @@ function ReferenceCartPanel({
                 </Badge>
               ) : null}
               {customer?.type === 'MEMBER' && memberNumber ? (
-                <Badge variant="outline" className="shrink-0 px-2 py-0 text-[10px]">{memberNumber}</Badge>
+                <Badge variant="outline" className="shrink-0 px-2 py-0 text-[10px]">
+                  {memberNumber}
+                </Badge>
               ) : null}
             </div>
             <p className="mt-0.5 truncate text-[11px] text-[var(--color-text-muted)]">
@@ -2629,7 +2701,8 @@ function ReferenceCartPanel({
                 ? copy('Loading loyalty points…')
                 : customer?.type === 'MEMBER' && pointBalance !== null
                   ? `${copy('Loyalty points')}: ${pointBalance}`
-                  : customerDisplayDetail(customer) ?? copy('Name and WhatsApp number are both required.')}
+                  : (customerDisplayDetail(customer) ??
+                    copy('Name and WhatsApp number are both required.'))}
             </p>
           </div>
           <ChevronDown className="size-4 shrink-0 text-[var(--color-text-muted)]" />
@@ -2804,7 +2877,6 @@ function ReferenceCartPanel({
   );
 }
 
-
 type PaymentDialogStep = 'edit' | 'review' | 'leave';
 
 /**
@@ -2821,13 +2893,7 @@ function usePaymentDialogStep(open: boolean) {
   return [step, setStep] as const;
 }
 
-function DiscountInfoTooltip({
-  label,
-  content,
-}: {
-  label: string;
-  content: ReactNode;
-}) {
+function DiscountInfoTooltip({ label, content }: { label: string; content: ReactNode }) {
   const [open, setOpen] = useState(false);
 
   return (

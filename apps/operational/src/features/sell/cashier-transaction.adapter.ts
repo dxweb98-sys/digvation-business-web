@@ -49,6 +49,11 @@ export interface AddSaleLineInput {
   quantity: string;
 }
 
+export interface LoyaltyRedemptionInput {
+  expectedVersion: number;
+  points: string;
+}
+
 export interface SetSaleLineQuantityInput {
   expectedVersion: number;
   quantity: string;
@@ -160,6 +165,16 @@ export interface SaleTransactionClient {
     idempotencyKey: string,
   ): Promise<Sale>;
   addSaleLine(saleId: string, input: AddSaleLineInput, idempotencyKey: string): Promise<Sale>;
+  applyLoyaltyRedemption(
+    saleId: string,
+    input: LoyaltyRedemptionInput,
+    idempotencyKey: string,
+  ): Promise<Sale>;
+  removeLoyaltyRedemption(
+    saleId: string,
+    expectedVersion: number,
+    idempotencyKey: string,
+  ): Promise<Sale>;
   setSaleLineQuantity(
     saleId: string,
     saleLineId: string,
@@ -368,6 +383,26 @@ export class HttpCashierTransactionAdapter
     });
   }
 
+  public applyLoyaltyRedemption(
+    saleId: string,
+    input: LoyaltyRedemptionInput,
+    idempotencyKey: string,
+  ): Promise<Sale> {
+    return this.client.post<Sale>(`${API_PREFIX}/sales/${saleId}/loyalty-redemption`, input, {
+      headers: { 'Idempotency-Key': idempotencyKey },
+    });
+  }
+  public removeLoyaltyRedemption(
+    saleId: string,
+    expectedVersion: number,
+    idempotencyKey: string,
+  ): Promise<Sale> {
+    return this.client.post<Sale>(
+      `${API_PREFIX}/sales/${saleId}/loyalty-redemption/remove`,
+      { expectedVersion },
+      { headers: { 'Idempotency-Key': idempotencyKey } },
+    );
+  }
   public setSaleLineQuantity(
     saleId: string,
     saleLineId: string,
