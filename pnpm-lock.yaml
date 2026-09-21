@@ -116,6 +116,9 @@ importers:
       '@digvation/business-auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@digvation/business-catalog':
+        specifier: workspace:*
+        version: link:../../packages/catalog
       '@digvation/business-money':
         specifier: workspace:*
         version: link:../../packages/money
