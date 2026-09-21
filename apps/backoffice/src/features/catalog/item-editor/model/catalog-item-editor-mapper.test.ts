@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   buildCatalogItemBaseInput,
   normalizeOptionalCatalogCode,
-} from './catalog-item-editor.mapper';
-import { createCatalogItemEditorState } from './catalog-item-editor.state';
+} from './catalog-item-editor-mapper';
+import { createCatalogItemEditorState } from './catalog-item-editor-state';
 
 describe('catalog item editor mapper', () => {
   it('normalizes optional item code at the command boundary', () => {
