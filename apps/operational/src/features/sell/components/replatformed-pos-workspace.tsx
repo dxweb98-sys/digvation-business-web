@@ -808,6 +808,10 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     staleTime: 15_000,
   });
 
+  useEffect(() => {
+    setLoyaltyPoints('');
+  }, [activeCustomer?.phoneE164, activeCustomer?.referenceId, activeCustomer?.type]);
+
   const displayedQueueDetail =
     receiptSaleId && sale?.id === receiptSaleId && hasSuccessfulPayment(sale) ? sale : queueDetail;
   const displayedAdjustmentTarget =
