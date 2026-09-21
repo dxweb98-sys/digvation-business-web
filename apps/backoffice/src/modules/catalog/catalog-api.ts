@@ -1,17 +1,12 @@
 import type { ApiClient } from '@digvation/business-api';
 import type {
-  CatalogCategory as Category,
-  CatalogItem as Item,
-  CatalogVariant as Variant,
+  CatalogItemType,
+  CatalogLifecycle,
+  CatalogRecordStatus,
   VariantSelectionMode,
 } from '@digvation/business-catalog';
 
-export type {
-  CatalogCategory as Category,
-  CatalogItem as Item,
-  CatalogVariant as Variant,
-  VariantSelectionMode,
-} from '@digvation/business-catalog';
+export type { VariantSelectionMode } from '@digvation/business-catalog';
 
 export const CATALOG_IMAGE_MAX_BYTES = 1024 * 1024;
 export const CATALOG_IMAGE_CONTENT_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
@@ -36,6 +31,35 @@ export interface CategoryQuery {
   status?: 'ACTIVE' | 'INACTIVE';
   limit?: number;
   offset?: number;
+}
+export interface NamedRecord {
+  id: string;
+  code: string;
+  name: string;
+  status: CatalogRecordStatus;
+  version: number;
+}
+
+export type Category = NamedRecord;
+
+export interface Variant extends NamedRecord {
+  catalogItemId: string;
+}
+
+export interface Item {
+  id: string;
+  code: string;
+  name: string;
+  type: CatalogItemType;
+  categoryId: string | null;
+  description: string | null;
+  lifecycle: CatalogLifecycle;
+  fulfillmentBehavior: 'INSTANT' | 'TRACKED';
+  variantSelectionMode: VariantSelectionMode;
+  version: number;
+  serviceDefinition: {
+    defaultDurationMinutes: number | null;
+  } | null;
 }
 export interface CatalogManagementItem extends Item {
   variantCount: number;
