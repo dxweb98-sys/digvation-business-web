@@ -148,11 +148,11 @@ describe('CatalogItemDialog variant pricing', () => {
     expect(scope().queryByLabelText('Poin per unit')).toBeNull();
   });
 
-  it('creates an item without variants exactly as before', async () => {
+  it('creates an item without variants as the default sellable option', async () => {
     const api = fakeApi();
     const { dialog } = renderDialog(api, null);
     await type(within(dialog()).getByLabelText('Nama Item'), 'Teh');
-    await type(within(dialog()).getByLabelText('Harga jual (IDR)'), '10000');
+    await type(within(dialog()).getByLabelText('Harga tanpa varian (IDR)'), '10000');
     await act(async () =>
       fireEvent.click(within(dialog()).getByRole('button', { name: 'Simpan' })),
     );
@@ -164,7 +164,7 @@ describe('CatalogItemDialog variant pricing', () => {
     expect(api.createVariant).not.toHaveBeenCalled();
     expect(api.changeVariantPrices).not.toHaveBeenCalled();
     expect(api.createItem).toHaveBeenCalledWith(
-      expect.not.objectContaining({ variantSelectionMode: expect.anything() }),
+      expect.objectContaining({ variantSelectionMode: 'OPTIONAL' }),
     );
   });
 
@@ -173,7 +173,7 @@ describe('CatalogItemDialog variant pricing', () => {
     const { dialog } = renderDialog(api, null);
     const scope = () => within(dialog());
     await type(scope().getByLabelText('Nama Item'), 'Kopi');
-    await type(scope().getByLabelText('Harga jual (IDR)'), '25000');
+    await act(async () => fireEvent.click(scope().getByLabelText(/Wajib pilih varian/)));
 
     await act(async () => fireEvent.click(scope().getByRole('button', { name: 'Tambah varian' })));
     await act(async () => fireEvent.click(scope().getByRole('button', { name: 'Tambah varian' })));
@@ -192,7 +192,7 @@ describe('CatalogItemDialog variant pricing', () => {
     await act(async () => fireEvent.click(scope().getByRole('button', { name: 'Tambah varian' })));
     await act(async () => fireEvent.click(scope().getByRole('button', { name: 'Hapus varian 4' })));
 
-    // Variants required by default: the item itself is not offered as a choice.
+    // Required mode: the default/item option is not offered as a sellable choice.
     expect(scope().queryByLabelText('Harga tanpa varian (IDR)')).toBeNull();
     expect(scope().queryByLabelText('Harga jual (IDR)')).toBeNull();
     const review = scope().getByRole('region', { name: 'Akan disimpan' });
@@ -226,6 +226,7 @@ describe('CatalogItemDialog variant pricing', () => {
     const { dialog } = renderDialog(api, null);
     const scope = () => within(dialog());
     await type(scope().getByLabelText('Nama Item'), 'Es Teh');
+    await act(async () => fireEvent.click(scope().getByLabelText(/Wajib pilih varian/)));
     await act(async () => fireEvent.click(scope().getByRole('button', { name: 'Tambah varian' })));
     await type(scope().getByLabelText('Nama varian 1'), 'Large');
     await type(scope().getByLabelText('Harga Large'), '15000');
@@ -251,6 +252,44 @@ describe('CatalogItemDialog variant pricing', () => {
       expect.objectContaining({ amount: '15000', catalogVariantIds: ['v-1'] }),
     );
     expect(api.createVariant).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocks required mode until at least one variant exists', async () => {
+    const api = fakeApi();
+    const { dialog } = renderDialog(api, null);
+    const scope = () => within(dialog());
+
+    await type(scope().getByLabelText('Nama Item'), 'Kopi');
+    await act(async () => fireEvent.click(scope().getByLabelText(/Wajib pilih varian/)));
+    await act(async () => fireEvent.click(scope().getByRole('button', { name: 'Simpan' })));
+
+    expect(scope().getByText('Varian wajib belum ditambahkan.')).toBeTruthy();
+    expect(api.createItem).not.toHaveBeenCalled();
+  });
+
+  it('can add and price a new variant while editing an existing item', async () => {
+    const api = fakeApi();
+    const { dialog } = renderDialog(api, existingItem);
+    const scope = () => within(dialog());
+
+    expect(await scope().findByText('Varian wajib belum ditambahkan.')).toBeTruthy();
+    await act(async () => fireEvent.click(scope().getByRole('button', { name: 'Tambah varian' })));
+    await type(scope().getByLabelText('Nama varian 1'), 'Large');
+    await type(scope().getByLabelText('Harga Large'), '18000');
+    await act(async () => fireEvent.click(scope().getByRole('button', { name: 'Simpan' })));
+
+    await waitFor(() => expect(api.createVariant).toHaveBeenCalledTimes(1));
+    expect(api.updateItem).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ variantSelectionMode: 'REQUIRED' }),
+    );
+    expect(api.createVariant).toHaveBeenCalledWith(
+      'item-1',
+      expect.objectContaining({ name: 'Large', status: 'ACTIVE' }),
+    );
+    expect(api.changeVariantPrices).toHaveBeenCalledWith(
+      expect.objectContaining({ amount: '18000', catalogVariantIds: ['v-1'] }),
+    );
   });
 
   it('changes the price without a variant and leaves every variant price untouched', async () => {
