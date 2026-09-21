@@ -1,15 +1,9 @@
-import { DDialog, useToast } from '@digvation/ui';
-import { useQueryClient } from '@tanstack/react-query';
+import { DDialog } from '@digvation/ui';
 import { useEffect, useMemo } from 'react';
-import { normalizeBackofficeApiError } from '../../../../app/api/backoffice-api-error';
 import { useCatalogItemEditorData } from '../api/use-catalog-item-editor-data';
-import {
-  buildCatalogItemBaseInput,
-  normalizeOptionalCatalogCode,
-} from '../model/catalog-item-editor.mapper';
+import { useCatalogItemEditorSave } from '../api/use-catalog-item-editor-save';
 import { deriveCatalogItemEditorValidation } from '../model/catalog-item-editor.validation';
 import { useCatalogItemEditor } from '../model/use-catalog-item-editor';
-import { isSessionExpiredError } from '../../../../auth/backoffice-auth-context';
 import type { LoyaltyApi } from '../../../../modules/loyalty/loyalty-api';
 import type { CatalogApi, Category, Item } from '../../api/catalog-api';
 import { CatalogItemEditorHeader } from './catalog-item-editor-header';
@@ -21,13 +15,8 @@ import { CatalogItemServiceSection } from './catalog-item-service-section';
 import { CatalogItemVariantsSection } from './catalog-item-variants-section';
 import { useCatalogLocalization } from '../../localization/use-catalog-localization';
 import { variantPriceState } from '../../model/catalog-price-history';
-import { sellsItemItself } from '../../model/catalog-selling';
 import { DialogFooter } from '../../ui/catalog-shared';
-import {
-  editableAmount,
-  sameAmount,
-  variantPriceSubmissions,
-} from '../model/variant-price-draft';
+import { editableAmount } from '../model/variant-price-draft';
 
 export function CatalogItemDialog({
   item,
@@ -59,45 +48,17 @@ export function CatalogItemDialog({
   onSaved: () => void;
 }) {
   const fresh = item === null;
-  const client = useQueryClient();
-  const { showToast } = useToast();
   const { formatMoney } = useCatalogLocalization();
   const editor = useCatalogItemEditor(item);
 
-  const {
-    code,
-    name,
-    type,
-    categoryId,
-    description,
-    lifecycle,
-    defaultDurationMinutes,
-    variantSelectionMode,
-    defaultPrice,
-    variants,
-  } = editor.form;
-  const {
-    behavior: loyaltyBehavior,
-    pointsPerUnit: loyaltyPointsPerUnit,
-    touched: loyaltyTouched,
-  } = editor.loyalty;
-  const {
-    file: selectedImage,
-    removeRequested: removeImageRequested,
-  } = editor.image;
+  const { name, type } = editor.form;
+  const { touched: loyaltyTouched, behavior: loyaltyBehavior } = editor.loyalty;
   const { showIssues, saving } = editor.ui;
   const { initialPrice, variantsLoaded, loyaltyRuleLoaded } = editor.refs;
   const {
-    setFormField,
     hydrateDefaultPrice,
     hydrateVariants,
     hydrateLoyalty,
-    setLoyaltyBehavior,
-    setLoyaltyPointsPerUnit,
-    selectImage,
-    requestImageRemoval,
-    setShowIssues,
-    setSaving,
   } = editor.actions;
   const effectiveAt = editor.effectiveAt;
 
@@ -204,149 +165,28 @@ export function CatalogItemDialog({
     [categories, item?.categoryId],
   );
 
-  const save = async () => {
-    if (disabled) return;
-    if (variantsHaveIssues) {
-      setShowIssues(true);
-      return;
-    }
-    setSaving(true);
-    let persistedItem: Item | null = null;
-    let createdItem = false;
-    try {
-      const baseInput = buildCatalogItemBaseInput({
-        form: editor.form,
-        hasVariants,
-        parsedDefaultDuration,
-      });
-      const effectiveFrom = new Date().toISOString();
-      const createdVariantIds = new Map<string, string>();
-
-      if (fresh) {
-        persistedItem = await api.createItem({
-          ...baseInput,
-          ...(normalizeOptionalCatalogCode(code)
-            ? { code: normalizeOptionalCatalogCode(code)! }
-            : {}),
-          type,
-        });
-        createdItem = true;
-        if (canCreateVariants)
-          for (const draft of variants) {
-            const created = await api.createVariant(persistedItem.id, {
-              ...(normalizeOptionalCatalogCode(draft.code)
-                ? { code: normalizeOptionalCatalogCode(draft.code)! }
-                : {}),
-              name: draft.name.trim(),
-              status: 'ACTIVE',
-            });
-            createdVariantIds.set(draft.key, created.id);
-          }
-        if (canCreatePricing && sellsItemItself(model) && defaultPrice.trim())
-          await api.createPrice({
-            catalogItemId: persistedItem.id,
-            catalogVariantId: null,
-            locationId: null,
-            currency,
-            amount: defaultPrice.trim(),
-            effectiveFrom,
-          });
-      } else if (item) {
-        persistedItem = await api.updateItem(item, baseInput);
-        const nextPrice = defaultPrice.trim();
-        const initialItemPrice = initialPrice.current ?? null;
-        if (
-          canEditPrice &&
-          sellsItemItself(model) &&
-          nextPrice &&
-          !(initialItemPrice && sameAmount(nextPrice, initialItemPrice))
-        ) {
-          const input = {
-            catalogItemId: item.id,
-            catalogVariantId: null,
-            locationId: null,
-            currency,
-            amount: nextPrice,
-            effectiveFrom,
-          };
-          await (initialItemPrice ? api.changePrice(input) : api.createPrice(input));
-        }
-      }
-
-      // Every variant price, new or changed, is persisted as its own explicit Runtime price.
-      if (persistedItem && canEditPrice)
-        for (const submission of variantPriceSubmissions(variants, createdVariantIds))
-          await api.changeVariantPrices({
-            catalogItemId: persistedItem.id,
-            catalogVariantIds: submission.catalogVariantIds,
-            currency,
-            amount: submission.amount,
-            effectiveFrom,
-          });
-
-      if (persistedItem && shouldSaveLoyalty) {
-        try {
-          await loyaltyApi.updateEarningRule(persistedItem.id, {
-            expectedVersion: loyaltyRule?.version ?? 0,
-            behavior: loyaltyBehavior,
-            fixedPointsPerUnit: loyaltyBehavior === 'FIXED' ? loyaltyPoints : 0,
-          });
-          void client.invalidateQueries({ queryKey: ['loyalty', 'earning-rules'] });
-        } catch (error) {
-          if (!isSessionExpiredError(error))
-            showToast({
-              variant: 'danger',
-              title: normalizeBackofficeApiError(
-                error,
-                'Item tersimpan, tetapi aturan poin belum diperbarui.',
-              ).safeMessage,
-            });
-        }
-      }
-
-      if (persistedItem && canManageImage) {
-        if (selectedImage) {
-          await api.replaceItemImage(persistedItem.id, selectedImage);
-          void client.invalidateQueries({ queryKey: ['catalog', 'image', persistedItem.id] });
-        } else if (removeImageRequested && existingImage.data) {
-          await api.removeItemImage(persistedItem.id);
-          void client.invalidateQueries({ queryKey: ['catalog', 'image', persistedItem.id] });
-        }
-      }
-
-      refreshPricingViews();
-      onSaved();
-      showToast({
-        variant: 'success',
-        title: fresh ? 'Item berhasil ditambahkan.' : 'Item berhasil diperbarui.',
-      });
-      onClose();
-    } catch (error) {
-      if (persistedItem) {
-        refreshPricingViews();
-        onSaved();
-        showToast({
-          variant: 'danger',
-          title: createdItem
-            ? 'Item tersimpan, tetapi pengaturan awal belum lengkap.'
-            : 'Item tersimpan, tetapi harga, gambar, atau pengaturan terkait belum selesai diperbarui.',
-        });
-        onClose();
-      } else if (!isSessionExpiredError(error)) {
-        showToast({
-          variant: 'danger',
-          title: normalizeBackofficeApiError(error, 'Item tidak dapat disimpan.').safeMessage,
-        });
-      }
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  function refreshPricingViews() {
-    for (const key of ['prices', 'variants', 'variant-price', 'edit-price', 'edit-variant-price'])
-      void client.invalidateQueries({ queryKey: ['catalog', key] });
-  }
+  const save = useCatalogItemEditorSave({
+    item,
+    editor,
+    api,
+    loyaltyApi,
+    loyaltyRule,
+    currency,
+    model,
+    parsedDefaultDuration,
+    hasVariants,
+    canCreateVariants,
+    canCreatePricing,
+    canEditPrice,
+    canManageImage,
+    shouldSaveLoyalty,
+    loyaltyPoints,
+    existingImagePresent: Boolean(existingImage.data),
+    disabled,
+    variantsHaveIssues,
+    onSaved,
+    onClose,
+  });
 
   return (
     <DDialog
