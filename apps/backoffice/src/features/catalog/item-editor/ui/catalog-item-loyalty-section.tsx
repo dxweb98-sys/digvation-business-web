@@ -1,4 +1,4 @@
-import { DBadge, DInput, DSelect } from '@digvation/ui';
+import { DInput, DSelect } from '@digvation/ui';
 import { Star } from 'lucide-react';
 
 import type {
@@ -35,35 +35,27 @@ export function CatalogItemLoyaltySection({
   return (
     <section
       aria-label="Poin Loyalitas Member"
-      className="border-t border-[var(--color-border)] pt-5"
+      className="mt-5 border-t border-[var(--color-border)] pt-5"
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <Star className="size-4 text-[var(--color-brand)]" aria-hidden="true" />
-            <h3 className="text-sm font-semibold text-[var(--color-text)]">
-              Poin Loyalitas Member
-            </h3>
-            {!loading ? (
-              <DBadge variant={followingDefault ? 'secondary' : 'info'}>
-                {followingDefault ? 'Mengikuti default' : 'Aturan khusus'}
-              </DBadge>
-            ) : null}
-          </div>
-          <p className="mt-1 text-xs leading-5 text-[var(--color-text-muted)]">
-            {followingDefault
-              ? effectiveBehavior === 'EXCLUDED'
-                ? 'Default bisnis: item tidak memberikan poin.'
-                : `Default bisnis: ${effectivePoints} poin per unit.`
-              : 'Aturan khusus ini hanya berlaku untuk item ini.'}
-          </p>
-        </div>
+      <div className="flex items-center gap-2">
+        <Star className="size-4 text-[var(--color-brand)]" aria-hidden="true" />
+        <h3 className="text-sm font-semibold text-[var(--color-text)]">
+          Poin Loyalitas Member
+        </h3>
       </div>
 
-      {loading ? (
-        <p className="mt-3 text-xs text-[var(--color-text-muted)]">Memuat aturan poin...</p>
-      ) : canConfigure ? (
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+      <p className="mt-1 text-xs leading-5 text-[var(--color-text-muted)]">
+        {loading
+          ? 'Memuat aturan poin...'
+          : followingDefault
+            ? effectiveBehavior === 'EXCLUDED'
+              ? 'Mengikuti default bisnis: tidak dapat poin.'
+              : `Mengikuti default bisnis: ${effectivePoints} poin per unit.`
+            : 'Menggunakan aturan khusus untuk item ini.'}
+      </p>
+
+      {!loading && canConfigure ? (
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <DSelect
             label="Perolehan poin"
             value={behavior}
@@ -91,19 +83,13 @@ export function CatalogItemLoyaltySection({
                   : undefined
               }
             />
-          ) : (
-            <div className="flex items-end">
-              <p className="pb-2 text-xs leading-5 text-[var(--color-text-muted)]">
-                Member tidak memperoleh poin dari item ini.
-              </p>
-            </div>
-          )}
+          ) : null}
         </div>
-      ) : (
+      ) : !loading ? (
         <p className="mt-3 text-xs text-[var(--color-text-muted)]">
-          Anda memiliki akses baca untuk aturan Loyalty item ini.
+          Hanya dapat dilihat.
         </p>
-      )}
+      ) : null}
     </section>
   );
 }
