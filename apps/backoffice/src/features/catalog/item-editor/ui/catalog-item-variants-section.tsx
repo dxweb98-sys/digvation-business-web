@@ -1,4 +1,3 @@
-import { CatalogSection } from '../../ui/catalog-shared';
 import { sellsItemItself, type SellingModel } from '../../model/catalog-selling';
 import type { useCatalogItemEditor } from '../model/use-catalog-item-editor';
 import { VariantPriceEditor } from './catalog-variant-price-editor';
@@ -37,17 +36,13 @@ export function CatalogItemVariantsSection({
   }
 
   return (
-    <CatalogSection
-      title="Daftar Varian Item"
-      count={variants.length}
-      description={
-        fresh
-          ? 'Setiap varian memiliki harga final dan dapat diedit satu per satu.'
-          : inactiveVariantCount
-            ? `${inactiveVariantCount} varian nonaktif tidak ditampilkan di editor ini.`
-            : 'Harga setiap varian tetap dikelola secara individual.'
-      }
-    >
+    <div className="mt-3">
+      {inactiveVariantCount ? (
+        <p className="mb-2 text-xs text-[var(--color-text-muted)]">
+          {inactiveVariantCount} varian nonaktif tidak ditampilkan di editor ini.
+        </p>
+      ) : null}
+
       {variantPricesLoading && !fresh ? (
         <div className="rounded-xl border border-[var(--color-border)] px-4 py-5 text-sm text-[var(--color-text-muted)]">
           Memuat varian...
@@ -67,6 +62,6 @@ export function CatalogItemVariantsSection({
           showIssues={showIssues}
         />
       )}
-    </CatalogSection>
+    </div>
   );
 }
