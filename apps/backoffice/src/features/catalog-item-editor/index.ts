@@ -1,1 +1,1 @@
-export { CatalogItemDialog } from './ui/catalog-item-dialog';
+export { CatalogItemDialog } from '../catalog/item-editor';
