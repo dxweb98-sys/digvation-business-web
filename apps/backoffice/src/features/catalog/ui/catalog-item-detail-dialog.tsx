@@ -120,6 +120,7 @@ export function CatalogItemDetailDialog({
   const [pricingTarget, setPricingTarget] = useState<'default' | Variant | null>(null);
   const [bulkPricing, setBulkPricing] = useState(false);
   const [showAllHistory, setShowAllHistory] = useState(false);
+  const [activeDetailTab, setActiveDetailTab] = useState<'variants' | 'history'>('variants');
   const [statusTarget, setStatusTarget] = useState<Variant | null>(null);
   const [changingStatus, setChangingStatus] = useState(false);
 
@@ -361,14 +362,14 @@ export function CatalogItemDetailDialog({
             </div>
 
             {canViewPricing ? (
-              <div className="flex min-h-28 flex-col justify-center rounded-xl border border-[var(--color-brand)]/20 bg-[var(--color-brand)]/[0.035] px-4 py-3 text-right">
-                <div className="flex flex-wrap items-center justify-end gap-2">
-                  <span className="text-xs font-medium text-[var(--color-text-muted)]">
-                    {model === 'DIRECT' ? 'Harga jual' : 'Harga varian'}
+              <div className="flex min-h-28 flex-col justify-center border-t border-[var(--color-border)] pt-4 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--color-text-muted)]">
+                    {model === 'DIRECT' ? 'Harga Jual' : 'Ringkasan Harga'}
                   </span>
                   {variants.isLoading ? null : <SellingModelBadge model={model} />}
                 </div>
-                <div className="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-[var(--color-text)]">
+                <div className="mt-1.5 text-2xl font-semibold tabular-nums tracking-tight text-[var(--color-text)]">
                   {model === 'DIRECT' ? (
                     <PriceLabel
                       price={defaultPrice}
@@ -379,11 +380,11 @@ export function CatalogItemDetailDialog({
                     displayPrice
                   )}
                 </div>
-                <p className="mt-1 text-[11px] leading-4 text-[var(--color-text-muted)]">
+                <p className="mt-1 max-w-xs text-xs leading-5 text-[var(--color-text-muted)]">
                   {sellingModelCopy[model].description}
                 </p>
                 {canCreatePricing && model === 'DIRECT' ? (
-                  <div className="mt-3 flex justify-end">
+                  <div className="mt-3">
                     <DButton
                       variant="outline"
                       size="sm"
@@ -397,96 +398,6 @@ export function CatalogItemDetailDialog({
               </div>
             ) : null}
           </div>
-        </CatalogPanel>
-
-        <CatalogPanel>
-          <CatalogPanelHeader
-            title="Daftar Varian"
-            count={model === 'ITEM_AND_VARIANTS' ? optionRows.length : variantCount}
-            description={
-              model === 'ITEM_AND_VARIANTS'
-                ? 'Kasir memilih salah satu: tanpa varian atau salah satu varian sebelum checkout.'
-                : model === 'VARIANT_REQUIRED'
-                  ? 'Kasir wajib memilih salah satu varian sebelum checkout.'
-                  : 'Item ini belum menggunakan varian.'
-            }
-            actions={
-              <>
-                {canCreatePricing && hasVariants ? (
-                  <DButton
-                    variant="secondary"
-                    size="sm"
-                    leftIcon={<Layers className="size-4" />}
-                    onClick={() => setBulkPricing(true)}
-                  >
-                    Terapkan harga ke semua
-                  </DButton>
-                ) : null}
-                {canCreate ? (
-                  <DButton
-                    variant="outline"
-                    size="sm"
-                    leftIcon={<Plus className="size-4" />}
-                    onClick={() => setEditingVariant(null)}
-                  >
-                    Tambah varian
-                  </DButton>
-                ) : null}
-              </>
-            }
-          />
-          {canViewPricing && variantsWithoutPrice > 0 ? (
-            <div className="px-4 pt-4">
-              <DInfoNote variant="warning">
-                {variantsWithoutPrice} varian aktif belum memiliki harga dan tidak bisa dijual.
-                {canCreatePricing
-                  ? ' Terapkan satu harga ke semua varian atau atur harga tiap varian.'
-                  : ''}
-              </DInfoNote>
-            </div>
-          ) : null}
-          <DDataTable
-            columns={optionColumns}
-            data={optionRows}
-            loading={variants.isLoading}
-            rowKey="id"
-            emptyMessage="Item ini tidak memiliki varian."
-            actions={[
-              {
-                label: 'Ubah harga',
-                icon: <BadgeDollarSign className="size-4" />,
-                onClick: () => setPricingTarget('default'),
-                show: (row) => canCreatePricing && row.kind === 'item',
-              },
-              {
-                label: 'Ubah harga varian',
-                icon: <BadgeDollarSign className="size-4" />,
-                onClick: (row) => row.kind === 'variant' && setPricingTarget(row.variant),
-                show: (row) =>
-                  canCreatePricing && row.kind === 'variant' && row.variant.status === 'ACTIVE',
-              },
-              {
-                label: 'Edit varian',
-                icon: <Pencil className="size-4" />,
-                onClick: (row) => row.kind === 'variant' && setEditingVariant(row.variant),
-                show: (row) => canUpdate && row.kind === 'variant',
-              },
-              {
-                label: 'Nonaktifkan varian',
-                icon: <Power className="size-4" />,
-                onClick: (row) => row.kind === 'variant' && setStatusTarget(row.variant),
-                show: (row) =>
-                  canUpdate && row.kind === 'variant' && row.variant.status === 'ACTIVE',
-              },
-              {
-                label: 'Aktifkan varian',
-                icon: <RotateCcw className="size-4" />,
-                onClick: (row) => row.kind === 'variant' && setStatusTarget(row.variant),
-                show: (row) =>
-                  canUpdate && row.kind === 'variant' && row.variant.status === 'INACTIVE',
-              },
-            ]}
-          />
         </CatalogPanel>
 
         <CatalogPanel className="p-5">
@@ -538,43 +449,174 @@ export function CatalogItemDetailDialog({
           </div>
         </CatalogPanel>
 
-        {canViewPricing ? (
-          <CatalogPanel>
-            <CatalogPanelHeader
-              title="Riwayat Perubahan Harga"
-              count={history.length}
-              trailing={
-                <span className="text-xs text-[var(--color-text-muted)]">log</span>
-              }
-              actions={
-                <span className="text-xs text-[var(--color-text-muted)]">Terbaru di atas</span>
-              }
-            />
-            <ItemPriceHistory
-              entries={visibleHistory}
-              loading={priceHistory.isLoading}
-              error={priceHistory.isError}
-              canCancel={canCancelPricing}
-              onCancel={async (price) => {
-                await api.cancelPrice(price.id);
-                refreshPricing();
-              }}
-            />
-            {history.length > HISTORY_PREVIEW ? (
-              <div className="flex justify-center border-t border-[var(--color-border)] px-4 py-3">
-                <DButton
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowAllHistory((current) => !current)}
+        <CatalogPanel>
+          <div className="border-b border-[var(--color-border)] px-4 pt-3">
+            <div
+              role="tablist"
+              aria-label="Detail item"
+              className="flex min-w-0 gap-1 overflow-x-auto"
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeDetailTab === 'variants'}
+                onClick={() => setActiveDetailTab('variants')}
+                className={`border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+                  activeDetailTab === 'variants'
+                    ? 'border-[var(--color-brand)] text-[var(--color-brand)]'
+                    : 'border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
+                }`}
+              >
+                Daftar Varian
+                <span className="ml-1.5 rounded-full bg-[var(--color-surface-muted)] px-1.5 py-0.5 text-[10px]">
+                  {model === 'ITEM_AND_VARIANTS' ? optionRows.length : variantCount}
+                </span>
+              </button>
+              {canViewPricing ? (
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeDetailTab === 'history'}
+                  onClick={() => setActiveDetailTab('history')}
+                  className={`border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+                    activeDetailTab === 'history'
+                      ? 'border-[var(--color-brand)] text-[var(--color-brand)]'
+                      : 'border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
+                  }`}
                 >
-                  {showAllHistory
-                    ? 'Tampilkan lebih sedikit'
-                    : `Tampilkan semua riwayat (${history.length})`}
-                </DButton>
-              </div>
-            ) : null}
-          </CatalogPanel>
-        ) : null}
+                  Riwayat Harga
+                  <span className="ml-1.5 rounded-full bg-[var(--color-surface-muted)] px-1.5 py-0.5 text-[10px]">
+                    {history.length}
+                  </span>
+                </button>
+              ) : null}
+            </div>
+          </div>
+
+          {activeDetailTab === 'variants' || !canViewPricing ? (
+            <div role="tabpanel" aria-label="Daftar Varian">
+              <CatalogPanelHeader
+                title="Daftar Varian"
+                description={
+                  model === 'ITEM_AND_VARIANTS'
+                    ? 'Item utama tetap bisa dijual, dengan varian sebagai pilihan tambahan.'
+                    : model === 'VARIANT_REQUIRED'
+                      ? 'Kasir wajib memilih salah satu varian sebelum checkout.'
+                      : 'Item ini belum menggunakan varian.'
+                }
+                actions={
+                  <>
+                    {canCreatePricing && hasVariants ? (
+                      <DButton
+                        variant="secondary"
+                        size="sm"
+                        leftIcon={<Layers className="size-4" />}
+                        onClick={() => setBulkPricing(true)}
+                      >
+                        Terapkan harga ke semua
+                      </DButton>
+                    ) : null}
+                    {canCreate ? (
+                      <DButton
+                        variant="outline"
+                        size="sm"
+                        leftIcon={<Plus className="size-4" />}
+                        onClick={() => setEditingVariant(null)}
+                      >
+                        Tambah varian
+                      </DButton>
+                    ) : null}
+                  </>
+                }
+              />
+              {canViewPricing && variantsWithoutPrice > 0 ? (
+                <div className="px-4 pt-4">
+                  <DInfoNote variant="warning">
+                    {variantsWithoutPrice} varian aktif belum memiliki harga dan tidak bisa dijual.
+                    {canCreatePricing
+                      ? ' Terapkan satu harga ke semua varian atau atur harga tiap varian.'
+                      : ''}
+                  </DInfoNote>
+                </div>
+              ) : null}
+              <DDataTable
+                columns={optionColumns}
+                data={optionRows}
+                loading={variants.isLoading}
+                rowKey="id"
+                emptyMessage="Item ini tidak memiliki varian."
+                actions={[
+                  {
+                    label: 'Ubah harga',
+                    icon: <BadgeDollarSign className="size-4" />,
+                    onClick: () => setPricingTarget('default'),
+                    show: (row) => canCreatePricing && row.kind === 'item',
+                  },
+                  {
+                    label: 'Ubah harga varian',
+                    icon: <BadgeDollarSign className="size-4" />,
+                    onClick: (row) => row.kind === 'variant' && setPricingTarget(row.variant),
+                    show: (row) =>
+                      canCreatePricing &&
+                      row.kind === 'variant' &&
+                      row.variant.status === 'ACTIVE',
+                  },
+                  {
+                    label: 'Edit varian',
+                    icon: <Pencil className="size-4" />,
+                    onClick: (row) => row.kind === 'variant' && setEditingVariant(row.variant),
+                    show: (row) => canUpdate && row.kind === 'variant',
+                  },
+                  {
+                    label: 'Nonaktifkan varian',
+                    icon: <Power className="size-4" />,
+                    onClick: (row) => row.kind === 'variant' && setStatusTarget(row.variant),
+                    show: (row) =>
+                      canUpdate && row.kind === 'variant' && row.variant.status === 'ACTIVE',
+                  },
+                  {
+                    label: 'Aktifkan varian',
+                    icon: <RotateCcw className="size-4" />,
+                    onClick: (row) => row.kind === 'variant' && setStatusTarget(row.variant),
+                    show: (row) =>
+                      canUpdate && row.kind === 'variant' && row.variant.status === 'INACTIVE',
+                  },
+                ]}
+              />
+            </div>
+          ) : (
+            <div role="tabpanel" aria-label="Riwayat Harga">
+              <CatalogPanelHeader
+                title="Riwayat Perubahan Harga"
+                description="Perubahan harga terbaru ditampilkan lebih dulu."
+                count={history.length}
+              />
+              <ItemPriceHistory
+                entries={visibleHistory}
+                loading={priceHistory.isLoading}
+                error={priceHistory.isError}
+                canCancel={canCancelPricing}
+                onCancel={async (price) => {
+                  await api.cancelPrice(price.id);
+                  refreshPricing();
+                }}
+              />
+              {history.length > HISTORY_PREVIEW ? (
+                <div className="flex justify-center border-t border-[var(--color-border)] px-4 py-3">
+                  <DButton
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowAllHistory((current) => !current)}
+                  >
+                    {showAllHistory
+                      ? 'Tampilkan lebih sedikit'
+                      : `Tampilkan semua riwayat (${history.length})`}
+                  </DButton>
+                </div>
+              ) : null}
+            </div>
+          )}
+        </CatalogPanel>
       </div>
 
       <CatalogNamedRecordDialog
