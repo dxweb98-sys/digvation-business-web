@@ -1,4 +1,3 @@
-import type { CatalogItem } from '@digvation/business-catalog';
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 
 import type { VariantPriceDraft } from './variant-price-draft';
@@ -9,15 +8,16 @@ import {
 import {
   createCatalogItemEditorState,
   type CatalogItemEditorForm,
+  type CatalogItemEditorSource,
 } from './catalog-item-editor.state';
 
-function editorIdentity(item: CatalogItem | null | undefined) {
+function editorIdentity(item: CatalogItemEditorSource | null | undefined) {
   if (item === undefined) return 'closed';
   if (item === null) return 'new';
   return item.id;
 }
 
-export function useCatalogItemEditor(item: CatalogItem | null | undefined) {
+export function useCatalogItemEditor(item: CatalogItemEditorSource | null | undefined) {
   const [state, dispatch] = useReducer(
     catalogItemEditorReducer,
     item,
