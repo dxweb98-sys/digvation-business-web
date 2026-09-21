@@ -98,13 +98,32 @@ export function CatalogItemDialog({
   });
 
   useEffect(() => {
-    if (!item || !canViewLoyalty || loyaltyRules.isLoading) return;
+    if (
+      !canViewLoyalty ||
+      loyaltyConfiguration.isLoading ||
+      (item && loyaltyRules.isLoading)
+    ) {
+      return;
+    }
 
-    hydrateLoyaltyOnce(
-      loyaltyRule?.behavior ?? 'FIXED',
-      loyaltyRule ? String(loyaltyRule.fixedPointsPerUnit) : '',
-    );
-  }, [canViewLoyalty, hydrateLoyaltyOnce, item, loyaltyRule, loyaltyRules.isLoading]);
+    const behavior =
+      loyaltyRule?.behavior ??
+      loyaltyConfiguration.data?.defaultEarningBehavior ??
+      'FIXED';
+    const points =
+      loyaltyRule?.fixedPointsPerUnit ??
+      loyaltyConfiguration.data?.defaultFixedPointsPerUnit;
+
+    hydrateLoyaltyOnce(behavior, points !== undefined ? String(points) : '');
+  }, [
+    canViewLoyalty,
+    hydrateLoyaltyOnce,
+    item,
+    loyaltyConfiguration.data,
+    loyaltyConfiguration.isLoading,
+    loyaltyRule,
+    loyaltyRules.isLoading,
+  ]);
 
   useEffect(() => {
     if (fresh || currentPrice.isLoading) return;
@@ -168,7 +187,7 @@ export function CatalogItemDialog({
     ? loyaltyBehavior !== loyaltyRule.behavior || loyaltyPoints !== loyaltyRule.fixedPointsPerUnit
     : loyaltyTouched;
   const shouldSaveLoyalty =
-    !fresh && canConfigureLoyalty && loyaltyTouched && loyaltyDraftValid && loyaltyDraftChanged;
+    canConfigureLoyalty && loyaltyTouched && loyaltyDraftValid && loyaltyDraftChanged;
   const disabled =
     !name.trim() ||
     !validDefaultDuration ||
@@ -286,7 +305,9 @@ export function CatalogItemDialog({
                 canViewLoyalty={canViewLoyalty}
                 loyaltyRule={loyaltyRule}
                 loyaltyConfiguration={loyaltyConfiguration.data}
-                loyaltyLoading={loyaltyRules.isLoading || loyaltyConfiguration.isLoading}
+                loyaltyLoading={
+                  loyaltyConfiguration.isLoading || (!fresh && loyaltyRules.isLoading)
+                }
                 canConfigureLoyalty={canConfigureLoyalty}
                 loyaltyDraftValid={loyaltyDraftValid}
               />
