@@ -5,6 +5,7 @@ export type BackofficeCapability =
   | 'catalog'
   | 'promotions'
   | 'employees'
+  | 'memberships'
   | 'attendance'
   | 'finance'
   | 'expenses'
@@ -41,6 +42,8 @@ export type BackofficeAction =
   | 'createEmployee'
   | 'updateEmployee'
   | 'manageAttendance'
+  | 'enrollMember'
+  | 'manageMember'
   | 'createFinancialAccount'
   | 'updateFinancialAccount'
   | 'updatePaymentRouting'
@@ -66,6 +69,7 @@ const capabilityPermissions: Record<BackofficeCapability, PermissionRequirement>
   catalog: { allOf: ['catalog:read'] },
   promotions: { allOf: ['promotions:read'] },
   employees: { allOf: ['employees:read'] },
+  memberships: { allOf: ['membership:read'] },
   attendance: { allOf: ['attendance:read'] },
   finance: { allOf: ['payments:read'] },
   expenses: { allOf: ['expenses:read'] },
@@ -121,6 +125,8 @@ const actionPermissions: Record<BackofficeAction, readonly string[]> = {
   createEmployee: ['employees:create'],
   updateEmployee: ['employees:update'],
   manageAttendance: ['attendance:manage'],
+  enrollMember: ['membership:enroll'],
+  manageMember: ['customers:manage', 'membership:update'],
   createFinancialAccount: ['financial-accounts:create'],
   updateFinancialAccount: ['financial-accounts:update'],
   updatePaymentRouting: ['payment-routing:update'],
