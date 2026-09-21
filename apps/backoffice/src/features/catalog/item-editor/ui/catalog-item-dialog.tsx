@@ -14,7 +14,12 @@ import { CatalogItemSaveSummarySection } from './catalog-item-save-summary-secti
 import { CatalogItemVariantsSection } from './catalog-item-variants-section';
 import { useCatalogLocalization } from '../../localization/use-catalog-localization';
 import { variantPriceState } from '../../model/catalog-price-history';
-import { CatalogSection, DialogFooter, Status } from '../../ui/catalog-shared';
+import {
+  CatalogPanel,
+  CatalogPanelHeader,
+  DialogFooter,
+  Status,
+} from '../../ui/catalog-shared';
 import { editableAmount } from '../model/variant-price-draft';
 
 export function CatalogItemDialog({
@@ -197,6 +202,7 @@ export function CatalogItemDialog({
       size="xl"
       title={
         <div className="flex flex-wrap items-center gap-2">
+          <span className="size-2 rounded-full bg-[var(--color-brand)]" aria-hidden="true" />
           <span>{fresh ? 'Tambah Item' : 'Edit Item'}</span>
           {!fresh && item ? (
             <>
@@ -208,7 +214,7 @@ export function CatalogItemDialog({
       }
       footer={<DialogFooter onClose={onClose} onSave={() => void save()} disabled={disabled} />}
     >
-      <div className="divide-y divide-(--color-border)">
+      <div className="space-y-5">
         <CatalogItemInformationSection
           editor={editor}
           fresh={fresh}
@@ -219,38 +225,42 @@ export function CatalogItemDialog({
         />
 
         {showSellingSection ? (
-          <CatalogSection
-            title="Penjualan & Penentuan Harga"
-            icon={<BadgeDollarSign className="size-4" aria-hidden="true" />}
-            actions={hasVariants ? <DBadge variant="info">Mode Varian</DBadge> : undefined}
-          >
-            {showPrice ? (
-              <CatalogItemPricingSection
+          <CatalogPanel ariaLabel="Penjualan & Penentuan Harga">
+            <CatalogPanelHeader
+              title="Penjualan & Penentuan Harga"
+              icon={<BadgeDollarSign className="size-4" aria-hidden="true" />}
+              description="Atur cara item dijual, harga default, dan varian dalam satu tempat."
+              actions={hasVariants ? <DBadge variant="info">Mode Varian</DBadge> : undefined}
+            />
+            <div className="p-5">
+              {showPrice ? (
+                <CatalogItemPricingSection
+                  editor={editor}
+                  model={model}
+                  currency={currency}
+                  fresh={fresh}
+                  hasVariants={hasVariants}
+                  canEditPrice={canEditPrice}
+                  currentPriceLoading={currentPrice.isLoading}
+                  itemPriceError={itemPriceError}
+                  storedItemPrice={storedItemPrice}
+                  formatMoney={formatMoney}
+                />
+              ) : null}
+
+              <CatalogItemVariantsSection
                 editor={editor}
                 model={model}
                 currency={currency}
                 fresh={fresh}
-                hasVariants={hasVariants}
+                canViewPricing={canViewPricing}
                 canEditPrice={canEditPrice}
-                currentPriceLoading={currentPrice.isLoading}
-                itemPriceError={itemPriceError}
-                storedItemPrice={storedItemPrice}
-                formatMoney={formatMoney}
+                canCreateVariants={canCreateVariants}
+                variantPricesLoading={variantPricesLoading}
+                inactiveVariantCount={inactiveVariantCount}
               />
-            ) : null}
-
-            <CatalogItemVariantsSection
-              editor={editor}
-              model={model}
-              currency={currency}
-              fresh={fresh}
-              canViewPricing={canViewPricing}
-              canEditPrice={canEditPrice}
-              canCreateVariants={canCreateVariants}
-              variantPricesLoading={variantPricesLoading}
-              inactiveVariantCount={inactiveVariantCount}
-            />
-          </CatalogSection>
+            </div>
+          </CatalogPanel>
         ) : null}
 
         {!fresh && canViewLoyalty ? (
