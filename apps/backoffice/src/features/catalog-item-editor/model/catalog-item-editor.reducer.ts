@@ -1,17 +1,16 @@
-import type { CatalogItem } from '@digvation/business-catalog';
-
 import type { VariantPriceDraft } from './variant-price-draft';
 import type { LoyaltyEarningBehavior } from '../../../modules/loyalty/loyalty-api';
 import {
   createCatalogItemEditorState,
   type CatalogItemEditorForm,
+  type CatalogItemEditorSource,
   type CatalogItemEditorState,
 } from './catalog-item-editor.state';
 
 export type CatalogItemEditorAction =
   | {
       type: 'RESET';
-      item: CatalogItem | null | undefined;
+      item: CatalogItemEditorSource | null | undefined;
     }
   | {
       type: 'FORM_FIELD_CHANGED';
