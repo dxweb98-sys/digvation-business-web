@@ -31,7 +31,7 @@ export function CatalogItemLoyaltySection({
   const effectiveBehavior = loyaltyRule?.behavior ?? configuration?.defaultEarningBehavior;
   const effectivePoints =
     loyaltyRule?.fixedPointsPerUnit ?? configuration?.defaultFixedPointsPerUnit ?? 0;
-  const active = effectiveBehavior !== 'EXCLUDED';
+  const active = effectiveBehavior === 'FIXED';
 
   return (
     <CatalogSection
