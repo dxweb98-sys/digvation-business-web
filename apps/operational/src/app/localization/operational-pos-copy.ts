@@ -4,7 +4,7 @@ type LocalizedCopy = Record<OperationalLocale, string>;
 
 const posCopy: Record<string, LocalizedCopy> = {
   'Pay later': { 'id-ID': 'Bayar nanti', 'en-US': 'Pay later' },
-  'Payment timing': { 'id-ID': 'Waktu pembayaran', 'en-US': 'Payment timing' },
+  'Payment timing': { 'id-ID': 'Waktu & Cara Pembayaran', 'en-US': 'Payment timing' },
   'Pay and add to queue': {
     'id-ID': 'Bayar dan masukkan ke antrian',
     'en-US': 'Pay and add to queue',
@@ -311,12 +311,16 @@ const posCopy: Record<string, LocalizedCopy> = {
   'points used': { 'id-ID': 'poin digunakan', 'en-US': 'points used' },
   'Use loyalty points': { 'id-ID': 'Gunakan poin', 'en-US': 'Use loyalty points' },
   'Change points': { 'id-ID': 'Ubah poin', 'en-US': 'Change points' },
-  'Points to use': { 'id-ID': 'Jumlah poin', 'en-US': 'Points to use' },
+  'Points to use': { 'id-ID': 'Jumlah Poin Ditukarkan', 'en-US': 'Points to use' },
   'Available balance': { 'id-ID': 'Saldo tersedia', 'en-US': 'Available balance' },
   points: { 'id-ID': 'poin', 'en-US': 'points' },
   'Enter the number of points to use for this transaction.': {
     'id-ID': 'Masukkan jumlah poin yang ingin digunakan untuk transaksi ini.',
     'en-US': 'Enter the number of points to use for this transaction.',
+  },
+  'Points are only consumed after the transaction is finalized.': {
+    'id-ID': 'Poin baru dipotong setelah transaksi berhasil diselesaikan.',
+    'en-US': 'Points are only consumed after the transaction is finalized.',
   },
   Update: { 'id-ID': 'Perbarui', 'en-US': 'Update' },
   'Use member points for this transaction. Points are consumed only when the sale is finalized.': {
