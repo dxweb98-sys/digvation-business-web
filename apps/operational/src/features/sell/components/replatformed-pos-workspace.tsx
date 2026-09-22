@@ -3116,8 +3116,12 @@ function ReferencePaymentDialog({
   const [step, setStep] = usePaymentDialogStep(open);
   const [allocationMode, setAllocationMode] = usePaymentAllocationMode(open);
   const [loyaltyEditorOpen, setLoyaltyEditorOpen] = useState(false);
+  const [routeMenuOpen, setRouteMenuOpen] = useState(false);
   useEffect(() => {
-    if (!open) setLoyaltyEditorOpen(false);
+    if (!open) {
+      setLoyaltyEditorOpen(false);
+      setRouteMenuOpen(false);
+    }
   }, [open]);
   const format = (amount: string) => money(amount, locale);
   const routesForMethod = paymentRoutes.filter((route) => route.paymentMethod === method);
@@ -3752,10 +3756,10 @@ function ReferencePaymentDialog({
                     }}
                   >
                     <DTabsList className="grid w-full grid-cols-2 rounded-xl bg-[var(--color-surface-muted)] p-1">
-                      <DTabsTrigger value="FULL" className="min-w-0 px-3">
+                      <DTabsTrigger value="FULL" className="h-9 min-w-0 px-3 text-sm font-semibold">
                         {copy('Full payment')}
                       </DTabsTrigger>
-                      <DTabsTrigger value="SPLIT" className="min-w-0 px-3">
+                      <DTabsTrigger value="SPLIT" className="h-9 min-w-0 px-3 text-sm font-semibold">
                         {copy('Split payment')}
                       </DTabsTrigger>
                     </DTabsList>
@@ -3810,23 +3814,31 @@ function ReferencePaymentDialog({
                 <p className="mt-4 mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
                   {copy('Payment method')}
                 </p>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="grid grid-cols-2 gap-2">
                   {methods.map((option) => {
                     const routeAvailable = paymentRoutes.some(
                       (route) => route.paymentMethod === option.value,
                     );
                     const disabled = isPaymentRoutesLoading || !routeAvailable || hasPending;
+                    const selected = method === option.value;
                     return (
                       <button
                         key={option.value}
                         type="button"
                         disabled={disabled}
-                        aria-pressed={method === option.value}
-                        onClick={() => onMethod(option.value)}
-                        className={`flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-xl border px-2 text-xs font-semibold transition-all active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-40 ${method === option.value ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white shadow-sm' : 'border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)]'}`}
+                        aria-pressed={selected}
+                        onClick={() => {
+                          setRouteMenuOpen(false);
+                          onMethod(option.value);
+                        }}
+                        className={`flex h-12 min-w-0 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
+                          selected
+                            ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white shadow-sm'
+                            : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] hover:border-[var(--color-brand)]/40 hover:bg-[var(--color-brand)]/[.04]'
+                        }`}
                       >
-                        {option.icon}
-                        <span className="pos-payment-method-label">{label(option.value)}</span>
+                        <span className="shrink-0">{option.icon}</span>
+                        <span className="min-w-0">{label(option.value)}</span>
                       </button>
                     );
                   })}
@@ -3841,26 +3853,78 @@ function ReferencePaymentDialog({
                     <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
                       {copy('Settlement account')}
                     </p>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {routesForMethod.map((route) => (
-                        <button
-                          key={route.id}
-                          type="button"
-                          aria-pressed={activeRoute.id === route.id}
-                          onClick={() => onPaymentRoute(route.id)}
-                          className={`rounded-xl border px-3 py-2.5 text-left transition-colors ${activeRoute.id === route.id ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10' : 'border-[var(--color-border)] bg-[var(--color-surface-muted)]/50 hover:bg-[var(--color-surface-muted)]'}`}
-                        >
-                          <span className="block truncate text-sm font-semibold">
-                            {route.financialAccountName}
+                    {routesForMethod.length > 1 ? (
+                      <PortalDropdown
+                        open={routeMenuOpen}
+                        onOpenChange={setRouteMenuOpen}
+                        placement="bottom-start"
+                        contentPadding={false}
+                        closeOnItemClick
+                        minWidth={320}
+                        trigger={() => (
+                          <button
+                            type="button"
+                            aria-expanded={routeMenuOpen}
+                            className="flex h-11 w-full items-center justify-between gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-left transition-colors hover:border-[var(--color-brand)]/40"
+                          >
+                            <span className="min-w-0">
+                              <span className="block truncate text-sm font-medium text-[var(--color-text)]">
+                                {activeRoute.financialAccountName}
+                              </span>
+                              {activeRoute.financialAccountCode ? (
+                                <span className="mt-0.5 block truncate text-[10px] text-[var(--color-text-muted)]">
+                                  {activeRoute.financialAccountCode}
+                                </span>
+                              ) : null}
+                            </span>
+                            <ChevronDown className="size-4 shrink-0 text-[var(--color-text-muted)]" />
+                          </button>
+                        )}
+                      >
+                        <div className="w-[min(360px,calc(100vw-24px))] p-1.5">
+                          {routesForMethod.map((route) => {
+                            const selected = route.id === activeRoute.id;
+                            return (
+                              <button
+                                key={route.id}
+                                type="button"
+                                onClick={() => onPaymentRoute(route.id)}
+                                className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-[var(--color-surface-muted)] ${
+                                  selected ? 'bg-[var(--color-brand)]/[.06]' : ''
+                                }`}
+                              >
+                                <span className="min-w-0">
+                                  <span className="block truncate text-sm font-medium">
+                                    {route.financialAccountName}
+                                  </span>
+                                  {route.financialAccountCode ? (
+                                    <span className="mt-0.5 block truncate text-[10px] text-[var(--color-text-muted)]">
+                                      {route.financialAccountCode}
+                                    </span>
+                                  ) : null}
+                                </span>
+                                {selected ? (
+                                  <CheckCircle2 className="size-4 shrink-0 text-[var(--color-brand)]" />
+                                ) : null}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </PortalDropdown>
+                    ) : (
+                      <div className="flex min-h-11 items-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3">
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-medium text-[var(--color-text)]">
+                            {activeRoute.financialAccountName}
                           </span>
-                          {route.financialAccountCode ? (
-                            <span className="mt-0.5 block truncate text-[11px] text-[var(--color-text-muted)]">
-                              {route.financialAccountCode}
+                          {activeRoute.financialAccountCode ? (
+                            <span className="mt-0.5 block truncate text-[10px] text-[var(--color-text-muted)]">
+                              {activeRoute.financialAccountCode}
                             </span>
                           ) : null}
-                        </button>
-                      ))}
-                    </div>
+                        </span>
+                      </div>
+                    )}
                   </div>
                 ) : null}
                 {!isCash ? (
