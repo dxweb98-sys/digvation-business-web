@@ -228,7 +228,9 @@ export function useSaleWorkspaceController({
         ),
       ),
     onSuccess: command.commitSale,
-    onError: async (error, intent) => command.recoverFailure(error, intent.saleId),
+    onError: async (_error, intent) => {
+      await command.refetchSale(intent.saleId);
+    },
   });
   const removeLoyaltyRedemptionMutation = useMutation({
     mutationFn: (intent: { saleId: string; expectedVersion: number }) =>
@@ -386,10 +388,14 @@ export function useSaleWorkspaceController({
     return draftCommitGateRef.current.run(() => commitDraftMutation.mutateAsync(intent));
   };
 
-  const applyLoyaltyRedemption = (points: string) => {
+  const applyLoyaltyRedemption = async (points: string) => {
     const sale = saleQuery.data;
-    if (!sale || sale.customer?.type !== 'MEMBER' || !points.trim()) return;
-    loyaltyRedemptionMutation.mutate({ saleId: sale.id, expectedVersion: sale.version, points });
+    if (!sale || sale.customer?.type !== 'MEMBER' || !points.trim()) return null;
+    return loyaltyRedemptionMutation.mutateAsync({
+      saleId: sale.id,
+      expectedVersion: sale.version,
+      points,
+    });
   };
   const removeLoyaltyRedemption = () => {
     const sale = saleQuery.data;
