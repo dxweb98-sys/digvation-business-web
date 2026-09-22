@@ -814,9 +814,9 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   ]);
 
   const memberBalanceQuery = useQuery({
-    queryKey: ['operational-member-balance', activeSelectedMember?.id],
-    queryFn: ({ signal }) => customerMemberApi.getPointBalance(activeSelectedMember!.id, signal),
-    enabled: Boolean(activeSelectedMember && canReadLoyalty),
+    queryKey: ['operational-member-balance', selectedMember?.id],
+    queryFn: ({ signal }) => customerMemberApi.getPointBalance(selectedMember!.id, signal),
+    enabled: Boolean(selectedMember && canReadLoyalty),
     staleTime: 15_000,
   });
 
@@ -1658,13 +1658,15 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         canReadLoyalty={canReadLoyalty}
         onClose={() => setCustomerPickerOpen(false)}
         onChoose={(selection, member) => {
+          const previousMember = selectedMember;
+          setSelectedMember(member ?? null);
           void workspace
             .changeCustomer(selection)
             .then(() => {
-              setSelectedMember(member ?? null);
               setCustomerPickerOpen(false);
             })
             .catch((error: unknown) => {
+              setSelectedMember(previousMember);
               showToast({
                 title: copy('Could not save the customer'),
                 description: cashierTransactionErrorMessage(error),
@@ -1731,8 +1733,13 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         onQueue={() => void queueCheckout('QUEUE')}
         onQueueWithBalance={() => void queueCheckout('QUEUE')}
         loyaltyRedemption={sale?.loyaltyRedemption ?? null}
-        loyaltyPointBalance={memberBalanceQuery.data?.pointsBalance ?? null}
-        isLoyaltyBalanceLoading={memberBalanceQuery.isLoading || memberIdentityQuery.isLoading}
+        loyaltyPointBalance={
+          activeSelectedMember ? (memberBalanceQuery.data?.pointsBalance ?? null) : null
+        }
+        isLoyaltyBalanceLoading={
+          Boolean(activeSelectedMember) &&
+          (memberBalanceQuery.isLoading || memberIdentityQuery.isLoading)
+        }
         canRedeemLoyalty={
           Boolean(sale) && canRedeemLoyalty && activeCustomer?.type === 'MEMBER'
         }
