@@ -301,6 +301,16 @@ function customerDisplayDetail(customer: SaleCustomer | null): string | null {
   return customer && customer.phoneE164.trim() ? customer.phoneE164 : null;
 }
 
+function customerInitials(customer: SaleCustomer | null): string {
+  const name = customer?.name?.trim();
+  if (!name) return '—';
+  return name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('');
+}
+
 function customerStatus(customer: SaleCustomer | null): {
   label: 'Member' | 'Non-member';
   variant: 'primary' | 'outline';
@@ -3270,9 +3280,7 @@ function ReferencePaymentDialog({
       ? copy('Confirm payment')
       : step === 'leave'
         ? copy('Payment is not finished')
-        : hasRecordedMoney && !fullyPaid
-          ? copy('Continue payment')
-          : copy('Checkout');
+        : copy('POS payment');
 
   const editFooter = (
     <div className="flex items-center justify-end gap-2">
@@ -3322,6 +3330,11 @@ function ReferencePaymentDialog({
   return (
     <DDialog
       title={title}
+      description={
+        step === 'edit' && sale
+          ? `${copy('Transaction ID')}: ${transactionNumber(sale, locale)}`
+          : undefined
+      }
       open={open}
       onClose={requestClose}
       ariaLabel={title}
@@ -3627,115 +3640,10 @@ function ReferencePaymentDialog({
               </div>
             </fieldset>
           ) : null}
-          </div>
-
-          <div className="flex min-h-0 flex-col bg-[var(--color-surface)]">
-            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-4">
-              <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs text-[var(--color-text-muted)]">{copy('Payment total')}</p>
-                <h3 className="mt-0.5 text-2xl font-bold leading-tight tabular-nums text-[var(--color-brand)]">
-                  {format(total)}
-                </h3>
-              </div>
-              <div className="min-w-0 text-right">
-                <p className="text-xs text-[var(--color-text-muted)]">{copy('Customer')}</p>
-                <p className="max-w-[170px] truncate text-sm font-semibold">
-                  {customerDisplayName(customer, locale)}
-                </p>
-                {customerBadge ? (
-                  <Badge variant={customerBadge.variant} className="mt-1 px-2 py-0 text-[10px]">
-                    {copy(customerBadge.label)}
-                  </Badge>
-                ) : null}
-                <p className="text-[11px] text-[var(--color-text-muted)]">
-                  {lines.length} {copy('items')}
-                </p>
-              </div>
-            </div>
-            <div className="mt-3 rounded-xl bg-[var(--color-surface-muted)]/60 px-3 py-2 text-xs">
-              <div className="flex justify-between">
-                <span className="text-[var(--color-text-muted)]">{copy('Subtotal')}</span>
-                <span className="font-semibold">{format(gross)}</span>
-              </div>
-              {hasDiscount ? (
-                <div className="mt-1 flex justify-between">
-                  <span className="text-[var(--color-text-muted)]">{discountLabel}</span>
-                  <span className="font-semibold text-[var(--color-danger)]">
-                    −{format(discountAmount)}
-                  </span>
-                </div>
-              ) : null}
-              {hasLoyaltyRedemption ? (
-                <div className="mt-1 flex justify-between">
-                  <span className="text-[var(--color-text-muted)]">
-                    {copy('Loyalty redemption')}
-                  </span>
-                  <span className="font-semibold text-[var(--color-danger)]">
-                    −{format(redeemedAmount!)}
-                  </span>
-                </div>
-              ) : null}
-              {hasTax ? (
-                <div className="mt-1 flex justify-between">
-                  <span className="text-[var(--color-text-muted)]">{taxLabel}</span>
-                  <span className="font-semibold">{format(taxAmount)}</span>
-                </div>
-              ) : null}
-              <div className="mt-2 flex justify-between border-t border-[var(--color-border)] pt-2 text-sm">
-                <span className="font-bold">{copy('Total')}</span>
-                <span className="font-bold text-[var(--color-brand)]">{format(total)}</span>
-              </div>
-            </div>
-            {hasPaymentActivity ? (
-              <div className="mt-3">
-                <PaymentProgressSummary
-                  total={sale?.totalAmount ?? total}
-                  progress={progress}
-                  format={format}
-                />
-                {hasRecordedMoney && !fullyPaid ? (
-                  <p className="mt-2 text-[11px] font-medium text-[var(--color-text-muted)]">
-                    {copy('The transaction is not complete until the remaining amount is paid.')}
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-
-          {hasPaymentActivity && sale ? (
-            <RecordedPaymentList
-              payments={payments}
-              totalAmount={sale.totalAmount}
-              progress={progress}
-              format={format}
-              isMutating={isSubmitting}
-              onTransition={onTransitionPayment}
-            />
-          ) : null}
-
-
 
           {collectsPayment ? (
-            <>
-              <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
-                {hasRecordedMoney ? (
-                  <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
-                    {copy('Next payment')}
-                  </p>
-                ) : null}
-                {paymentError ? (
-                  <DAlert
-                    variant="danger"
-                    role="alert"
-                    title={copy('Payment was not recorded')}
-                    className="mb-3"
-                  >
-                    {paymentError} {copy('Nothing was added to the paid amount.')}
-                  </DAlert>
-                ) : null}
-                <div>
+            <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-3">
+              <div>
                   <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
                     {copy('Payment allocation')}
                   </p>
@@ -3810,9 +3718,149 @@ function ReferencePaymentDialog({
                     </DTabsContent>
                   </DTabs>
                 </div>
-                <p className="mt-4 mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
-                  {copy('Payment method')}
+            </section>
+          ) : null}
+          </div>
+
+          <div className="flex min-h-0 flex-col bg-[var(--color-surface)]">
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-4">
+              {customer ? (
+                <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="grid size-11 shrink-0 place-items-center rounded-full bg-[var(--color-brand)] text-sm font-bold text-white">
+                      {customerInitials(customer)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <p className="truncate text-base font-bold">
+                          {customerDisplayName(customer, locale)}
+                        </p>
+                        {customerBadge ? (
+                          <Badge variant={customerBadge.variant} className="shrink-0 px-2 py-0 text-[10px]">
+                            {copy(customerBadge.label)}
+                          </Badge>
+                        ) : null}
+                      </div>
+                      {customerDisplayDetail(customer) ? (
+                        <p className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">
+                          {customerDisplayDetail(customer)}
+                        </p>
+                      ) : null}
+                    </div>
+                    {customer.type === 'MEMBER' ? (
+                      <div className="shrink-0 border-l border-[var(--color-border)] pl-4 text-right">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+                          {copy('Points')}
+                        </p>
+                        <p className="mt-1 text-sm font-bold text-[var(--color-warning)]">
+                          {isLoyaltyBalanceLoading
+                            ? '…'
+                            : `${pointQuantity(loyaltyPointBalance, locale)} PTS`}
+                        </p>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+                  {copy('Payment total')}
                 </p>
+                <h3 className="mt-1 text-3xl font-bold leading-tight tabular-nums text-[var(--color-brand)]">
+                  {format(total)}
+                </h3>
+                <div className="mt-4 border-t border-[var(--color-border)] pt-3 text-sm">
+                  <div className="flex justify-between gap-3">
+                    <span className="text-[var(--color-text-muted)]">{copy('Subtotal')}</span>
+                    <span className="font-semibold">{format(gross)}</span>
+                  </div>
+                  {hasDiscount ? (
+                    <div className="mt-2 flex justify-between gap-3">
+                      <span className="text-[var(--color-text-muted)]">{discountLabel}</span>
+                      <span className="font-semibold text-[var(--color-danger)]">
+                        −{format(discountAmount)}
+                      </span>
+                    </div>
+                  ) : null}
+                  {hasLoyaltyRedemption ? (
+                    <div className="mt-2 flex justify-between gap-3">
+                      <span className="flex items-center gap-2 text-[var(--color-text-muted)]">
+                        <span className="size-2 rounded-full bg-[var(--color-warning)]" />
+                        {copy('Loyalty redemption')}
+                      </span>
+                      <span className="font-semibold text-[var(--color-danger)]">
+                        −{format(redeemedAmount!)}
+                      </span>
+                    </div>
+                  ) : null}
+                  {hasTax ? (
+                    <div className="mt-2 flex justify-between gap-3">
+                      <span className="text-[var(--color-text-muted)]">{taxLabel}</span>
+                      <span className="font-semibold">{format(taxAmount)}</span>
+                    </div>
+                  ) : null}
+                  <div className="mt-3 flex justify-between border-t border-[var(--color-border)] pt-3">
+                    <span className="font-bold">{copy('Net total')}</span>
+                    <span className="font-bold">{format(total)}</span>
+                  </div>
+                </div>
+                {hasPaymentActivity ? (
+                  <div className="mt-3">
+                    <PaymentProgressSummary
+                      total={sale?.totalAmount ?? total}
+                      progress={progress}
+                      format={format}
+                    />
+                    {hasRecordedMoney && !fullyPaid ? (
+                      <p className="mt-2 text-[11px] font-medium text-[var(--color-text-muted)]">
+                        {copy('The transaction is not complete until the remaining amount is paid.')}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+
+          {hasPaymentActivity && sale ? (
+            <RecordedPaymentList
+              payments={payments}
+              totalAmount={sale.totalAmount}
+              progress={progress}
+              format={format}
+              isMutating={isSubmitting}
+              onTransition={onTransitionPayment}
+            />
+          ) : null}
+
+
+
+          {collectsPayment ? (
+            <>
+              <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <p className="text-sm font-bold uppercase tracking-wide text-[var(--color-text)]">
+                    {copy('Payment method')}
+                  </p>
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-success)]">
+                    <span className="size-2 rounded-full bg-[var(--color-success)]" />
+                    {copy('Ready to pay')}
+                  </span>
+                </div>
+                {hasRecordedMoney ? (
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+                    {copy('Next payment')}
+                  </p>
+                ) : null}
+                {paymentError ? (
+                  <DAlert
+                    variant="danger"
+                    role="alert"
+                    title={copy('Payment was not recorded')}
+                    className="mb-3"
+                  >
+                    {paymentError} {copy('Nothing was added to the paid amount.')}
+                  </DAlert>
+                ) : null}
                 <div className="grid grid-cols-2 gap-2">
                   {methods.map((option) => {
                     const routeAvailable = paymentRoutes.some(
