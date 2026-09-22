@@ -3115,6 +3115,7 @@ function ReferencePaymentDialog({
   const isCash = method === 'CASH';
   const hasDiscount = !createDecimal(discountAmount).equals(createDecimal('0'));
   const hasTax = !createDecimal(taxAmount).equals(createDecimal('0'));
+  const validLoyaltyPointInput = /^[1-9]\d*$/.test(loyaltyPoints.trim());
   const canSubmitLoyalty =
     canRedeemLoyalty && validLoyaltyPointInput && !isLoyaltyMutating;
   const legacyLoyaltyRedemption = loyaltyRedemption as
@@ -3133,7 +3134,6 @@ function ReferencePaymentDialog({
   const hasKnownPointBalance = wholePointBalance !== null;
   const pointBalancePositive =
     wholePointBalance !== null && createDecimal(wholePointBalance).greaterThan(createDecimal('0'));
-  const validLoyaltyPointInput = /^[1-9]\d*$/.test(loyaltyPoints.trim());
   const applyLoyalty = async () => {
     if (!canSubmitLoyalty) return;
     try {
