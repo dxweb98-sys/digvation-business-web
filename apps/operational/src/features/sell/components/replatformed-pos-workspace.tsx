@@ -1243,10 +1243,12 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     }
   };
 
-  const recordCheckoutPayment = () =>
+  const recordCheckoutPayment = (allocationOverride?: string) =>
     sendPaymentOnce(async () => {
       if (!sale || !lines.length) return;
-      const allocation = normalizeCurrencyPresentationInput(paymentAmount);
+      const allocation = normalizeCurrencyPresentationInput(
+        allocationOverride ?? paymentAmount,
+      );
       const progress = paymentProgress(sale);
       if (
         !isPositiveDecimal(allocation) ||
@@ -2933,6 +2935,17 @@ function ReferenceCartPanel({
 }
 
 type PaymentDialogStep = 'edit' | 'review' | 'leave';
+type PaymentAllocationMode = 'FULL' | 'SPLIT';
+
+function usePaymentAllocationMode(open: boolean) {
+  const [mode, setMode] = useState<PaymentAllocationMode>('FULL');
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setMode('FULL');
+  }
+  return [mode, setMode] as const;
+}
 
 /**
  * Keeps the confirmation step inside the payment dialog so Escape, overlay and focus handling stay
@@ -3063,7 +3076,7 @@ function ReferencePaymentDialog({
   /** Why the last payment attempt was not recorded; cleared when the payment is edited. */
   paymentError: string | null;
   /** Sends the confirmed payment to Runtime. Resolves once Runtime has answered. */
-  onConfirmPayment: () => Promise<void>;
+  onConfirmPayment: (allocation: string) => Promise<void>;
   onQueue: () => void;
   /** Queues a partly paid transaction so the rest is collected from the queue. */
   onQueueWithBalance: () => void;
@@ -3082,6 +3095,7 @@ function ReferencePaymentDialog({
   const { copy, label } = useOperationalLocalization();
   const { showToast } = useToast();
   const [step, setStep] = usePaymentDialogStep(open);
+  const [allocationMode, setAllocationMode] = usePaymentAllocationMode(open);
   const format = (amount: string) => money(amount, locale);
   const routesForMethod = paymentRoutes.filter((route) => route.paymentMethod === method);
   const activeRoute =
@@ -3134,9 +3148,10 @@ function ReferencePaymentDialog({
   const progress = sale
     ? paymentProgress(sale)
     : { paidAmount: '0.0000', pendingAmount: '0.0000', remainingAmount: total };
-  const normalizedAllocation = normalizeCurrencyPresentationInput(
-    appliedAmount || progress.remainingAmount,
-  );
+  const normalizedAllocation =
+    allocationMode === 'FULL'
+      ? normalizeCurrencyPresentationInput(progress.remainingAmount)
+      : normalizeCurrencyPresentationInput(appliedAmount);
   const intent = paymentIntent(
     { totalAmount: sale?.totalAmount ?? total, payments },
     normalizedAllocation,
@@ -3196,7 +3211,7 @@ function ReferencePaymentDialog({
     onClose();
   };
   const confirmPayment = async () => {
-    await onConfirmPayment();
+    await onConfirmPayment(normalizedAllocation);
     setStep('edit');
   };
 
@@ -3598,33 +3613,83 @@ function ReferencePaymentDialog({
                     {paymentError} {copy('Nothing was added to the paid amount.')}
                   </DAlert>
                 ) : null}
-                <label className="block text-sm font-medium">
-                  {copy('Payment amount')}
-                  <PosCurrencyInput
-                    aria-label={copy('Payment amount')}
-                    className="mt-1.5 h-11 rounded-lg bg-[var(--color-surface)] text-right text-lg font-bold"
-                    value={appliedAmount}
-                    onChange={onAppliedAmount}
-                  />
-                </label>
-                {overAllocated ? (
-                  <p className="mt-1 text-xs text-[var(--color-danger)]" role="alert">
-                    {copy('Payment allocation cannot exceed the remaining amount.')}{' '}
-                    {copy('Remaining')}: {format(progress.remainingAmount)}
+                <div>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+                    {copy('Payment allocation')}
                   </p>
-                ) : (
-                  <div className="mt-2">
-                    <PaymentIntentHint
-                      intent={intent}
-                      format={format}
-                      onPayRemaining={() =>
-                        onAppliedAmount(
-                          normalizeCurrencyPresentationInput(progress.remainingAmount),
-                        )
+                  <DTabs
+                    value={allocationMode}
+                    defaultValue="FULL"
+                    onValueChange={(value) => {
+                      const next = value as PaymentAllocationMode;
+                      setAllocationMode(next);
+                      setPaymentError(null);
+                      if (next === 'FULL') {
+                        const remaining = normalizeCurrencyPresentationInput(
+                          progress.remainingAmount,
+                        );
+                        onAppliedAmount(remaining);
+                      } else {
+                        onAppliedAmount('');
                       }
-                    />
-                  </div>
-                )}
+                    }}
+                  >
+                    <DTabsList className="grid w-full grid-cols-2 rounded-xl bg-[var(--color-surface-muted)] p-1">
+                      <DTabsTrigger value="FULL" className="min-w-0 px-3">
+                        {copy('Full payment')}
+                      </DTabsTrigger>
+                      <DTabsTrigger value="SPLIT" className="min-w-0 px-3">
+                        {copy('Split payment')}
+                      </DTabsTrigger>
+                    </DTabsList>
+
+                    <DTabsContent value="FULL" className="mt-3">
+                      <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--color-success)]/20 bg-[var(--color-success)]/[.06] px-3 py-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold">{copy('Pay full remaining balance')}</p>
+                          <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
+                            {copy('No payment amount needs to be entered.')}
+                          </p>
+                        </div>
+                        <span className="shrink-0 text-base font-bold tabular-nums text-[var(--color-success)]">
+                          {format(progress.remainingAmount)}
+                        </span>
+                      </div>
+                    </DTabsContent>
+
+                    <DTabsContent value="SPLIT" className="mt-3">
+                      <label className="block text-sm font-medium">
+                        {copy('Payment amount')}
+                        <PosCurrencyInput
+                          aria-label={copy('Payment amount')}
+                          className="mt-1.5 h-11 rounded-lg bg-[var(--color-surface)] text-right text-lg font-bold"
+                          value={appliedAmount}
+                          onChange={onAppliedAmount}
+                        />
+                      </label>
+                      {overAllocated ? (
+                        <p className="mt-1 text-xs text-[var(--color-danger)]" role="alert">
+                          {copy('Payment allocation cannot exceed the remaining amount.')}{' '}
+                          {copy('Remaining')}: {format(progress.remainingAmount)}
+                        </p>
+                      ) : (
+                        <div className="mt-2">
+                          <PaymentIntentHint
+                            intent={intent}
+                            format={format}
+                            onPayRemaining={() => {
+                              const remaining = normalizeCurrencyPresentationInput(
+                                progress.remainingAmount,
+                              );
+                              onAppliedAmount(remaining);
+                              setAllocationMode('FULL');
+                            }}
+                          />
+                        </div>
+                      )}
+                    </DTabsContent>
+                  </DTabs>
+                </div>
                 <p className="mt-4 mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
                   {copy('Payment method')}
                 </p>
