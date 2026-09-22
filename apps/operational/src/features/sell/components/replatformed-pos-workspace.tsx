@@ -3623,7 +3623,6 @@ function ReferencePaymentDialog({
                     onValueChange={(value) => {
                       const next = value as PaymentAllocationMode;
                       setAllocationMode(next);
-                      setPaymentError(null);
                       if (next === 'FULL') {
                         const remaining = normalizeCurrencyPresentationInput(
                           progress.remainingAmount,
