@@ -3459,19 +3459,21 @@ function ReferencePaymentDialog({
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2">
-                    <Sparkles className="size-4 text-[var(--color-brand)]" aria-hidden="true" />
-                    <p className="text-sm font-semibold">{copy('Loyalty points')}</p>
+                    <span className="grid size-8 shrink-0 place-items-center rounded-full border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/[.08] text-[var(--color-warning)]">
+                      <Sparkles className="size-4" aria-hidden="true" />
+                    </span>
+                    <p className="text-sm font-bold">{copy('Loyalty points')}</p>
                   </div>
                   <p className="mt-1 text-xs text-[var(--color-text-muted)]">
                     {copy('Use member points for this transaction. Points are consumed only when the sale is finalized.')}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  <div className="rounded-lg bg-[var(--color-brand)]/[.08] px-2.5 py-1.5 text-right">
-                    <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-text-muted)]">
+                  <div className="rounded-xl border border-[var(--color-warning)]/25 bg-[var(--color-warning)]/[.07] px-3 py-2 text-right">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-warning)]">
                       {copy('Point balance')}
                     </p>
-                    <p className="mt-0.5 text-sm font-bold tabular-nums text-[var(--color-brand)]">
+                    <p className="mt-0.5 text-base font-bold tabular-nums text-[var(--color-warning)]">
                       {isLoyaltyBalanceLoading
                         ? '…'
                         : pointQuantity(loyaltyPointBalance, locale)}
@@ -3603,8 +3605,11 @@ function ReferencePaymentDialog({
           {/* Once money is recorded the transaction is already being paid now. */}
           {!hasRecordedMoney ? (
             <fieldset className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-3">
-              <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
-                {copy('Payment timing')}
+              <legend className="px-1">
+                <span className="inline-flex items-center gap-2 text-sm font-bold text-[var(--color-text)]">
+                  <Clock className="size-4 text-[var(--color-brand)]" aria-hidden="true" />
+                  {copy('Payment timing')}
+                </span>
               </legend>
               <div className="mt-1 grid gap-2 sm:grid-cols-2">
                 {[
@@ -3638,15 +3643,9 @@ function ReferencePaymentDialog({
                   </label>
                 ))}
               </div>
-            </fieldset>
-          ) : null}
 
-          {collectsPayment ? (
-            <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-3">
-              <div>
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
-                    {copy('Payment allocation')}
-                  </p>
+              {collectsPayment ? (
+                <div className="mt-3 border-t border-[var(--color-border)] pt-3">
                   <DTabs
                     value={allocationMode}
                     defaultValue="FULL"
@@ -3672,20 +3671,18 @@ function ReferencePaymentDialog({
                       </DTabsTrigger>
                     </DTabsList>
 
-                    <DTabsContent value="FULL" className="mt-3">
-                      <div className="flex items-center justify-between gap-3 rounded-xl bg-[var(--color-surface-muted)]/65 px-3 py-2.5">
-                        <div className="min-w-0">
-                          <p className="text-xs text-[var(--color-text-muted)]">
-                            {copy('Pay full remaining balance')}
-                          </p>
-                        </div>
+                    <DTabsContent value="FULL" className="mt-2">
+                      <div className="flex items-center justify-between gap-3 rounded-lg bg-[var(--color-brand)]/[.045] px-3 py-2.5">
+                        <span className="text-xs text-[var(--color-text)]">
+                          {copy('Pay full remaining balance')}
+                        </span>
                         <span className="shrink-0 text-base font-bold tabular-nums text-[var(--color-brand)]">
                           {format(progress.remainingAmount)}
                         </span>
                       </div>
                     </DTabsContent>
 
-                    <DTabsContent value="SPLIT" className="mt-3">
+                    <DTabsContent value="SPLIT" className="mt-2">
                       <label className="block text-sm font-medium">
                         {copy('Payment amount')}
                         <PosCurrencyInput
@@ -3718,8 +3715,10 @@ function ReferencePaymentDialog({
                     </DTabsContent>
                   </DTabs>
                 </div>
-            </section>
+              ) : null}
+            </fieldset>
           ) : null}
+
           </div>
 
           <div className="flex min-h-0 flex-col bg-[var(--color-surface)]">
