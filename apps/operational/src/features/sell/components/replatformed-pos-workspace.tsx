@@ -3582,6 +3582,47 @@ function ReferencePaymentDialog({
               ) : null}
             </section>
           ) : null}
+
+          {/* Once money is recorded the transaction is already being paid now. */}
+          {!hasRecordedMoney ? (
+            <fieldset className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-3">
+              <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+                {copy('Payment timing')}
+              </legend>
+              <div className="mt-1 grid gap-2 sm:grid-cols-2">
+                {[
+                  {
+                    value: true,
+                    title: copy('Pay now'),
+                    description: copy('Choose a payment method before continuing.'),
+                  },
+                  {
+                    value: false,
+                    title: copy('Pay later'),
+                    description: copy('Payment can be recorded after transaction creation.'),
+                  },
+                ].map((option) => (
+                  <label
+                    key={String(option.value)}
+                    className={`pos-choice ${payNow === option.value ? 'pos-choice--selected' : ''}`}
+                  >
+                    <DRadio
+                      name="pos-payment-timing"
+                      className="mt-0.5 shrink-0"
+                      checked={payNow === option.value}
+                      onChange={() => onPayNowChange(option.value)}
+                    />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold">{option.title}</span>
+                      <span className="mt-0.5 block text-xs leading-4 text-[var(--color-text-muted)]">
+                        {option.description}
+                      </span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          ) : null}
           </div>
 
           <div className="flex min-h-0 flex-col bg-[var(--color-surface)]">
@@ -3671,47 +3712,6 @@ function ReferencePaymentDialog({
           ) : null}
 
 
-
-          {/* Once money is recorded the transaction is already being paid now. */}
-          {!hasRecordedMoney ? (
-            <fieldset className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-3">
-              <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
-                {copy('Payment timing')}
-              </legend>
-              <div className="mt-1 grid gap-2 sm:grid-cols-2">
-                {[
-                  {
-                    value: true,
-                    title: copy('Pay now'),
-                    description: copy('Choose a payment method before continuing.'),
-                  },
-                  {
-                    value: false,
-                    title: copy('Pay later'),
-                    description: copy('Payment can be recorded after transaction creation.'),
-                  },
-                ].map((option) => (
-                  <label
-                    key={String(option.value)}
-                    className={`pos-choice ${payNow === option.value ? 'pos-choice--selected' : ''}`}
-                  >
-                    <DRadio
-                      name="pos-payment-timing"
-                      className="mt-0.5 shrink-0"
-                      checked={payNow === option.value}
-                      onChange={() => onPayNowChange(option.value)}
-                    />
-                    <span className="min-w-0">
-                      <span className="block text-sm font-semibold">{option.title}</span>
-                      <span className="mt-0.5 block text-xs leading-4 text-[var(--color-text-muted)]">
-                        {option.description}
-                      </span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-          ) : null}
 
           {collectsPayment ? (
             <>
