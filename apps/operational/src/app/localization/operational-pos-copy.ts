@@ -308,6 +308,7 @@ const posCopy: Record<string, LocalizedCopy> = {
   },
   'Loading loyalty points…': { 'id-ID': 'Memuat poin loyalty…', 'en-US': 'Loading loyalty points…' },
   'Use all': { 'id-ID': 'Pakai semua', 'en-US': 'Use all' },
+  'Fill all': { 'id-ID': 'Isi semua', 'en-US': 'Fill all' },
   'Insufficient loyalty points': {
     'id-ID': 'Poin tidak mencukupi',
     'en-US': 'Insufficient loyalty points',
