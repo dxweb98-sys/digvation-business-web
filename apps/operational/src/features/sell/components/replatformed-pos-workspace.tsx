@@ -3126,12 +3126,8 @@ function ReferencePaymentDialog({
   const [step, setStep] = usePaymentDialogStep(open);
   const [allocationMode, setAllocationMode] = usePaymentAllocationMode(open);
   const [loyaltyEditorOpen, setLoyaltyEditorOpen] = useState(false);
-  const [routeMenuOpen, setRouteMenuOpen] = useState(false);
   useEffect(() => {
-    if (!open) {
-      setLoyaltyEditorOpen(false);
-      setRouteMenuOpen(false);
-    }
+    if (!open) setLoyaltyEditorOpen(false);
   }, [open]);
   const format = (amount: string) => money(amount, locale);
   const routesForMethod = paymentRoutes.filter((route) => route.paymentMethod === method);
@@ -3892,10 +3888,7 @@ function ReferencePaymentDialog({
                         type="button"
                         disabled={disabled}
                         aria-pressed={selected}
-                        onClick={() => {
-                          setRouteMenuOpen(false);
-                          onMethod(option.value);
-                        }}
+                        onClick={() => onMethod(option.value)}
                         className={`flex h-10 min-w-0 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
                           selected
                             ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white shadow-sm'
@@ -3915,92 +3908,33 @@ function ReferencePaymentDialog({
                 ) : null}
                 {activeRoute ? (
                   <div className="mt-3">
-                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
-                      {copy('Settlement account')}
-                    </p>
-                    {routesForMethod.length > 1 ? (
-                      <PortalDropdown
-                        open={routeMenuOpen}
-                        onOpenChange={setRouteMenuOpen}
-                        placement="bottom-start"
-                        contentPadding={false}
-                        closeOnItemClick
-                        minWidth={320}
-                        trigger={() => (
-                          <button
-                            type="button"
-                            aria-expanded={routeMenuOpen}
-                            className="flex h-10 w-full items-center justify-between gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-left transition-colors hover:border-[var(--color-brand)]/40"
-                          >
-                            <span className="min-w-0">
-                              <span className="block truncate text-sm font-medium text-[var(--color-text)]">
-                                {activeRoute.financialAccountName}
-                              </span>
-                              {activeRoute.financialAccountCode ? (
-                                <span className="mt-0.5 block truncate text-[10px] text-[var(--color-text-muted)]">
-                                  {activeRoute.financialAccountCode}
-                                </span>
-                              ) : null}
-                            </span>
-                            <ChevronDown className="size-4 shrink-0 text-[var(--color-text-muted)]" />
-                          </button>
-                        )}
-                      >
-                        <div className="w-[min(360px,calc(100vw-24px))] p-1.5">
-                          {routesForMethod.map((route) => {
-                            const selected = route.id === activeRoute.id;
-                            return (
-                              <button
-                                key={route.id}
-                                type="button"
-                                onClick={() => onPaymentRoute(route.id)}
-                                className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-[var(--color-surface-muted)] ${
-                                  selected ? 'bg-[var(--color-brand)]/[.06]' : ''
-                                }`}
-                              >
-                                <span className="min-w-0">
-                                  <span className="block truncate text-sm font-medium">
-                                    {route.financialAccountName}
-                                  </span>
-                                  {route.financialAccountCode ? (
-                                    <span className="mt-0.5 block truncate text-[10px] text-[var(--color-text-muted)]">
-                                      {route.financialAccountCode}
-                                    </span>
-                                  ) : null}
-                                </span>
-                                {selected ? (
-                                  <CheckCircle2 className="size-4 shrink-0 text-[var(--color-brand)]" />
-                                ) : null}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </PortalDropdown>
-                    ) : (
-                      <div className="flex min-h-10 items-center rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3">
-                        <span className="min-w-0">
-                          <span className="block truncate text-sm font-medium text-[var(--color-text)]">
-                            {activeRoute.financialAccountName}
-                          </span>
-                          {activeRoute.financialAccountCode ? (
-                            <span className="mt-0.5 block truncate text-[10px] text-[var(--color-text-muted)]">
-                              {activeRoute.financialAccountCode}
-                            </span>
-                          ) : null}
-                        </span>
-                      </div>
-                    )}
+                    <Select
+                      label={copy('Settlement account')}
+                      value={activeRoute.id}
+                      options={routesForMethod.map((route) => ({
+                        value: route.id,
+                        label: route.financialAccountCode
+                          ? `${route.financialAccountName} · ${route.financialAccountCode}`
+                          : route.financialAccountName,
+                      }))}
+                      onChange={(value) => {
+                        if (typeof value === 'string') onPaymentRoute(value);
+                      }}
+                      className="w-full"
+                    />
                   </div>
                 ) : null}
                 {!isCash ? (
-                  <DInput
-                    aria-label={copy('Payment reference')}
-                    label={copy('Payment reference')}
-                    value={paymentReference}
-                    onChange={onPaymentReference}
-                    placeholder={copy('Optional reference')}
-                    className="mt-3"
-                  />
+                  <div className="mt-3">
+                    <DInput
+                      aria-label={copy('Payment reference')}
+                      label={copy('Payment reference')}
+                      value={paymentReference}
+                      onChange={onPaymentReference}
+                      placeholder={copy('Optional reference')}
+                      className="w-full"
+                    />
+                  </div>
                 ) : (
                   <div className="mt-3 border-t border-[var(--color-border)] pt-3">
                     <div className="mb-1.5 flex items-center justify-between gap-3">
