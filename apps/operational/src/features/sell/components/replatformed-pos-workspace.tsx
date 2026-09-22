@@ -3873,7 +3873,7 @@ function ReferencePaymentDialog({
                           setRouteMenuOpen(false);
                           onMethod(option.value);
                         }}
-                        className={`flex h-12 min-w-0 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
+                        className={`flex h-10 min-w-0 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
                           selected
                             ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white shadow-sm'
                             : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] hover:border-[var(--color-brand)]/40 hover:bg-[var(--color-brand)]/[.04]'
@@ -3907,7 +3907,7 @@ function ReferencePaymentDialog({
                           <button
                             type="button"
                             aria-expanded={routeMenuOpen}
-                            className="flex h-11 w-full items-center justify-between gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-left transition-colors hover:border-[var(--color-brand)]/40"
+                            className="flex h-10 w-full items-center justify-between gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-left transition-colors hover:border-[var(--color-brand)]/40"
                           >
                             <span className="min-w-0">
                               <span className="block truncate text-sm font-medium text-[var(--color-text)]">
@@ -3954,7 +3954,7 @@ function ReferencePaymentDialog({
                         </div>
                       </PortalDropdown>
                     ) : (
-                      <div className="flex min-h-11 items-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3">
+                      <div className="flex min-h-10 items-center rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3">
                         <span className="min-w-0">
                           <span className="block truncate text-sm font-medium text-[var(--color-text)]">
                             {activeRoute.financialAccountName}
@@ -3980,29 +3980,43 @@ function ReferencePaymentDialog({
                   />
                 ) : (
                   <div className="mt-3 border-t border-[var(--color-border)] pt-3">
-                    <label className="block text-sm font-medium">
-                      {copy('Cash received')}
-                      <PosCurrencyInput
-                        aria-label={copy('Cash received')}
-                        className="mt-1.5 h-11 rounded-lg bg-[var(--color-surface)] text-right text-lg font-bold"
-                        value={tender}
-                        onChange={onTender}
-                      />
-                    </label>
-                    <div className="mt-2 grid grid-cols-3 gap-2">
-                      {normalizedQuickTender.map((amount) => (
-                        <button
-                          key={amount}
-                          type="button"
-                          onClick={() => onTender(amount)}
-                          className={`h-9 rounded-lg border text-[11px] font-semibold transition-colors ${normalizeCurrencyPresentationInput(tender) === amount ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-muted)]'}`}
-                        >
-                          {format(amount)}
-                        </button>
-                      ))}
+                    <div className="mb-1.5 flex items-center justify-between gap-3">
+                      <span className="text-sm font-semibold">{copy('Cash received')}</span>
+                      <button
+                        type="button"
+                        disabled={!allocationPositive}
+                        onClick={() => onTender(normalizedAllocation)}
+                        className="text-xs font-semibold text-[var(--color-brand)] hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {copy('Exact amount')} {format(normalizedAllocation || '0')}
+                      </button>
                     </div>
+
+                    <PosCurrencyInput
+                      aria-label={copy('Cash received')}
+                      className="h-10 rounded-lg bg-[var(--color-surface)] text-right text-base font-bold"
+                      value={tender}
+                      onChange={onTender}
+                    />
+
+                    <div className="mt-2 grid grid-cols-5 gap-1.5">
+                      {normalizedQuickTender
+                        .filter((amount) => amount !== normalizedAllocation)
+                        .slice(0, 5)
+                        .map((amount) => (
+                          <button
+                            key={amount}
+                            type="button"
+                            onClick={() => onTender(amount)}
+                            className={`h-8 rounded-md border px-1 text-[10px] font-semibold transition-colors ${normalizeCurrencyPresentationInput(tender) === amount ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-muted)]'}`}
+                          >
+                            {format(amount)}
+                          </button>
+                        ))}
+                    </div>
+
                     <div
-                      className={`mt-2 flex items-center justify-between rounded-lg px-3 py-2 ${cashShort ? 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]' : 'bg-[var(--color-success)]/10 text-[var(--color-success)]'}`}
+                      className={`mt-2 flex items-center justify-between rounded-lg px-3 py-1.5 ${cashShort ? 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]' : 'bg-[var(--color-success)]/10 text-[var(--color-success)]'}`}
                     >
                       <span className="text-sm font-bold">
                         {copy(cashShort ? 'Payment short' : 'Change')}
