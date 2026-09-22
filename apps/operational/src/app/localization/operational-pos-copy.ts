@@ -91,6 +91,7 @@ const posCopy: Record<string, LocalizedCopy> = {
   },
   'Manage adjustments': { 'id-ID': 'Atur', 'en-US': 'Manage' },
   'Add adjustment': { 'id-ID': 'Tambah', 'en-US': 'Add' },
+  'Add promotion': { 'id-ID': 'Tambah Promo', 'en-US': 'Add promotion' },
   'Applied adjustments': { 'id-ID': 'Sedang diterapkan', 'en-US': 'Currently applied' },
   'Total after adjustments': {
     'id-ID': 'Total setelah penyesuaian',
