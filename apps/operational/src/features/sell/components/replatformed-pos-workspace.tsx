@@ -3340,8 +3340,12 @@ function ReferencePaymentDialog({
       ariaLabel={title}
       closeOnEscape
       closeOnOverlay
-      className="pos-reference-dialog max-h-[94dvh] w-[calc(100vw-2rem)] !max-w-[1180px] overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
-      noPadding
+      className={
+        step === 'edit'
+          ? 'pos-reference-dialog max-h-[94dvh] w-[calc(100vw-2rem)] !max-w-[1180px] overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl'
+          : 'pos-reference-dialog max-h-[90dvh] w-[calc(100vw-2rem)] !max-w-[680px] overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl'
+      }
+      noPadding={step === 'edit'}
       footer={step === 'edit' ? undefined : footer}
     >
       {step === 'review' ? (
