@@ -3346,8 +3346,8 @@ function ReferencePaymentDialog({
       ) : step === 'leave' ? (
         <PaymentLeaveNotice progress={progress} format={format} hasPending={hasPending} />
       ) : (
-        <div className="grid min-h-0 max-h-[78dvh] gap-0 overflow-hidden lg:grid-cols-[minmax(0,1.08fr)_minmax(420px,0.92fr)]">
-          <div className="min-h-0 space-y-3 overflow-y-auto bg-[var(--color-surface)] p-4 lg:border-r lg:border-[var(--color-border)]">
+        <div className="grid h-[min(640px,calc(100dvh-9rem))] min-h-0 gap-0 overflow-hidden lg:grid-cols-[minmax(0,1.08fr)_minmax(420px,0.92fr)]">
+          <div className="min-h-0 space-y-3 overflow-y-auto overscroll-contain bg-[var(--color-surface)] p-4 lg:border-r lg:border-[var(--color-border)]">
             <section className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)]">
             <div className="flex items-center justify-between gap-4 border-b border-[var(--color-border)] px-4 py-3">
               <div className="min-w-0">
@@ -3630,7 +3630,7 @@ function ReferencePaymentDialog({
           </div>
 
           <div className="flex min-h-0 flex-col bg-[var(--color-surface)]">
-            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-4">
               <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -3765,14 +3765,13 @@ function ReferencePaymentDialog({
                     </DTabsList>
 
                     <DTabsContent value="FULL" className="mt-3">
-                      <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--color-success)]/20 bg-[var(--color-success)]/[.06] px-3 py-3">
+                      <div className="flex items-center justify-between gap-3 rounded-xl bg-[var(--color-surface-muted)]/65 px-3 py-2.5">
                         <div className="min-w-0">
-                          <p className="text-sm font-semibold">{copy('Pay full remaining balance')}</p>
-                          <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
-                            {copy('No payment amount needs to be entered.')}
+                          <p className="text-xs text-[var(--color-text-muted)]">
+                            {copy('Pay full remaining balance')}
                           </p>
                         </div>
-                        <span className="shrink-0 text-base font-bold tabular-nums text-[var(--color-success)]">
+                        <span className="shrink-0 text-base font-bold tabular-nums text-[var(--color-brand)]">
                           {format(progress.remainingAmount)}
                         </span>
                       </div>
@@ -3936,50 +3935,48 @@ function ReferencePaymentDialog({
                     placeholder={copy('Optional reference')}
                     className="mt-3"
                   />
-                ) : null}
+                ) : (
+                  <div className="mt-4 border-t border-[var(--color-border)] pt-4">
+                    <label className="block text-sm font-medium">
+                      {copy('Cash received')}
+                      <PosCurrencyInput
+                        aria-label={copy('Cash received')}
+                        className="mt-1.5 h-11 rounded-lg bg-[var(--color-surface)] text-right text-lg font-bold"
+                        value={tender}
+                        onChange={onTender}
+                      />
+                    </label>
+                    <div className="mt-2 grid grid-cols-3 gap-2">
+                      {normalizedQuickTender.map((amount) => (
+                        <button
+                          key={amount}
+                          type="button"
+                          onClick={() => onTender(amount)}
+                          className={`h-9 rounded-lg border text-[11px] font-semibold transition-colors ${normalizeCurrencyPresentationInput(tender) === amount ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-muted)]'}`}
+                        >
+                          {format(amount)}
+                        </button>
+                      ))}
+                    </div>
+                    <div
+                      className={`mt-2 flex items-center justify-between rounded-lg px-3 py-2 ${cashShort ? 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]' : 'bg-[var(--color-success)]/10 text-[var(--color-success)]'}`}
+                    >
+                      <span className="text-sm font-bold">
+                        {copy(cashShort ? 'Payment short' : 'Change')}
+                      </span>
+                      <span className="text-sm font-bold tabular-nums">
+                        {format(
+                          cashShort
+                            ? createDecimal(normalizedAllocation)
+                                .minus(createDecimal(normalizedTender || '0'))
+                                .toFixed(0)
+                            : cashChange,
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
-
-              {isCash ? (
-                <div className="space-y-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
-                  <label className="block text-sm font-medium">
-                    {copy('Cash received')}
-                    <PosCurrencyInput
-                      aria-label={copy('Cash received')}
-                      className="mt-1.5 h-11 rounded-lg bg-[var(--color-surface)] text-right text-lg font-bold"
-                      value={tender}
-                      onChange={onTender}
-                    />
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {normalizedQuickTender.map((amount) => (
-                      <button
-                        key={amount}
-                        type="button"
-                        onClick={() => onTender(amount)}
-                        className={`h-10 rounded-lg border text-[11px] font-semibold transition-all active:scale-[.98] ${normalizeCurrencyPresentationInput(tender) === amount ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'border-[var(--color-border)] bg-[var(--color-background)] hover:bg-[var(--color-surface-muted)]'}`}
-                      >
-                        {format(amount)}
-                      </button>
-                    ))}
-                  </div>
-                  <div
-                    className={`flex items-center justify-between rounded-xl px-3 py-2 ${cashShort ? 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]' : 'bg-[var(--color-success)]/10 text-[var(--color-success)]'}`}
-                  >
-                    <span className="text-sm font-bold">
-                      {copy(cashShort ? 'Payment short' : 'Change')}
-                    </span>
-                    <span className="text-sm font-bold tabular-nums">
-                      {format(
-                        cashShort
-                          ? createDecimal(normalizedAllocation)
-                              .minus(createDecimal(normalizedTender || '0'))
-                              .toFixed(0)
-                          : cashChange,
-                      )}
-                    </span>
-                  </div>
-                </div>
-              ) : null}
             </>
           ) : null}
             </div>
