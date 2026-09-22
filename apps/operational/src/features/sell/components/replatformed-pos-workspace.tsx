@@ -3361,23 +3361,31 @@ function ReferencePaymentDialog({
       ) : (
         <div className="grid h-[min(720px,calc(100dvh-7.5rem))] min-h-0 gap-0 overflow-hidden lg:grid-cols-[minmax(0,1fr)_440px]">
           <div className="min-h-0 space-y-3 overflow-y-auto overscroll-contain bg-[var(--color-surface)] p-4 pr-3 lg:border-r lg:border-[var(--color-border)]">
-            <section className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)]">
-              <div className="flex items-center justify-between gap-4 border-b border-[var(--color-border)] px-4 py-3">
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[var(--color-brand)]/[.07] text-[var(--color-brand)]">
+            <section className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]">
+              <div className="flex items-center justify-between gap-4 border-b border-[var(--color-border)] bg-[var(--color-surface-muted)]/55 px-4 py-3.5">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[var(--color-brand)]/[.08] text-[var(--color-brand)]">
                     <ShoppingBag className="size-4" aria-hidden="true" />
                   </span>
-                  <p className="truncate text-sm font-bold">
-                    {copy('Order details')} ({lines.length} {copy('items')})
-                  </p>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <p className="truncate text-sm font-bold text-[var(--color-text)]">
+                      {copy('Order details')}
+                    </p>
+                    <span className="shrink-0 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-text-muted)]">
+                      {lines.length} {copy('items')}
+                    </span>
+                  </div>
                 </div>
                 <div className="shrink-0 text-right">
-                  <p className="text-xs text-[var(--color-text-muted)]">
-                    {copy('Subtotal')}: <span className="font-bold text-[var(--color-text)]">{format(gross)}</span>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+                    {copy('Subtotal')}
+                  </p>
+                  <p className="mt-0.5 text-sm font-bold tabular-nums text-[var(--color-text)]">
+                    {format(gross)}
                   </p>
                 </div>
               </div>
-              <div className="divide-y divide-[var(--color-border)]">
+              <div className="divide-y divide-[var(--color-border)] bg-[var(--color-surface)]">
               {lines.map((line) => {
                 const discountPercentage = lineDiscountPercentage(line);
                 const discounted = isPositiveDecimal(line.lineDiscountAmount);
@@ -3417,11 +3425,13 @@ function ReferencePaymentDialog({
                   </div>
                 );
                 return (
-                  <div key={line.id} className="px-4 py-2.5">
-                    <div className="flex items-start justify-between gap-3">
+                  <div key={line.id} className="px-4 py-3">
+                    <div className="flex items-center justify-between gap-4">
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold">{line.itemNameSnapshot}</p>
-                        <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
+                        <p className="truncate text-sm font-semibold text-[var(--color-text)]">
+                          {line.itemNameSnapshot}
+                        </p>
+                        <p className="mt-1 text-[11px] font-medium text-[var(--color-text-muted)]">
                           {quantity(line.quantity)} × {format(line.effectiveUnitPrice)}
                         </p>
                         {discounted ? (
@@ -3438,11 +3448,13 @@ function ReferencePaymentDialog({
                       </div>
                       <div className="shrink-0 text-right tabular-nums">
                         {discounted ? (
-                          <p className="text-[11px] font-medium text-[var(--color-danger)] line-through decoration-[1.5px]">
+                          <p className="text-[10px] font-medium text-[var(--color-danger)] line-through decoration-[1.5px]">
                             {format(line.totalAmount)}
                           </p>
                         ) : null}
-                        <p className="text-sm font-bold">{format(discountedLineAmount)}</p>
+                        <p className="text-sm font-bold text-[var(--color-text)]">
+                          {format(discountedLineAmount)}
+                        </p>
                       </div>
                     </div>
                   </div>
