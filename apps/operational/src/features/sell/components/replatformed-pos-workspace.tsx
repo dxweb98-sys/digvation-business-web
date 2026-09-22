@@ -3270,6 +3270,23 @@ function ReferencePaymentDialog({
           ? copy('Continue payment')
           : copy('Checkout');
 
+  const editFooter = (
+    <div className="flex items-center justify-end gap-2">
+      <DButton variant="ghost" onClick={requestClose}>
+        {copy(hasRecordedMoney && !fullyPaid ? 'Leave payment' : 'Cancel')}
+      </DButton>
+      {collectsPayment ? (
+        <DButton disabled={!canPay} onClick={() => setStep('review')}>
+          {copy('Pay')} {format(normalizedAllocation || '0')}
+        </DButton>
+      ) : (
+        <DButton disabled={!canQueue} loading={isSubmitting} onClick={onQueue}>
+          {copy('Add to queue')}
+        </DButton>
+      )}
+    </div>
+  );
+
   const footer =
     step === 'review' ? (
       <div className="flex flex-col-reverse justify-end gap-2 sm:flex-row">
@@ -3296,22 +3313,7 @@ function ReferencePaymentDialog({
         </DButton>
         <DButton onClick={() => setStep('edit')}>{copy('Continue payment')}</DButton>
       </div>
-    ) : (
-      <div className="flex flex-col-reverse justify-end gap-2 sm:flex-row">
-        <DButton variant="ghost" onClick={requestClose}>
-          {copy(hasRecordedMoney && !fullyPaid ? 'Leave payment' : 'Cancel')}
-        </DButton>
-        {collectsPayment ? (
-          <DButton disabled={!canPay} onClick={() => setStep('review')}>
-            {copy('Pay')} {format(normalizedAllocation || '0')}
-          </DButton>
-        ) : (
-          <DButton disabled={!canQueue} loading={isSubmitting} onClick={onQueue}>
-            {copy('Add to queue')}
-          </DButton>
-        )}
-      </div>
-    );
+    ) : undefined;
 
   return (
     <DDialog
@@ -3321,8 +3323,8 @@ function ReferencePaymentDialog({
       ariaLabel={title}
       closeOnEscape
       closeOnOverlay
-      className="pos-reference-dialog w-full max-w-lg overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
-      footer={footer}
+      className="pos-reference-dialog w-full max-w-6xl overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
+      footer={step === 'edit' ? undefined : footer}
     >
       {step === 'review' ? (
         <PaymentReview
@@ -3339,8 +3341,95 @@ function ReferencePaymentDialog({
       ) : step === 'leave' ? (
         <PaymentLeaveNotice progress={progress} format={format} hasPending={hasPending} />
       ) : (
-        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto">
-          <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
+        <div className="grid min-h-0 max-h-[78dvh] gap-0 overflow-hidden lg:grid-cols-[minmax(0,1.15fr)_minmax(380px,0.85fr)]">
+          <div className="flex min-h-0 flex-col bg-[var(--color-surface)] p-4 lg:border-r lg:border-[var(--color-border)]">
+            <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)]">
+            <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-2.5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+                {copy('Order details')}
+              </p>
+              <span className="text-xs text-[var(--color-text-muted)]">
+                {lines.length} {copy('items')}
+              </span>
+            </div>
+              <div className="min-h-0 flex-1 divide-y divide-[var(--color-border)] overflow-y-auto">
+              {lines.map((line) => {
+                const discountPercentage = lineDiscountPercentage(line);
+                const discounted = isPositiveDecimal(line.lineDiscountAmount);
+                const discountedLineAmount = discounted
+                  ? createDecimal(line.totalAmount)
+                      .minus(createDecimal(line.lineDiscountAmount))
+                      .toFixed(4)
+                  : line.totalAmount;
+                const promotionTooltip = (
+                  <div className="space-y-1">
+                    {line.promotion?.name ? (
+                      <p className="font-semibold">{line.promotion.name}</p>
+                    ) : null}
+                    {discountPercentage ? (
+                      <p>
+                        {copy('Discount')}: {discountPercentage}%
+                      </p>
+                    ) : null}
+                    {line.promotion?.effectiveFrom ? (
+                      <p>
+                        {copy('Start')}:{' '}
+                        {new Intl.DateTimeFormat(locale, {
+                          dateStyle: 'medium',
+                          timeStyle: 'short',
+                        }).format(new Date(line.promotion.effectiveFrom))}
+                      </p>
+                    ) : null}
+                    {line.promotion?.effectiveUntil ? (
+                      <p>
+                        {copy('End')}:{' '}
+                        {new Intl.DateTimeFormat(locale, {
+                          dateStyle: 'medium',
+                          timeStyle: 'short',
+                        }).format(new Date(line.promotion.effectiveUntil))}
+                      </p>
+                    ) : null}
+                  </div>
+                );
+                return (
+                  <div key={line.id} className="px-4 py-2.5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold">{line.itemNameSnapshot}</p>
+                        <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
+                          {quantity(line.quantity)} × {format(line.effectiveUnitPrice)}
+                        </p>
+                        {discounted ? (
+                          <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-[var(--color-danger)]">
+                            <DiscountInfoTooltip
+                              label={copy('Discount information')}
+                              content={promotionTooltip}
+                            />
+                            <span>
+                              {copy('Discount')} −{format(line.lineDiscountAmount)}
+                            </span>
+                          </div>
+                        ) : null}
+                      </div>
+                      <div className="shrink-0 text-right tabular-nums">
+                        {discounted ? (
+                          <p className="text-[11px] font-medium text-[var(--color-danger)] line-through decoration-[1.5px]">
+                            {format(line.totalAmount)}
+                          </p>
+                        ) : null}
+                        <p className="text-sm font-bold">{format(discountedLineAmount)}</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            </section>
+          </div>
+
+          <div className="flex min-h-0 flex-col bg-[var(--color-surface)]">
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+              <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs text-[var(--color-text-muted)]">{copy('Payment total')}</p>
@@ -3572,88 +3661,7 @@ function ReferencePaymentDialog({
             />
           ) : null}
 
-          <div className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)]">
-            <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-2.5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
-                {copy('Order details')}
-              </p>
-              <span className="text-xs text-[var(--color-text-muted)]">
-                {lines.length} {copy('items')}
-              </span>
-            </div>
-            <div className="max-h-[120px] divide-y divide-[var(--color-border)] overflow-y-auto">
-              {lines.map((line) => {
-                const discountPercentage = lineDiscountPercentage(line);
-                const discounted = isPositiveDecimal(line.lineDiscountAmount);
-                const discountedLineAmount = discounted
-                  ? createDecimal(line.totalAmount)
-                      .minus(createDecimal(line.lineDiscountAmount))
-                      .toFixed(4)
-                  : line.totalAmount;
-                const promotionTooltip = (
-                  <div className="space-y-1">
-                    {line.promotion?.name ? (
-                      <p className="font-semibold">{line.promotion.name}</p>
-                    ) : null}
-                    {discountPercentage ? (
-                      <p>
-                        {copy('Discount')}: {discountPercentage}%
-                      </p>
-                    ) : null}
-                    {line.promotion?.effectiveFrom ? (
-                      <p>
-                        {copy('Start')}:{' '}
-                        {new Intl.DateTimeFormat(locale, {
-                          dateStyle: 'medium',
-                          timeStyle: 'short',
-                        }).format(new Date(line.promotion.effectiveFrom))}
-                      </p>
-                    ) : null}
-                    {line.promotion?.effectiveUntil ? (
-                      <p>
-                        {copy('End')}:{' '}
-                        {new Intl.DateTimeFormat(locale, {
-                          dateStyle: 'medium',
-                          timeStyle: 'short',
-                        }).format(new Date(line.promotion.effectiveUntil))}
-                      </p>
-                    ) : null}
-                  </div>
-                );
-                return (
-                  <div key={line.id} className="px-4 py-2.5">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold">{line.itemNameSnapshot}</p>
-                        <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
-                          {quantity(line.quantity)} × {format(line.effectiveUnitPrice)}
-                        </p>
-                        {discounted ? (
-                          <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-[var(--color-danger)]">
-                            <DiscountInfoTooltip
-                              label={copy('Discount information')}
-                              content={promotionTooltip}
-                            />
-                            <span>
-                              {copy('Discount')} −{format(line.lineDiscountAmount)}
-                            </span>
-                          </div>
-                        ) : null}
-                      </div>
-                      <div className="shrink-0 text-right tabular-nums">
-                        {discounted ? (
-                          <p className="text-[11px] font-medium text-[var(--color-danger)] line-through decoration-[1.5px]">
-                            {format(line.totalAmount)}
-                          </p>
-                        ) : null}
-                        <p className="text-sm font-bold">{format(discountedLineAmount)}</p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+
 
           {/* Once money is recorded the transaction is already being paid now. */}
           {!hasRecordedMoney ? (
@@ -3901,6 +3909,12 @@ function ReferencePaymentDialog({
               ) : null}
             </>
           ) : null}
+            </div>
+
+            <div className="shrink-0 border-t border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3">
+              {editFooter}
+            </div>
+          </div>
         </div>
       )}
     </DDialog>
