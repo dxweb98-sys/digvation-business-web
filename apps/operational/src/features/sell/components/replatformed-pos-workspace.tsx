@@ -3340,7 +3340,7 @@ function ReferencePaymentDialog({
       ariaLabel={title}
       closeOnEscape
       closeOnOverlay
-      className="pos-reference-dialog max-h-[92dvh] w-[calc(100vw-2rem)] !max-w-[1120px] overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
+      className="pos-reference-dialog max-h-[94dvh] w-[calc(100vw-2rem)] !max-w-[1180px] overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
       noPadding
       footer={step === 'edit' ? undefined : footer}
     >
@@ -3359,8 +3359,8 @@ function ReferencePaymentDialog({
       ) : step === 'leave' ? (
         <PaymentLeaveNotice progress={progress} format={format} hasPending={hasPending} />
       ) : (
-        <div className="grid h-[min(640px,calc(100dvh-9rem))] min-h-0 gap-0 overflow-hidden lg:grid-cols-[minmax(0,1.08fr)_minmax(420px,0.92fr)]">
-          <div className="min-h-0 space-y-3 overflow-y-auto overscroll-contain bg-[var(--color-surface)] p-4 lg:border-r lg:border-[var(--color-border)]">
+        <div className="grid h-[min(720px,calc(100dvh-7.5rem))] min-h-0 gap-0 overflow-hidden lg:grid-cols-[minmax(0,1fr)_440px]">
+          <div className="min-h-0 space-y-3 overflow-y-auto overscroll-contain bg-[var(--color-surface)] p-4 pr-3 lg:border-r lg:border-[var(--color-border)]">
             <section className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)]">
             <div className="flex items-center justify-between gap-4 border-b border-[var(--color-border)] px-4 py-3">
               <div className="min-w-0">
@@ -3721,10 +3721,10 @@ function ReferencePaymentDialog({
 
           </div>
 
-          <div className="flex min-h-0 flex-col bg-[var(--color-surface)]">
-            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-4">
+          <div className="sticky top-0 flex h-full min-h-0 flex-col overflow-hidden bg-[var(--color-surface)]">
+            <div className="min-h-0 flex-1 space-y-3 overflow-hidden p-4">
               {customer ? (
-                <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
+                <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-3.5">
                   <div className="flex items-center gap-3">
                     <div className="grid size-11 shrink-0 place-items-center rounded-full bg-[var(--color-brand)] text-sm font-bold text-white">
                       {customerInitials(customer)}
@@ -3762,7 +3762,7 @@ function ReferencePaymentDialog({
                 </div>
               ) : null}
 
-              <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
+              <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-3.5">
                 <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
                   {copy('Payment total')}
                 </p>
@@ -3835,8 +3835,8 @@ function ReferencePaymentDialog({
 
           {collectsPayment ? (
             <>
-              <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
-                <div className="mb-3 flex items-center justify-between gap-3">
+              <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-3.5">
+                <div className="mb-2.5 flex items-center justify-between gap-3">
                   <p className="text-sm font-bold uppercase tracking-wide text-[var(--color-text)]">
                     {copy('Payment method')}
                   </p>
@@ -3983,7 +3983,7 @@ function ReferencePaymentDialog({
                     className="mt-3"
                   />
                 ) : (
-                  <div className="mt-4 border-t border-[var(--color-border)] pt-4">
+                  <div className="mt-3 border-t border-[var(--color-border)] pt-3">
                     <label className="block text-sm font-medium">
                       {copy('Cash received')}
                       <PosCurrencyInput
@@ -5207,7 +5207,7 @@ function ReferenceBalancePaymentDialog({
             onTransition={onTransitionPayment}
           />
 
-          <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
+          <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-3.5">
             {sale.payments.length ? (
               <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
                 {copy('Next payment')}
@@ -5320,7 +5320,7 @@ function ReferenceBalancePaymentDialog({
           </div>
 
           {isCash ? (
-            <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
+            <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-3.5">
               <label className="block text-sm font-medium">
                 {copy('Cash received')}
                 <PosCurrencyInput
