@@ -3108,6 +3108,10 @@ function ReferencePaymentDialog({
   const { showToast } = useToast();
   const [step, setStep] = usePaymentDialogStep(open);
   const [allocationMode, setAllocationMode] = usePaymentAllocationMode(open);
+  const [loyaltyEditorOpen, setLoyaltyEditorOpen] = useState(false);
+  useEffect(() => {
+    if (!open) setLoyaltyEditorOpen(false);
+  }, [open]);
   const format = (amount: string) => money(amount, locale);
   const routesForMethod = paymentRoutes.filter((route) => route.paymentMethod === method);
   const activeRoute =
@@ -3152,6 +3156,7 @@ function ReferencePaymentDialog({
         return;
       }
       await onApplyLoyalty(canonicalLoyaltyPoints!);
+      setLoyaltyEditorOpen(false);
     } catch (error) {
       showToast({
         title: copy('Could not apply loyalty points'),
@@ -3159,6 +3164,18 @@ function ReferencePaymentDialog({
         variant: 'danger',
       });
     }
+  };
+  const editLoyalty = () => {
+    onLoyaltyPointsChange(wholePointValue(redeemedPoints) ?? '');
+    setLoyaltyEditorOpen(true);
+  };
+  const startLoyalty = () => {
+    onLoyaltyPointsChange('');
+    setLoyaltyEditorOpen(true);
+  };
+  const removeLoyalty = () => {
+    setLoyaltyEditorOpen(false);
+    onRemoveLoyalty();
   };
   const customerBadge = customerStatus(customer);
   const payments = sale?.payments ?? [];
@@ -3410,15 +3427,15 @@ function ReferencePaymentDialog({
                         : pointQuantity(loyaltyPointBalance, locale)}
                     </p>
                   </div>
-                  {pointBalancePositive ? (
+                  {!hasLoyaltyRedemption && canRedeemLoyalty && !loyaltyEditorOpen ? (
                     <DButton
                       type="button"
                       size="sm"
                       variant="secondary"
-                      disabled={isLoyaltyMutating}
-                      onClick={() => onLoyaltyPointsChange(wholePointBalance!)}
+                      disabled={!pointBalancePositive || isLoyaltyMutating}
+                      onClick={startLoyalty}
                     >
-                      {copy('Fill all')}
+                      {copy('Use loyalty points')}
                     </DButton>
                   ) : null}
                 </div>
@@ -3440,43 +3457,72 @@ function ReferencePaymentDialog({
                     −{format(redeemedAmount!)}
                   </span>
                   {canRedeemLoyalty ? (
-                    <DButton
-                      size="sm"
-                      variant="ghost"
-                      disabled={isLoyaltyMutating}
-                      loading={isLoyaltyMutating}
-                      onClick={onRemoveLoyalty}
-                    >
-                      {copy('Remove')}
-                    </DButton>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <DButton
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        aria-label={copy('Edit')}
+                        disabled={isLoyaltyMutating}
+                        onClick={editLoyalty}
+                      >
+                        <Pencil className="size-4" aria-hidden="true" />
+                      </DButton>
+                      <DButton
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        aria-label={copy('Remove')}
+                        disabled={isLoyaltyMutating}
+                        loading={isLoyaltyMutating}
+                        onClick={removeLoyalty}
+                      >
+                        <Trash2
+                          className="size-4 text-[var(--color-danger)]"
+                          aria-hidden="true"
+                        />
+                      </DButton>
+                    </div>
                   ) : null}
                 </div>
               ) : null}
 
-              {canRedeemLoyalty ? (
-                <div
-                  className={`mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2 ${
-                    hasLoyaltyRedemption ? 'border-t border-[var(--color-border)] pt-3' : ''
-                  }`}
-                >
-                  <DInput
-                    label={copy(hasLoyaltyRedemption ? 'Change points' : 'Use loyalty points')}
-                    value={loyaltyPoints}
-                    onChange={(value) => onLoyaltyPointsChange(value.replace(/\D/g, ''))}
-                    inputMode="numeric"
-                    disabled={isLoyaltyMutating}
-                    placeholder="0"
-                  />
-                  <DButton
-                    type="button"
-                    size="sm"
-                    variant={hasLoyaltyRedemption ? 'secondary' : 'primary'}
-                    disabled={!canSubmitLoyalty}
-                    loading={isLoyaltyMutating}
-                    onClick={() => void applyLoyalty()}
-                  >
-                    {copy(hasLoyaltyRedemption ? 'Update' : 'Apply')}
-                  </DButton>
+              {canRedeemLoyalty && loyaltyEditorOpen ? (
+                <div className="mt-3 border-t border-[var(--color-border)] pt-3">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <p className="text-xs font-semibold">
+                      {copy(hasLoyaltyRedemption ? 'Change points' : 'Use loyalty points')}
+                    </p>
+                    {pointBalancePositive ? (
+                      <DButton
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        disabled={isLoyaltyMutating}
+                        onClick={() => onLoyaltyPointsChange(wholePointBalance!)}
+                      >
+                        {copy('Fill all')}
+                      </DButton>
+                    ) : null}
+                  </div>
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
+                    <DInput
+                      value={loyaltyPoints}
+                      onChange={(value) => onLoyaltyPointsChange(value.replace(/\D/g, ''))}
+                      inputMode="numeric"
+                      disabled={isLoyaltyMutating}
+                      placeholder="0"
+                    />
+                    <DButton
+                      type="button"
+                      size="sm"
+                      disabled={!canSubmitLoyalty}
+                      loading={isLoyaltyMutating}
+                      onClick={() => void applyLoyalty()}
+                    >
+                      {copy('Apply')}
+                    </DButton>
+                  </div>
                 </div>
               ) : null}
             </section>
