@@ -3736,7 +3736,7 @@ function ReferencePaymentDialog({
           </div>
 
           <div className="sticky top-0 flex h-full w-full min-h-0 self-stretch flex-col overflow-hidden bg-[var(--color-surface)] lg:w-[440px] lg:min-w-[440px]">
-            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-4">
+            <div className="shrink-0 space-y-3 p-4 pb-3">
               {customer ? (
                 <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-3.5">
                   <div className="flex items-center gap-3">
@@ -3834,6 +3834,9 @@ function ReferencePaymentDialog({
                 ) : null}
               </div>
 
+            </div>
+
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 pb-4">
           {hasPaymentActivity && sale ? (
             <RecordedPaymentList
               payments={payments}
