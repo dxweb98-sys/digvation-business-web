@@ -3283,16 +3283,16 @@ function ReferencePaymentDialog({
         : copy('POS payment');
 
   const editFooter = (
-    <div className="flex items-center justify-end gap-2">
-      <DButton variant="ghost" onClick={requestClose}>
+    <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2">
+      <DButton variant="outline" onClick={requestClose}>
         {copy(hasRecordedMoney && !fullyPaid ? 'Leave payment' : 'Cancel')}
       </DButton>
       {collectsPayment ? (
-        <DButton disabled={!canPay} onClick={() => setStep('review')}>
-          {copy('Pay')} {format(normalizedAllocation || '0')}
+        <DButton disabled={!canPay} onClick={() => setStep('review')} className="justify-center">
+          {copy('Pay')} {format(normalizedAllocation || '0')} <ChevronRight className="size-4" />
         </DButton>
       ) : (
-        <DButton disabled={!canQueue} loading={isSubmitting} onClick={onQueue}>
+        <DButton disabled={!canQueue} loading={isSubmitting} onClick={onQueue} className="justify-center">
           {copy('Add to queue')}
         </DButton>
       )}
@@ -3362,22 +3362,21 @@ function ReferencePaymentDialog({
         <div className="grid h-[min(720px,calc(100dvh-7.5rem))] min-h-0 gap-0 overflow-hidden lg:grid-cols-[minmax(0,1fr)_440px]">
           <div className="min-h-0 space-y-3 overflow-y-auto overscroll-contain bg-[var(--color-surface)] p-4 pr-3 lg:border-r lg:border-[var(--color-border)]">
             <section className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)]">
-            <div className="flex items-center justify-between gap-4 border-b border-[var(--color-border)] px-4 py-3">
-              <div className="min-w-0">
-                <p className="text-sm font-semibold">
-                  {copy('Order details')} ({lines.length} {copy('items')})
-                </p>
-                <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
-                  {copy('Review the items before payment.')}
-                </p>
+              <div className="flex items-center justify-between gap-4 border-b border-[var(--color-border)] px-4 py-3">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[var(--color-brand)]/[.07] text-[var(--color-brand)]">
+                    <ShoppingBag className="size-4" aria-hidden="true" />
+                  </span>
+                  <p className="truncate text-sm font-bold">
+                    {copy('Order details')} ({lines.length} {copy('items')})
+                  </p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="text-xs text-[var(--color-text-muted)]">
+                    {copy('Subtotal')}: <span className="font-bold text-[var(--color-text)]">{format(gross)}</span>
+                  </p>
+                </div>
               </div>
-              <div className="shrink-0 text-right">
-                <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-text-muted)]">
-                  {copy('Subtotal')}
-                </p>
-                <p className="mt-0.5 text-sm font-bold tabular-nums">{format(gross)}</p>
-              </div>
-            </div>
               <div className="divide-y divide-[var(--color-border)]">
               {lines.map((line) => {
                 const discountPercentage = lineDiscountPercentage(line);
@@ -3456,54 +3455,90 @@ function ReferencePaymentDialog({
 
           {customer?.type === 'MEMBER' && (canRedeemLoyalty || hasLoyaltyRedemption) ? (
             <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="flex items-center gap-2">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2.5">
                     <span className="grid size-8 shrink-0 place-items-center rounded-full border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/[.08] text-[var(--color-warning)]">
                       <Sparkles className="size-4" aria-hidden="true" />
                     </span>
                     <p className="text-sm font-bold">{copy('Loyalty points')}</p>
                   </div>
-                  <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                  <p className="mt-1 pl-10 text-xs leading-5 text-[var(--color-text-muted)]">
                     {copy('Use member points for this transaction. Points are consumed only when the sale is finalized.')}
                   </p>
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <div className="rounded-xl border border-[var(--color-warning)]/25 bg-[var(--color-warning)]/[.07] px-3 py-2 text-right">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-warning)]">
-                      {copy('Point balance')}
+                <div className="shrink-0 rounded-xl border border-[var(--color-warning)]/25 bg-[var(--color-warning)]/[.07] px-3 py-2 text-right">
+                  <p className="text-[10px] font-semibold text-[var(--color-warning)]">
+                    {copy('Point balance')}
+                  </p>
+                  <p className="mt-0.5 text-base font-bold tabular-nums text-[var(--color-warning)]">
+                    {isLoyaltyBalanceLoading
+                      ? '…'
+                      : `${pointQuantity(loyaltyPointBalance, locale)} PTS`}
+                  </p>
+                </div>
+              </div>
+
+              {!hasLoyaltyRedemption && canRedeemLoyalty && !loyaltyEditorOpen ? (
+                <div className="mt-3 rounded-xl bg-[var(--color-surface-muted)]/55 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs text-[var(--color-text-muted)]">
+                      {copy('Available balance')}: {pointQuantity(loyaltyPointBalance, locale)} {copy('points')}
                     </p>
-                    <p className="mt-0.5 text-base font-bold tabular-nums text-[var(--color-warning)]">
-                      {isLoyaltyBalanceLoading
-                        ? '…'
-                        : pointQuantity(loyaltyPointBalance, locale)}
-                    </p>
-                  </div>
-                  {!hasLoyaltyRedemption && canRedeemLoyalty && !loyaltyEditorOpen ? (
                     <DButton
                       type="button"
                       size="sm"
-                      variant="secondary"
+                      variant="outline"
                       disabled={!pointBalancePositive || isLoyaltyMutating}
                       onClick={startLoyalty}
                     >
                       {copy('Use loyalty points')}
                     </DButton>
-                  ) : null}
+                  </div>
                 </div>
-              </div>
+              ) : null}
 
               {loyaltyEditorOpen && canRedeemLoyalty ? (
-                <div className="mt-4 border-t border-[var(--color-border)] pt-3">
-                  <div className="mb-3 flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold">
-                        {copy(hasLoyaltyRedemption ? 'Change points' : 'Use loyalty points')}
-                      </p>
-                      <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
-                        {copy('Enter the number of points to use for this transaction.')}
-                      </p>
-                    </div>
+                <div className="mt-3 rounded-xl bg-[var(--color-surface-muted)]/55 p-3">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <p className="text-xs font-semibold">{copy('Points to use')}</p>
+                    <p className="text-xs text-[var(--color-text-muted)]">
+                      {copy('Available balance')}: {pointQuantity(loyaltyPointBalance, locale)} {copy('points')}
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2">
+                    <DInput
+                      value={loyaltyPoints}
+                      onChange={(value) => onLoyaltyPointsChange(value.replace(/\D/g, ''))}
+                      inputMode="numeric"
+                      disabled={isLoyaltyMutating}
+                      placeholder="0"
+                      autoFocus
+                    />
+                    <DButton
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      disabled={!pointBalancePositive || isLoyaltyMutating}
+                      onClick={() => onLoyaltyPointsChange(wholePointBalance!)}
+                    >
+                      {copy('Fill all')}
+                    </DButton>
+                    <DButton
+                      type="button"
+                      size="sm"
+                      disabled={!canSubmitLoyalty}
+                      loading={isLoyaltyMutating}
+                      onClick={() => void applyLoyalty()}
+                    >
+                      {copy('Apply')}
+                    </DButton>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <p className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[var(--color-success)]">
+                      <CheckCircle2 className="size-3.5" aria-hidden="true" />
+                      {copy('Points are only consumed after the transaction is finalized.')}
+                    </p>
                     <DButton
                       type="button"
                       size="sm"
@@ -3514,45 +3549,6 @@ function ReferencePaymentDialog({
                       {copy('Cancel')}
                     </DButton>
                   </div>
-
-                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
-                    <DInput
-                      label={copy('Points to use')}
-                      value={loyaltyPoints}
-                      onChange={(value) => onLoyaltyPointsChange(value.replace(/\D/g, ''))}
-                      inputMode="numeric"
-                      disabled={isLoyaltyMutating}
-                      placeholder="0"
-                      autoFocus
-                    />
-                    <DButton
-                      type="button"
-                      disabled={!canSubmitLoyalty}
-                      loading={isLoyaltyMutating}
-                      onClick={() => void applyLoyalty()}
-                      className="h-10 px-4"
-                    >
-                      {copy('Apply')}
-                    </DButton>
-                  </div>
-
-                  {pointBalancePositive ? (
-                    <div className="mt-2 flex items-center justify-between gap-3">
-                      <p className="text-[11px] text-[var(--color-text-muted)]">
-                        {copy('Available balance')}: {pointQuantity(loyaltyPointBalance, locale)}{' '}
-                        {copy('points')}
-                      </p>
-                      <DButton
-                        type="button"
-                        size="sm"
-                        variant="secondary"
-                        disabled={isLoyaltyMutating}
-                        onClick={() => onLoyaltyPointsChange(wholePointBalance!)}
-                      >
-                        {copy('Fill all')}
-                      </DButton>
-                    </div>
-                  ) : null}
                 </div>
               ) : hasLoyaltyRedemption ? (
                 <div className="mt-3 flex items-center gap-3 rounded-[var(--radius-control)] border border-[var(--color-success)]/20 bg-[var(--color-success)]/[.06] px-3 py-2.5">
@@ -3722,7 +3718,7 @@ function ReferencePaymentDialog({
           </div>
 
           <div className="sticky top-0 flex h-full min-h-0 flex-col overflow-hidden bg-[var(--color-surface)]">
-            <div className="min-h-0 flex-1 space-y-3 overflow-hidden p-4">
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-4">
               {customer ? (
                 <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-3.5">
                   <div className="flex items-center gap-3">
