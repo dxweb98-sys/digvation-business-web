@@ -1739,7 +1739,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         loyaltyPoints={loyaltyPoints}
         isLoyaltyMutating={workspace.isLoyaltyRedemptionPending}
         onLoyaltyPointsChange={setLoyaltyPoints}
-        onApplyLoyalty={() => workspace.applyLoyaltyRedemption(loyaltyPoints)}
+        onApplyLoyalty={(points) => workspace.applyLoyaltyRedemption(points)}
         onRemoveLoyalty={() => {
           workspace.removeLoyaltyRedemption();
           setLoyaltyPoints('');
@@ -3099,7 +3099,7 @@ function ReferencePaymentDialog({
   loyaltyPoints: string;
   isLoyaltyMutating: boolean;
   onLoyaltyPointsChange: (value: string) => void;
-  onApplyLoyalty: () => Promise<unknown>;
+  onApplyLoyalty: (points: string) => Promise<unknown>;
   onRemoveLoyalty: () => void;
   /** Applied promotions and discounts for the authoritative Sale being paid. */
   adjustmentSlot?: ReactNode;
@@ -3115,7 +3115,10 @@ function ReferencePaymentDialog({
   const isCash = method === 'CASH';
   const hasDiscount = !createDecimal(discountAmount).equals(createDecimal('0'));
   const hasTax = !createDecimal(taxAmount).equals(createDecimal('0'));
-  const validLoyaltyPointInput = /^[1-9]\d*$/.test(loyaltyPoints.trim());
+  const canonicalLoyaltyPoints = wholePointValue(loyaltyPoints);
+  const validLoyaltyPointInput =
+    canonicalLoyaltyPoints !== null &&
+    createDecimal(canonicalLoyaltyPoints).greaterThan(createDecimal('0'));
   const canSubmitLoyalty =
     canRedeemLoyalty && validLoyaltyPointInput && !isLoyaltyMutating;
   const legacyLoyaltyRedemption = loyaltyRedemption as
@@ -3139,7 +3142,7 @@ function ReferencePaymentDialog({
     try {
       if (
         hasKnownPointBalance &&
-        createDecimal(loyaltyPoints.trim()).greaterThan(createDecimal(wholePointBalance!))
+        createDecimal(canonicalLoyaltyPoints!).greaterThan(createDecimal(wholePointBalance!))
       ) {
         showToast({
           title: copy('Insufficient loyalty points'),
@@ -3148,7 +3151,7 @@ function ReferencePaymentDialog({
         });
         return;
       }
-      await onApplyLoyalty();
+      await onApplyLoyalty(canonicalLoyaltyPoints!);
     } catch (error) {
       showToast({
         title: copy('Could not apply loyalty points'),
@@ -3409,12 +3412,13 @@ function ReferencePaymentDialog({
                   </div>
                   {pointBalancePositive ? (
                     <DButton
+                      type="button"
                       size="sm"
                       variant="secondary"
                       disabled={isLoyaltyMutating}
                       onClick={() => onLoyaltyPointsChange(wholePointBalance!)}
                     >
-                      {copy('Use all')}
+                      {copy('Fill all')}
                     </DButton>
                   ) : null}
                 </div>
@@ -3464,6 +3468,7 @@ function ReferencePaymentDialog({
                     placeholder="0"
                   />
                   <DButton
+                    type="button"
                     size="sm"
                     variant={hasLoyaltyRedemption ? 'secondary' : 'primary'}
                     disabled={!canSubmitLoyalty}
