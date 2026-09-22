@@ -3,7 +3,7 @@ import { createDecimal, formatMoney } from '@digvation/pos-money';
 import { useRuntime } from '@digvation/pos-runtime';
 import { DAlert, DButton, DDialog, DInput, DSelect, useToast } from '@digvation-labs/ui';
 import { useQueryClient } from '@tanstack/react-query';
-import { BadgePercent, CheckCircle2, Tag, X } from 'lucide-react';
+import { BadgePercent, CheckCircle2, Plus, Tag, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { useOperationalLocalization } from '../../../app/localization/operational-localization';
@@ -358,7 +358,7 @@ export function SaleAdjustmentControls({
       variant={placement === 'payment' ? 'outline' : 'primary'}
       disabled={preparing}
       loading={preparing}
-      leftIcon={<BadgePercent className="size-4" />}
+      leftIcon={placement === 'payment' ? <Plus className="size-4" /> : <BadgePercent className="size-4" />}
       onClick={() => void prepareAndOpen()}
     >
       {placement === 'payment'
@@ -372,16 +372,24 @@ export function SaleAdjustmentControls({
       {placement === 'payment' ? (
         <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-semibold">{copy('Promotions & discounts')}</p>
+            <div className="flex items-center gap-2">
+              <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-[var(--color-brand)]/[.08] text-[var(--color-brand)]">
+                <Tag className="size-4" aria-hidden="true" />
+              </span>
+              <p className="text-sm font-bold">{copy('Promotions & discounts')}</p>
+            </div>
             {trigger}
           </div>
           <div className="mt-3">
             {appliedAdjustments.length ? (
               appliedList
             ) : (
-              <p className="text-xs text-[var(--color-text-muted)]">
-                {copy('No promotion or discount applied yet.')}
-              </p>
+              <div className="flex items-center gap-2 rounded-xl bg-[var(--color-brand)]/[.035] px-3 py-2.5 text-xs text-[var(--color-text-muted)]">
+                <span className="grid size-5 shrink-0 place-items-center rounded-full border border-[var(--color-brand)]/25 text-[var(--color-brand)]">
+                  i
+                </span>
+                <span>{copy('No promotion or discount applied yet.')}</span>
+              </div>
             )}
           </div>
         </section>
