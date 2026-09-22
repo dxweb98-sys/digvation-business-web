@@ -3466,7 +3466,8 @@ function ReferencePaymentDialog({
           {adjustmentSlot}
 
           {customer?.type === 'MEMBER' && (canRedeemLoyalty || hasLoyaltyRedemption) ? (
-            <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
+            <section className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]">
+              <div className="border-b border-[var(--color-border)] bg-[var(--color-surface-muted)]/45 px-4 py-3">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2.5">
@@ -3490,6 +3491,8 @@ function ReferencePaymentDialog({
                   </p>
                 </div>
               </div>
+              </div>
+              <div className="p-3">
 
               {!hasLoyaltyRedemption && canRedeemLoyalty && !loyaltyEditorOpen ? (
                 <div className="mt-3 rounded-xl bg-[var(--color-surface-muted)]/55 p-3">
@@ -3607,19 +3610,21 @@ function ReferencePaymentDialog({
                   ) : null}
                 </div>
               ) : null}
+              </div>
             </section>
           ) : null}
 
           {/* Once money is recorded the transaction is already being paid now. */}
           {!hasRecordedMoney ? (
-            <fieldset className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-3">
-              <legend className="px-1">
-                <span className="inline-flex items-center gap-2 text-sm font-bold text-[var(--color-text)]">
-                  <Clock className="size-4 text-[var(--color-brand)]" aria-hidden="true" />
-                  {copy('Payment timing')}
+            <section className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]">
+              <div className="flex items-center gap-2.5 border-b border-[var(--color-border)] bg-[var(--color-surface-muted)]/45 px-4 py-3">
+                <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[var(--color-brand)]/[.08] text-[var(--color-brand)]">
+                  <Clock className="size-4" aria-hidden="true" />
                 </span>
-              </legend>
-              <div className="mt-1 grid gap-2 sm:grid-cols-2">
+                <p className="text-sm font-bold">{copy('Payment timing')}</p>
+              </div>
+              <div className="p-3">
+                <div className="grid gap-2 sm:grid-cols-2">
                 {[
                   {
                     value: true,
@@ -3724,12 +3729,13 @@ function ReferencePaymentDialog({
                   </DTabs>
                 </div>
               ) : null}
-            </fieldset>
+              </div>
+            </section>
           ) : null}
 
           </div>
 
-          <div className="sticky top-0 flex h-full min-h-0 flex-col overflow-hidden bg-[var(--color-surface)]">
+          <div className="sticky top-0 flex h-full w-full min-h-0 self-stretch flex-col overflow-hidden bg-[var(--color-surface)] lg:w-[440px] lg:min-w-[440px]">
             <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-4">
               {customer ? (
                 <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-3.5">
