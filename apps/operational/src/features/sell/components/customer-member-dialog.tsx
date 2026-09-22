@@ -259,18 +259,24 @@ export function CustomerMemberDialog({
               canEnrollMember ? 'grid-cols-3' : 'grid-cols-2'
             } rounded-xl bg-[var(--color-surface-muted)] p-1`}
           >
-            <DTabsTrigger value="CUSTOMER" className="min-w-0 !flex-row items-center justify-center gap-2 px-2">
-              <User className="size-3.5 shrink-0" />
-              <span className="truncate">{text('Regular customer')}</span>
+            <DTabsTrigger value="CUSTOMER" className="min-w-0 px-2">
+              <span className="flex min-w-0 items-center justify-center gap-2">
+                <User className="size-3.5 shrink-0" aria-hidden="true" />
+                <span className="truncate">{text('Regular customer')}</span>
+              </span>
             </DTabsTrigger>
-            <DTabsTrigger value="MEMBER" className="min-w-0 !flex-row items-center justify-center gap-2 px-2">
-              <Users className="size-3.5 shrink-0" />
-              <span className="truncate">{text('Registered member')}</span>
+            <DTabsTrigger value="MEMBER" className="min-w-0 px-2">
+              <span className="flex min-w-0 items-center justify-center gap-2">
+                <Users className="size-3.5 shrink-0" aria-hidden="true" />
+                <span className="truncate">{text('Registered member')}</span>
+              </span>
             </DTabsTrigger>
             {canEnrollMember ? (
-              <DTabsTrigger value="ENROLL" className="min-w-0 !flex-row items-center justify-center gap-2 px-2">
-                <UserPlus className="size-3.5 shrink-0" />
-                <span className="truncate">{text('Enroll member')}</span>
+              <DTabsTrigger value="ENROLL" className="min-w-0 px-2">
+                <span className="flex min-w-0 items-center justify-center gap-2">
+                  <UserPlus className="size-3.5 shrink-0" aria-hidden="true" />
+                  <span className="truncate">{text('Enroll member')}</span>
+                </span>
               </DTabsTrigger>
             ) : null}
           </DTabsList>
