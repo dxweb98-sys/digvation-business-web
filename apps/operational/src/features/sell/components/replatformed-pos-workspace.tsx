@@ -3108,18 +3108,18 @@ function ReferencePaymentDialog({
     hasKnownPointBalance && createDecimal(loyaltyPointBalance).greaterThan(createDecimal('0'));
   const applyLoyalty = async () => {
     if (!canSubmitLoyalty) return;
-    if (
-      hasKnownPointBalance &&
-      createDecimal(loyaltyPoints.trim()).greaterThan(createDecimal(loyaltyPointBalance))
-    ) {
-      showToast({
-        title: copy('Insufficient loyalty points'),
-        description: copy('The requested points exceed the member point balance.'),
-        variant: 'danger',
-      });
-      return;
-    }
     try {
+      if (
+        hasKnownPointBalance &&
+        createDecimal(loyaltyPoints.trim()).greaterThan(createDecimal(loyaltyPointBalance))
+      ) {
+        showToast({
+          title: copy('Insufficient loyalty points'),
+          description: copy('The requested points exceed the member point balance.'),
+          variant: 'danger',
+        });
+        return;
+      }
       await onApplyLoyalty();
     } catch (error) {
       showToast({
