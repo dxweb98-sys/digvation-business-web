@@ -3323,7 +3323,8 @@ function ReferencePaymentDialog({
       ariaLabel={title}
       closeOnEscape
       closeOnOverlay
-      className="pos-reference-dialog w-full max-w-6xl overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
+      className="pos-reference-dialog max-h-[92dvh] w-[calc(100vw-2rem)] !max-w-[1120px] overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
+      noPadding
       footer={step === 'edit' ? undefined : footer}
     >
       {step === 'review' ? (
@@ -3341,9 +3342,9 @@ function ReferencePaymentDialog({
       ) : step === 'leave' ? (
         <PaymentLeaveNotice progress={progress} format={format} hasPending={hasPending} />
       ) : (
-        <div className="grid min-h-0 max-h-[78dvh] gap-0 overflow-hidden lg:grid-cols-[minmax(0,1.15fr)_minmax(380px,0.85fr)]">
-          <div className="flex min-h-0 flex-col bg-[var(--color-surface)] p-4 lg:border-r lg:border-[var(--color-border)]">
-            <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)]">
+        <div className="grid min-h-0 max-h-[78dvh] gap-0 overflow-hidden lg:grid-cols-[minmax(0,1.08fr)_minmax(420px,0.92fr)]">
+          <div className="min-h-0 space-y-3 overflow-y-auto bg-[var(--color-surface)] p-4 lg:border-r lg:border-[var(--color-border)]">
+            <section className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)]">
             <div className="flex items-center justify-between gap-4 border-b border-[var(--color-border)] px-4 py-3">
               <div className="min-w-0">
                 <p className="text-sm font-semibold">
@@ -3360,7 +3361,7 @@ function ReferencePaymentDialog({
                 <p className="mt-0.5 text-sm font-bold tabular-nums">{format(gross)}</p>
               </div>
             </div>
-              <div className="min-h-0 flex-1 divide-y divide-[var(--color-border)] overflow-y-auto">
+              <div className="divide-y divide-[var(--color-border)]">
               {lines.map((line) => {
                 const discountPercentage = lineDiscountPercentage(line);
                 const discounted = isPositiveDecimal(line.lineDiscountAmount);
@@ -3433,82 +3434,6 @@ function ReferencePaymentDialog({
               })}
             </div>
             </section>
-          </div>
-
-          <div className="flex min-h-0 flex-col bg-[var(--color-surface)]">
-            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
-              <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs text-[var(--color-text-muted)]">{copy('Payment total')}</p>
-                <h3 className="mt-0.5 text-2xl font-bold leading-tight tabular-nums text-[var(--color-brand)]">
-                  {format(total)}
-                </h3>
-              </div>
-              <div className="min-w-0 text-right">
-                <p className="text-xs text-[var(--color-text-muted)]">{copy('Customer')}</p>
-                <p className="max-w-[170px] truncate text-sm font-semibold">
-                  {customerDisplayName(customer, locale)}
-                </p>
-                {customerBadge ? (
-                  <Badge variant={customerBadge.variant} className="mt-1 px-2 py-0 text-[10px]">
-                    {copy(customerBadge.label)}
-                  </Badge>
-                ) : null}
-                <p className="text-[11px] text-[var(--color-text-muted)]">
-                  {lines.length} {copy('items')}
-                </p>
-              </div>
-            </div>
-            <div className="mt-3 rounded-xl bg-[var(--color-surface-muted)]/60 px-3 py-2 text-xs">
-              <div className="flex justify-between">
-                <span className="text-[var(--color-text-muted)]">{copy('Subtotal')}</span>
-                <span className="font-semibold">{format(gross)}</span>
-              </div>
-              {hasDiscount ? (
-                <div className="mt-1 flex justify-between">
-                  <span className="text-[var(--color-text-muted)]">{discountLabel}</span>
-                  <span className="font-semibold text-[var(--color-danger)]">
-                    −{format(discountAmount)}
-                  </span>
-                </div>
-              ) : null}
-              {hasLoyaltyRedemption ? (
-                <div className="mt-1 flex justify-between">
-                  <span className="text-[var(--color-text-muted)]">
-                    {copy('Loyalty redemption')}
-                  </span>
-                  <span className="font-semibold text-[var(--color-danger)]">
-                    −{format(redeemedAmount!)}
-                  </span>
-                </div>
-              ) : null}
-              {hasTax ? (
-                <div className="mt-1 flex justify-between">
-                  <span className="text-[var(--color-text-muted)]">{taxLabel}</span>
-                  <span className="font-semibold">{format(taxAmount)}</span>
-                </div>
-              ) : null}
-              <div className="mt-2 flex justify-between border-t border-[var(--color-border)] pt-2 text-sm">
-                <span className="font-bold">{copy('Total')}</span>
-                <span className="font-bold text-[var(--color-brand)]">{format(total)}</span>
-              </div>
-            </div>
-            {hasPaymentActivity ? (
-              <div className="mt-3">
-                <PaymentProgressSummary
-                  total={sale?.totalAmount ?? total}
-                  progress={progress}
-                  format={format}
-                />
-                {hasRecordedMoney && !fullyPaid ? (
-                  <p className="mt-2 text-[11px] font-medium text-[var(--color-text-muted)]">
-                    {copy('The transaction is not complete until the remaining amount is paid.')}
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
 
           {adjustmentSlot}
 
@@ -3657,6 +3582,82 @@ function ReferencePaymentDialog({
               ) : null}
             </section>
           ) : null}
+          </div>
+
+          <div className="flex min-h-0 flex-col bg-[var(--color-surface)]">
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+              <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs text-[var(--color-text-muted)]">{copy('Payment total')}</p>
+                <h3 className="mt-0.5 text-2xl font-bold leading-tight tabular-nums text-[var(--color-brand)]">
+                  {format(total)}
+                </h3>
+              </div>
+              <div className="min-w-0 text-right">
+                <p className="text-xs text-[var(--color-text-muted)]">{copy('Customer')}</p>
+                <p className="max-w-[170px] truncate text-sm font-semibold">
+                  {customerDisplayName(customer, locale)}
+                </p>
+                {customerBadge ? (
+                  <Badge variant={customerBadge.variant} className="mt-1 px-2 py-0 text-[10px]">
+                    {copy(customerBadge.label)}
+                  </Badge>
+                ) : null}
+                <p className="text-[11px] text-[var(--color-text-muted)]">
+                  {lines.length} {copy('items')}
+                </p>
+              </div>
+            </div>
+            <div className="mt-3 rounded-xl bg-[var(--color-surface-muted)]/60 px-3 py-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-[var(--color-text-muted)]">{copy('Subtotal')}</span>
+                <span className="font-semibold">{format(gross)}</span>
+              </div>
+              {hasDiscount ? (
+                <div className="mt-1 flex justify-between">
+                  <span className="text-[var(--color-text-muted)]">{discountLabel}</span>
+                  <span className="font-semibold text-[var(--color-danger)]">
+                    −{format(discountAmount)}
+                  </span>
+                </div>
+              ) : null}
+              {hasLoyaltyRedemption ? (
+                <div className="mt-1 flex justify-between">
+                  <span className="text-[var(--color-text-muted)]">
+                    {copy('Loyalty redemption')}
+                  </span>
+                  <span className="font-semibold text-[var(--color-danger)]">
+                    −{format(redeemedAmount!)}
+                  </span>
+                </div>
+              ) : null}
+              {hasTax ? (
+                <div className="mt-1 flex justify-between">
+                  <span className="text-[var(--color-text-muted)]">{taxLabel}</span>
+                  <span className="font-semibold">{format(taxAmount)}</span>
+                </div>
+              ) : null}
+              <div className="mt-2 flex justify-between border-t border-[var(--color-border)] pt-2 text-sm">
+                <span className="font-bold">{copy('Total')}</span>
+                <span className="font-bold text-[var(--color-brand)]">{format(total)}</span>
+              </div>
+            </div>
+            {hasPaymentActivity ? (
+              <div className="mt-3">
+                <PaymentProgressSummary
+                  total={sale?.totalAmount ?? total}
+                  progress={progress}
+                  format={format}
+                />
+                {hasRecordedMoney && !fullyPaid ? (
+                  <p className="mt-2 text-[11px] font-medium text-[var(--color-text-muted)]">
+                    {copy('The transaction is not complete until the remaining amount is paid.')}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
 
           {hasPaymentActivity && sale ? (
             <RecordedPaymentList
