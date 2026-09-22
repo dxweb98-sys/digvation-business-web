@@ -290,6 +290,11 @@ const posCopy: Record<string, LocalizedCopy> = {
     'en-US': 'Assignment was not changed. Try again.',
   },
   'Add to queue': { 'id-ID': 'Masukkan ke antrian', 'en-US': 'Add to queue' },
+  'Order details': { 'id-ID': 'Detail pesanan', 'en-US': 'Order details' },
+  'Review the items before payment.': {
+    'id-ID': 'Periksa kembali item sebelum pembayaran.',
+    'en-US': 'Review the items before payment.',
+  },
   'Payment total': { 'id-ID': 'Total pembayaran', 'en-US': 'Payment total' },
   'Transaction discount': { 'id-ID': 'Diskon transaksi', 'en-US': 'Transaction discount' },
   'Promotions and discounts': { 'id-ID': 'Promo dan diskon', 'en-US': 'Promotions and discounts' },
