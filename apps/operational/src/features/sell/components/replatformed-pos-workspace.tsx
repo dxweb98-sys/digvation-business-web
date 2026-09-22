@@ -5207,7 +5207,7 @@ function ReferenceBalancePaymentDialog({
             onTransition={onTransitionPayment}
           />
 
-          <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-3.5">
+          <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
             {sale.payments.length ? (
               <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
                 {copy('Next payment')}
@@ -5320,7 +5320,7 @@ function ReferenceBalancePaymentDialog({
           </div>
 
           {isCash ? (
-            <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-3.5">
+            <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
               <label className="block text-sm font-medium">
                 {copy('Cash received')}
                 <PosCurrencyInput
