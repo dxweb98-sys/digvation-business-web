@@ -4339,6 +4339,18 @@ function ReceiptContent({
   const discountRows = saleDiscountRows(sale);
   const composition = appliedPaymentComposition(sale);
   const settlement = saleSettlement(sale);
+  const legacyLoyaltyRedemption = sale.loyaltyRedemption as
+    | (NonNullable<Sale['loyaltyRedemption']> & {
+        requestedPoints?: string;
+        redemptionAmount?: string;
+      })
+    | null
+    | undefined;
+  const redeemedPoints =
+    sale.loyaltyRedemption?.points ?? legacyLoyaltyRedemption?.requestedPoints ?? null;
+  const redeemedAmount =
+    sale.loyaltyRedemption?.amount ?? legacyLoyaltyRedemption?.redemptionAmount ?? null;
+  const hasLoyaltyRedemption = Boolean(redeemedPoints && redeemedAmount);
   return (
     <>
       <header className="text-center">
@@ -4425,6 +4437,17 @@ function ReceiptContent({
           <div className="flex justify-between gap-3">
             <dt className="text-slate-500">{copy('Discount')}</dt>
             <dd>−{money(sale.discountAmount, locale)}</dd>
+          </div>
+        ) : null}
+        {hasLoyaltyRedemption ? (
+          <div className="flex items-start justify-between gap-3">
+            <dt className="min-w-0 text-slate-500">
+              {copy('Loyalty redemption')}
+              <span className="block text-[10px] leading-3">
+                {pointQuantity(redeemedPoints, locale)} {copy('points used')}
+              </span>
+            </dt>
+            <dd className="shrink-0">−{money(redeemedAmount!, locale)}</dd>
           </div>
         ) : null}
         {hasTax ? (
