@@ -375,6 +375,7 @@ const posCopy: Record<string, LocalizedCopy> = {
   'Tax included': { 'id-ID': 'Pajak termasuk', 'en-US': 'Tax included' },
   'Paid amount': { 'id-ID': 'Dibayar', 'en-US': 'Paid amount' },
   'Cash received': { 'id-ID': 'Uang diterima', 'en-US': 'Cash received' },
+  'Exact amount': { 'id-ID': 'Pas', 'en-US': 'Exact' },
   'Thank you for your purchase.': {
     'id-ID': 'Terima kasih telah bertransaksi.',
     'en-US': 'Thank you for your purchase.',
