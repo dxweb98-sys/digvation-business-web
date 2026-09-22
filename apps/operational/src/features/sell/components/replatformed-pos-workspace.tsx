@@ -3453,36 +3453,30 @@ function ReferencePaymentDialog({
               </div>
 
               {loyaltyEditorOpen && canRedeemLoyalty ? (
-                <div className="mt-3 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
-                  <div className="mb-2 flex items-center justify-between gap-3">
-                    <p className="text-xs font-semibold">
-                      {copy(hasLoyaltyRedemption ? 'Change points' : 'Use loyalty points')}
-                    </p>
-                    <div className="flex items-center gap-1">
-                      {pointBalancePositive ? (
-                        <DButton
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          disabled={isLoyaltyMutating}
-                          onClick={() => onLoyaltyPointsChange(wholePointBalance!)}
-                        >
-                          {copy('Fill all')}
-                        </DButton>
-                      ) : null}
-                      <DButton
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        disabled={isLoyaltyMutating}
-                        onClick={cancelLoyaltyEditor}
-                      >
-                        {copy('Cancel')}
-                      </DButton>
+                <div className="mt-4 border-t border-[var(--color-border)] pt-3">
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold">
+                        {copy(hasLoyaltyRedemption ? 'Change points' : 'Use loyalty points')}
+                      </p>
+                      <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
+                        {copy('Enter the number of points to use for this transaction.')}
+                      </p>
                     </div>
+                    <DButton
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      disabled={isLoyaltyMutating}
+                      onClick={cancelLoyaltyEditor}
+                    >
+                      {copy('Cancel')}
+                    </DButton>
                   </div>
+
                   <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
                     <DInput
+                      label={copy('Points to use')}
                       value={loyaltyPoints}
                       onChange={(value) => onLoyaltyPointsChange(value.replace(/\D/g, ''))}
                       inputMode="numeric"
@@ -3492,14 +3486,32 @@ function ReferencePaymentDialog({
                     />
                     <DButton
                       type="button"
-                      size="sm"
                       disabled={!canSubmitLoyalty}
                       loading={isLoyaltyMutating}
                       onClick={() => void applyLoyalty()}
+                      className="h-10 px-4"
                     >
                       {copy('Apply')}
                     </DButton>
                   </div>
+
+                  {pointBalancePositive ? (
+                    <div className="mt-2 flex items-center justify-between gap-3">
+                      <p className="text-[11px] text-[var(--color-text-muted)]">
+                        {copy('Available balance')}: {pointQuantity(loyaltyPointBalance, locale)}{' '}
+                        {copy('points')}
+                      </p>
+                      <DButton
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        disabled={isLoyaltyMutating}
+                        onClick={() => onLoyaltyPointsChange(wholePointBalance!)}
+                      >
+                        {copy('Fill all')}
+                      </DButton>
+                    </div>
+                  ) : null}
                 </div>
               ) : hasLoyaltyRedemption ? (
                 <div className="mt-3 flex items-center gap-3 rounded-[var(--radius-control)] border border-[var(--color-success)]/20 bg-[var(--color-success)]/[.06] px-3 py-2.5">
