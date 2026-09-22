@@ -3331,9 +3331,7 @@ function ReferencePaymentDialog({
     <DDialog
       title={title}
       description={
-        step === 'edit' && sale
-          ? `${copy('Transaction ID')}: ${transactionNumber(sale, locale)}`
-          : undefined
+        sale ? `${copy('Transaction ID')}: ${transactionNumber(sale, locale)}` : undefined
       }
       open={open}
       onClose={requestClose}
