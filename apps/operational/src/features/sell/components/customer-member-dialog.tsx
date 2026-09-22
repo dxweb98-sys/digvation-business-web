@@ -1,7 +1,7 @@
-import { DAlert, DButton, DDialog, DInput, DSearchInput, DSkeleton } from '@digvation-labs/ui';
+import { DAlert, DButton, DDialog, DInput, DSkeleton } from '@digvation-labs/ui';
 import { DTabs, DTabsContent, DTabsList, DTabsTrigger } from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
-import { CheckCircle2, Phone, User, UserPlus, Users, X } from 'lucide-react';
+import { CheckCircle2, Phone, User, UserPlus, Users } from 'lucide-react';
 import { useState } from 'react';
 
 import { useOperationalLocalization } from '../../../app/localization/operational-localization';
@@ -43,6 +43,10 @@ const localCopy: Record<string, { 'id-ID': string; 'en-US': string }> = {
   'Regular customer status': { 'id-ID': 'Status: Pelanggan Umum (Walk-In)', 'en-US': 'Status: Regular Customer (Walk-In)' },
   'Search member': { 'id-ID': 'Cari Member Terdaftar', 'en-US': 'Search Registered Member' },
   'Search member placeholder': { 'id-ID': 'Cari nama, nomor telepon, atau kode member', 'en-US': 'Search name, phone, or member number' },
+  'Type at least 2 characters to search members.': {
+    'id-ID': 'Ketik minimal 2 karakter untuk mencari member.',
+    'en-US': 'Type at least 2 characters to search members.',
+  },
   'Search results': { 'id-ID': 'Hasil Pencarian', 'en-US': 'Search Results' },
   'No members found.': { 'id-ID': 'Member tidak ditemukan.', 'en-US': 'No members found.' },
   'Member lookup could not be completed.': { 'id-ID': 'Pencarian member tidak dapat dimuat.', 'en-US': 'Member lookup could not be completed.' },
@@ -86,6 +90,13 @@ function initials(name: string): string {
     .join('');
 }
 
+function formatPoints(value: string | null | undefined, locale: string): string {
+  if (!value) return '0';
+  const match = /^(\d+)(?:\.0+)?$/.exec(value.trim());
+  if (!match) return '—';
+  return new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(Number(match[1]));
+}
+
 export function CustomerMemberDialog({
   open,
   customer,
@@ -118,10 +129,11 @@ export function CustomerMemberDialog({
   const [enrollError, setEnrollError] = useState<string | null>(null);
   const [isEnrolling, setEnrolling] = useState(false);
 
+  const memberSearchReady = query.trim().length >= 2;
   const memberQuery = useQuery({
-    queryKey: ['operational-member-search', query],
-    queryFn: ({ signal }) => api.searchMembers(query, signal),
-    enabled: open && mode === 'MEMBER' && canReadMembers,
+    queryKey: ['operational-member-search', query.trim()],
+    queryFn: ({ signal }) => api.searchMembers(query.trim(), signal),
+    enabled: open && mode === 'MEMBER' && canReadMembers && memberSearchReady,
   });
   const selectedBalanceQuery = useQuery({
     queryKey: ['operational-member-picker-balance', selectedMember?.id],
@@ -221,6 +233,7 @@ export function CustomerMemberDialog({
 
   return (
     <DDialog
+      title={text('Choose customer')}
       open={open}
       onClose={onClose}
       ariaLabel={text('Choose customer')}
@@ -230,28 +243,11 @@ export function CustomerMemberDialog({
       footer={footer}
     >
       <div className="space-y-4">
-        <header className="flex items-start gap-3">
-          <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-[var(--color-brand)]/10 text-[var(--color-brand)]">
-            <Users className="size-4.5" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h2 className="text-lg font-bold leading-6">{text('Choose customer')}</h2>
-            <p className="mt-0.5 text-xs leading-5 text-[var(--color-text-muted)]">
-              {text(
-                'Find a customer, choose a registered member, or enroll a new member for this transaction.',
-              )}
-            </p>
-          </div>
-          <DButton
-            size="icon"
-            variant="ghost"
-            aria-label={text('Cancel')}
-            onClick={onClose}
-            className="-mr-1 -mt-1 shrink-0"
-          >
-            <X className="size-4.5" />
-          </DButton>
-        </header>
+        <p className="text-xs leading-5 text-[var(--color-text-muted)]">
+          {text(
+            'Find a customer, choose a registered member, or enroll a new member for this transaction.',
+          )}
+        </p>
 
         <DTabs
           value={mode}
@@ -263,16 +259,16 @@ export function CustomerMemberDialog({
               canEnrollMember ? 'grid-cols-3' : 'grid-cols-2'
             } rounded-xl bg-[var(--color-surface-muted)] p-1`}
           >
-            <DTabsTrigger value="CUSTOMER" className="min-w-0 gap-1.5 px-2">
+            <DTabsTrigger value="CUSTOMER" className="min-w-0 !flex-row items-center justify-center gap-2 px-2">
               <User className="size-3.5 shrink-0" />
               <span className="truncate">{text('Regular customer')}</span>
             </DTabsTrigger>
-            <DTabsTrigger value="MEMBER" className="min-w-0 gap-1.5 px-2">
+            <DTabsTrigger value="MEMBER" className="min-w-0 !flex-row items-center justify-center gap-2 px-2">
               <Users className="size-3.5 shrink-0" />
               <span className="truncate">{text('Registered member')}</span>
             </DTabsTrigger>
             {canEnrollMember ? (
-              <DTabsTrigger value="ENROLL" className="min-w-0 gap-1.5 px-2">
+              <DTabsTrigger value="ENROLL" className="min-w-0 !flex-row items-center justify-center gap-2 px-2">
                 <UserPlus className="size-3.5 shrink-0" />
                 <span className="truncate">{text('Enroll member')}</span>
               </DTabsTrigger>
@@ -337,20 +333,21 @@ export function CustomerMemberDialog({
               <DAlert variant="neutral">{text('No member search permission.')}</DAlert>
             ) : (
               <>
-                <div className="space-y-1.5">
-                  <p className="text-xs font-semibold">{text('Search member')}</p>
-                  <DSearchInput
-                    aria-label={text('Search member')}
-                    value={query}
-                    onChange={(value) => {
-                      setQuery(value);
-                      setSelectedMember(null);
-                    }}
-                    placeholder={text('Search member placeholder')}
-                    className="w-full"
-                  />
-                </div>
+                <DInput
+                  label={text('Search member')}
+                  value={query}
+                  onChange={(value) => {
+                    setQuery(value);
+                    setSelectedMember(null);
+                  }}
+                  placeholder={text('Search member placeholder')}
+                />
 
+                {!memberSearchReady ? (
+                  <p className="text-xs text-[var(--color-text-muted)]">
+                    {text('Type at least 2 characters to search members.')}
+                  </p>
+                ) : (
                 <div className="overflow-hidden rounded-xl border border-[var(--color-border)]">
                   <div className="flex items-center justify-between bg-[var(--color-surface-muted)] px-3 py-2">
                     <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
@@ -431,6 +428,7 @@ export function CustomerMemberDialog({
                     </div>
                   ) : null}
                 </div>
+                )}
 
                 {selectedMember ? (
                   <div className="rounded-xl border border-[var(--color-brand)]/20 bg-[var(--color-brand)]/[.04] p-3">
@@ -451,7 +449,7 @@ export function CustomerMemberDialog({
                           <p className="mt-1 text-sm font-bold text-[var(--color-brand)]">
                             {selectedBalanceQuery.isLoading
                               ? text('Loading points...')
-                              : (selectedBalanceQuery.data?.pointsBalance ?? '0')}
+                              : formatPoints(selectedBalanceQuery.data?.pointsBalance, locale)}
                           </p>
                         </div>
                       ) : null}
