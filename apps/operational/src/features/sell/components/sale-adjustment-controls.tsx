@@ -370,17 +370,17 @@ export function SaleAdjustmentControls({
   return (
     <>
       {placement === 'payment' ? (
-        <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-[var(--color-brand)]/[.08] text-[var(--color-brand)]">
+        <section className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]">
+          <div className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface-muted)]/45 px-4 py-3">
+            <div className="flex items-center gap-2.5">
+              <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[var(--color-brand)]/[.08] text-[var(--color-brand)]">
                 <Tag className="size-4" aria-hidden="true" />
               </span>
               <p className="text-sm font-bold">{copy('Promotions & discounts')}</p>
             </div>
             {trigger}
           </div>
-          <div className="mt-3">
+          <div className="p-3">
             {appliedAdjustments.length ? (
               appliedList
             ) : (
