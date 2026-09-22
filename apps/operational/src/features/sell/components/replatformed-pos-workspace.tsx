@@ -756,12 +756,12 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   );
   const canReadMembers = session.access.permissions.includes('membership:read');
   const canEnrollMember = session.access.permissions.includes('membership:enroll');
-  const canReadLoyalty =
-    session.access.capabilities.includes('LOYALTY_POINTS') &&
-    session.access.permissions.includes('loyalty:read');
+  const hasLoyaltyCapability = session.access.capabilities.includes('LOYALTY_POINTS');
   const canRedeemLoyalty =
-    session.access.capabilities.includes('LOYALTY_POINTS') &&
-    session.access.permissions.includes('loyalty:redeem');
+    hasLoyaltyCapability && session.access.permissions.includes('loyalty:redeem');
+  const canReadLoyalty =
+    hasLoyaltyCapability &&
+    (session.access.permissions.includes('loyalty:read') || canRedeemLoyalty);
   const activeSelectedMember =
     activeCustomer?.type === 'MEMBER' &&
     selectedMember?.customerId === activeCustomer.referenceId
@@ -3074,12 +3074,13 @@ function ReferencePaymentDialog({
   loyaltyPoints: string;
   isLoyaltyMutating: boolean;
   onLoyaltyPointsChange: (value: string) => void;
-  onApplyLoyalty: () => void;
+  onApplyLoyalty: () => Promise<unknown>;
   onRemoveLoyalty: () => void;
   /** Applied promotions and discounts for the authoritative Sale being paid. */
   adjustmentSlot?: ReactNode;
 }) {
   const { copy, label } = useOperationalLocalization();
+  const { showToast } = useToast();
   const [step, setStep] = usePaymentDialogStep(open);
   const format = (amount: string) => money(amount, locale);
   const routesForMethod = paymentRoutes.filter((route) => route.paymentMethod === method);
@@ -3102,6 +3103,32 @@ function ReferencePaymentDialog({
   const redeemedAmount =
     loyaltyRedemption?.amount ?? legacyLoyaltyRedemption?.redemptionAmount ?? null;
   const hasLoyaltyRedemption = Boolean(redeemedPoints && redeemedAmount);
+  const hasKnownPointBalance = loyaltyPointBalance !== null;
+  const pointBalancePositive =
+    hasKnownPointBalance && createDecimal(loyaltyPointBalance).greaterThan(createDecimal('0'));
+  const applyLoyalty = async () => {
+    if (!canSubmitLoyalty) return;
+    if (
+      hasKnownPointBalance &&
+      createDecimal(loyaltyPoints.trim()).greaterThan(createDecimal(loyaltyPointBalance))
+    ) {
+      showToast({
+        title: copy('Insufficient loyalty points'),
+        description: copy('The requested points exceed the member point balance.'),
+        variant: 'danger',
+      });
+      return;
+    }
+    try {
+      await onApplyLoyalty();
+    } catch (error) {
+      showToast({
+        title: copy('Could not apply loyalty points'),
+        description: cashierTransactionErrorMessage(error, locale),
+        variant: 'danger',
+      });
+    }
+  };
   const customerBadge = customerStatus(customer);
   const payments = sale?.payments ?? [];
   const progress = sale
@@ -3288,6 +3315,16 @@ function ReferencePaymentDialog({
                   </span>
                 </div>
               ) : null}
+              {hasLoyaltyRedemption ? (
+                <div className="mt-1 flex justify-between">
+                  <span className="text-[var(--color-text-muted)]">
+                    {copy('Loyalty redemption')}
+                  </span>
+                  <span className="font-semibold text-[var(--color-danger)]">
+                    −{format(redeemedAmount!)}
+                  </span>
+                </div>
+              ) : null}
               {hasTax ? (
                 <div className="mt-1 flex justify-between">
                   <span className="text-[var(--color-text-muted)]">{taxLabel}</span>
@@ -3329,13 +3366,25 @@ function ReferencePaymentDialog({
                     {copy('Use member points for this transaction. Points are consumed only when the sale is finalized.')}
                   </p>
                 </div>
-                <div className="shrink-0 rounded-lg bg-[var(--color-brand)]/[.08] px-2.5 py-1.5 text-right">
-                  <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-text-muted)]">
-                    {copy('Point balance')}
-                  </p>
-                  <p className="mt-0.5 text-sm font-bold tabular-nums text-[var(--color-brand)]">
-                    {isLoyaltyBalanceLoading ? '…' : (loyaltyPointBalance ?? '0')}
-                  </p>
+                <div className="flex shrink-0 items-center gap-2">
+                  <div className="rounded-lg bg-[var(--color-brand)]/[.08] px-2.5 py-1.5 text-right">
+                    <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-text-muted)]">
+                      {copy('Point balance')}
+                    </p>
+                    <p className="mt-0.5 text-sm font-bold tabular-nums text-[var(--color-brand)]">
+                      {isLoyaltyBalanceLoading ? '…' : (loyaltyPointBalance ?? '—')}
+                    </p>
+                  </div>
+                  {pointBalancePositive ? (
+                    <DButton
+                      size="sm"
+                      variant="secondary"
+                      disabled={isLoyaltyMutating}
+                      onClick={() => onLoyaltyPointsChange(loyaltyPointBalance!)}
+                    >
+                      {copy('Use all')}
+                    </DButton>
+                  ) : null}
                 </div>
               </div>
 
@@ -3387,7 +3436,7 @@ function ReferencePaymentDialog({
                     variant={hasLoyaltyRedemption ? 'secondary' : 'primary'}
                     disabled={!canSubmitLoyalty}
                     loading={isLoyaltyMutating}
-                    onClick={onApplyLoyalty}
+                    onClick={() => void applyLoyalty()}
                   >
                     {copy(hasLoyaltyRedemption ? 'Update' : 'Apply')}
                   </DButton>
