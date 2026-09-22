@@ -3344,13 +3344,21 @@ function ReferencePaymentDialog({
         <div className="grid min-h-0 max-h-[78dvh] gap-0 overflow-hidden lg:grid-cols-[minmax(0,1.15fr)_minmax(380px,0.85fr)]">
           <div className="flex min-h-0 flex-col bg-[var(--color-surface)] p-4 lg:border-r lg:border-[var(--color-border)]">
             <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)]">
-            <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-2.5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
-                {copy('Order details')}
-              </p>
-              <span className="text-xs text-[var(--color-text-muted)]">
-                {lines.length} {copy('items')}
-              </span>
+            <div className="flex items-center justify-between gap-4 border-b border-[var(--color-border)] px-4 py-3">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold">
+                  {copy('Order details')} ({lines.length} {copy('items')})
+                </p>
+                <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
+                  {copy('Review the items before payment.')}
+                </p>
+              </div>
+              <div className="shrink-0 text-right">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-text-muted)]">
+                  {copy('Subtotal')}
+                </p>
+                <p className="mt-0.5 text-sm font-bold tabular-nums">{format(gross)}</p>
+              </div>
             </div>
               <div className="min-h-0 flex-1 divide-y divide-[var(--color-border)] overflow-y-auto">
               {lines.map((line) => {
