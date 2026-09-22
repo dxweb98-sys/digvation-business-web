@@ -307,6 +307,19 @@ const posCopy: Record<string, LocalizedCopy> = {
     'en-US': 'Use member points for this transaction. Points are consumed only when the sale is finalized.',
   },
   'Loading loyalty points…': { 'id-ID': 'Memuat poin loyalty…', 'en-US': 'Loading loyalty points…' },
+  'Use all': { 'id-ID': 'Pakai semua', 'en-US': 'Use all' },
+  'Insufficient loyalty points': {
+    'id-ID': 'Poin tidak mencukupi',
+    'en-US': 'Insufficient loyalty points',
+  },
+  'The requested points exceed the member point balance.': {
+    'id-ID': 'Jumlah poin yang digunakan melebihi saldo poin member.',
+    'en-US': 'The requested points exceed the member point balance.',
+  },
+  'Could not apply loyalty points': {
+    'id-ID': 'Poin loyalty tidak dapat digunakan',
+    'en-US': 'Could not apply loyalty points',
+  },
   'Calculating…': { 'id-ID': 'Menghitung…', 'en-US': 'Calculating…' },
   'Choose a payment method before continuing.': {
     'id-ID': 'Pilih metode pembayaran sebelum melanjutkan.',
