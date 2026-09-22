@@ -254,6 +254,18 @@ function money(amount: string, locale: string) {
   return formatMoney(amount, 'IDR', locale, 0);
 }
 
+function wholePointValue(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const match = /^(\d+)(?:\.0+)?$/.exec(value.trim());
+  return match?.[1] ?? null;
+}
+
+function pointQuantity(value: string | null | undefined, locale: string): string {
+  const whole = wholePointValue(value);
+  if (whole === null) return '—';
+  return new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(Number(whole));
+}
+
 function formatDurationMinutes(minutes: number | null | undefined, locale: string): string | null {
   return formatServiceDuration(minutes, {
     hour: copyFor('hour-short', locale),
@@ -2751,7 +2763,7 @@ function ReferenceCartPanel({
               {customer?.type === 'MEMBER' && isPointBalanceLoading
                 ? copy('Loading loyalty points…')
                 : customer?.type === 'MEMBER' && pointBalance !== null
-                  ? `${copy('Loyalty points')}: ${pointBalance}`
+                  ? `${copy('Loyalty points')}: ${pointQuantity(pointBalance, locale)}`
                   : (customerDisplayDetail(customer) ??
                     copy('Name and WhatsApp number are both required.'))}
             </p>
@@ -3104,7 +3116,7 @@ function ReferencePaymentDialog({
   const hasDiscount = !createDecimal(discountAmount).equals(createDecimal('0'));
   const hasTax = !createDecimal(taxAmount).equals(createDecimal('0'));
   const canSubmitLoyalty =
-    canRedeemLoyalty && Boolean(loyaltyPoints.trim()) && !isLoyaltyMutating;
+    canRedeemLoyalty && validLoyaltyPointInput && !isLoyaltyMutating;
   const legacyLoyaltyRedemption = loyaltyRedemption as
     | (NonNullable<Sale['loyaltyRedemption']> & {
         requestedPoints?: string;
@@ -3117,15 +3129,17 @@ function ReferencePaymentDialog({
   const redeemedAmount =
     loyaltyRedemption?.amount ?? legacyLoyaltyRedemption?.redemptionAmount ?? null;
   const hasLoyaltyRedemption = Boolean(redeemedPoints && redeemedAmount);
-  const hasKnownPointBalance = loyaltyPointBalance !== null;
+  const wholePointBalance = wholePointValue(loyaltyPointBalance);
+  const hasKnownPointBalance = wholePointBalance !== null;
   const pointBalancePositive =
-    hasKnownPointBalance && createDecimal(loyaltyPointBalance).greaterThan(createDecimal('0'));
+    wholePointBalance !== null && createDecimal(wholePointBalance).greaterThan(createDecimal('0'));
+  const validLoyaltyPointInput = /^[1-9]\d*$/.test(loyaltyPoints.trim());
   const applyLoyalty = async () => {
     if (!canSubmitLoyalty) return;
     try {
       if (
         hasKnownPointBalance &&
-        createDecimal(loyaltyPoints.trim()).greaterThan(createDecimal(loyaltyPointBalance))
+        createDecimal(loyaltyPoints.trim()).greaterThan(createDecimal(wholePointBalance!))
       ) {
         showToast({
           title: copy('Insufficient loyalty points'),
@@ -3193,6 +3207,7 @@ function ReferencePaymentDialog({
   ];
   const normalizedQuickTender = [normalizedAllocation, ...quickTender]
     .map((amount) => normalizeCurrencyPresentationInput(amount))
+    .filter(isPositiveDecimal)
     .filter((amount, index, list) => list.indexOf(amount) === index)
     .slice(0, 6);
   const completes = intent.outcome !== 'LEAVES_BALANCE';
@@ -3387,7 +3402,9 @@ function ReferencePaymentDialog({
                       {copy('Point balance')}
                     </p>
                     <p className="mt-0.5 text-sm font-bold tabular-nums text-[var(--color-brand)]">
-                      {isLoyaltyBalanceLoading ? '…' : (loyaltyPointBalance ?? '—')}
+                      {isLoyaltyBalanceLoading
+                        ? '…'
+                        : pointQuantity(loyaltyPointBalance, locale)}
                     </p>
                   </div>
                   {pointBalancePositive ? (
@@ -3395,7 +3412,7 @@ function ReferencePaymentDialog({
                       size="sm"
                       variant="secondary"
                       disabled={isLoyaltyMutating}
-                      onClick={() => onLoyaltyPointsChange(loyaltyPointBalance!)}
+                      onClick={() => onLoyaltyPointsChange(wholePointBalance!)}
                     >
                       {copy('Use all')}
                     </DButton>
@@ -3412,7 +3429,7 @@ function ReferencePaymentDialog({
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-semibold">{copy('Loyalty redemption')}</p>
                     <p className="mt-0.5 text-[11px] text-[var(--color-text-muted)]">
-                      {redeemedPoints} {copy('points used')}
+                      {pointQuantity(redeemedPoints, locale)} {copy('points used')}
                     </p>
                   </div>
                   <span className="shrink-0 text-xs font-semibold tabular-nums text-[var(--color-danger)]">
@@ -3441,8 +3458,8 @@ function ReferencePaymentDialog({
                   <DInput
                     label={copy(hasLoyaltyRedemption ? 'Change points' : 'Use loyalty points')}
                     value={loyaltyPoints}
-                    onChange={onLoyaltyPointsChange}
-                    inputMode="decimal"
+                    onChange={(value) => onLoyaltyPointsChange(value.replace(/\D/g, ''))}
+                    inputMode="numeric"
                     disabled={isLoyaltyMutating}
                     placeholder="0"
                   />
