@@ -362,7 +362,7 @@ export function SaleAdjustmentControls({
       onClick={() => void prepareAndOpen()}
     >
       {placement === 'payment'
-        ? copy(appliedAdjustments.length ? 'Manage adjustments' : 'Add adjustment')
+        ? copy(appliedAdjustments.length ? 'Manage adjustments' : 'Add promotion')
         : text('Discounts & promotions')}
     </DButton>
   );
