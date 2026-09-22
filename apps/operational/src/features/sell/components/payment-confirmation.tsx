@@ -142,60 +142,116 @@ export function PaymentReview({
   const completes = intent.outcome !== 'LEAVES_BALANCE';
   const recorded = earlierPayments.filter((payment) => payment.status === 'SUCCEEDED');
   return (
-    <div className="space-y-3">
-      <div className="pos-payment-review__hero">
-        <p className="text-xs font-medium text-[var(--color-text-muted)]">
-          {copy(completes ? 'You are receiving' : 'You are receiving part of the total')}
-        </p>
-        <p className="mt-1 text-3xl font-bold leading-tight tabular-nums text-[var(--color-text)]">
-          {format(intent.amount)}
-        </p>
-        <p className="mt-1 text-sm font-semibold">
-          {accountName}
-          {accountName !== methodName ? (
-            <span className="font-normal text-[var(--color-text-muted)]"> · {methodName}</span>
-          ) : null}
-        </p>
-        {reference ? (
-          <p className="mt-0.5 break-all font-mono text-[11px] text-[var(--color-text-muted)]">
-            {reference}
-          </p>
-        ) : null}
-        {tendered ? (
-          <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-            {copy('Cash received')}: {format(tendered)}
-            {change && isPositive(change) ? ` · ${copy('Change')}: ${format(change)}` : ''}
-          </p>
-        ) : null}
-      </div>
-
-      <dl className="pos-payment-review__rows">
-        <div>
-          <dt>{copy('Transaction total')}</dt>
-          <dd>{format(total)}</dd>
-        </div>
-        {recorded.map((payment) => (
-          <div key={payment.id}>
-            <dt>
-              {copy('Received')} · {paymentAccountName(payment, label)}
-            </dt>
-            <dd>−{format(payment.appliedAmount)}</dd>
+    <div className="space-y-4">
+      <section className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]">
+        <div className="p-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-[var(--color-text-muted)]">
+                {copy(completes ? 'You are receiving' : 'You are receiving part of the total')}
+              </p>
+              <p className="mt-1 text-3xl font-bold leading-tight tabular-nums text-[var(--color-brand)]">
+                {format(intent.amount)}
+              </p>
+            </div>
+            <span
+              className={`grid size-10 shrink-0 place-items-center rounded-full ${
+                completes
+                  ? 'bg-[var(--color-success)]/10 text-[var(--color-success)]'
+                  : 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]'
+              }`}
+            >
+              {completes ? (
+                <CheckCircle2 className="size-5" aria-hidden />
+              ) : (
+                <SplitSquareHorizontal className="size-5" aria-hidden />
+              )}
+            </span>
           </div>
-        ))}
-        <div>
-          <dt>{copy('This payment')}</dt>
-          <dd>−{format(intent.amount)}</dd>
+
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            <div className="rounded-xl bg-[var(--color-surface-muted)]/55 px-3 py-2.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+                {methodName}
+              </p>
+              <p className="mt-1 truncate text-sm font-semibold text-[var(--color-text)]">
+                {accountName}
+              </p>
+            </div>
+
+            {tendered ? (
+              <div className="rounded-xl bg-[var(--color-surface-muted)]/55 px-3 py-2.5">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+                  {copy('Cash received')}
+                </p>
+                <div className="mt-1 flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold tabular-nums">{format(tendered)}</p>
+                  {change && isPositive(change) ? (
+                    <p className="text-xs font-semibold text-[var(--color-success)]">
+                      {copy('Change')} {format(change)}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            ) : reference ? (
+              <div className="rounded-xl bg-[var(--color-surface-muted)]/55 px-3 py-2.5">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+                  Reference
+                </p>
+                <p className="mt-1 truncate font-mono text-xs font-medium text-[var(--color-text)]">
+                  {reference}
+                </p>
+              </div>
+            ) : null}
+          </div>
         </div>
-        <div className="pos-payment-review__rows-total">
-          <dt>{copy('Remaining after this payment')}</dt>
-          <dd className={completes ? 'text-[var(--color-success)]' : 'text-[var(--color-brand)]'}>
-            {format(intent.remainingAfter)}
-          </dd>
-        </div>
-      </dl>
+      </section>
+
+      <section className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]">
+        <dl className="divide-y divide-[var(--color-border)]">
+          <div className="flex items-center justify-between gap-4 px-4 py-3">
+            <dt className="text-sm text-[var(--color-text-muted)]">{copy('Transaction total')}</dt>
+            <dd className="text-sm font-semibold tabular-nums">{format(total)}</dd>
+          </div>
+
+          {recorded.map((payment) => (
+            <div key={payment.id} className="flex items-center justify-between gap-4 px-4 py-3">
+              <dt className="min-w-0 truncate text-sm text-[var(--color-text-muted)]">
+                {copy('Received')} · {paymentAccountName(payment, label)}
+              </dt>
+              <dd className="shrink-0 text-sm font-semibold tabular-nums text-[var(--color-success)]">
+                −{format(payment.appliedAmount)}
+              </dd>
+            </div>
+          ))}
+
+          <div className="flex items-center justify-between gap-4 px-4 py-3">
+            <dt className="text-sm font-medium">{copy('This payment')}</dt>
+            <dd className="text-sm font-bold tabular-nums text-[var(--color-brand)]">
+              −{format(intent.amount)}
+            </dd>
+          </div>
+
+          <div className="flex items-center justify-between gap-4 bg-[var(--color-surface-muted)]/45 px-4 py-3">
+            <dt className="text-sm font-bold">{copy('Remaining after this payment')}</dt>
+            <dd
+              className={`text-base font-bold tabular-nums ${
+                completes ? 'text-[var(--color-success)]' : 'text-[var(--color-brand)]'
+              }`}
+            >
+              {format(intent.remainingAfter)}
+            </dd>
+          </div>
+        </dl>
+      </section>
 
       <div
-        className={`pos-payment-intent ${completes ? 'pos-payment-intent--full' : 'pos-payment-intent--split'}`}
+        className={`flex items-start gap-2.5 rounded-xl px-3 py-2.5 text-sm ${
+          completes
+            ? 'bg-[var(--color-success)]/[.08] text-[var(--color-success)]'
+            : 'bg-[var(--color-brand)]/[.08] text-[var(--color-brand)]'
+        }`}
+        role="status"
       >
         {completes ? (
           <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden />
@@ -215,11 +271,6 @@ export function PaymentReview({
           {copy('It is recorded as received immediately.')}
         </DAlert>
       ) : null}
-
-      <p className="flex gap-1.5 text-[11px] leading-4 text-[var(--color-text-muted)]">
-        <Info className="mt-px size-3.5 shrink-0" aria-hidden />
-        {copy('Check the method and amount. A recorded payment cannot be edited afterwards.')}
-      </p>
     </div>
   );
 }

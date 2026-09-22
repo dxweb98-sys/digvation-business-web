@@ -54,6 +54,15 @@ export interface LoyaltyRedemptionInput {
   points: string;
 }
 
+export interface SaleTaxConfiguration {
+  enabled: boolean;
+  /** Decimal fraction from Runtime; "0.11" means 11%. */
+  rate: string;
+  version: number;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
 export interface SetSaleLineQuantityInput {
   expectedVersion: number;
   quantity: string;
@@ -156,6 +165,7 @@ export interface OpenSalesQuery {
 }
 
 export interface SaleTransactionClient {
+  getTaxConfiguration(signal?: AbortSignal): Promise<SaleTaxConfiguration>;
   getSale(saleId: string, signal?: AbortSignal): Promise<Sale>;
   createSale(input: CreateSaleInput, idempotencyKey: string): Promise<Sale>;
   startSale(input: StartSaleInput, idempotencyKey: string): Promise<Sale>;
@@ -345,6 +355,12 @@ export class HttpCashierTransactionAdapter
 
   public listSales(signal?: AbortSignal): Promise<ApiPage<QueueSale>> {
     return this.client.get<ApiPage<QueueSale>>(pagePath(`${API_PREFIX}/sales`), { signal });
+  }
+
+  public getTaxConfiguration(signal?: AbortSignal): Promise<SaleTaxConfiguration> {
+    return this.client.get<SaleTaxConfiguration>(`${API_PREFIX}/sales/configuration/tax`, {
+      signal,
+    });
   }
 
   public getSale(saleId: string, signal?: AbortSignal): Promise<Sale> {

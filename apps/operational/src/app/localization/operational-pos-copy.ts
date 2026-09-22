@@ -4,7 +4,7 @@ type LocalizedCopy = Record<OperationalLocale, string>;
 
 const posCopy: Record<string, LocalizedCopy> = {
   'Pay later': { 'id-ID': 'Bayar nanti', 'en-US': 'Pay later' },
-  'Payment timing': { 'id-ID': 'Waktu pembayaran', 'en-US': 'Payment timing' },
+  'Payment timing': { 'id-ID': 'Waktu & Cara Pembayaran', 'en-US': 'Payment timing' },
   'Pay and add to queue': {
     'id-ID': 'Bayar dan masukkan ke antrian',
     'en-US': 'Pay and add to queue',
@@ -91,6 +91,7 @@ const posCopy: Record<string, LocalizedCopy> = {
   },
   'Manage adjustments': { 'id-ID': 'Atur', 'en-US': 'Manage' },
   'Add adjustment': { 'id-ID': 'Tambah', 'en-US': 'Add' },
+  'Add promotion': { 'id-ID': 'Tambah Promo', 'en-US': 'Add promotion' },
   'Applied adjustments': { 'id-ID': 'Sedang diterapkan', 'en-US': 'Currently applied' },
   'Total after adjustments': {
     'id-ID': 'Total setelah penyesuaian',
@@ -290,11 +291,59 @@ const posCopy: Record<string, LocalizedCopy> = {
     'en-US': 'Assignment was not changed. Try again.',
   },
   'Add to queue': { 'id-ID': 'Masukkan ke antrian', 'en-US': 'Add to queue' },
+  'Order details': { 'id-ID': 'Detail pesanan', 'en-US': 'Order details' },
+  'Review the items before payment.': {
+    'id-ID': 'Periksa kembali item sebelum pembayaran.',
+    'en-US': 'Review the items before payment.',
+  },
+  'POS payment': { 'id-ID': 'Pembayaran POS', 'en-US': 'POS Payment' },
+  'Transaction ID': { 'id-ID': 'ID Transaksi', 'en-US': 'Transaction ID' },
+  Points: { 'id-ID': 'Poin', 'en-US': 'Points' },
+  'Net total': { 'id-ID': 'Total Bersih', 'en-US': 'Net total' },
+  'Ready to pay': { 'id-ID': 'Siap bayar', 'en-US': 'Ready to pay' },
   'Payment total': { 'id-ID': 'Total pembayaran', 'en-US': 'Payment total' },
   'Transaction discount': { 'id-ID': 'Diskon transaksi', 'en-US': 'Transaction discount' },
   'Promotions and discounts': { 'id-ID': 'Promo dan diskon', 'en-US': 'Promotions and discounts' },
   Promotion: { 'id-ID': 'Promo', 'en-US': 'Promotion' },
   'Use member points': { 'id-ID': 'Gunakan poin member', 'en-US': 'Use member points' },
+  'Loyalty points': { 'id-ID': 'Poin loyalty', 'en-US': 'Loyalty points' },
+  'Point balance': { 'id-ID': 'Saldo poin', 'en-US': 'Point balance' },
+  'Loyalty redemption': { 'id-ID': 'Penggunaan poin', 'en-US': 'Loyalty redemption' },
+  'points used': { 'id-ID': 'poin digunakan', 'en-US': 'points used' },
+  'Use loyalty points': { 'id-ID': 'Gunakan poin', 'en-US': 'Use loyalty points' },
+  'Change points': { 'id-ID': 'Ubah poin', 'en-US': 'Change points' },
+  'Points to use': { 'id-ID': 'Jumlah Poin Ditukarkan', 'en-US': 'Points to use' },
+  'Available balance': { 'id-ID': 'Saldo tersedia', 'en-US': 'Available balance' },
+  points: { 'id-ID': 'poin', 'en-US': 'points' },
+  'Enter the number of points to use for this transaction.': {
+    'id-ID': 'Masukkan jumlah poin yang ingin digunakan untuk transaksi ini.',
+    'en-US': 'Enter the number of points to use for this transaction.',
+  },
+  'Points are only consumed after the transaction is finalized.': {
+    'id-ID': 'Poin baru dipotong setelah transaksi berhasil diselesaikan.',
+    'en-US': 'Points are only consumed after the transaction is finalized.',
+  },
+  Update: { 'id-ID': 'Perbarui', 'en-US': 'Update' },
+  'Use member points for this transaction. Points are consumed only when the sale is finalized.': {
+    'id-ID': 'Gunakan poin member untuk transaksi ini. Poin baru dipotong saat transaksi berhasil diselesaikan.',
+    'en-US': 'Use member points for this transaction. Points are consumed only when the sale is finalized.',
+  },
+  'Loading loyalty points…': { 'id-ID': 'Memuat poin loyalty…', 'en-US': 'Loading loyalty points…' },
+  'Use all': { 'id-ID': 'Pakai semua', 'en-US': 'Use all' },
+  'Fill all': { 'id-ID': 'Isi semua', 'en-US': 'Fill all' },
+  'Insufficient loyalty points': {
+    'id-ID': 'Poin tidak mencukupi',
+    'en-US': 'Insufficient loyalty points',
+  },
+  'The requested points exceed the member point balance.': {
+    'id-ID': 'Jumlah poin yang digunakan melebihi saldo poin member.',
+    'en-US': 'The requested points exceed the member point balance.',
+  },
+  'Could not apply loyalty points': {
+    'id-ID': 'Poin loyalty tidak dapat digunakan',
+    'en-US': 'Could not apply loyalty points',
+  },
+  'Calculating…': { 'id-ID': 'Menghitung…', 'en-US': 'Calculating…' },
   'Choose a payment method before continuing.': {
     'id-ID': 'Pilih metode pembayaran sebelum melanjutkan.',
     'en-US': 'Choose a payment method before continuing.',
@@ -326,6 +375,7 @@ const posCopy: Record<string, LocalizedCopy> = {
   'Tax included': { 'id-ID': 'Pajak termasuk', 'en-US': 'Tax included' },
   'Paid amount': { 'id-ID': 'Dibayar', 'en-US': 'Paid amount' },
   'Cash received': { 'id-ID': 'Uang diterima', 'en-US': 'Cash received' },
+  'Exact amount': { 'id-ID': 'Pas', 'en-US': 'Exact' },
   'Thank you for your purchase.': {
     'id-ID': 'Terima kasih telah bertransaksi.',
     'en-US': 'Thank you for your purchase.',
@@ -546,7 +596,17 @@ const posCopy: Record<string, LocalizedCopy> = {
     'id-ID': 'Melunasi sisa tagihan',
     'en-US': 'Pays the remaining balance',
   },
-  'Full payment': { 'id-ID': 'Pembayaran penuh', 'en-US': 'Full payment' },
+  'Full payment': { 'id-ID': 'Bayar penuh', 'en-US': 'Full payment' },
+  'Split payment': { 'id-ID': 'Split pembayaran', 'en-US': 'Split payment' },
+  'Payment allocation': { 'id-ID': 'Cara pembayaran', 'en-US': 'Payment allocation' },
+  'Pay full remaining balance': {
+    'id-ID': 'Bayar seluruh sisa tagihan',
+    'en-US': 'Pay the full remaining balance',
+  },
+  'No payment amount needs to be entered.': {
+    'id-ID': 'Nominal otomatis mengikuti sisa tagihan, jadi tidak perlu diisi.',
+    'en-US': 'The amount follows the remaining balance automatically, so no amount needs to be entered.',
+  },
   'This payment completes the transaction.': {
     'id-ID': 'Pembayaran ini menyelesaikan transaksi.',
     'en-US': 'This payment completes the transaction.',
