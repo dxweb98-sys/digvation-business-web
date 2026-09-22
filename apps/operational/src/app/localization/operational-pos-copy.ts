@@ -572,7 +572,17 @@ const posCopy: Record<string, LocalizedCopy> = {
     'id-ID': 'Melunasi sisa tagihan',
     'en-US': 'Pays the remaining balance',
   },
-  'Full payment': { 'id-ID': 'Pembayaran penuh', 'en-US': 'Full payment' },
+  'Full payment': { 'id-ID': 'Bayar penuh', 'en-US': 'Full payment' },
+  'Split payment': { 'id-ID': 'Split pembayaran', 'en-US': 'Split payment' },
+  'Payment allocation': { 'id-ID': 'Cara pembayaran', 'en-US': 'Payment allocation' },
+  'Pay full remaining balance': {
+    'id-ID': 'Bayar seluruh sisa tagihan',
+    'en-US': 'Pay the full remaining balance',
+  },
+  'No payment amount needs to be entered.': {
+    'id-ID': 'Nominal otomatis mengikuti sisa tagihan, jadi tidak perlu diisi.',
+    'en-US': 'The amount follows the remaining balance automatically, so no amount needs to be entered.',
+  },
   'This payment completes the transaction.': {
     'id-ID': 'Pembayaran ini menyelesaikan transaksi.',
     'en-US': 'This payment completes the transaction.',
