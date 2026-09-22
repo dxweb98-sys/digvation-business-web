@@ -144,35 +144,30 @@ export function PaymentReview({
   return (
     <div className="space-y-4">
       <section className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]">
-        <div className="flex items-center gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface-muted)]/45 px-4 py-3">
-          <span
-            className={`grid size-9 shrink-0 place-items-center rounded-full ${
-              completes
-                ? 'bg-[var(--color-success)]/10 text-[var(--color-success)]'
-                : 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]'
-            }`}
-          >
-            {completes ? (
-              <CheckCircle2 className="size-4.5" aria-hidden />
-            ) : (
-              <SplitSquareHorizontal className="size-4.5" aria-hidden />
-            )}
-          </span>
-          <div className="min-w-0">
-            <p className="text-sm font-bold">{copy('Confirm payment')}</p>
-            <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
-              {copy('Check the method and amount. A recorded payment cannot be edited afterwards.')}
-            </p>
-          </div>
-        </div>
-
         <div className="p-4">
-          <p className="text-xs font-medium text-[var(--color-text-muted)]">
-            {copy(completes ? 'You are receiving' : 'You are receiving part of the total')}
-          </p>
-          <p className="mt-1 text-3xl font-bold leading-tight tabular-nums text-[var(--color-brand)]">
-            {format(intent.amount)}
-          </p>
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-[var(--color-text-muted)]">
+                {copy(completes ? 'You are receiving' : 'You are receiving part of the total')}
+              </p>
+              <p className="mt-1 text-3xl font-bold leading-tight tabular-nums text-[var(--color-brand)]">
+                {format(intent.amount)}
+              </p>
+            </div>
+            <span
+              className={`grid size-10 shrink-0 place-items-center rounded-full ${
+                completes
+                  ? 'bg-[var(--color-success)]/10 text-[var(--color-success)]'
+                  : 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]'
+              }`}
+            >
+              {completes ? (
+                <CheckCircle2 className="size-5" aria-hidden />
+              ) : (
+                <SplitSquareHorizontal className="size-5" aria-hidden />
+              )}
+            </span>
+          </div>
 
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
             <div className="rounded-xl bg-[var(--color-surface-muted)]/55 px-3 py-2.5">
