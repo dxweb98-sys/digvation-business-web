@@ -3090,6 +3090,18 @@ function ReferencePaymentDialog({
   const hasTax = !createDecimal(taxAmount).equals(createDecimal('0'));
   const canSubmitLoyalty =
     canRedeemLoyalty && Boolean(loyaltyPoints.trim()) && !isLoyaltyMutating;
+  const legacyLoyaltyRedemption = loyaltyRedemption as
+    | (NonNullable<Sale['loyaltyRedemption']> & {
+        requestedPoints?: string;
+        redemptionAmount?: string;
+      })
+    | null
+    | undefined;
+  const redeemedPoints =
+    loyaltyRedemption?.points ?? legacyLoyaltyRedemption?.requestedPoints ?? null;
+  const redeemedAmount =
+    loyaltyRedemption?.amount ?? legacyLoyaltyRedemption?.redemptionAmount ?? null;
+  const hasLoyaltyRedemption = Boolean(redeemedPoints && redeemedAmount);
   const customerBadge = customerStatus(customer);
   const payments = sale?.payments ?? [];
   const progress = sale
@@ -3305,7 +3317,7 @@ function ReferencePaymentDialog({
 
           {adjustmentSlot}
 
-          {customer?.type === 'MEMBER' && (canRedeemLoyalty || loyaltyRedemption) ? (
+          {customer?.type === 'MEMBER' && (canRedeemLoyalty || hasLoyaltyRedemption) ? (
             <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -3327,7 +3339,7 @@ function ReferencePaymentDialog({
                 </div>
               </div>
 
-              {loyaltyRedemption ? (
+              {hasLoyaltyRedemption ? (
                 <div className="mt-3 flex items-center gap-3 rounded-[var(--radius-control)] border border-[var(--color-success)]/20 bg-[var(--color-success)]/[.06] px-3 py-2.5">
                   <CheckCircle2
                     className="size-4 shrink-0 text-[var(--color-success)]"
@@ -3336,11 +3348,11 @@ function ReferencePaymentDialog({
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-semibold">{copy('Loyalty redemption')}</p>
                     <p className="mt-0.5 text-[11px] text-[var(--color-text-muted)]">
-                      {loyaltyRedemption.points} {copy('points used')}
+                      {redeemedPoints} {copy('points used')}
                     </p>
                   </div>
                   <span className="shrink-0 text-xs font-semibold tabular-nums text-[var(--color-danger)]">
-                    −{format(loyaltyRedemption.amount)}
+                    −{format(redeemedAmount!)}
                   </span>
                   {canRedeemLoyalty ? (
                     <DButton
@@ -3359,11 +3371,11 @@ function ReferencePaymentDialog({
               {canRedeemLoyalty ? (
                 <div
                   className={`mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2 ${
-                    loyaltyRedemption ? 'border-t border-[var(--color-border)] pt-3' : ''
+                    hasLoyaltyRedemption ? 'border-t border-[var(--color-border)] pt-3' : ''
                   }`}
                 >
                   <DInput
-                    label={copy(loyaltyRedemption ? 'Change points' : 'Use loyalty points')}
+                    label={copy(hasLoyaltyRedemption ? 'Change points' : 'Use loyalty points')}
                     value={loyaltyPoints}
                     onChange={onLoyaltyPointsChange}
                     inputMode="decimal"
@@ -3372,12 +3384,12 @@ function ReferencePaymentDialog({
                   />
                   <DButton
                     size="sm"
-                    variant={loyaltyRedemption ? 'secondary' : 'primary'}
+                    variant={hasLoyaltyRedemption ? 'secondary' : 'primary'}
                     disabled={!canSubmitLoyalty}
                     loading={isLoyaltyMutating}
                     onClick={onApplyLoyalty}
                   >
-                    {copy(loyaltyRedemption ? 'Update' : 'Apply')}
+                    {copy(hasLoyaltyRedemption ? 'Update' : 'Apply')}
                   </DButton>
                 </div>
               ) : null}
