@@ -301,6 +301,13 @@ const posCopy: Record<string, LocalizedCopy> = {
   'points used': { 'id-ID': 'poin digunakan', 'en-US': 'points used' },
   'Use loyalty points': { 'id-ID': 'Gunakan poin', 'en-US': 'Use loyalty points' },
   'Change points': { 'id-ID': 'Ubah poin', 'en-US': 'Change points' },
+  'Points to use': { 'id-ID': 'Jumlah poin', 'en-US': 'Points to use' },
+  'Available balance': { 'id-ID': 'Saldo tersedia', 'en-US': 'Available balance' },
+  points: { 'id-ID': 'poin', 'en-US': 'points' },
+  'Enter the number of points to use for this transaction.': {
+    'id-ID': 'Masukkan jumlah poin yang ingin digunakan untuk transaksi ini.',
+    'en-US': 'Enter the number of points to use for this transaction.',
+  },
   Update: { 'id-ID': 'Perbarui', 'en-US': 'Update' },
   'Use member points for this transaction. Points are consumed only when the sale is finalized.': {
     'id-ID': 'Gunakan poin member untuk transaksi ini. Poin baru dipotong saat transaksi berhasil diselesaikan.',
