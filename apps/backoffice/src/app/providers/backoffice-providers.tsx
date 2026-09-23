@@ -1,8 +1,11 @@
 import {
   AuthenticatedRuntimeProjectionProvider,
+  ConnectivityProvider,
   DeploymentBootstrapProvider,
+  useConnectivity,
   type DeploymentBootstrapConfig,
 } from '@digvation/business-runtime';
+import { ConnectionStateBoundary } from '@digvation/business-system-states';
 import type { AuthPort } from '@digvation/business-auth';
 import { DLocalizationProvider, DToastProvider } from '@digvation/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -42,11 +45,13 @@ export function BackofficeProviders({
 }: BackofficeProvidersProps) {
   return (
     <DeploymentBootstrapProvider config={bootstrap}>
-      <BackofficeLocalizationProvider>
-        <PasswordRecoveryProvider port={passwordRecovery}>
-          <BackofficeDesignSystemProviders auth={auth} router={router} />
-        </PasswordRecoveryProvider>
-      </BackofficeLocalizationProvider>
+      <ConnectivityProvider>
+        <BackofficeLocalizationProvider>
+          <PasswordRecoveryProvider port={passwordRecovery}>
+            <BackofficeDesignSystemProviders auth={auth} router={router} />
+          </PasswordRecoveryProvider>
+        </BackofficeLocalizationProvider>
+      </ConnectivityProvider>
     </DeploymentBootstrapProvider>
   );
 }
@@ -88,7 +93,7 @@ function AuthenticatedBackofficeProviders({ router }: Pick<BackofficeProvidersPr
   const content = (
     <QueryClientProvider client={queryClient}>
       <BusinessLocationProvider>
-        <RouterProvider router={router} />
+        <ConnectedBackofficeRouter router={router} />
       </BusinessLocationProvider>
     </QueryClientProvider>
   );
@@ -99,5 +104,14 @@ function AuthenticatedBackofficeProviders({ router }: Pick<BackofficeProvidersPr
     <AuthenticatedRuntimeProjectionProvider projection={session}>
       {content}
     </AuthenticatedRuntimeProjectionProvider>
+  );
+}
+
+function ConnectedBackofficeRouter({ router }: Pick<BackofficeProvidersProps, 'router'>) {
+  const { isOnline } = useConnectivity();
+  return (
+    <ConnectionStateBoundary isOnline={isOnline}>
+      <RouterProvider router={router} />
+    </ConnectionStateBoundary>
   );
 }

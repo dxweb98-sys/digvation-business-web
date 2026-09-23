@@ -8,20 +8,16 @@ import {
   AuthenticatedRuntimeProjectionProvider,
   ConnectivityProvider,
   DeploymentBootstrapProvider,
+  useConnectivity,
   type DeploymentBootstrapConfig,
 } from '@digvation/business-runtime';
+import { ConnectionStateBoundary } from '@digvation/business-system-states';
 import { DLocalizationProvider, DToastProvider as ToastProvider, useToast } from '@digvation/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { RouterProviderProps } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type TransitionEvent,
-} from 'react';
+import { useCallback, useEffect, useRef, useState, type TransitionEvent } from 'react';
 
 import { operationalQueryClientDefaults } from '../data/operational-cache-policy';
 import { operationalCopy, type OperationalLocale } from '../localization/operational-localization';
@@ -57,11 +53,7 @@ interface OperationalProvidersProps {
 
 type OperationalAuthBoundaryProps = Omit<OperationalProvidersProps, 'bootstrap'>;
 
-function OperationalAuthBoundary({
-  session,
-  authPort,
-  router,
-}: OperationalAuthBoundaryProps) {
+function OperationalAuthBoundary({ session, authPort, router }: OperationalAuthBoundaryProps) {
   const [authenticatedSession, setAuthenticatedSession] = useState(session);
   const [isLoggingOut, setLoggingOut] = useState(false);
   const sessionEnded = useRef(false);
@@ -149,7 +141,7 @@ function OperationalAuthBoundary({
                 }`}
                 onTransitionEnd={completeLogoutTransition}
               >
-                <RouterProvider router={router} />
+                <ConnectedOperationalRouter router={router} />
               </div>
             </PosOperationalSessionProvider>
           </OperationalSessionProvider>
@@ -171,15 +163,20 @@ export function OperationalProviders({
         <QueryClientProvider client={queryClient}>
           <DLocalizationProvider locale={runtimeLocale(bootstrap.defaults.locale)}>
             <ToastProvider>
-              <OperationalAuthBoundary
-                session={session}
-                authPort={authPort}
-                router={router}
-              />
+              <OperationalAuthBoundary session={session} authPort={authPort} router={router} />
             </ToastProvider>
           </DLocalizationProvider>
         </QueryClientProvider>
       </ConnectivityProvider>
     </DeploymentBootstrapProvider>
+  );
+}
+
+function ConnectedOperationalRouter({ router }: Pick<OperationalProvidersProps, 'router'>) {
+  const { isOnline } = useConnectivity();
+  return (
+    <ConnectionStateBoundary isOnline={isOnline}>
+      <RouterProvider router={router} />
+    </ConnectionStateBoundary>
   );
 }
