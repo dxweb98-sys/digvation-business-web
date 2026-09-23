@@ -1,4 +1,6 @@
-import { createBrowserRouter } from 'react-router';
+import { SystemStatePage } from '@digvation/business-system-states';
+import { DButton } from '@digvation/ui';
+import { createBrowserRouter, useNavigate } from 'react-router';
 
 import { AuthenticatedRoute } from '../../auth/authenticated-route';
 import { AuthorizedRoute } from '../../auth/authorized-route';
@@ -19,11 +21,40 @@ import { ReportsPage } from '../../modules/reporting';
 import { ActivityPage } from '../../modules/activity';
 import { NotificationsPage } from '../../modules/notifications';
 
+function BackofficeNotFoundRoute() {
+  const navigate = useNavigate();
+  return (
+    <SystemStatePage
+      state="not-found"
+      variant="content"
+      action={
+        <DButton variant="secondary" size="sm" onClick={() => navigate('/')}>
+          Kembali ke dashboard
+        </DButton>
+      }
+    />
+  );
+}
+
+function BackofficeApplicationErrorRoute() {
+  return (
+    <SystemStatePage
+      state="application-error"
+      action={
+        <DButton variant="secondary" size="sm" onClick={() => window.location.reload()}>
+          Coba lagi
+        </DButton>
+      }
+    />
+  );
+}
+
 export const backofficeRouter = createBrowserRouter([
   { path: '/login', element: <BackofficeLoginPage /> },
   { path: PASSWORD_RECOVERY_PATH, element: <BackofficePasswordRecoveryPage /> },
   {
     element: <AuthenticatedRoute />,
+    errorElement: <BackofficeApplicationErrorRoute />,
     children: [
       {
         element: <BackofficeShell />,
@@ -87,8 +118,5 @@ export const backofficeRouter = createBrowserRouter([
       },
     ],
   },
-  {
-    path: '*',
-    element: <BackofficeLoginPage />,
-  },
+  { path: '*', element: <BackofficeNotFoundRoute /> },
 ]);

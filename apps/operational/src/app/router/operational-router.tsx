@@ -1,5 +1,7 @@
 import { useAuth } from '@digvation/business-auth';
-import { Navigate, createBrowserRouter } from 'react-router';
+import { SystemStatePage } from '@digvation/business-system-states';
+import { DButton } from '@digvation/ui';
+import { Navigate, createBrowserRouter, useNavigate } from 'react-router';
 import type { ReactNode } from 'react';
 
 import { useOperationalLocalization } from '../localization/operational-localization';
@@ -69,8 +71,51 @@ function OperationalHome() {
   return <Navigate to="/login" replace />;
 }
 
+export function OperationalNotFoundRoute() {
+  const navigate = useNavigate();
+  return (
+    <SystemStatePage
+      state="not-found"
+      variant="content"
+      variant="content"
+      action={
+        <DButton variant="secondary" size="sm" onClick={() => navigate('/')}>
+          Kembali ke Jual
+        </DButton>
+      }
+    />
+  );
+}
+
+function OperationalAccessDeniedRoute() {
+  const navigate = useNavigate();
+  return (
+    <SystemStatePage
+      state="forbidden"
+      action={
+        <DButton variant="secondary" size="sm" onClick={() => navigate('/')}>
+          Kembali ke Jual
+        </DButton>
+      }
+    />
+  );
+}
+
+function OperationalApplicationErrorRoute() {
+  return (
+    <SystemStatePage
+      state="application-error"
+      action={
+        <DButton variant="secondary" size="sm" onClick={() => window.location.reload()}>
+          Coba lagi
+        </DButton>
+      }
+    />
+  );
+}
+
 function SurfaceGate({ allowed, children }: { allowed: boolean; children: ReactNode }) {
-  return allowed ? <>{children}</> : <OperationalHome />;
+  return allowed ? <>{children}</> : <OperationalAccessDeniedRoute />;
 }
 
 function SellRoute() {
@@ -95,13 +140,13 @@ export const operationalRouter = createBrowserRouter([
   { path: '/login', element: <Navigate to="/" replace /> },
   {
     element: <OperationalLayout />,
+    errorElement: <OperationalApplicationErrorRoute />,
     children: [
       { index: true, element: <OperationalHome /> },
       { path: '/sell', element: <SellRoute /> },
       { path: '/sell/:saleId', element: <SellRoute /> },
       { path: '/expenses', element: <ExpensesRoute /> },
-      // Retired or unknown paths, such as the former transaction history, land on the home redirect.
-      { path: '*', element: <OperationalHome /> },
+      { path: '*', element: <OperationalNotFoundRoute /> },
     ],
   },
 ]);
