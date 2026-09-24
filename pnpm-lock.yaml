@@ -168,6 +168,15 @@ importers:
         specifier: 4.5.4
         version: 4.5.4
 
+  packages/system-states:
+    dependencies:
+      '@digvation/ui':
+        specifier: 1.1.0
+        version: 1.1.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      react:
+        specifier: ^19.2.0
+        version: 19.2.8
+
   packages/testing:
     dependencies:
       msw:
