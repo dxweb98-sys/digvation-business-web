@@ -828,6 +828,13 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
 
   const displayedQueueDetail =
     receiptSaleId && sale?.id === receiptSaleId && hasSuccessfulPayment(sale) ? sale : queueDetail;
+  const receiptDeliveryStatusQuery = useQuery({
+    queryKey: ['operational-receipt-delivery', displayedQueueDetail?.id ?? null],
+    queryFn: () => adapter.getReceiptDeliveryStatus(displayedQueueDetail!.id),
+    enabled: Boolean(displayedQueueDetail?.status === 'FINALIZED'),
+    refetchInterval: displayedQueueDetail?.status === 'FINALIZED' ? 3_000 : false,
+    staleTime: 1_000,
+  });
   const displayedAdjustmentTarget =
     adjustmentTarget && sale?.id === adjustmentTarget.id ? sale : adjustmentTarget;
   const displayedQueuePaymentTarget =
@@ -980,6 +987,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     } finally {
       setSendingReceipt(false);
       setSendingReceiptId(null);
+      void receiptDeliveryStatusQuery.refetch();
     }
   };
 
@@ -1793,6 +1801,12 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         }}
         onSendReceipt={(transaction) => void sendReceipt(transaction)}
         isSendingReceipt={isSendingReceipt}
+        deliveryStatus={
+          displayedQueueDetail?.status === 'FINALIZED'
+            ? receiptDeliveryStatusQuery.data
+            : undefined
+        }
+        onRetryDelivery={(transaction) => void sendReceipt(transaction)}
         onAssign={(line) => {
           if (!displayedQueueDetail) return;
           workspace.requestEmployeeOptions();
@@ -4069,6 +4083,8 @@ export function ReferenceTransactionDetail({
   onViewReceipt,
   onSendReceipt,
   isSendingReceipt,
+  deliveryStatus,
+  onRetryDelivery,
   onAssign,
   onComplete,
   isMutating,
@@ -4086,6 +4102,15 @@ export function ReferenceTransactionDetail({
   onViewReceipt: (sale: Sale) => void;
   onSendReceipt?: (sale: Sale) => void;
   isSendingReceipt?: boolean;
+  deliveryStatus?: {
+    available: boolean;
+    delivery: {
+      status: 'QUEUED' | 'SENDING' | 'SENT' | 'FAILED';
+      attemptCount: number;
+      retryAllowed: boolean;
+    } | null;
+  };
+  onRetryDelivery?: (sale: Sale) => void;
   onAssign: (line: SaleLine) => void;
   onComplete: () => void;
   isMutating: boolean;
@@ -4149,6 +4174,25 @@ export function ReferenceTransactionDetail({
   const redeemedAmount =
     sale.loyaltyRedemption?.amount ?? legacyLoyaltyRedemption?.redemptionAmount ?? null;
   const hasLoyaltyRedemption = Boolean(redeemedPoints && redeemedAmount);
+  const receiptDelivery = deliveryStatus?.delivery ?? null;
+  const receiptDeliveryBusy =
+    receiptDelivery?.status === 'QUEUED' || receiptDelivery?.status === 'SENDING';
+  const receiptDeliverySent = receiptDelivery?.status === 'SENT';
+  const receiptDeliveryFailed = receiptDelivery?.status === 'FAILED';
+  const receiptDeliveryAction =
+    receiptDeliveryFailed && receiptDelivery.retryAllowed
+      ? (onRetryDelivery ?? onSendReceipt)
+      : onSendReceipt;
+  const receiptDeliveryLabel =
+    receiptDelivery?.status === 'QUEUED'
+      ? 'Mengantre'
+      : receiptDelivery?.status === 'SENDING'
+        ? 'Mengirim'
+        : receiptDelivery?.status === 'SENT'
+          ? 'Terkirim'
+          : receiptDelivery?.status === 'FAILED'
+            ? 'Coba lagi'
+            : copy('Send via WhatsApp');
 
   return (
     <>
@@ -4200,13 +4244,15 @@ export function ReferenceTransactionDetail({
                 <DButton variant="ghost" onClick={onClose}>
                   {copy('Close')}
                 </DButton>
-                {onSendReceipt ? (
+                {deliveryStatus?.available && receiptDeliveryAction ? (
                   <DButton
                     variant="outline"
-                    loading={Boolean(isSendingReceipt)}
-                    onClick={() => onSendReceipt(sale)}
+                    loading={Boolean(isSendingReceipt) || receiptDeliveryBusy}
+                    disabled={receiptDeliverySent}
+                    aria-label={receiptDeliveryFailed ? 'Retry sending' : undefined}
+                    onClick={() => receiptDeliveryAction(sale)}
                   >
-                    {copy('Send via WhatsApp')}
+                    {receiptDeliveryLabel}
                   </DButton>
                 ) : null}
                 <DButton
