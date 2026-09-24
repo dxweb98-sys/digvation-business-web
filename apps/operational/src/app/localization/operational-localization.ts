@@ -1,4 +1,5 @@
 import { useOptionalAuth } from '@digvation/business-auth';
+import { formatMoney as formatSharedMoney } from '@digvation/business-money';
 import {
   createBusinessDateTimeFormatter,
   useDeploymentBootstrap,
@@ -39,10 +40,6 @@ export function useOperationalLocalization() {
     formatDateOnly: dateTime.formatDateOnly,
     businessTimezone: dateTime.timezone,
     formatMoney: (amount: string, currency: string) =>
-      new Intl.NumberFormat(locale, {
-        style: 'currency',
-        currency,
-        maximumFractionDigits: 0,
-      }).format(Number(amount)),
+      formatSharedMoney(amount, currency, locale),
   };
 }

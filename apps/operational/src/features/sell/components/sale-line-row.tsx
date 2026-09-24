@@ -1,4 +1,10 @@
-import { compareDecimalStrings, createDecimal, formatMoney } from '@digvation/pos-money';
+import {
+  compareDecimalStrings,
+  createDecimal,
+  formatDecimalNumber,
+  formatMoney,
+} from '@digvation/pos-money';
+import { useOperationalLocalization } from '../../../app/localization/operational-localization';
 import { DBadge, DButton } from '@digvation-labs/ui';
 import { Minus, Plus, SlidersHorizontal, Trash2 } from 'lucide-react';
 
@@ -23,6 +29,7 @@ export function SaleLineRow({
   onRemove,
   onManage,
 }: SaleLineRowProps) {
+  const { label } = useOperationalLocalization();
   const isDisabled = availability.state !== 'AVAILABLE';
   const canDecrease = !isDisabled && compareDecimalStrings(line.quantity, '1') > 0;
   const assignedCount = line.participations.filter(
@@ -68,7 +75,7 @@ export function SaleLineRow({
       <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-semibold text-[var(--color-text-muted)]">
         {line.fulfillment ? (
           <DBadge className="bg-[var(--color-accent-sky)]/45 px-2 py-1">
-            {line.fulfillment.status}
+            {label(line.fulfillment.status)}
           </DBadge>
         ) : null}
         {assignedCount > 0 ? (
@@ -102,7 +109,7 @@ export function SaleLineRow({
             <Minus className="size-4" />
           </DButton>
           <span className="min-w-10 px-2 text-center text-sm font-bold tabular-nums">
-            {line.quantity}
+            {formatDecimalNumber(line.quantity, locale)}
           </span>
           <DButton
             variant="ghost"

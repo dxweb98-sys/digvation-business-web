@@ -1,3 +1,4 @@
+import { formatDecimalNumber, formatPercentageFromRate } from '@digvation/business-money';
 import { useRuntime } from '@digvation/business-runtime';
 import {
   DButton,
@@ -12,6 +13,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ChartNoAxesColumnIncreasing, CircleDollarSign, Hash, PackageCheck } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
+import { humanReadableLabel } from '../../app/localization/human-readable-labels';
 import {
   AnalyticsDonutChart,
   AnalyticsHorizontalBarChart,
@@ -354,7 +356,7 @@ export function ReportsPage() {
   const { createApiClient, getAccessToken, session } = useBackofficeAuth();
   const runtime = useRuntime();
   const { apiBaseUrl } = runtime;
-  const { copy, formatDate, formatMoney } = useWorkforceLocalization();
+  const { copy, formatDate, formatDateOnly, formatMoney, locale } = useWorkforceLocalization();
   const api = useMemo(() => createApiClient(apiBaseUrl), [apiBaseUrl, createApiClient]);
   const availableTypes = useMemo(
     () => types.filter(([candidate]) => canAccessReport(session, candidate)),
@@ -447,15 +449,23 @@ export function ReportsPage() {
         const attendanceLabel = attendanceLabels[String(v ?? '')];
         if (attendanceLabel) return copy(attendanceLabel);
       }
-      return money(k)
-        ? formatMoney(String(v ?? 0), 'IDR')
-        : count(k)
-          ? integer(Number(v ?? 0))
-          : quantity(k)
-            ? new Intl.NumberFormat('id-ID', { maximumFractionDigits: 4 }).format(Number(v ?? 0))
-            : copy(String(v ?? '—'));
+      if (v === null || v === undefined || v === '') return '—';
+      if (money(k)) return formatMoney(String(v), 'IDR');
+      if (k === 'taxRate')
+        return formatPercentageFromRate(String(v), locale === 'id' ? 'id-ID' : 'en-US');
+      if (count(k)) return integer(Number(v));
+      if (quantity(k))
+        return formatDecimalNumber(String(v), locale === 'id' ? 'id-ID' : 'en-US');
+      if (/At$/.test(k))
+        return formatDate(new Date(String(v)), { dateStyle: 'medium', timeStyle: 'short' });
+      if (/Status(?:es)?$|^status$|Method$|^method$|^type$|Treatment$|^origin$|Lifecycle$|Source$/.test(k))
+        return String(v)
+          .split(',')
+          .map((part) => humanReadableLabel(part.trim(), locale))
+          .join(', ');
+      return copy(String(v));
     },
-    [copy, formatDate, formatMoney, type],
+    [copy, formatDate, formatMoney, locale, type],
   );
   const columns = useMemo<TableColumn<Row>[]>(
     () =>
@@ -491,7 +501,9 @@ export function ReportsPage() {
             { value: '', label: copy('All') },
             ...values.map((value) => ({
               value,
-              label: copy(attendanceLabels[value] ?? value),
+              label: attendanceLabels[value]
+                ? copy(attendanceLabels[value])
+                : humanReadableLabel(value, locale),
             })),
           ],
         ] as [string, string, { value: string; label: string }[]],
@@ -654,7 +666,9 @@ export function ReportsPage() {
       }));
   const activeFilters = Object.entries(filters).map(([k, v]) => ({
     key: k,
-    label: `${copy(title(k))}: ${copy(attendanceLabels[v] ?? v)}`,
+    label: `${copy(title(k))}: ${
+      attendanceLabels[v] ? copy(attendanceLabels[v]) : humanReadableLabel(v, locale)
+    }`,
   }));
   const exportAction =
     type === 'attendance' ? (
@@ -792,7 +806,7 @@ export function ReportsPage() {
         <div className="mt-4 flex flex-col gap-3 border-t border-[var(--color-border)] pt-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-muted)]">
             <span>
-              {from} - {to}
+              {formatDateOnly(from)} - {formatDateOnly(to)}
             </span>
             <span aria-hidden="true">|</span>
             <span>

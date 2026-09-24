@@ -26,13 +26,35 @@ export function formatMoney(
   amount: string,
   currency: string,
   locale: string,
-  maximumFractionDigits = 2,
+  maximumFractionDigits?: number,
 ): string {
   const decimal = createDecimal(amount);
 
   return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency,
-    maximumFractionDigits,
+    ...(maximumFractionDigits === undefined ? {} : { maximumFractionDigits }),
   }).format(decimal.toNumber());
+}
+
+export function formatDecimalNumber(
+  value: string,
+  locale: string,
+  maximumFractionDigits = 4,
+): string {
+  return new Intl.NumberFormat(locale, {
+    maximumFractionDigits,
+  }).format(createDecimal(value).toNumber());
+}
+
+export function formatPercentageFromRate(
+  rate: string,
+  locale: string,
+  maximumFractionDigits = 4,
+): string {
+  return `${formatDecimalNumber(
+    createDecimal(rate).times(100).toFixed(),
+    locale,
+    maximumFractionDigits,
+  )}%`;
 }

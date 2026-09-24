@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { addDecimalStrings, compareDecimalStrings, subtractDecimalStrings } from './money';
+import {
+  addDecimalStrings,
+  compareDecimalStrings,
+  formatDecimalNumber,
+  formatMoney,
+  formatPercentageFromRate,
+  subtractDecimalStrings,
+} from './money';
 
 describe('money helpers', () => {
   it('does not use floating-point arithmetic for addition', () => {
@@ -13,5 +20,22 @@ describe('money helpers', () => {
 
   it('compares decimal strings', () => {
     expect(compareDecimalStrings('10.0000', '10')).toBe(0);
+  });
+
+  it('uses currency minor units by default', () => {
+    expect(formatMoney('110000.0000', 'IDR', 'id-ID')).toBe(
+      formatMoney('110000', 'IDR', 'id-ID'),
+    );
+    expect(formatMoney('12.50', 'USD', 'en-US')).toBe('$12.50');
+  });
+
+  it('normalizes quantities without falsifying fractions', () => {
+    expect(formatDecimalNumber('1.0000', 'id-ID')).toBe('1');
+    expect(formatDecimalNumber('1.2500', 'id-ID')).toBe('1,25');
+  });
+
+  it('normalizes fractional rates as percentages', () => {
+    expect(formatPercentageFromRate('0.1100', 'id-ID')).toBe('11%');
+    expect(formatPercentageFromRate('0.1050', 'id-ID')).toBe('10,5%');
   });
 });

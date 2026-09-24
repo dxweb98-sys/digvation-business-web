@@ -1,3 +1,4 @@
+import { formatMoney as formatSharedMoney } from '@digvation/business-money';
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 
 import { backofficeCopy } from './backoffice-localization-copy';
@@ -40,11 +41,7 @@ export function BackofficeLocalizationProvider({ children }: { children: ReactNo
       formatDate: (value, options) =>
         new Intl.DateTimeFormat(locale === 'id' ? 'id-ID' : 'en-US', options).format(value),
       formatMoney: (amount, currency) =>
-        new Intl.NumberFormat(locale === 'id' ? 'id-ID' : 'en-US', {
-          style: 'currency',
-          currency,
-          maximumFractionDigits: 0,
-        }).format(Number(amount)),
+        formatSharedMoney(amount, currency, locale === 'id' ? 'id-ID' : 'en-US'),
     }),
     [locale, setLocale],
   );

@@ -1,4 +1,5 @@
 import { createDecimal, formatMoney } from '@digvation/pos-money';
+import { useOperationalLocalization } from '../../../app/localization/operational-localization';
 import { DButton, DSkeleton } from '@digvation-labs/ui';
 import { ArrowRight, BadgeCheck, CircleAlert, Plus, ShoppingBag, UserRound } from 'lucide-react';
 
@@ -50,6 +51,7 @@ export function CurrentSalePane({
   onContinue,
   onNewSale,
 }: CurrentSalePaneProps) {
+  const { label } = useOperationalLocalization();
   const sale = viewModel.sale;
 
   if (!sale) {
@@ -130,7 +132,7 @@ export function CurrentSalePane({
             </p>
             <h2 className="mt-1 truncate text-base font-bold">Current order</h2>
             <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-              {viewModel.activeLines.length} items Â· {sale.status}
+              {viewModel.activeLines.length} items Â· {label(sale.status)}
             </p>
           </div>
         </div>
