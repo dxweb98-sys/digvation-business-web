@@ -12,6 +12,7 @@ import type {
   OpenSalesQuery,
   PaymentTransitionInput,
   PriceOverrideInput,
+  SaleTaxConfiguration,
   SaleTransactionClient,
   SellingCatalogQuery,
   SetSaleCustomerInput,
@@ -424,6 +425,16 @@ export class LocalDemoCashierTransactionAdapter
 
   public async listSales(): Promise<ApiPage<Sale>> {
     return page([...state.sales.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)));
+  }
+
+  public async getTaxConfiguration(): Promise<SaleTaxConfiguration> {
+    return {
+      enabled: false,
+      rate: '0',
+      version: 0,
+      createdAt: null,
+      updatedAt: null,
+    };
   }
 
   public async getSale(saleId: string): Promise<Sale> {
