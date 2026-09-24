@@ -5,6 +5,7 @@ export interface Customer { id: string; name: string; phoneE164: string; version
 export interface Member { id: string; customerId: string; customer: Customer; memberNumber: string; status: Status; joinedAt: string; version: number; }
 export interface MemberPage { items: Member[]; total: number; limit: number; offset: number; }
 export interface Balance { membershipId: string; pointsBalance: string; }
+export interface PortalAccess { status: string; handle: string; }
 type LedgerType = 'EARN'|'REDEEM'|'EARN_REVERSAL'|'REDEEM_REVERSAL';
 type LedgerResponse = { id: string; type: LedgerType; pointsDelta: string; balanceAfter: string; sourceSaleId: string; reversesLedgerEntryId: string|null; createdAt: string; };
 export interface Ledger { id: string; type: 'Points earned'|'Points redeemed'|'Earned points reversed'|'Redeemed points restored'; pointsDelta: string; balanceAfter: string; sourceSaleId: string; reversesLedgerEntryId: string|null; createdAt: string; }
@@ -19,4 +20,7 @@ export class MembersApi {
   updateStatus(member:Member,status:Status) { return this.client.patch<Member>(`/api/v1/memberships/${member.id}/status`,{status,expectedVersion:member.version}); }
   balance(id:string) { return this.client.get<Balance>(`/api/v1/loyalty/memberships/${id}/balance`); }
   async history(id:string) { const rows = await this.client.get<LedgerResponse[]>(`/api/v1/loyalty/memberships/${id}/history`); return rows.map(({type,...row})=>({...row,type:ledgerTypeLabel[type]})); }
+  portalAccess(id:string) { return this.client.get<PortalAccess>(`/api/v1/memberships/${id}/portal-access`); }
+  rotatePortalAccess(id:string) { return this.client.post<PortalAccess>(`/api/v1/memberships/${id}/portal-access/rotate`,{}); }
+  revokePortalAccess(id:string) { return this.client.post<{completed:true}>(`/api/v1/memberships/${id}/portal-access/revoke`,{}); }
 }
