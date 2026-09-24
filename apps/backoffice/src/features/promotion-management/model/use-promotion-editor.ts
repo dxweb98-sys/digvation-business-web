@@ -35,7 +35,7 @@ export function usePromotionEditor(promotion: Promotion | null | undefined) {
     form.reset(createPromotionEditorForm(promotion));
     setSaving(false);
     setStep('INFORMATION');
-  }, [form, identity, promotion]);
+  }, [form.reset, identity, promotion]);
 
   const changeMode = useCallback(
     (value: PromotionMode) => {
@@ -44,7 +44,7 @@ export function usePromotionEditor(promotion: Promotion | null | undefined) {
         ...(value === 'AUTOMATIC' ? { code: '' } : {}),
       });
     },
-    [form],
+    [form.patch],
   );
 
   const changeDiscountType = useCallback(
@@ -54,7 +54,7 @@ export function usePromotionEditor(promotion: Promotion | null | undefined) {
         ...(value === 'FIXED_AMOUNT' ? { maximumDiscount: '' } : {}),
       });
     },
-    [form],
+    [form.patch],
   );
 
   const changeScope = useCallback(
@@ -86,7 +86,7 @@ export function usePromotionEditor(promotion: Promotion | null | undefined) {
         categoryItemScope: 'ALL',
       });
     },
-    [form],
+    [form.patch],
   );
 
   const changeCategories = useCallback(
@@ -99,7 +99,7 @@ export function usePromotionEditor(promotion: Promotion | null | undefined) {
 
       form.patch({ categoryIds, itemIds });
     },
-    [form],
+    [form.patch, form.values.itemIds],
   );
 
   const changeCategoryItemScope = useCallback(
@@ -109,7 +109,7 @@ export function usePromotionEditor(promotion: Promotion | null | undefined) {
         ...(value === 'ALL' ? { itemIds: [] } : {}),
       });
     },
-    [form],
+    [form.patch],
   );
 
   return {

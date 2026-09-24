@@ -33,7 +33,7 @@ describe('usePromotionEditor', () => {
   it('uses the shared form state for field updates', () => {
     const { result } = renderHook(() => usePromotionEditor(promotion));
 
-    act(() => result.current.form.values.setField('name', 'Changed promotion'));
+    act(() => result.current.form.setField('name', 'Changed promotion'));
 
     expect(result.current.form.values.name).toBe('Changed promotion');
     expect(result.current.form.values.code).toBe('SAVE10');
