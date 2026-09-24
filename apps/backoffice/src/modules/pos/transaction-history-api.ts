@@ -21,6 +21,19 @@ export interface Payment {
   createdAt: string;
 }
 
+export interface SaleReversal {
+  reason: string;
+  reversedAt: string;
+  reversedByActorId?: string | null;
+}
+
+export interface SaleLoyaltyRedemption {
+  membershipId: string;
+  points: string;
+  pointValue: string;
+  amount: string;
+}
+
 export interface SaleLine {
   id: string;
   itemNameSnapshot: string;
@@ -43,12 +56,16 @@ export interface Sale {
   sellingLocationId: string;
   currency: string;
   status: SaleStatus;
+  version: number;
+  grossAmount: string;
   totalAmount: string;
   taxAmount: string;
   discountAmount: string;
   createdAt: string;
   finalizedAt: string | null;
   voidedAt: string | null;
+  reversal?: SaleReversal | null;
+  loyaltyRedemption?: SaleLoyaltyRedemption | null;
   lines: SaleLine[];
   payments: Payment[];
 }
@@ -76,5 +93,19 @@ export class TransactionHistoryApi {
   }
   get(id: string) {
     return this.client.get<Sale>(`/api/v1/sales/${id}`);
+  }
+  refundPayment(saleId: string, paymentId: string, expectedVersion: number, amount: string) {
+    return this.client.post<Sale>(
+      `/api/v1/sales/${saleId}/payments/${paymentId}/refund`,
+      { expectedVersion, amount },
+      { headers: { 'idempotency-key': crypto.randomUUID() } },
+    );
+  }
+  reverse(saleId: string, expectedVersion: number, reason: string) {
+    return this.client.post<Sale>(
+      `/api/v1/sales/${saleId}/reverse`,
+      { expectedVersion, reason },
+      { headers: { 'idempotency-key': crypto.randomUUID() } },
+    );
   }
 }

@@ -271,6 +271,11 @@ export interface SaleLine {
   removedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Runtime authority: mutable preview for OPEN Sales, immutable snapshot once finalized. */
+  loyaltyEarning?: {
+    state: 'PREVIEW' | 'FINALIZED';
+    pointsEarned: string;
+  } | null;
   fulfillment: SaleLineFulfillment | null;
   participations: SaleParticipation[];
   contributions: EmployeeContribution[];
