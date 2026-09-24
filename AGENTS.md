@@ -171,7 +171,7 @@ Ownership rules:
 - ordinary detail/entity fetching continues to use TanStack Query directly;
 - UI/editor state must be mapped to Runtime API DTOs at the command boundary rather than becoming the transport contract.
 
-Promotion is the first reference migration for explicit `entities` + `features` separation. Catalog remains a valid existing feature-owned implementation until a dedicated migration is requested; do not perform a big-bang tree rewrite.
+Promotion is the first completed reference for explicit `entities` + `features` separation. Its Backoffice route imports the feature directly and the legacy Promotion module has been removed after approval. Catalog remains a valid existing feature-owned implementation until a dedicated migration is requested; do not perform a big-bang tree rewrite.
 
 Localization follows ownership:
 

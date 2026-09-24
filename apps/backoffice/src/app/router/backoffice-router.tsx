@@ -12,7 +12,7 @@ import { BackofficeShell } from '../shell/backoffice-shell';
 import { AccessControlPage } from '../../modules/identity';
 import { BusinessSettingsPage } from '../../modules/organization';
 import { CatalogPage } from '../../features/catalog';
-import { PromotionsPage } from '../../modules/promotions';
+import { PromotionsPage } from '../../features/promotion-management';
 import { EmployeesPage } from '../../modules/workforce';
 import { MembersPage } from '../../modules/membership';
 import { ExpensesPage, FinancialAccountsPage } from '../../modules/finance';

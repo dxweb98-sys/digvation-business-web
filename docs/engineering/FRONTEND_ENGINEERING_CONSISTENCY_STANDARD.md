@@ -311,7 +311,7 @@ Do not recreate `modules/catalog`. Catalog is owned by `apps/backoffice/src/feat
 
 ## Reference implementation
 
-Promotion is the first reference migration for explicit `entities/<entity>` plus `features/<use-case>` separation.
+Promotion is the first completed reference for explicit `entities/<entity>` plus `features/<use-case>` separation; its legacy `modules/promotions` path has been removed after approval.
 
 Catalog remains the reference for complex editor state, reducer/custom-hook ownership, and section composition until it receives a dedicated migration.
 

@@ -218,7 +218,7 @@ Do not create a generic feature-level `localization/` dumping ground when the co
 
 ## Current Backoffice reference layout
 
-Promotion is the first incremental reference for explicit entity + feature separation:
+Promotion is the first completed reference for explicit entity + feature separation:
 
 ```text
 apps/backoffice/src/
@@ -230,17 +230,15 @@ apps/backoffice/src/
 │       ├── model/
 │       │   └── promotion.types.ts
 │       └── index.ts
-├── features/
-│   └── promotion-management/
-│       ├── config/
-│       ├── model/
-│       ├── ui/
-│       └── index.ts
-└── modules/
-    └── promotions/        # temporary compatibility path during migration only
+└── features/
+    └── promotion-management/
+        ├── config/
+        ├── model/
+        ├── ui/
+        └── index.ts
 ```
 
-Catalog remains an accepted feature-owned reference for complex editor state and is not automatically migrated by this decision.
+The legacy `modules/promotions` compatibility path was removed only after manual approval. Catalog remains an accepted feature-owned reference for complex editor state and is not automatically migrated by this decision.
 
 Incremental migration is deliberate:
 
