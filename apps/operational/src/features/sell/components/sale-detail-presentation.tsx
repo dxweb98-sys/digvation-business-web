@@ -144,6 +144,7 @@ export function SaleLineItem({
   pricing,
   amount,
   discounts = [],
+  earning,
   context,
   detail,
   action,
@@ -155,6 +156,8 @@ export function SaleLineItem({
   amount: string;
   /** Discounts on this line, each with its own title, optional note and amount. */
   discounts?: readonly { id: string; title: string; note: string | null; amount: string }[];
+  /** Compact Runtime-authoritative Loyalty preview or finalized fact. */
+  earning?: ReactNode;
   /** Secondary operational context such as fulfillment status and performers. */
   context?: ReactNode;
   /** A full-width block under the context row, such as who performs the service. */
@@ -175,6 +178,9 @@ export function SaleLineItem({
         {variant ? <span className="min-w-0 break-words">{variant}</span> : null}
         <span>{pricing}</span>
       </p>
+      {earning ? (
+        <p className="mt-1 text-xs font-medium text-[var(--color-success)]">{earning}</p>
+      ) : null}
       {discounts.map((discount) => (
         <div key={discount.id} className="mt-1 flex items-start justify-between gap-4 text-xs">
           <span className="min-w-0 text-[var(--color-text-muted)]">
@@ -219,14 +225,21 @@ function DiscountTerm({
 }
 
 export function SaleFinancialSummary({
+  title,
+  context,
   labels,
   gross,
   discounts,
+  adjustments = [],
   tax,
   total,
   settlement,
   format,
+  payment,
+  paymentAttempts,
 }: {
+  title?: string;
+  context?: ReactNode;
   labels: {
     subtotal: string;
     total: string;
@@ -242,14 +255,20 @@ export function SaleFinancialSummary({
   };
   gross: string;
   discounts: readonly DiscountPresentationRow[];
+  /** Authoritative non-promotion deductions, such as a recorded Loyalty redemption. */
+  adjustments?: readonly { id: string; label: string; detail?: string | null; amount: string }[];
   tax: { label: string; amount: string } | null;
   total: string;
   settlement: SaleSettlement;
   format: (amount: string) => string;
+  payment?: { title: string; aside?: ReactNode; content: ReactNode } | null;
+  paymentAttempts?: ReactNode;
 }) {
   const hasBalance = settlement.balanceDue !== '0.0000';
   return (
-    <div className="pos-detail-summary">
+    <section className="pos-financial-panel">
+      {context ? <div className="pos-financial-panel__context">{context}</div> : null}
+      {title ? <h3 className="text-sm font-semibold text-[var(--color-text)]">{title}</h3> : null}
       <dl className="space-y-2 text-sm">
         <div className="flex justify-between gap-4">
           <dt className="text-[var(--color-text-muted)]">{labels.subtotal}</dt>
@@ -266,6 +285,19 @@ export function SaleFinancialSummary({
             </dd>
           </div>
         ))}
+        {adjustments.map((adjustment) => (
+          <div key={adjustment.id} className="flex items-start justify-between gap-4">
+            <dt className="min-w-0 text-[var(--color-text-muted)]">
+              <span className="text-[var(--color-text)]">{adjustment.label}</span>
+              {adjustment.detail ? (
+                <span className="block break-words text-xs">{adjustment.detail}</span>
+              ) : null}
+            </dt>
+            <dd className="shrink-0 tabular-nums text-[var(--color-danger)]">
+              −{format(adjustment.amount)}
+            </dd>
+          </div>
+        ))}
         {tax ? (
           <div className="flex justify-between gap-4">
             <dt className="text-[var(--color-text-muted)]">{tax.label}</dt>
@@ -277,7 +309,7 @@ export function SaleFinancialSummary({
           <dd className="text-lg font-bold tabular-nums">{format(total)}</dd>
         </div>
       </dl>
-      <dl className="mt-3 space-y-1.5 rounded-[var(--radius-control)] bg-[var(--color-surface-muted)]/55 px-3 py-2.5 text-sm">
+      <dl className="mt-4 space-y-2 border-t border-[var(--color-border)] pt-4 text-sm">
         <div className="flex justify-between gap-4">
           <dt className="text-[var(--color-text-muted)]">{labels.paid}</dt>
           <dd className="tabular-nums">{format(settlement.totalPaid)}</dd>
@@ -303,7 +335,23 @@ export function SaleFinancialSummary({
           </div>
         ) : null}
       </dl>
-    </div>
+      {payment ? (
+        <section className="mt-4 border-t border-[var(--color-border)] pt-4">
+          <div className="mb-2 flex items-baseline justify-between gap-3">
+            <h4 className="text-sm font-semibold text-[var(--color-text)]">{payment.title}</h4>
+            {payment.aside ? (
+              <span className="text-xs text-[var(--color-text-muted)]">{payment.aside}</span>
+            ) : null}
+          </div>
+          {payment.content}
+        </section>
+      ) : null}
+      {paymentAttempts ? (
+        <section className="mt-4 border-t border-[var(--color-border)] pt-4">
+          {paymentAttempts}
+        </section>
+      ) : null}
+    </section>
   );
 }
 

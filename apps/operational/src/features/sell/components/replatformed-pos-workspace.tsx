@@ -1,4 +1,5 @@
 import { useAuth } from '@digvation/pos-auth';
+import { ApiClient } from '@digvation/business-api';
 import { createDecimal, formatMoney } from '@digvation/pos-money';
 import { useRuntime } from '@digvation/pos-runtime';
 import {
@@ -18,7 +19,14 @@ import {
   DSkeleton as Skeleton,
   useToast,
 } from '@digvation-labs/ui';
-import { DDropdown as PortalDropdown, DTabs, DTabsContent, DTabsList, DTabsTrigger, DTextarea } from '@digvation/ui';
+import {
+  DDropdown as PortalDropdown,
+  DTabs,
+  DTabsContent,
+  DTabsList,
+  DTabsTrigger,
+  DTextarea,
+} from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
 import {
   AlertCircle,
@@ -61,6 +69,7 @@ import {
 } from '../../../app/localization/operational-localization';
 import { cashierTransactionKeys } from '../cashier-transaction-keys';
 import { cashierTransactionErrorMessage } from '../cashier-transaction-errors';
+import { CustomerMemberApi, type MemberLookupResult } from '../customer-member-api';
 import type { CartDisplayLine } from '../cart-draft';
 import {
   createCashierTransactionAdapter,
@@ -100,7 +109,6 @@ import type { useCashierTransactionWorkspace } from '../use-cashier-transaction-
 
 import { normalizeCurrencyPresentationInput, PosCurrencyInput } from './pos-controls';
 import {
-  SaleDetailHeader,
   SaleDetailSection,
   SaleFinancialSummary,
   SaleLineItem,
@@ -139,6 +147,7 @@ import {
   useCanReadCompletedSaleDetails,
 } from '../completed-sale-visibility';
 import './replatformed-pos-workspace.css';
+import { CustomerMemberDialog } from './customer-member-dialog';
 
 type Workspace = ReturnType<typeof useCashierTransactionWorkspace>;
 type QueueStatus = 'QUEUED' | 'PROGRESS' | 'COMPLETED' | 'CANCELED';
@@ -244,6 +253,18 @@ function money(amount: string, locale: string) {
   return formatMoney(amount, 'IDR', locale, 0);
 }
 
+function wholePointValue(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const match = /^(\d+)(?:\.0+)?$/.exec(value.trim());
+  return match?.[1] ?? null;
+}
+
+function pointQuantity(value: string | null | undefined, locale: string): string {
+  const whole = wholePointValue(value);
+  if (whole === null) return '—';
+  return new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(Number(whole));
+}
+
 function formatDurationMinutes(minutes: number | null | undefined, locale: string): string | null {
   return formatServiceDuration(minutes, {
     hour: copyFor('hour-short', locale),
@@ -277,6 +298,16 @@ function customerDisplayName(customer: Pick<SaleCustomer, 'name'> | null, locale
 
 function customerDisplayDetail(customer: SaleCustomer | null): string | null {
   return customer && customer.phoneE164.trim() ? customer.phoneE164 : null;
+}
+
+function customerInitials(customer: SaleCustomer | null): string {
+  const name = customer?.name?.trim();
+  if (!name) return '—';
+  return name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('');
 }
 
 function customerStatus(customer: SaleCustomer | null): {
@@ -655,6 +686,11 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     ...liveQueryPolicy,
     refetchInterval: QUEUE_REFRESH_INTERVAL_MS,
   });
+  const taxConfigurationQuery = useQuery({
+    queryKey: cashierTransactionKeys.taxConfiguration(),
+    queryFn: ({ signal }) => adapter.getTaxConfiguration(signal),
+    staleTime: 60_000,
+  });
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [queueTab, setQueueTab] = useState<QueueStatus>('QUEUED');
@@ -674,11 +710,13 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const [queuePaymentAmount, setQueuePaymentAmount] = useState<string | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
   const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<MemberLookupResult | null>(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [payNow, setPayNow] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
   const [paymentRouteId, setPaymentRouteId] = useState('');
   const [paymentAmount, setPaymentAmount] = useState('');
+  const [loyaltyPoints, setLoyaltyPoints] = useState('');
   const [paymentReference, setPaymentReference] = useState('');
   const [tender, setTender] = useState('');
   const [paymentError, setPaymentError] = useState<string | null>(null);
@@ -702,10 +740,101 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const sale = workspace.viewModel.sale;
   const lines = workspace.cart.lines;
   const total = workspace.cart.totalAmount;
+  const draftTaxAmount =
+    !sale && workspace.cart.isLocalDraft && taxConfigurationQuery.data?.enabled
+      ? createDecimal(workspace.cart.grossAmount)
+          .times(createDecimal(taxConfigurationQuery.data.rate))
+          .toFixed(4)
+      : workspace.cart.taxAmount;
+  const cartPreviewTotal =
+    !sale && workspace.cart.isLocalDraft
+      ? createDecimal(workspace.cart.grossAmount).plus(createDecimal(draftTaxAmount)).toFixed(4)
+      : total;
+  const isTaxPreviewLoading =
+    !sale && workspace.cart.isLocalDraft && taxConfigurationQuery.isLoading;
+  const isTaxPreviewUnavailable =
+    !sale && workspace.cart.isLocalDraft && taxConfigurationQuery.isError;
+  const draftTaxLabel = taxConfigurationQuery.data?.enabled
+    ? `${copy('Tax')} (${createDecimal(taxConfigurationQuery.data.rate)
+        .times(100)
+        .toFixed(2)
+        .replace(/\.?0+$/, '')}%)`
+    : copy('Tax');
   const activeCustomer = workspace.customer;
+  const customerMemberApi = useMemo(
+    () =>
+      new CustomerMemberApi(
+        new ApiClient({
+          baseUrl: runtime.apiBaseUrl,
+          applicationSurface: 'operational',
+          ...(authPort.getAccessToken
+            ? { getAccessToken: authPort.getAccessToken.bind(authPort) }
+            : {}),
+        }),
+      ),
+    [authPort, runtime.apiBaseUrl],
+  );
+  const canReadMembers = session.access.permissions.includes('membership:read');
+  const canEnrollMember = session.access.permissions.includes('membership:enroll');
+  const hasLoyaltyCapability = session.access.capabilities.includes('LOYALTY_POINTS');
+  const canRedeemLoyalty =
+    hasLoyaltyCapability && session.access.permissions.includes('loyalty:redeem');
+  const canReadLoyalty =
+    hasLoyaltyCapability &&
+    (session.access.permissions.includes('loyalty:read') || canRedeemLoyalty);
+  const activeSelectedMember =
+    activeCustomer?.type === 'MEMBER' && selectedMember?.customerId === activeCustomer.referenceId
+      ? selectedMember
+      : null;
+
+  const memberIdentityQuery = useQuery({
+    queryKey: [
+      'operational-member-by-customer',
+      activeCustomer?.type === 'MEMBER' ? activeCustomer.referenceId : null,
+      activeCustomer?.phoneE164 ?? null,
+    ],
+    queryFn: ({ signal }) => customerMemberApi.searchMembers(activeCustomer!.phoneE164, signal),
+    enabled: Boolean(
+      canReadMembers &&
+      activeCustomer?.type === 'MEMBER' &&
+      activeCustomer.referenceId &&
+      activeSelectedMember === null,
+    ),
+    staleTime: 30_000,
+  });
+
+  useEffect(() => {
+    if (activeCustomer?.type !== 'MEMBER') {
+      if (selectedMember) setSelectedMember(null);
+      return;
+    }
+    if (selectedMember?.customerId === activeCustomer.referenceId) return;
+    const matched = memberIdentityQuery.data?.items.find(
+      (member) => member.customerId === activeCustomer.referenceId,
+    );
+    if (matched) setSelectedMember(matched);
+  }, [activeCustomer?.referenceId, activeCustomer?.type, memberIdentityQuery.data, selectedMember]);
+
+  const memberBalanceQuery = useQuery({
+    queryKey: ['operational-member-balance', selectedMember?.id],
+    queryFn: ({ signal }) => customerMemberApi.getPointBalance(selectedMember!.id, signal),
+    enabled: Boolean(selectedMember && canReadLoyalty),
+    staleTime: 15_000,
+  });
+
+  useEffect(() => {
+    setLoyaltyPoints('');
+  }, [activeCustomer?.phoneE164, activeCustomer?.referenceId, activeCustomer?.type]);
 
   const displayedQueueDetail =
     receiptSaleId && sale?.id === receiptSaleId && hasSuccessfulPayment(sale) ? sale : queueDetail;
+  const receiptDeliveryStatusQuery = useQuery({
+    queryKey: ['operational-receipt-delivery', displayedQueueDetail?.id ?? null],
+    queryFn: () => adapter.getReceiptDeliveryStatus(displayedQueueDetail!.id),
+    enabled: Boolean(displayedQueueDetail?.status === 'FINALIZED'),
+    refetchInterval: displayedQueueDetail?.status === 'FINALIZED' ? 3_000 : false,
+    staleTime: 1_000,
+  });
   const displayedAdjustmentTarget =
     adjustmentTarget && sale?.id === adjustmentTarget.id ? sale : adjustmentTarget;
   const displayedQueuePaymentTarget =
@@ -858,6 +987,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     } finally {
       setSendingReceipt(false);
       setSendingReceiptId(null);
+      void receiptDeliveryStatusQuery.refetch();
     }
   };
 
@@ -1135,10 +1265,10 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     }
   };
 
-  const recordCheckoutPayment = () =>
+  const recordCheckoutPayment = (allocationOverride?: string) =>
     sendPaymentOnce(async () => {
       if (!sale || !lines.length) return;
-      const allocation = normalizeCurrencyPresentationInput(paymentAmount);
+      const allocation = normalizeCurrencyPresentationInput(allocationOverride ?? paymentAmount);
       const progress = paymentProgress(sale);
       if (
         !isPositiveDecimal(allocation) ||
@@ -1397,7 +1527,21 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           onAdjust={openAdjustment}
           onPay={(transaction) => void openQueuePayment(transaction)}
           onCancel={requestCancel}
-          onView={setQueueDetail}
+          onView={(transaction) => {
+            // A queue card is a polling projection. Show it immediately, then
+            // replace it with the authoritative transaction response so detail
+            // facts such as an OPEN Sale's loyalty-redemption intent never
+            // depend on which queue projection was cached first.
+            setQueueDetail(transaction);
+            void adapter
+              .getSale(transaction.id)
+              .then(setQueueDetail)
+              .catch((error) => showToast({
+                title: copy('Could not load transaction'),
+                description: cashierTransactionErrorMessage(error),
+                variant: 'danger',
+              }));
+          }}
           onViewReceipt={(transaction) => {
             setQueueDetail(transaction);
             setReceiptSaleId(transaction.id);
@@ -1490,7 +1634,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         open={cartOpen}
         onOpenChange={setCartOpen}
         lines={lines}
-        total={total}
+        total={cartPreviewTotal}
         gross={workspace.cart.grossAmount}
         discountAmount={workspace.cart.discountAmount}
         discountLabel={
@@ -1498,11 +1642,16 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
             ? transactionDiscountLabel(sale, copy('Promotions and discounts'))
             : copy('Promotions and discounts')
         }
-        taxAmount={workspace.cart.taxAmount}
-        taxLabel={sale ? saleTaxLabel(sale, copy('Tax')) : copy('Tax')}
+        taxAmount={draftTaxAmount}
+        taxLabel={sale ? saleTaxLabel(sale, copy('Tax')) : draftTaxLabel}
         isEstimate={workspace.cart.isLocalDraft}
+        isTaxPreviewLoading={isTaxPreviewLoading}
+        isTaxPreviewUnavailable={isTaxPreviewUnavailable}
         locale={workspace.locale}
         customer={activeCustomer}
+        memberNumber={activeSelectedMember?.memberNumber ?? null}
+        pointBalance={memberBalanceQuery.data?.pointsBalance ?? null}
+        isPointBalanceLoading={memberBalanceQuery.isLoading}
         onChooseCustomer={() => setCustomerPickerOpen(true)}
         onQuantity={(line, next) => {
           if (workspace.cart.isLocalDraft) workspace.changeDraftQuantity(line.id, next);
@@ -1521,18 +1670,25 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         onCheckout={() => void openCheckout()}
       />
 
-      <ReferenceCustomerDialog
+      <CustomerMemberDialog
         open={customerPickerOpen}
         customer={activeCustomer}
         isSaving={workspace.isCustomerPending}
+        api={customerMemberApi}
+        canReadMembers={canReadMembers}
+        canEnrollMember={canEnrollMember}
+        canReadLoyalty={canReadLoyalty}
         onClose={() => setCustomerPickerOpen(false)}
-        onChoose={(selection) => {
-          // Runtime validates and normalizes the identity; the dialog closes
-          // only once the change is accepted.
+        onChoose={(selection, member) => {
+          const previousMember = selectedMember;
+          setSelectedMember(member ?? null);
           void workspace
             .changeCustomer(selection)
-            .then(() => setCustomerPickerOpen(false))
+            .then(() => {
+              setCustomerPickerOpen(false);
+            })
             .catch((error: unknown) => {
+              setSelectedMember(previousMember);
               showToast({
                 title: copy('Could not save the customer'),
                 description: cashierTransactionErrorMessage(error),
@@ -1598,6 +1754,23 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         onConfirmPayment={recordCheckoutPayment}
         onQueue={() => void queueCheckout('QUEUE')}
         onQueueWithBalance={() => void queueCheckout('QUEUE')}
+        loyaltyRedemption={sale?.loyaltyRedemption ?? null}
+        loyaltyPointBalance={
+          activeSelectedMember ? (memberBalanceQuery.data?.pointsBalance ?? null) : null
+        }
+        isLoyaltyBalanceLoading={
+          Boolean(activeSelectedMember) &&
+          (memberBalanceQuery.isLoading || memberIdentityQuery.isLoading)
+        }
+        canRedeemLoyalty={Boolean(sale) && canRedeemLoyalty && activeCustomer?.type === 'MEMBER'}
+        loyaltyPoints={loyaltyPoints}
+        isLoyaltyMutating={workspace.isLoyaltyRedemptionPending}
+        onLoyaltyPointsChange={setLoyaltyPoints}
+        onApplyLoyalty={(points) => workspace.applyLoyaltyRedemption(points)}
+        onRemoveLoyalty={() => {
+          workspace.removeLoyaltyRedemption();
+          setLoyaltyPoints('');
+        }}
         adjustmentSlot={<SaleAdjustmentControls workspace={workspace} placement="payment" />}
       />
 
@@ -1628,6 +1801,12 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         }}
         onSendReceipt={(transaction) => void sendReceipt(transaction)}
         isSendingReceipt={isSendingReceipt}
+        deliveryStatus={
+          displayedQueueDetail?.status === 'FINALIZED'
+            ? receiptDeliveryStatusQuery.data
+            : undefined
+        }
+        onRetryDelivery={(transaction) => void sendReceipt(transaction)}
         onAssign={(line) => {
           if (!displayedQueueDetail) return;
           workspace.requestEmployeeOptions();
@@ -2378,8 +2557,13 @@ function ReferenceFloatingCart({
   taxAmount,
   taxLabel,
   isEstimate,
+  isTaxPreviewLoading,
+  isTaxPreviewUnavailable,
   locale,
   customer,
+  memberNumber,
+  pointBalance,
+  isPointBalanceLoading,
   onChooseCustomer,
   onQuantity,
   onRemove,
@@ -2395,8 +2579,13 @@ function ReferenceFloatingCart({
   taxAmount: string;
   taxLabel: string;
   isEstimate: boolean;
+  isTaxPreviewLoading: boolean;
+  isTaxPreviewUnavailable: boolean;
   locale: string;
   customer: SaleCustomer | null;
+  memberNumber: string | null;
+  pointBalance: string | null;
+  isPointBalanceLoading: boolean;
   onChooseCustomer: () => void;
   onQuantity: (line: CartDisplayLine, quantity: string) => void;
   onRemove: (line: CartDisplayLine) => void;
@@ -2423,8 +2612,13 @@ function ReferenceFloatingCart({
       taxAmount={taxAmount}
       taxLabel={taxLabel}
       isEstimate={isEstimate}
+      isTaxPreviewLoading={isTaxPreviewLoading}
+      isTaxPreviewUnavailable={isTaxPreviewUnavailable}
       locale={locale}
       customer={customer}
+      memberNumber={memberNumber}
+      pointBalance={pointBalance}
+      isPointBalanceLoading={isPointBalanceLoading}
       onChooseCustomer={onChooseCustomer}
       onQuantity={onQuantity}
       onRemove={onRemove}
@@ -2526,8 +2720,13 @@ function ReferenceCartPanel({
   taxAmount,
   taxLabel,
   isEstimate,
+  isTaxPreviewLoading,
+  isTaxPreviewUnavailable,
   locale,
   customer,
+  memberNumber,
+  pointBalance,
+  isPointBalanceLoading,
   onChooseCustomer,
   onQuantity,
   onRemove,
@@ -2541,8 +2740,13 @@ function ReferenceCartPanel({
   taxAmount: string;
   taxLabel: string;
   isEstimate: boolean;
+  isTaxPreviewLoading: boolean;
+  isTaxPreviewUnavailable: boolean;
   locale: string;
   customer: SaleCustomer | null;
+  memberNumber: string | null;
+  pointBalance: string | null;
+  isPointBalanceLoading: boolean;
   onChooseCustomer: () => void;
   onQuantity: (line: CartDisplayLine, quantity: string) => void;
   onRemove: (line: CartDisplayLine) => void;
@@ -2582,10 +2786,19 @@ function ReferenceCartPanel({
                   {copy(status.label)}
                 </Badge>
               ) : null}
+              {customer?.type === 'MEMBER' && memberNumber ? (
+                <Badge variant="outline" className="shrink-0 px-2 py-0 text-[10px]">
+                  {memberNumber}
+                </Badge>
+              ) : null}
             </div>
             <p className="mt-0.5 truncate text-[11px] text-[var(--color-text-muted)]">
-              {customerDisplayDetail(customer) ??
-                copy('Name and WhatsApp number are both required.')}
+              {customer?.type === 'MEMBER' && isPointBalanceLoading
+                ? copy('Loading loyalty points…')
+                : customer?.type === 'MEMBER' && pointBalance !== null
+                  ? `${copy('Loyalty points')}: ${pointQuantity(pointBalance, locale)}`
+                  : (customerDisplayDetail(customer) ??
+                    copy('Name and WhatsApp number are both required.'))}
             </p>
           </div>
           <ChevronDown className="size-4 shrink-0 text-[var(--color-text-muted)]" />
@@ -2724,10 +2937,16 @@ function ReferenceCartPanel({
               </span>
             </div>
           ) : null}
-          {hasTax ? (
+          {hasTax || isTaxPreviewLoading || isTaxPreviewUnavailable ? (
             <div className="flex items-center justify-between text-xs">
               <span className="text-[var(--color-text-muted)]">{taxLabel}</span>
-              <span className="font-medium">{money(taxAmount, locale)}</span>
+              <span className="font-medium">
+                {isTaxPreviewLoading
+                  ? copy('Calculating…')
+                  : isTaxPreviewUnavailable
+                    ? copy('Not available')
+                    : money(taxAmount, locale)}
+              </span>
             </div>
           ) : null}
           <div className="flex items-center justify-between border-t border-[var(--color-border)] pt-2">
@@ -2760,112 +2979,18 @@ function ReferenceCartPanel({
   );
 }
 
-function ReferenceCustomerDialog({
-  open,
-  customer,
-  isSaving,
-  onClose,
-  onChoose,
-}: {
-  open: boolean;
-  customer: SaleCustomer | null;
-  isSaving: boolean;
-  onClose: () => void;
-  onChoose: (selection: SaleCustomerSelection) => void;
-}) {
-  const { copy } = useOperationalLocalization();
-  const [mode, setMode] = useState<'NON_MEMBER' | 'MEMBER'>('NON_MEMBER');
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [openedFor, setOpenedFor] = useState<string | null>(null);
-
-  // Each time the dialog opens it shows the identity the transaction currently
-  // carries, never what was typed for an earlier transaction.
-  const identityKey = open ? `${customer?.type ?? 'NONE'}:${customer?.phoneE164 ?? ''}` : null;
-  if (openedFor !== identityKey) {
-    setOpenedFor(identityKey);
-    setMode(customer?.type === 'MEMBER' ? 'MEMBER' : 'NON_MEMBER');
-    setName(customer?.type === 'NON_MEMBER' ? customer.name : '');
-    setPhone(customer?.type === 'NON_MEMBER' ? customer.phoneE164 : '');
-  }
-
-  const canSubmit = Boolean(name.trim() && phone.trim()) && !isSaving;
-  const submitNonMember = () => {
-    if (!canSubmit) return;
-    onChoose({ type: 'NON_MEMBER', name: name.trim(), phone: phone.trim() });
-  };
-
-  return (
-    <DDialog
-      title={copy('Choose customer')}
-      open={open}
-      onClose={onClose}
-      ariaLabel={copy('Choose customer')}
-      closeOnEscape
-      closeOnOverlay
-      className="pos-reference-dialog w-full max-w-md overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
-    >
-      <div className="min-h-0 space-y-3 overflow-y-auto">
-        <p className="text-xs text-[var(--color-text-muted)]">
-          {copy(
-            'A transaction belongs to a customer. Fill in the name and WhatsApp number, or choose a member.',
-          )}
-        </p>
-        <div className="flex gap-2" aria-label={copy('Customer')}>
-          <Button
-            size="sm"
-            variant={mode === 'NON_MEMBER' ? 'primary' : 'secondary'}
-            onClick={() => setMode('NON_MEMBER')}
-          >
-            {copy('Non-member')}
-          </Button>
-          <Button
-            size="sm"
-            variant={mode === 'MEMBER' ? 'primary' : 'secondary'}
-            onClick={() => setMode('MEMBER')}
-          >
-            {copy('Member')}
-          </Button>
-        </div>
-
-        {mode === 'NON_MEMBER' ? (
-          <div className="space-y-3">
-            <DInput
-              aria-label={copy('Customer name')}
-              label={copy('Name')}
-              value={name}
-              onChange={setName}
-              placeholder={copy('Customer name')}
-            />
-            <DInput
-              aria-label={copy('WhatsApp number')}
-              label={copy('WhatsApp number')}
-              value={phone}
-              onChange={setPhone}
-              placeholder={copy('WhatsApp number')}
-              inputMode="tel"
-              hint={copy('Name and WhatsApp number are both required.')}
-            />
-            <Button fullWidth disabled={!canSubmit} onClick={submitNonMember}>
-              {copy('Use customer')}
-            </Button>
-          </div>
-        ) : (
-          // Member identity is owned by the canonical Customer authority. Until
-          // that directory is connected there is nothing truthful to search, so
-          // the state says so instead of offering invented members.
-          <DAlert variant="info" title={copy('Member lookup is not available yet')}>
-            {copy(
-              'Member identity comes from the customer directory, which is not connected to this installation yet.',
-            )}
-          </DAlert>
-        )}
-      </div>
-    </DDialog>
-  );
-}
-
 type PaymentDialogStep = 'edit' | 'review' | 'leave';
+type PaymentAllocationMode = 'FULL' | 'SPLIT';
+
+function usePaymentAllocationMode(open: boolean) {
+  const [mode, setMode] = useState<PaymentAllocationMode>('FULL');
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setMode('FULL');
+  }
+  return [mode, setMode] as const;
+}
 
 /**
  * Keeps the confirmation step inside the payment dialog so Escape, overlay and focus handling stay
@@ -2881,13 +3006,7 @@ function usePaymentDialogStep(open: boolean) {
   return [step, setStep] as const;
 }
 
-function DiscountInfoTooltip({
-  label,
-  content,
-}: {
-  label: string;
-  content: ReactNode;
-}) {
+function DiscountInfoTooltip({ label, content }: { label: string; content: ReactNode }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -2959,6 +3078,15 @@ function ReferencePaymentDialog({
   onConfirmPayment,
   onQueue,
   onQueueWithBalance,
+  loyaltyRedemption,
+  loyaltyPointBalance,
+  isLoyaltyBalanceLoading,
+  canRedeemLoyalty,
+  loyaltyPoints,
+  isLoyaltyMutating,
+  onLoyaltyPointsChange,
+  onApplyLoyalty,
+  onRemoveLoyalty,
   adjustmentSlot,
 }: {
   open: boolean;
@@ -2993,15 +3121,30 @@ function ReferencePaymentDialog({
   /** Why the last payment attempt was not recorded; cleared when the payment is edited. */
   paymentError: string | null;
   /** Sends the confirmed payment to Runtime. Resolves once Runtime has answered. */
-  onConfirmPayment: () => Promise<void>;
+  onConfirmPayment: (allocation: string) => Promise<void>;
   onQueue: () => void;
   /** Queues a partly paid transaction so the rest is collected from the queue. */
   onQueueWithBalance: () => void;
+  loyaltyRedemption: Sale['loyaltyRedemption'];
+  loyaltyPointBalance: string | null;
+  isLoyaltyBalanceLoading: boolean;
+  canRedeemLoyalty: boolean;
+  loyaltyPoints: string;
+  isLoyaltyMutating: boolean;
+  onLoyaltyPointsChange: (value: string) => void;
+  onApplyLoyalty: (points: string) => Promise<unknown>;
+  onRemoveLoyalty: () => void;
   /** Applied promotions and discounts for the authoritative Sale being paid. */
   adjustmentSlot?: ReactNode;
 }) {
   const { copy, label } = useOperationalLocalization();
+  const { showToast } = useToast();
   const [step, setStep] = usePaymentDialogStep(open);
+  const [allocationMode, setAllocationMode] = usePaymentAllocationMode(open);
+  const [loyaltyEditorOpen, setLoyaltyEditorOpen] = useState(false);
+  useEffect(() => {
+    if (!open) setLoyaltyEditorOpen(false);
+  }, [open]);
   const format = (amount: string) => money(amount, locale);
   const routesForMethod = paymentRoutes.filter((route) => route.paymentMethod === method);
   const activeRoute =
@@ -3009,14 +3152,76 @@ function ReferencePaymentDialog({
   const isCash = method === 'CASH';
   const hasDiscount = !createDecimal(discountAmount).equals(createDecimal('0'));
   const hasTax = !createDecimal(taxAmount).equals(createDecimal('0'));
+  const canonicalLoyaltyPoints = wholePointValue(loyaltyPoints);
+  const validLoyaltyPointInput =
+    canonicalLoyaltyPoints !== null &&
+    createDecimal(canonicalLoyaltyPoints).greaterThan(createDecimal('0'));
+  const canSubmitLoyalty = canRedeemLoyalty && validLoyaltyPointInput && !isLoyaltyMutating;
+  const legacyLoyaltyRedemption = loyaltyRedemption as
+    | (NonNullable<Sale['loyaltyRedemption']> & {
+        requestedPoints?: string;
+        redemptionAmount?: string;
+      })
+    | null
+    | undefined;
+  const redeemedPoints =
+    loyaltyRedemption?.points ?? legacyLoyaltyRedemption?.requestedPoints ?? null;
+  const redeemedAmount =
+    loyaltyRedemption?.amount ?? legacyLoyaltyRedemption?.redemptionAmount ?? null;
+  const hasLoyaltyRedemption = Boolean(redeemedPoints && redeemedAmount);
+  const wholePointBalance = wholePointValue(loyaltyPointBalance);
+  const hasKnownPointBalance = wholePointBalance !== null;
+  const pointBalancePositive =
+    wholePointBalance !== null && createDecimal(wholePointBalance).greaterThan(createDecimal('0'));
+  const applyLoyalty = async () => {
+    if (!canSubmitLoyalty) return;
+    try {
+      if (
+        hasKnownPointBalance &&
+        createDecimal(canonicalLoyaltyPoints!).greaterThan(createDecimal(wholePointBalance!))
+      ) {
+        showToast({
+          title: copy('Insufficient loyalty points'),
+          description: copy('The requested points exceed the member point balance.'),
+          variant: 'danger',
+        });
+        return;
+      }
+      await onApplyLoyalty(canonicalLoyaltyPoints!);
+      setLoyaltyEditorOpen(false);
+    } catch (error) {
+      showToast({
+        title: copy('Could not apply loyalty points'),
+        description: cashierTransactionErrorMessage(error, locale),
+        variant: 'danger',
+      });
+    }
+  };
+  const editLoyalty = () => {
+    onLoyaltyPointsChange(wholePointValue(redeemedPoints) ?? '');
+    setLoyaltyEditorOpen(true);
+  };
+  const startLoyalty = () => {
+    onLoyaltyPointsChange('');
+    setLoyaltyEditorOpen(true);
+  };
+  const cancelLoyaltyEditor = () => {
+    onLoyaltyPointsChange('');
+    setLoyaltyEditorOpen(false);
+  };
+  const removeLoyalty = () => {
+    setLoyaltyEditorOpen(false);
+    onRemoveLoyalty();
+  };
   const customerBadge = customerStatus(customer);
   const payments = sale?.payments ?? [];
   const progress = sale
     ? paymentProgress(sale)
     : { paidAmount: '0.0000', pendingAmount: '0.0000', remainingAmount: total };
-  const normalizedAllocation = normalizeCurrencyPresentationInput(
-    appliedAmount || progress.remainingAmount,
-  );
+  const normalizedAllocation =
+    allocationMode === 'FULL'
+      ? normalizeCurrencyPresentationInput(progress.remainingAmount)
+      : normalizeCurrencyPresentationInput(appliedAmount);
   const intent = paymentIntent(
     { totalAmount: sale?.totalAmount ?? total, payments },
     normalizedAllocation,
@@ -3058,6 +3263,7 @@ function ReferencePaymentDialog({
   ];
   const normalizedQuickTender = [normalizedAllocation, ...quickTender]
     .map((amount) => normalizeCurrencyPresentationInput(amount))
+    .filter(isPositiveDecimal)
     .filter((amount, index, list) => list.indexOf(amount) === index)
     .slice(0, 6);
   const completes = intent.outcome !== 'LEAVES_BALANCE';
@@ -3076,7 +3282,7 @@ function ReferencePaymentDialog({
     onClose();
   };
   const confirmPayment = async () => {
-    await onConfirmPayment();
+    await onConfirmPayment(normalizedAllocation);
     setStep('edit');
   };
 
@@ -3085,9 +3291,29 @@ function ReferencePaymentDialog({
       ? copy('Confirm payment')
       : step === 'leave'
         ? copy('Payment is not finished')
-        : hasRecordedMoney && !fullyPaid
-          ? copy('Continue payment')
-          : copy('Checkout');
+        : copy('POS payment');
+
+  const editFooter = (
+    <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2">
+      <DButton variant="outline" onClick={requestClose}>
+        {copy(hasRecordedMoney && !fullyPaid ? 'Leave payment' : 'Cancel')}
+      </DButton>
+      {collectsPayment ? (
+        <DButton disabled={!canPay} onClick={() => setStep('review')} className="justify-center">
+          {copy('Pay')} {format(normalizedAllocation || '0')} <ChevronRight className="size-4" />
+        </DButton>
+      ) : (
+        <DButton
+          disabled={!canQueue}
+          loading={isSubmitting}
+          onClick={onQueue}
+          className="justify-center"
+        >
+          {copy('Add to queue')}
+        </DButton>
+      )}
+    </div>
+  );
 
   const footer =
     step === 'review' ? (
@@ -3115,33 +3341,26 @@ function ReferencePaymentDialog({
         </DButton>
         <DButton onClick={() => setStep('edit')}>{copy('Continue payment')}</DButton>
       </div>
-    ) : (
-      <div className="flex flex-col-reverse justify-end gap-2 sm:flex-row">
-        <DButton variant="ghost" onClick={requestClose}>
-          {copy(hasRecordedMoney && !fullyPaid ? 'Leave payment' : 'Cancel')}
-        </DButton>
-        {collectsPayment ? (
-          <DButton disabled={!canPay} onClick={() => setStep('review')}>
-            {copy('Pay')} {format(normalizedAllocation || '0')}
-          </DButton>
-        ) : (
-          <DButton disabled={!canQueue} loading={isSubmitting} onClick={onQueue}>
-            {copy('Add to queue')}
-          </DButton>
-        )}
-      </div>
-    );
+    ) : undefined;
 
   return (
     <DDialog
       title={title}
+      description={
+        sale ? `${copy('Transaction ID')}: ${transactionNumber(sale, locale)}` : undefined
+      }
       open={open}
       onClose={requestClose}
       ariaLabel={title}
       closeOnEscape
       closeOnOverlay
-      className="pos-reference-dialog w-full max-w-lg overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
-      footer={footer}
+      className={
+        step === 'edit'
+          ? 'pos-reference-dialog max-h-[94dvh] w-[calc(100vw-2rem)] !max-w-[1180px] overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl'
+          : 'pos-reference-dialog max-h-[90dvh] w-[calc(100vw-2rem)] !max-w-[680px] overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl'
+      }
+      noPadding={step === 'edit'}
+      footer={step === 'edit' ? undefined : footer}
     >
       {step === 'review' ? (
         <PaymentReview
@@ -3158,363 +3377,658 @@ function ReferencePaymentDialog({
       ) : step === 'leave' ? (
         <PaymentLeaveNotice progress={progress} format={format} hasPending={hasPending} />
       ) : (
-        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto">
-          <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs text-[var(--color-text-muted)]">{copy('Payment total')}</p>
-                <h3 className="mt-0.5 text-2xl font-bold leading-tight tabular-nums text-[var(--color-brand)]">
-                  {format(total)}
-                </h3>
-              </div>
-              <div className="min-w-0 text-right">
-                <p className="text-xs text-[var(--color-text-muted)]">{copy('Customer')}</p>
-                <p className="max-w-[170px] truncate text-sm font-semibold">
-                  {customerDisplayName(customer, locale)}
-                </p>
-                {customerBadge ? (
-                  <Badge variant={customerBadge.variant} className="mt-1 px-2 py-0 text-[10px]">
-                    {copy(customerBadge.label)}
-                  </Badge>
-                ) : null}
-                <p className="text-[11px] text-[var(--color-text-muted)]">
-                  {lines.length} {copy('items')}
-                </p>
-              </div>
-            </div>
-            <div className="mt-3 rounded-xl bg-[var(--color-surface-muted)]/60 px-3 py-2 text-xs">
-              <div className="flex justify-between">
-                <span className="text-[var(--color-text-muted)]">{copy('Subtotal')}</span>
-                <span className="font-semibold">{format(gross)}</span>
-              </div>
-              {hasDiscount ? (
-                <div className="mt-1 flex justify-between">
-                  <span className="text-[var(--color-text-muted)]">{discountLabel}</span>
-                  <span className="font-semibold text-[var(--color-danger)]">
-                    −{format(discountAmount)}
+        <div className="grid h-[min(720px,calc(100dvh-7.5rem))] min-h-0 gap-0 overflow-hidden lg:grid-cols-[minmax(0,1fr)_440px]">
+          <div className="min-h-0 space-y-3 overflow-y-auto overscroll-contain bg-[var(--color-surface)] p-4 pr-3 lg:border-r lg:border-[var(--color-border)]">
+            <section className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]">
+              <div className="flex items-center justify-between gap-4 border-b border-[var(--color-border)] bg-[var(--color-surface-muted)]/55 px-4 py-3.5">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[var(--color-brand)]/[.08] text-[var(--color-brand)]">
+                    <ShoppingBag className="size-4" aria-hidden="true" />
                   </span>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <p className="truncate text-sm font-bold text-[var(--color-text)]">
+                      {copy('Order details')}
+                    </p>
+                    <span className="shrink-0 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-text-muted)]">
+                      {lines.length} {copy('items')}
+                    </span>
+                  </div>
                 </div>
-              ) : null}
-              {hasTax ? (
-                <div className="mt-1 flex justify-between">
-                  <span className="text-[var(--color-text-muted)]">{taxLabel}</span>
-                  <span className="font-semibold">{format(taxAmount)}</span>
-                </div>
-              ) : null}
-              <div className="mt-2 flex justify-between border-t border-[var(--color-border)] pt-2 text-sm">
-                <span className="font-bold">{copy('Total')}</span>
-                <span className="font-bold text-[var(--color-brand)]">{format(total)}</span>
-              </div>
-            </div>
-            {hasPaymentActivity ? (
-              <div className="mt-3">
-                <PaymentProgressSummary
-                  total={sale?.totalAmount ?? total}
-                  progress={progress}
-                  format={format}
-                />
-                {hasRecordedMoney && !fullyPaid ? (
-                  <p className="mt-2 text-[11px] font-medium text-[var(--color-text-muted)]">
-                    {copy('The transaction is not complete until the remaining amount is paid.')}
+                <div className="shrink-0 text-right">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+                    {copy('Subtotal')}
                   </p>
-                ) : null}
+                  <p className="mt-0.5 text-sm font-bold tabular-nums text-[var(--color-text)]">
+                    {format(gross)}
+                  </p>
+                </div>
               </div>
+              <div className="divide-y divide-[var(--color-border)] bg-[var(--color-surface)]">
+                {lines.map((line) => {
+                  const discountPercentage = lineDiscountPercentage(line);
+                  const discounted = isPositiveDecimal(line.lineDiscountAmount);
+                  const discountedLineAmount = discounted
+                    ? createDecimal(line.totalAmount)
+                        .minus(createDecimal(line.lineDiscountAmount))
+                        .toFixed(4)
+                    : line.totalAmount;
+                  const promotionTooltip = (
+                    <div className="space-y-1">
+                      {line.promotion?.name ? (
+                        <p className="font-semibold">{line.promotion.name}</p>
+                      ) : null}
+                      {discountPercentage ? (
+                        <p>
+                          {copy('Discount')}: {discountPercentage}%
+                        </p>
+                      ) : null}
+                      {line.promotion?.effectiveFrom ? (
+                        <p>
+                          {copy('Start')}:{' '}
+                          {new Intl.DateTimeFormat(locale, {
+                            dateStyle: 'medium',
+                            timeStyle: 'short',
+                          }).format(new Date(line.promotion.effectiveFrom))}
+                        </p>
+                      ) : null}
+                      {line.promotion?.effectiveUntil ? (
+                        <p>
+                          {copy('End')}:{' '}
+                          {new Intl.DateTimeFormat(locale, {
+                            dateStyle: 'medium',
+                            timeStyle: 'short',
+                          }).format(new Date(line.promotion.effectiveUntil))}
+                        </p>
+                      ) : null}
+                    </div>
+                  );
+                  return (
+                    <div key={line.id} className="px-4 py-3">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-[var(--color-text)]">
+                            {line.itemNameSnapshot}
+                          </p>
+                          <p className="mt-1 text-[11px] font-medium text-[var(--color-text-muted)]">
+                            {quantity(line.quantity)} × {format(line.effectiveUnitPrice)}
+                          </p>
+                          {discounted ? (
+                            <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-[var(--color-danger)]">
+                              <DiscountInfoTooltip
+                                label={copy('Discount information')}
+                                content={promotionTooltip}
+                              />
+                              <span>
+                                {copy('Discount')} −{format(line.lineDiscountAmount)}
+                              </span>
+                            </div>
+                          ) : null}
+                        </div>
+                        <div className="shrink-0 text-right tabular-nums">
+                          {discounted ? (
+                            <p className="text-[10px] font-medium text-[var(--color-danger)] line-through decoration-[1.5px]">
+                              {format(line.totalAmount)}
+                            </p>
+                          ) : null}
+                          <p className="text-sm font-bold text-[var(--color-text)]">
+                            {format(discountedLineAmount)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+
+            {adjustmentSlot}
+
+            {customer?.type === 'MEMBER' && (canRedeemLoyalty || hasLoyaltyRedemption) ? (
+              <section className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]">
+                <div className="border-b border-[var(--color-border)] bg-[var(--color-surface-muted)]/45 px-4 py-3">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2.5">
+                        <span className="grid size-8 shrink-0 place-items-center rounded-full border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/[.08] text-[var(--color-warning)]">
+                          <Sparkles className="size-4" aria-hidden="true" />
+                        </span>
+                        <p className="text-sm font-bold">{copy('Loyalty points')}</p>
+                      </div>
+                      <p className="mt-1 pl-10 text-xs leading-5 text-[var(--color-text-muted)]">
+                        {copy(
+                          'Use member points for this transaction. Points are consumed only when the sale is finalized.',
+                        )}
+                      </p>
+                    </div>
+                    <div className="shrink-0 rounded-xl border border-[var(--color-warning)]/25 bg-[var(--color-warning)]/[.07] px-3 py-2 text-right">
+                      <p className="text-[10px] font-semibold text-[var(--color-warning)]">
+                        {copy('Point balance')}
+                      </p>
+                      <p className="mt-0.5 text-base font-bold tabular-nums text-[var(--color-warning)]">
+                        {isLoyaltyBalanceLoading
+                          ? '…'
+                          : `${pointQuantity(loyaltyPointBalance, locale)} PTS`}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-3">
+                  {!hasLoyaltyRedemption && canRedeemLoyalty && !loyaltyEditorOpen ? (
+                    <div className="mt-3 rounded-xl bg-[var(--color-surface-muted)]/55 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-xs text-[var(--color-text-muted)]">
+                          {copy('Available balance')}: {pointQuantity(loyaltyPointBalance, locale)}{' '}
+                          {copy('points')}
+                        </p>
+                        <DButton
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={!pointBalancePositive || isLoyaltyMutating}
+                          onClick={startLoyalty}
+                        >
+                          {copy('Use loyalty points')}
+                        </DButton>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {loyaltyEditorOpen && canRedeemLoyalty ? (
+                    <div className="mt-3 rounded-xl bg-[var(--color-surface-muted)]/55 p-3">
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <p className="text-xs font-semibold">{copy('Points to use')}</p>
+                        <p className="text-xs text-[var(--color-text-muted)]">
+                          {copy('Available balance')}: {pointQuantity(loyaltyPointBalance, locale)}{' '}
+                          {copy('points')}
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2">
+                        <DInput
+                          value={loyaltyPoints}
+                          onChange={(value) => onLoyaltyPointsChange(value.replace(/\D/g, ''))}
+                          inputMode="numeric"
+                          disabled={isLoyaltyMutating}
+                          placeholder="0"
+                          autoFocus
+                        />
+                        <DButton
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          disabled={!pointBalancePositive || isLoyaltyMutating}
+                          onClick={() => onLoyaltyPointsChange(wholePointBalance!)}
+                        >
+                          {copy('Fill all')}
+                        </DButton>
+                        <DButton
+                          type="button"
+                          size="sm"
+                          disabled={!canSubmitLoyalty}
+                          loading={isLoyaltyMutating}
+                          onClick={() => void applyLoyalty()}
+                        >
+                          {copy('Apply')}
+                        </DButton>
+                      </div>
+                      <div className="mt-2 flex items-center justify-between gap-3">
+                        <p className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[var(--color-success)]">
+                          <CheckCircle2 className="size-3.5" aria-hidden="true" />
+                          {copy('Points are only consumed after the transaction is finalized.')}
+                        </p>
+                        <DButton
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          disabled={isLoyaltyMutating}
+                          onClick={cancelLoyaltyEditor}
+                        >
+                          {copy('Cancel')}
+                        </DButton>
+                      </div>
+                    </div>
+                  ) : hasLoyaltyRedemption ? (
+                    <div className="mt-3 flex items-center gap-3 rounded-[var(--radius-control)] border border-[var(--color-success)]/20 bg-[var(--color-success)]/[.06] px-3 py-2.5">
+                      <CheckCircle2
+                        className="size-4 shrink-0 text-[var(--color-success)]"
+                        aria-hidden="true"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold">{copy('Loyalty redemption')}</p>
+                        <p className="mt-0.5 text-[11px] text-[var(--color-text-muted)]">
+                          {pointQuantity(redeemedPoints, locale)} {copy('points used')}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-xs font-semibold tabular-nums text-[var(--color-danger)]">
+                        −{format(redeemedAmount!)}
+                      </span>
+                      {canRedeemLoyalty ? (
+                        <div className="flex shrink-0 items-center gap-1">
+                          <DButton
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            aria-label={copy('Edit')}
+                            disabled={isLoyaltyMutating}
+                            onClick={editLoyalty}
+                          >
+                            <Pencil className="size-4" aria-hidden="true" />
+                          </DButton>
+                          <DButton
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            aria-label={copy('Remove')}
+                            disabled={isLoyaltyMutating}
+                            loading={isLoyaltyMutating}
+                            onClick={removeLoyalty}
+                          >
+                            <Trash2
+                              className="size-4 text-[var(--color-danger)]"
+                              aria-hidden="true"
+                            />
+                          </DButton>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              </section>
+            ) : null}
+
+            {/* Once money is recorded the transaction is already being paid now. */}
+            {!hasRecordedMoney ? (
+              <section className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]">
+                <div className="flex items-center gap-2.5 border-b border-[var(--color-border)] bg-[var(--color-surface-muted)]/45 px-4 py-3">
+                  <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[var(--color-brand)]/[.08] text-[var(--color-brand)]">
+                    <Clock className="size-4" aria-hidden="true" />
+                  </span>
+                  <p className="text-sm font-bold">{copy('Payment timing')}</p>
+                </div>
+                <div className="p-3">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {[
+                      {
+                        value: true,
+                        title: copy('Pay now'),
+                        description: copy('Choose a payment method before continuing.'),
+                      },
+                      {
+                        value: false,
+                        title: copy('Pay later'),
+                        description: copy('Payment can be recorded after transaction creation.'),
+                      },
+                    ].map((option) => (
+                      <label
+                        key={String(option.value)}
+                        className={`pos-choice ${payNow === option.value ? 'pos-choice--selected' : ''}`}
+                      >
+                        <DRadio
+                          name="pos-payment-timing"
+                          className="mt-0.5 shrink-0"
+                          checked={payNow === option.value}
+                          onChange={() => onPayNowChange(option.value)}
+                        />
+                        <span className="min-w-0">
+                          <span className="block text-sm font-semibold">{option.title}</span>
+                          <span className="mt-0.5 block text-xs leading-4 text-[var(--color-text-muted)]">
+                            {option.description}
+                          </span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+
+                  {collectsPayment ? (
+                    <div className="mt-3 border-t border-[var(--color-border)] pt-3">
+                      <DTabs
+                        value={allocationMode}
+                        defaultValue="FULL"
+                        onValueChange={(value) => {
+                          const next = value as PaymentAllocationMode;
+                          setAllocationMode(next);
+                          if (next === 'FULL') {
+                            const remaining = normalizeCurrencyPresentationInput(
+                              progress.remainingAmount,
+                            );
+                            onAppliedAmount(remaining);
+                          } else {
+                            onAppliedAmount('');
+                          }
+                        }}
+                      >
+                        <DTabsList className="grid w-full grid-cols-2 rounded-xl bg-[var(--color-surface-muted)] p-1">
+                          <DTabsTrigger
+                            value="FULL"
+                            className="h-9 min-w-0 px-3 text-sm font-semibold"
+                          >
+                            {copy('Full payment')}
+                          </DTabsTrigger>
+                          <DTabsTrigger
+                            value="SPLIT"
+                            className="h-9 min-w-0 px-3 text-sm font-semibold"
+                          >
+                            {copy('Split payment')}
+                          </DTabsTrigger>
+                        </DTabsList>
+
+                        <DTabsContent value="FULL" className="mt-2">
+                          <div className="flex items-center justify-between gap-3 rounded-lg bg-[var(--color-brand)]/[.045] px-3 py-2.5">
+                            <span className="text-xs text-[var(--color-text)]">
+                              {copy('Pay full remaining balance')}
+                            </span>
+                            <span className="shrink-0 text-base font-bold tabular-nums text-[var(--color-brand)]">
+                              {format(progress.remainingAmount)}
+                            </span>
+                          </div>
+                        </DTabsContent>
+
+                        <DTabsContent value="SPLIT" className="mt-2">
+                          <label className="block text-sm font-medium">
+                            {copy('Payment amount')}
+                            <PosCurrencyInput
+                              aria-label={copy('Payment amount')}
+                              className="mt-1.5 h-11 rounded-lg bg-[var(--color-surface)] text-right text-lg font-bold"
+                              value={appliedAmount}
+                              onChange={onAppliedAmount}
+                            />
+                          </label>
+                          {overAllocated ? (
+                            <p className="mt-1 text-xs text-[var(--color-danger)]" role="alert">
+                              {copy('Payment allocation cannot exceed the remaining amount.')}{' '}
+                              {copy('Remaining')}: {format(progress.remainingAmount)}
+                            </p>
+                          ) : (
+                            <div className="mt-2">
+                              <PaymentIntentHint
+                                intent={intent}
+                                format={format}
+                                onPayRemaining={() => {
+                                  const remaining = normalizeCurrencyPresentationInput(
+                                    progress.remainingAmount,
+                                  );
+                                  onAppliedAmount(remaining);
+                                  setAllocationMode('FULL');
+                                }}
+                              />
+                            </div>
+                          )}
+                        </DTabsContent>
+                      </DTabs>
+                    </div>
+                  ) : null}
+                </div>
+              </section>
             ) : null}
           </div>
 
-          {adjustmentSlot}
-
-          {hasPaymentActivity && sale ? (
-            <RecordedPaymentList
-              payments={payments}
-              totalAmount={sale.totalAmount}
-              progress={progress}
-              format={format}
-              isMutating={isSubmitting}
-              onTransition={onTransitionPayment}
-            />
-          ) : null}
-
-          <div className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)]">
-            <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-2.5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
-                {copy('Order details')}
-              </p>
-              <span className="text-xs text-[var(--color-text-muted)]">
-                {lines.length} {copy('items')}
-              </span>
-            </div>
-            <div className="max-h-[120px] divide-y divide-[var(--color-border)] overflow-y-auto">
-              {lines.map((line) => {
-                const discountPercentage = lineDiscountPercentage(line);
-                const discounted = isPositiveDecimal(line.lineDiscountAmount);
-                const discountedLineAmount = discounted
-                  ? createDecimal(line.totalAmount)
-                      .minus(createDecimal(line.lineDiscountAmount))
-                      .toFixed(4)
-                  : line.totalAmount;
-                const promotionTooltip = (
-                  <div className="space-y-1">
-                    {line.promotion?.name ? (
-                      <p className="font-semibold">{line.promotion.name}</p>
-                    ) : null}
-                    {discountPercentage ? (
-                      <p>
-                        {copy('Discount')}: {discountPercentage}%
-                      </p>
-                    ) : null}
-                    {line.promotion?.effectiveFrom ? (
-                      <p>
-                        {copy('Start')}:{' '}
-                        {new Intl.DateTimeFormat(locale, {
-                          dateStyle: 'medium',
-                          timeStyle: 'short',
-                        }).format(new Date(line.promotion.effectiveFrom))}
-                      </p>
-                    ) : null}
-                    {line.promotion?.effectiveUntil ? (
-                      <p>
-                        {copy('End')}:{' '}
-                        {new Intl.DateTimeFormat(locale, {
-                          dateStyle: 'medium',
-                          timeStyle: 'short',
-                        }).format(new Date(line.promotion.effectiveUntil))}
-                      </p>
-                    ) : null}
-                  </div>
-                );
-                return (
-                  <div key={line.id} className="px-4 py-2.5">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold">{line.itemNameSnapshot}</p>
-                        <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
-                          {quantity(line.quantity)} × {format(line.effectiveUnitPrice)}
+          <div className="sticky top-0 flex h-full w-full min-h-0 self-stretch flex-col overflow-hidden bg-[var(--color-surface)] lg:w-[440px] lg:min-w-[440px]">
+            <div className="shrink-0 space-y-3 p-4 pb-3">
+              {customer ? (
+                <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-3.5">
+                  <div className="flex items-center gap-3">
+                    <div className="grid size-11 shrink-0 place-items-center rounded-full bg-[var(--color-brand)] text-sm font-bold text-white">
+                      {customerInitials(customer)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <p className="truncate text-base font-bold">
+                          {customerDisplayName(customer, locale)}
                         </p>
-                        {discounted ? (
-                          <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-[var(--color-danger)]">
-                            <DiscountInfoTooltip
-                              label={copy('Discount information')}
-                              content={promotionTooltip}
-                            />
-                            <span>
-                              {copy('Discount')} −{format(line.lineDiscountAmount)}
-                            </span>
-                          </div>
+                        {customerBadge ? (
+                          <Badge
+                            variant={customerBadge.variant}
+                            className="shrink-0 px-2 py-0 text-[10px]"
+                          >
+                            {copy(customerBadge.label)}
+                          </Badge>
                         ) : null}
                       </div>
-                      <div className="shrink-0 text-right tabular-nums">
-                        {discounted ? (
-                          <p className="text-[11px] font-medium text-[var(--color-danger)] line-through decoration-[1.5px]">
-                            {format(line.totalAmount)}
-                          </p>
-                        ) : null}
-                        <p className="text-sm font-bold">{format(discountedLineAmount)}</p>
+                      {customerDisplayDetail(customer) ? (
+                        <p className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">
+                          {customerDisplayDetail(customer)}
+                        </p>
+                      ) : null}
+                    </div>
+                    {customer.type === 'MEMBER' ? (
+                      <div className="shrink-0 border-l border-[var(--color-border)] pl-4 text-right">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+                          {copy('Points')}
+                        </p>
+                        <p className="mt-1 text-sm font-bold text-[var(--color-warning)]">
+                          {isLoyaltyBalanceLoading
+                            ? '…'
+                            : `${pointQuantity(loyaltyPointBalance, locale)} PTS`}
+                        </p>
                       </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Once money is recorded the transaction is already being paid now. */}
-          {!hasRecordedMoney ? (
-            <fieldset className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-3">
-              <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
-                {copy('Payment timing')}
-              </legend>
-              <div className="mt-1 grid gap-2 sm:grid-cols-2">
-                {[
-                  {
-                    value: true,
-                    title: copy('Pay now'),
-                    description: copy('Choose a payment method before continuing.'),
-                  },
-                  {
-                    value: false,
-                    title: copy('Pay later'),
-                    description: copy('Payment can be recorded after transaction creation.'),
-                  },
-                ].map((option) => (
-                  <label
-                    key={String(option.value)}
-                    className={`pos-choice ${payNow === option.value ? 'pos-choice--selected' : ''}`}
-                  >
-                    <DRadio
-                      name="pos-payment-timing"
-                      className="mt-0.5 shrink-0"
-                      checked={payNow === option.value}
-                      onChange={() => onPayNowChange(option.value)}
-                    />
-                    <span className="min-w-0">
-                      <span className="block text-sm font-semibold">{option.title}</span>
-                      <span className="mt-0.5 block text-xs leading-4 text-[var(--color-text-muted)]">
-                        {option.description}
-                      </span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-          ) : null}
-
-          {collectsPayment ? (
-            <>
-              <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
-                {hasRecordedMoney ? (
-                  <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
-                    {copy('Next payment')}
-                  </p>
-                ) : null}
-                {paymentError ? (
-                  <DAlert
-                    variant="danger"
-                    role="alert"
-                    title={copy('Payment was not recorded')}
-                    className="mb-3"
-                  >
-                    {paymentError} {copy('Nothing was added to the paid amount.')}
-                  </DAlert>
-                ) : null}
-                <label className="block text-sm font-medium">
-                  {copy('Payment amount')}
-                  <PosCurrencyInput
-                    aria-label={copy('Payment amount')}
-                    className="mt-1.5 h-11 rounded-lg bg-[var(--color-surface)] text-right text-lg font-bold"
-                    value={appliedAmount}
-                    onChange={onAppliedAmount}
-                  />
-                </label>
-                {overAllocated ? (
-                  <p className="mt-1 text-xs text-[var(--color-danger)]" role="alert">
-                    {copy('Payment allocation cannot exceed the remaining amount.')}{' '}
-                    {copy('Remaining')}: {format(progress.remainingAmount)}
-                  </p>
-                ) : (
-                  <div className="mt-2">
-                    <PaymentIntentHint
-                      intent={intent}
-                      format={format}
-                      onPayRemaining={() =>
-                        onAppliedAmount(
-                          normalizeCurrencyPresentationInput(progress.remainingAmount),
-                        )
-                      }
-                    />
-                  </div>
-                )}
-                <p className="mt-4 mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
-                  {copy('Payment method')}
-                </p>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  {methods.map((option) => {
-                    const routeAvailable = paymentRoutes.some(
-                      (route) => route.paymentMethod === option.value,
-                    );
-                    const disabled = isPaymentRoutesLoading || !routeAvailable || hasPending;
-                    return (
-                      <button
-                        key={option.value}
-                        type="button"
-                        disabled={disabled}
-                        aria-pressed={method === option.value}
-                        onClick={() => onMethod(option.value)}
-                        className={`flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-xl border px-2 text-xs font-semibold transition-all active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-40 ${method === option.value ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white shadow-sm' : 'border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)]'}`}
-                      >
-                        {option.icon}
-                        <span className="pos-payment-method-label">{label(option.value)}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-                {hasPending ? (
-                  <p className="mt-2 text-xs text-[var(--color-warning)]">
-                    {copy('Confirm or cancel the waiting payment before adding another one.')}
-                  </p>
-                ) : null}
-                {activeRoute ? (
-                  <div className="mt-3">
-                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
-                      {copy('Settlement account')}
-                    </p>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {routesForMethod.map((route) => (
-                        <button
-                          key={route.id}
-                          type="button"
-                          aria-pressed={activeRoute.id === route.id}
-                          onClick={() => onPaymentRoute(route.id)}
-                          className={`rounded-xl border px-3 py-2.5 text-left transition-colors ${activeRoute.id === route.id ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10' : 'border-[var(--color-border)] bg-[var(--color-surface-muted)]/50 hover:bg-[var(--color-surface-muted)]'}`}
-                        >
-                          <span className="block truncate text-sm font-semibold">
-                            {route.financialAccountName}
-                          </span>
-                          {route.financialAccountCode ? (
-                            <span className="mt-0.5 block truncate text-[11px] text-[var(--color-text-muted)]">
-                              {route.financialAccountCode}
-                            </span>
-                          ) : null}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-                {!isCash ? (
-                  <DInput
-                    aria-label={copy('Payment reference')}
-                    label={copy('Payment reference')}
-                    value={paymentReference}
-                    onChange={onPaymentReference}
-                    placeholder={copy('Optional reference')}
-                    className="mt-3"
-                  />
-                ) : null}
-              </div>
-
-              {isCash ? (
-                <div className="space-y-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
-                  <label className="block text-sm font-medium">
-                    {copy('Cash received')}
-                    <PosCurrencyInput
-                      aria-label={copy('Cash received')}
-                      className="mt-1.5 h-11 rounded-lg bg-[var(--color-surface)] text-right text-lg font-bold"
-                      value={tender}
-                      onChange={onTender}
-                    />
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {normalizedQuickTender.map((amount) => (
-                      <button
-                        key={amount}
-                        type="button"
-                        onClick={() => onTender(amount)}
-                        className={`h-10 rounded-lg border text-[11px] font-semibold transition-all active:scale-[.98] ${normalizeCurrencyPresentationInput(tender) === amount ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'border-[var(--color-border)] bg-[var(--color-background)] hover:bg-[var(--color-surface-muted)]'}`}
-                      >
-                        {format(amount)}
-                      </button>
-                    ))}
-                  </div>
-                  <div
-                    className={`flex items-center justify-between rounded-xl px-3 py-2 ${cashShort ? 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]' : 'bg-[var(--color-success)]/10 text-[var(--color-success)]'}`}
-                  >
-                    <span className="text-sm font-bold">
-                      {copy(cashShort ? 'Payment short' : 'Change')}
-                    </span>
-                    <span className="text-sm font-bold tabular-nums">
-                      {format(
-                        cashShort
-                          ? createDecimal(normalizedAllocation)
-                              .minus(createDecimal(normalizedTender || '0'))
-                              .toFixed(0)
-                          : cashChange,
-                      )}
-                    </span>
+                    ) : null}
                   </div>
                 </div>
               ) : null}
-            </>
-          ) : null}
+
+              <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-3.5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+                  {copy('Payment total')}
+                </p>
+                <h3 className="mt-1 text-3xl font-bold leading-tight tabular-nums text-[var(--color-brand)]">
+                  {format(total)}
+                </h3>
+                <div className="mt-4 border-t border-[var(--color-border)] pt-3 text-sm">
+                  <div className="flex justify-between gap-3">
+                    <span className="text-[var(--color-text-muted)]">{copy('Subtotal')}</span>
+                    <span className="font-semibold">{format(gross)}</span>
+                  </div>
+                  {hasDiscount ? (
+                    <div className="mt-2 flex justify-between gap-3">
+                      <span className="text-[var(--color-text-muted)]">{discountLabel}</span>
+                      <span className="font-semibold text-[var(--color-danger)]">
+                        −{format(discountAmount)}
+                      </span>
+                    </div>
+                  ) : null}
+                  {hasLoyaltyRedemption ? (
+                    <div className="mt-2 flex justify-between gap-3">
+                      <span className="flex items-center gap-2 text-[var(--color-text-muted)]">
+                        <span className="size-2 rounded-full bg-[var(--color-warning)]" />
+                        {copy('Loyalty redemption')}
+                      </span>
+                      <span className="font-semibold text-[var(--color-danger)]">
+                        −{format(redeemedAmount!)}
+                      </span>
+                    </div>
+                  ) : null}
+                  {hasTax ? (
+                    <div className="mt-2 flex justify-between gap-3">
+                      <span className="text-[var(--color-text-muted)]">{taxLabel}</span>
+                      <span className="font-semibold">{format(taxAmount)}</span>
+                    </div>
+                  ) : null}
+                  <div className="mt-3 flex justify-between border-t border-[var(--color-border)] pt-3">
+                    <span className="font-bold">{copy('Net total')}</span>
+                    <span className="font-bold">{format(total)}</span>
+                  </div>
+                </div>
+                {hasPaymentActivity ? (
+                  <div className="mt-3">
+                    <PaymentProgressSummary
+                      total={sale?.totalAmount ?? total}
+                      progress={progress}
+                      format={format}
+                    />
+                    {hasRecordedMoney && !fullyPaid ? (
+                      <p className="mt-2 text-[11px] font-medium text-[var(--color-text-muted)]">
+                        {copy(
+                          'The transaction is not complete until the remaining amount is paid.',
+                        )}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 pb-4">
+              {hasPaymentActivity && sale ? (
+                <RecordedPaymentList
+                  payments={payments}
+                  totalAmount={sale.totalAmount}
+                  progress={progress}
+                  format={format}
+                  isMutating={isSubmitting}
+                  onTransition={onTransitionPayment}
+                />
+              ) : null}
+
+              {collectsPayment ? (
+                <>
+                  <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-3.5">
+                    <div className="mb-2.5 flex items-center justify-between gap-3">
+                      <p className="text-sm font-bold uppercase tracking-wide text-[var(--color-text)]">
+                        {copy('Payment method')}
+                      </p>
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-success)]">
+                        <span className="size-2 rounded-full bg-[var(--color-success)]" />
+                        {copy('Ready to pay')}
+                      </span>
+                    </div>
+                    {hasRecordedMoney ? (
+                      <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+                        {copy('Next payment')}
+                      </p>
+                    ) : null}
+                    {paymentError ? (
+                      <DAlert
+                        variant="danger"
+                        role="alert"
+                        title={copy('Payment was not recorded')}
+                        className="mb-3"
+                      >
+                        {paymentError} {copy('Nothing was added to the paid amount.')}
+                      </DAlert>
+                    ) : null}
+                    <div className="grid grid-cols-2 gap-2">
+                      {methods.map((option) => {
+                        const routeAvailable = paymentRoutes.some(
+                          (route) => route.paymentMethod === option.value,
+                        );
+                        const disabled = isPaymentRoutesLoading || !routeAvailable || hasPending;
+                        const selected = method === option.value;
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            disabled={disabled}
+                            aria-pressed={selected}
+                            onClick={() => onMethod(option.value)}
+                            className={`flex h-10 min-w-0 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
+                              selected
+                                ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white shadow-sm'
+                                : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] hover:border-[var(--color-brand)]/40 hover:bg-[var(--color-brand)]/[.04]'
+                            }`}
+                          >
+                            <span className="shrink-0">{option.icon}</span>
+                            <span className="min-w-0">{label(option.value)}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {hasPending ? (
+                      <p className="mt-2 text-xs text-[var(--color-warning)]">
+                        {copy('Confirm or cancel the waiting payment before adding another one.')}
+                      </p>
+                    ) : null}
+                    {activeRoute ? (
+                      <div className="mt-3">
+                        <Select
+                          label={copy('Settlement account')}
+                          value={activeRoute.id}
+                          options={routesForMethod.map((route) => ({
+                            value: route.id,
+                            label: route.financialAccountCode
+                              ? `${route.financialAccountName} · ${route.financialAccountCode}`
+                              : route.financialAccountName,
+                          }))}
+                          onChange={(value) => {
+                            if (typeof value === 'string') onPaymentRoute(value);
+                          }}
+                          className="w-full"
+                        />
+                      </div>
+                    ) : null}
+                    {!isCash ? (
+                      <div className="mt-3">
+                        <DInput
+                          aria-label={copy('Payment reference')}
+                          label={copy('Payment reference')}
+                          value={paymentReference}
+                          onChange={onPaymentReference}
+                          placeholder={copy('Optional reference')}
+                          className="w-full"
+                        />
+                      </div>
+                    ) : (
+                      <div className="mt-3 border-t border-[var(--color-border)] pt-3">
+                        <div className="mb-1.5 flex items-center justify-between gap-3">
+                          <span className="text-sm font-semibold">{copy('Cash received')}</span>
+                          <button
+                            type="button"
+                            disabled={!allocationPositive}
+                            onClick={() => onTender(normalizedAllocation)}
+                            className="text-xs font-semibold text-[var(--color-brand)] hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {copy('Exact amount')} {format(normalizedAllocation || '0')}
+                          </button>
+                        </div>
+
+                        <PosCurrencyInput
+                          aria-label={copy('Cash received')}
+                          className="h-10 rounded-lg bg-[var(--color-surface)] text-right text-base font-bold"
+                          value={tender}
+                          onChange={onTender}
+                        />
+
+                        <div className="mt-2 grid grid-cols-5 gap-1.5">
+                          {normalizedQuickTender
+                            .filter((amount) => amount !== normalizedAllocation)
+                            .slice(0, 5)
+                            .map((amount) => (
+                              <button
+                                key={amount}
+                                type="button"
+                                onClick={() => onTender(amount)}
+                                className={`h-8 rounded-md border px-1 text-[10px] font-semibold transition-colors ${normalizeCurrencyPresentationInput(tender) === amount ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-muted)]'}`}
+                              >
+                                {format(amount)}
+                              </button>
+                            ))}
+                        </div>
+
+                        <div
+                          className={`mt-2 flex items-center justify-between rounded-lg px-3 py-1.5 ${cashShort ? 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]' : 'bg-[var(--color-success)]/10 text-[var(--color-success)]'}`}
+                        >
+                          <span className="text-sm font-bold">
+                            {copy(cashShort ? 'Payment short' : 'Change')}
+                          </span>
+                          <span className="text-sm font-bold tabular-nums">
+                            {format(
+                              cashShort
+                                ? createDecimal(normalizedAllocation)
+                                    .minus(createDecimal(normalizedTender || '0'))
+                                    .toFixed(0)
+                                : cashChange,
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : null}
+            </div>
+
+            <div className="shrink-0 border-t border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3">
+              {editFooter}
+            </div>
+          </div>
         </div>
       )}
     </DDialog>
@@ -3535,6 +4049,19 @@ const fulfillmentTone: Record<string, 'neutral' | 'brand' | 'success' | 'warning
   CANCELED: 'danger',
 };
 
+export const referenceTransactionDetailLayout = {
+  dialog: 'pos-reference-transaction-dialog lg:!max-w-[1060px]',
+  body: 'pos-transaction-detail-story',
+  orderColumn: 'pos-transaction-detail-order',
+  summaryColumn: 'pos-transaction-detail-summary',
+} as const;
+
+export const referenceTransactionDetailPresentation = {
+  showTopTotal: false,
+  showRightContext: true,
+  emphasizePrimaryStatus: true,
+} as const;
+
 function queueStatusTone(status: QueueStatus | null) {
   if (status === 'QUEUED') return 'warning' as const;
   if (status === 'PROGRESS') return 'brand' as const;
@@ -3543,7 +4070,7 @@ function queueStatusTone(status: QueueStatus | null) {
   return 'neutral' as const;
 }
 
-function ReferenceTransactionDetail({
+export function ReferenceTransactionDetail({
   sale: currentSale,
   locale,
   employees,
@@ -3556,6 +4083,8 @@ function ReferenceTransactionDetail({
   onViewReceipt,
   onSendReceipt,
   isSendingReceipt,
+  deliveryStatus,
+  onRetryDelivery,
   onAssign,
   onComplete,
   isMutating,
@@ -3573,6 +4102,15 @@ function ReferenceTransactionDetail({
   onViewReceipt: (sale: Sale) => void;
   onSendReceipt?: (sale: Sale) => void;
   isSendingReceipt?: boolean;
+  deliveryStatus?: {
+    available: boolean;
+    delivery: {
+      status: 'QUEUED' | 'SENDING' | 'SENT' | 'FAILED';
+      attemptCount: number;
+      retryAllowed: boolean;
+    } | null;
+  };
+  onRetryDelivery?: (sale: Sale) => void;
   onAssign: (line: SaleLine) => void;
   onComplete: () => void;
   isMutating: boolean;
@@ -3624,6 +4162,37 @@ function ReferenceTransactionDetail({
       : settlement.paymentState === 'PARTIALLY_PAID'
         ? 'Partially paid'
         : 'Unpaid';
+  const legacyLoyaltyRedemption = sale.loyaltyRedemption as
+    | (NonNullable<Sale['loyaltyRedemption']> & {
+        requestedPoints?: string;
+        redemptionAmount?: string;
+      })
+    | null
+    | undefined;
+  const redeemedPoints =
+    sale.loyaltyRedemption?.points ?? legacyLoyaltyRedemption?.requestedPoints ?? null;
+  const redeemedAmount =
+    sale.loyaltyRedemption?.amount ?? legacyLoyaltyRedemption?.redemptionAmount ?? null;
+  const hasLoyaltyRedemption = Boolean(redeemedPoints && redeemedAmount);
+  const receiptDelivery = deliveryStatus?.delivery ?? null;
+  const receiptDeliveryBusy =
+    receiptDelivery?.status === 'QUEUED' || receiptDelivery?.status === 'SENDING';
+  const receiptDeliverySent = receiptDelivery?.status === 'SENT';
+  const receiptDeliveryFailed = receiptDelivery?.status === 'FAILED';
+  const receiptDeliveryAction =
+    receiptDeliveryFailed && receiptDelivery.retryAllowed
+      ? (onRetryDelivery ?? onSendReceipt)
+      : onSendReceipt;
+  const receiptDeliveryLabel =
+    receiptDelivery?.status === 'QUEUED'
+      ? 'Mengantre'
+      : receiptDelivery?.status === 'SENDING'
+        ? 'Mengirim'
+        : receiptDelivery?.status === 'SENT'
+          ? 'Terkirim'
+          : receiptDelivery?.status === 'FAILED'
+            ? 'Coba lagi'
+            : copy('Send via WhatsApp');
 
   return (
     <>
@@ -3636,8 +4205,8 @@ function ReferenceTransactionDetail({
         closeOnEscape
         closeOnOverlay
         noPadding
-        size="md"
-        className="pos-reference-dialog max-h-[92dvh] w-full overflow-hidden"
+        size="xl"
+        className={`pos-reference-dialog ${referenceTransactionDetailLayout.dialog} w-full overflow-hidden`}
         footer={
           showReceipt ? (
             <div className="flex flex-col gap-3">
@@ -3675,13 +4244,15 @@ function ReferenceTransactionDetail({
                 <DButton variant="ghost" onClick={onClose}>
                   {copy('Close')}
                 </DButton>
-                {onSendReceipt ? (
+                {deliveryStatus?.available && receiptDeliveryAction ? (
                   <DButton
                     variant="outline"
-                    loading={Boolean(isSendingReceipt)}
-                    onClick={() => onSendReceipt(sale)}
+                    loading={Boolean(isSendingReceipt) || receiptDeliveryBusy}
+                    disabled={receiptDeliverySent}
+                    aria-label={receiptDeliveryFailed ? 'Retry sending' : undefined}
+                    onClick={() => receiptDeliveryAction(sale)}
                   >
-                    {copy('Send via WhatsApp')}
+                    {receiptDeliveryLabel}
                   </DButton>
                 ) : null}
                 <DButton
@@ -3694,7 +4265,7 @@ function ReferenceTransactionDetail({
               </div>
             </div>
           ) : (
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+            <div className="flex flex-col-reverse gap-2 border-t border-[var(--color-border)] pt-3 sm:flex-row sm:items-center sm:justify-end">
               <DButton variant="ghost" onClick={onClose}>
                 {copy('Close')}
               </DButton>
@@ -3743,246 +4314,282 @@ function ReferenceTransactionDetail({
             </div>
           </div>
         ) : (
-          <div className="pos-detail-story flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-5 sm:px-6">
-            <SaleDetailHeader
-              eyebrow={copy('Transaction')}
-              number={identity}
-              secondaryNumber={sale.invoiceNumber}
-              badges={
-                <>
-                  <StatusPill
-                    tone={queueStatusTone(status)}
-                    icon={status ? statusMeta[status].icon : null}
-                  >
-                    {status ? label(statusMeta[status].value) : label('OPEN')}
-                  </StatusPill>
-                  <StatusPill
-                    tone={
-                      settlement.paymentState === 'PAID'
-                        ? 'success'
-                        : settlement.paymentState === 'PARTIALLY_PAID'
-                          ? 'warning'
-                          : 'neutral'
-                    }
-                  >
-                    {copy(paymentStateLabel)}
-                  </StatusPill>
-                </>
-              }
-              totalLabel={copy('Total')}
-              total={format(sale.totalAmount)}
-              settlementNote={
-                settlement.balanceDue !== '0.0000' ? (
-                  <span className="text-[var(--color-warning)]">
-                    {copy('Balance due')} {format(settlement.balanceDue)}
-                  </span>
-                ) : null
-              }
-              meta={[
-                { label: copy('Date'), value: transactionDate },
-                {
-                  label: copy('Customer'),
-                  value: (
-                    <span className="flex min-w-0 flex-wrap items-center gap-1.5">
-                      <span className="truncate">{customerDisplayName(customer, locale)}</span>
-                      {customerStatus(customer) ? (
-                        <Badge
-                          variant={customerStatus(customer)!.variant}
-                          className="shrink-0 text-[10px]"
-                        >
-                          {copy(customerStatus(customer)!.label)}
-                        </Badge>
-                      ) : null}
-                      {customerDisplayDetail(customer) ? (
-                        <span className="w-full text-xs font-normal text-[var(--color-text-muted)]">
-                          {customerDisplayDetail(customer)}
-                        </span>
-                      ) : null}
-                    </span>
-                  ),
-                },
-              ]}
-            />
+          <div className={`${referenceTransactionDetailLayout.body} gap-5 px-5 py-5 sm:px-6`}>
+            <div className="pos-detail-columns">
+              <div className={`pos-detail-column ${referenceTransactionDetailLayout.orderColumn}`}>
+                <SaleDetailSection
+                  title={copy('Order')}
+                  aside={`${activeLines.length} ${copy('items')}`}
+                >
+                  <SaleLineItemList>
+                    {activeLines.map((line) => {
+                      const isTrackedService =
+                        line.itemTypeSnapshot === 'SERVICE' &&
+                        line.fulfillmentBehaviorSnapshot === 'TRACKED' &&
+                        line.fulfillment !== null;
+                      const requiresEmployeeAttribution =
+                        line.employeeAssignmentModeSnapshot !== 'NONE' ||
+                        line.allowEmployeeContributionSnapshot;
+                      const attributed = isTrackedService && requiresEmployeeAttribution;
+                      const plannedUnits = line.workUnits?.length ?? 0;
+                      const needsAttention =
+                        attributed &&
+                        (employeeAssignmentIssues(line, locale).length > 0 ||
+                          (plannedUnits > 0 && plannedUnits !== serviceWorkUnitCount(line)));
+                      const durationLabel = formatDurationMinutes(
+                        line.defaultDurationMinutesSnapshot,
+                        locale,
+                      );
+                      const workSummary = attributed
+                        ? servicePerformerSummary(line, employees, locale)
+                        : null;
+                      const editable = attributed && status === 'PROGRESS';
+                      return (
+                        <SaleLineItem
+                          key={line.id}
+                          name={line.itemNameSnapshot}
+                          variant={line.variantNameSnapshot}
+                          pricing={`${quantity(line.quantity)} × ${format(line.effectiveUnitPrice)}`}
+                          amount={format(line.grossAmount)}
+                          discounts={lineDiscountRows(sale, line, copy('Discount')).map((row) => ({
+                            ...row,
+                            amount: format(row.amount),
+                          }))}
+                          earning={
+                            line.loyaltyEarning
+                              ? `${
+                                  line.loyaltyEarning.state === 'FINALIZED'
+                                    ? `${copy('Points earned')}: `
+                                    : `${copy('Point preview')}: `
+                                }+${pointQuantity(line.loyaltyEarning.pointsEarned, locale)} ${copy('points')}`
+                              : null
+                          }
+                          context={
+                            line.fulfillment || durationLabel ? (
+                              <>
+                                {line.fulfillment ? (
+                                  <StatusPill
+                                    tone={fulfillmentTone[line.fulfillment.status] ?? 'neutral'}
+                                  >
+                                    {label(line.fulfillment.status)}
+                                  </StatusPill>
+                                ) : null}
+                                {durationLabel ? <span>{durationLabel}</span> : null}
+                              </>
+                            ) : null
+                          }
+                          detail={
+                            workSummary ? (
+                              <ServicePerformerSummary
+                                itemName={line.itemNameSnapshot}
+                                summary={workSummary}
+                                needsAttention={needsAttention}
+                                editable={editable}
+                                disabled={isMutating}
+                                onEdit={() => onAssign(line)}
+                              />
+                            ) : null
+                          }
+                        />
+                      );
+                    })}
+                  </SaleLineItemList>
+                </SaleDetailSection>
 
-            {sale.status === 'VOIDED' && cancellationReason ? (
-              <div className="rounded-[var(--radius-control)] border border-[var(--color-danger)]/25 bg-[var(--color-danger)]/10 px-3 py-2 text-xs">
-                <p className="font-semibold text-[var(--color-danger)]">
-                  {copy('Cancellation reason')}
-                </p>
-                <p className="mt-1 text-[var(--color-text-muted)]">{cancellationReason}</p>
-              </div>
-            ) : null}
-
-            {completionIssues.length ? (
-              <div className="rounded-[var(--radius-control)] border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 px-3 py-2 text-xs">
-                <p className="font-semibold text-[var(--color-warning)]">
-                  {copy('Not ready to complete')}
-                </p>
-                <div className="mt-2 space-y-2 text-[var(--color-text-muted)]">
-                  {completionIssueGroups.map((group) => (
-                    <div key={group.id}>
-                      <p className="font-semibold text-[var(--color-text)]">{group.label}</p>
-                      <ul className="mt-0.5 list-disc space-y-0.5 pl-4">
-                        {group.issues.map((issue) => (
-                          <li key={issue}>{issue}</li>
-                        ))}
-                      </ul>
+                {completionIssues.length ? (
+                  <section className="rounded-[var(--radius-control)] border border-[var(--color-warning)]/25 bg-[var(--color-warning)]/[.06] px-3 py-2.5 text-xs">
+                    <p className="font-semibold text-[var(--color-warning)]">
+                      {copy('Not ready to complete')}
+                    </p>
+                    <div className="mt-1.5 space-y-1.5 text-[var(--color-text-muted)]">
+                      {completionIssueGroups.map((group) => (
+                        <div key={group.id}>
+                          <p className="font-medium text-[var(--color-text)]">{group.label}</p>
+                          <ul className="mt-0.5 list-disc space-y-0.5 pl-4">
+                            {group.issues.map((issue) => (
+                              <li key={issue}>{issue}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </section>
+                ) : null}
               </div>
-            ) : null}
-
-            <SaleDetailSection
-              title={copy('Order')}
-              aside={`${activeLines.length} ${copy('items')}`}
-            >
-              <SaleLineItemList>
-                {activeLines.map((line) => {
-                  const isTrackedService =
-                    line.itemTypeSnapshot === 'SERVICE' &&
-                    line.fulfillmentBehaviorSnapshot === 'TRACKED' &&
-                    line.fulfillment !== null;
-                  const requiresEmployeeAttribution =
-                    line.employeeAssignmentModeSnapshot !== 'NONE' ||
-                    line.allowEmployeeContributionSnapshot;
-                  const attributed = isTrackedService && requiresEmployeeAttribution;
-                  const plannedUnits = line.workUnits?.length ?? 0;
-                  const needsAttention =
-                    attributed &&
-                    (employeeAssignmentIssues(line, locale).length > 0 ||
-                      (plannedUnits > 0 && plannedUnits !== serviceWorkUnitCount(line)));
-                  const durationLabel = formatDurationMinutes(
-                    line.defaultDurationMinutesSnapshot,
-                    locale,
-                  );
-                  const workSummary = attributed
-                    ? servicePerformerSummary(line, employees, locale)
-                    : null;
-                  const editable = attributed && status === 'PROGRESS';
-                  return (
-                    <SaleLineItem
-                      key={line.id}
-                      name={line.itemNameSnapshot}
-                      variant={line.variantNameSnapshot}
-                      pricing={`${quantity(line.quantity)} × ${format(line.effectiveUnitPrice)}`}
-                      amount={format(line.grossAmount)}
-                      discounts={lineDiscountRows(sale, line, copy('Discount')).map((row) => ({
-                        ...row,
-                        amount: format(row.amount),
-                      }))}
-                      context={
-                        line.fulfillment || durationLabel ? (
-                          <>
-                            {line.fulfillment ? (
-                              <StatusPill
-                                tone={fulfillmentTone[line.fulfillment.status] ?? 'neutral'}
-                              >
-                                {label(line.fulfillment.status)}
-                              </StatusPill>
-                            ) : null}
-                            {durationLabel ? <span>{durationLabel}</span> : null}
-                          </>
-                        ) : null
-                      }
-                      detail={
-                        workSummary ? (
-                          <ServicePerformerSummary
-                            itemName={line.itemNameSnapshot}
-                            summary={workSummary}
-                            needsAttention={needsAttention}
-                            editable={editable}
-                            disabled={isMutating}
-                            onEdit={() => onAssign(line)}
-                          />
-                        ) : null
-                      }
-                    />
-                  );
-                })}
-              </SaleLineItemList>
-            </SaleDetailSection>
-
-            <SaleDetailSection title={copy('Order summary')} surface="muted">
-              <SaleFinancialSummary
-                labels={{
-                  subtotal: copy('Subtotal'),
-                  total: copy('Total'),
-                  paid: copy('Paid amount'),
-                  balance: copy('Balance due'),
-                  settled: copy('Paid'),
-                  cashReceived: copy('Cash received'),
-                  change: copy('Change'),
-                  discount: copy('Discount'),
-                  discountContext: (row) =>
-                    `${copy(row.source === 'PROMOTION' ? 'Promotion' : 'Manual discount')} · ${copy(
-                      row.scope === 'TRANSACTION'
-                        ? 'Whole transaction'
-                        : row.scope === 'ITEM'
-                          ? 'Item-level'
-                          : 'Category-level',
-                    )}`,
-                }}
-                gross={sale.grossAmount}
-                discounts={summaryDiscounts}
-                tax={
-                  hasTax ? { label: saleTaxLabel(sale, copy('Tax')), amount: sale.taxAmount } : null
-                }
-                total={sale.totalAmount}
-                settlement={settlement}
-                format={format}
-              />
-            </SaleDetailSection>
-
-            {composition.components.length ? (
-              <SaleDetailSection
-                title={copy('Payment')}
-                aside={
-                  composition.isSplit ? (
-                    <StatusPill tone="brand">
-                      {copy('Split Payment')} · {composition.components.length} {copy('methods')}
-                    </StatusPill>
-                  ) : undefined
-                }
+              <div
+                className={`pos-detail-column ${referenceTransactionDetailLayout.summaryColumn}`}
               >
-                <SalePaymentComposition
-                  components={composition.components.map((item) => {
-                    const name = paymentAccountLabel(item, (method) => label(method));
-                    const methodName = label(item.method);
-                    return {
-                      id: item.id,
-                      name,
-                      method: name === methodName ? null : methodName,
-                      reference: item.providerReference,
-                      amount: format(item.appliedAmount),
-                    };
-                  })}
+                <SaleFinancialSummary
+                  title={copy('Order summary')}
+                  context={
+                    referenceTransactionDetailPresentation.showRightContext ? (
+                      <div className="space-y-3">
+                        <div className="flex items-start gap-3">
+                          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[var(--color-brand)] text-sm font-bold text-white">
+                            {customerInitials(customer)}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                              <p className="truncate text-sm font-bold text-[var(--color-text)]">
+                                {customerDisplayName(customer, locale)}
+                              </p>
+                              {customerStatus(customer) ? (
+                                <Badge
+                                  variant={customerStatus(customer)!.variant}
+                                  className="shrink-0 text-[10px]"
+                                >
+                                  {copy(customerStatus(customer)!.label)}
+                                </Badge>
+                              ) : null}
+                            </div>
+                            {customerDisplayDetail(customer) ? (
+                              <p className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">
+                                {customerDisplayDetail(customer)}
+                              </p>
+                            ) : null}
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          <StatusPill
+                            tone={
+                              sale.status === 'VOIDED' || status === 'CANCELED'
+                                ? 'danger'
+                                : queueStatusTone(status)
+                            }
+                            icon={status ? statusMeta[status].icon : null}
+                          >
+                            {status ? label(statusMeta[status].value) : label('OPEN')}
+                          </StatusPill>
+                          <StatusPill
+                            tone={
+                              settlement.paymentState === 'PAID'
+                                ? 'success'
+                                : settlement.paymentState === 'PARTIALLY_PAID'
+                                  ? 'warning'
+                                  : 'neutral'
+                            }
+                          >
+                            {copy(paymentStateLabel)}
+                          </StatusPill>
+                        </div>
+                        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--color-text-muted)]">
+                          {sale.invoiceNumber ? (
+                            <span className="font-mono text-[var(--color-text)]">
+                              {sale.invoiceNumber}
+                            </span>
+                          ) : null}
+                          <span>{transactionDate}</span>
+                        </div>
+                        {sale.status === 'VOIDED' && cancellationReason ? (
+                          <div className="border-l-2 border-[var(--color-danger)] pl-2.5 text-xs">
+                            <p className="font-semibold text-[var(--color-danger)]">
+                              {copy('Cancellation reason')}
+                            </p>
+                            <p className="mt-0.5 text-[var(--color-text-muted)]">
+                              {cancellationReason}
+                            </p>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null
+                  }
+                  labels={{
+                    subtotal: copy('Subtotal'),
+                    total: copy('Total'),
+                    paid: copy('Paid amount'),
+                    balance: copy('Balance due'),
+                    settled: copy('Paid'),
+                    cashReceived: copy('Cash received'),
+                    change: copy('Change'),
+                    discount: copy('Discount'),
+                    discountContext: (row) =>
+                      `${copy(row.source === 'PROMOTION' ? 'Promotion' : 'Manual discount')} · ${copy(
+                        row.scope === 'TRANSACTION'
+                          ? 'Whole transaction'
+                          : row.scope === 'ITEM'
+                            ? 'Item-level'
+                            : 'Category-level',
+                      )}`,
+                  }}
+                  gross={sale.grossAmount}
+                  discounts={summaryDiscounts}
+                  adjustments={
+                    hasLoyaltyRedemption
+                      ? [
+                          {
+                            id: 'loyalty-redemption',
+                            label: copy('Loyalty redemption'),
+                            detail: `${pointQuantity(redeemedPoints, locale)} ${copy('points used')}`,
+                            amount: redeemedAmount!,
+                          },
+                        ]
+                      : []
+                  }
+                  tax={
+                    hasTax
+                      ? { label: saleTaxLabel(sale, copy('Tax')), amount: sale.taxAmount }
+                      : null
+                  }
+                  total={sale.totalAmount}
+                  settlement={settlement}
+                  format={format}
+                  payment={
+                    composition.components.length
+                      ? {
+                          title: copy('Payment'),
+                          aside: composition.isSplit ? (
+                            <StatusPill tone="brand">
+                              {copy('Split Payment')} · {composition.components.length}{' '}
+                              {copy('methods')}
+                            </StatusPill>
+                          ) : undefined,
+                          content: (
+                            <SalePaymentComposition
+                              components={composition.components.map((item) => {
+                                const name = paymentAccountLabel(item, (method) => label(method));
+                                const methodName = label(item.method);
+                                return {
+                                  id: item.id,
+                                  name,
+                                  method: name === methodName ? null : methodName,
+                                  reference: item.providerReference,
+                                  amount: format(item.appliedAmount),
+                                };
+                              })}
+                            />
+                          ),
+                        }
+                      : null
+                  }
+                  paymentAttempts={
+                    unappliedPayments.length ? (
+                      <>
+                        <h4 className="text-sm font-semibold text-[var(--color-text)]">
+                          {copy('Payment attempts')}
+                        </h4>
+                        <SalePaymentList
+                          emptyLabel={copy('No payment recorded yet.')}
+                          payments={unappliedPayments.map((item) => ({
+                            id: item.id,
+                            method: paymentAccountLabel(item, (method) => label(method)),
+                            status: (
+                              <StatusPill tone={item.status === 'PENDING' ? 'warning' : 'neutral'}>
+                                {label(item.status)}
+                              </StatusPill>
+                            ),
+                            detail: new Intl.DateTimeFormat(locale, {
+                              dateStyle: 'medium',
+                              timeStyle: 'short',
+                            }).format(new Date(item.terminalAt ?? item.updatedAt)),
+                            amount: format(item.appliedAmount),
+                          }))}
+                        />
+                      </>
+                    ) : null
+                  }
                 />
-              </SaleDetailSection>
-            ) : null}
-
-            {/* Attempts that did not settle the sale stay visible for audit, apart from how it was paid. */}
-            {unappliedPayments.length ? (
-              <SaleDetailSection title={copy('Other payment attempts')}>
-                <SalePaymentList
-                  emptyLabel={copy('No payment recorded yet.')}
-                  payments={unappliedPayments.map((item) => ({
-                    id: item.id,
-                    method: paymentAccountLabel(item, (method) => label(method)),
-                    status: (
-                      <StatusPill tone={item.status === 'PENDING' ? 'warning' : 'neutral'}>
-                        {label(item.status)}
-                      </StatusPill>
-                    ),
-                    detail: new Intl.DateTimeFormat(locale, {
-                      dateStyle: 'medium',
-                      timeStyle: 'short',
-                    }).format(new Date(item.terminalAt ?? item.updatedAt)),
-                    amount: format(item.appliedAmount),
-                  }))}
-                />
-              </SaleDetailSection>
-            ) : null}
+              </div>
+            </div>
           </div>
         )}
       </Dialog>
@@ -4010,7 +4617,7 @@ function ReferenceTransactionDetail({
   );
 }
 
-function ReceiptContent({
+export function ReceiptContent({
   sale,
   activeLines,
   customer,
@@ -4037,6 +4644,18 @@ function ReceiptContent({
   const discountRows = saleDiscountRows(sale);
   const composition = appliedPaymentComposition(sale);
   const settlement = saleSettlement(sale);
+  const legacyLoyaltyRedemption = sale.loyaltyRedemption as
+    | (NonNullable<Sale['loyaltyRedemption']> & {
+        requestedPoints?: string;
+        redemptionAmount?: string;
+      })
+    | null
+    | undefined;
+  const redeemedPoints =
+    sale.loyaltyRedemption?.points ?? legacyLoyaltyRedemption?.requestedPoints ?? null;
+  const redeemedAmount =
+    sale.loyaltyRedemption?.amount ?? legacyLoyaltyRedemption?.redemptionAmount ?? null;
+  const hasLoyaltyRedemption = Boolean(redeemedPoints && redeemedAmount);
   return (
     <>
       <header className="text-center">
@@ -4093,6 +4712,14 @@ function ReceiptContent({
                   <span className="shrink-0">−{money(discount.amount, locale)}</span>
                 </div>
               ))}
+              {line.loyaltyEarning?.state === 'FINALIZED' ? (
+                <div className="mt-1 flex items-start justify-between gap-3 text-slate-500">
+                  <span>{copy('Points earned')}</span>
+                  <span className="shrink-0 font-medium text-slate-950">
+                    +{pointQuantity(line.loyaltyEarning.pointsEarned, locale)}
+                  </span>
+                </div>
+              ) : null}
             </div>
           );
         })}
@@ -4123,6 +4750,17 @@ function ReceiptContent({
           <div className="flex justify-between gap-3">
             <dt className="text-slate-500">{copy('Discount')}</dt>
             <dd>−{money(sale.discountAmount, locale)}</dd>
+          </div>
+        ) : null}
+        {hasLoyaltyRedemption ? (
+          <div className="flex items-start justify-between gap-3">
+            <dt className="min-w-0 text-slate-500">
+              {copy('Loyalty redemption')}
+              <span className="block text-[10px] leading-3">
+                {pointQuantity(redeemedPoints, locale)} {copy('points used')}
+              </span>
+            </dt>
+            <dd className="shrink-0">−{money(redeemedAmount!, locale)}</dd>
           </div>
         ) : null}
         {hasTax ? (

@@ -35,6 +35,8 @@ import {
   type SellingLocation,
 } from './business-settings-api';
 import { useBusinessConfigurationI18n } from './business-configuration-i18n';
+import { LoyaltyApi } from '../loyalty/loyalty-api';
+import { LoyaltyConfigurationSection } from '../loyalty/loyalty-configuration-section';
 
 const keys = {
   configuration: ['business-settings', 'configuration'] as const,
@@ -52,6 +54,19 @@ export function BusinessConfigurationPage() {
     [createApiClient, runtime.apiBaseUrl],
   );
 
+  const loyaltyApi = useMemo(
+    () => new LoyaltyApi(createApiClient(runtime.apiBaseUrl)),
+    [createApiClient, runtime.apiBaseUrl],
+  );
+  const hasLoyaltyCapability = Boolean(
+    session?.effectiveEntitlements.capabilities.includes('LOYALTY_POINTS'),
+  );
+  const canViewLoyalty = Boolean(
+    hasLoyaltyCapability && session && canPerformBackofficeAction(session, 'viewLoyalty'),
+  );
+  const canConfigureLoyalty = Boolean(
+    hasLoyaltyCapability && session && canPerformBackofficeAction(session, 'configureLoyalty'),
+  );
   const canViewProfile = Boolean(
     session && canPerformBackofficeAction(session, 'viewBusinessProfile'),
   );
@@ -88,7 +103,13 @@ export function BusinessConfigurationPage() {
 
   const invalidate = (queryKey: readonly string[]) =>
     void queryClient.invalidateQueries({ queryKey });
-  const firstTab = canViewProfile ? 'profile' : 'locations';
+  const firstTab = canViewProfile
+    ? 'profile'
+    : canViewLocations
+      ? 'locations'
+      : canViewLoyalty
+        ? 'loyalty'
+        : 'profile';
 
   return (
     <BackofficePage>
@@ -113,6 +134,7 @@ export function BusinessConfigurationPage() {
           {canViewProfile ? (
             <DTabsTrigger value="numbering">{copy('Numbering')}</DTabsTrigger>
           ) : null}
+          {canViewLoyalty ? <DTabsTrigger value="loyalty">Loyalty</DTabsTrigger> : null}
         </DTabsList>
 
         <DTabsContent value="profile" className="mt-5">
@@ -155,6 +177,12 @@ export function BusinessConfigurationPage() {
             onChanged={() => invalidate(keys.configuration)}
           />
         </DTabsContent>
+
+        {canViewLoyalty ? (
+          <DTabsContent value="loyalty" className="mt-5">
+            <LoyaltyConfigurationSection api={loyaltyApi} canConfigure={canConfigureLoyalty} />
+          </DTabsContent>
+        ) : null}
 
         <DTabsContent value="numbering" className="mt-5">
           <NumberingSection

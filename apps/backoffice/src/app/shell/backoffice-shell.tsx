@@ -16,6 +16,7 @@ import {
   UserRound,
   UserCircle,
   UsersRound,
+  ContactRound,
   WalletCards,
   type LucideIcon,
 } from 'lucide-react';
@@ -69,6 +70,13 @@ const navigationSections: ReadonlyArray<{
         capability: 'promotions',
       },
       { label: 'employees', to: '/employees', icon: UsersRound, capability: 'employees' },
+      {
+        label: 'catalog',
+        localizedLabel: { id: 'Member', en: 'Members' },
+        to: '/memberships',
+        icon: ContactRound,
+        capability: 'memberships',
+      },
     ],
   },
   {

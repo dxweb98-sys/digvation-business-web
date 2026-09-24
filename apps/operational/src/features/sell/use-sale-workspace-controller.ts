@@ -218,6 +218,32 @@ export function useSaleWorkspaceController({
     onError: async (error, intent) => command.recoverFailure(error, intent.saleId),
   });
 
+  const loyaltyRedemptionMutation = useMutation({
+    mutationFn: (intent: { saleId: string; expectedVersion: number; points: string }) =>
+      command.runMutation(() =>
+        client.applyLoyaltyRedemption(
+          intent.saleId,
+          { expectedVersion: intent.expectedVersion, points: intent.points },
+          createIdempotencyKey('loyalty-redemption'),
+        ),
+      ),
+    onSuccess: command.commitSale,
+    onError: async (_error, intent) => {
+      await command.refetchSale(intent.saleId);
+    },
+  });
+  const removeLoyaltyRedemptionMutation = useMutation({
+    mutationFn: (intent: { saleId: string; expectedVersion: number }) =>
+      command.runMutation(() =>
+        client.removeLoyaltyRedemption(
+          intent.saleId,
+          intent.expectedVersion,
+          createIdempotencyKey('loyalty-redemption-remove'),
+        ),
+      ),
+    onSuccess: command.commitSale,
+    onError: async (error, intent) => command.recoverFailure(error, intent.saleId),
+  });
   const quantityMutation = useMutation({
     mutationFn: (intent: {
       saleId: string;
@@ -362,6 +388,20 @@ export function useSaleWorkspaceController({
     return draftCommitGateRef.current.run(() => commitDraftMutation.mutateAsync(intent));
   };
 
+  const applyLoyaltyRedemption = async (points: string) => {
+    const sale = saleQuery.data;
+    if (!sale || sale.customer?.type !== 'MEMBER' || !points.trim()) return null;
+    return loyaltyRedemptionMutation.mutateAsync({
+      saleId: sale.id,
+      expectedVersion: sale.version,
+      points,
+    });
+  };
+  const removeLoyaltyRedemption = () => {
+    const sale = saleQuery.data;
+    if (!sale?.loyaltyRedemption) return;
+    removeLoyaltyRedemptionMutation.mutate({ saleId: sale.id, expectedVersion: sale.version });
+  };
   const activeSaleLines = viewModel.activeLines;
   const draftLines = cartDraftDisplayLines(draft);
   const cartLines = saleQuery.data
@@ -376,6 +416,10 @@ export function useSaleWorkspaceController({
     isCustomerPending: customerMutation.isPending,
     changeCustomer,
     isLoading: Boolean(routeSaleId) && saleQuery.isLoading,
+    isLoyaltyRedemptionPending:
+      loyaltyRedemptionMutation.isPending || removeLoyaltyRedemptionMutation.isPending,
+    applyLoyaltyRedemption,
+    removeLoyaltyRedemption,
     cart: {
       lines: cartLines,
       grossAmount: saleQuery.data?.grossAmount ?? cartTotal,

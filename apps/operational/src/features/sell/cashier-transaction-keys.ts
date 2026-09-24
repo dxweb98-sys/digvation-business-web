@@ -25,6 +25,7 @@ export const cashierTransactionKeys = {
   employees: () => ['cashier-transaction', 'employees'] as const,
   paymentRoutes: (sellingLocationId: string, currency: string) =>
     ['cashier-transaction', 'payment-routes', sellingLocationId, currency] as const,
+  taxConfiguration: () => ['cashier-transaction', 'tax-configuration'] as const,
   contributionPreview: (saleId: string, saleLineId: string) =>
     ['cashier-transaction', 'contribution-preview', saleId, saleLineId] as const,
   sales: () => ['cashier-transaction', 'operational-queue'] as const,

@@ -271,6 +271,11 @@ export interface SaleLine {
   removedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Runtime authority: mutable preview for OPEN Sales, immutable snapshot once finalized. */
+  loyaltyEarning?: {
+    state: 'PREVIEW' | 'FINALIZED';
+    pointsEarned: string;
+  } | null;
   fulfillment: SaleLineFulfillment | null;
   participations: SaleParticipation[];
   contributions: EmployeeContribution[];
@@ -298,6 +303,13 @@ export interface SaleCustomer {
 /** Customer identity requested from Runtime, which resolves and normalizes it. */
 export type SaleCustomerSelection =
   { type: 'NON_MEMBER'; name: string; phone: string } | { type: 'MEMBER'; referenceId: string };
+
+export interface SaleLoyaltyRedemption {
+  membershipId: string;
+  points: string;
+  pointValue: string;
+  amount: string;
+}
 
 export interface Sale {
   id: string;
@@ -328,6 +340,7 @@ export interface Sale {
   transactionTaxAmount?: string;
   promotionCode?: string | null;
   adjustments?: SaleAdjustment[];
+  loyaltyRedemption?: SaleLoyaltyRedemption | null;
   customer?: SaleCustomer | null;
   createdByActorId?: string;
   createdByActorKind?: string;

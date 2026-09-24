@@ -8,7 +8,7 @@ import {
   DSelectFilter,
   type TableColumn,
 } from '@digvation/ui';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { Eye } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
 import { useRuntime } from '@digvation/business-runtime';
@@ -24,6 +24,7 @@ import {
   type Sale,
   type SaleStatus,
 } from './transaction-history-api';
+import { TransactionFinancialSummary } from './transaction-financial-summary';
 import { transactionPaymentComposition } from './transaction-payment-composition';
 
 const defaultPageSize = 20;
@@ -80,7 +81,7 @@ const transactionCopy = {
 } as const;
 
 export function TransactionHistoryPage() {
-  const { createApiClient } = useBackofficeAuth();
+  const { createApiClient, session } = useBackofficeAuth();
   const runtime = useRuntime();
   const { copy, formatDate, formatMoney, locale } = useBackofficeLocalization();
   const text = transactionCopy[locale];
@@ -292,6 +293,13 @@ export function TransactionHistoryPage() {
         loading={detail.isLoading}
         error={detail.isError}
         onClose={() => setDetailId(null)}
+        api={api}
+        canRefund={Boolean(session?.access.permissions.includes('payments:refund'))}
+        canReverse={Boolean(session?.access.permissions.includes('sales:reverse'))}
+        onUpdated={() => {
+          void detail.refetch();
+          void list.refetch();
+        }}
       />
     </BackofficePage>
   );
@@ -337,15 +345,59 @@ function TransactionDetail({
   loading,
   error,
   onClose,
+  api,
+  canRefund,
+  canReverse,
+  onUpdated,
 }: {
   open: boolean;
   item: Sale | undefined;
   loading: boolean;
   error: boolean;
   onClose: () => void;
+  api: TransactionHistoryApi;
+  canRefund: boolean;
+  canReverse: boolean;
+  onUpdated: () => void;
 }) {
   const { copy, formatDate, formatMoney, locale } = useBackofficeLocalization();
   const text = transactionCopy[locale];
+  const [reason, setReason] = useState('');
+  const [reverseOpen, setReverseOpen] = useState(false);
+  const [refundPayment, setRefundPayment] = useState<Payment | null>(null);
+  const [refundAmount, setRefundAmount] = useState('');
+  const [actionError, setActionError] = useState<string | null>(null);
+  const reverse = useMutation({
+    mutationFn: () => api.reverse(item!.id, item!.version, reason.trim()),
+    onSuccess: () => {
+      setReverseOpen(false);
+      setReason('');
+      setActionError(null);
+      onUpdated();
+    },
+    onError: (failure: { message?: string }) =>
+      setActionError(failure.message ?? copy('Could not reverse this transaction.')),
+  });
+  const refund = useMutation({
+    mutationFn: () =>
+      api.refundPayment(item!.id, refundPayment!.id, item!.version, refundAmount.trim()),
+    onSuccess: () => {
+      setRefundPayment(null);
+      setRefundAmount('');
+      setActionError(null);
+      onUpdated();
+    },
+    onError: (failure: { message?: string }) =>
+      setActionError(failure.message ?? copy('Could not refund this payment.')),
+  });
+  const refundableCash =
+    item?.payments.filter(
+      (payment) =>
+        payment.method === 'CASH' &&
+        payment.status === 'SUCCEEDED' &&
+        !payment.providerReference &&
+        !payment.appliedAmount.startsWith('-'),
+    ) ?? [];
   return (
     <DDialog
       open={open}
@@ -388,6 +440,18 @@ function TransactionDetail({
               </div>
               <StatusBadge status={item.status} />
             </div>
+            {item.reversal ? (
+              <div className="mt-4 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3 text-sm">
+                <p className="font-medium">{copy('Reversed')}</p>
+                <p className="mt-1 text-[var(--color-text-muted)]">
+                  {item.reversal.reason} ·{' '}
+                  {formatDate(new Date(item.reversal.reversedAt), {
+                    dateStyle: 'medium',
+                    timeStyle: 'short',
+                  })}
+                </p>
+              </div>
+            ) : null}
             <div className="mt-5 border-t border-[var(--color-border)] pt-4">
               <p className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
                 {copy('Total')}
@@ -399,23 +463,49 @@ function TransactionDetail({
           </section>
 
           <section className="border-b border-[var(--color-border)] py-5">
-            <h3 className="text-base font-semibold">{text.saleInformation}</h3>
-            <dl className="mt-4 grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
-              <Fact
-                label={copy('Discount')}
-                value={formatMoney(item.discountAmount, item.currency)}
-              />
-              <Fact label={copy('Tax')} value={formatMoney(item.taxAmount, item.currency)} />
-              <Fact
-                label={copy('Total')}
-                value={formatMoney(item.totalAmount, item.currency)}
-                emphasized
-              />
-              <Fact label={text.currency} value={item.currency} />
-            </dl>
+            <TransactionFinancialSummary sale={item} copy={copy} formatMoney={formatMoney} />
+            <p className="mt-4 text-xs text-[var(--color-text-muted)]">
+              {text.currency}: {item.currency}
+            </p>
           </section>
 
           <TransactionPayments item={item} />
+
+          {item.status === 'FINALIZED' && !item.reversal && (canRefund || canReverse) ? (
+            <section className="border-b border-[var(--color-border)] py-5">
+              <h3 className="text-base font-semibold">{copy('Transaction actions')}</h3>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {canRefund &&
+                  refundableCash.map((payment) => (
+                    <DButton
+                      key={payment.id}
+                      variant="secondary"
+                      onClick={() => {
+                        setActionError(null);
+                        setRefundPayment(payment);
+                        setRefundAmount(payment.appliedAmount);
+                      }}
+                    >
+                      {copy('Refund cash payment')}
+                    </DButton>
+                  ))}
+                {canReverse ? (
+                  <DButton
+                    variant="secondary"
+                    onClick={() => {
+                      setActionError(null);
+                      setReverseOpen(true);
+                    }}
+                  >
+                    {copy('Reverse transaction')}
+                  </DButton>
+                ) : null}
+              </div>
+              {actionError ? (
+                <p className="mt-3 text-sm text-[var(--color-danger)]">{actionError}</p>
+              ) : null}
+            </section>
+          ) : null}
 
           <section className="pt-5">
             <div className="flex items-center gap-2">
@@ -453,6 +543,81 @@ function TransactionDetail({
           </section>
         </div>
       )}
+      <DDialog
+        open={Boolean(refundPayment)}
+        onClose={() => !refund.isPending && setRefundPayment(null)}
+        title={copy('Refund cash payment')}
+        footer={
+          <div className="flex justify-end gap-2">
+            <DButton
+              variant="secondary"
+              onClick={() => setRefundPayment(null)}
+              disabled={refund.isPending}
+            >
+              {copy('Cancel')}
+            </DButton>
+            <DButton
+              onClick={() => refund.mutate()}
+              disabled={refund.isPending || !refundAmount.trim()}
+            >
+              {copy('Refund payment')}
+            </DButton>
+          </div>
+        }
+      >
+        <label className="block text-sm font-medium" htmlFor="refund-amount">
+          {copy('Refund amount')}
+        </label>
+        <input
+          id="refund-amount"
+          className="mt-2 w-full rounded-md border border-[var(--color-border)] bg-transparent px-3 py-2"
+          value={refundAmount}
+          onChange={(event) => setRefundAmount(event.target.value)}
+          inputMode="decimal"
+        />
+        <p className="mt-3 text-sm text-[var(--color-text-muted)]">
+          {copy(
+            'Only cash refunds can be completed here. Provider-backed payments require their authoritative provider flow.',
+          )}
+        </p>
+      </DDialog>
+      <DDialog
+        open={reverseOpen}
+        onClose={() => !reverse.isPending && setReverseOpen(false)}
+        title={copy('Reverse transaction')}
+        footer={
+          <div className="flex justify-end gap-2">
+            <DButton
+              variant="secondary"
+              onClick={() => setReverseOpen(false)}
+              disabled={reverse.isPending}
+            >
+              {copy('Cancel')}
+            </DButton>
+            <DButton
+              onClick={() => reverse.mutate()}
+              disabled={reverse.isPending || !reason.trim()}
+            >
+              {copy('Reverse transaction')}
+            </DButton>
+          </div>
+        }
+      >
+        <label className="block text-sm font-medium" htmlFor="reverse-reason">
+          {copy('Reason')}
+        </label>
+        <textarea
+          id="reverse-reason"
+          className="mt-2 min-h-24 w-full rounded-md border border-[var(--color-border)] bg-transparent px-3 py-2"
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+        />
+        <p className="mt-3 text-sm text-[var(--color-text-muted)]">
+          {copy(
+            'All successful payments must be fully refunded before this transaction can be reversed.',
+          )}
+        </p>
+      </DDialog>
     </DDialog>
   );
 }

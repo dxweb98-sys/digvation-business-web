@@ -1,4 +1,6 @@
-import { createBrowserRouter } from 'react-router';
+import { SystemStatePage } from '@digvation/business-system-states';
+import { DButton } from '@digvation/ui';
+import { createBrowserRouter, useNavigate } from 'react-router';
 
 import { AuthenticatedRoute } from '../../auth/authenticated-route';
 import { AuthorizedRoute } from '../../auth/authorized-route';
@@ -9,20 +11,50 @@ import { DashboardPage } from '../../modules/dashboard/dashboard-page';
 import { BackofficeShell } from '../shell/backoffice-shell';
 import { AccessControlPage } from '../../modules/identity';
 import { BusinessSettingsPage } from '../../modules/organization';
-import { CatalogPage } from '../../modules/catalog';
+import { CatalogPage } from '../../features/catalog';
 import { PromotionsPage } from '../../modules/promotions';
 import { EmployeesPage } from '../../modules/workforce';
+import { MembersPage } from '../../modules/membership';
 import { ExpensesPage, FinancialAccountsPage } from '../../modules/finance';
 import { TransactionHistoryPage } from '../../modules/pos';
 import { ReportsPage } from '../../modules/reporting';
 import { ActivityPage } from '../../modules/activity';
 import { NotificationsPage } from '../../modules/notifications';
 
+function BackofficeNotFoundRoute() {
+  const navigate = useNavigate();
+  return (
+    <SystemStatePage
+      state="not-found"
+      variant="content"
+      action={
+        <DButton variant="secondary" size="sm" onClick={() => navigate('/')}>
+          Kembali ke dashboard
+        </DButton>
+      }
+    />
+  );
+}
+
+function BackofficeApplicationErrorRoute() {
+  return (
+    <SystemStatePage
+      state="application-error"
+      action={
+        <DButton variant="secondary" size="sm" onClick={() => window.location.reload()}>
+          Coba lagi
+        </DButton>
+      }
+    />
+  );
+}
+
 export const backofficeRouter = createBrowserRouter([
   { path: '/login', element: <BackofficeLoginPage /> },
   { path: PASSWORD_RECOVERY_PATH, element: <BackofficePasswordRecoveryPage /> },
   {
     element: <AuthenticatedRoute />,
+    errorElement: <BackofficeApplicationErrorRoute />,
     children: [
       {
         element: <BackofficeShell />,
@@ -42,6 +74,10 @@ export const backofficeRouter = createBrowserRouter([
           {
             element: <AuthorizedRoute capability="employees" />,
             children: [{ path: '/employees', element: <EmployeesPage /> }],
+          },
+          {
+            element: <AuthorizedRoute capability="memberships" />,
+            children: [{ path: '/memberships', element: <MembersPage /> }],
           },
           {
             element: <AuthorizedRoute capability="financialAccounts" />,
@@ -82,8 +118,5 @@ export const backofficeRouter = createBrowserRouter([
       },
     ],
   },
-  {
-    path: '*',
-    element: <BackofficeLoginPage />,
-  },
+  { path: '*', element: <BackofficeNotFoundRoute /> },
 ]);

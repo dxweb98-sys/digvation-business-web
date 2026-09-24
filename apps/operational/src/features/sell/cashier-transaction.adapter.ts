@@ -49,6 +49,20 @@ export interface AddSaleLineInput {
   quantity: string;
 }
 
+export interface LoyaltyRedemptionInput {
+  expectedVersion: number;
+  points: string;
+}
+
+export interface SaleTaxConfiguration {
+  enabled: boolean;
+  /** Decimal fraction from Runtime; "0.11" means 11%. */
+  rate: string;
+  version: number;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
 export interface SetSaleLineQuantityInput {
   expectedVersion: number;
   quantity: string;
@@ -151,6 +165,7 @@ export interface OpenSalesQuery {
 }
 
 export interface SaleTransactionClient {
+  getTaxConfiguration(signal?: AbortSignal): Promise<SaleTaxConfiguration>;
   getSale(saleId: string, signal?: AbortSignal): Promise<Sale>;
   createSale(input: CreateSaleInput, idempotencyKey: string): Promise<Sale>;
   startSale(input: StartSaleInput, idempotencyKey: string): Promise<Sale>;
@@ -160,6 +175,16 @@ export interface SaleTransactionClient {
     idempotencyKey: string,
   ): Promise<Sale>;
   addSaleLine(saleId: string, input: AddSaleLineInput, idempotencyKey: string): Promise<Sale>;
+  applyLoyaltyRedemption(
+    saleId: string,
+    input: LoyaltyRedemptionInput,
+    idempotencyKey: string,
+  ): Promise<Sale>;
+  removeLoyaltyRedemption(
+    saleId: string,
+    expectedVersion: number,
+    idempotencyKey: string,
+  ): Promise<Sale>;
   setSaleLineQuantity(
     saleId: string,
     saleLineId: string,
@@ -332,6 +357,12 @@ export class HttpCashierTransactionAdapter
     return this.client.get<ApiPage<QueueSale>>(pagePath(`${API_PREFIX}/sales`), { signal });
   }
 
+  public getTaxConfiguration(signal?: AbortSignal): Promise<SaleTaxConfiguration> {
+    return this.client.get<SaleTaxConfiguration>(`${API_PREFIX}/sales/configuration/tax`, {
+      signal,
+    });
+  }
+
   public getSale(saleId: string, signal?: AbortSignal): Promise<Sale> {
     return this.client.get<Sale>(`${API_PREFIX}/sales/${saleId}`, { signal });
   }
@@ -368,6 +399,26 @@ export class HttpCashierTransactionAdapter
     });
   }
 
+  public applyLoyaltyRedemption(
+    saleId: string,
+    input: LoyaltyRedemptionInput,
+    idempotencyKey: string,
+  ): Promise<Sale> {
+    return this.client.post<Sale>(`${API_PREFIX}/sales/${saleId}/loyalty-redemption`, input, {
+      headers: { 'Idempotency-Key': idempotencyKey },
+    });
+  }
+  public removeLoyaltyRedemption(
+    saleId: string,
+    expectedVersion: number,
+    idempotencyKey: string,
+  ): Promise<Sale> {
+    return this.client.post<Sale>(
+      `${API_PREFIX}/sales/${saleId}/loyalty-redemption/remove`,
+      { expectedVersion },
+      { headers: { 'Idempotency-Key': idempotencyKey } },
+    );
+  }
   public setSaleLineQuantity(
     saleId: string,
     saleLineId: string,

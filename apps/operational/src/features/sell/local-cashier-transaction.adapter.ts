@@ -10,6 +10,7 @@ import type {
   FulfillmentInput,
   PaymentTransitionInput,
   PriceOverrideInput,
+  SaleTaxConfiguration,
   SaleTransactionPort,
   SetSaleCustomerInput,
   SetSaleLineQuantityInput,
@@ -162,6 +163,16 @@ export class LocalCashierTransactionAdapter implements SaleTransactionPort {
     return page(
       [...this.sales.values()].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)),
     );
+  }
+
+  public async getTaxConfiguration(): Promise<SaleTaxConfiguration> {
+    return {
+      enabled: false,
+      rate: '0',
+      version: 0,
+      createdAt: null,
+      updatedAt: null,
+    };
   }
 
   public async getSale(saleId: string): Promise<Sale> {
@@ -337,6 +348,20 @@ export class LocalCashierTransactionAdapter implements SaleTransactionPort {
     return this.save(sale, { lines: [...sale.lines, line] });
   }
 
+  public async applyLoyaltyRedemption(
+    _saleId: string,
+    _input: import('./cashier-transaction.adapter').LoyaltyRedemptionInput,
+    _idempotencyKey: string,
+  ): Promise<import('./cashier-transaction.types').Sale> {
+    throw new Error('Loyalty redemption requires the Runtime-backed Operational adapter.');
+  }
+  public async removeLoyaltyRedemption(
+    _saleId: string,
+    _expectedVersion: number,
+    _idempotencyKey: string,
+  ): Promise<import('./cashier-transaction.types').Sale> {
+    throw new Error('Loyalty redemption requires the Runtime-backed Operational adapter.');
+  }
   public async setSaleLineQuantity(
     saleId: string,
     saleLineId: string,

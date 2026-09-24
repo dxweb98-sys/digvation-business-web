@@ -61,6 +61,21 @@ export interface OperationalReceiptDeliveryCommands {
     saleId: string,
     channel: 'WHATSAPP',
   ): Promise<{ deliveryId: string; channel: 'WHATSAPP'; state: string }>;
+  getReceiptDeliveryStatus(saleId: string): Promise<OperationalReceiptDeliveryStatus>;
+}
+
+export interface OperationalReceiptDeliveryStatus {
+  readonly available: boolean;
+  readonly delivery: {
+    readonly deliveryId: string;
+    readonly status: 'QUEUED' | 'SENDING' | 'SENT' | 'FAILED';
+    readonly attemptCount: number;
+    readonly failureCategory: string | null;
+    readonly requestedAt: string;
+    readonly sentAt: string | null;
+    readonly failedAt: string | null;
+    readonly retryAllowed: boolean;
+  } | null;
 }
 
 export type OperationalAwareTransactionPort = SaleTransactionPort &
@@ -130,6 +145,11 @@ export function attachOperationalProjection(
       `${OPERATIONAL_PREFIX}/transactions/${saleId}/receipt-deliveries`,
       { channel },
       idempotencyHeaders(`receipt-delivery-${saleId}`),
+    );
+
+  operational.getReceiptDeliveryStatus = (saleId: string) =>
+    client.get<OperationalReceiptDeliveryStatus>(
+      `${OPERATIONAL_PREFIX}/transactions/${saleId}/receipt-deliveries/latest`,
     );
 
   operational.getSale = (saleId, signal) =>
