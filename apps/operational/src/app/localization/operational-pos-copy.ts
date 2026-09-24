@@ -299,6 +299,8 @@ const posCopy: Record<string, LocalizedCopy> = {
   'POS payment': { 'id-ID': 'Pembayaran POS', 'en-US': 'POS Payment' },
   'Transaction ID': { 'id-ID': 'ID Transaksi', 'en-US': 'Transaction ID' },
   Points: { 'id-ID': 'Poin', 'en-US': 'Points' },
+  'Point preview': { 'id-ID': 'Perkiraan poin', 'en-US': 'Point preview' },
+  'Points earned': { 'id-ID': 'Poin diperoleh', 'en-US': 'Points earned' },
   'Net total': { 'id-ID': 'Total Bersih', 'en-US': 'Net total' },
   'Ready to pay': { 'id-ID': 'Siap bayar', 'en-US': 'Ready to pay' },
   'Payment total': { 'id-ID': 'Total pembayaran', 'en-US': 'Payment total' },
@@ -743,9 +745,9 @@ const posCopy: Record<string, LocalizedCopy> = {
   'Split Payment': { 'id-ID': 'Split Payment', 'en-US': 'Split Payment' },
   methods: { 'id-ID': 'metode', 'en-US': 'methods' },
   'Total paid': { 'id-ID': 'Total dibayar', 'en-US': 'Total paid' },
-  'Other payment attempts': {
-    'id-ID': 'Percobaan pembayaran lain',
-    'en-US': 'Other payment attempts',
+  'Payment attempts': {
+    'id-ID': 'Percobaan pembayaran',
+    'en-US': 'Payment attempts',
   },
 };
 
