@@ -136,7 +136,11 @@ function runtimeQueueDetail(overrides: Partial<Sale> = {}): Sale {
   };
 }
 
-function renderRuntimeDetail(sale: Sale) {
+function renderRuntimeDetail(
+  sale: Sale,
+  delivery?: { status: 'FAILED'; onRetry: () => void },
+  showPaymentReceipt = false,
+) {
   return render(
     <DeploymentBootstrapProvider config={bootstrap}>
       <ReferenceTransactionDetail
@@ -146,13 +150,26 @@ function renderRuntimeDetail(sale: Sale) {
         businessName="Digvation"
         branchName="Main branch"
         cashierName="Kasir"
-        showPaymentReceipt={false}
+        showPaymentReceipt={showPaymentReceipt}
         onClose={vi.fn()}
         onNewSale={vi.fn()}
         onViewReceipt={vi.fn()}
         onAssign={vi.fn()}
         onComplete={vi.fn()}
         isMutating={false}
+        {...(delivery
+          ? {
+              deliveryStatus: {
+                available: true,
+                delivery: {
+                  status: delivery.status,
+                  attemptCount: 3,
+                  retryAllowed: true,
+                },
+              },
+              onRetryDelivery: delivery.onRetry,
+            }
+          : {})}
       />
     </DeploymentBootstrapProvider>,
   );
@@ -281,5 +298,20 @@ describe('ReferenceTransactionDetail Runtime detail shapes', () => {
     expect(screen.getByText('Dibatalkan')).toBeTruthy();
     expect(screen.queryByRole('heading', { name: 'Pembayaran' })).toBeNull();
     expect(screen.getAllByText(/Rp\s*0/).length).toBeGreaterThan(0);
+  });
+
+  it('makes a failed receipt delivery visible and retryable without changing the Sale', () => {
+    const onRetry = vi.fn();
+    const sale = runtimeQueueDetail({
+      status: 'FINALIZED',
+      finalizedAt: '2026-09-24T02:15:00.000Z',
+    });
+
+    renderRuntimeDetail(sale, { status: 'FAILED', onRetry }, true);
+
+    const retry = screen.queryByRole('button', { name: /retry sending/i });
+    expect(retry).not.toBeNull();
+    retry?.click();
+    expect(onRetry).toHaveBeenCalledTimes(1);
   });
 });
