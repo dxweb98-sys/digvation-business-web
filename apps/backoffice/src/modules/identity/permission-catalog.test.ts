@@ -2,9 +2,13 @@ import { describe, expect, it } from 'vitest';
 import type { AccessPermission } from './access-control-api';
 import { groupAccessPermissions } from './permission-catalog';
 
-const permission = (key: string, surface: AccessPermission['surface']): AccessPermission => ({
+const permission = (
+  key: string,
+  surface: AccessPermission['surface'],
+  label = { id: 'Lihat penjualan', en: 'View sales' },
+): AccessPermission => ({
   key,
-  label: { id: key, en: key },
+  label,
   product: 'POS',
   capability: null,
   foundation: null,
@@ -32,6 +36,23 @@ describe('groupAccessPermissions', () => {
       'sales:create',
       'sales:read',
     ]);
+  });
+
+  it('keeps human-readable permission metadata separate from the technical key', () => {
+    const groups = groupAccessPermissions(
+      [
+        permission('membership:read', 'BACKOFFICE', {
+          id: 'Lihat member',
+          en: 'View members',
+        }),
+      ],
+      'id',
+      '',
+    );
+    expect(groups[0]?.modules[0]?.permissions[0]).toMatchObject({
+      key: 'membership:read',
+      label: { id: 'Lihat member', en: 'View members' },
+    });
   });
 
   it('keeps experience context when search filters permissions', () => {

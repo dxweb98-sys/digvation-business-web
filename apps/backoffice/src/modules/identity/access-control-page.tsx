@@ -284,10 +284,7 @@ function RolesTable({
       key: 'name',
       label: copy('Role'),
       render: (role) => (
-        <div>
-          <p className="font-medium">{role.name}</p>
-          <p className="text-xs text-[var(--color-text-muted)]">{role.code}</p>
-        </div>
+        <p className="font-medium">{role.name}</p>
       ),
     },
     {

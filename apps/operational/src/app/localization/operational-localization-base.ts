@@ -1,3 +1,4 @@
+import { formatMoney as formatSharedMoney } from '@digvation/business-money';
 import { useRuntime } from '@digvation/business-runtime';
 
 import { operationalPosCopy } from './operational-pos-copy';
@@ -597,6 +598,20 @@ const technicalLabels: Record<string, LocalizedLabel> = {
   BACKOFFICE: { 'id-ID': 'Backoffice', 'en-US': 'Backoffice' },
   OPERATIONAL: { 'id-ID': 'Operational', 'en-US': 'Operational' },
   SYSTEM: { 'id-ID': 'Sistem', 'en-US': 'System' },
+  PARTIALLY_PAID: { 'id-ID': 'Dibayar sebagian', 'en-US': 'Partially paid' },
+  PAID: { 'id-ID': 'Lunas', 'en-US': 'Paid' },
+  UNPAID: { 'id-ID': 'Belum dibayar', 'en-US': 'Unpaid' },
+  MATCHED: { 'id-ID': 'Sesuai', 'en-US': 'Matched' },
+  ARCHIVED: { 'id-ID': 'Diarsipkan', 'en-US': 'Archived' },
+  PRESENT: { 'id-ID': 'Hadir', 'en-US': 'Present' },
+  ABSENT: { 'id-ID': 'Tidak hadir', 'en-US': 'Absent' },
+  LEAVE: { 'id-ID': 'Izin', 'en-US': 'Leave' },
+  SICK: { 'id-ID': 'Sakit', 'en-US': 'Sick' },
+  LOCAL: { 'id-ID': 'Lokal', 'en-US': 'Local' },
+  HRIS: { 'id-ID': 'HRIS', 'en-US': 'HRIS' },
+  CASHIER: { 'id-ID': 'Kasir', 'en-US': 'Cashier' },
+  INCLUDED: { 'id-ID': 'Termasuk harga', 'en-US': 'Included in price' },
+  EXCLUDED: { 'id-ID': 'Di luar harga', 'en-US': 'Excluded from price' },
 };
 
 function humanizeTechnicalValue(value: string): string {
@@ -630,10 +645,6 @@ export function useOperationalLocalization() {
     formatDate: (value: Date, options?: Intl.DateTimeFormatOptions) =>
       new Intl.DateTimeFormat(locale, options).format(value),
     formatMoney: (amount: string, currency: string) =>
-      new Intl.NumberFormat(locale, {
-        style: 'currency',
-        currency,
-        maximumFractionDigits: 0,
-      }).format(Number(amount)),
+      formatSharedMoney(amount, currency, locale),
   };
 }

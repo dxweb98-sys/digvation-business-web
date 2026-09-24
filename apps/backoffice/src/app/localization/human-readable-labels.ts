@@ -42,6 +42,22 @@ const technicalLabels: Record<string, LocalizedLabel> = {
   QRIS: { id: 'QRIS', en: 'QRIS' },
   CASH_IN: { id: 'Kas masuk', en: 'Cash in' },
   CASH_OUT: { id: 'Kas keluar', en: 'Cash out' },
+  PARTIALLY_PAID: { id: 'Dibayar sebagian', en: 'Partially paid' },
+  PAID: { id: 'Lunas', en: 'Paid' },
+  UNPAID: { id: 'Belum dibayar', en: 'Unpaid' },
+  MATCHED: { id: 'Sesuai', en: 'Matched' },
+  ARCHIVED: { id: 'Diarsipkan', en: 'Archived' },
+  PRESENT: { id: 'Hadir', en: 'Present' },
+  ABSENT: { id: 'Tidak hadir', en: 'Absent' },
+  LEAVE: { id: 'Izin', en: 'Leave' },
+  SICK: { id: 'Sakit', en: 'Sick' },
+  LOCAL: { id: 'Lokal', en: 'Local' },
+  HRIS: { id: 'HRIS', en: 'HRIS' },
+  BACKOFFICE: { id: 'Backoffice', en: 'Backoffice' },
+  OPERATIONAL: { id: 'Operational', en: 'Operational' },
+  CASHIER: { id: 'Kasir', en: 'Cashier' },
+  INCLUDED: { id: 'Termasuk harga', en: 'Included in price' },
+  EXCLUDED: { id: 'Di luar harga', en: 'Excluded from price' },
 };
 
 const eventLabels: Record<string, LocalizedLabel> = {

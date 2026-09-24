@@ -40,5 +40,13 @@ describe('operational localization', () => {
     expect(operationalLabel('BACKOFFICE', 'id-ID')).toBe('Backoffice');
     expect(operationalLabel('OPERATIONAL', 'id-ID')).toBe('Operational');
     expect(operationalLabel('SYSTEM', 'id-ID')).toBe('Sistem');
+    expect(operationalLabel('BANK_TRANSFER', 'id-ID')).toBe('Transfer bank');
+    expect(operationalLabel('SUCCEEDED', 'id-ID')).toBe('Berhasil');
+    expect(operationalLabel('PARTIALLY_PAID', 'id-ID')).toBe('Dibayar sebagian');
+    expect(operationalLabel('MATCHED', 'id-ID')).toBe('Sesuai');
+  });
+
+  it('degrades unknown technical values to readable words', () => {
+    expect(operationalLabel('NEW_SAFE_VALUE', 'id-ID')).toBe('New Safe Value');
   });
 });

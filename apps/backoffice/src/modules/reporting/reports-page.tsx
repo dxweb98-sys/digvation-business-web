@@ -438,7 +438,8 @@ export function ReportsPage() {
     queryFn: () => api.get<Dataset>(`/api/v1/reports/${type}?${params}`),
   });
   const data = query.data;
-  const integer = (v: number) => new Intl.NumberFormat('id-ID').format(v);
+  const numberLocale = locale === 'id' ? 'id-ID' : 'en-US';
+  const integer = (v: number) => new Intl.NumberFormat(numberLocale).format(v);
   const format = useCallback(
     (k: string, v: Row[string] | undefined) => {
       if (type === 'attendance') {
@@ -450,12 +451,12 @@ export function ReportsPage() {
         if (attendanceLabel) return copy(attendanceLabel);
       }
       if (v === null || v === undefined || v === '') return '—';
-      if (money(k)) return formatMoney(String(v), 'IDR');
+      if (money(k)) return formatMoney(String(v), runtime.currency);
       if (k === 'taxRate')
-        return formatPercentageFromRate(String(v), locale === 'id' ? 'id-ID' : 'en-US');
+        return formatPercentageFromRate(String(v), numberLocale);
       if (count(k)) return integer(Number(v));
       if (quantity(k))
-        return formatDecimalNumber(String(v), locale === 'id' ? 'id-ID' : 'en-US');
+        return formatDecimalNumber(String(v), numberLocale);
       if (/At$/.test(k))
         return formatDate(new Date(String(v)), { dateStyle: 'medium', timeStyle: 'short' });
       if (/Status(?:es)?$|^status$|Method$|^method$|^type$|Treatment$|^origin$|Lifecycle$|Source$/.test(k))
@@ -465,7 +466,7 @@ export function ReportsPage() {
           .join(', ');
       return copy(String(v));
     },
-    [copy, formatDate, formatMoney, locale, type],
+    [copy, formatDate, formatMoney, locale, numberLocale, runtime.currency, type],
   );
   const columns = useMemo<TableColumn<Row>[]>(
     () =>
@@ -868,7 +869,7 @@ export function ReportsPage() {
               subtitle={`${copy('Selected period')}: ${from} — ${to}`}
               data={data?.analytics.trend ?? []}
               formatValue={(v) =>
-                type === 'attendance' ? integer(Number(v)) : formatMoney(v, 'IDR')
+                type === 'attendance' ? integer(Number(v)) : formatMoney(v, runtime.currency)
               }
               emptyMessage={empty}
               pointsLabel={copy('data points')}
@@ -898,7 +899,7 @@ export function ReportsPage() {
           <AnalyticsHorizontalBarChart
             title={copy(visual.ranking)}
             data={data.analytics.ranking}
-            formatValue={(v) => formatMoney(v, 'IDR')}
+            formatValue={(v) => formatMoney(v, runtime.currency)}
             emptyMessage={empty}
           />
         </section>
