@@ -1,7 +1,9 @@
 import type { ApiClient } from '@digvation/business-api';
+import { buildQueryString } from '../../../shared/api/build-query-string';
 import type { Promotion } from '../model/promotion.types';
 
 import type {
+  PromotionListQuery,
   PromotionPage,
   PromotionReferenceOptions,
   PromotionWriteInput,
@@ -10,8 +12,10 @@ import type {
 export class PromotionsApi {
   public constructor(private readonly client: ApiClient) {}
 
-  list() {
-    return this.client.get<PromotionPage>('/api/v1/promotions?limit=100&offset=0');
+  list(query: PromotionListQuery = { limit: 100, offset: 0 }) {
+    return this.client.get<PromotionPage>(
+      `/api/v1/promotions?${buildQueryString({ limit: 100, offset: 0, ...query })}`,
+    );
   }
 
   options() {

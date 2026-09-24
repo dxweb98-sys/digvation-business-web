@@ -46,6 +46,11 @@ export interface PromotionWriteInput {
   locationIds: string[];
 }
 
+export interface PromotionListQuery {
+  limit?: number;
+  offset?: number;
+}
+
 export interface PromotionPage {
   items: Promotion[];
   total: number;

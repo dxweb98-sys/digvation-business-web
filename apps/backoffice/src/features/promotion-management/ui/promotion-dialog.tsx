@@ -8,24 +8,22 @@ import {
   useToast,
 } from '@digvation/ui';
 import { Check, Info, List, LockKeyhole, Tag, Trash2, X } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 
 import { normalizeBackofficeApiError } from '../../../app/api/backoffice-api-error';
 import { isSessionExpiredError } from '../../../auth/backoffice-auth-context';
 import type {
   Promotion,
-  PromotionDiscountType,
   PromotionMode,
   PromotionReferenceOptions,
   PromotionsApi,
-  PromotionScope,
   PromotionWriteInput,
 } from '../../../entities/promotion';
 import { usePromotionsLocalization } from '../config/promotion.i18n';
+import { usePromotionEditor } from '../model/use-promotion-editor';
 import { ItemVariantTargetSelector } from './item-variant-target-selector';
 import { TargetSelector } from './target-selector';
 
-type CategoryItemScope = 'ALL' | 'SELECTED';
 
 export function PromotionDialog({
   promotion,
@@ -42,33 +40,46 @@ export function PromotionDialog({
 }) {
   const copy = usePromotionsLocalization();
   const { showToast } = useToast();
-  const [name, setName] = useState(promotion?.name ?? '');
-  const [enabled, setEnabled] = useState(promotion?.enabled ?? true);
-  const [mode, setMode] = useState<PromotionMode>(promotion?.mode ?? 'AUTOMATIC');
-  const [code, setCode] = useState(promotion?.code ?? '');
-  const [scope, setScope] = useState<PromotionScope>(promotion?.scope ?? 'TRANSACTION');
-  const [discountType, setDiscountType] = useState<PromotionDiscountType>(
-    promotion?.discountType ?? 'PERCENTAGE',
-  );
-  const [discountValue, setDiscountValue] = useState(
-    promotion?.discountType === 'PERCENTAGE'
-      ? String(Number(promotion.discountValue) * 100)
-      : (promotion?.discountValue ?? ''),
-  );
-  const [currency] = useState(promotion?.currency ?? 'IDR');
-  const [maximumDiscount, setMaximumDiscount] = useState(promotion?.maximumDiscount ?? '');
-  const [minimumPurchase, setMinimumPurchase] = useState(promotion?.minimumPurchase ?? '');
-  const [effectiveFrom, setEffectiveFrom] = useState(promotion?.effectiveFrom ?? '');
-  const [effectiveUntil, setEffectiveUntil] = useState(promotion?.effectiveUntil ?? '');
-  const [itemIds, setItemIds] = useState<string[]>(promotion?.itemIds ?? []);
-  const [variantIds, setVariantIds] = useState<string[]>(promotion?.variantIds ?? []);
-  const [categoryIds, setCategoryIds] = useState<string[]>(promotion?.categoryIds ?? []);
-  const [categoryItemScope, setCategoryItemScope] = useState<CategoryItemScope>(
-    promotion?.scope === 'CATEGORY' && promotion.itemIds.length > 0 ? 'SELECTED' : 'ALL',
-  );
-  const [locationIds, setLocationIds] = useState<string[]>(promotion?.locationIds ?? []);
-  const [saving, setSaving] = useState(false);
-  const [step, setStep] = useState<'INFORMATION' | 'TARGET'>('INFORMATION');
+  const editor = usePromotionEditor(promotion);
+  const {
+    name,
+    enabled,
+    mode,
+    code,
+    scope,
+    discountType,
+    discountValue,
+    currency,
+    maximumDiscount,
+    minimumPurchase,
+    effectiveFrom,
+    effectiveUntil,
+    itemIds,
+    variantIds,
+    categoryIds,
+    categoryItemScope,
+    locationIds,
+  } = editor.form;
+  const { saving, step } = editor.ui;
+
+  const setName = (value: string) => editor.actions.setField('name', value);
+  const setEnabled = (value: boolean) => editor.actions.setField('enabled', value);
+  const setMode = editor.actions.changeMode;
+  const setCode = (value: string) => editor.actions.setField('code', value);
+  const setDiscountType = editor.actions.changeDiscountType;
+  const setDiscountValue = (value: string) => editor.actions.setField('discountValue', value);
+  const setMaximumDiscount = (value: string) =>
+    editor.actions.setField('maximumDiscount', value);
+  const setMinimumPurchase = (value: string) =>
+    editor.actions.setField('minimumPurchase', value);
+  const setEffectiveFrom = (value: string) => editor.actions.setField('effectiveFrom', value);
+  const setEffectiveUntil = (value: string) =>
+    editor.actions.setField('effectiveUntil', value);
+  const setItemIds = (value: string[]) => editor.actions.setField('itemIds', value);
+  const setVariantIds = (value: string[]) => editor.actions.setField('variantIds', value);
+  const setLocationIds = (value: string[]) => editor.actions.setField('locationIds', value);
+  const setSaving = editor.actions.setSaving;
+  const setStep = editor.actions.setStep;
 
   const categoryItemOptions = useMemo(() => {
     const selectedCategories = new Set(categoryIds);
@@ -126,38 +137,9 @@ export function PromotionDialog({
     targetValid &&
     periodValid;
 
-  const changeScope = (value: PromotionScope) => {
-    setScope(value);
-    if (value === 'TRANSACTION') {
-      setItemIds([]);
-      setVariantIds([]);
-      setCategoryIds([]);
-      setCategoryItemScope('ALL');
-    } else if (value === 'ITEM') {
-      setCategoryIds([]);
-      setCategoryItemScope('ALL');
-    } else {
-      setItemIds([]);
-      setVariantIds([]);
-      setCategoryItemScope('ALL');
-    }
-  };
-
-  const changeCategories = (ids: string[]) => {
-    setCategoryIds(ids);
-    const selectedCategories = new Set(ids);
-    setItemIds((current) =>
-      current.filter((itemId) => {
-        const option = options.items.find((item) => item.id === itemId);
-        return Boolean(option?.categoryId && selectedCategories.has(option.categoryId));
-      }),
-    );
-  };
-
-  const changeCategoryItemScope = (value: CategoryItemScope) => {
-    setCategoryItemScope(value);
-    if (value === 'ALL') setItemIds([]);
-  };
+  const changeScope = editor.actions.changeScope;
+  const changeCategories = (ids: string[]) => editor.actions.changeCategories(ids, options.items);
+  const changeCategoryItemScope = editor.actions.changeCategoryItemScope;
 
   const save = async () => {
     if (!valid || saving) return;

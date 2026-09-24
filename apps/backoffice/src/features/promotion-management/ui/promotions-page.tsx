@@ -9,6 +9,8 @@ import { useBackofficeLocalization } from '../../../app/localization/backoffice-
 import { canPerformBackofficeAction } from '../../../auth/backoffice-access';
 import { useBackofficeAuth } from '../../../auth/backoffice-auth-context';
 import { PromotionsApi, type Promotion } from '../../../entities/promotion';
+import { useListQuery } from '../../../shared/query/use-list-query';
+import { usePaginationState } from '../../../shared/query/use-pagination-state';
 import { usePromotionsLocalization } from '../config/promotion.i18n';
 import { percentageDisplay, promotionTargetSummary } from '../model/promotion-presentation';
 import { PromotionDialog } from './promotion-dialog';
@@ -29,13 +31,18 @@ export function PromotionsPage() {
     [createApiClient, runtime.apiBaseUrl],
   );
   const [editing, setEditing] = useState<Promotion | null | undefined>(undefined);
+  const pagination = usePaginationState({ initialPageSize: 10 });
 
   const canCreate = Boolean(session && canPerformBackofficeAction(session, 'createPromotion'));
   const canUpdate = Boolean(session && canPerformBackofficeAction(session, 'updatePromotion'));
 
-  const promotions = useQuery({
+  const promotions = useListQuery({
     queryKey: keys.list,
-    queryFn: () => api.list(),
+    pagination: {
+      page: pagination.page,
+      pageSize: pagination.pageSize,
+    },
+    queryFn: (requestPagination) => api.list(requestPagination ?? pagination.request),
   });
   const options = useQuery({
     queryKey: keys.options,
@@ -137,6 +144,13 @@ export function PromotionsPage() {
             data={promotions.data?.items ?? []}
             rowKey="id"
             emptyMessage={promotionCopy('empty')}
+            pagination={{
+              page: pagination.page,
+              pageSize: pagination.pageSize,
+              total: promotions.data?.total ?? 0,
+            }}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={pagination.setPageSize}
             headerActions={
               canCreate ? (
                 <DButton leftIcon={<Plus className="size-4" />} onClick={() => setEditing(null)}>
