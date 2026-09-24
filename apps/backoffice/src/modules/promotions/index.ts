@@ -1,1 +1,1 @@
-export { PromotionsPage } from './promotions-page';
+export { PromotionsPage } from '../../features/promotion-management';

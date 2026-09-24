@@ -67,12 +67,14 @@ Each deployable application owns its application composition:
 apps/backoffice/src/
   app/
   routes/
+  entities/
   features/
   shared/
 
 apps/operational/src/
   app/
   routes/
+  entities/     # introduce only when the app has a stable entity boundary
   features/
   shared/
 ```
@@ -148,90 +150,109 @@ Catalog Item Editor
 
 Catalog remains the authority for reusable catalog identity/classification semantics. Loyalty may reference a Catalog item, but Loyalty remains the authority for loyalty rules and ledger behavior.
 
-## Feature structure
+## Entity and feature structure
 
-Large user use cases should be organized by feature responsibility rather than by generic technical buckets.
+Use the smallest boundary that makes ownership obvious.
 
-Reference shape:
+Stable business vocabulary and narrow transport contracts belong to an entity slice:
+
+```text
+entities/
+  promotion/
+    api/
+      promotion.api.ts
+      promotion.contracts.ts
+    model/
+      promotion.types.ts
+    index.ts
+```
+
+User workflows belong to a feature/use-case slice:
 
 ```text
 features/
-  catalog/
-    api/
-      catalog-api.ts
-    localization/
-      ...
+  promotion-management/
+    config/
+      promotion.i18n.ts
     model/
-      ...
+      promotion-presentation.ts
     ui/
-      catalog-page.tsx
+      promotions-page.tsx
+      promotion-dialog.tsx
       ...
-    item-editor/
-      model/
-        catalog-item-editor-state.ts
-        catalog-item-editor-reducer.ts
-        catalog-item-editor-validation.ts
-        catalog-item-editor-mapper.ts
-        use-catalog-item-editor.ts
-      api/
-        use-catalog-item-editor-data.ts
-      ui/
-        catalog-item-dialog.tsx
-        ...
+    index.ts
 ```
 
-Segments mean:
+Segment meaning:
 
-- `model/` — feature-local state, reducer, view-model derivation, validation, and orchestration helpers;
-- `api/` — feature query/command bindings when the feature needs them;
-- `ui/` — React presentation and composition;
-- `lib/` — feature-private pure helpers that do not have a better owner.
+- `entities/<entity>/model` — stable frontend business types/vocabulary;
+- `entities/<entity>/api` — narrow entity transport client and request/response contracts;
+- `features/<use-case>/model` — workflow state, derived presentation state, validation, mappers, and orchestration helpers;
+- `features/<use-case>/api` — feature-specific query/command hooks only when they add real workflow behavior;
+- `features/<use-case>/ui` — React presentation and composition;
+- `features/<use-case>/config` — feature-owned configuration or localization copy;
+- `lib/` — private pure helpers only when no clearer owner exists.
 
 Do not create empty segments merely for symmetry.
 
-Avoid broad folders such as:
+Do not create `I*` / `T*` prefixes merely to encode the TypeScript construct. Prefer domain names such as `Promotion`, `PromotionMode`, and `PromotionWriteInput`.
+
+Do not wrap every API method in a hook. A hook must own React state, query/mutation orchestration, editor behavior, or another real use-case responsibility.
+
+### Localization ownership
+
+Localization follows the owner of the words:
 
 ```text
-components/
-hooks/
-types/
-utils/
-helpers/
-misc/
+app/localization
+  -> locale runtime, application-wide formatting, shared application copy
+
+entities/<entity>
+  -> entity-owned vocabulary only when genuinely reusable outside one workflow
+
+features/<use-case>/config/*.i18n.ts
+  -> page/editor/action copy owned by that workflow
 ```
 
-when those names hide feature ownership. Small local folders may use them when responsibility remains obvious, but they are not the default architecture.
+Do not create a generic feature-level `localization/` dumping ground when the copy belongs specifically to a page/editor workflow.
 
 ## Current Backoffice reference layout
 
-The current Catalog refactor is the concrete reference for Backoffice feature ownership:
+Promotion is the first incremental reference for explicit entity + feature separation:
 
 ```text
 apps/backoffice/src/
-├── features/
-│   └── catalog/
+├── entities/
+│   └── promotion/
 │       ├── api/
+│       │   ├── promotion.api.ts
+│       │   └── promotion.contracts.ts
 │       ├── model/
-│       ├── localization/
+│       │   └── promotion.types.ts
+│       └── index.ts
+├── features/
+│   └── promotion-management/
+│       ├── config/
+│       ├── model/
 │       ├── ui/
-│       └── item-editor/
-│           ├── api/
-│           ├── model/
-│           └── ui/
-│
-└── shared/
-    ├── api/
-    │   └── build-query-string.ts
-    ├── forms/
-    │   └── use-form-state.ts
-    └── query/
-        ├── use-list-query.ts
-        └── use-pagination-state.ts
+│       └── index.ts
+└── modules/
+    └── promotions/        # temporary compatibility path during migration only
 ```
 
-`apps/backoffice/src/modules/catalog` is no longer an accepted Catalog implementation path. New Catalog work belongs under `features/catalog`.
+Catalog remains an accepted feature-owned reference for complex editor state and is not automatically migrated by this decision.
 
-The shared files above are Backoffice-wide primitives and may be reused by any Backoffice feature when their semantics match. Their existence does not require every feature to use them.
+Incremental migration is deliberate:
+
+```text
+legacy module/import
+  -> new entity + feature implementation
+  -> compatibility facade
+  -> manual review / validation
+  -> remove legacy module only after approval
+```
+
+Do not duplicate or rewrite business behavior merely to achieve the folder shape.
 
 ## Reuse without speculative abstraction
 

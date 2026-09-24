@@ -136,48 +136,56 @@ Do not invent backend/domain contracts.
 
 ## Current Backoffice structure
 
-Backoffice frontend work must follow the current feature/shared structure.
-
-Reference implementation:
+Backoffice frontend code uses ownership-first separation:
 
 ```text
 apps/backoffice/src/
-├── features/
-│   └── catalog/
+├── app/
+├── routes/
+├── entities/
+│   └── <entity>/
 │       ├── api/
 │       ├── model/
-│       ├── localization/
+│       └── index.ts
+├── features/
+│   └── <use-case>/
+│       ├── config/        # optional feature-owned configuration/localization
+│       ├── api/           # optional feature query/command bindings
+│       ├── model/
 │       ├── ui/
-│       └── item-editor/
-│           ├── api/
-│           ├── model/
-│           └── ui/
-│
-└── shared/
-    ├── api/
-    ├── forms/
-    └── query/
+│       └── index.ts
+├── shared/
+└── modules/               # legacy compatibility only while migrated incrementally
 ```
 
-Rules:
+Ownership rules:
 
-- `apps/backoffice/src/features/<feature>` owns feature/domain-specific frontend behavior;
-- `apps/backoffice/src/shared/<concern>` owns generic primitives reusable across Backoffice features;
-- do not recreate `apps/backoffice/src/modules/catalog`; Catalog implementation now lives under `features/catalog`;
-- do not move feature-specific reducers, validation, selling rules, Loyalty rules, or domain behavior into `shared/`;
-- use existing shared primitives before creating another equivalent helper;
-- simple related form state may use Backoffice shared form helpers;
-- complex editors with hydration, coordinated transitions, validation, or multiple persistence boundaries use feature-specific reducer/custom hooks;
-- collection UI pagination may use shared `page/pageSize` state, but Runtime API contracts remain `limit/offset`;
+- `entities/<entity>` owns stable frontend business vocabulary and the narrow API/contracts for that entity;
+- `features/<use-case>` owns user workflows, editor/list orchestration, feature-local state, validation, presentation, and feature-specific copy;
+- `shared/<concern>` owns generic primitives with multiple legitimate Backoffice consumers;
+- `app/` owns application runtime/composition concerns;
+- `modules/` is not the target for new feature implementation; an existing module may remain temporarily as a compatibility facade during an approved incremental migration;
+- do not create empty architecture folders only for symmetry;
+- do not split one type/function per file when one responsibility-oriented file is clearer;
+- do not create hooks that merely rename an API method; hooks must own state/orchestration behavior;
 - ordinary detail/entity fetching continues to use TanStack Query directly;
 - UI/editor state must be mapped to Runtime API DTOs at the command boundary rather than becoming the transport contract.
+
+Promotion is the first reference migration for explicit `entities` + `features` separation. Catalog remains a valid existing feature-owned implementation until a dedicated migration is requested; do not perform a big-bang tree rewrite.
+
+Localization follows ownership:
+
+- application-wide locale runtime/formatting -> `app/localization`;
+- truly generic reusable copy/formatting -> application `shared` only when reuse is real;
+- entity vocabulary belongs with the entity when it is genuinely entity-owned;
+- page/editor/workflow copy belongs with the owning feature, for example `features/promotion-management/config/promotion.i18n.ts`.
 
 For architecture-sensitive frontend work, read:
 
 - `docs/architecture/FRONTEND_ARCHITECTURE_BASELINE.md`
 - `docs/engineering/FRONTEND_ENGINEERING_CONSISTENCY_STANDARD.md`
 
-Catalog is the current reference implementation for this pattern. Reuse the architecture principles, not Catalog-specific business logic.
+Reuse the architecture principles, not another feature's business logic.
 
 ## Frontend invariants
 

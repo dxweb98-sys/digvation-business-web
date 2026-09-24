@@ -23,6 +23,8 @@ Frontend ownership order:
 application composition
 -> route
 -> feature/use case
+-> entity
+-> application shared primitive
 -> stable cross-app package
 -> transport/platform package
 ```
@@ -91,6 +93,28 @@ Examples:
 - lightweight generic form state -> application `shared/forms`;
 - Catalog Item Editor reducer -> Catalog editor feature, not generic shared state.
 
+## Entity structure
+
+Use an entity slice when a business concept has stable vocabulary or a narrow API contract used by one or more workflows:
+
+```text
+entities/<entity>/
+  api/
+  model/
+  index.ts
+```
+
+Keep entity slices small:
+
+- `model/` owns stable business-facing types and vocabulary;
+- `api/` owns the entity API client and transport contracts;
+- `index.ts` is the narrow public surface;
+- add `ui/` only for truly entity-level reusable presentation;
+- do not add repository/use-case/port layers to ordinary frontend CRUD when they add no boundary value;
+- do not duplicate DTO/domain shapes unless a real translation is required.
+
+Use semantic names such as `Promotion`, `PromotionWriteInput`, and `PromotionPage`. Do not use `IPromotion` or `TPromotionMode` prefixes.
+
 ## Feature structure
 
 For large features, prefer responsibility-oriented segments:
@@ -124,6 +148,17 @@ Create only the segments the feature actually needs.
 `ui/` contains React presentation and composition.
 
 `lib/` contains feature-private pure helpers.
+
+## Localization ownership
+
+Keep localization with the smallest correct owner:
+
+- application locale runtime and application-wide formatting -> `app/localization`;
+- generic reusable formatting/copy -> application `shared` only when multiple consumers are real;
+- stable entity vocabulary -> the owning entity when genuinely reusable across workflows;
+- editor/page/action copy -> the owning feature, preferably a clearly named `config/*.i18n.ts` file.
+
+Do not move feature copy into global localization merely to centralize strings.
 
 ## State management
 
@@ -276,6 +311,8 @@ Do not recreate `modules/catalog`. Catalog is owned by `apps/backoffice/src/feat
 
 ## Reference implementation
 
-The Backoffice Catalog Item Editor is the first reference implementation for this structure.
+Promotion is the first reference migration for explicit `entities/<entity>` plus `features/<use-case>` separation.
 
-Future large editor/form refactors should reuse its architectural principles, not blindly copy every file. Adapt the pattern to the actual domain/use case and promote only truly reusable behavior to the correct `packages/*` owner.
+Catalog remains the reference for complex editor state, reducer/custom-hook ownership, and section composition until it receives a dedicated migration.
+
+Future module cleanups should be incremental: establish the new owner, keep a thin compatibility path when required, validate behavior, and remove the legacy module only after approval. Do not perform repository-wide structural rewrites as a side effect of one feature cleanup.
