@@ -5,7 +5,7 @@ export interface Customer { id: string; name: string; phoneE164: string; version
 export interface Member { id: string; customerId: string; customer: Customer; memberNumber: string; status: Status; joinedAt: string; version: number; }
 export interface MemberPage { items: Member[]; total: number; limit: number; offset: number; }
 export interface Balance { membershipId: string; pointsBalance: string; }
-export interface PortalAccess { status: string; handle: string; }
+export interface PortalAccess { status: 'ACTIVE'|'INACTIVE'|'REVOKED'; url: string; }
 type LedgerType = 'EARN'|'REDEEM'|'EARN_REVERSAL'|'REDEEM_REVERSAL';
 type LedgerResponse = { id: string; type: LedgerType; pointsDelta: string; balanceAfter: string; sourceSaleId: string; reversesLedgerEntryId: string|null; createdAt: string; };
 export interface Ledger { id: string; type: 'Points earned'|'Points redeemed'|'Earned points reversed'|'Redeemed points restored'; pointsDelta: string; balanceAfter: string; sourceSaleId: string; reversesLedgerEntryId: string|null; createdAt: string; }
