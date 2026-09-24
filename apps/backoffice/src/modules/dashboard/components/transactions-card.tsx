@@ -2,6 +2,7 @@ import { DCard } from '@digvation/ui';
 import { ReceiptText } from 'lucide-react';
 
 import { useBackofficeLocalization } from '../../../app/localization/backoffice-localization';
+import { humanReadableLabel } from '../../../app/localization/human-readable-labels';
 import { useDashboardI18n } from '../dashboard-i18n';
 import type { DashboardRow } from '../dashboard.types';
 import { DashboardCardHeader } from './dashboard-card-header';
@@ -66,7 +67,7 @@ export function TransactionsCard({
                       {transactionNumber}
                     </p>
                     <span className="shrink-0 rounded-full bg-(--color-surface-muted) px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-(--color-text-muted)">
-                      {copy(String(transaction.saleStatus ?? '—'))}
+                      {humanReadableLabel(String(transaction.saleStatus ?? '—'), locale)}
                     </span>
                   </div>
                   <p className="mt-0.5 text-[10px] text-(--color-text-muted)" title={occurredAt}>

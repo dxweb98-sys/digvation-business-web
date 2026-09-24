@@ -119,7 +119,7 @@ function welcomeCopy(locale: 'id' | 'en', name: string, hour: number) {
 export function DashboardPage() {
   const { session, createApiClient } = useBackofficeAuth();
   const runtime = useRuntime();
-  const { formatMoney } = useBackofficeLocalization();
+  const { formatDateTime: formatBusinessDateTime, formatMoney } = useBackofficeLocalization();
   const { locale, text } = useDashboardI18n();
   const {
     selectedLocationId: locationId,
@@ -220,12 +220,7 @@ export function DashboardPage() {
     new Intl.NumberFormat(numberLocale).format(Number(value) || 0);
   const formatDateTime = (value: DashboardRow[string] | undefined) => {
     if (typeof value !== 'string') return '—';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return value;
-    return new Intl.DateTimeFormat(numberLocale, {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    }).format(date);
+    return formatBusinessDateTime(value);
   };
   const money = (value: DashboardRow[string] | undefined) =>
     formatMoney(String(value ?? 0), runtime.currency);
