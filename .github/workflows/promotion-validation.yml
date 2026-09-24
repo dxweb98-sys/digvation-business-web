@@ -1,0 +1,28 @@
+name: Promotion Validation
+
+on:
+  push:
+    branches:
+      - fix/discount-promos
+
+permissions:
+  contents: read
+
+jobs:
+  promotion:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - run: corepack enable
+      - run: corepack prepare pnpm@11.22.0 --activate
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck Backoffice
+        run: pnpm --filter @digvation/business-backoffice typecheck
+      - name: Lint Promotion ownership
+        run: pnpm exec eslint apps/backoffice/src/entities/promotion apps/backoffice/src/features/promotion-management apps/backoffice/src/app/router/backoffice-router.tsx
+      - name: Test Promotion
+        run: pnpm exec vitest run apps/backoffice/src/features/promotion-management/model apps/backoffice/src/entities/promotion/api/promotion.api.test.ts
