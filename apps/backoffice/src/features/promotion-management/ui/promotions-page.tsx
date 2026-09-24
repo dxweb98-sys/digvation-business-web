@@ -57,8 +57,8 @@ export function PromotionsPage() {
       label: promotionCopy('name'),
       render: (row) => (
         <div className="min-w-0">
-          <p className="font-medium text-[var(--color-text)]">{row.name}</p>
-          <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
+          <p className="font-medium text-(--color-text)">{row.name}</p>
+          <p className="mt-0.5 text-xs text-(--color-text-muted)">
             {row.mode === 'CODE' ? row.code : promotionCopy('automatic')}
           </p>
         </div>

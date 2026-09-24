@@ -1,12 +1,4 @@
-import {
-  DButton,
-  DDatePicker,
-  DDialog,
-  DInput,
-  DSelect,
-  DToggle,
-  useToast,
-} from '@digvation/ui';
+import { DButton, DDatePicker, DDialog, DInput, DSelect, DToggle, useToast } from '@digvation/ui';
 import { Check, Info, List, LockKeyhole, Tag, Trash2, X } from 'lucide-react';
 import { useMemo } from 'react';
 
@@ -23,7 +15,6 @@ import { usePromotionsLocalization } from '../config/promotion.i18n';
 import { usePromotionEditor } from '../model/use-promotion-editor';
 import { ItemVariantTargetSelector } from './item-variant-target-selector';
 import { TargetSelector } from './target-selector';
-
 
 export function PromotionDialog({
   promotion,
@@ -68,13 +59,10 @@ export function PromotionDialog({
   const setCode = (value: string) => editor.actions.setField('code', value);
   const setDiscountType = editor.actions.changeDiscountType;
   const setDiscountValue = (value: string) => editor.actions.setField('discountValue', value);
-  const setMaximumDiscount = (value: string) =>
-    editor.actions.setField('maximumDiscount', value);
-  const setMinimumPurchase = (value: string) =>
-    editor.actions.setField('minimumPurchase', value);
+  const setMaximumDiscount = (value: string) => editor.actions.setField('maximumDiscount', value);
+  const setMinimumPurchase = (value: string) => editor.actions.setField('minimumPurchase', value);
   const setEffectiveFrom = (value: string) => editor.actions.setField('effectiveFrom', value);
-  const setEffectiveUntil = (value: string) =>
-    editor.actions.setField('effectiveUntil', value);
+  const setEffectiveUntil = (value: string) => editor.actions.setField('effectiveUntil', value);
   const setItemIds = (value: string[]) => editor.actions.setField('itemIds', value);
   const setVariantIds = (value: string[]) => editor.actions.setField('variantIds', value);
   const setLocationIds = (value: string[]) => editor.actions.setField('locationIds', value);
@@ -206,11 +194,11 @@ export function PromotionDialog({
           <span className="inline-flex min-w-0 flex-wrap items-center gap-2">
             <span>{promotion ? copy('edit') : copy('add')}</span>
             {!promotion ? (
-              <span className="rounded-md border border-[var(--color-brand)]/25 bg-[var(--color-brand)]/[.06] px-2 py-0.5 text-[11px] font-semibold text-[var(--color-brand)]">
+              <span className="rounded-md border border-(--color-brand)/25 bg-(--color-brand)/6 px-2 py-0.5 text-[11px] font-semibold text-(--color-brand)">
                 {copy('newBadge')}
               </span>
             ) : promotion.code ? (
-              <span className="rounded-md border border-[var(--color-brand)]/25 bg-[var(--color-brand)]/[.06] px-2 py-0.5 font-mono text-[11px] font-semibold text-[var(--color-brand)]">
+              <span className="rounded-md border border-(--color-brand)/25 bg-(--color-brand)/6 px-2 py-0.5 font-mono text-[11px] font-semibold text-(--color-brand)">
                 {promotion.code}
               </span>
             ) : null}
@@ -220,13 +208,13 @@ export function PromotionDialog({
                   'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-semibold',
                   enabled
                     ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                    : 'border-[var(--color-border)] bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]',
+                    : 'border-(--color-border) bg-(--color-surface-muted) text-(--color-text-muted)',
                 ].join(' ')}
               >
                 <span
                   className={[
                     'size-1.5 rounded-full',
-                    enabled ? 'bg-emerald-500' : 'bg-[var(--color-text-muted)]',
+                    enabled ? 'bg-emerald-500' : 'bg-(--color-text-muted)',
                   ].join(' ')}
                 />
                 {enabled ? copy('active') : copy('disabled')}
@@ -237,7 +225,7 @@ export function PromotionDialog({
             type="button"
             aria-label={copy('cancel')}
             onClick={onClose}
-            className="grid size-8 shrink-0 place-items-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand)]/20"
+            className="grid size-8 shrink-0 place-items-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-brand)/20"
           >
             <X className="size-4" />
           </button>
@@ -254,7 +242,7 @@ export function PromotionDialog({
               className={[
                 'flex min-h-9 items-center justify-center gap-2 rounded-lg px-3 text-xs font-semibold transition-all',
                 step === 'INFORMATION'
-                  ? 'border border-slate-200 bg-white text-[var(--color-brand)] shadow-sm'
+                  ? 'border border-slate-200 bg-white text-(--color-brand) shadow-sm'
                   : 'text-slate-600 hover:text-slate-900',
               ].join(' ')}
             >
@@ -268,7 +256,7 @@ export function PromotionDialog({
               className={[
                 'flex min-h-9 items-center justify-center gap-2 rounded-lg px-3 text-xs font-semibold transition-all',
                 step === 'TARGET'
-                  ? 'border border-slate-200 bg-white text-[var(--color-brand)] shadow-sm'
+                  ? 'border border-slate-200 bg-white text-(--color-brand) shadow-sm'
                   : 'text-slate-600 hover:text-slate-900',
               ].join(' ')}
             >
@@ -277,9 +265,7 @@ export function PromotionDialog({
               <span
                 className={[
                   'rounded-full px-1.5 py-0.5 text-[9px] font-semibold',
-                  step === 'TARGET'
-                    ? 'bg-blue-50 text-[var(--color-brand)]'
-                    : 'text-slate-400',
+                  step === 'TARGET' ? 'bg-blue-50 text-(--color-brand)' : 'text-slate-400',
                 ].join(' ')}
               >
                 {targetStepSummary}
@@ -291,7 +277,7 @@ export function PromotionDialog({
       size="md"
       showClose={false}
       overlayClassName="bg-slate-900/40"
-      className="sm:max-h-[calc(100vh-24px)] sm:max-w-[540px] sm:rounded-2xl"
+      className="sm:max-h-[calc(100vh-24px)] sm:max-w-135 sm:rounded-2xl"
       footer={
         <div className="flex w-full items-center justify-between gap-3">
           <div>
@@ -301,13 +287,13 @@ export function PromotionDialog({
                 size="sm"
                 disabled
                 title={copy('deleteUnavailable')}
-                className="border-[var(--color-danger)]/35 text-[var(--color-danger)]"
+                className="border-(--color-danger)/35 text-(--color-danger)"
                 leftIcon={<Trash2 className="size-3.5" />}
               >
                 {copy('deletePromotion')}
               </DButton>
             ) : (
-              <span className="text-[11px] font-medium text-[var(--color-danger)]">
+              <span className="text-[11px] font-medium text-(--color-danger)">
                 {copy('requiredHint')}
               </span>
             )}
@@ -329,13 +315,13 @@ export function PromotionDialog({
         </div>
       }
     >
-      <div className="mx-auto w-full max-w-[500px] space-y-5">
+      <div className="mx-auto w-full max-w-135 space-y-5">
         {step === 'INFORMATION' ? (
           <div className="space-y-4">
             <section>
               <div className="mb-3 flex items-center justify-between gap-3 border-b border-slate-100 pb-2">
                 <div className="flex items-center gap-2">
-                  <span className="grid size-5 place-items-center rounded-full bg-blue-50 text-[var(--color-brand)]">
+                  <span className="grid size-5 place-items-center rounded-full bg-blue-50 text-(--color-brand)">
                     <Info className="size-3" />
                   </span>
                   <h3 className="text-[11px] font-bold uppercase tracking-wide text-slate-700">
@@ -379,7 +365,9 @@ export function PromotionDialog({
                   label={copy('codeLabel')}
                   value={code}
                   readOnly={mode === 'AUTOMATIC'}
-                  className={mode === 'AUTOMATIC' ? 'read-only:bg-white read-only:text-slate-400' : undefined}
+                  className={
+                    mode === 'AUTOMATIC' ? 'read-only:bg-white read-only:text-slate-400' : undefined
+                  }
                   onChange={(value) => setCode(value.toUpperCase())}
                   placeholder={mode === 'AUTOMATIC' ? copy('automaticCodeHint') : 'SEP10'}
                 />
@@ -387,7 +375,7 @@ export function PromotionDialog({
                 <div className="sm:col-span-2 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/40 px-3.5 py-3">
                   <div>
                     <p className="text-xs font-semibold">{copy('operationalStatus')}</p>
-                    <p className="mt-0.5 text-[10px] text-[var(--color-text-muted)]">
+                    <p className="mt-0.5 text-[10px] text-(--color-text-muted)">
                       {copy('operationalStatusHint')}
                     </p>
                   </div>
@@ -398,7 +386,7 @@ export function PromotionDialog({
 
             <section>
               <div className="mb-3 flex items-center gap-2 border-b border-slate-100 pb-2">
-                <span className="grid size-5 place-items-center rounded-full bg-blue-50 text-[var(--color-brand)]">
+                <span className="grid size-5 place-items-center rounded-full bg-blue-50 text-(--color-brand)">
                   <Tag className="size-3" />
                 </span>
                 <h3 className="text-[11px] font-bold uppercase tracking-wide text-slate-700">
@@ -412,10 +400,10 @@ export function PromotionDialog({
                   aria-pressed={discountType === 'PERCENTAGE'}
                   onClick={() => setDiscountType('PERCENTAGE')}
                   className={[
-                    'min-h-[72px] rounded-xl border px-3 py-2.5 text-left transition-all',
+                    'min-h-18 rounded-xl border px-3 py-2.5 text-left transition-all',
                     discountType === 'PERCENTAGE'
-                      ? 'border-2 border-[var(--color-brand)] bg-blue-50/30'
-                      : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-brand)]/35',
+                      ? 'border-2 border-(--color-brand) bg-blue-50/30'
+                      : 'border-(--color-border) bg-(--color-surface) hover:border-(--color-brand)/35',
                   ].join(' ')}
                 >
                   <div className="flex items-start gap-2">
@@ -423,15 +411,15 @@ export function PromotionDialog({
                       className={[
                         'mt-0.5 grid size-4 shrink-0 place-items-center rounded-full border',
                         discountType === 'PERCENTAGE'
-                          ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white'
-                          : 'border-[var(--color-border)]',
+                          ? 'border-(--color-brand) bg-(--color-brand) text-white'
+                          : 'border-(--color-border)',
                       ].join(' ')}
                     >
                       {discountType === 'PERCENTAGE' ? <Check className="size-2.5" /> : null}
                     </span>
                     <span>
                       <span className="block text-xs font-semibold">{copy('percentageCard')}</span>
-                      <span className="mt-0.5 block text-[10px] leading-4 text-[var(--color-text-muted)]">
+                      <span className="mt-0.5 block text-[10px] leading-4 text-(--color-text-muted)">
                         {copy('percentageCardHint')}
                       </span>
                     </span>
@@ -446,10 +434,10 @@ export function PromotionDialog({
                     setMaximumDiscount('');
                   }}
                   className={[
-                    'min-h-[72px] rounded-xl border px-3 py-2.5 text-left transition-all',
+                    'min-h-18 rounded-xl border px-3 py-2.5 text-left transition-all',
                     discountType === 'FIXED_AMOUNT'
-                      ? 'border-2 border-[var(--color-brand)] bg-blue-50/30'
-                      : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-brand)]/35',
+                      ? 'border-2 border-(--color-brand) bg-blue-50/30'
+                      : 'border-(--color-border) bg-(--color-surface) hover:border-(--color-brand)/35',
                   ].join(' ')}
                 >
                   <div className="flex items-start gap-2">
@@ -457,15 +445,15 @@ export function PromotionDialog({
                       className={[
                         'mt-0.5 grid size-4 shrink-0 place-items-center rounded-full border',
                         discountType === 'FIXED_AMOUNT'
-                          ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white'
-                          : 'border-[var(--color-border)]',
+                          ? 'border-(--color-brand) bg-(--color-brand) text-white'
+                          : 'border-(--color-border)',
                       ].join(' ')}
                     >
                       {discountType === 'FIXED_AMOUNT' ? <Check className="size-2.5" /> : null}
                     </span>
                     <span>
                       <span className="block text-xs font-semibold">{copy('fixedCard')}</span>
-                      <span className="mt-0.5 block text-[10px] leading-4 text-[var(--color-text-muted)]">
+                      <span className="mt-0.5 block text-[10px] leading-4 text-(--color-text-muted)">
                         {copy('fixedCardHint')}
                       </span>
                     </span>
@@ -485,18 +473,18 @@ export function PromotionDialog({
                     suffix={discountType === 'PERCENTAGE' ? '%' : undefined}
                     onChange={setDiscountValue}
                   />
-                  <p className="mt-1 text-[10px] text-[var(--color-text-muted)]">
+                  <p className="mt-1 text-[10px] text-(--color-text-muted)">
                     {copy(discountType === 'PERCENTAGE' ? 'percentageHint' : 'fixedHint')}
                   </p>
                 </div>
 
                 <div className="flex min-w-0 flex-col gap-1.5">
-                  <label className="text-xs font-medium text-[var(--color-text)]">
+                  <label className="text-xs font-medium text-(--color-text)">
                     {copy('currency')}
                   </label>
                   <div
                     aria-label={copy('currencyLocked')}
-                    className="flex h-8 min-w-0 items-center justify-between gap-2 rounded-[var(--radius-control)] border border-slate-200 bg-slate-100/80 px-3"
+                    className="flex h-8 min-w-0 items-center justify-between gap-2 rounded-(--radius-control) border border-slate-200 bg-slate-100/80 px-3"
                   >
                     <span className="truncate text-xs font-semibold text-slate-700">
                       {currency === 'IDR' ? 'IDR (Rupiah)' : currency}
@@ -516,7 +504,7 @@ export function PromotionDialog({
                     label={
                       <span>
                         {copy('maximum')}{' '}
-                        <span className="font-normal text-[var(--color-text-muted)]">
+                        <span className="font-normal text-(--color-text-muted)">
                           ({copy('optional')})
                         </span>
                       </span>
@@ -537,7 +525,7 @@ export function PromotionDialog({
                   label={
                     <span>
                       {copy('minimum')}{' '}
-                      <span className="font-normal text-[var(--color-text-muted)]">
+                      <span className="font-normal text-(--color-text-muted)">
                         ({copy('optional')})
                       </span>
                     </span>
@@ -598,17 +586,17 @@ export function PromotionDialog({
                       aria-pressed={active}
                       onClick={() => changeScope(option.value)}
                       className={[
-                        'flex min-h-[68px] flex-col items-center justify-center rounded-xl border px-3 py-2.5 text-center transition-all',
+                        'flex min-h-17 flex-col items-center justify-center rounded-xl border px-3 py-2.5 text-center transition-all',
                         active
-                          ? 'border-2 border-[var(--color-brand)] bg-blue-50/30 text-[var(--color-brand)]'
-                          : 'border-slate-200 bg-white text-slate-700 hover:border-[var(--color-brand)]/35',
+                          ? 'border-2 border-(--color-brand) bg-blue-50/30 text-(--color-brand)'
+                          : 'border-slate-200 bg-white text-slate-700 hover:border-(--color-brand)/35',
                       ].join(' ')}
                     >
                       <span className="block text-xs font-semibold">{option.title}</span>
                       <span
                         className={[
                           'mt-1 block text-[10px]',
-                          active ? 'text-[var(--color-brand)]/80' : 'text-slate-400',
+                          active ? 'text-(--color-brand)/80' : 'text-slate-400',
                         ].join(' ')}
                       >
                         {option.hint}
@@ -624,11 +612,11 @@ export function PromotionDialog({
                 <div className="mb-2">
                   <h3 className="text-xs font-semibold">
                     {copy('targetItems')}
-                    <span className="ml-2 text-[10px] font-medium text-[var(--color-text-muted)]">
+                    <span className="ml-2 text-[10px] font-medium text-(--color-text-muted)">
                       {selectedItemGroups.size} {copy('selectedActive')}
                     </span>
                   </h3>
-                  <p className="mt-0.5 text-[10px] text-[var(--color-text-muted)]">
+                  <p className="mt-0.5 text-[10px] text-(--color-text-muted)">
                     {copy('targetWorkspaceHint')}
                   </p>
                 </div>
@@ -664,7 +652,7 @@ export function PromotionDialog({
                   emptyLabel={copy('noOptions')}
                 />
 
-                <div className="flex items-center justify-between rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5">
+                <div className="flex items-center justify-between rounded-(--radius-control) border border-(--color-border) bg-(--color-surface) px-3 py-2.5">
                   <span className="text-xs font-medium">{copy('selectedCategoriesAllItems')}</span>
                   <DToggle
                     checked={categoryItemScope === 'ALL'}
@@ -686,9 +674,9 @@ export function PromotionDialog({
             ) : null}
 
             {scope === 'TRANSACTION' ? (
-              <div className="rounded-[var(--radius-control)] border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)]/55 px-4 py-5 text-center">
+              <div className="rounded-(--radius-control) border border-dashed border-(--color-border) bg-(--color-surface-muted)/55 px-4 py-5 text-center">
                 <p className="text-sm font-semibold">{copy('allTransactions')}</p>
-                <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                <p className="mt-1 text-xs text-(--color-text-muted)">
                   {copy('allTransactionsHint')}
                 </p>
               </div>
