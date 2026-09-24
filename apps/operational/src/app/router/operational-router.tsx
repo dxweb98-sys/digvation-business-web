@@ -77,7 +77,6 @@ export function OperationalNotFoundRoute() {
     <SystemStatePage
       state="not-found"
       variant="content"
-      variant="content"
       action={
         <DButton variant="secondary" size="sm" onClick={() => navigate('/')}>
           Kembali ke Jual
