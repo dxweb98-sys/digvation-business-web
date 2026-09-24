@@ -119,7 +119,7 @@ export function PromotionDialog({
               <span
                 className={[
                   'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-semibold',
-                  enabled
+                  form.enabled
                     ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                     : 'border-(--color-border) bg-(--color-surface-muted) text-(--color-text-muted)',
                 ].join(' ')}
@@ -127,10 +127,10 @@ export function PromotionDialog({
                 <span
                   className={[
                     'size-1.5 rounded-full',
-                    form.form.enabled ? 'bg-emerald-500' : 'bg-(--color-text-muted)',
+                    form.enabled ? 'bg-emerald-500' : 'bg-(--color-text-muted)',
                   ].join(' ')}
                 />
-                {form.form.enabled ? copy('active') : copy('disabled')}
+                {form.enabled ? copy('active') : copy('disabled')}
               </span>
             ) : null}
           </span>
