@@ -3,14 +3,30 @@ import { createRoot } from 'react-dom/client';
 import './style.css';
 const api = import.meta.env.VITE_RUNTIME_API_URL ?? '';
 const handle = location.pathname.split('/').pop() ?? '';
+type PortalState =
+  | 'ENTRY'
+  | 'PHONE_VERIFICATION'
+  | 'OTP_REQUESTED'
+  | 'OTP_VERIFYING'
+  | 'AUTHENTICATED'
+  | 'SESSION_EXPIRED'
+  | 'INVALID_LINK';
+
+class PortalRequestError extends Error {
+  constructor(readonly status: number) {
+    super('Member portal request failed');
+  }
+}
+
 async function call(path: string, init?: RequestInit) {
   const r = await fetch(`${api}/api/v1/member-portal${path}`, {
     credentials: 'include',
     headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) },
     ...init,
   });
-  if (!r.ok) throw new Error('unavailable');
-  return r.json();
+  if (!r.ok) throw new PortalRequestError(r.status);
+  const payload = await r.json();
+  return payload?.data ?? payload;
 }
 const formatNumber = (value: string | number) =>
   new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(Number(value) || 0);
@@ -39,6 +55,7 @@ function isValidIndonesianPhone(raw: string) {
   return /^\+62\d{8,13}$/.test(submittedPhone(raw));
 }
 function App() {
+  const [state, setState] = useState<PortalState>('ENTRY');
   const [entry, setEntry] = useState<any>();
   const [code, setCode] = useState('');
   const [challenge, setChallenge] = useState('');
@@ -47,51 +64,112 @@ function App() {
   const [tab, setTab] = useState<'points' | 'transactions'>('points');
   const [items, setItems] = useState<any[]>([]);
   const [offset, setOffset] = useState(0);
-  const [error, setError] = useState('');
   const [entryMessage, setEntryMessage] = useState('');
+  const [sendingOtp, setSendingOtp] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState('');
   const [hasMore, setHasMore] = useState(true);
   useEffect(() => {
     call(`/entry/${handle}`)
-      .then(setEntry)
-      .catch(() => setError('Tautan member tidak tersedia.'));
+      .then((resolvedEntry) => {
+        setEntry(resolvedEntry);
+        setState('PHONE_VERIFICATION');
+      })
+      .catch(() => setState('INVALID_LINK'));
   }, []);
   useEffect(() => {
-    if (!portal) return;
+    if (state !== 'AUTHENTICATED') return;
+    let active = true;
     call(`/${tab}?offset=${offset}&limit=20`)
       .then((x) => {
+        if (!active) return;
         setItems((v) => (offset ? v.concat(x.items) : x.items));
         setHasMore(x.items.length === 20);
       })
-      .catch(() => setError('Sesi telah berakhir.'));
-  }, [portal, tab, offset]);
+      .catch((requestError) => {
+        if (!active) return;
+        if (
+          requestError instanceof PortalRequestError &&
+          (requestError.status === 401 || requestError.status === 403)
+        )
+          setState('SESSION_EXPIRED');
+      });
+    return () => {
+      active = false;
+    };
+  }, [state, tab, offset]);
   async function requestOtp() {
+    if (
+      !isValidIndonesianPhone(phone) ||
+      sendingOtp ||
+      (state !== 'PHONE_VERIFICATION' && state !== 'OTP_REQUESTED')
+    )
+      return;
     setEntryMessage('');
+    setSendingOtp(true);
     try {
       const x = await call('/otp', {
         method: 'POST',
         body: JSON.stringify({ handle, phone: submittedPhone(phone) }),
       });
-      setChallenge(x.challengeId ?? '');
-    } catch {
-      setEntryMessage('Kode belum dapat dikirim. Silakan coba beberapa saat lagi.');
+      if (!x.challengeId) throw new PortalRequestError(503);
+      setCode('');
+      setChallenge(x.challengeId);
+      setState('OTP_REQUESTED');
+    } catch (requestError) {
+      setEntryMessage(
+        requestError instanceof PortalRequestError && requestError.status === 503
+          ? 'Kode verifikasi belum dapat dikirim. Silakan coba lagi.'
+          : 'Nomor tidak dapat diverifikasi. Pastikan Anda menggunakan nomor yang terdaftar.',
+      );
+    } finally {
+      setSendingOtp(false);
     }
   }
   async function verifyOtp() {
+    if (state !== 'OTP_REQUESTED' || code.length !== 6) return;
     setEntryMessage('');
+    setState('OTP_VERIFYING');
+    let verified = false;
     try {
       await call('/verify', {
         method: 'POST',
         body: JSON.stringify({ handle, challengeId: challenge, code }),
       });
-      setPortal(await call('/summary'));
+      verified = true;
+      const summary = await call('/summary');
+      setPortal(summary);
+      setState('AUTHENTICATED');
     } catch {
+      setState(verified ? 'PHONE_VERIFICATION' : 'OTP_REQUESTED');
+      if (verified) {
+        setChallenge('');
+        setCode('');
+      }
       setEntryMessage(
-        'Kode belum sesuai atau sudah tidak berlaku. Periksa kembali lalu coba lagi.',
+        verified
+          ? 'Portal belum dapat dibuka. Silakan minta kode verifikasi baru.'
+          : 'Kode belum sesuai atau sudah tidak berlaku. Periksa kembali lalu coba lagi.',
       );
     }
   }
-  if (error)
+  function returnToPhoneVerification() {
+    setPortal(undefined);
+    setChallenge('');
+    setCode('');
+    setItems([]);
+    setOffset(0);
+    setHasMore(true);
+    setEntryMessage('');
+    if (entry) setState('PHONE_VERIFICATION');
+  }
+  async function logout() {
+    try {
+      await call('/logout', { method: 'POST' });
+    } finally {
+      returnToPhoneVerification();
+    }
+  }
+  if (state === 'INVALID_LINK' || state === 'SESSION_EXPIRED')
     return (
       <main className="portal-shell">
         <section className="state-card">
@@ -100,23 +178,26 @@ function App() {
           </span>
           <p className="eyebrow">Member Portal</p>
           <h1>
-            {error === 'Sesi telah berakhir.'
+            {state === 'SESSION_EXPIRED'
               ? 'Sesi Anda telah berakhir'
               : 'Tautan member tidak tersedia'}
           </h1>
           <p>
-            {error === 'Sesi telah berakhir.'
+            {state === 'SESSION_EXPIRED'
               ? 'Untuk menjaga keamanan akun, silakan buka kembali tautan member Anda dan verifikasi nomor telepon.'
               : 'Tautan ini mungkin sudah tidak aktif atau telah diperbarui. Silakan hubungi tempat Anda terdaftar sebagai member.'}
           </p>
-          <button className="button primary" onClick={() => location.reload()}>
+          <button
+            className="button primary"
+            onClick={() => (entry ? returnToPhoneVerification() : location.reload())}
+          >
             Kembali ke awal
           </button>
         </section>
       </main>
     );
-  if (!entry) return <main className="skeleton">Memuat…</main>;
-  if (!portal)
+  if (state === 'ENTRY' || !entry) return <main className="skeleton">Memuat…</main>;
+  if (state !== 'AUTHENTICATED')
     return (
       <main className="portal-shell">
         <section className="entry-screen" aria-labelledby="entry-title">
@@ -151,17 +232,18 @@ function App() {
               {entryMessage}
             </p>
           )}
-          {!challenge ? (
+          {state === 'PHONE_VERIFICATION' ? (
             <button
               className="button primary"
-              disabled={!isValidIndonesianPhone(phone)}
+              disabled={sendingOtp || !isValidIndonesianPhone(phone)}
               onClick={requestOtp}
             >
-              Kirim kode OTP
+              {sendingOtp ? 'Mengirim kode…' : 'Kirim kode OTP'}
             </button>
           ) : (
             <div className="otp-block">
               <label htmlFor="otp">Kode OTP</label>
+              <p className="otp-destination">Kode dikirim ke {entry.phoneHint}.</p>
               <input
                 id="otp"
                 aria-describedby="otp-note"
@@ -172,17 +254,15 @@ function App() {
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 placeholder="_ _ _ _ _ _"
               />
-              <button className="button primary" disabled={code.length !== 6} onClick={verifyOtp}>
-                Verifikasi
-              </button>
               <button
-                className="resend"
-                onClick={() => {
-                  setChallenge('');
-                  setCode('');
-                }}
+                className="button primary"
+                disabled={state === 'OTP_VERIFYING' || code.length !== 6}
+                onClick={verifyOtp}
               >
-                Kirim ulang kode
+                {state === 'OTP_VERIFYING' ? 'Memverifikasi…' : 'Verifikasi'}
+              </button>
+              <button className="resend" disabled={sendingOtp} onClick={requestOtp}>
+                {sendingOtp ? 'Mengirim ulang kode…' : 'Kirim ulang kode'}
               </button>
             </div>
           )}
@@ -296,10 +376,7 @@ function App() {
           Muat lebih banyak
         </button>
       )}
-      <button
-        className="logout"
-        onClick={() => call('/logout', { method: 'POST' }).then(() => location.reload())}
-      >
+      <button className="logout" onClick={logout}>
         Keluar dari portal
       </button>
     </main>
