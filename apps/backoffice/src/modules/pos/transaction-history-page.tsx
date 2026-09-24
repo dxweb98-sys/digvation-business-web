@@ -1,3 +1,4 @@
+import { formatDecimalNumber } from '@digvation/business-money';
 import {
   DBadge,
   DButton,
@@ -530,7 +531,7 @@ function TransactionDetail({
                           </p>
                         ) : null}
                         <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                          {text.quantity}: {line.quantity}
+                          {text.quantity}: {formatDecimalNumber(line.quantity, locale === 'id' ? 'id-ID' : 'en-US')}
                         </p>
                       </div>
                       <StatusBadge status={line.fulfillment!.status} />

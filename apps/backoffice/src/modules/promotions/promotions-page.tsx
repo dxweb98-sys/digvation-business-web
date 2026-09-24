@@ -1,3 +1,4 @@
+import { formatPercentageFromRate } from '@digvation/business-money';
 import { useRuntime } from '@digvation/business-runtime';
 import {
   DBadge,
@@ -52,9 +53,8 @@ const keys = {
 
 type CategoryItemScope = 'ALL' | 'SELECTED';
 
-function percentageDisplay(value: string) {
-  const amount = Number(value) * 100;
-  return Number.isFinite(amount) ? `${amount.toLocaleString()}%` : value;
+function percentageDisplay(value: string, locale: 'id' | 'en') {
+  return formatPercentageFromRate(value, locale === 'id' ? 'id-ID' : 'en-US');
 }
 
 export type PromotionCopy = (
@@ -111,7 +111,7 @@ export function PromotionsPage() {
   const runtime = useRuntime();
   const queryClient = useQueryClient();
   const promotionCopy = usePromotionsLocalization();
-  const { formatDate } = useBackofficeLocalization();
+  const { formatDate, formatMoney, locale } = useBackofficeLocalization();
   const api = useMemo(
     () => new PromotionsApi(createApiClient(runtime.apiBaseUrl)),
     [createApiClient, runtime.apiBaseUrl],
@@ -156,8 +156,8 @@ export function PromotionsPage() {
       label: promotionCopy('discount'),
       render: (row) =>
         row.discountType === 'PERCENTAGE'
-          ? percentageDisplay(row.discountValue)
-          : `${row.currency ?? ''} ${row.discountValue}`.trim(),
+          ? percentageDisplay(row.discountValue, locale)
+          : formatMoney(row.discountValue, row.currency ?? runtime.currency),
     },
     {
       key: 'itemIds',

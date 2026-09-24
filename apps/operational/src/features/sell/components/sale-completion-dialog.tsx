@@ -1,4 +1,5 @@
 import { createDecimal, formatMoney } from '@digvation/pos-money';
+import { useOperationalLocalization } from '../../../app/localization/operational-localization';
 import {
   DButton,
   DCurrencyInput,
@@ -75,6 +76,7 @@ export function SaleCompletionDialog({
   onFinalize,
   onVoid,
 }: SaleCompletionDialogProps) {
+  const { label } = useOperationalLocalization();
   const sale = viewModel.sale;
   const [method, setMethod] = useState<PaymentMethod>('CASH');
   const [appliedAmount, setAppliedAmount] = useState(viewModel.availableToPay);
@@ -221,10 +223,10 @@ export function SaleCompletionDialog({
                     }}
                     className="mt-1.5"
                   >
-                    <option value="CASH">Cash</option>
-                    <option value="BANK_TRANSFER">Bank transfer</option>
-                    <option value="WALLET">Wallet</option>
-                    <option value="QRIS">QRIS</option>
+                    <option value="CASH">{label('CASH')}</option>
+                    <option value="BANK_TRANSFER">{label('BANK_TRANSFER')}</option>
+                    <option value="WALLET">{label('WALLET')}</option>
+                    <option value="QRIS">{label('QRIS')}</option>
                   </DSelect>
                 </label>
                 <label className="text-xs font-semibold text-[var(--color-text-muted)]">
@@ -282,9 +284,9 @@ export function SaleCompletionDialog({
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <p className="text-sm font-bold">{payment.method.replace('_', ' ')}</p>
+                          <p className="text-sm font-bold">{label(payment.method)}</p>
                           <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                            {payment.status}
+                            {label(payment.status)}
                           </p>
                         </div>
                         <p className="text-sm font-bold tabular-nums">
@@ -474,7 +476,7 @@ export function SaleCompletionDialog({
                 <div className="flex items-center gap-2 font-bold">
                   <RefreshCcw className="size-4" /> Synchronization attention
                 </div>
-                <p className="mt-2 text-[var(--color-text-muted)]">{viewModel.synchronization}</p>
+                <p className="mt-2 text-[var(--color-text-muted)]">{label(viewModel.synchronization)}</p>
               </article>
             ) : null}
           </aside>

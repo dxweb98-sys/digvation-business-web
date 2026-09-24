@@ -1,3 +1,5 @@
+import { formatDecimalNumber } from '@digvation/business-money';
+import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
 import type { Sale } from './transaction-history-api';
 
 export function TransactionFinancialSummary({
@@ -9,8 +11,12 @@ export function TransactionFinancialSummary({
   copy: (value: string) => string;
   formatMoney: (amount: string, currency: string) => string;
 }) {
+  const { locale } = useBackofficeLocalization();
   const loyaltyLabel = sale.loyaltyRedemption
-    ? `${copy('Loyalty redemption')} (${sale.loyaltyRedemption.points} ${copy('points')})`
+    ? `${copy('Loyalty redemption')} (${formatDecimalNumber(
+        sale.loyaltyRedemption.points,
+        locale === 'id' ? 'id-ID' : 'en-US',
+      )} ${copy('points')})`
     : null;
 
   return (

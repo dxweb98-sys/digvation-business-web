@@ -58,6 +58,10 @@ const technicalLabels: Record<string, LocalizedLabel> = {
   CASHIER: { id: 'Kasir', en: 'Cashier' },
   INCLUDED: { id: 'Termasuk harga', en: 'Included in price' },
   EXCLUDED: { id: 'Di luar harga', en: 'Excluded from price' },
+  'Points earned': { id: 'Poin diperoleh', en: 'Points earned' },
+  'Points redeemed': { id: 'Poin digunakan', en: 'Points redeemed' },
+  'Earned points reversed': { id: 'Poin perolehan dibatalkan', en: 'Earned points reversed' },
+  'Redeemed points restored': { id: 'Poin penggunaan dikembalikan', en: 'Redeemed points restored' },
 };
 
 const eventLabels: Record<string, LocalizedLabel> = {
