@@ -79,6 +79,9 @@ importers:
       '@digvation/business-runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
+      '@digvation/business-system-states':
+        specifier: workspace:*
+        version: link:../../packages/system-states
       '@digvation/ui':
         specifier: 1.1.0
         version: 1.1.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -119,6 +122,9 @@ importers:
       '@digvation/business-runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
+      '@digvation/business-system-states':
+        specifier: workspace:*
+        version: link:../../packages/system-states
       '@digvation/ui':
         specifier: 1.1.0
         version: 1.1.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
