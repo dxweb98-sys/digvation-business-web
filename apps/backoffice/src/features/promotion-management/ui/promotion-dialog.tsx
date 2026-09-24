@@ -32,6 +32,7 @@ export function PromotionDialog({
   const copy = usePromotionsLocalization();
   const { showToast } = useToast();
   const editor = usePromotionEditor(promotion);
+  const { values: form, setField } = editor.form;
   const {
     name,
     enabled,
@@ -50,24 +51,8 @@ export function PromotionDialog({
     categoryIds,
     categoryItemScope,
     locationIds,
-  } = editor.form;
-  const { saving, step } = editor.ui;
-
-  const setName = (value: string) => editor.actions.setField('name', value);
-  const setEnabled = (value: boolean) => editor.actions.setField('enabled', value);
-  const setMode = editor.actions.changeMode;
-  const setCode = (value: string) => editor.actions.setField('code', value);
-  const setDiscountType = editor.actions.changeDiscountType;
-  const setDiscountValue = (value: string) => editor.actions.setField('discountValue', value);
-  const setMaximumDiscount = (value: string) => editor.actions.setField('maximumDiscount', value);
-  const setMinimumPurchase = (value: string) => editor.actions.setField('minimumPurchase', value);
-  const setEffectiveFrom = (value: string) => editor.actions.setField('effectiveFrom', value);
-  const setEffectiveUntil = (value: string) => editor.actions.setField('effectiveUntil', value);
-  const setItemIds = (value: string[]) => editor.actions.setField('itemIds', value);
-  const setVariantIds = (value: string[]) => editor.actions.setField('variantIds', value);
-  const setLocationIds = (value: string[]) => editor.actions.setField('locationIds', value);
-  const setSaving = editor.actions.setSaving;
-  const setStep = editor.actions.setStep;
+  } = form;
+  const { saving, step, setSaving, setStep } = editor.ui;
 
   const categoryItemOptions = useMemo(() => {
     const selectedCategories = new Set(categoryIds);
@@ -338,7 +323,7 @@ export function PromotionDialog({
                     clearable={false}
                     label={copy('name') + ' *'}
                     value={name}
-                    onChange={setName}
+                    onChange={(value) => setField('name', value)}
                     placeholder={copy('namePlaceholder')}
                   />
                 </div>
@@ -352,11 +337,7 @@ export function PromotionDialog({
                     { value: 'AUTOMATIC', label: copy('automatic') },
                     { value: 'CODE', label: copy('code') },
                   ]}
-                  onValueChange={(value) => {
-                    const next = value as PromotionMode;
-                    setMode(next);
-                    if (next === 'AUTOMATIC') setCode('');
-                  }}
+                  onValueChange={(value) => editor.actions.changeMode(value as PromotionMode)}
                 />
 
                 <DInput
@@ -368,7 +349,7 @@ export function PromotionDialog({
                   className={
                     mode === 'AUTOMATIC' ? 'read-only:bg-white read-only:text-slate-400' : undefined
                   }
-                  onChange={(value) => setCode(value.toUpperCase())}
+                  onChange={(value) => setField('code', value.toUpperCase())}
                   placeholder={mode === 'AUTOMATIC' ? copy('automaticCodeHint') : 'SEP10'}
                 />
 
@@ -379,7 +360,7 @@ export function PromotionDialog({
                       {copy('operationalStatusHint')}
                     </p>
                   </div>
-                  <DToggle checked={enabled} onChange={setEnabled} ariaLabel={copy('enabled')} />
+                  <DToggle checked={enabled} onChange={(value) => setField('enabled', value)} ariaLabel={copy('enabled')} />
                 </div>
               </div>
             </section>
@@ -398,7 +379,7 @@ export function PromotionDialog({
                 <button
                   type="button"
                   aria-pressed={discountType === 'PERCENTAGE'}
-                  onClick={() => setDiscountType('PERCENTAGE')}
+                  onClick={() => editor.actions.changeDiscountType('PERCENTAGE')}
                   className={[
                     'min-h-18 rounded-xl border px-3 py-2.5 text-left transition-all',
                     discountType === 'PERCENTAGE'
@@ -429,10 +410,7 @@ export function PromotionDialog({
                 <button
                   type="button"
                   aria-pressed={discountType === 'FIXED_AMOUNT'}
-                  onClick={() => {
-                    setDiscountType('FIXED_AMOUNT');
-                    setMaximumDiscount('');
-                  }}
+                  onClick={() => editor.actions.changeDiscountType('FIXED_AMOUNT')}
                   className={[
                     'min-h-18 rounded-xl border px-3 py-2.5 text-left transition-all',
                     discountType === 'FIXED_AMOUNT'
@@ -471,7 +449,7 @@ export function PromotionDialog({
                     value={discountValue}
                     prefix={discountType === 'FIXED_AMOUNT' ? 'Rp' : undefined}
                     suffix={discountType === 'PERCENTAGE' ? '%' : undefined}
-                    onChange={setDiscountValue}
+                    onChange={(value) => setField('discountValue', value)}
                   />
                   <p className="mt-1 text-[10px] text-(--color-text-muted)">
                     {copy(discountType === 'PERCENTAGE' ? 'percentageHint' : 'fixedHint')}
@@ -512,7 +490,7 @@ export function PromotionDialog({
                     inputMode="decimal"
                     value={maximumDiscount}
                     placeholder={copy('maximumPlaceholder')}
-                    onChange={setMaximumDiscount}
+                    onChange={(value) => setField('maximumDiscount', value)}
                   />
                 ) : (
                   <div />
@@ -533,23 +511,23 @@ export function PromotionDialog({
                   inputMode="decimal"
                   value={minimumPurchase}
                   placeholder={copy('minimumPlaceholder')}
-                  onChange={setMinimumPurchase}
+                  onChange={(value) => setField('minimumPurchase', value)}
                 />
 
                 <DDatePicker
                   label={copy('effectiveFrom') + ' (' + copy('optional') + ')'}
                   variant="date-time"
                   value={effectiveFrom}
-                  onChange={(value) => setEffectiveFrom(value == null ? '' : String(value))}
-                  onClear={() => setEffectiveFrom('')}
+                  onChange={(value) => setField('effectiveFrom', value == null ? '' : String(value))}
+                  onClear={() => setField('effectiveFrom', '')}
                   clearable
                 />
                 <DDatePicker
                   label={copy('effectiveUntil') + ' (' + copy('optional') + ')'}
                   variant="date-time"
                   value={effectiveUntil}
-                  onChange={(value) => setEffectiveUntil(value == null ? '' : String(value))}
-                  onClear={() => setEffectiveUntil('')}
+                  onChange={(value) => setField('effectiveUntil', value == null ? '' : String(value))}
+                  onClear={() => setField('effectiveUntil', '')}
                   clearable
                   error={periodValid ? undefined : copy('invalid')}
                 />
@@ -627,8 +605,8 @@ export function PromotionDialog({
                   variants={options.variants}
                   itemIds={itemIds}
                   variantIds={variantIds}
-                  onItemsChange={setItemIds}
-                  onVariantsChange={setVariantIds}
+                  onItemsChange={(ids) => setField('itemIds', ids)}
+                  onVariantsChange={(ids) => setField('variantIds', ids)}
                   emptyLabel={copy('noOptions')}
                   specificLabel={copy('specificVariants')}
                   includedLabel={copy('includedViaParent')}
@@ -666,7 +644,7 @@ export function PromotionDialog({
                     label={copy('selectCategoryItems')}
                     options={categoryItemOptions}
                     selected={itemIds}
-                    onChange={setItemIds}
+                    onChange={(ids) => setField('itemIds', ids)}
                     emptyLabel={copy('noCategoryItems')}
                   />
                 ) : null}
@@ -692,7 +670,7 @@ export function PromotionDialog({
               }
               options={options.locations}
               selected={locationIds}
-              onChange={setLocationIds}
+              onChange={(ids) => setField('locationIds', ids)}
               emptyLabel={copy('noOptions')}
             />
           </div>

@@ -21,12 +21,7 @@ function promotionEditorIdentity(promotion: Promotion | null | undefined) {
 }
 
 export function usePromotionEditor(promotion: Promotion | null | undefined) {
-  const {
-    values,
-    setField,
-    patch,
-    reset,
-  } = useFormState(() => createPromotionEditorForm(promotion));
+  const form = useFormState(() => createPromotionEditorForm(promotion));
   const [saving, setSaving] = useState(false);
   const [step, setStep] = useState<PromotionEditorStep>('INFORMATION');
 
@@ -37,35 +32,35 @@ export function usePromotionEditor(promotion: Promotion | null | undefined) {
     if (previousIdentityRef.current === identity) return;
 
     previousIdentityRef.current = identity;
-    reset(createPromotionEditorForm(promotion));
+    form.reset(createPromotionEditorForm(promotion));
     setSaving(false);
     setStep('INFORMATION');
-  }, [identity, promotion, reset]);
+  }, [form, identity, promotion]);
 
   const changeMode = useCallback(
     (value: PromotionMode) => {
-      patch({
+      form.patch({
         mode: value,
         ...(value === 'AUTOMATIC' ? { code: '' } : {}),
       });
     },
-    [patch],
+    [form],
   );
 
   const changeDiscountType = useCallback(
     (value: PromotionDiscountType) => {
-      patch({
+      form.patch({
         discountType: value,
         ...(value === 'FIXED_AMOUNT' ? { maximumDiscount: '' } : {}),
       });
     },
-    [patch],
+    [form],
   );
 
   const changeScope = useCallback(
     (value: PromotionScope) => {
       if (value === 'TRANSACTION') {
-        patch({
+        form.patch({
           scope: value,
           itemIds: [],
           variantIds: [],
@@ -76,7 +71,7 @@ export function usePromotionEditor(promotion: Promotion | null | undefined) {
       }
 
       if (value === 'ITEM') {
-        patch({
+        form.patch({
           scope: value,
           categoryIds: [],
           categoryItemScope: 'ALL',
@@ -84,54 +79,53 @@ export function usePromotionEditor(promotion: Promotion | null | undefined) {
         return;
       }
 
-      patch({
+      form.patch({
         scope: value,
         itemIds: [],
         variantIds: [],
         categoryItemScope: 'ALL',
       });
     },
-    [patch],
+    [form],
   );
 
   const changeCategories = useCallback(
     (categoryIds: string[], items: PromotionReferenceOption[]) => {
       const selectedCategories = new Set(categoryIds);
-      const itemIds = values.itemIds.filter((itemId) => {
+      const itemIds = form.values.itemIds.filter((itemId) => {
         const option = items.find((item) => item.id === itemId);
         return Boolean(option?.categoryId && selectedCategories.has(option.categoryId));
       });
 
-      patch({ categoryIds, itemIds });
+      form.patch({ categoryIds, itemIds });
     },
-    [patch, values.itemIds],
+    [form],
   );
 
   const changeCategoryItemScope = useCallback(
     (value: PromotionCategoryItemScope) => {
-      patch({
+      form.patch({
         categoryItemScope: value,
         ...(value === 'ALL' ? { itemIds: [] } : {}),
       });
     },
-    [patch],
+    [form],
   );
 
   return {
-    form: values,
+    form,
     ui: {
       saving,
       step,
+      setSaving,
+      setStep,
     },
     actions: {
-      setField,
       changeMode,
       changeDiscountType,
       changeScope,
       changeCategories,
       changeCategoryItemScope,
-      setSaving,
-      setStep,
     },
   };
 }

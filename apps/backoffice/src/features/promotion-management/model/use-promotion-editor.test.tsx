@@ -33,21 +33,21 @@ describe('usePromotionEditor', () => {
   it('uses the shared form state for field updates', () => {
     const { result } = renderHook(() => usePromotionEditor(promotion));
 
-    act(() => result.current.actions.setField('name', 'Changed promotion'));
+    act(() => result.current.form.values.setField('name', 'Changed promotion'));
 
-    expect(result.current.form.name).toBe('Changed promotion');
-    expect(result.current.form.code).toBe('SAVE10');
+    expect(result.current.form.values.name).toBe('Changed promotion');
+    expect(result.current.form.values.code).toBe('SAVE10');
   });
 
   it('hydrates percentage values and keeps coordinated mode transitions', () => {
     const { result } = renderHook(() => usePromotionEditor(promotion));
 
-    expect(result.current.form.discountValue).toBe('10');
+    expect(result.current.form.values.discountValue).toBe('10');
 
     act(() => result.current.actions.changeMode('AUTOMATIC'));
 
-    expect(result.current.form.mode).toBe('AUTOMATIC');
-    expect(result.current.form.code).toBe('');
+    expect(result.current.form.values.mode).toBe('AUTOMATIC');
+    expect(result.current.form.values.code).toBe('');
   });
 
   it('clears incompatible targets when scope changes', () => {
@@ -55,10 +55,10 @@ describe('usePromotionEditor', () => {
 
     act(() => result.current.actions.changeScope('TRANSACTION'));
 
-    expect(result.current.form.itemIds).toEqual([]);
-    expect(result.current.form.variantIds).toEqual([]);
-    expect(result.current.form.categoryIds).toEqual([]);
-    expect(result.current.form.categoryItemScope).toBe('ALL');
+    expect(result.current.form.values.itemIds).toEqual([]);
+    expect(result.current.form.values.variantIds).toEqual([]);
+    expect(result.current.form.values.categoryIds).toEqual([]);
+    expect(result.current.form.values.categoryItemScope).toBe('ALL');
   });
 
   it('keeps only selected-category items when categories change', () => {
@@ -77,8 +77,8 @@ describe('usePromotionEditor', () => {
 
     act(() => result.current.actions.changeCategories(['category-2'], options));
 
-    expect(result.current.form.categoryIds).toEqual(['category-2']);
-    expect(result.current.form.itemIds).toEqual(['item-2']);
+    expect(result.current.form.values.categoryIds).toEqual(['category-2']);
+    expect(result.current.form.values.itemIds).toEqual(['item-2']);
   });
 
   it('clears maximum discount when fixed amount is selected', () => {
@@ -86,7 +86,7 @@ describe('usePromotionEditor', () => {
 
     act(() => result.current.actions.changeDiscountType('FIXED_AMOUNT'));
 
-    expect(result.current.form.discountType).toBe('FIXED_AMOUNT');
-    expect(result.current.form.maximumDiscount).toBe('');
+    expect(result.current.form.values.discountType).toBe('FIXED_AMOUNT');
+    expect(result.current.form.values.maximumDiscount).toBe('');
   });
 });
