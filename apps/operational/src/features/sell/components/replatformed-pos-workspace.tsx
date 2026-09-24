@@ -1801,11 +1801,9 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         }}
         onSendReceipt={(transaction) => void sendReceipt(transaction)}
         isSendingReceipt={isSendingReceipt}
-        deliveryStatus={
-          displayedQueueDetail?.status === 'FINALIZED'
-            ? receiptDeliveryStatusQuery.data
-            : undefined
-        }
+        {...(displayedQueueDetail?.status === 'FINALIZED' && receiptDeliveryStatusQuery.data
+          ? { deliveryStatus: receiptDeliveryStatusQuery.data }
+          : {})}
         onRetryDelivery={(transaction) => void sendReceipt(transaction)}
         onAssign={(line) => {
           if (!displayedQueueDetail) return;
