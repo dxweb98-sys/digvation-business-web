@@ -1,3 +1,4 @@
+import { formatDecimalNumber } from '@digvation/business-money';
 import { DCard } from '@digvation/ui';
 import { Lightbulb } from 'lucide-react';
 
@@ -43,7 +44,9 @@ export function BusinessInsightWidget({
   ];
   paymentPoints.sort((a, b) => numeric(b.value) - numeric(a.value));
   const dominantPayment = paymentPoints[0];
-  const integer = new Intl.NumberFormat(locale === 'id' ? 'id-ID' : 'en-US');
+  const numberLocale = locale === 'id' ? 'id-ID' : 'en-US';
+  const integer = new Intl.NumberFormat(numberLocale);
+  const percentage = (value: number) => formatDecimalNumber(String(Math.abs(value)), numberLocale, 1);
 
   const revenueInsight =
     revenueChange === null
@@ -52,7 +55,7 @@ export function BusinessInsightWidget({
           ? `Pendapatan mencapai ${formatMoney(String(revenue), currency)} tanpa pembanding pada bulan sebelumnya.`
           : `Revenue reached ${formatMoney(String(revenue), currency)} with no comparable revenue in the previous month.`
         : text('noRevenueMonth')
-      : `${revenueChange >= 0 ? text('revenueHigher') : text('revenueLower')} ${Math.abs(revenueChange).toFixed(1)}% ${text('previousMonthSuffix')}`;
+      : `${revenueChange >= 0 ? text('revenueHigher') : text('revenueLower')} ${percentage(revenueChange)}% ${text('previousMonthSuffix')}`;
 
   const transactionInsight =
     transactionChange === null
@@ -61,7 +64,7 @@ export function BusinessInsightWidget({
           ? `${integer.format(transactions)} transaksi tercatat, sementara bulan sebelumnya belum memiliki transaksi.`
           : `${integer.format(transactions)} transactions were recorded while the previous month had none.`
         : text('noTransactionsMonth')
-      : `${transactionChange >= 0 ? text('transactionHigher') : text('transactionLower')} ${Math.abs(transactionChange).toFixed(1)}% ${text('previousMonthSuffix')}`;
+      : `${transactionChange >= 0 ? text('transactionHigher') : text('transactionLower')} ${percentage(transactionChange)}% ${text('previousMonthSuffix')}`;
 
   const insights = [
     revenueInsight,

@@ -1,5 +1,8 @@
+import { formatDecimalNumber } from '@digvation/business-money';
 import { DCard } from '@digvation/ui';
 import type { ReactNode } from 'react';
+
+import { useDashboardI18n } from '../dashboard-i18n';
 
 const toneStyle = {
   sky: {
@@ -37,10 +40,15 @@ function sparkline(start: number, end: number) {
   };
 }
 
-function deltaText(delta: number | null | undefined): string | null {
+function deltaText(delta: number | null | undefined, locale: 'id' | 'en'): string | null {
   if (delta == null) return null;
-  if (Math.abs(delta) < 0.05) return '0.0%';
-  return `${delta > 0 ? '+' : '-'}${Math.abs(delta).toFixed(1)}%`;
+  if (Math.abs(delta) < 0.05) return '0%';
+  const value = formatDecimalNumber(
+    String(Math.abs(delta)),
+    locale === 'id' ? 'id-ID' : 'en-US',
+    1,
+  );
+  return `${delta > 0 ? '+' : '-'}${value}%`;
 }
 
 function deltaClass(delta: number | null | undefined): string {
@@ -69,8 +77,9 @@ export function DashboardKpiCard({
   trendEnd?: number;
   tone?: keyof typeof toneStyle;
 }) {
+  const { locale } = useDashboardI18n();
   const visual = toneStyle[tone];
-  const resolvedDelta = deltaText(delta);
+  const resolvedDelta = deltaText(delta, locale);
   const { path, area, endY } = sparkline(trendStart, trendEnd);
   const gradientId = `dashboard-kpi-${tone}`;
 

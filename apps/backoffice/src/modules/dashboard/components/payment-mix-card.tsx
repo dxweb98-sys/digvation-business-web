@@ -1,3 +1,4 @@
+import { formatDecimalNumber } from '@digvation/business-money';
 import { DCard } from '@digvation/ui';
 import { CreditCard } from 'lucide-react';
 
@@ -27,7 +28,8 @@ export function PaymentMixCard({
   seeAllHref?: string | undefined;
 }) {
   const { copy } = useBackofficeLocalization();
-  const { text } = useDashboardI18n();
+  const { locale, text } = useDashboardI18n();
+  const numberLocale = locale === 'id' ? 'id-ID' : 'en-US';
   const sorted = [...points].sort((a, b) => numeric(b.value) - numeric(a.value)).slice(0, 4);
   const total = sorted.reduce((sum, point) => sum + numeric(point.value), 0);
 
@@ -88,7 +90,7 @@ export function PaymentMixCard({
                         {label}
                       </p>
                       <p className="shrink-0 text-xs font-semibold tabular-nums">
-                        {ratio.toFixed(1)}%
+                        {formatDecimalNumber(String(ratio), numberLocale, 1)}%
                       </p>
                     </div>
                     <p className="mt-0.5 text-[10px] text-(--color-text-muted)">

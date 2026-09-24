@@ -1,3 +1,4 @@
+import { formatDecimalNumber } from '@digvation/business-money';
 import { DCard } from '@digvation/ui';
 import { ChartNoAxesCombined } from 'lucide-react';
 
@@ -48,8 +49,14 @@ function change(current: number, previous: number): number | null {
 }
 
 function Delta({ value }: { value: number | null }) {
+  const { locale } = useDashboardI18n();
   if (value == null) return null;
   const positive = value >= 0;
+  const formatted = formatDecimalNumber(
+    String(Math.abs(value)),
+    locale === 'id' ? 'id-ID' : 'en-US',
+    1,
+  );
   return (
     <span
       className={[
@@ -58,7 +65,7 @@ function Delta({ value }: { value: number | null }) {
       ].join(' ')}
     >
       {positive ? '↗ ' : '↘ '}
-      {Math.abs(value).toFixed(1)}%
+      {formatted}%
     </span>
   );
 }

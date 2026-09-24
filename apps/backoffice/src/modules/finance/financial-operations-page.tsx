@@ -17,6 +17,7 @@ import {
   type TableColumn,
 } from '@digvation/ui';
 import { CircleCheck, Eye, Plus } from 'lucide-react';
+import { formatMoney as formatSharedMoney } from '@digvation/business-money';
 import { useRuntime } from '@digvation/business-runtime';
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
 import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
@@ -42,9 +43,7 @@ const label = (method: PaymentMethod) =>
         ? 'Cash'
         : 'QRIS';
 const format = (amount: string, currency: string) =>
-  new Intl.NumberFormat('id-ID', { style: 'currency', currency, maximumFractionDigits: 0 }).format(
-    Number(amount),
-  );
+  formatSharedMoney(amount, currency, 'id-ID');
 
 export function FinancialOperationsPage() {
   const { session, createApiClient } = useBackofficeAuth();

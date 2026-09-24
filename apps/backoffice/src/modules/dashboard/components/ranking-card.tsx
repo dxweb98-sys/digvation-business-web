@@ -1,6 +1,8 @@
+import { formatDecimalNumber } from '@digvation/business-money';
 import { DCard } from '@digvation/ui';
 import { Package, Users } from 'lucide-react';
 
+import { useDashboardI18n } from '../dashboard-i18n';
 import { DashboardCardHeader } from './dashboard-card-header';
 
 export interface RankingCardItem {
@@ -25,6 +27,9 @@ export function RankingCard({
   kind: 'items' | 'employees';
   seeAllHref?: string | undefined;
 }) {
+  const { locale } = useDashboardI18n();
+  const numberLocale = locale === 'id' ? 'id-ID' : 'en-US';
+  const percentage = (value: number) => formatDecimalNumber(String(Math.abs(value)), numberLocale, 1);
   const Icon = kind === 'items' ? Package : Users;
 
   return (
@@ -82,8 +87,8 @@ export function RankingCard({
                     ].join(' ')}
                   >
                     {Math.abs(item.delta) < 0.05
-                      ? '0.0%'
-                      : `${item.delta > 0 ? '+' : '-'}${Math.abs(item.delta).toFixed(1)}%`}
+                      ? '0%'
+                      : `${item.delta > 0 ? '+' : '-'}${percentage(item.delta)}%`}
                   </span>
                 ) : null}
               </div>
