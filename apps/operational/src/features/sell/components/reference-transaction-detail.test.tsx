@@ -139,6 +139,7 @@ function runtimeQueueDetail(overrides: Partial<Sale> = {}): Sale {
 function renderRuntimeDetail(
   sale: Sale,
   delivery?: { status: 'FAILED'; onRetry: () => void },
+  showPaymentReceipt = false,
 ) {
   return render(
     <DeploymentBootstrapProvider config={bootstrap}>
@@ -149,7 +150,7 @@ function renderRuntimeDetail(
         businessName="Digvation"
         branchName="Main branch"
         cashierName="Kasir"
-        showPaymentReceipt={false}
+        showPaymentReceipt={showPaymentReceipt}
         onClose={vi.fn()}
         onNewSale={vi.fn()}
         onViewReceipt={vi.fn()}
@@ -306,7 +307,7 @@ describe('ReferenceTransactionDetail Runtime detail shapes', () => {
       finalizedAt: '2026-09-24T02:15:00.000Z',
     });
 
-    renderRuntimeDetail(sale, { status: 'FAILED', onRetry });
+    renderRuntimeDetail(sale, { status: 'FAILED', onRetry }, true);
 
     const retry = screen.queryByRole('button', { name: /retry sending/i });
     expect(retry).not.toBeNull();
