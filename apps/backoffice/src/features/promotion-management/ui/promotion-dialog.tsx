@@ -12,14 +12,14 @@ import { useMemo, useState } from 'react';
 
 import { normalizeBackofficeApiError } from '../../../app/api/backoffice-api-error';
 import { isSessionExpiredError } from '../../../auth/backoffice-auth-context';
-import {
+import type {
+  Promotion,
+  PromotionDiscountType,
+  PromotionMode,
+  PromotionReferenceOptions,
   PromotionsApi,
-  type Promotion,
-  type PromotionDiscountType,
-  type PromotionMode,
-  type PromotionReferenceOptions,
-  type PromotionScope,
-  type PromotionWriteInput,
+  PromotionScope,
+  PromotionWriteInput,
 } from '../../../entities/promotion';
 import { usePromotionsLocalization } from '../config/promotion.i18n';
 import { ItemVariantTargetSelector } from './item-variant-target-selector';

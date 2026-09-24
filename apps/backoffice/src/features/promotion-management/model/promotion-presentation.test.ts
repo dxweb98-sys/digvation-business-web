@@ -4,9 +4,7 @@ import type { Promotion, PromotionReferenceOption } from '../../../entities/prom
 import {
   filterPromotionItemTargets,
   promotionTargetSummary,
-  type PromotionCopy,
 } from './promotion-presentation';
-
 
 const promotion: Promotion = {
   id: 'promotion-1',
@@ -47,7 +45,6 @@ describe('Promotion variant target presentation', () => {
     expect(promotionTargetSummary(promotion, copy)).toBe('1 Item · 1 Specific variants');
   });
 });
-
 
 describe('Promotion target search', () => {
   const items: PromotionReferenceOption[] = [

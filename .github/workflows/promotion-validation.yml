@@ -37,4 +37,4 @@ jobs:
         run: pnpm exec eslint apps/backoffice/src/entities/promotion apps/backoffice/src/features/promotion-management apps/backoffice/src/app/router/backoffice-router.tsx
 
       - name: Test Promotion management
-        run: pnpm exec vitest run apps/backoffice/src/features/promotion-management/model/promotion-presentation.test.ts
+        run: pnpm exec vitest run apps/backoffice/src/features/promotion-management/model/promotion-presentation.test.ts apps/backoffice/src/entities/promotion/api/promotion.api.test.ts
