@@ -1,5 +1,14 @@
 import type { PromotionReferenceOption } from '../../../entities/promotion';
 
+export interface TargetSelectorProps {
+  label: string;
+  options: PromotionReferenceOption[];
+  selected: string[];
+  onChange: (ids: string[]) => void;
+  emptyLabel: string;
+  className?: string;
+}
+
 export function TargetSelector({
   label,
   options,
@@ -7,14 +16,7 @@ export function TargetSelector({
   onChange,
   emptyLabel,
   className = '',
-}: {
-  label: string;
-  options: PromotionReferenceOption[];
-  selected: string[];
-  onChange: (ids: string[]) => void;
-  emptyLabel: string;
-  className?: string;
-}) {
+}: TargetSelectorProps) {
   const selectedSet = new Set(selected);
   const toggle = (id: string) => {
     onChange(selectedSet.has(id) ? selected.filter((value) => value !== id) : [...selected, id]);

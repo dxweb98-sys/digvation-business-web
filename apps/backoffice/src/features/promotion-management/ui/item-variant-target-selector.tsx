@@ -5,6 +5,25 @@ import { useMemo, useState } from 'react';
 import type { PromotionReferenceOption } from '../../../entities/promotion';
 import { filterPromotionItemTargets } from '../model/promotion-presentation';
 
+export interface ItemVariantTargetSelectorProps {
+  items: PromotionReferenceOption[];
+  searchItems: PromotionReferenceOption[];
+  variants: PromotionReferenceOption[];
+  itemIds: string[];
+  variantIds: string[];
+  onItemsChange: (ids: string[]) => void;
+  onVariantsChange: (ids: string[]) => void;
+  emptyLabel: string;
+  specificLabel: string;
+  includedLabel: string;
+  notIncludedLabel: string;
+  parentIncludesVariantsLabel: string;
+  activeLabel: string;
+  searchLabel: string;
+  searchPlaceholder: string;
+  noSearchResults: string;
+}
+
 export function ItemVariantTargetSelector({
   items,
   searchItems,
@@ -22,24 +41,7 @@ export function ItemVariantTargetSelector({
   searchLabel,
   searchPlaceholder,
   noSearchResults,
-}: {
-  items: PromotionReferenceOption[];
-  searchItems: PromotionReferenceOption[];
-  variants: PromotionReferenceOption[];
-  itemIds: string[];
-  variantIds: string[];
-  onItemsChange: (ids: string[]) => void;
-  onVariantsChange: (ids: string[]) => void;
-  emptyLabel: string;
-  specificLabel: string;
-  includedLabel: string;
-  notIncludedLabel: string;
-  parentIncludesVariantsLabel: string;
-  activeLabel: string;
-  searchLabel: string;
-  searchPlaceholder: string;
-  noSearchResults: string;
-}) {
+}: ItemVariantTargetSelectorProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const itemSet = new Set(itemIds);
   const variantSet = new Set(variantIds);

@@ -9,12 +9,23 @@ import type {
   PromotionMode,
   PromotionReferenceOptions,
   PromotionsApi,
-  PromotionWriteInput,
 } from '../../../entities/promotion';
 import { usePromotionsLocalization } from '../config/promotion.i18n';
+import {
+  toPromotionWriteInput,
+  validatePromotionEditorForm,
+} from '../model/promotion-editor-form';
 import { usePromotionEditor } from '../model/use-promotion-editor';
 import { ItemVariantTargetSelector } from './item-variant-target-selector';
 import { TargetSelector } from './target-selector';
+
+export interface PromotionDialogProps {
+  promotion: Promotion | null;
+  options: PromotionReferenceOptions;
+  api: PromotionsApi;
+  onClose: () => void;
+  onChanged: () => void;
+}
 
 export function PromotionDialog({
   promotion,
@@ -22,123 +33,40 @@ export function PromotionDialog({
   api,
   onClose,
   onChanged,
-}: {
-  promotion: Promotion | null;
-  options: PromotionReferenceOptions;
-  api: PromotionsApi;
-  onClose: () => void;
-  onChanged: () => void;
-}) {
+}: PromotionDialogProps) {
   const copy = usePromotionsLocalization();
   const { showToast } = useToast();
   const editor = usePromotionEditor(promotion);
-  const { values: form, setField } = editor.form;
-  const {
-    name,
-    enabled,
-    mode,
-    code,
-    scope,
-    discountType,
-    discountValue,
-    currency,
-    maximumDiscount,
-    minimumPurchase,
-    effectiveFrom,
-    effectiveUntil,
-    itemIds,
-    variantIds,
-    categoryIds,
-    categoryItemScope,
-    locationIds,
-  } = form;
-  const { saving, step, setSaving, setStep } = editor.ui;
+  const form = editor.form;
+  const { valid, periodValid } = validatePromotionEditorForm(form);
 
   const categoryItemOptions = useMemo(() => {
-    const selectedCategories = new Set(categoryIds);
+    const selectedCategories = new Set(form.categoryIds);
     return options.items.filter(
       (option) => option.categoryId && selectedCategories.has(option.categoryId),
     );
-  }, [categoryIds, options.items]);
+  }, [form.categoryIds, options.items]);
 
   const selectedItemGroups = useMemo(() => {
-    const parentIds = new Set(itemIds);
+    const parentIds = new Set(form.itemIds);
     for (const variant of options.variants) {
-      if (variantIds.includes(variant.id) && variant.catalogItemId) {
+      if (form.variantIds.includes(variant.id) && variant.catalogItemId) {
         parentIds.add(variant.catalogItemId);
       }
     }
     return parentIds;
-  }, [itemIds, options.variants, variantIds]);
+  }, [form.itemIds, options.variants, form.variantIds]);
 
   // Search is now the only discovery affordance, so the target workspace must
   // always keep the full catalog visible. Selection changes state, not visibility.
   const visibleItemTargets = options.items;
 
-  const numericValue = Number(discountValue);
-  const numericMaximum = maximumDiscount ? Number(maximumDiscount) : null;
-  const numericMinimum = minimumPurchase ? Number(minimumPurchase) : null;
-  const needsCurrency =
-    discountType === 'FIXED_AMOUNT' || maximumDiscount !== '' || minimumPurchase !== '';
-  const currencyValid = !needsCurrency || /^[A-Z]{3}$/.test(currency.trim().toUpperCase());
-  const targetValid =
-    scope === 'TRANSACTION' ||
-    (scope === 'ITEM' && (itemIds.length > 0 || variantIds.length > 0)) ||
-    (scope === 'CATEGORY' &&
-      categoryIds.length > 0 &&
-      (categoryItemScope === 'ALL' || itemIds.length > 0));
-  const valueValid =
-    Number.isFinite(numericValue) &&
-    numericValue > 0 &&
-    (discountType === 'FIXED_AMOUNT' || numericValue <= 100);
-  const maximumValid =
-    numericMaximum === null ||
-    (discountType === 'PERCENTAGE' && Number.isFinite(numericMaximum) && numericMaximum > 0);
-  const minimumValid =
-    numericMinimum === null || (Number.isFinite(numericMinimum) && numericMinimum >= 0);
-  const periodValid =
-    !effectiveFrom ||
-    !effectiveUntil ||
-    new Date(effectiveUntil).getTime() > new Date(effectiveFrom).getTime();
-  const valid =
-    name.trim().length > 0 &&
-    (mode === 'AUTOMATIC' || code.trim().length > 0) &&
-    valueValid &&
-    maximumValid &&
-    minimumValid &&
-    currencyValid &&
-    targetValid &&
-    periodValid;
-
-  const changeScope = editor.actions.changeScope;
-  const changeCategories = (ids: string[]) => editor.actions.changeCategories(ids, options.items);
-  const changeCategoryItemScope = editor.actions.changeCategoryItemScope;
-
   const save = async () => {
-    if (!valid || saving) return;
-    setSaving(true);
-    const input: PromotionWriteInput = {
-      name: name.trim(),
-      enabled,
-      mode,
-      code: mode === 'CODE' ? code.trim().toUpperCase() : null,
-      scope,
-      discountType,
-      discountValue:
-        discountType === 'PERCENTAGE' ? String(numericValue / 100) : discountValue.trim(),
-      currency: currency.trim() ? currency.trim().toUpperCase() : null,
-      maximumDiscount: maximumDiscount.trim() || null,
-      minimumPurchase: minimumPurchase.trim() || null,
-      effectiveFrom: effectiveFrom ? new Date(effectiveFrom).toISOString() : null,
-      effectiveUntil: effectiveUntil ? new Date(effectiveUntil).toISOString() : null,
-      itemIds:
-        scope === 'ITEM' || (scope === 'CATEGORY' && categoryItemScope === 'SELECTED')
-          ? itemIds
-          : [],
-      variantIds: scope === 'ITEM' ? variantIds : [],
-      categoryIds: scope === 'CATEGORY' ? categoryIds : [],
-      locationIds,
-    };
+    if (!valid || editor.ui.saving) return;
+
+    editor.actions.setSaving(true);
+    const input = toPromotionWriteInput(form);
+
     try {
       if (promotion) await api.update(promotion.id, promotion.version, input);
       else await api.create(input);
@@ -157,15 +85,15 @@ export function PromotionDialog({
         showToast({ variant: 'danger', title });
       }
     } finally {
-      setSaving(false);
+      editor.actions.setSaving(false);
     }
   };
 
   const targetStepSummary =
-    scope === 'TRANSACTION'
+    form.scope === 'TRANSACTION'
       ? copy('allItems')
-      : scope === 'CATEGORY'
-        ? String(categoryIds.length) + ' ' + copy('category')
+      : form.scope === 'CATEGORY'
+        ? String(form.categoryIds.length) + ' ' + copy('category')
         : selectedItemGroups.size > 0
           ? String(selectedItemGroups.size) + ' ' + copy('activeShort')
           : copy('allItems');
@@ -199,10 +127,10 @@ export function PromotionDialog({
                 <span
                   className={[
                     'size-1.5 rounded-full',
-                    enabled ? 'bg-emerald-500' : 'bg-(--color-text-muted)',
+                    form.form.enabled ? 'bg-emerald-500' : 'bg-(--color-text-muted)',
                   ].join(' ')}
                 />
-                {enabled ? copy('active') : copy('disabled')}
+                {form.form.enabled ? copy('active') : copy('disabled')}
               </span>
             ) : null}
           </span>
@@ -222,11 +150,11 @@ export function PromotionDialog({
           <span className="mt-3 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1">
             <button
               type="button"
-              aria-pressed={step === 'INFORMATION'}
-              onClick={() => setStep('INFORMATION')}
+              aria-pressed={editor.ui.step === 'INFORMATION'}
+              onClick={() => editor.actions.setStep('INFORMATION')}
               className={[
                 'flex min-h-9 items-center justify-center gap-2 rounded-lg px-3 text-xs font-semibold transition-all',
-                step === 'INFORMATION'
+                editor.ui.step === 'INFORMATION'
                   ? 'border border-slate-200 bg-white text-(--color-brand) shadow-sm'
                   : 'text-slate-600 hover:text-slate-900',
               ].join(' ')}
@@ -236,11 +164,11 @@ export function PromotionDialog({
             </button>
             <button
               type="button"
-              aria-pressed={step === 'TARGET'}
-              onClick={() => setStep('TARGET')}
+              aria-pressed={editor.ui.step === 'TARGET'}
+              onClick={() => editor.actions.setStep('TARGET')}
               className={[
                 'flex min-h-9 items-center justify-center gap-2 rounded-lg px-3 text-xs font-semibold transition-all',
-                step === 'TARGET'
+                editor.ui.step === 'TARGET'
                   ? 'border border-slate-200 bg-white text-(--color-brand) shadow-sm'
                   : 'text-slate-600 hover:text-slate-900',
               ].join(' ')}
@@ -250,7 +178,7 @@ export function PromotionDialog({
               <span
                 className={[
                   'rounded-full px-1.5 py-0.5 text-[9px] font-semibold',
-                  step === 'TARGET' ? 'bg-blue-50 text-(--color-brand)' : 'text-slate-400',
+                  editor.ui.step === 'TARGET' ? 'bg-blue-50 text-(--color-brand)' : 'text-slate-400',
                 ].join(' ')}
               >
                 {targetStepSummary}
@@ -291,8 +219,8 @@ export function PromotionDialog({
               size="sm"
               leftIcon={<Check className="size-3.5" />}
               onClick={() => void save()}
-              disabled={!valid || saving}
-              loading={saving}
+              disabled={!valid || editor.ui.saving}
+              loading={editor.ui.saving}
             >
               {promotion ? copy('saveChanges') : copy('savePromotion')}
             </DButton>
@@ -301,7 +229,7 @@ export function PromotionDialog({
       }
     >
       <div className="mx-auto w-full max-w-135 space-y-5">
-        {step === 'INFORMATION' ? (
+        {editor.ui.step === 'INFORMATION' ? (
           <div className="space-y-4">
             <section>
               <div className="mb-3 flex items-center justify-between gap-3 border-b border-slate-100 pb-2">
@@ -322,8 +250,8 @@ export function PromotionDialog({
                     size="sm"
                     clearable={false}
                     label={copy('name') + ' *'}
-                    value={name}
-                    onChange={(value) => setField('name', value)}
+                    value={form.name}
+                    onChange={(value) => editor.setField('name', value)}
                     placeholder={copy('namePlaceholder')}
                   />
                 </div>
@@ -331,7 +259,7 @@ export function PromotionDialog({
                 <DSelect
                   size="sm"
                   label={copy('mode')}
-                  value={mode}
+                  value={form.mode}
                   clearable={false}
                   options={[
                     { value: 'AUTOMATIC', label: copy('automatic') },
@@ -344,13 +272,13 @@ export function PromotionDialog({
                   size="sm"
                   clearable={false}
                   label={copy('codeLabel')}
-                  value={code}
-                  readOnly={mode === 'AUTOMATIC'}
+                  value={form.code}
+                  readOnly={form.mode === 'AUTOMATIC'}
                   className={
-                    mode === 'AUTOMATIC' ? 'read-only:bg-white read-only:text-slate-400' : undefined
+                    form.mode === 'AUTOMATIC' ? 'read-only:bg-white read-only:text-slate-400' : undefined
                   }
-                  onChange={(value) => setField('code', value.toUpperCase())}
-                  placeholder={mode === 'AUTOMATIC' ? copy('automaticCodeHint') : 'SEP10'}
+                  onChange={(value) => editor.setField('code', value.toUpperCase())}
+                  placeholder={form.mode === 'AUTOMATIC' ? copy('automaticCodeHint') : 'SEP10'}
                 />
 
                 <div className="sm:col-span-2 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/40 px-3.5 py-3">
@@ -360,7 +288,7 @@ export function PromotionDialog({
                       {copy('operationalStatusHint')}
                     </p>
                   </div>
-                  <DToggle checked={enabled} onChange={(value) => setField('enabled', value)} ariaLabel={copy('enabled')} />
+                  <DToggle checked={form.enabled} onChange={(value) => editor.setField('enabled', value)} ariaLabel={copy('enabled')} />
                 </div>
               </div>
             </section>
@@ -378,11 +306,11 @@ export function PromotionDialog({
               <div className="grid gap-2 sm:grid-cols-2">
                 <button
                   type="button"
-                  aria-pressed={discountType === 'PERCENTAGE'}
+                  aria-pressed={form.discountType === 'PERCENTAGE'}
                   onClick={() => editor.actions.changeDiscountType('PERCENTAGE')}
                   className={[
                     'min-h-18 rounded-xl border px-3 py-2.5 text-left transition-all',
-                    discountType === 'PERCENTAGE'
+                    form.discountType === 'PERCENTAGE'
                       ? 'border-2 border-(--color-brand) bg-blue-50/30'
                       : 'border-(--color-border) bg-(--color-surface) hover:border-(--color-brand)/35',
                   ].join(' ')}
@@ -391,12 +319,12 @@ export function PromotionDialog({
                     <span
                       className={[
                         'mt-0.5 grid size-4 shrink-0 place-items-center rounded-full border',
-                        discountType === 'PERCENTAGE'
+                        form.discountType === 'PERCENTAGE'
                           ? 'border-(--color-brand) bg-(--color-brand) text-white'
                           : 'border-(--color-border)',
                       ].join(' ')}
                     >
-                      {discountType === 'PERCENTAGE' ? <Check className="size-2.5" /> : null}
+                      {form.discountType === 'PERCENTAGE' ? <Check className="size-2.5" /> : null}
                     </span>
                     <span>
                       <span className="block text-xs font-semibold">{copy('percentageCard')}</span>
@@ -409,11 +337,11 @@ export function PromotionDialog({
 
                 <button
                   type="button"
-                  aria-pressed={discountType === 'FIXED_AMOUNT'}
+                  aria-pressed={form.discountType === 'FIXED_AMOUNT'}
                   onClick={() => editor.actions.changeDiscountType('FIXED_AMOUNT')}
                   className={[
                     'min-h-18 rounded-xl border px-3 py-2.5 text-left transition-all',
-                    discountType === 'FIXED_AMOUNT'
+                    form.discountType === 'FIXED_AMOUNT'
                       ? 'border-2 border-(--color-brand) bg-blue-50/30'
                       : 'border-(--color-border) bg-(--color-surface) hover:border-(--color-brand)/35',
                   ].join(' ')}
@@ -422,12 +350,12 @@ export function PromotionDialog({
                     <span
                       className={[
                         'mt-0.5 grid size-4 shrink-0 place-items-center rounded-full border',
-                        discountType === 'FIXED_AMOUNT'
+                        form.discountType === 'FIXED_AMOUNT'
                           ? 'border-(--color-brand) bg-(--color-brand) text-white'
                           : 'border-(--color-border)',
                       ].join(' ')}
                     >
-                      {discountType === 'FIXED_AMOUNT' ? <Check className="size-2.5" /> : null}
+                      {form.discountType === 'FIXED_AMOUNT' ? <Check className="size-2.5" /> : null}
                     </span>
                     <span>
                       <span className="block text-xs font-semibold">{copy('fixedCard')}</span>
@@ -446,13 +374,13 @@ export function PromotionDialog({
                     clearable={false}
                     label={copy('value') + ' *'}
                     inputMode="decimal"
-                    value={discountValue}
-                    prefix={discountType === 'FIXED_AMOUNT' ? 'Rp' : undefined}
-                    suffix={discountType === 'PERCENTAGE' ? '%' : undefined}
-                    onChange={(value) => setField('discountValue', value)}
+                    value={form.discountValue}
+                    prefix={form.discountType === 'FIXED_AMOUNT' ? 'Rp' : undefined}
+                    suffix={form.discountType === 'PERCENTAGE' ? '%' : undefined}
+                    onChange={(value) => editor.setField('discountValue', value)}
                   />
                   <p className="mt-1 text-[10px] text-(--color-text-muted)">
-                    {copy(discountType === 'PERCENTAGE' ? 'percentageHint' : 'fixedHint')}
+                    {copy(form.discountType === 'PERCENTAGE' ? 'percentageHint' : 'fixedHint')}
                   </p>
                 </div>
 
@@ -465,7 +393,7 @@ export function PromotionDialog({
                     className="flex h-8 min-w-0 items-center justify-between gap-2 rounded-(--radius-control) border border-slate-200 bg-slate-100/80 px-3"
                   >
                     <span className="truncate text-xs font-semibold text-slate-700">
-                      {currency === 'IDR' ? 'IDR (Rupiah)' : currency}
+                      {form.currency === 'IDR' ? 'IDR (Rupiah)' : form.currency}
                     </span>
                     <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-slate-200/70 px-1.5 py-0.5 text-[9px] font-semibold text-slate-500">
                       <LockKeyhole className="size-2.5" />
@@ -474,7 +402,7 @@ export function PromotionDialog({
                   </div>
                 </div>
 
-                {discountType === 'PERCENTAGE' ? (
+                {form.discountType === 'PERCENTAGE' ? (
                   <DInput
                     size="sm"
                     clearable={false}
@@ -488,9 +416,9 @@ export function PromotionDialog({
                       </span>
                     }
                     inputMode="decimal"
-                    value={maximumDiscount}
+                    value={form.maximumDiscount}
                     placeholder={copy('maximumPlaceholder')}
-                    onChange={(value) => setField('maximumDiscount', value)}
+                    onChange={(value) => editor.setField('maximumDiscount', value)}
                   />
                 ) : (
                   <div />
@@ -509,25 +437,25 @@ export function PromotionDialog({
                     </span>
                   }
                   inputMode="decimal"
-                  value={minimumPurchase}
+                  value={form.minimumPurchase}
                   placeholder={copy('minimumPlaceholder')}
-                  onChange={(value) => setField('minimumPurchase', value)}
+                  onChange={(value) => editor.setField('minimumPurchase', value)}
                 />
 
                 <DDatePicker
                   label={copy('effectiveFrom') + ' (' + copy('optional') + ')'}
                   variant="date-time"
-                  value={effectiveFrom}
-                  onChange={(value) => setField('effectiveFrom', value == null ? '' : String(value))}
-                  onClear={() => setField('effectiveFrom', '')}
+                  value={form.effectiveFrom}
+                  onChange={(value) => editor.setField('effectiveFrom', value == null ? '' : String(value))}
+                  onClear={() => editor.setField('effectiveFrom', '')}
                   clearable
                 />
                 <DDatePicker
                   label={copy('effectiveUntil') + ' (' + copy('optional') + ')'}
                   variant="date-time"
-                  value={effectiveUntil}
-                  onChange={(value) => setField('effectiveUntil', value == null ? '' : String(value))}
-                  onClear={() => setField('effectiveUntil', '')}
+                  value={form.effectiveUntil}
+                  onChange={(value) => editor.setField('effectiveUntil', value == null ? '' : String(value))}
+                  onClear={() => editor.setField('effectiveUntil', '')}
                   clearable
                   error={periodValid ? undefined : copy('invalid')}
                 />
@@ -556,13 +484,13 @@ export function PromotionDialog({
                     hint: copy('perItemVariantHint'),
                   },
                 ].map((option) => {
-                  const active = scope === option.value;
+                  const active = form.scope === option.value;
                   return (
                     <button
                       key={option.value}
                       type="button"
                       aria-pressed={active}
-                      onClick={() => changeScope(option.value)}
+                      onClick={() => editor.actions.changeScope(option.value)}
                       className={[
                         'flex min-h-17 flex-col items-center justify-center rounded-xl border px-3 py-2.5 text-center transition-all',
                         active
@@ -585,7 +513,7 @@ export function PromotionDialog({
               </div>
             </section>
 
-            {scope === 'ITEM' ? (
+            {form.scope === 'ITEM' ? (
               <section>
                 <div className="mb-2">
                   <h3 className="text-xs font-semibold">
@@ -603,10 +531,10 @@ export function PromotionDialog({
                   items={visibleItemTargets}
                   searchItems={options.items}
                   variants={options.variants}
-                  itemIds={itemIds}
-                  variantIds={variantIds}
-                  onItemsChange={(ids) => setField('itemIds', ids)}
-                  onVariantsChange={(ids) => setField('variantIds', ids)}
+                  itemIds={form.itemIds}
+                  variantIds={form.variantIds}
+                  onItemsChange={(ids) => editor.setField('itemIds', ids)}
+                  onVariantsChange={(ids) => editor.setField('variantIds', ids)}
                   emptyLabel={copy('noOptions')}
                   specificLabel={copy('specificVariants')}
                   includedLabel={copy('includedViaParent')}
@@ -620,38 +548,38 @@ export function PromotionDialog({
               </section>
             ) : null}
 
-            {scope === 'CATEGORY' ? (
+            {form.scope === 'CATEGORY' ? (
               <section className="space-y-3">
                 <TargetSelector
                   label={copy('targets')}
                   options={options.categories}
-                  selected={categoryIds}
-                  onChange={changeCategories}
+                  selected={form.categoryIds}
+                  onChange={(ids) => editor.actions.changeCategories(ids, options.items)}
                   emptyLabel={copy('noOptions')}
                 />
 
                 <div className="flex items-center justify-between rounded-(--radius-control) border border-(--color-border) bg-(--color-surface) px-3 py-2.5">
                   <span className="text-xs font-medium">{copy('selectedCategoriesAllItems')}</span>
                   <DToggle
-                    checked={categoryItemScope === 'ALL'}
-                    onChange={(checked) => changeCategoryItemScope(checked ? 'ALL' : 'SELECTED')}
+                    checked={form.categoryItemScope === 'ALL'}
+                    onChange={(checked) => editor.actions.changeCategoryItemScope(checked ? 'ALL' : 'SELECTED')}
                     ariaLabel={copy('selectedCategoriesAllItems')}
                   />
                 </div>
 
-                {categoryItemScope === 'SELECTED' ? (
+                {form.categoryItemScope === 'SELECTED' ? (
                   <TargetSelector
                     label={copy('selectCategoryItems')}
                     options={categoryItemOptions}
-                    selected={itemIds}
-                    onChange={(ids) => setField('itemIds', ids)}
+                    selected={form.itemIds}
+                    onChange={(ids) => editor.setField('itemIds', ids)}
                     emptyLabel={copy('noCategoryItems')}
                   />
                 ) : null}
               </section>
             ) : null}
 
-            {scope === 'TRANSACTION' ? (
+            {form.scope === 'TRANSACTION' ? (
               <div className="rounded-(--radius-control) border border-dashed border-(--color-border) bg-(--color-surface-muted)/55 px-4 py-5 text-center">
                 <p className="text-sm font-semibold">{copy('allTransactions')}</p>
                 <p className="mt-1 text-xs text-(--color-text-muted)">
@@ -664,13 +592,13 @@ export function PromotionDialog({
               label={
                 copy('locations') +
                 ' · ' +
-                (locationIds.length
-                  ? String(locationIds.length) + ' ' + copy('selected')
+                (form.locationIds.length
+                  ? String(form.locationIds.length) + ' ' + copy('selected')
                   : copy('allLocations'))
               }
               options={options.locations}
-              selected={locationIds}
-              onChange={(ids) => setField('locationIds', ids)}
+              selected={form.locationIds}
+              onChange={(ids) => editor.setField('locationIds', ids)}
               emptyLabel={copy('noOptions')}
             />
           </div>
