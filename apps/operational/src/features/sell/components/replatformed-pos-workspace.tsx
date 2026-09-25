@@ -75,7 +75,7 @@ import {
   createCashierTransactionAdapter,
   isLocalCashierDemoEnabled,
 } from '../cashier-transaction-adapter-factory';
-import { hasStartableQueuedWork } from '../queued-sale-work';
+import { hasStartableQueuedWork, saleLineWorkStatus } from '../queued-sale-work';
 import {
   appliedPaymentComposition,
   employeeDisplayName,
@@ -111,6 +111,7 @@ import {
   currencyInputFromAmount,
   normalizeCurrencyPaymentInput,
   PosCurrencyInput,
+  PosNumericInput,
 } from './pos-controls';
 import {
   SaleDetailSection,
@@ -520,16 +521,21 @@ function isPositiveDecimal(value: string) {
   }
 }
 
-function employeeAssignmentIssues(line: SaleLine, locale: string): string[] {
+function employeeAssignmentIssues(
+  line: SaleLine,
+  locale: string,
+  // A corrected replacement is staffed on its retired historical source line.
+  workLine: SaleLine = line,
+): string[] {
   const issues: string[] = [];
   if (
     line.employeeAssignmentModeSnapshot === 'REQUIRED' &&
-    !line.participations.some((participation) => participation.assigned)
+    !workLine.participations.some((participation) => participation.assigned)
   ) {
     issues.push(`${line.itemNameSnapshot}: ${copyFor('Select an employee.', locale)}`);
   }
   if (line.allowEmployeeContributionSnapshot) {
-    const shares = line.participations.filter(
+    const shares = workLine.participations.filter(
       (participation) => participation.assigned && participation.shareRate !== null,
     );
     const total = shares.reduce(
@@ -571,15 +577,19 @@ function workflowIssues(sale: Sale, locale: string) {
       line.itemTypeSnapshot === 'SERVICE' && line.fulfillmentBehaviorSnapshot === 'TRACKED';
     if (!requiresTrackedServiceAssignment) continue;
 
-    const plannedUnits = line.workUnits?.length ?? 0;
-    if (plannedUnits > 0 && plannedUnits !== serviceWorkUnitCount(line)) {
+    const workLine =
+      (line.workLineage
+        ? sale.lines.find((candidate) => candidate.id === line.workLineage!.sourceLineId)
+        : null) ?? line;
+    const plannedUnits = workLine.workUnits?.length ?? 0;
+    if (plannedUnits > 0 && plannedUnits !== serviceWorkUnitCount(workLine)) {
       issues.push(
         `${line.itemNameSnapshot}: ${copyFor('Every work unit needs at least one employee.', locale)}`,
       );
       continue;
     }
 
-    issues.push(...employeeAssignmentIssues(line, locale));
+    issues.push(...employeeAssignmentIssues(line, locale, workLine));
   }
   return issues;
 }
@@ -4372,14 +4382,17 @@ export function ReferenceTransactionDetail({
                               : null
                           }
                           context={
-                            line.fulfillment || durationLabel ? (
+                            saleLineWorkStatus(line) || durationLabel ? (
                               <>
-                                {line.fulfillment ? (
+                                {saleLineWorkStatus(line) ? (
                                   <StatusPill
-                                    tone={fulfillmentTone[line.fulfillment.status] ?? 'neutral'}
+                                    tone={fulfillmentTone[saleLineWorkStatus(line)!] ?? 'neutral'}
                                   >
-                                    {label(line.fulfillment.status)}
+                                    {label(saleLineWorkStatus(line)!)}
                                   </StatusPill>
+                                ) : null}
+                                {line.workLineage ? (
+                                  <span>Pekerjaan tercatat pada {line.workLineage.sourceItemName}</span>
                                 ) : null}
                                 {durationLabel ? <span>{durationLabel}</span> : null}
                               </>
@@ -4888,12 +4901,25 @@ export function ReferenceOrderAdjustmentDialog({
   const [replacementVariantId, setReplacementVariantId] = useState('');
   const [replacementQuantity, setReplacementQuantity] = useState('1');
   const [correctionReason, setCorrectionReason] = useState('');
+  const [replacementSearch, setReplacementSearch] = useState('');
+  // The Sale returned by the persisted correction/compensation is the settlement authority.
+  const [appliedSale, setAppliedSale] = useState<Sale | null>(null);
+  const [correctionSaved, setCorrectionSaved] = useState(false);
+  const [correctionError, setCorrectionError] = useState(false);
+  const [compensationState, setCompensationState] = useState<'IDLE' | 'LOADING' | 'ERROR'>('IDLE');
   const [correctionPreview, setCorrectionPreview] = useState<Awaited<ReturnType<typeof onPreview>> | null>(null);
   const [previewState, setPreviewState] = useState<'IDLE' | 'LOADING' | 'ERROR'>('IDLE');
   const [progressedCorrectionNotice, setProgressedCorrectionNotice] = useState<string | null>(null);
+  const previewRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    // Keep the authoritative result in view; it renders below the form.
+    if (correctionPreview) previewRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+  }, [correctionPreview]);
   const replacementItem = items.find((item) => item.id === replacementItemId) ?? null;
   const replacementVariants = replacementItem?.variants ?? [];
-  const variantRequired = replacementItem?.variantSelectionMode === 'REQUIRED';
+  // Only demand a variant when the item actually offers variants to choose from.
+  const variantRequired =
+    replacementItem?.variantSelectionMode === 'REQUIRED' && replacementVariants.length > 0;
   const selectedVariantId =
     variantSelection && variantSelection.itemId === variantPicker?.item.id
       ? variantSelection.variantId
@@ -4938,6 +4964,79 @@ export function ReferenceOrderAdjustmentDialog({
       value: item.id,
       label: `${item.name} (${item.code})`,
     }));
+  const correctionSource = correctionLine;
+  const correctionProgressed =
+    correctionSource != null &&
+    saleLineWorkStatus(correctionSource) !== null &&
+    saleLineWorkStatus(correctionSource) !== 'WAITING';
+  // The selected item stays in the option list so its label remains visible while searching.
+  const replacementOptions = (() => {
+    const query = replacementSearch.trim().toLocaleLowerCase();
+    const matches = items.filter(
+      (item) =>
+        item.id === replacementItemId ||
+        !query ||
+        `${item.name} ${item.code}`.toLocaleLowerCase().includes(query),
+    );
+    return matches.slice(0, 20).map((item) => ({ value: item.id, label: `${item.name} (${item.code})` }));
+  })();
+  const correctionInput = () => ({
+    catalogItemId: replacementItemId,
+    ...(replacementVariantId ? { catalogVariantId: replacementVariantId } : {}),
+    quantity: replacementQuantity,
+  });
+  const correctionReady =
+    Boolean(replacementItemId) &&
+    isPositiveDecimal(replacementQuantity) &&
+    !(variantRequired && !replacementVariantId);
+  const previewCorrection = () => {
+    if (!correctionSource) return;
+    setPreviewState('LOADING');
+    void onPreview(correctionSource, correctionInput())
+      .then((value) => {
+        setCorrectionPreview(value);
+        setPreviewState('IDLE');
+      })
+      .catch(() => setPreviewState('ERROR'));
+  };
+  const asSale = (value: unknown): Sale | null =>
+    typeof value === 'object' && value !== null && 'payments' in value && 'totalAmount' in value
+      ? (value as Sale)
+      : null;
+  const confirmCorrection = () => {
+    if (!correctionSource) return;
+    setCorrectionError(false);
+    // Keep the flow open: whether money must now be returned depends on the persisted Sale.
+    void onCorrect(correctionSource, { ...correctionInput(), reason: correctionReason.trim() })
+      .then((updated) => {
+        setAppliedSale(asSale(updated));
+        setCorrectionSaved(true);
+      })
+      .catch(() => setCorrectionError(true));
+  };
+  const authoritativeSale = appliedSale ?? sale;
+  const authoritativeSettlement = saleSettlement(authoritativeSale);
+  const settledPaid = createDecimal(authoritativeSettlement.totalPaid);
+  const settledTotal = createDecimal(authoritativeSale.totalAmount);
+  const settledOverpayment = settledPaid.greaterThan(settledTotal) ? settledPaid.minus(settledTotal) : createDecimal('0');
+  const settledBalance = settledTotal.greaterThan(settledPaid) ? settledTotal.minus(settledPaid) : createDecimal('0');
+  const settlementCashPayment = authoritativeSale.payments.find((item) => item.status === 'SUCCEEDED' && item.method === 'CASH' && createDecimal(item.appliedAmount).greaterThan(0));
+  const settlementProviderPayment = authoritativeSale.payments.find((item) => item.status === 'SUCCEEDED' && item.method !== 'CASH' && createDecimal(item.appliedAmount).greaterThan(0));
+  const compensateOverpayment = (paymentId: string) => {
+    setCompensationState('LOADING');
+    void onCompensate(authoritativeSale, paymentId, settledOverpayment.toFixed(4))
+      .then((updated) => {
+        setAppliedSale(asSale(updated) ?? appliedSale);
+        setCompensationState('IDLE');
+      })
+      .catch(() => setCompensationState('ERROR'));
+  };
+  const figure = (label: string, value: string, className = '') => (
+    <div className={`flex items-baseline justify-between gap-3 ${className}`}>
+      <dt>{label}</dt>
+      <dd className="tabular-nums">{money(value, locale)}</dd>
+    </div>
+  );
   const stepperClass =
     'flex size-8 items-center justify-center rounded-lg border border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] disabled:cursor-not-allowed disabled:opacity-40';
 
@@ -4983,7 +5082,7 @@ export function ReferenceOrderAdjustmentDialog({
         </p>
         <ul className="divide-y divide-[var(--color-border)] rounded-xl border border-[var(--color-border)]">
           {activeLines.map((line) => {
-            const lineMutable = !line.fulfillment || line.fulfillment.status === 'WAITING';
+            const lineMutable = !saleLineWorkStatus(line) || saleLineWorkStatus(line) === 'WAITING';
             const progressed = !lineMutable;
             const canDecrease =
               lineMutable && createDecimal(line.quantity).greaterThan(createDecimal('1'));
@@ -5073,7 +5172,12 @@ export function ReferenceOrderAdjustmentDialog({
                         setCorrectionLine(line);
                         setReplacementItemId(line.catalogItemId);
                         setReplacementVariantId(line.catalogVariantId ?? '');
-                        setReplacementQuantity(line.quantity);
+                        setReplacementQuantity(quantity(line.quantity));
+                        setReplacementSearch('');
+                        setAppliedSale(null);
+                        setCorrectionSaved(false);
+                        setCorrectionError(false);
+                        setCompensationState('IDLE');
                         setCorrectionReason('');
                         setCorrectionPreview(null);
                         setPreviewState('IDLE');
@@ -5195,24 +5299,201 @@ export function ReferenceOrderAdjustmentDialog({
       </div>
     </Dialog>
     {correctionLine ? (
-      <Dialog open onClose={() => setCorrectionLine(null)} title="Koreksi item" ariaLabel="Koreksi item">
-        <div className="space-y-3">
-          <p className="text-sm"><span className="text-[var(--color-text-muted)]">Item saat ini</span><br /><strong>{correctionLine.itemNameSnapshot}</strong></p>
-          {correctionLine.fulfillment && correctionLine.fulfillment.status !== 'WAITING' ? (
-            <DAlert variant="warning">
-              Pengerjaan item ini sudah dimulai. Riwayat pengerjaan tetap disimpan setelah koreksi.
-            </DAlert>
-          ) : null}
-          <Select label="Item pengganti" value={replacementItemId} options={items.map((item) => ({ value: item.id, label: item.name }))} onChange={(value) => { setReplacementItemId(String(value)); setReplacementVariantId(''); setCorrectionPreview(null); }} />
-          {replacementVariants.length ? <Select label="Varian" value={replacementVariantId} placeholder={variantRequired ? 'Pilih varian' : 'Tanpa varian'} options={[...(variantRequired ? [] : [{ value: '', label: 'Tanpa varian' }]), ...replacementVariants.map((variant) => ({ value: variant.id, label: variant.name }))]} onChange={(value) => { setReplacementVariantId(String(value)); setCorrectionPreview(null); }} /> : null}
-          <DInput label="Jumlah" value={replacementQuantity} onChange={(value) => { setReplacementQuantity(value); setCorrectionPreview(null); }} />
-          <DInput label="Alasan koreksi" value={correctionReason} onChange={setCorrectionReason} />
-          <Button disabled={!replacementItemId || !replacementQuantity || (variantRequired && !replacementVariantId) || previewState === 'LOADING'} onClick={() => { setPreviewState('LOADING'); void onPreview(correctionLine, { catalogItemId: replacementItemId, ...(replacementVariantId ? { catalogVariantId: replacementVariantId } : {}), quantity: replacementQuantity }).then((value) => { setCorrectionPreview(value); setPreviewState('IDLE'); }).catch(() => setPreviewState('ERROR')); }}>Lihat dampak</Button>
-          {previewState === 'LOADING' ? <p className="text-sm">Menghitung koreksi…</p> : null}
-          {previewState === 'ERROR' ? <DAlert variant="danger">Koreksi tidak dapat dipratinjau. Muat ulang transaksi lalu coba lagi.</DAlert> : null}
-          {correctionPreview ? <section className="space-y-1 rounded-xl bg-[var(--color-surface-muted)] p-3 text-sm"><p>Total sebelumnya <strong className="float-right">{money(correctionPreview.currentTotalAmount, locale)}</strong></p><p>Total setelah koreksi <strong className="float-right">{money(correctionPreview.correctedTotalAmount, locale)}</strong></p><p>Sudah dibayar <strong className="float-right">{money(correctionPreview.netSuccessfulPaidAmount, locale)}</strong></p>{correctionPreview.overpaymentAmount !== '0.0000' ? <><p className="font-semibold text-[var(--color-danger)]">Kelebihan pembayaran <strong className="float-right">{money(correctionPreview.overpaymentAmount, locale)}</strong></p><p className="text-xs">Transaksi belum dapat diselesaikan sampai kelebihan pembayaran dikembalikan.</p>{(() => { const cashPayment = sale.payments.find((item) => item.status === 'SUCCEEDED' && item.method === 'CASH' && createDecimal(item.appliedAmount).greaterThan(0)); const providerPayment = sale.payments.find((item) => item.status === 'SUCCEEDED' && item.method !== 'CASH' && createDecimal(item.appliedAmount).greaterThan(0)); return cashPayment ? canRefundPayment ? <Button size="sm" disabled={isMutating} onClick={() => void onCompensate(sale, cashPayment.id, correctionPreview.overpaymentAmount)}>Kembalikan kelebihan pembayaran</Button> : <p className="text-xs">Pengembalian dana memerlukan pengguna dengan izin pengembalian pembayaran.</p> : providerPayment ? <p className="text-xs">Pengembalian pembayaran ini memerlukan konfirmasi dari penyedia pembayaran.</p> : null; })()}</> : <p className="font-semibold">Sisa pembayaran <strong className="float-right">{money(correctionPreview.remainingPaymentAmount, locale)}</strong></p>}</section> : null}
-          <Button disabled={!correctionPreview || !correctionReason.trim() || isMutating} onClick={() => void onCorrect(correctionLine, { catalogItemId: replacementItemId, ...(replacementVariantId ? { catalogVariantId: replacementVariantId } : {}), quantity: replacementQuantity, reason: correctionReason }).then(() => setCorrectionLine(null))}>Konfirmasi koreksi</Button>
-        </div>
+      <Dialog
+        open
+        onClose={() => setCorrectionLine(null)}
+        title="Koreksi item"
+        description={transactionNumber(sale, locale)}
+        ariaLabel="Koreksi item"
+        closeOnOverlay={false}
+        className="pos-reference-dialog w-full max-w-lg overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
+        footer={
+          correctionSaved ? (
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button onClick={() => setCorrectionLine(null)}>Selesai</Button>
+            </div>
+          ) : (
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
+              <Button variant="ghost" className="sm:mr-auto" onClick={() => setCorrectionLine(null)}>
+                Kembali
+              </Button>
+              <Button
+                variant="outline"
+                disabled={!correctionReady || isMutating}
+                loading={previewState === 'LOADING'}
+                onClick={previewCorrection}
+              >
+                Lihat dampak
+              </Button>
+              <Button
+                disabled={!correctionPreview || !correctionReason.trim() || isMutating}
+                loading={isMutating}
+                onClick={confirmCorrection}
+              >
+                Konfirmasi koreksi
+              </Button>
+            </div>
+          )
+        }
+      >
+        {correctionSaved ? (
+          <div className="space-y-4" aria-live="polite">
+            <DAlert variant="success">Koreksi tersimpan.</DAlert>
+            <section aria-label="Penyelesaian pembayaran" className="rounded-xl bg-[var(--color-surface-muted)] p-3 text-sm">
+              <dl className="space-y-1.5 text-[var(--color-text-muted)]">
+                {figure('Total transaksi', authoritativeSale.totalAmount, 'font-semibold text-[var(--color-text)]')}
+                {figure('Sudah dibayar', settledPaid.toFixed(4))}
+              </dl>
+              <div className="mt-2 space-y-1.5 border-t border-[var(--color-border)] pt-2">
+                {settledOverpayment.greaterThan(createDecimal('0')) ? (
+                  <>
+                    <dl>{figure('Kelebihan pembayaran', settledOverpayment.toFixed(4), 'font-semibold text-[var(--color-danger)]')}</dl>
+                    <p className="text-xs text-[var(--color-text-muted)]">
+                      Transaksi belum dapat diselesaikan sampai kelebihan pembayaran dikembalikan.
+                    </p>
+                    {settlementCashPayment ? (
+                      canRefundPayment ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          loading={compensationState === 'LOADING'}
+                          disabled={isMutating}
+                          onClick={() => compensateOverpayment(settlementCashPayment.id)}
+                        >
+                          Kembalikan kelebihan pembayaran
+                        </Button>
+                      ) : (
+                        <p className="text-xs text-[var(--color-text-muted)]">
+                          Pengembalian dana memerlukan pengguna dengan izin pengembalian pembayaran.
+                        </p>
+                      )
+                    ) : settlementProviderPayment ? (
+                      <p className="text-xs text-[var(--color-text-muted)]">
+                        Pengembalian pembayaran ini memerlukan konfirmasi dari penyedia pembayaran.
+                      </p>
+                    ) : null}
+                    {compensationState === 'ERROR' ? (
+                      <DAlert variant="danger">
+                        Pengembalian kelebihan pembayaran belum dapat diselesaikan. Muat ulang transaksi lalu coba lagi.
+                      </DAlert>
+                    ) : null}
+                  </>
+                ) : (
+                  settledBalance.greaterThan(createDecimal('0')) ? (
+                    <dl>{figure('Sisa pembayaran', settledBalance.toFixed(4), 'font-semibold text-[var(--color-text)]')}</dl>
+                  ) : (
+                    <p className="font-semibold text-[var(--color-text)]">Pembayaran sudah sesuai</p>
+                  )
+                )}
+              </div>
+            </section>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <div>
+                <p className="text-xs text-[var(--color-text-muted)]">Item saat ini</p>
+                <p className="text-sm font-semibold text-[var(--color-text)]">{correctionLine.itemNameSnapshot}</p>
+                <p className="text-xs tabular-nums text-[var(--color-text-muted)]">
+                  {quantity(correctionLine.quantity)} × {money(correctionLine.effectiveUnitPrice, locale)}
+                </p>
+              </div>
+              {correctionProgressed ? (
+                <DAlert variant="warning" className="text-xs">
+                  Pengerjaan item ini sudah dimulai. Riwayat pengerjaan tetap disimpan setelah koreksi.
+                </DAlert>
+              ) : null}
+            </div>
+            <div className="space-y-3 border-t border-[var(--color-border)] pt-4">
+              <Combobox
+                label="Item pengganti"
+                ariaLabel="Item pengganti"
+                placeholder="Cari produk atau layanan"
+                idleMessage="Cari berdasarkan nama atau kode item."
+                value={replacementItemId || null}
+                options={replacementOptions}
+                clearable
+                onSearchChange={setReplacementSearch}
+                onChange={(value) => {
+                  setReplacementItemId(value === null ? '' : String(value));
+                  setReplacementVariantId('');
+                  setCorrectionPreview(null);
+                }}
+              />
+              <div className="grid gap-3 sm:grid-cols-2">
+                {replacementVariants.length ? (
+                  <Select
+                    label="Varian"
+                    value={replacementVariantId}
+                    placeholder={variantRequired ? 'Pilih varian' : 'Tanpa varian'}
+                    options={[
+                      ...(variantRequired ? [] : [{ value: '', label: 'Tanpa varian' }]),
+                      ...replacementVariants.map((variant) => ({ value: variant.id, label: variant.name })),
+                    ]}
+                    onChange={(value) => {
+                      setReplacementVariantId(String(value));
+                      setCorrectionPreview(null);
+                    }}
+                  />
+                ) : null}
+                <PosNumericInput
+                  label="Jumlah"
+                  value={replacementQuantity}
+                  onChange={(value) => {
+                    setReplacementQuantity(value);
+                    setCorrectionPreview(null);
+                  }}
+                />
+              </div>
+              <DTextarea
+                label="Alasan koreksi"
+                rows={3}
+                value={correctionReason}
+                placeholder="Contoh: Salah memilih layanan"
+                onChange={setCorrectionReason}
+              />
+            </div>
+            {previewState === 'ERROR' ? (
+              <DAlert variant="danger">
+                Koreksi tidak dapat dipratinjau. Muat ulang transaksi lalu coba lagi.
+              </DAlert>
+            ) : null}
+            {correctionError ? (
+              <DAlert variant="danger">
+                Koreksi belum dapat disimpan. Muat ulang transaksi lalu coba lagi.
+              </DAlert>
+            ) : null}
+            {correctionPreview ? (
+              <section
+                ref={previewRef}
+                aria-label="Dampak koreksi"
+                aria-live="polite"
+                className="rounded-xl bg-[var(--color-surface-muted)] p-3 text-sm"
+              >
+                <dl className="space-y-1.5 text-[var(--color-text-muted)]">
+                  {figure('Total sebelumnya', correctionPreview.currentTotalAmount)}
+                  {figure('Total setelah koreksi', correctionPreview.correctedTotalAmount, 'font-semibold text-[var(--color-text)]')}
+                  {figure('Sudah dibayar', correctionPreview.netSuccessfulPaidAmount)}
+                </dl>
+                <div className="mt-2 space-y-1.5 border-t border-[var(--color-border)] pt-2">
+                  {correctionPreview.overpaymentAmount !== '0.0000' ? (
+                    <>
+                      <dl>
+                        {figure('Kelebihan pembayaran', correctionPreview.overpaymentAmount, 'font-semibold text-[var(--color-danger)]')}
+                      </dl>
+                      {/* A preview is read-only: the refund is offered only once the correction is saved. */}
+                      <p className="text-xs text-[var(--color-text-muted)]">
+                        Setelah koreksi dikonfirmasi, {money(correctionPreview.overpaymentAmount, locale)} perlu dikembalikan kepada pelanggan sebelum transaksi dapat diselesaikan.
+                      </p>
+                    </>
+                  ) : (
+                    <dl>{figure('Sisa pembayaran', correctionPreview.remainingPaymentAmount, 'font-semibold text-[var(--color-text)]')}</dl>
+                  )}
+                </div>
+              </section>
+            ) : null}
+          </div>
+        )}
       </Dialog>
     ) : null}
     </>

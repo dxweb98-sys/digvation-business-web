@@ -6,6 +6,7 @@ import {
   resolveOperationalLocale,
 } from '../../app/localization/operational-localization';
 import type { Sale, SaleLine } from './cashier-transaction.types';
+import { saleLineWorkStatus } from './queued-sale-work';
 
 export type SaleWorkspacePrimaryMode =
   | 'EMPTY'
@@ -92,9 +93,9 @@ function sumPayments(sale: Sale | null, status: 'SUCCEEDED' | 'PENDING'): string
   return (total ?? createDecimal('0')).toFixed(4);
 }
 
-function hasValidContribution(line: SaleLine): boolean {
+function hasValidContribution(line: SaleLine, workLine: SaleLine = line): boolean {
   if (!line.allowEmployeeContributionSnapshot) return true;
-  const rates = line.participations.flatMap((participation) =>
+  const rates = workLine.participations.flatMap((participation) =>
     participation.shareRate === null ? [] : [createDecimal(participation.shareRate)],
   );
   if (rates.length === 0) return false;
@@ -126,9 +127,14 @@ function domainReadiness(sale: Sale | null, activeLines: SaleLine[], locale?: st
   }
 
   for (const line of activeLines) {
+    // A corrected replacement is staffed and worked on its retired historical source line.
+    const workLine =
+      (line.workLineage
+        ? sale.lines.find((candidate) => candidate.id === line.workLineage!.sourceLineId)
+        : null) ?? line;
     if (
       line.fulfillmentBehaviorSnapshot === 'TRACKED' &&
-      line.fulfillment?.status !== 'COMPLETED'
+      saleLineWorkStatus(line) !== 'COMPLETED'
     ) {
       blockers.push({
         code: 'FULFILLMENT_INCOMPLETE',
@@ -139,7 +145,7 @@ function domainReadiness(sale: Sale | null, activeLines: SaleLine[], locale?: st
 
     if (
       line.employeeAssignmentModeSnapshot === 'REQUIRED' &&
-      !line.participations.some((participation) => participation.assigned)
+      !workLine.participations.some((participation) => participation.assigned)
     ) {
       blockers.push({
         code: 'ASSIGNMENT_REQUIRED',
@@ -148,7 +154,7 @@ function domainReadiness(sale: Sale | null, activeLines: SaleLine[], locale?: st
       });
     }
 
-    if (!hasValidContribution(line)) {
+    if (!hasValidContribution(line, workLine)) {
       blockers.push({
         code: 'CONTRIBUTION_REQUIRED',
         saleLineId: line.id,

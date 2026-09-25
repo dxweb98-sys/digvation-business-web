@@ -1,4 +1,4 @@
-import type { Sale } from './cashier-transaction.types';
+import type { Sale, SaleLine } from './cashier-transaction.types';
 
 /**
  * Mirrors the Runtime start-work precondition from the authoritative Sale projection.
@@ -16,4 +16,11 @@ export function hasStartableQueuedWork(sale: Sale): boolean {
         line.fulfillment?.status === 'WAITING',
     )
   );
+}
+
+/** Work status that governs a line: its own fulfillment, or its historical source's for a corrected line. */
+export function saleLineWorkStatus(
+  line: Pick<SaleLine, 'fulfillment' | 'workLineage'>,
+): NonNullable<SaleLine['fulfillment']>['status'] | null {
+  return line.fulfillment?.status ?? line.workLineage?.status ?? null;
 }

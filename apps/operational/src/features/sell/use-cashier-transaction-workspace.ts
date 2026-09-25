@@ -641,15 +641,22 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
       const trackedLines = current.lines.filter(
         (line) => line.removedAt === null && line.fulfillmentBehaviorSnapshot === 'TRACKED',
       );
-      if (trackedLines.some((line) => line.fulfillment?.status === 'WAITING')) {
+      // A corrected replacement is worked on its retired historical source line; never a second record.
+      const workLines = trackedLines.map(
+        (line) =>
+          (line.workLineage
+            ? current.lines.find((candidate) => candidate.id === line.workLineage!.sourceLineId)
+            : null) ?? line,
+      );
+      if (workLines.some((line) => line.fulfillment?.status === 'WAITING')) {
         throw new Error(copy('Start all work before completing the transaction.'));
       }
       if (
-        trackedLines.some((line) => !line.fulfillment || line.fulfillment.status === 'CANCELED')
+        workLines.some((line) => !line.fulfillment || line.fulfillment.status === 'CANCELED')
       ) {
         throw new Error(copy('Canceled work cannot be completed as an active transaction.'));
       }
-      for (const trackedLine of trackedLines) {
+      for (const trackedLine of workLines) {
         const liveLine = current.lines.find((line) => line.id === trackedLine.id);
         if (liveLine?.fulfillment?.status !== 'IN_PROGRESS') continue;
         current = await command.runMutation(() =>
