@@ -43,26 +43,34 @@ function clampNumericText(value: string, min: string, max: string | undefined, i
   return normalized;
 }
 
-function canonicalIntegerCurrency(value: string): string | null {
+/**
+ * Converts a canonical Runtime decimal amount into the whole-IDR domain value
+ * used by the payment form. Runtime uses decimal strings (for example
+ * `105224.0000`); the currency control must never parse that as an Indonesian
+ * formatted display value.
+ */
+export function currencyInputFromAmount(value: string, fractionDigits = 0) {
   const trimmed = value.trim();
-  const match = /^(-?)(\d+)\.(\d+)$/.exec(trimmed);
-  if (!match) return null;
+  if (!trimmed) return '';
+  const match = /^(-?)(\d+)(?:\.(\d+))?$/.exec(trimmed);
+  if (!match) throw new Error('Amount must be a canonical decimal string.');
 
   const sign = match[1] ?? '';
   const whole = match[2] ?? '0';
   const fraction = match[3] ?? '';
-  if (!fraction || !/^0+$/.test(fraction)) return null;
+  if (fractionDigits === 0 && fraction && !/^0+$/.test(fraction)) {
+    throw new Error('Whole-currency payment amounts cannot contain fractional units.');
+  }
 
   const normalizedWhole = whole.replace(/^0+(?=\d)/, '') || '0';
-  return `${sign}${normalizedWhole}`;
+  return fractionDigits === 0 || !fraction
+    ? `${sign}${normalizedWhole}`
+    : `${sign}${normalizedWhole}.${fraction}`;
 }
 
-export function normalizeCurrencyPresentationInput(value: string, fractionDigits = 0) {
+/** Converts the CurrencyInput's parsed value into the payment command value. */
+export function normalizeCurrencyPaymentInput(value: string, fractionDigits = 0) {
   if (!value) return '';
-  if (fractionDigits === 0) {
-    const canonical = canonicalIntegerCurrency(value);
-    if (canonical !== null) return canonical;
-  }
   return normalizeDecimalInput(value, { integer: fractionDigits === 0 });
 }
 
@@ -133,13 +141,13 @@ export function PosCurrencyInput({
   onChange: (value: string) => void;
   fractionDigits?: number;
 }) {
-  const normalizedValue = normalizeCurrencyPresentationInput(value, fractionDigits);
+  const normalizedValue = normalizeCurrencyPaymentInput(value, fractionDigits);
   return (
     <DCurrencyInput
       {...props}
       value={normalizedValue}
       onValueChange={(nextValue) =>
-        onChange(normalizeCurrencyPresentationInput(nextValue, fractionDigits))
+        onChange(normalizeCurrencyPaymentInput(nextValue, fractionDigits))
       }
       className={`${className} tabular-nums`}
     />

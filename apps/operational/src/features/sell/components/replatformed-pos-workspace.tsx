@@ -107,7 +107,11 @@ import type {
 import type { CatalogItemTypeFilter } from '../use-selling-catalog';
 import type { useCashierTransactionWorkspace } from '../use-cashier-transaction-workspace';
 
-import { normalizeCurrencyPresentationInput, PosCurrencyInput } from './pos-controls';
+import {
+  currencyInputFromAmount,
+  normalizeCurrencyPaymentInput,
+  PosCurrencyInput,
+} from './pos-controls';
 import {
   SaleDetailSection,
   SaleFinancialSummary,
@@ -949,7 +953,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       checkoutSale && checkoutSale.payments.length
         ? paymentProgress(checkoutSale).remainingAmount
         : checkoutTotal;
-    const normalizedCheckoutTotal = normalizeCurrencyPresentationInput(openAmount);
+    const normalizedCheckoutTotal = currencyInputFromAmount(openAmount);
     setPaymentAmount(normalizedCheckoutTotal);
     setTender(normalizedCheckoutTotal);
     setPaymentError(null);
@@ -1174,7 +1178,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       );
       setQueueDetail(null);
       const latestPaymentRoutes = await workspace.refreshPaymentRoutes();
-      const normalizedAvailable = normalizeCurrencyPresentationInput(availableToPay);
+      const normalizedAvailable = currencyInputFromAmount(availableToPay);
       setPaymentMethod('CASH');
       setPaymentRouteId(
         latestPaymentRoutes.find((route) => route.paymentMethod === 'CASH')?.id ?? '',
@@ -1268,7 +1272,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const recordCheckoutPayment = (allocationOverride?: string) =>
     sendPaymentOnce(async () => {
       if (!sale || !lines.length) return;
-      const allocation = normalizeCurrencyPresentationInput(allocationOverride ?? paymentAmount);
+      const allocation = normalizeCurrencyPaymentInput(allocationOverride ?? paymentAmount);
       const progress = paymentProgress(sale);
       if (
         !isPositiveDecimal(allocation) ||
@@ -1277,7 +1281,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         return;
       const tendered =
         paymentMethod === 'CASH'
-          ? normalizeCurrencyPresentationInput(tender || allocation)
+          ? normalizeCurrencyPaymentInput(tender || allocation)
           : undefined;
       if (tendered && createDecimal(tendered).lessThan(createDecimal(allocation))) return;
       const selectedRoute =
@@ -1305,8 +1309,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       const next = paymentProgress(completedSale);
       if (!hasSuccessfulCheckout(completedSale)) {
         const waiting = completedSale.payments.some((payment) => payment.status === 'PENDING');
-        setPaymentAmount(normalizeCurrencyPresentationInput(next.remainingAmount));
-        setTender(normalizeCurrencyPresentationInput(next.remainingAmount));
+        setPaymentAmount(currencyInputFromAmount(next.remainingAmount));
+        setTender(currencyInputFromAmount(next.remainingAmount));
         setPaymentReference('');
         showToast({
           title: copy(waiting ? 'Payment waiting for confirmation' : 'Payment recorded'),
@@ -1336,8 +1340,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     sendPaymentOnce(async () => {
       const transaction = displayedQueuePaymentTarget;
       if (!transaction || !queuePaymentAmount) return;
-      const due = normalizeCurrencyPresentationInput(queuePaymentAmount);
-      const allocation = normalizeCurrencyPresentationInput(paymentAmount);
+      const due = currencyInputFromAmount(queuePaymentAmount);
+      const allocation = normalizeCurrencyPaymentInput(paymentAmount);
       if (
         !isPositiveDecimal(allocation) ||
         createDecimal(allocation).greaterThan(createDecimal(due))
@@ -1345,7 +1349,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         return;
       const tendered =
         paymentMethod === 'CASH'
-          ? normalizeCurrencyPresentationInput(tender || allocation)
+          ? normalizeCurrencyPaymentInput(tender || allocation)
           : undefined;
       if (tendered && createDecimal(tendered).lessThan(createDecimal(allocation))) return;
       const selectedRoute =
@@ -1370,8 +1374,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         const waiting = updatedSale.payments.some((payment) => payment.status === 'PENDING');
         setQueuePaymentTarget(updatedSale);
         setQueuePaymentAmount(next.remainingAmount);
-        setPaymentAmount(normalizeCurrencyPresentationInput(next.remainingAmount));
-        setTender(normalizeCurrencyPresentationInput(next.remainingAmount));
+        setPaymentAmount(currencyInputFromAmount(next.remainingAmount));
+        setTender(currencyInputFromAmount(next.remainingAmount));
         setPaymentReference('');
         if (settled) {
           setQueuePaymentTarget(null);
@@ -1400,8 +1404,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     try {
       const updatedSale = await workspace.transitionPayment(payment, status);
       const nextAllocation = paymentProgress(updatedSale);
-      setPaymentAmount(normalizeCurrencyPresentationInput(nextAllocation.remainingAmount));
-      setTender(normalizeCurrencyPresentationInput(nextAllocation.remainingAmount));
+      setPaymentAmount(currencyInputFromAmount(nextAllocation.remainingAmount));
+      setTender(currencyInputFromAmount(nextAllocation.remainingAmount));
       setPaymentReference('');
       if (hasSuccessfulCheckout(updatedSale)) {
         try {
@@ -1443,8 +1447,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       const nextAllocation = paymentProgress(updatedSale);
       setQueuePaymentTarget(updatedSale);
       setQueuePaymentAmount(nextAllocation.remainingAmount);
-      setPaymentAmount(normalizeCurrencyPresentationInput(nextAllocation.remainingAmount));
-      setTender(normalizeCurrencyPresentationInput(nextAllocation.remainingAmount));
+      setPaymentAmount(currencyInputFromAmount(nextAllocation.remainingAmount));
+      setTender(currencyInputFromAmount(nextAllocation.remainingAmount));
       setPaymentReference('');
       if (hasSuccessfulCheckout(updatedSale)) {
         setQueuePaymentTarget(null);
@@ -1838,6 +1842,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         onRemove={workspace.removeLine}
         onCorrect={(line, input) => workspace.correctLine(line, input)}
         onPreview={(line, input) => workspace.previewLineCorrection(line, input)}
+        canCorrectProgressedLine={session.access.permissions.includes('sales:correct-progressed-line')}
         canRefundPayment={session.access.permissions.includes('payments:refund')}
         onCompensate={(sale, paymentId, amount) => workspace.compensateOpenPayment(sale, paymentId, amount)}
       />
@@ -3046,7 +3051,7 @@ function DiscountInfoTooltip({ label, content }: { label: string; content: React
   );
 }
 
-function ReferencePaymentDialog({
+export function ReferencePaymentDialog({
   open,
   onClose,
   sale,
@@ -3222,8 +3227,8 @@ function ReferencePaymentDialog({
     : { paidAmount: '0.0000', pendingAmount: '0.0000', remainingAmount: total };
   const normalizedAllocation =
     allocationMode === 'FULL'
-      ? normalizeCurrencyPresentationInput(progress.remainingAmount)
-      : normalizeCurrencyPresentationInput(appliedAmount);
+      ? currencyInputFromAmount(progress.remainingAmount)
+      : normalizeCurrencyPaymentInput(appliedAmount);
   const intent = paymentIntent(
     { totalAmount: sale?.totalAmount ?? total, payments },
     normalizedAllocation,
@@ -3237,7 +3242,7 @@ function ReferencePaymentDialog({
   const hasRecordedMoney = payments.some(
     (payment) => payment.status === 'SUCCEEDED' || payment.status === 'PENDING',
   );
-  const normalizedTender = normalizeCurrencyPresentationInput(tender || normalizedAllocation);
+  const normalizedTender = normalizeCurrencyPaymentInput(tender || normalizedAllocation);
   const cashShort =
     isCash &&
     allocationPositive &&
@@ -3264,7 +3269,7 @@ function ReferencePaymentDialog({
     { value: 'WALLET', icon: <ShoppingBag className="size-[15px]" /> },
   ];
   const normalizedQuickTender = [normalizedAllocation, ...quickTender]
-    .map((amount) => normalizeCurrencyPresentationInput(amount))
+    .map((amount) => normalizeCurrencyPaymentInput(amount))
     .filter(isPositiveDecimal)
     .filter((amount, index, list) => list.indexOf(amount) === index)
     .slice(0, 6);
@@ -3689,7 +3694,7 @@ function ReferencePaymentDialog({
                           const next = value as PaymentAllocationMode;
                           setAllocationMode(next);
                           if (next === 'FULL') {
-                            const remaining = normalizeCurrencyPresentationInput(
+                            const remaining = currencyInputFromAmount(
                               progress.remainingAmount,
                             );
                             onAppliedAmount(remaining);
@@ -3745,7 +3750,7 @@ function ReferencePaymentDialog({
                                 intent={intent}
                                 format={format}
                                 onPayRemaining={() => {
-                                  const remaining = normalizeCurrencyPresentationInput(
+                                  const remaining = currencyInputFromAmount(
                                     progress.remainingAmount,
                                   );
                                   onAppliedAmount(remaining);
@@ -3997,7 +4002,7 @@ function ReferencePaymentDialog({
                                 key={amount}
                                 type="button"
                                 onClick={() => onTender(amount)}
-                                className={`h-8 rounded-md border px-1 text-[10px] font-semibold transition-colors ${normalizeCurrencyPresentationInput(tender) === amount ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-muted)]'}`}
+                                className={`h-8 rounded-md border px-1 text-[10px] font-semibold transition-colors ${normalizeCurrencyPaymentInput(tender) === amount ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-muted)]'}`}
                               >
                                 {format(amount)}
                               </button>
@@ -4829,7 +4834,7 @@ export function ReceiptContent({
 /** Select value for "the item itself"; it becomes no variant when added. */
 const ADJUSTMENT_ITEM_OPTION = 'item-option';
 
-function ReferenceOrderAdjustmentDialog({
+export function ReferenceOrderAdjustmentDialog({
   sale,
   items,
   locale,
@@ -4842,6 +4847,7 @@ function ReferenceOrderAdjustmentDialog({
   onRemove,
   onCorrect,
   onPreview,
+  canCorrectProgressedLine,
   canRefundPayment,
   onCompensate,
 }: {
@@ -4857,6 +4863,7 @@ function ReferenceOrderAdjustmentDialog({
   onRemove: (line: SaleLine) => void;
   onCorrect: (line: SaleLine, input: { catalogItemId: string; catalogVariantId?: string; quantity: string; reason: string }) => Promise<unknown>;
   onPreview: (line: SaleLine, input: { catalogItemId: string; catalogVariantId?: string; quantity: string }) => Promise<{ saleVersion: number; currentTotalAmount: string; correctedTotalAmount: string; netSuccessfulPaidAmount: string; remainingPaymentAmount: string; overpaymentAmount: string }>;
+  canCorrectProgressedLine: boolean;
   canRefundPayment: boolean;
   onCompensate: (sale: Sale, paymentId: string, amount: string) => Promise<unknown>;
 }) {
@@ -4883,6 +4890,7 @@ function ReferenceOrderAdjustmentDialog({
   const [correctionReason, setCorrectionReason] = useState('');
   const [correctionPreview, setCorrectionPreview] = useState<Awaited<ReturnType<typeof onPreview>> | null>(null);
   const [previewState, setPreviewState] = useState<'IDLE' | 'LOADING' | 'ERROR'>('IDLE');
+  const [progressedCorrectionNotice, setProgressedCorrectionNotice] = useState<string | null>(null);
   const replacementItem = items.find((item) => item.id === replacementItemId) ?? null;
   const replacementVariants = replacementItem?.variants ?? [];
   const variantRequired = replacementItem?.variantSelectionMode === 'REQUIRED';
@@ -4976,6 +4984,7 @@ function ReferenceOrderAdjustmentDialog({
         <ul className="divide-y divide-[var(--color-border)] rounded-xl border border-[var(--color-border)]">
           {activeLines.map((line) => {
             const lineMutable = !line.fulfillment || line.fulfillment.status === 'WAITING';
+            const progressed = !lineMutable;
             const canDecrease =
               lineMutable && createDecimal(line.quantity).greaterThan(createDecimal('1'));
             const before = baseline.get(line.id);
@@ -5050,27 +5059,39 @@ function ReferenceOrderAdjustmentDialog({
                   >
                     <Trash2 className="size-3.5" />
                   </button>
-                  <button
-                    type="button"
-                    disabled={!lineMutable || isMutating}
-                    onClick={() => {
-                      setCorrectionLine(line);
-                      setReplacementItemId(line.catalogItemId);
-                      setReplacementVariantId(line.catalogVariantId ?? '');
-                      setReplacementQuantity(line.quantity);
-                      setCorrectionReason('');
-                      setCorrectionPreview(null);
-                      setPreviewState('IDLE');
-                    }}
-                    className="ml-1 rounded-lg px-2 text-xs font-semibold text-[var(--color-brand)] hover:bg-[var(--color-brand)]/10 disabled:opacity-40"
-                  >
-                    Koreksi item
-                  </button>
+                  {sale.status === 'OPEN' ? (
+                    <button
+                      type="button"
+                      disabled={isMutating}
+                      onClick={() => {
+                        if (progressed && !canCorrectProgressedLine) {
+                          setProgressedCorrectionNotice(
+                            'Koreksi setelah pengerjaan dimulai memerlukan pengguna yang berwenang.',
+                          );
+                          return;
+                        }
+                        setCorrectionLine(line);
+                        setReplacementItemId(line.catalogItemId);
+                        setReplacementVariantId(line.catalogVariantId ?? '');
+                        setReplacementQuantity(line.quantity);
+                        setCorrectionReason('');
+                        setCorrectionPreview(null);
+                        setPreviewState('IDLE');
+                        setProgressedCorrectionNotice(null);
+                      }}
+                      className="ml-1 rounded-lg px-2 text-xs font-semibold text-[var(--color-brand)] hover:bg-[var(--color-brand)]/10 disabled:opacity-40"
+                    >
+                      Koreksi item
+                    </button>
+                  ) : null}
                 </div>
               </li>
             );
           })}
         </ul>
+        {progressedCorrectionNotice ? (
+          <DAlert variant="warning">{progressedCorrectionNotice}</DAlert>
+        ) : null}
         {removedCount ? (
           <p className="text-xs text-[var(--color-text-muted)]">
             {removedCount} {copy('items removed')}
@@ -5177,6 +5198,11 @@ function ReferenceOrderAdjustmentDialog({
       <Dialog open onClose={() => setCorrectionLine(null)} title="Koreksi item" ariaLabel="Koreksi item">
         <div className="space-y-3">
           <p className="text-sm"><span className="text-[var(--color-text-muted)]">Item saat ini</span><br /><strong>{correctionLine.itemNameSnapshot}</strong></p>
+          {correctionLine.fulfillment && correctionLine.fulfillment.status !== 'WAITING' ? (
+            <DAlert variant="warning">
+              Pengerjaan item ini sudah dimulai. Riwayat pengerjaan tetap disimpan setelah koreksi.
+            </DAlert>
+          ) : null}
           <Select label="Item pengganti" value={replacementItemId} options={items.map((item) => ({ value: item.id, label: item.name }))} onChange={(value) => { setReplacementItemId(String(value)); setReplacementVariantId(''); setCorrectionPreview(null); }} />
           {replacementVariants.length ? <Select label="Varian" value={replacementVariantId} placeholder={variantRequired ? 'Pilih varian' : 'Tanpa varian'} options={[...(variantRequired ? [] : [{ value: '', label: 'Tanpa varian' }]), ...replacementVariants.map((variant) => ({ value: variant.id, label: variant.name }))]} onChange={(value) => { setReplacementVariantId(String(value)); setCorrectionPreview(null); }} /> : null}
           <DInput label="Jumlah" value={replacementQuantity} onChange={(value) => { setReplacementQuantity(value); setCorrectionPreview(null); }} />
@@ -5184,7 +5210,7 @@ function ReferenceOrderAdjustmentDialog({
           <Button disabled={!replacementItemId || !replacementQuantity || (variantRequired && !replacementVariantId) || previewState === 'LOADING'} onClick={() => { setPreviewState('LOADING'); void onPreview(correctionLine, { catalogItemId: replacementItemId, ...(replacementVariantId ? { catalogVariantId: replacementVariantId } : {}), quantity: replacementQuantity }).then((value) => { setCorrectionPreview(value); setPreviewState('IDLE'); }).catch(() => setPreviewState('ERROR')); }}>Lihat dampak</Button>
           {previewState === 'LOADING' ? <p className="text-sm">Menghitung koreksi…</p> : null}
           {previewState === 'ERROR' ? <DAlert variant="danger">Koreksi tidak dapat dipratinjau. Muat ulang transaksi lalu coba lagi.</DAlert> : null}
-          {correctionPreview ? <section className="space-y-1 rounded-xl bg-[var(--color-surface-muted)] p-3 text-sm"><p>Total sebelumnya <strong className="float-right">{money(correctionPreview.currentTotalAmount, locale)}</strong></p><p>Total setelah koreksi <strong className="float-right">{money(correctionPreview.correctedTotalAmount, locale)}</strong></p><p>Sudah dibayar <strong className="float-right">{money(correctionPreview.netSuccessfulPaidAmount, locale)}</strong></p>{correctionPreview.overpaymentAmount !== '0.0000' ? <><p className="font-semibold text-[var(--color-danger)]">Kelebihan pembayaran <strong className="float-right">{money(correctionPreview.overpaymentAmount, locale)}</strong></p><p className="text-xs">Transaksi belum dapat diselesaikan sampai kelebihan pembayaran dikembalikan.</p>{canRefundPayment ? <Button size="sm" disabled={isMutating} onClick={() => { const payment = sale.payments.find((item) => item.status === 'SUCCEEDED' && item.method === 'CASH' && createDecimal(item.appliedAmount).greaterThan(0)); if (payment) void onCompensate(sale, payment.id, correctionPreview.overpaymentAmount); }}>Kembalikan kelebihan pembayaran</Button> : <p className="text-xs">Pengembalian dana memerlukan pengguna dengan izin pengembalian pembayaran.</p>}</> : <p className="font-semibold">Sisa pembayaran <strong className="float-right">{money(correctionPreview.remainingPaymentAmount, locale)}</strong></p>}</section> : null}
+          {correctionPreview ? <section className="space-y-1 rounded-xl bg-[var(--color-surface-muted)] p-3 text-sm"><p>Total sebelumnya <strong className="float-right">{money(correctionPreview.currentTotalAmount, locale)}</strong></p><p>Total setelah koreksi <strong className="float-right">{money(correctionPreview.correctedTotalAmount, locale)}</strong></p><p>Sudah dibayar <strong className="float-right">{money(correctionPreview.netSuccessfulPaidAmount, locale)}</strong></p>{correctionPreview.overpaymentAmount !== '0.0000' ? <><p className="font-semibold text-[var(--color-danger)]">Kelebihan pembayaran <strong className="float-right">{money(correctionPreview.overpaymentAmount, locale)}</strong></p><p className="text-xs">Transaksi belum dapat diselesaikan sampai kelebihan pembayaran dikembalikan.</p>{(() => { const cashPayment = sale.payments.find((item) => item.status === 'SUCCEEDED' && item.method === 'CASH' && createDecimal(item.appliedAmount).greaterThan(0)); const providerPayment = sale.payments.find((item) => item.status === 'SUCCEEDED' && item.method !== 'CASH' && createDecimal(item.appliedAmount).greaterThan(0)); return cashPayment ? canRefundPayment ? <Button size="sm" disabled={isMutating} onClick={() => void onCompensate(sale, cashPayment.id, correctionPreview.overpaymentAmount)}>Kembalikan kelebihan pembayaran</Button> : <p className="text-xs">Pengembalian dana memerlukan pengguna dengan izin pengembalian pembayaran.</p> : providerPayment ? <p className="text-xs">Pengembalian pembayaran ini memerlukan konfirmasi dari penyedia pembayaran.</p> : null; })()}</> : <p className="font-semibold">Sisa pembayaran <strong className="float-right">{money(correctionPreview.remainingPaymentAmount, locale)}</strong></p>}</section> : null}
           <Button disabled={!correctionPreview || !correctionReason.trim() || isMutating} onClick={() => void onCorrect(correctionLine, { catalogItemId: replacementItemId, ...(replacementVariantId ? { catalogVariantId: replacementVariantId } : {}), quantity: replacementQuantity, reason: correctionReason }).then(() => setCorrectionLine(null))}>Konfirmasi koreksi</Button>
         </div>
       </Dialog>
@@ -5247,9 +5273,9 @@ function ReferenceBalancePaymentDialog({
   const format = (amount: string) => money(amount, locale);
   const progress = paymentProgress(sale);
   const remainingToAllocate = availableToPay ?? progress.remainingAmount;
-  const normalizedAllocation = normalizeCurrencyPresentationInput(
-    appliedAmount || remainingToAllocate,
-  );
+  const normalizedAllocation = appliedAmount
+    ? normalizeCurrencyPaymentInput(appliedAmount)
+    : currencyInputFromAmount(remainingToAllocate);
   const intent = paymentIntent(sale, normalizedAllocation);
   const allocationPositive = isPositiveDecimal(normalizedAllocation);
   const overAllocated =
@@ -5257,7 +5283,7 @@ function ReferenceBalancePaymentDialog({
     createDecimal(normalizedAllocation).greaterThan(createDecimal(remainingToAllocate));
   const hasPending = sale.payments.some((payment) => payment.status === 'PENDING');
   const isCash = method === 'CASH';
-  const normalizedTender = normalizeCurrencyPresentationInput(tender || normalizedAllocation);
+  const normalizedTender = normalizeCurrencyPaymentInput(tender || normalizedAllocation);
   const cashShort =
     isCash &&
     allocationPositive &&
@@ -5395,7 +5421,7 @@ function ReferenceBalancePaymentDialog({
                   intent={intent}
                   format={format}
                   onPayRemaining={() =>
-                    onAppliedAmount(normalizeCurrencyPresentationInput(remainingToAllocate))
+                    onAppliedAmount(currencyInputFromAmount(remainingToAllocate))
                   }
                 />
               </div>
