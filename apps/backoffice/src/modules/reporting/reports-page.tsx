@@ -663,7 +663,9 @@ export function ReportsPage() {
         []
       ).map((p) => ({
         ...p,
-        label: copy(attendanceLabels[p.label] ?? p.label),
+        label: attendanceLabels[p.label]
+          ? copy(attendanceLabels[p.label])
+          : humanReadableLabel(p.label, locale),
       }));
   const activeFilters = Object.entries(filters).map(([k, v]) => ({
     key: k,
@@ -866,7 +868,7 @@ export function ReportsPage() {
           {visual.trend ? (
             <AnalyticsLineChart
               title={copy(visual.trend)}
-              subtitle={`${copy('Selected period')}: ${from} — ${to}`}
+              subtitle={`${copy('Selected period')}: ${formatDateOnly(from)} — ${formatDateOnly(to)}`}
               data={data?.analytics.trend ?? []}
               formatValue={(v) =>
                 type === 'attendance' ? integer(Number(v)) : formatMoney(v, runtime.currency)
