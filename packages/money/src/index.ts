@@ -5,5 +5,6 @@ export {
   formatDecimalNumber,
   formatMoney,
   formatPercentageFromRate,
+  percentageValueFromRate,
   subtractDecimalStrings,
 } from './money';

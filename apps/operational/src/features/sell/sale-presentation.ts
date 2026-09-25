@@ -1,4 +1,4 @@
-import { createDecimal } from '@digvation/pos-money';
+import { createDecimal, percentageValueFromRate } from '@digvation/pos-money';
 
 import type {
   Employee,
@@ -93,10 +93,7 @@ function positive(value: string | null | undefined): boolean {
 export function percentageFromRate(rate: string | null | undefined): string | null {
   if (!rate) return null;
   try {
-    return createDecimal(rate)
-      .times(100)
-      .toFixed(4)
-      .replace(/(\.\d*?[1-9])0+$|\.0+$/, '$1');
+    return percentageValueFromRate(rate);
   } catch {
     return null;
   }

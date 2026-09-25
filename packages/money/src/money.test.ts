@@ -6,6 +6,7 @@ import {
   formatDecimalNumber,
   formatMoney,
   formatPercentageFromRate,
+  percentageValueFromRate,
   subtractDecimalStrings,
 } from './money';
 
@@ -35,6 +36,8 @@ describe('money helpers', () => {
   });
 
   it('normalizes fractional rates as percentages', () => {
+    expect(percentageValueFromRate('0.1100')).toBe('11');
+    expect(percentageValueFromRate('0.1050')).toBe('10.5');
     expect(formatPercentageFromRate('0.1100', 'id-ID')).toBe('11%');
     expect(formatPercentageFromRate('0.1050', 'id-ID')).toBe('10,5%');
   });

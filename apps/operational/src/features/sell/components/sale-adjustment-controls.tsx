@@ -1,5 +1,9 @@
 import { useAuth } from '@digvation/pos-auth';
-import { createDecimal, formatMoney } from '@digvation/pos-money';
+import {
+  createDecimal,
+  formatMoney,
+  percentageValueFromRate,
+} from '@digvation/pos-money';
 import { useRuntime } from '@digvation/pos-runtime';
 import { DAlert, DButton, DDialog, DInput, DSelect, useToast } from '@digvation-labs/ui';
 import { useQueryClient } from '@tanstack/react-query';
@@ -84,7 +88,7 @@ const localCopy: Record<string, { 'id-ID': string; 'en-US': string }> = {
 
 function discountValueForForm(type: DiscountType | null, value: string | null): string {
   if (!type || !value) return '';
-  return type === 'PERCENTAGE' ? createDecimal(value).times(100).toFixed() : value;
+  return type === 'PERCENTAGE' ? percentageValueFromRate(value, 6) : value;
 }
 
 function discountValueForApi(type: DiscountType, value: string): string | null {

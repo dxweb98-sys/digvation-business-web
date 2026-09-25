@@ -47,13 +47,20 @@ export function formatDecimalNumber(
   }).format(createDecimal(value).toNumber());
 }
 
+export function percentageValueFromRate(
+  rate: string,
+  maximumFractionDigits = 4,
+): string {
+  return createDecimal(rate).times(100).toDecimalPlaces(maximumFractionDigits).toString();
+}
+
 export function formatPercentageFromRate(
   rate: string,
   locale: string,
   maximumFractionDigits = 4,
 ): string {
   return `${formatDecimalNumber(
-    createDecimal(rate).times(100).toFixed(),
+    percentageValueFromRate(rate, maximumFractionDigits),
     locale,
     maximumFractionDigits,
   )}%`;

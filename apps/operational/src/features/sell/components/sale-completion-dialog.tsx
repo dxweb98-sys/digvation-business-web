@@ -1,4 +1,8 @@
-import { createDecimal, formatMoney } from '@digvation/pos-money';
+import {
+  createDecimal,
+  formatMoney,
+  percentageValueFromRate,
+} from '@digvation/pos-money';
 import { useOperationalLocalization } from '../../../app/localization/operational-localization';
 import {
   DButton,
@@ -49,7 +53,7 @@ interface SaleCompletionDialogProps {
 
 function discountToFormValue(type: DiscountType, value: string | null): string {
   if (!value) return '';
-  return type === 'PERCENTAGE' ? createDecimal(value).times(100).toFixed() : value;
+  return type === 'PERCENTAGE' ? percentageValueFromRate(value, 6) : value;
 }
 
 function discountToApiValue(type: DiscountType, value: string): string | null {

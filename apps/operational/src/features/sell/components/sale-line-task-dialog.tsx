@@ -1,4 +1,8 @@
-import { createDecimal, formatMoney } from '@digvation/pos-money';
+import {
+  createDecimal,
+  formatMoney,
+  percentageValueFromRate,
+} from '@digvation/pos-money';
 import { DButton, DCheckbox, DDecimalInput, DDialog, DInput, DSelect } from '@digvation-labs/ui';
 import { CheckCircle2, Play, Square, UserRound, X } from 'lucide-react';
 import { useState } from 'react';
@@ -41,7 +45,7 @@ interface SaleLineTaskDialogProps {
 }
 
 function rateToPercent(rate: string | null): string {
-  return rate === null ? '' : createDecimal(rate).times(100).toFixed();
+  return rate === null ? '' : percentageValueFromRate(rate, 6);
 }
 
 function percentToRate(percent: string): string | null {
@@ -55,7 +59,7 @@ function percentToRate(percent: string): string | null {
 
 function discountValueForForm(type: DiscountType, value: string | null): string {
   if (!value) return '';
-  return type === 'PERCENTAGE' ? createDecimal(value).times(100).toFixed() : value;
+  return type === 'PERCENTAGE' ? percentageValueFromRate(value, 6) : value;
 }
 
 function discountValueForApi(type: DiscountType, value: string): string | null {

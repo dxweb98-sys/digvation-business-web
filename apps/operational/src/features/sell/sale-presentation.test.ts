@@ -69,6 +69,7 @@ describe('sale presentation', () => {
   });
   it('uses configured percentage metadata instead of deriving percentage from money amounts', () => {
     expect(percentageFromRate('0.1')).toBe('10');
+    expect(percentageFromRate('0.1050')).toBe('10.5');
     expect(
       transactionDiscountPercentage({
         adjustments: [percentageAdjustment],
