@@ -32,15 +32,6 @@ import type { OperationalNavigationSection } from './operational-navigation';
 import { resolveOperationalLocationSelection } from './operational-location-selection';
 import { useOperationalSession } from './operational-session-provider';
 
-function formatCurrentDate(locale: string): string {
-  return new Intl.DateTimeFormat(locale, {
-    weekday: 'short',
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  }).format(new Date());
-}
-
 function identityInitials(displayName: string): string | null {
   const derived = displayName
     .trim()
@@ -64,7 +55,7 @@ export function OperationalShell({
 }: OperationalShellProps) {
   const bootstrap = useDeploymentBootstrap();
   const connectivity = useConnectivity();
-  const { copy, label } = useOperationalLocalization();
+  const { copy, label, formatDate } = useOperationalLocalization();
   const { session, authPort, logout } = useAuth();
   const { showToast } = useToast();
   const [isLoggingOut, setLoggingOut] = useState(false);
@@ -310,7 +301,12 @@ export function OperationalShell({
               <span className="size-1.5 rounded-full bg-current" /> {label(connectivity.state)}
             </span>
             <span className="operational-shell__header-date hidden text-xs text-[var(--color-text-muted)] md:inline">
-              {formatCurrentDate(session.preferences.locale)}
+              {formatDate(new Date(), {
+                weekday: 'short',
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+              })}
             </span>
           </div>
 
