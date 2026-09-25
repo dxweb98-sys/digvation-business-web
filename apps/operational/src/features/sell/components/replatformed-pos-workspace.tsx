@@ -1,6 +1,6 @@
 import { useAuth } from '@digvation/pos-auth';
 import { ApiClient } from '@digvation/business-api';
-import { createDecimal, formatMoney } from '@digvation/pos-money';
+import { createDecimal, formatDecimalNumber, formatMoney } from '@digvation/pos-money';
 import { useRuntime } from '@digvation/pos-runtime';
 import {
   DAlert,
@@ -260,9 +260,12 @@ function wholePointValue(value: string | null | undefined): string | null {
 }
 
 function pointQuantity(value: string | null | undefined, locale: string): string {
-  const whole = wholePointValue(value);
-  if (whole === null) return '—';
-  return new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(Number(whole));
+  if (!value) return '—';
+  try {
+    return formatDecimalNumber(value, locale);
+  } catch {
+    return '—';
+  }
 }
 
 function formatDurationMinutes(minutes: number | null | undefined, locale: string): string | null {
@@ -272,9 +275,12 @@ function formatDurationMinutes(minutes: number | null | undefined, locale: strin
   });
 }
 
-function quantity(value: string) {
-  const normalized = value.replace(/(\.\d*?[1-9])0+$|\.0+$/, '$1');
-  return normalized === '-0' ? '0' : normalized;
+function quantity(value: string, locale: string) {
+  try {
+    return formatDecimalNumber(value, locale);
+  } catch {
+    return '—';
+  }
 }
 
 function transactionNumber(sale: Pick<Sale, 'id' | 'saleNumber'>, locale: string) {
@@ -2290,7 +2296,7 @@ export function RestrictedCompletedQueueCard({
   isSending: boolean;
   onSendReceipt: (sale: Pick<QueueSale, 'id' | 'saleNumber'>) => void;
 }) {
-  const { copy, label } = useOperationalLocalization();
+  const { copy, label, formatTime } = useOperationalLocalization();
   const meta = statusMeta.COMPLETED;
   const number = transactionNumber(summary, locale);
   return (
@@ -2314,9 +2320,7 @@ export function RestrictedCompletedQueueCard({
       <div className="flex items-center justify-between gap-3">
         <p className="min-w-0 text-xs text-[var(--color-text-muted)]">
           {summary.itemCount} {copy('items')},{' '}
-          {new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(
-            new Date(summary.finalizedAt ?? summary.createdAt),
-          )}
+          {formatTime(summary.finalizedAt ?? summary.createdAt)}
         </p>
         <DButton
           size="sm"
@@ -2361,7 +2365,7 @@ export function ReferenceQueueCard({
   onViewReceipt: (sale: Sale) => void;
   onSendReceipt: (sale: Sale) => void;
 }) {
-  const { copy, label } = useOperationalLocalization();
+  const { copy, label, formatTime } = useOperationalLocalization();
   const meta = statusMeta[status];
   const { balanceDue } = financialSummary(sale);
   const hasPayment = hasSuccessfulPayment(sale);
@@ -2482,9 +2486,7 @@ export function ReferenceQueueCard({
         <div>
           <p className="text-xs text-[var(--color-text-muted)]">
             {sale.lines.filter((line) => !line.removedAt).length} {copy('items')},{' '}
-            {new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(
-              new Date(sale.createdAt),
-            )}
+            {formatTime(sale.createdAt)}
           </p>
           <p className="mt-1 text-sm font-bold text-[var(--color-brand)]">
             {money(sale.totalAmount, locale)}
@@ -2750,7 +2752,7 @@ function ReferenceCartPanel({
   onRemove: (line: CartDisplayLine) => void;
   onCheckout: () => void;
 }) {
-  const { copy } = useOperationalLocalization();
+  const { copy, formatDate } = useOperationalLocalization();
   const status = customerStatus(customer);
   const hasDiscount = !createDecimal(discountAmount).equals(createDecimal('0'));
   const hasTax = !createDecimal(taxAmount).equals(createDecimal('0'));
@@ -2831,10 +2833,10 @@ function ReferenceCartPanel({
                             title={[
                               line.promotion.name,
                               line.promotion.effectiveFrom
-                                ? `${copy('Start')}: ${new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(line.promotion.effectiveFrom))}`
+                                ? `${copy('Start')}: ${formatDate(line.promotion.effectiveFrom, { dateStyle: 'medium', timeStyle: 'short' })}`
                                 : null,
                               line.promotion.effectiveUntil
-                                ? `${copy('End')}: ${new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(line.promotion.effectiveUntil))}`
+                                ? `${copy('End')}: ${formatDate(line.promotion.effectiveUntil, { dateStyle: 'medium', timeStyle: 'short' })}`
                                 : null,
                             ]
                               .filter(Boolean)
@@ -2877,7 +2879,7 @@ function ReferenceCartPanel({
                         aria-label={`${copy('Quantity')} ${line.itemNameSnapshot}`}
                         className="flex h-9 w-12 items-center justify-center text-xs font-bold tabular-nums text-[var(--color-text)]"
                       >
-                        {quantity(line.quantity)}
+                        {quantity(line.quantity, locale)}
                       </output>
                       <button
                         type="button"
@@ -3135,7 +3137,7 @@ function ReferencePaymentDialog({
   /** Applied promotions and discounts for the authoritative Sale being paid. */
   adjustmentSlot?: ReactNode;
 }) {
-  const { copy, label } = useOperationalLocalization();
+  const { copy, label, formatDate } = useOperationalLocalization();
   const { showToast } = useToast();
   const [step, setStep] = usePaymentDialogStep(open);
   const [allocationMode, setAllocationMode] = usePaymentAllocationMode(open);
@@ -3423,19 +3425,19 @@ function ReferencePaymentDialog({
                       {line.promotion?.effectiveFrom ? (
                         <p>
                           {copy('Start')}:{' '}
-                          {new Intl.DateTimeFormat(locale, {
+                          {formatDate(line.promotion.effectiveFrom, {
                             dateStyle: 'medium',
                             timeStyle: 'short',
-                          }).format(new Date(line.promotion.effectiveFrom))}
+                          })}
                         </p>
                       ) : null}
                       {line.promotion?.effectiveUntil ? (
                         <p>
                           {copy('End')}:{' '}
-                          {new Intl.DateTimeFormat(locale, {
+                          {formatDate(line.promotion.effectiveUntil, {
                             dateStyle: 'medium',
                             timeStyle: 'short',
-                          }).format(new Date(line.promotion.effectiveUntil))}
+                          })}
                         </p>
                       ) : null}
                     </div>
@@ -3448,7 +3450,7 @@ function ReferencePaymentDialog({
                             {line.itemNameSnapshot}
                           </p>
                           <p className="mt-1 text-[11px] font-medium text-[var(--color-text-muted)]">
-                            {quantity(line.quantity)} × {format(line.effectiveUnitPrice)}
+                            {quantity(line.quantity, locale)} × {format(line.effectiveUnitPrice)}
                           </p>
                           {discounted ? (
                             <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-[var(--color-danger)]">
@@ -4113,7 +4115,7 @@ export function ReferenceTransactionDetail({
   onComplete: () => void;
   isMutating: boolean;
 }) {
-  const { copy, label } = useOperationalLocalization();
+  const { copy, label, formatDate } = useOperationalLocalization();
   const [receiptPaper, setReceiptPaper] = useState<'58' | '80'>('80');
   const sale = useRetainedValue(currentSale);
   if (!sale) return null;
@@ -4132,10 +4134,10 @@ export function ReferenceTransactionDetail({
   const hasTax = !createDecimal(sale.taxAmount).equals(createDecimal('0'));
   const completionIssues = status === 'PROGRESS' ? workflowIssues(sale, locale) : [];
   const completionIssueGroups = groupWorkflowIssues(sale, completionIssues, locale);
-  const transactionDate = new Intl.DateTimeFormat(locale, {
+  const transactionDate = formatDate(sale.finalizedAt ?? sale.updatedAt, {
     dateStyle: 'medium',
     timeStyle: 'short',
-  }).format(new Date(sale.finalizedAt ?? sale.updatedAt));
+  });
   const identity = transactionNumber(sale, locale);
   const format = (amount: string) => money(amount, locale);
   const discountRows = saleDiscountRows(sale);
@@ -4347,7 +4349,7 @@ export function ReferenceTransactionDetail({
                           key={line.id}
                           name={line.itemNameSnapshot}
                           variant={line.variantNameSnapshot}
-                          pricing={`${quantity(line.quantity)} × ${format(line.effectiveUnitPrice)}`}
+                          pricing={`${quantity(line.quantity, locale)} × ${format(line.effectiveUnitPrice)}`}
                           amount={format(line.grossAmount)}
                           discounts={lineDiscountRows(sale, line, copy('Discount')).map((row) => ({
                             ...row,
@@ -4575,10 +4577,10 @@ export function ReferenceTransactionDetail({
                                 {label(item.status)}
                               </StatusPill>
                             ),
-                            detail: new Intl.DateTimeFormat(locale, {
+                            detail: formatDate(item.terminalAt ?? item.updatedAt, {
                               dateStyle: 'medium',
                               timeStyle: 'short',
-                            }).format(new Date(item.terminalAt ?? item.updatedAt)),
+                            }),
                             amount: format(item.appliedAmount),
                           }))}
                         />
@@ -4692,7 +4694,7 @@ export function ReceiptContent({
                 <p className="shrink-0 font-bold">{money(line.grossAmount, locale)}</p>
               </div>
               <p className="mt-1 text-slate-500">
-                {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
+                {quantity(line.quantity, locale)} × {money(line.effectiveUnitPrice, locale)}
               </p>
               {lineDiscounts.map((discount) => (
                 <div
@@ -4961,7 +4963,7 @@ function ReferenceOrderAdjustmentDialog({
                 ? copy('New')
                 : createDecimal(before).equals(createDecimal(line.quantity))
                   ? null
-                  : `${copy('Was')} ${quantity(before)}`;
+                  : `${copy('Was')} ${quantity(before, locale)}`;
             return (
               <li key={line.id} className="flex items-center gap-3 px-3 py-2">
                 <div className="min-w-0 flex-1">
@@ -5002,7 +5004,7 @@ function ReferenceOrderAdjustmentDialog({
                     <Minus className="size-3.5" />
                   </button>
                   <span className="w-7 text-center text-xs font-semibold tabular-nums">
-                    {quantity(line.quantity)}
+                    {quantity(line.quantity, locale)}
                   </span>
                   <button
                     type="button"
