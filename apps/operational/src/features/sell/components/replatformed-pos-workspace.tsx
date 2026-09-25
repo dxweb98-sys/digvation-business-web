@@ -1,6 +1,11 @@
 import { useAuth } from '@digvation/pos-auth';
 import { ApiClient } from '@digvation/business-api';
-import { createDecimal, formatDecimalNumber, formatMoney } from '@digvation/pos-money';
+import {
+  createDecimal,
+  formatDecimalNumber,
+  formatMoney,
+  formatPercentageFromRate,
+} from '@digvation/pos-money';
 import { useRuntime } from '@digvation/pos-runtime';
 import {
   DAlert,
@@ -761,10 +766,10 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const isTaxPreviewUnavailable =
     !sale && workspace.cart.isLocalDraft && taxConfigurationQuery.isError;
   const draftTaxLabel = taxConfigurationQuery.data?.enabled
-    ? `${copy('Tax')} (${createDecimal(taxConfigurationQuery.data.rate)
-        .times(100)
-        .toFixed(2)
-        .replace(/\.?0+$/, '')}%)`
+    ? `${copy('Tax')} (${formatPercentageFromRate(
+        taxConfigurationQuery.data.rate,
+        workspace.locale,
+      )})`
     : copy('Tax');
   const activeCustomer = workspace.customer;
   const customerMemberApi = useMemo(
