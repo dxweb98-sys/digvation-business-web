@@ -75,13 +75,14 @@ function BackofficeDesignSystemProviders({
 
 function AuthenticatedBackofficeProviders({ router }: Pick<BackofficeProvidersProps, 'router'>) {
   const { session, status } = useBackofficeAuth();
-  const { setLocale } = useBackofficeLocalization();
+  const { setLocale, setBusinessDateTimePreferences } = useBackofficeLocalization();
   const markStartupReady = useBackofficeStartupReady();
 
   useEffect(() => {
     if (!session) return;
     setLocale(resolveBackofficeLocale(session.preferences.locale));
-  }, [session, setLocale]);
+    setBusinessDateTimePreferences(session.preferences);
+  }, [session, setBusinessDateTimePreferences, setLocale]);
 
   useEffect(() => {
     if (status !== 'hydrating') markStartupReady();
