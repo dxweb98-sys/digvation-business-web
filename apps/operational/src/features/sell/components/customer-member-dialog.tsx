@@ -1,3 +1,4 @@
+import { formatDecimalNumber } from '@digvation/pos-money';
 import { DAlert, DButton, DDialog, DInput, DSkeleton } from '@digvation-labs/ui';
 import { DTabs, DTabsContent, DTabsList, DTabsTrigger } from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
@@ -92,9 +93,11 @@ function initials(name: string): string {
 
 function formatPoints(value: string | null | undefined, locale: string): string {
   if (!value) return '0';
-  const match = /^(\d+)(?:\.0+)?$/.exec(value.trim());
-  if (!match) return '—';
-  return new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(Number(match[1]));
+  try {
+    return formatDecimalNumber(value, locale);
+  } catch {
+    return '—';
+  }
 }
 
 export function CustomerMemberDialog({
