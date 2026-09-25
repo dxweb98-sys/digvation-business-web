@@ -417,6 +417,58 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
       .catch((error) => command.reportError(error));
   };
 
+  const correctLine = async (
+    line: SaleLine,
+    input: {
+      catalogItemId: string;
+      catalogVariantId?: string;
+      quantity: string;
+      reason: string;
+    },
+  ) => {
+    const sale = queueContextSale?.id === line.saleId
+      ? queueContextSale
+      : saleWorkspace.sale;
+    if (!sale || !transactionAdapter.correctSaleLine)
+      throw new Error(copy('Item correction is not available.'));
+    const updated = await command.runMutation(() =>
+      transactionAdapter.correctSaleLine!(sale.id, line.id, {
+        expectedVersion: sale.version,
+        ...input,
+      }, `cashier-correct-line-${crypto.randomUUID()}`),
+    );
+    cacheQueueContext(updated);
+    return updated;
+  };
+
+  const previewLineCorrection = async (
+    line: SaleLine,
+    input: { catalogItemId: string; catalogVariantId?: string; quantity: string },
+  ) => {
+    const sale = queueContextSale?.id === line.saleId
+      ? queueContextSale
+      : saleWorkspace.sale;
+    if (!sale || !transactionAdapter.previewSaleLineCorrection)
+      throw new Error(copy('Preview koreksi item belum tersedia.'));
+    return transactionAdapter.previewSaleLineCorrection(sale.id, line.id, {
+      expectedVersion: sale.version,
+      ...input,
+    });
+  };
+
+  const compensateOpenPayment = async (sale: Sale, paymentId: string, amount: string) => {
+    if (!transactionAdapter.compensateOpenSalePayment)
+      throw new Error(copy('Pengembalian pembayaran belum tersedia.'));
+    const updated = await command.runMutation(() =>
+      transactionAdapter.compensateOpenSalePayment!(sale.id, paymentId, {
+        expectedVersion: sale.version,
+        amount,
+      }, `cashier-compensate-${crypto.randomUUID()}`),
+    );
+    cacheQueueContext(updated);
+    return updated;
+  };
+
   const transitionQueuedFulfillment = async (
     sale: Sale,
     line: SaleLine,
@@ -759,6 +811,9 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     closeVariantPicker: () => setVariantPicker(null),
     changeQuantity,
     removeLine,
+    correctLine,
+    previewLineCorrection,
+    compensateOpenPayment,
     changeDraftQuantity: saleWorkspace.changeDraftQuantity,
     removeDraftLine: saleWorkspace.removeDraftLine,
     commitDraft: saleWorkspace.commitDraft,

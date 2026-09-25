@@ -1836,6 +1836,10 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         onAddVariant={(variantId) => void workspace.selectVariant(variantId)}
         onQuantity={(line, next) => workspace.changeQuantity(line, next)}
         onRemove={workspace.removeLine}
+        onCorrect={(line, input) => workspace.correctLine(line, input)}
+        onPreview={(line, input) => workspace.previewLineCorrection(line, input)}
+        canRefundPayment={session.access.permissions.includes('payments:refund')}
+        onCompensate={(sale, paymentId, amount) => workspace.compensateOpenPayment(sale, paymentId, amount)}
       />
 
       <ReferenceBalancePaymentDialog
@@ -4836,6 +4840,10 @@ function ReferenceOrderAdjustmentDialog({
   onAddVariant,
   onQuantity,
   onRemove,
+  onCorrect,
+  onPreview,
+  canRefundPayment,
+  onCompensate,
 }: {
   sale: Sale | null;
   items: readonly CatalogItem[];
@@ -4847,6 +4855,10 @@ function ReferenceOrderAdjustmentDialog({
   onAddVariant: (catalogVariantId: string | null) => void;
   onQuantity: (line: SaleLine, quantity: string) => void;
   onRemove: (line: SaleLine) => void;
+  onCorrect: (line: SaleLine, input: { catalogItemId: string; catalogVariantId?: string; quantity: string; reason: string }) => Promise<unknown>;
+  onPreview: (line: SaleLine, input: { catalogItemId: string; catalogVariantId?: string; quantity: string }) => Promise<{ saleVersion: number; currentTotalAmount: string; correctedTotalAmount: string; netSuccessfulPaidAmount: string; remainingPaymentAmount: string; overpaymentAmount: string }>;
+  canRefundPayment: boolean;
+  onCompensate: (sale: Sale, paymentId: string, amount: string) => Promise<unknown>;
 }) {
   const { copy } = useOperationalLocalization();
   const [catalogSearch, setCatalogSearch] = useState('');
@@ -4864,6 +4876,16 @@ function ReferenceOrderAdjustmentDialog({
     itemId: string;
     variantId: string;
   } | null>(null);
+  const [correctionLine, setCorrectionLine] = useState<SaleLine | null>(null);
+  const [replacementItemId, setReplacementItemId] = useState('');
+  const [replacementVariantId, setReplacementVariantId] = useState('');
+  const [replacementQuantity, setReplacementQuantity] = useState('1');
+  const [correctionReason, setCorrectionReason] = useState('');
+  const [correctionPreview, setCorrectionPreview] = useState<Awaited<ReturnType<typeof onPreview>> | null>(null);
+  const [previewState, setPreviewState] = useState<'IDLE' | 'LOADING' | 'ERROR'>('IDLE');
+  const replacementItem = items.find((item) => item.id === replacementItemId) ?? null;
+  const replacementVariants = replacementItem?.variants ?? [];
+  const variantRequired = replacementItem?.variantSelectionMode === 'REQUIRED';
   const selectedVariantId =
     variantSelection && variantSelection.itemId === variantPicker?.item.id
       ? variantSelection.variantId
@@ -4912,6 +4934,7 @@ function ReferenceOrderAdjustmentDialog({
     'flex size-8 items-center justify-center rounded-lg border border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] disabled:cursor-not-allowed disabled:opacity-40';
 
   return (
+    <>
     <Dialog
       open
       onClose={onClose}
@@ -5027,6 +5050,22 @@ function ReferenceOrderAdjustmentDialog({
                   >
                     <Trash2 className="size-3.5" />
                   </button>
+                  <button
+                    type="button"
+                    disabled={!lineMutable || isMutating}
+                    onClick={() => {
+                      setCorrectionLine(line);
+                      setReplacementItemId(line.catalogItemId);
+                      setReplacementVariantId(line.catalogVariantId ?? '');
+                      setReplacementQuantity(line.quantity);
+                      setCorrectionReason('');
+                      setCorrectionPreview(null);
+                      setPreviewState('IDLE');
+                    }}
+                    className="ml-1 rounded-lg px-2 text-xs font-semibold text-[var(--color-brand)] hover:bg-[var(--color-brand)]/10 disabled:opacity-40"
+                  >
+                    Koreksi item
+                  </button>
                 </div>
               </li>
             );
@@ -5134,6 +5173,23 @@ function ReferenceOrderAdjustmentDialog({
         ) : null}
       </div>
     </Dialog>
+    {correctionLine ? (
+      <Dialog open onClose={() => setCorrectionLine(null)} title="Koreksi item" ariaLabel="Koreksi item">
+        <div className="space-y-3">
+          <p className="text-sm"><span className="text-[var(--color-text-muted)]">Item saat ini</span><br /><strong>{correctionLine.itemNameSnapshot}</strong></p>
+          <Select label="Item pengganti" value={replacementItemId} options={items.map((item) => ({ value: item.id, label: item.name }))} onChange={(value) => { setReplacementItemId(String(value)); setReplacementVariantId(''); setCorrectionPreview(null); }} />
+          {replacementVariants.length ? <Select label="Varian" value={replacementVariantId} placeholder={variantRequired ? 'Pilih varian' : 'Tanpa varian'} options={[...(variantRequired ? [] : [{ value: '', label: 'Tanpa varian' }]), ...replacementVariants.map((variant) => ({ value: variant.id, label: variant.name }))]} onChange={(value) => { setReplacementVariantId(String(value)); setCorrectionPreview(null); }} /> : null}
+          <DInput label="Jumlah" value={replacementQuantity} onChange={(value) => { setReplacementQuantity(value); setCorrectionPreview(null); }} />
+          <DInput label="Alasan koreksi" value={correctionReason} onChange={setCorrectionReason} />
+          <Button disabled={!replacementItemId || !replacementQuantity || (variantRequired && !replacementVariantId) || previewState === 'LOADING'} onClick={() => { setPreviewState('LOADING'); void onPreview(correctionLine, { catalogItemId: replacementItemId, ...(replacementVariantId ? { catalogVariantId: replacementVariantId } : {}), quantity: replacementQuantity }).then((value) => { setCorrectionPreview(value); setPreviewState('IDLE'); }).catch(() => setPreviewState('ERROR')); }}>Lihat dampak</Button>
+          {previewState === 'LOADING' ? <p className="text-sm">Menghitung koreksi…</p> : null}
+          {previewState === 'ERROR' ? <DAlert variant="danger">Koreksi tidak dapat dipratinjau. Muat ulang transaksi lalu coba lagi.</DAlert> : null}
+          {correctionPreview ? <section className="space-y-1 rounded-xl bg-[var(--color-surface-muted)] p-3 text-sm"><p>Total sebelumnya <strong className="float-right">{money(correctionPreview.currentTotalAmount, locale)}</strong></p><p>Total setelah koreksi <strong className="float-right">{money(correctionPreview.correctedTotalAmount, locale)}</strong></p><p>Sudah dibayar <strong className="float-right">{money(correctionPreview.netSuccessfulPaidAmount, locale)}</strong></p>{correctionPreview.overpaymentAmount !== '0.0000' ? <><p className="font-semibold text-[var(--color-danger)]">Kelebihan pembayaran <strong className="float-right">{money(correctionPreview.overpaymentAmount, locale)}</strong></p><p className="text-xs">Transaksi belum dapat diselesaikan sampai kelebihan pembayaran dikembalikan.</p>{canRefundPayment ? <Button size="sm" disabled={isMutating} onClick={() => { const payment = sale.payments.find((item) => item.status === 'SUCCEEDED' && item.method === 'CASH' && createDecimal(item.appliedAmount).greaterThan(0)); if (payment) void onCompensate(sale, payment.id, correctionPreview.overpaymentAmount); }}>Kembalikan kelebihan pembayaran</Button> : <p className="text-xs">Pengembalian dana memerlukan pengguna dengan izin pengembalian pembayaran.</p>}</> : <p className="font-semibold">Sisa pembayaran <strong className="float-right">{money(correctionPreview.remainingPaymentAmount, locale)}</strong></p>}</section> : null}
+          <Button disabled={!correctionPreview || !correctionReason.trim() || isMutating} onClick={() => void onCorrect(correctionLine, { catalogItemId: replacementItemId, ...(replacementVariantId ? { catalogVariantId: replacementVariantId } : {}), quantity: replacementQuantity, reason: correctionReason }).then(() => setCorrectionLine(null))}>Konfirmasi koreksi</Button>
+        </div>
+      </Dialog>
+    ) : null}
+    </>
   );
 }
 
