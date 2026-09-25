@@ -9,6 +9,7 @@ import {
   DSelect,
   DSkeleton,
   DStatusFilter,
+  DToggle,
   DTabs,
   DTabsContent,
   DTabsList,
@@ -122,24 +123,11 @@ export function EmployeesPage() {
     {
       key: 'serviceAssignment',
       label: copy('Service assignment'),
-      render: (employee) =>
-        employee.position ? (
-          <DBadge
-            variant={
-              employee.position.status === 'ACTIVE' && employee.position.serviceAssignmentEnabled
-                ? 'success'
-                : 'secondary'
-            }
-          >
-            {copy(
-              employee.position.status === 'ACTIVE' && employee.position.serviceAssignmentEnabled
-                ? 'Can perform services'
-                : 'Cannot perform services',
-            )}
-          </DBadge>
-        ) : (
-          copy('Not set')
-        ),
+      render: (employee) => (
+        <DBadge variant={employee.canPerformServices ? 'success' : 'secondary'}>
+          {copy(employee.canPerformServices ? 'Can perform services' : 'Cannot perform services')}
+        </DBadge>
+      ),
     },
     {
       key: 'joinedOn',
@@ -362,6 +350,9 @@ function EmployeeEditor({
   const [code, setCode] = useState(employee?.code ?? '');
   const [displayName, setDisplayName] = useState(employee?.displayName ?? '');
   const [positionId, setPositionId] = useState(employee?.positionId ?? '');
+  const [servicePerformerEligible, setServicePerformerEligible] = useState(
+    employee?.servicePerformerEligible ?? true,
+  );
   const [joinedOn, setJoinedOn] = useState(employee?.joinedOn ?? '');
 
   const positions = useQuery({
@@ -378,12 +369,18 @@ function EmployeeEditor({
           ...(code.trim() ? { code: code.trim().toUpperCase() } : {}),
           displayName: displayName.trim(),
           positionId: positionId || null,
+          servicePerformerEligible,
           ...(joinedOn ? { joinedOn } : {}),
         });
       } else if (employee) {
         await api.update(employee, {
           displayName: displayName.trim(),
-          ...(positionId !== (employee.positionId ?? '') ? { positionId: positionId || null } : {}),
+          ...(positionId !== (employee.positionId ?? '')
+            ? { positionId: positionId || null }
+            : {}),
+          ...(servicePerformerEligible !== employee.servicePerformerEligible
+            ? { servicePerformerEligible }
+            : {}),
           joinedOn: joinedOn || null,
         });
       }
@@ -464,7 +461,7 @@ function EmployeeEditor({
             clearable
             placeholder={copy('Select position')}
             hint={copy(
-              'Service eligibility is controlled by the employee position. Catalog service assignment mode still decides whether assignment is optional or required.',
+              'The position must also allow service assignment for this employee to become selectable.',
             )}
           />
           <DDatePicker
@@ -476,6 +473,25 @@ function EmployeeEditor({
             variant="date"
             placeholder={copy('Select join date')}
           />
+          <section className="border-t border-[var(--color-border)] pt-4 sm:col-span-2">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-[var(--color-text)]">
+                  {copy('Can perform services')}
+                </p>
+                <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+                  {copy(
+                    'Allow this employee to be selected for service work. The position must also allow service assignment.',
+                  )}
+                </p>
+              </div>
+              <DToggle
+                checked={servicePerformerEligible}
+                onChange={setServicePerformerEligible}
+                ariaLabel={copy('Can perform services')}
+              />
+            </div>
+          </section>
         </div>
       )}
     </DDialog>

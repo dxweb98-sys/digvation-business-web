@@ -22,6 +22,8 @@ export interface Employee {
   displayName: string;
   positionId: string | null;
   position: EmployeePosition | null;
+  servicePerformerEligible: boolean;
+  canPerformServices: boolean;
   joinedOn: string | null;
   status: RecordStatus;
   version: number;
@@ -112,12 +114,14 @@ export interface CreateEmployeeInput {
   code?: string;
   displayName: string;
   positionId?: string | null;
+  servicePerformerEligible?: boolean;
   joinedOn?: string | null;
 }
 
 export interface UpdateEmployeeInput {
   displayName?: string;
   positionId?: string | null;
+  servicePerformerEligible?: boolean;
   status?: Employee['status'];
   joinedOn?: string | null;
   statusReason?: string | null;

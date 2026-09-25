@@ -197,7 +197,9 @@ export function EmployeeDetailDialog({
                 {copy('Employment information')}
               </h3>
               <p className="mt-1 max-w-3xl text-sm text-[var(--color-text-muted)]">
-                {copy('Service assignment eligibility is controlled by the employee position.')}
+                {copy(
+                  'Service performer eligibility requires both the employee setting and an active eligible position.',
+                )}
               </p>
               <DetailGrid>
                 <Field label={copy('Employee code')} value={employee.code} />
@@ -209,25 +211,13 @@ export function EmployeeDetailDialog({
                 <Field
                   label={copy('Service assignment')}
                   value={
-                    employee.position ? (
-                      <DBadge
-                        variant={
-                          employee.position.status === 'ACTIVE' &&
-                          employee.position.serviceAssignmentEnabled
-                            ? 'success'
-                            : 'secondary'
-                        }
-                      >
-                        {copy(
-                          employee.position.status === 'ACTIVE' &&
-                            employee.position.serviceAssignmentEnabled
-                            ? 'Can perform services'
-                            : 'Cannot perform services',
-                        )}
-                      </DBadge>
-                    ) : (
-                      copy('Not set')
-                    )
+                    <DBadge variant={employee.canPerformServices ? 'success' : 'secondary'}>
+                      {copy(
+                        employee.canPerformServices
+                          ? 'Can perform services'
+                          : 'Cannot perform services',
+                      )}
+                    </DBadge>
                   }
                 />
                 <Field

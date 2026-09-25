@@ -166,10 +166,20 @@ const workforceCopy: Record<string, { id: string; en: string }> = {
     id: 'Riwayat absensi tidak dapat dimuat.',
     en: 'Could not load attendance history.',
   },
-  'Service assignment eligibility is controlled by the employee position.': {
-    id: 'Penugasan layanan mengikuti jabatan karyawan.',
-    en: 'Service assignment follows the employee position.',
+  'The position must also allow service assignment for this employee to become selectable.': {
+    id: 'Jabatan juga harus mengizinkan penugasan layanan agar karyawan ini dapat dipilih.',
+    en: 'The position must also allow service assignment for this employee to become selectable.',
   },
+  'Allow this employee to be selected for service work. The position must also allow service assignment.':
+    {
+      id: 'Izinkan karyawan ini dipilih untuk mengerjakan layanan. Jabatan juga harus mengizinkan penugasan layanan.',
+      en: 'Allow this employee to be selected for service work. The position must also allow service assignment.',
+    },
+  'Service performer eligibility requires both the employee setting and an active eligible position.':
+    {
+      id: 'Kelayakan sebagai pelaksana layanan membutuhkan pengaturan karyawan dan jabatan aktif yang memenuhi syarat.',
+      en: 'Service performer eligibility requires both the employee setting and an active eligible position.',
+    },
 };
 
 export function useWorkforceLocalization() {
