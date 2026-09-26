@@ -542,6 +542,7 @@ const posCopy: Record<string, LocalizedCopy> = {
     'en-US': 'The service line is no longer available.',
   },
   'Use for all services': { 'id-ID': 'Pakai untuk semua layanan', 'en-US': 'Use for all services' },
+  'Use for all work': { 'id-ID': 'Pakai untuk semua pengerjaan', 'en-US': 'Use for all work' },
   'Applies to': { 'id-ID': 'Berlaku untuk', 'en-US': 'Applies to' },
   services: { 'id-ID': 'layanan', 'en-US': 'services' },
   Employees: { 'id-ID': 'Karyawan', 'en-US': 'Employees' },
@@ -573,6 +574,9 @@ const posCopy: Record<string, LocalizedCopy> = {
   'Choose employee': { 'id-ID': 'Pilih karyawan', 'en-US': 'Choose employee' },
   'Edit employee': { 'id-ID': 'Ubah', 'en-US': 'Edit employee' },
   'Change employee': { 'id-ID': 'Ubah karyawan', 'en-US': 'Change employee' },
+  'All work': { 'id-ID': 'Semua pengerjaan', 'en-US': 'All work' },
+  'Shared work': { 'id-ID': 'Dikerjakan bersama', 'en-US': 'Shared work' },
+  'work set': { 'id-ID': 'pengerjaan sudah diatur', 'en-US': 'work set' },
   'Paper width': { 'id-ID': 'Lebar kertas', 'en-US': 'Paper width' },
   'Send receipt': { 'id-ID': 'Kirim struk', 'en-US': 'Send receipt' },
   'Send receipt to customer': {

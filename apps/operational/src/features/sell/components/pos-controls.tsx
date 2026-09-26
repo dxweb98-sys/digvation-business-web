@@ -43,35 +43,55 @@ function clampNumericText(value: string, min: string, max: string | undefined, i
   return normalized;
 }
 
+const CANONICAL_AMOUNT = /^(-?)(\d+)(?:\.(\d+))?$/;
+
 /**
- * Converts a canonical Runtime decimal amount into the whole-IDR domain value
- * used by the payment form. Runtime uses decimal strings (for example
- * `105224.0000`); the currency control must never parse that as an Indonesian
- * formatted display value.
+ * Meaningful fraction digits of a canonical Runtime decimal: `105224.0000` has none,
+ * `328171.5000` has one. Runtime decimals carry up to four digits; only a non-zero
+ * fraction is meaningful. Anything that is not a canonical decimal reports none.
  */
-export function currencyInputFromAmount(value: string, fractionDigits = 0) {
-  const trimmed = value.trim();
-  if (!trimmed) return '';
-  const match = /^(-?)(\d+)(?:\.(\d+))?$/.exec(trimmed);
-  if (!match) throw new Error('Amount must be a canonical decimal string.');
-
-  const sign = match[1] ?? '';
-  const whole = match[2] ?? '0';
-  const fraction = match[3] ?? '';
-  if (fractionDigits === 0 && fraction && !/^0+$/.test(fraction)) {
-    throw new Error('Whole-currency payment amounts cannot contain fractional units.');
-  }
-
-  const normalizedWhole = whole.replace(/^0+(?=\d)/, '') || '0';
-  return fractionDigits === 0 || !fraction
-    ? `${sign}${normalizedWhole}`
-    : `${sign}${normalizedWhole}.${fraction}`;
+export function amountFractionDigits(value: string): number {
+  const match = CANONICAL_AMOUNT.exec(value.trim());
+  return match ? (match[3] ?? '').replace(/0+$/, '').length : 0;
 }
 
-/** Converts the CurrencyInput's parsed value into the payment command value. */
-export function normalizeCurrencyPaymentInput(value: string, fractionDigits = 0) {
+/**
+ * Converts a canonical Runtime decimal amount into the exact domain value used by the
+ * payment form. The value is never rounded, scaled or reinterpreted: `105224.0000`
+ * becomes `105224`, `328171.5000` becomes `328171.5`. Runtime uses `.` as its decimal
+ * point, so this must never treat it as a display thousands separator.
+ *
+ * Text that is not a canonical decimal yields no amount (empty) rather than a guess, so
+ * the payment stays disabled instead of charging a different value.
+ */
+export function currencyInputFromAmount(value: string): string {
+  const match = CANONICAL_AMOUNT.exec(value.trim());
+  if (!match) return '';
+  const sign = match[1] ?? '';
+  const whole = (match[2] ?? '0').replace(/^0+(?=\d)/, '');
+  const fraction = (match[3] ?? '').replace(/0+$/, '');
+  if (whole === '0' && !fraction) return '0';
+  return `${sign}${whole}${fraction ? `.${fraction}` : ''}`;
+}
+
+function normalizeAmountText(value: string, fractionDigits: number, keepTypingSeparator: boolean) {
+  const match = /^(\d*)(\.(\d*))?$/.exec(value.trim());
+  // Formatted or otherwise unrecognised text never becomes another amount.
+  if (!match) return '';
+  const whole = (match[1] ?? '').replace(/^0+(?=\d)/, '');
+  if (fractionDigits <= 0 || match[2] === undefined) return whole;
+  const fraction = (match[3] ?? '').slice(0, fractionDigits);
+  if (!fraction && !keepTypingSeparator) return whole || '0';
+  return `${whole || '0'}.${fraction}`;
+}
+
+/**
+ * Normalizes a domain amount (canonical `.` decimal) into the payment command value.
+ * Up to `fractionDigits` fraction digits are preserved exactly; nothing is rounded.
+ */
+export function normalizeCurrencyPaymentInput(value: string, fractionDigits = 4) {
   if (!value) return '';
-  return normalizeDecimalInput(value, { integer: fractionDigits === 0 });
+  return normalizeAmountText(value, fractionDigits, false);
 }
 
 /** Feature-owned numeric constraint handling composed from canonical DecimalInput. */
@@ -141,13 +161,13 @@ export function PosCurrencyInput({
   onChange: (value: string) => void;
   fractionDigits?: number;
 }) {
-  const normalizedValue = normalizeCurrencyPaymentInput(value, fractionDigits);
+  const normalizedValue = value ? normalizeAmountText(value, fractionDigits, true) : '';
   return (
     <DCurrencyInput
       {...props}
       value={normalizedValue}
       onValueChange={(nextValue) =>
-        onChange(normalizeCurrencyPaymentInput(nextValue, fractionDigits))
+        onChange(nextValue ? normalizeAmountText(nextValue, fractionDigits, true) : '')
       }
       className={`${className} tabular-nums`}
     />

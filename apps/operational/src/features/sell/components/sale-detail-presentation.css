@@ -1,5 +1,4 @@
-/* Section surfaces carry the priority: identity is tinted, the order list stays plain
-   white for scanning, and the money summary sits on a muted surface. */
+/* The identity header of a transaction is tinted; the order and summary are DCards. */
 .pos-detail-header {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-panel);
@@ -9,37 +8,6 @@
     var(--color-surface) 100%
   );
   padding: 16px;
-}
-
-.pos-detail-panel {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-panel);
-  background-color: var(--color-surface);
-  padding: 2px 14px;
-}
-
-.pos-detail-panel--muted {
-  border-color: color-mix(in srgb, var(--color-border) 80%, transparent);
-  background-color: color-mix(in srgb, var(--color-surface-muted) 45%, var(--color-surface));
-  padding: 14px;
-}
-
-.pos-financial-panel {
-  border: 1px solid color-mix(in srgb, var(--color-border) 80%, transparent);
-  border-radius: var(--radius-panel);
-  background-color: color-mix(in srgb, var(--color-surface-muted) 45%, var(--color-surface));
-  padding: 14px;
-}
-
-.pos-financial-panel > h3 + dl {
-  margin-top: 14px;
-}
-
-.pos-financial-panel__context {
-  margin: -14px -14px 14px;
-  border-bottom: 1px solid var(--color-border);
-  background-color: color-mix(in srgb, var(--color-surface-muted) 45%, var(--color-surface));
-  padding: 14px;
 }
 
 .pos-detail-columns {

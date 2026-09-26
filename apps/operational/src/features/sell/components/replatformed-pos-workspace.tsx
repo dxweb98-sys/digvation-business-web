@@ -20,6 +20,7 @@ import {
   useToast,
 } from '@digvation-labs/ui';
 import {
+  DAvatar,
   DDropdown as PortalDropdown,
   DTabs,
   DTabsContent,
@@ -55,7 +56,7 @@ import {
   X,
   XCircle,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
 import {
@@ -108,6 +109,7 @@ import type { CatalogItemTypeFilter } from '../use-selling-catalog';
 import type { useCashierTransactionWorkspace } from '../use-cashier-transaction-workspace';
 
 import {
+  amountFractionDigits,
   currencyInputFromAmount,
   normalizeCurrencyPaymentInput,
   PosCurrencyInput,
@@ -255,7 +257,8 @@ const statusMeta: Record<
 };
 
 function money(amount: string, locale: string) {
-  return formatMoney(amount, 'IDR', locale, 0);
+  // Whole IDR stays clean; a genuinely fractional authoritative amount keeps its fraction.
+  return formatMoney(amount, 'IDR', locale, Math.min(4, amountFractionDigits(amount)));
 }
 
 function wholePointValue(value: string | null | undefined): string | null {
@@ -375,35 +378,79 @@ function servicePerformerSummary(
 /** Distinct settings listed before the rest folds away, keeping long lines scannable. */
 const VISIBLE_PERFORMER_GROUPS = 3;
 
-function PerformerNames({ performers }: { performers: readonly PerformerCredit[] }) {
+/** Avatars stacked for one shared unit; more people than this collapse into the names. */
+const VISIBLE_AVATARS = 3;
+
+/**
+ * Who works one unit. The avatar carries identity so the name reads as a
+ * person. Several people on ONE unit overlap their avatars and add a
+ * "Shared work" caption; that is what tells it apart from several quantity
+ * units, which are listed as separate rows instead.
+ */
+function PerformerCredits({
+  performers,
+  allWork = false,
+}: {
+  performers: readonly PerformerCredit[];
+  /** The same person performs every unit of a quantity above one. */
+  allWork?: boolean;
+}) {
   const { copy } = useOperationalLocalization();
   if (!performers.length)
     return (
-      <span className="font-medium text-[var(--color-warning)]">{copy('No employee yet')}</span>
+      <span className="flex min-h-6 items-center">
+        <Badge variant="warning" dot>
+          {copy('No employee yet')}
+        </Badge>
+      </span>
     );
+  const shared = performers.length > 1;
   return (
-    // Bold name + muted share already separate people; a wrapped name keeps its
-    // share right after its last word.
-    <ul className="m-0 flex min-w-0 list-none flex-wrap gap-x-3 gap-y-0.5 p-0">
-      {performers.map((performer) => (
-        <li key={performer.employeeId} className="min-w-0 break-words">
-          <span className="font-medium text-[var(--color-text)]">{performer.name}</span>
-          {performer.percent ? (
-            <span className="ml-1 whitespace-nowrap tabular-nums text-[var(--color-text-muted)]">
-              {performer.percent}
+    <span className="flex min-w-0 items-start gap-2">
+      <span className="mt-0 flex shrink-0 -space-x-1.5" aria-hidden="true">
+        {performers.slice(0, VISIBLE_AVATARS).map((performer) => (
+          <DAvatar
+            key={performer.employeeId}
+            size="xs"
+            name={performer.name}
+            className="rounded-full ring-2 ring-[var(--color-surface)]"
+          />
+        ))}
+      </span>
+      <span className="min-w-0">
+        <span className="block break-words text-xs leading-6">
+          {performers.map((performer, index) => (
+            <span key={performer.employeeId}>
+              {index > 0 ? <span className="text-[var(--color-text-muted)]">, </span> : null}
+              <span className="font-medium text-[var(--color-text)]">{performer.name}</span>
+              {performer.percent ? (
+                <span className="ml-1 whitespace-nowrap text-xs tabular-nums text-[var(--color-text-muted)]">
+                  {performer.percent}
+                </span>
+              ) : null}
             </span>
+          ))}
+          {allWork ? (
+            <span className="text-xs text-[var(--color-text-muted)]"> · {copy('All work')}</span>
           ) : null}
-        </li>
-      ))}
-    </ul>
+        </span>
+        {shared ? (
+          <span className="block text-[11px] leading-4 text-[var(--color-text-muted)]">
+            {copy('Shared work')}
+          </span>
+        ) : null}
+      </span>
+    </span>
   );
 }
 
 /**
- * The performers of one service line as a compact, self-contained block: who,
- * which services it covers, and the one action that changes it.
+ * Who performs one service line, and the action that changes it, as ONE block:
+ * the action sits on the same row as the people it edits. One setting is one
+ * row; a structured "Work 1 / Work 2" list appears only when units really
+ * differ. Quantity is never repeated as names.
  */
-function ServicePerformerSummary({
+function ServicePerformers({
   itemName,
   summary,
   needsAttention,
@@ -425,83 +472,78 @@ function ServicePerformerSummary({
   const foldable = groups.length > VISIBLE_PERFORMER_GROUPS;
   const shown = foldable && !expanded ? groups.slice(0, VISIBLE_PERFORMER_GROUPS - 1) : groups;
   const hiddenCount = groups.length - shown.length;
-  const scope = varied
-    ? copy('Different for each service')
-    : unitCount > 1
-      ? `${copy('Applies to')} ${unitCount} ${copy('services')}`
-      : null;
 
   return (
-    <section
+    <div
+      role="group"
       aria-label={`${copy('Performed by')}: ${itemName}`}
-      className={`mt-2 rounded-[var(--radius-control)] px-3 py-2 text-xs ${
-        needsAttention
-          ? 'bg-[var(--color-warning)]/10 ring-1 ring-inset ring-[var(--color-warning)]/25'
-          : 'bg-[var(--color-surface-muted)]/70'
-      }`}
+      className="mt-2 flex min-w-0 items-start justify-between gap-3"
     >
-      <div className="flex min-h-7 items-center justify-between gap-2">
-        <p className="flex min-w-0 flex-wrap items-baseline gap-x-1.5">
-          <span className="font-semibold text-[var(--color-text)]">{copy('Performed by')}</span>
-          {scope ? <span className="text-[var(--color-text-muted)]">· {scope}</span> : null}
-        </p>
-        {editable ? (
+      <div className="min-w-0 flex-1">
+        {varied ? (
+          <>
+            <dl className="m-0 grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1">
+              {shown.map((group) => (
+                <Fragment key={group.units}>
+                  <dt className="whitespace-nowrap text-xs leading-6 tabular-nums text-[var(--color-text-muted)]">
+                    {copy('Work')} {group.units}
+                  </dt>
+                  <dd className="m-0 min-w-0">
+                    <PerformerCredits performers={group.performers} />
+                  </dd>
+                </Fragment>
+              ))}
+            </dl>
+            {foldable ? (
+              <button
+                type="button"
+                aria-expanded={expanded}
+                onClick={() => setExpanded((current) => !current)}
+                className="mt-1 inline-flex min-h-6 items-center gap-1 rounded-md text-xs font-semibold text-[var(--color-brand)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/30"
+              >
+                {expanded ? copy('Show less') : `${copy('Show')} ${hiddenCount} ${copy('more')}`}
+                <ChevronDown
+                  className={`size-3.5 transition-transform motion-reduce:transition-none ${expanded ? 'rotate-180' : ''}`}
+                  aria-hidden="true"
+                />
+              </button>
+            ) : null}
+          </>
+        ) : (
+          <PerformerCredits
+            performers={groups[0]?.performers ?? []}
+            allWork={unitCount > 1 && (groups[0]?.performers.length ?? 0) > 0}
+          />
+        )}
+      </div>
+      {editable ? (
+        needsAttention ? (
           <DButton
             size="sm"
-            variant={needsAttention ? 'outline' : 'ghost'}
+            variant="soft"
             disabled={disabled}
-            leftIcon={
-              needsAttention ? <UserPlus className="size-3.5" /> : <Pencil className="size-3.5" />
-            }
-            aria-label={`${copy(needsAttention ? 'Choose employee' : 'Change employee')}: ${itemName}`}
-            className="-mr-1.5 h-7 shrink-0 px-2 text-xs"
+            leftIcon={<UserPlus className="size-3.5" aria-hidden="true" />}
+            aria-label={`${copy('Choose employee')}: ${itemName}`}
+            className="-mt-0.5 h-7 shrink-0 px-2"
             onClick={onEdit}
           >
-            {copy(needsAttention ? 'Choose employee' : 'Edit employee')}
+            {copy('Choose employee')}
           </DButton>
-        ) : null}
-      </div>
-
-      {varied ? (
-        <>
-          <dl className="mt-0.5 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3">
-            {shown.map((group, index) => (
-              <div
-                key={group.units}
-                className={`col-span-2 grid grid-cols-subgrid py-1.5 ${
-                  index > 0 ? 'border-t border-[var(--color-border)]' : ''
-                }`}
-              >
-                <dt className="max-w-[7.5rem] break-words tabular-nums text-[var(--color-text-muted)]">
-                  {copy('Service')} {group.units}
-                </dt>
-                <dd className="m-0 min-w-0">
-                  <PerformerNames performers={group.performers} />
-                </dd>
-              </div>
-            ))}
-          </dl>
-          {foldable ? (
-            <button
-              type="button"
-              aria-expanded={expanded}
-              onClick={() => setExpanded((current) => !current)}
-              className="inline-flex min-h-7 items-center gap-1 rounded-md font-semibold text-[var(--color-brand)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/30"
-            >
-              {expanded ? copy('Show less') : `${copy('Show')} ${hiddenCount} ${copy('more')}`}
-              <ChevronDown
-                className={`size-3.5 transition-transform motion-reduce:transition-none ${expanded ? 'rotate-180' : ''}`}
-                aria-hidden="true"
-              />
-            </button>
-          ) : null}
-        </>
-      ) : (
-        <div className="pb-0.5">
-          <PerformerNames performers={groups[0]?.performers ?? []} />
-        </div>
-      )}
-    </section>
+        ) : (
+          <DButton
+            size="icon"
+            variant="ghost"
+            disabled={disabled}
+            title={copy('Change employee')}
+            aria-label={`${copy('Change employee')}: ${itemName}`}
+            className="-my-1 -mr-1.5 size-8 shrink-0 text-[var(--color-text-muted)]"
+            onClick={onEdit}
+          >
+            <Pencil className="size-3.5" aria-hidden="true" />
+          </DButton>
+        )
+      ) : null}
+    </div>
   );
 }
 
@@ -3235,6 +3277,7 @@ export function ReferencePaymentDialog({
   const progress = sale
     ? paymentProgress(sale)
     : { paidAmount: '0.0000', pendingAmount: '0.0000', remainingAmount: total };
+  const amountScale = amountFractionDigits(progress.remainingAmount);
   const normalizedAllocation =
     allocationMode === 'FULL'
       ? currencyInputFromAmount(progress.remainingAmount)
@@ -3259,7 +3302,7 @@ export function ReferencePaymentDialog({
     createDecimal(normalizedTender).lessThan(createDecimal(normalizedAllocation));
   const cashChange =
     isCash && allocationPositive && !cashShort
-      ? createDecimal(normalizedTender).minus(createDecimal(normalizedAllocation)).toFixed(0)
+      ? createDecimal(normalizedTender).minus(createDecimal(normalizedAllocation)).toFixed(4)
       : '0';
   const fullyPaid = sale ? hasSuccessfulCheckout(sale) : false;
   const collectsPayment = payNow && !fullyPaid;
@@ -3747,6 +3790,7 @@ export function ReferencePaymentDialog({
                               className="mt-1.5 h-11 rounded-lg bg-[var(--color-surface)] text-right text-lg font-bold"
                               value={appliedAmount}
                               onChange={onAppliedAmount}
+                              fractionDigits={amountScale}
                             />
                           </label>
                           {overAllocated ? (
@@ -4001,6 +4045,7 @@ export function ReferencePaymentDialog({
                           className="h-10 rounded-lg bg-[var(--color-surface)] text-right text-base font-bold"
                           value={tender}
                           onChange={onTender}
+                          fractionDigits={amountScale}
                         />
 
                         <div className="mt-2 grid grid-cols-5 gap-1.5">
@@ -4030,7 +4075,7 @@ export function ReferencePaymentDialog({
                               cashShort
                                 ? createDecimal(normalizedAllocation)
                                     .minus(createDecimal(normalizedTender || '0'))
-                                    .toFixed(0)
+                                    .toFixed(4)
                                 : cashChange,
                             )}
                           </span>
@@ -4058,6 +4103,14 @@ function useRetainedValue<T>(value: T | null): T | null {
   if (value !== null && value !== retained) setRetained(value);
   return value ?? retained;
 }
+
+/** The line status a transaction state already implies, so it is not repeated per item. */
+const impliedLineWorkStatus: Partial<Record<QueueStatus, string>> = {
+  QUEUED: 'WAITING',
+  PROGRESS: 'IN_PROGRESS',
+  COMPLETED: 'COMPLETED',
+  CANCELED: 'CANCELED',
+};
 
 const fulfillmentTone: Record<string, 'neutral' | 'brand' | 'success' | 'warning' | 'danger'> = {
   WAITING: 'warning',
@@ -4173,12 +4226,6 @@ export function ReferenceTransactionDetail({
           },
         ]
       : discountRows;
-  const paymentStateLabel =
-    settlement.paymentState === 'PAID'
-      ? 'Paid'
-      : settlement.paymentState === 'PARTIALLY_PAID'
-        ? 'Partially paid'
-        : 'Unpaid';
   const legacyLoyaltyRedemption = sale.loyaltyRedemption as
     | (NonNullable<Sale['loyaltyRedemption']> & {
         requestedPoints?: string;
@@ -4361,6 +4408,11 @@ export function ReferenceTransactionDetail({
                         ? servicePerformerSummary(line, employees, locale)
                         : null;
                       const editable = attributed && status === 'PROGRESS';
+                      // The transaction's own state already says "in progress"; a line only
+                      // repeats it when it differs (waiting, completed, canceled).
+                      const showWorkStatus =
+                        saleLineWorkStatus(line) !== null &&
+                        saleLineWorkStatus(line) !== (status ? impliedLineWorkStatus[status] : undefined);
                       return (
                         <SaleLineItem
                           key={line.id}
@@ -4382,9 +4434,9 @@ export function ReferenceTransactionDetail({
                               : null
                           }
                           context={
-                            saleLineWorkStatus(line) || durationLabel ? (
+                            showWorkStatus || line.workLineage || durationLabel ? (
                               <>
-                                {saleLineWorkStatus(line) ? (
+                                {showWorkStatus ? (
                                   <StatusPill
                                     tone={fulfillmentTone[saleLineWorkStatus(line)!] ?? 'neutral'}
                                   >
@@ -4400,7 +4452,7 @@ export function ReferenceTransactionDetail({
                           }
                           detail={
                             workSummary ? (
-                              <ServicePerformerSummary
+                              <ServicePerformers
                                 itemName={line.itemNameSnapshot}
                                 summary={workSummary}
                                 needsAttention={needsAttention}
@@ -4415,26 +4467,6 @@ export function ReferenceTransactionDetail({
                     })}
                   </SaleLineItemList>
                 </SaleDetailSection>
-
-                {completionIssues.length ? (
-                  <section className="rounded-[var(--radius-control)] border border-[var(--color-warning)]/25 bg-[var(--color-warning)]/[.06] px-3 py-2.5 text-xs">
-                    <p className="font-semibold text-[var(--color-warning)]">
-                      {copy('Not ready to complete')}
-                    </p>
-                    <div className="mt-1.5 space-y-1.5 text-[var(--color-text-muted)]">
-                      {completionIssueGroups.map((group) => (
-                        <div key={group.id}>
-                          <p className="font-medium text-[var(--color-text)]">{group.label}</p>
-                          <ul className="mt-0.5 list-disc space-y-0.5 pl-4">
-                            {group.issues.map((issue) => (
-                              <li key={issue}>{issue}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                ) : null}
               </div>
               <div
                 className={`pos-detail-column ${referenceTransactionDetailLayout.summaryColumn}`}
@@ -4443,33 +4475,21 @@ export function ReferenceTransactionDetail({
                   title={copy('Order summary')}
                   context={
                     referenceTransactionDetailPresentation.showRightContext ? (
-                      <div className="space-y-3">
-                        <div className="flex items-start gap-3">
-                          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[var(--color-brand)] text-sm font-bold text-white">
-                            {customerInitials(customer)}
-                          </span>
+                      <div>
+                        <div className="flex items-center gap-3">
+                          <DAvatar size="md" fallback={customerInitials(customer)} />
                           <div className="min-w-0 flex-1">
-                            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                              <p className="truncate text-sm font-bold text-[var(--color-text)]">
-                                {customerDisplayName(customer, locale)}
-                              </p>
-                              {customerStatus(customer) ? (
-                                <Badge
-                                  variant={customerStatus(customer)!.variant}
-                                  className="shrink-0 text-[10px]"
-                                >
-                                  {copy(customerStatus(customer)!.label)}
-                                </Badge>
-                              ) : null}
-                            </div>
+                            <p className="truncate text-[15px] font-semibold leading-5 text-[var(--color-text)]">
+                              {customerDisplayName(customer, locale)}
+                            </p>
                             {customerDisplayDetail(customer) ? (
-                              <p className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">
+                              <p className="truncate text-xs text-[var(--color-text-muted)]">
                                 {customerDisplayDetail(customer)}
                               </p>
                             ) : null}
                           </div>
                         </div>
-                        <div className="flex flex-wrap gap-1.5">
+                        <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5">
                           <StatusPill
                             tone={
                               sale.status === 'VOIDED' || status === 'CANCELED'
@@ -4480,28 +4500,22 @@ export function ReferenceTransactionDetail({
                           >
                             {status ? label(statusMeta[status].value) : label('OPEN')}
                           </StatusPill>
-                          <StatusPill
-                            tone={
-                              settlement.paymentState === 'PAID'
-                                ? 'success'
-                                : settlement.paymentState === 'PARTIALLY_PAID'
-                                  ? 'warning'
-                                  : 'neutral'
-                            }
-                          >
-                            {copy(paymentStateLabel)}
-                          </StatusPill>
-                        </div>
-                        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--color-text-muted)]">
-                          {sale.invoiceNumber ? (
-                            <span className="font-mono text-[var(--color-text)]">
-                              {sale.invoiceNumber}
-                            </span>
+                          {customerStatus(customer) ? (
+                            <Badge variant={customerStatus(customer)!.variant}>
+                              {copy(customerStatus(customer)!.label)}
+                            </Badge>
                           ) : null}
-                          <span>{transactionDate}</span>
+                          <span className="text-xs text-[var(--color-text-muted)] sm:ml-auto">
+                            {sale.invoiceNumber ? (
+                              <span className="mr-2 font-mono text-[var(--color-text)]">
+                                {sale.invoiceNumber}
+                              </span>
+                            ) : null}
+                            {transactionDate}
+                          </span>
                         </div>
                         {sale.status === 'VOIDED' && cancellationReason ? (
-                          <div className="border-l-2 border-[var(--color-danger)] pl-2.5 text-xs">
+                          <div className="mt-2 border-l-2 border-[var(--color-danger)] pl-2.5 text-xs">
                             <p className="font-semibold text-[var(--color-danger)]">
                               {copy('Cancellation reason')}
                             </p>
@@ -4608,6 +4622,22 @@ export function ReferenceTransactionDetail({
                     ) : null
                   }
                 />
+                {completionIssues.length ? (
+                  <DAlert variant="warning" title={copy('Not ready to complete')}>
+                    <div className="space-y-1.5 text-[var(--color-text-muted)]">
+                      {completionIssueGroups.map((group) => (
+                        <div key={group.id}>
+                          <p className="font-medium text-[var(--color-text)]">{group.label}</p>
+                          <ul className="mt-0.5 list-disc space-y-0.5 pl-4">
+                            {group.issues.map((issue) => (
+                              <li key={issue}>{issue}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  </DAlert>
+                ) : null}
               </div>
             </div>
           </div>
@@ -5554,6 +5584,7 @@ function ReferenceBalancePaymentDialog({
   const format = (amount: string) => money(amount, locale);
   const progress = paymentProgress(sale);
   const remainingToAllocate = availableToPay ?? progress.remainingAmount;
+  const amountScale = amountFractionDigits(remainingToAllocate);
   const normalizedAllocation = appliedAmount
     ? normalizeCurrencyPaymentInput(appliedAmount)
     : currencyInputFromAmount(remainingToAllocate);
@@ -5571,7 +5602,7 @@ function ReferenceBalancePaymentDialog({
     createDecimal(normalizedTender).lessThan(createDecimal(normalizedAllocation));
   const cashChange =
     isCash && allocationPositive && !cashShort
-      ? createDecimal(normalizedTender).minus(createDecimal(normalizedAllocation)).toFixed(0)
+      ? createDecimal(normalizedTender).minus(createDecimal(normalizedAllocation)).toFixed(4)
       : '0';
   const canPay =
     allocationPositive &&
@@ -5689,6 +5720,7 @@ function ReferenceBalancePaymentDialog({
                 className="mt-1.5 h-11 rounded-lg text-right text-lg font-bold"
                 value={appliedAmount}
                 onChange={onAppliedAmount}
+                fractionDigits={amountScale}
               />
             </label>
             {overAllocated ? (
@@ -5787,6 +5819,7 @@ function ReferenceBalancePaymentDialog({
                   className="mt-1.5 h-11 rounded-lg text-right text-lg font-bold"
                   value={tender}
                   onChange={onTender}
+                  fractionDigits={amountScale}
                 />
               </label>
               <div
@@ -5800,7 +5833,7 @@ function ReferenceBalancePaymentDialog({
                     cashShort
                       ? createDecimal(normalizedAllocation)
                           .minus(createDecimal(normalizedTender || '0'))
-                          .toFixed(0)
+                          .toFixed(4)
                       : cashChange,
                   )}
                 </span>

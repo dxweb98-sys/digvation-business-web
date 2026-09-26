@@ -2,10 +2,10 @@ import {
   DeploymentBootstrapProvider,
   type DeploymentBootstrapConfig,
 } from '@digvation/business-runtime';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { Sale } from '../cashier-transaction.types';
+import type { Employee, Sale, SaleLine } from '../cashier-transaction.types';
 import { presentableTransaction } from '../completed-sale-visibility';
 import {
   ReceiptContent,
@@ -313,5 +313,144 @@ describe('ReferenceTransactionDetail Runtime detail shapes', () => {
     expect(retry).not.toBeNull();
     retry?.click();
     expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('ReferenceTransactionDetail performer relationship', () => {
+  const people = [
+    { id: 'emp-andini', code: 'AND', displayName: 'Andini', status: 'ACTIVE' },
+    { id: 'emp-rindu', code: 'RIN', displayName: 'Rindu Putri', status: 'ACTIVE' },
+    { id: 'emp-sari', code: 'SAR', displayName: 'Sari', status: 'ACTIVE' },
+  ] as unknown as Employee[];
+
+  function withPerformers(): Sale {
+    const base = runtimeQueueDetail({ operationalState: 'IN_PROGRESS' });
+    const template = base.lines[0]!;
+    const participation = (lineId: string, employeeId: string) => ({
+      saleId: base.id,
+      saleLineId: lineId,
+      employeeId,
+      assigned: true,
+      shareRate: '1.000000000000000000',
+    });
+    const unit = (unitNumber: number, ...employeeIds: string[]) => ({
+      unitNumber,
+      employeeIds,
+      performers: employeeIds.map((employeeId) => ({ employeeId, shareRate: null })),
+    });
+    const service = (id: string, name: string, quantity: string) => ({
+      ...template,
+      id,
+      itemNameSnapshot: name,
+      variantNameSnapshot: null,
+      quantity,
+      participations: [],
+      workUnits: [],
+    });
+    return {
+      ...base,
+      lines: [
+        {
+          ...service('line-color', 'Hair Color', '2.0000'),
+          participations: [participation('line-color', 'emp-andini'), participation('line-color', 'emp-rindu')],
+          workUnits: [unit(1, 'emp-andini'), unit(2, 'emp-rindu')],
+        },
+        {
+          ...service('line-curly', 'Smoothing Curly', '1.0000'),
+          participations: [participation('line-curly', 'emp-sari')],
+        },
+        service('line-bleach', 'Body Bleaching', '1.0000'),
+        {
+          ...service('line-same', 'Facial Treatment', '2.0000'),
+          participations: [participation('line-same', 'emp-andini')],
+          workUnits: [unit(1, 'emp-andini'), unit(2, 'emp-andini')],
+        },
+        {
+          ...service('line-shared', 'Creambath', '1.0000'),
+          participations: [participation('line-shared', 'emp-andini'), participation('line-shared', 'emp-rindu')],
+          workUnits: [unit(1, 'emp-andini', 'emp-rindu')],
+        },
+      ],
+    } as unknown as Sale;
+  }
+
+  function renderDetail(onAssign: (line: SaleLine) => void = vi.fn()) {
+    return render(
+      <DeploymentBootstrapProvider config={bootstrap}>
+        <ReferenceTransactionDetail
+          sale={withPerformers()}
+          locale="id-ID"
+          employees={people}
+          businessName="Digvation"
+          branchName="Main branch"
+          cashierName="Kasir"
+          showPaymentReceipt={false}
+          onClose={vi.fn()}
+          onNewSale={vi.fn()}
+          onViewReceipt={vi.fn()}
+          onAssign={onAssign}
+          onComplete={vi.fn()}
+          isMutating={false}
+        />
+      </DeploymentBootstrapProvider>,
+    );
+  }
+
+  const groupOf = (name: RegExp) => screen.getByRole('group', { name });
+
+  it('ties each unit of a quantity-2 service to its own performer, in a structured list', () => {
+    renderDetail();
+    const color = groupOf(/Hair Color/);
+    expect(within(color).getByText(/Pengerjaan 1/)).toBeTruthy();
+    expect(within(color).getByText('Andini')).toBeTruthy();
+    expect(within(color).getByText(/Pengerjaan 2/)).toBeTruthy();
+    expect(within(color).getByText('Rindu Putri')).toBeTruthy();
+  });
+
+  it('keeps a single performer compact: only the name, no unit numbering, no other performers', () => {
+    renderDetail();
+    const curly = groupOf(/Smoothing Curly/);
+    expect(within(curly).getByText('Sari')).toBeTruthy();
+    expect(within(curly).queryByText(/Pengerjaan/)).toBeNull();
+    expect(within(curly).queryByText('Andini')).toBeNull();
+  });
+
+  it('summarises the same performer on every unit instead of repeating the name', () => {
+    renderDetail();
+    const same = groupOf(/Facial Treatment/);
+    expect(within(same).getAllByText('Andini')).toHaveLength(1);
+    expect(within(same).getByText(/Semua pengerjaan/)).toBeTruthy();
+    expect(within(same).queryByText(/Pengerjaan \d/)).toBeNull();
+  });
+
+  it('shows several contributors on ONE unit as shared work, distinct from a quantity of two', () => {
+    renderDetail();
+    const shared = groupOf(/Creambath/);
+    expect(within(shared).getByText('Andini')).toBeTruthy();
+    expect(within(shared).getByText('Rindu Putri')).toBeTruthy();
+    expect(within(shared).getByText(/Dikerjakan bersama/)).toBeTruthy();
+    // Not presented as two separate work units.
+    expect(within(shared).queryByText(/Pengerjaan \d/)).toBeNull();
+    expect(within(shared).queryByText(/Semua pengerjaan/)).toBeNull();
+  });
+
+  it('makes a missing performer clear and actionable, with the action beside the item status', () => {
+    renderDetail();
+    const bleach = groupOf(/Body Bleaching/);
+    expect(within(bleach).getByText('Belum ada karyawan')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Pilih karyawan: Body Bleaching/ })).toBeTruthy();
+    // Services that already have performers offer a plain change action.
+    expect(screen.getByRole('button', { name: /Ubah karyawan: Hair Color/ })).toBeTruthy();
+  });
+
+  it('edits exactly the item whose action was clicked', () => {
+    const onAssign = vi.fn();
+    renderDetail(onAssign);
+    fireEvent.click(screen.getByRole('button', { name: /Ubah karyawan: Hair Color/ }));
+    expect(onAssign).toHaveBeenCalledTimes(1);
+    expect((onAssign.mock.calls[0]![0] as SaleLine).itemNameSnapshot).toBe('Hair Color');
+    fireEvent.click(screen.getByRole('button', { name: /Pilih karyawan: Body Bleaching/ }));
+    expect(onAssign).toHaveBeenCalledTimes(2);
+    expect((onAssign.mock.calls[1]![0] as SaleLine).itemNameSnapshot).toBe('Body Bleaching');
   });
 });

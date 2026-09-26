@@ -63,6 +63,80 @@ describe('SaleFinancialSummary', () => {
   });
 });
 
+describe('SaleFinancialSummary settlement', () => {
+  const labels = {
+    subtotal: 'Subtotal',
+    total: 'Total',
+    paid: 'Paid amount',
+    balance: 'Remaining',
+    settled: 'Settled',
+    cashReceived: 'Cash received',
+    change: 'Change',
+    discount: 'Discount',
+    discountContext: () => 'Transaction',
+  };
+  const summary = (settlement: Parameters<typeof SaleFinancialSummary>[0]['settlement']) => (
+    <SaleFinancialSummary
+      title="Order summary"
+      labels={labels}
+      gross="100000.0000"
+      discounts={[]}
+      tax={null}
+      total="100000.0000"
+      settlement={settlement}
+      format={(amount) => `Rp ${amount}`}
+      payment={{ title: 'Payment', content: <p>Cash</p> }}
+    />
+  );
+
+  it('says "settled" once, without repeating the paid amount, when payments equal the total', () => {
+    render(
+      summary({
+        paymentState: 'PAID',
+        totalPaid: '100000.0000',
+        balanceDue: '0.0000',
+        cashTendered: '100000.0000',
+        cashChange: null,
+      }),
+    );
+    expect(screen.getByText('Settled')).toBeTruthy();
+    expect(screen.queryByText('Paid amount')).toBeNull();
+    expect(screen.queryByText('Remaining')).toBeNull();
+    // Exact cash adds nothing beyond the payment itself.
+    expect(screen.queryByText('Cash received')).toBeNull();
+  });
+
+  it('shows what was paid and what remains, and no settled badge, while a balance is due', () => {
+    render(
+      summary({
+        paymentState: 'PARTIALLY_PAID',
+        totalPaid: '40000.0000',
+        balanceDue: '60000.0000',
+        cashTendered: null,
+        cashChange: null,
+      }),
+    );
+    expect(screen.queryByText('Settled')).toBeNull();
+    expect(screen.getByText('Paid amount')).toBeTruthy();
+    expect(screen.getByText('Remaining')).toBeTruthy();
+    expect(screen.getByText('Rp 60000.0000')).toBeTruthy();
+  });
+
+  it('keeps cash received and change when change was given', () => {
+    render(
+      summary({
+        paymentState: 'PAID',
+        totalPaid: '100000.0000',
+        balanceDue: '0.0000',
+        cashTendered: '150000.0000',
+        cashChange: '50000.0000',
+      }),
+    );
+    expect(screen.getByText('Cash received')).toBeTruthy();
+    expect(screen.getByText('Change')).toBeTruthy();
+  });
+});
+
 describe('reference transaction detail layout', () => {
   it('leaves sizing and scrolling to the shared Dialog body', () => {
     expect(referenceTransactionDetailLayout.dialog).toContain('lg:!max-w-[1060px]');

@@ -3,12 +3,12 @@ import {
   type DeploymentBootstrapConfig,
 } from '@digvation/business-runtime';
 import { DToastProvider } from '@digvation-labs/ui';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { PaymentRoute, Sale } from '../cashier-transaction.types';
-import { currencyInputFromAmount } from './pos-controls';
+import { amountFractionDigits, currencyInputFromAmount, normalizeCurrencyPaymentInput } from './pos-controls';
 import { ReferencePaymentDialog } from './replatformed-pos-workspace';
 
 const bootstrap = {
@@ -35,33 +35,43 @@ const route: PaymentRoute = {
   updatedAt: '2026-09-25T00:00:00.000Z',
 };
 
-const sale = {
-  id: 'sale-1',
-  saleNumber: 'TRX-1',
-  currency: 'IDR',
-  status: 'OPEN',
-  operationalState: 'QUEUED',
-  version: 1,
-  totalAmount: '105224.0000',
-  payments: [],
-} as unknown as Sale;
+function saleFor(amount: string) {
+  return {
+    id: 'sale-1',
+    saleNumber: 'TRX-1',
+    currency: 'IDR',
+    status: 'OPEN',
+    operationalState: 'QUEUED',
+    version: 1,
+    totalAmount: amount,
+    payments: [],
+  } as unknown as Sale;
+}
 
-const lines = [
-  {
-    id: 'line-1',
-    itemNameSnapshot: 'Layanan',
-    quantity: '1.0000',
-    effectiveUnitPrice: '105224.0000',
-    totalAmount: '105224.0000',
-    lineDiscountAmount: '0.0000',
-  },
-] as never[];
+function linesFor(amount: string) {
+  return [
+    {
+      id: 'line-1',
+      itemNameSnapshot: 'Layanan',
+      quantity: '1.0000',
+      effectiveUnitPrice: amount,
+      totalAmount: amount,
+      lineDiscountAmount: '0.0000',
+    },
+  ] as never[];
+}
 
-function PaymentHarness({ onConfirm }: { onConfirm: (amount: string) => Promise<void> }) {
-  const [appliedAmount, setAppliedAmount] = useState(() =>
-    currencyInputFromAmount('105224.0000'),
-  );
+function PaymentHarness({
+  onConfirm,
+  amount = '105224.0000',
+}: {
+  onConfirm: (amount: string) => Promise<void>;
+  amount?: string;
+}) {
+  const [appliedAmount, setAppliedAmount] = useState(() => currencyInputFromAmount(amount));
   const [tender, setTender] = useState('');
+  const sale = saleFor(amount);
+  const lines = linesFor(amount);
 
   return (
     <DeploymentBootstrapProvider config={bootstrap}>
@@ -71,8 +81,8 @@ function PaymentHarness({ onConfirm }: { onConfirm: (amount: string) => Promise<
           onClose={vi.fn()}
           sale={sale}
           lines={lines}
-          total="105224.0000"
-          gross="105224.0000"
+          total={amount}
+          gross={amount}
           discountAmount="0.0000"
           discountLabel="Diskon"
           taxAmount="0.0000"
@@ -115,6 +125,8 @@ function PaymentHarness({ onConfirm }: { onConfirm: (amount: string) => Promise<
   );
 }
 
+afterEach(cleanup);
+
 describe('ReferencePaymentDialog currency boundary', () => {
   it('keeps an authoritative IDR amount exact through Pas, cash entry, quick tender, change, and payment confirmation', async () => {
     const onConfirm = vi.fn(async () => undefined);
@@ -136,5 +148,57 @@ describe('ReferencePaymentDialog currency boundary', () => {
     fireEvent.click(screen.getByRole('button', { name: /Bayar.*105[.,]224/ }));
     fireEvent.click(screen.getByRole('button', { name: /Konfirmasi dan selesaikan/ }));
     expect(onConfirm).toHaveBeenCalledWith('105224');
+  });
+});
+
+describe('ReferencePaymentDialog fractional Runtime amounts', () => {
+  it('keeps a canonical fractional amount exact through Pas, cash entry, change and the payment payload without crashing', async () => {
+    const onConfirm = vi.fn(async () => undefined);
+    // Runtime tax on a discounted net legitimately yields fractions such as 328171.5000.
+    render(<PaymentHarness onConfirm={onConfirm} amount="328171.5000" />);
+
+    expect(screen.getByRole('button', { name: /Bayar.*328[.,]171[.,]5/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Pas.*328[.,]171[.,]5/ }));
+    expect((screen.getByLabelText('Uang diterima') as HTMLInputElement).value).toBe('328.171,5');
+
+    fireEvent.change(screen.getByLabelText('Uang diterima'), { target: { value: '400.000' } });
+    // Change is exact: 400000 - 328171.5 = 71828.5, never rounded to a whole unit.
+    expect(screen.getByText(/Rp\s?71[.,]828[.,]5/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: /Bayar.*328[.,]171[.,]5/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Konfirmasi dan selesaikan/ }));
+    expect(onConfirm).toHaveBeenCalledWith('328171.5');
+  });
+
+  it('keeps the manual quick amounts unchanged', () => {
+    render(<PaymentHarness onConfirm={vi.fn(async () => undefined)} amount="105224.0000" />);
+    for (const amount of ['50[.,]000', '100[.,]000', '150[.,]000', '200[.,]000', '500[.,]000'])
+      expect(screen.getByRole('button', { name: new RegExp(`Rp\\s?${amount}`) })).toBeTruthy();
+  });
+});
+
+describe('payment amount converters', () => {
+  it('preserves canonical whole and fractional Runtime decimals exactly, never scaling them', () => {
+    expect(currencyInputFromAmount('105224.0000')).toBe('105224');
+    expect(currencyInputFromAmount('105224')).toBe('105224');
+    expect(currencyInputFromAmount('328171.5000')).toBe('328171.5');
+    expect(currencyInputFromAmount('340758.9000')).toBe('340758.9');
+    expect(currencyInputFromAmount('0.0000')).toBe('0');
+    expect(currencyInputFromAmount('0.5000')).toBe('0.5');
+    expect(amountFractionDigits('105224.0000')).toBe(0);
+    expect(amountFractionDigits('328171.5000')).toBe(1);
+    expect(amountFractionDigits('12.3456')).toBe(4);
+    expect(normalizeCurrencyPaymentInput('328171.5')).toBe('328171.5');
+    expect(normalizeCurrencyPaymentInput('105224')).toBe('105224');
+  });
+
+  it('never turns malformed or display-formatted text into another amount', () => {
+    for (const malformed of ['105.224,0000', '105,224', 'Rp105.224', '1e5', '12.3.4', '--5', 'abc'])
+      expect(currencyInputFromAmount(malformed)).toBe('');
+    for (const malformed of ['105.224,0', 'Rp105.224', '1e5', 'abc'])
+      expect(normalizeCurrencyPaymentInput(malformed)).toBe('');
+    // Extra typed fraction digits are dropped, not rounded; whole-only entry ignores a fraction.
+    expect(normalizeCurrencyPaymentInput('10.99', 1)).toBe('10.9');
+    expect(normalizeCurrencyPaymentInput('10.99', 0)).toBe('10');
   });
 });
