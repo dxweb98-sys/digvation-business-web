@@ -116,6 +116,7 @@ import {
   PosNumericInput,
 } from './pos-controls';
 import {
+  SaleCustomerStrip,
   SaleDetailSection,
   SaleFinancialSummary,
   SaleLineItem,
@@ -3355,19 +3356,26 @@ export function ReferencePaymentDialog({
 
   const editFooter = (
     <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2">
-      <DButton variant="outline" onClick={requestClose}>
+      <DButton variant="ghost" className="h-12 px-3 text-sm" onClick={requestClose}>
         {copy(hasRecordedMoney && !fullyPaid ? 'Leave payment' : 'Cancel')}
       </DButton>
       {collectsPayment ? (
-        <DButton disabled={!canPay} onClick={() => setStep('review')} className="justify-center">
-          {copy('Pay')} {format(normalizedAllocation || '0')} <ChevronRight className="size-4" />
+        <DButton
+          size="lg"
+          disabled={!canPay}
+          onClick={() => setStep('review')}
+          rightIcon={<ChevronRight className="size-4" aria-hidden="true" />}
+          className="w-full justify-center whitespace-nowrap"
+        >
+          {copy('Pay')} {format(normalizedAllocation || '0')}
         </DButton>
       ) : (
         <DButton
+          size="lg"
           disabled={!canQueue}
           loading={isSubmitting}
           onClick={onQueue}
-          className="justify-center"
+          className="w-full justify-center whitespace-nowrap"
         >
           {copy('Add to queue')}
         </DButton>
@@ -3437,33 +3445,28 @@ export function ReferencePaymentDialog({
       ) : step === 'leave' ? (
         <PaymentLeaveNotice progress={progress} format={format} hasPending={hasPending} />
       ) : (
-        <div className="grid h-[min(720px,calc(100dvh-7.5rem))] min-h-0 gap-0 overflow-hidden lg:grid-cols-[minmax(0,1fr)_440px]">
-          <div className="min-h-0 space-y-3 overflow-y-auto overscroll-contain bg-[var(--color-surface)] p-4 pr-3 lg:border-r lg:border-[var(--color-border)]">
-            <section className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]">
-              <div className="flex items-center justify-between gap-4 border-b border-[var(--color-border)] bg-[var(--color-surface-muted)]/55 px-4 py-3.5">
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[var(--color-brand)]/[.08] text-[var(--color-brand)]">
-                    <ShoppingBag className="size-4" aria-hidden="true" />
+        <div className="grid min-h-0 gap-0 lg:h-[min(720px,calc(85dvh-5.5rem))] lg:grid-cols-[minmax(0,1fr)_440px] lg:overflow-hidden">
+          <div className="min-h-0 space-y-3 overscroll-contain bg-[var(--color-surface)] p-4 lg:overflow-y-auto lg:border-r lg:border-[var(--color-border)] lg:pr-3">
+            <section className="pos-pay-section">
+              <div className="pos-pay-section__head border-b border-[var(--color-border)]">
+                <div className="pos-pay-section__title">
+                  <ShoppingBag
+                    className="size-4 shrink-0 text-[var(--color-text-muted)]"
+                    aria-hidden="true"
+                  />
+                  <span className="truncate">{copy('Order details')}</span>
+                  <span className="shrink-0 rounded-full bg-[var(--color-surface-muted)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-text-muted)]">
+                    {lines.length} {copy('items')}
                   </span>
-                  <div className="flex min-w-0 items-center gap-2">
-                    <p className="truncate text-sm font-bold text-[var(--color-text)]">
-                      {copy('Order details')}
-                    </p>
-                    <span className="shrink-0 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-text-muted)]">
-                      {lines.length} {copy('items')}
-                    </span>
-                  </div>
                 </div>
                 <div className="shrink-0 text-right">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
-                    {copy('Subtotal')}
-                  </p>
+                  <p className="pos-pay-eyebrow">{copy('Subtotal')}</p>
                   <p className="mt-0.5 text-sm font-bold tabular-nums text-[var(--color-text)]">
                     {format(gross)}
                   </p>
                 </div>
               </div>
-              <div className="divide-y divide-[var(--color-border)] bg-[var(--color-surface)]">
+              <div className="divide-y divide-[var(--color-border)]/70 bg-[var(--color-surface)]">
                 {lines.map((line) => {
                   const discountPercentage = lineDiscountPercentage(line);
                   const discounted = isPositiveDecimal(line.lineDiscountAmount);
@@ -3544,37 +3547,34 @@ export function ReferencePaymentDialog({
             {adjustmentSlot}
 
             {customer?.type === 'MEMBER' && (canRedeemLoyalty || hasLoyaltyRedemption) ? (
-              <section className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]">
-                <div className="border-b border-[var(--color-border)] bg-[var(--color-surface-muted)]/45 px-4 py-3">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2.5">
-                        <span className="grid size-8 shrink-0 place-items-center rounded-full border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/[.08] text-[var(--color-warning)]">
-                          <Sparkles className="size-4" aria-hidden="true" />
-                        </span>
-                        <p className="text-sm font-bold">{copy('Loyalty points')}</p>
-                      </div>
-                      <p className="mt-1 pl-10 text-xs leading-5 text-[var(--color-text-muted)]">
-                        {copy(
-                          'Use member points for this transaction. Points are consumed only when the sale is finalized.',
-                        )}
-                      </p>
-                    </div>
-                    <div className="shrink-0 rounded-xl border border-[var(--color-warning)]/25 bg-[var(--color-warning)]/[.07] px-3 py-2 text-right">
-                      <p className="text-[10px] font-semibold text-[var(--color-warning)]">
-                        {copy('Point balance')}
-                      </p>
-                      <p className="mt-0.5 text-base font-bold tabular-nums text-[var(--color-warning)]">
-                        {isLoyaltyBalanceLoading
-                          ? '…'
-                          : `${pointQuantity(loyaltyPointBalance, locale)} PTS`}
-                      </p>
-                    </div>
+              <section className="pos-pay-section pos-pay-section--secondary">
+                <div className="pos-pay-section__head items-start">
+                  <div className="min-w-0">
+                    <p className="pos-pay-section__title">
+                      <Sparkles
+                        className="size-4 shrink-0 text-[var(--color-warning)]"
+                        aria-hidden="true"
+                      />
+                      {copy('Loyalty points')}
+                    </p>
+                    <p className="mt-1 pl-6 text-xs leading-5 text-[var(--color-text-muted)]">
+                      {copy(
+                        'Use member points for this transaction. Points are consumed only when the sale is finalized.',
+                      )}
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="pos-pay-eyebrow">{copy('Point balance')}</p>
+                    <p className="mt-0.5 text-sm font-bold tabular-nums text-[var(--color-warning)]">
+                      {isLoyaltyBalanceLoading
+                        ? '…'
+                        : `${pointQuantity(loyaltyPointBalance, locale)} PTS`}
+                    </p>
                   </div>
                 </div>
-                <div className="p-3">
+                <div className="px-4 pb-4">
                   {!hasLoyaltyRedemption && canRedeemLoyalty && !loyaltyEditorOpen ? (
-                    <div className="mt-3 rounded-xl bg-[var(--color-surface-muted)]/55 p-3">
+                    <div className="rounded-xl bg-[var(--color-surface)] p-3">
                       <div className="flex items-center justify-between gap-3">
                         <p className="text-xs text-[var(--color-text-muted)]">
                           {copy('Available balance')}: {pointQuantity(loyaltyPointBalance, locale)}{' '}
@@ -3594,7 +3594,7 @@ export function ReferencePaymentDialog({
                   ) : null}
 
                   {loyaltyEditorOpen && canRedeemLoyalty ? (
-                    <div className="mt-3 rounded-xl bg-[var(--color-surface-muted)]/55 p-3">
+                    <div className="rounded-xl bg-[var(--color-surface)] p-3">
                       <div className="mb-2 flex items-center justify-between gap-3">
                         <p className="text-xs font-semibold">{copy('Points to use')}</p>
                         <p className="text-xs text-[var(--color-text-muted)]">
@@ -3647,7 +3647,7 @@ export function ReferencePaymentDialog({
                       </div>
                     </div>
                   ) : hasLoyaltyRedemption ? (
-                    <div className="mt-3 flex items-center gap-3 rounded-[var(--radius-control)] border border-[var(--color-success)]/20 bg-[var(--color-success)]/[.06] px-3 py-2.5">
+                    <div className="flex items-center gap-3 rounded-xl border border-[var(--color-success)]/20 bg-[var(--color-success)]/[.06] px-3 py-2.5">
                       <CheckCircle2
                         className="size-4 shrink-0 text-[var(--color-success)]"
                         aria-hidden="true"
@@ -3697,14 +3697,14 @@ export function ReferencePaymentDialog({
 
             {/* Once money is recorded the transaction is already being paid now. */}
             {!hasRecordedMoney ? (
-              <section className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]">
-                <div className="flex items-center gap-2.5 border-b border-[var(--color-border)] bg-[var(--color-surface-muted)]/45 px-4 py-3">
-                  <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[var(--color-brand)]/[.08] text-[var(--color-brand)]">
-                    <Clock className="size-4" aria-hidden="true" />
-                  </span>
-                  <p className="text-sm font-bold">{copy('Payment timing')}</p>
+              <section className="pos-pay-section pos-pay-section--primary">
+                <div className="pos-pay-section__head">
+                  <p className="pos-pay-section__title">
+                    <Clock className="size-4 shrink-0 text-[var(--color-brand)]" aria-hidden="true" />
+                    {copy('Payment timing')}
+                  </p>
                 </div>
-                <div className="p-3">
+                <div className="pos-pay-section__body">
                   <div className="grid gap-2 sm:grid-cols-2">
                     {[
                       {
@@ -3822,64 +3822,50 @@ export function ReferencePaymentDialog({
             ) : null}
           </div>
 
-          <div className="sticky top-0 flex h-full w-full min-h-0 self-stretch flex-col overflow-hidden bg-[var(--color-surface)] lg:w-[440px] lg:min-w-[440px]">
-            <div className="shrink-0 space-y-3 p-4 pb-3">
+          <div className="max-lg:contents lg:sticky lg:top-0 lg:flex lg:h-full lg:min-h-0 lg:w-[440px] lg:min-w-[440px] lg:flex-col lg:self-stretch lg:overflow-hidden lg:bg-[var(--color-surface-muted)]/60">
+            <div className="shrink-0 space-y-3 bg-[var(--color-surface-muted)]/60 p-4 pb-3 lg:overflow-y-hidden lg:[scrollbar-gutter:stable]">
               {customer ? (
-                <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-3.5">
-                  <div className="flex items-center gap-3">
-                    <div className="grid size-11 shrink-0 place-items-center rounded-full bg-[var(--color-brand)] text-sm font-bold text-white">
-                      {customerInitials(customer)}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <p className="truncate text-base font-bold">
-                          {customerDisplayName(customer, locale)}
-                        </p>
-                        {customerBadge ? (
-                          <Badge
-                            variant={customerBadge.variant}
-                            className="shrink-0 px-2 py-0 text-[10px]"
-                          >
-                            {copy(customerBadge.label)}
-                          </Badge>
-                        ) : null}
-                      </div>
-                      {customerDisplayDetail(customer) ? (
-                        <p className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">
-                          {customerDisplayDetail(customer)}
-                        </p>
-                      ) : null}
-                    </div>
-                    {customer.type === 'MEMBER' ? (
-                      <div className="shrink-0 border-l border-[var(--color-border)] pl-4 text-right">
-                        <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
-                          {copy('Points')}
-                        </p>
-                        <p className="mt-1 text-sm font-bold text-[var(--color-warning)]">
+                <SaleCustomerStrip
+                  initials={customerInitials(customer)}
+                  name={customerDisplayName(customer, locale)}
+                  detail={customerDisplayDetail(customer)}
+                  badge={
+                    customerBadge ? (
+                      <Badge
+                        variant={customerBadge.variant}
+                        className="shrink-0 px-2 py-0 text-[10px]"
+                      >
+                        {copy(customerBadge.label)}
+                      </Badge>
+                    ) : null
+                  }
+                  aside={
+                    customer.type === 'MEMBER' ? (
+                      <>
+                        <p className="pos-pay-eyebrow">{copy('Points')}</p>
+                        <p className="mt-0.5 text-sm font-bold tabular-nums text-[var(--color-warning)]">
                           {isLoyaltyBalanceLoading
                             ? '…'
                             : `${pointQuantity(loyaltyPointBalance, locale)} PTS`}
                         </p>
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
+                      </>
+                    ) : null
+                  }
+                />
               ) : null}
 
-              <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-3.5">
-                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
-                  {copy('Payment total')}
-                </p>
-                <h3 className="mt-1 text-3xl font-bold leading-tight tabular-nums text-[var(--color-brand)]">
+              <div className="pos-pay-section p-4 shadow-sm">
+                <p className="pos-pay-eyebrow">{copy('Payment total')}</p>
+                <h3 className="mt-0.5 text-3xl font-bold leading-tight tabular-nums text-[var(--color-brand)]">
                   {format(total)}
                 </h3>
-                <div className="mt-4 border-t border-[var(--color-border)] pt-3 text-sm">
+                <div className="mt-3 space-y-1.5 border-t border-[var(--color-border)] pt-3 text-[13px]">
                   <div className="flex justify-between gap-3">
                     <span className="text-[var(--color-text-muted)]">{copy('Subtotal')}</span>
-                    <span className="font-semibold">{format(gross)}</span>
+                    <span className="font-semibold tabular-nums">{format(gross)}</span>
                   </div>
                   {hasDiscount ? (
-                    <div className="mt-2 flex justify-between gap-3">
+                    <div className="flex justify-between gap-3">
                       <span className="text-[var(--color-text-muted)]">{discountLabel}</span>
                       <span className="font-semibold text-[var(--color-danger)]">
                         −{format(discountAmount)}
@@ -3887,7 +3873,7 @@ export function ReferencePaymentDialog({
                     </div>
                   ) : null}
                   {hasLoyaltyRedemption ? (
-                    <div className="mt-2 flex justify-between gap-3">
+                    <div className="flex justify-between gap-3">
                       <span className="flex items-center gap-2 text-[var(--color-text-muted)]">
                         <span className="size-2 rounded-full bg-[var(--color-warning)]" />
                         {copy('Loyalty redemption')}
@@ -3898,12 +3884,12 @@ export function ReferencePaymentDialog({
                     </div>
                   ) : null}
                   {hasTax ? (
-                    <div className="mt-2 flex justify-between gap-3">
+                    <div className="flex justify-between gap-3">
                       <span className="text-[var(--color-text-muted)]">{taxLabel}</span>
                       <span className="font-semibold">{format(taxAmount)}</span>
                     </div>
                   ) : null}
-                  <div className="mt-3 flex justify-between border-t border-[var(--color-border)] pt-3">
+                  <div className="flex justify-between border-t border-[var(--color-border)] pt-2.5 text-sm font-bold">
                     <span className="font-bold">{copy('Net total')}</span>
                     <span className="font-bold">{format(total)}</span>
                   </div>
@@ -3927,7 +3913,7 @@ export function ReferencePaymentDialog({
               </div>
             </div>
 
-            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 pb-4">
+            <div className="min-h-0 flex-1 space-y-3 overscroll-contain bg-[var(--color-surface-muted)]/60 px-4 pb-4 lg:overflow-y-auto lg:[scrollbar-gutter:stable]">
               {hasPaymentActivity && sale ? (
                 <RecordedPaymentList
                   payments={payments}
@@ -3941,18 +3927,18 @@ export function ReferencePaymentDialog({
 
               {collectsPayment ? (
                 <>
-                  <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-3.5">
-                    <div className="mb-2.5 flex items-center justify-between gap-3">
-                      <p className="text-sm font-bold uppercase tracking-wide text-[var(--color-text)]">
+                  <div className="pos-pay-section p-4 shadow-sm">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <p className="text-sm font-bold text-[var(--color-text)]">
                         {copy('Payment method')}
                       </p>
-                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-success)]">
-                        <span className="size-2 rounded-full bg-[var(--color-success)]" />
+                      <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[var(--color-success)]">
+                        <span className="size-1.5 rounded-full bg-[var(--color-success)]" />
                         {copy('Ready to pay')}
                       </span>
                     </div>
                     {hasRecordedMoney ? (
-                      <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+                      <p className="pos-pay-eyebrow mb-3">
                         {copy('Next payment')}
                       </p>
                     ) : null}
@@ -3980,9 +3966,9 @@ export function ReferencePaymentDialog({
                             disabled={disabled}
                             aria-pressed={selected}
                             onClick={() => onMethod(option.value)}
-                            className={`flex h-10 min-w-0 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
+                            className={`flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg border px-2 text-[13px] font-semibold sm:gap-2 sm:px-3 sm:text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
                               selected
-                                ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white shadow-sm'
+                                ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/[.08] text-[var(--color-brand)] ring-1 ring-[var(--color-brand)]'
                                 : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] hover:border-[var(--color-brand)]/40 hover:bg-[var(--color-brand)]/[.04]'
                             }`}
                           >
@@ -4027,14 +4013,14 @@ export function ReferencePaymentDialog({
                         />
                       </div>
                     ) : (
-                      <div className="mt-3 border-t border-[var(--color-border)] pt-3">
-                        <div className="mb-1.5 flex items-center justify-between gap-3">
-                          <span className="text-sm font-semibold">{copy('Cash received')}</span>
+                      <div className="mt-4 border-t border-[var(--color-border)] pt-4">
+                        <div className="mb-2 flex items-center justify-between gap-3">
+                          <span className="text-sm font-bold">{copy('Cash received')}</span>
                           <button
                             type="button"
                             disabled={!allocationPositive}
                             onClick={() => onTender(normalizedAllocation)}
-                            className="text-xs font-semibold text-[var(--color-brand)] hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                            className="rounded-full bg-[var(--color-brand)]/[.08] px-2.5 py-1 text-xs font-semibold text-[var(--color-brand)] transition-colors hover:bg-[var(--color-brand)]/[.14] disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             {copy('Exact amount')} {format(normalizedAllocation || '0')}
                           </button>
@@ -4042,13 +4028,13 @@ export function ReferencePaymentDialog({
 
                         <PosCurrencyInput
                           aria-label={copy('Cash received')}
-                          className="h-10 rounded-lg bg-[var(--color-surface)] text-right text-base font-bold"
+                          className="h-12 rounded-lg bg-[var(--color-surface)] text-right text-lg font-bold"
                           value={tender}
                           onChange={onTender}
                           fractionDigits={amountScale}
                         />
 
-                        <div className="mt-2 grid grid-cols-5 gap-1.5">
+                        <div className="mt-2 grid grid-cols-3 gap-2">
                           {normalizedQuickTender
                             .filter((amount) => amount !== normalizedAllocation)
                             .slice(0, 5)
@@ -4057,7 +4043,7 @@ export function ReferencePaymentDialog({
                                 key={amount}
                                 type="button"
                                 onClick={() => onTender(amount)}
-                                className={`h-8 rounded-md border px-1 text-[10px] font-semibold transition-colors ${normalizeCurrencyPaymentInput(tender) === amount ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-muted)]'}`}
+                                className={`h-9 rounded-md border px-1 text-xs font-semibold tabular-nums transition-colors ${normalizeCurrencyPaymentInput(tender) === amount ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-muted)]'}`}
                               >
                                 {format(amount)}
                               </button>
@@ -4065,12 +4051,12 @@ export function ReferencePaymentDialog({
                         </div>
 
                         <div
-                          className={`mt-2 flex items-center justify-between rounded-lg px-3 py-1.5 ${cashShort ? 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]' : 'bg-[var(--color-success)]/10 text-[var(--color-success)]'}`}
+                          className={`mt-3 flex items-center justify-between rounded-lg px-3 py-2.5 ${cashShort ? 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]' : 'bg-[var(--color-success)]/10 text-[var(--color-success)]'}`}
                         >
                           <span className="text-sm font-bold">
                             {copy(cashShort ? 'Payment short' : 'Change')}
                           </span>
-                          <span className="text-sm font-bold tabular-nums">
+                          <span className="text-base font-bold tabular-nums">
                             {format(
                               cashShort
                                 ? createDecimal(normalizedAllocation)
@@ -4087,7 +4073,7 @@ export function ReferencePaymentDialog({
               ) : null}
             </div>
 
-            <div className="shrink-0 border-t border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3">
+            <div className="shrink-0 border-t border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 max-lg:sticky max-lg:bottom-0 max-lg:z-10 shadow-[0_-4px_12px_-8px_rgb(0_0_0/0.18)]">
               {editFooter}
             </div>
           </div>
@@ -4329,14 +4315,15 @@ export function ReferenceTransactionDetail({
               </div>
             </div>
           ) : (
-            <div className="flex flex-col-reverse gap-2 border-t border-[var(--color-border)] pt-3 sm:flex-row sm:items-center sm:justify-end">
-              <DButton variant="ghost" onClick={onClose}>
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:justify-end">
+              <DButton variant="ghost" className="justify-center" onClick={onClose}>
                 {copy('Close')}
               </DButton>
               {receiptAvailable ? (
                 <DButton
                   rightIcon={<Printer className="size-3.5" />}
                   variant="outline"
+                  className="justify-center"
                   onClick={() => onViewReceipt(sale)}
                 >
                   {copy('View receipt')}
@@ -4345,6 +4332,7 @@ export function ReferenceTransactionDetail({
               {status === 'PROGRESS' ? (
                 <DButton
                   variant="primary"
+                  className="order-first col-span-2 justify-center sm:order-none"
                   disabled={completionIssues.length > 0}
                   loading={isMutating}
                   leftIcon={<CheckCircle2 className="size-3.5" />}
@@ -4378,11 +4366,12 @@ export function ReferenceTransactionDetail({
             </div>
           </div>
         ) : (
-          <div className={`${referenceTransactionDetailLayout.body} gap-5 px-5 py-5 sm:px-6`}>
+          <div className={referenceTransactionDetailLayout.body}>
             <div className="pos-detail-columns">
               <div className={`pos-detail-column ${referenceTransactionDetailLayout.orderColumn}`}>
                 <SaleDetailSection
                   title={copy('Order')}
+                  icon={<ShoppingBag className="size-4" />}
                   aside={`${activeLines.length} ${copy('items')}`}
                 >
                   <SaleLineItemList>
@@ -4476,20 +4465,22 @@ export function ReferenceTransactionDetail({
                   context={
                     referenceTransactionDetailPresentation.showRightContext ? (
                       <div>
-                        <div className="flex items-center gap-3">
-                          <DAvatar size="md" fallback={customerInitials(customer)} />
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-[15px] font-semibold leading-5 text-[var(--color-text)]">
-                              {customerDisplayName(customer, locale)}
-                            </p>
-                            {customerDisplayDetail(customer) ? (
-                              <p className="truncate text-xs text-[var(--color-text-muted)]">
-                                {customerDisplayDetail(customer)}
-                              </p>
-                            ) : null}
-                          </div>
-                        </div>
-                        <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                        <SaleCustomerStrip
+                          initials={customerInitials(customer)}
+                          name={customerDisplayName(customer, locale)}
+                          detail={customerDisplayDetail(customer)}
+                          badge={
+                            customerStatus(customer) ? (
+                              <Badge
+                                variant={customerStatus(customer)!.variant}
+                                className="shrink-0 px-2 py-0 text-[10px]"
+                              >
+                                {copy(customerStatus(customer)!.label)}
+                              </Badge>
+                            ) : null
+                          }
+                        />
+                        <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1.5 px-1">
                           <StatusPill
                             tone={
                               sale.status === 'VOIDED' || status === 'CANCELED'
@@ -4500,11 +4491,6 @@ export function ReferenceTransactionDetail({
                           >
                             {status ? label(statusMeta[status].value) : label('OPEN')}
                           </StatusPill>
-                          {customerStatus(customer) ? (
-                            <Badge variant={customerStatus(customer)!.variant}>
-                              {copy(customerStatus(customer)!.label)}
-                            </Badge>
-                          ) : null}
                           <span className="text-xs text-[var(--color-text-muted)] sm:ml-auto">
                             {sale.invoiceNumber ? (
                               <span className="mr-2 font-mono text-[var(--color-text)]">
