@@ -1,3 +1,4 @@
+import { saleLineWorkStatus } from '../queued-sale-work';
 import { compareDecimalStrings, createDecimal, formatMoney } from '@digvation/pos-money';
 import { DBadge, DButton } from '@digvation-labs/ui';
 import { Minus, Plus, SlidersHorizontal, Trash2 } from 'lucide-react';
@@ -66,9 +67,9 @@ export function SaleLineRow({
       ) : null}
 
       <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-semibold text-[var(--color-text-muted)]">
-        {line.fulfillment ? (
+        {saleLineWorkStatus(line) ? (
           <DBadge className="bg-[var(--color-accent-sky)]/45 px-2 py-1">
-            {line.fulfillment.status}
+            {saleLineWorkStatus(line)}
           </DBadge>
         ) : null}
         {assignedCount > 0 ? (

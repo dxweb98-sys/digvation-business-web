@@ -225,6 +225,24 @@ describe('saleSettlement', () => {
     });
   });
 
+  it('presents a cash return through a compensation fact as change given back', () => {
+    expect(
+      saleSettlement({
+        totalAmount: '205350.0000',
+        payments: [
+          payment('SUCCEEDED', '222000.0000', 'CASH', '222000.0000', '0.0000'),
+          payment('SUCCEEDED', '-16650.0000', 'CASH'),
+        ],
+      }),
+    ).toEqual({
+      totalPaid: '205350.0000',
+      balanceDue: '0.0000',
+      cashTendered: '222000.0000',
+      cashChange: '16650.0000',
+      paymentState: 'PAID',
+    });
+  });
+
   it('reconciles an exact two-way split and keeps cash tender separate from applied amount', () => {
     expect(
       saleSettlement({

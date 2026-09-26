@@ -68,6 +68,26 @@ export interface SetSaleLineQuantityInput {
   quantity: string;
 }
 
+/** Deliberate pre-finalization replacement; Runtime remains money authority. */
+export interface CorrectSaleLineInput {
+  expectedVersion: number;
+  catalogItemId: string;
+  catalogVariantId?: string;
+  quantity: string;
+  reason: string;
+}
+export interface CorrectionPreview {
+  saleId: string;
+  saleVersion: number;
+  currency: string;
+  currentTotalAmount: string;
+  correctedTotalAmount: string;
+  netSuccessfulPaidAmount: string;
+  remainingPaymentAmount: string;
+  overpaymentAmount: string;
+  replacement: { itemName: string; variantName: string | null; quantity: string };
+}
+
 export interface PriceOverrideInput {
   expectedVersion: number;
   amount: string;
@@ -119,6 +139,11 @@ export interface CreatePaymentInput {
 export interface PaymentTransitionInput {
   expectedVersion: number;
   status: Exclude<PaymentStatus, 'PENDING'>;
+}
+
+export interface OpenSalePaymentCompensationInput {
+  expectedVersion: number;
+  amount: string;
 }
 
 export interface SellingCatalogDisplayInput {
@@ -191,6 +216,17 @@ export interface SaleTransactionClient {
     input: SetSaleLineQuantityInput,
   ): Promise<Sale>;
   removeSaleLine(saleId: string, saleLineId: string, expectedVersion: number): Promise<Sale>;
+  correctSaleLine?(
+    saleId: string,
+    saleLineId: string,
+    input: CorrectSaleLineInput,
+    idempotencyKey: string,
+  ): Promise<Sale>;
+  previewSaleLineCorrection?(
+    saleId: string,
+    saleLineId: string,
+    input: Omit<CorrectSaleLineInput, 'reason'>,
+  ): Promise<CorrectionPreview>;
   setSaleLinePriceOverride(
     saleId: string,
     saleLineId: string,
@@ -242,6 +278,12 @@ export interface SaleTransactionClient {
     saleId: string,
     paymentId: string,
     input: PaymentTransitionInput,
+  ): Promise<Sale>;
+  compensateOpenSalePayment?(
+    saleId: string,
+    paymentId: string,
+    input: OpenSalePaymentCompensationInput,
+    idempotencyKey: string,
   ): Promise<Sale>;
   finalizeSale(saleId: string, expectedVersion: number, idempotencyKey: string): Promise<Sale>;
   voidSale(saleId: string, expectedVersion: number, idempotencyKey: string): Promise<Sale>;
@@ -440,6 +482,30 @@ export class HttpCashierTransactionAdapter
     });
   }
 
+  public correctSaleLine(
+    saleId: string,
+    saleLineId: string,
+    input: CorrectSaleLineInput,
+    idempotencyKey: string,
+  ): Promise<Sale> {
+    return this.client.post<Sale>(
+      `${API_PREFIX}/sales/${saleId}/lines/${saleLineId}/correct`,
+      input,
+      { headers: { 'Idempotency-Key': idempotencyKey } },
+    );
+  }
+
+  public previewSaleLineCorrection(
+    saleId: string,
+    saleLineId: string,
+    input: Omit<CorrectSaleLineInput, 'reason'>,
+  ): Promise<CorrectionPreview> {
+    return this.client.post<CorrectionPreview>(
+      `${API_PREFIX}/sales/${saleId}/lines/${saleLineId}/correction-preview`,
+      input,
+    );
+  }
+
   public setSaleLinePriceOverride(
     saleId: string,
     saleLineId: string,
@@ -598,6 +664,19 @@ export class HttpCashierTransactionAdapter
     return this.client.post<Sale>(
       `${API_PREFIX}/sales/${saleId}/payments/${paymentId}/status`,
       input,
+    );
+  }
+
+  public compensateOpenSalePayment(
+    saleId: string,
+    paymentId: string,
+    input: OpenSalePaymentCompensationInput,
+    idempotencyKey: string,
+  ): Promise<Sale> {
+    return this.client.post<Sale>(
+      `${API_PREFIX}/sales/${saleId}/payments/${paymentId}/compensate-open`,
+      input,
+      { headers: { 'Idempotency-Key': idempotencyKey } },
     );
   }
 

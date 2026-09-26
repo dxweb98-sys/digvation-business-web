@@ -20,6 +20,7 @@ import {
   useToast,
 } from '@digvation-labs/ui';
 import {
+  DAvatar,
   DDropdown as PortalDropdown,
   DTabs,
   DTabsContent,
@@ -55,7 +56,7 @@ import {
   X,
   XCircle,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
 import {
@@ -75,7 +76,7 @@ import {
   createCashierTransactionAdapter,
   isLocalCashierDemoEnabled,
 } from '../cashier-transaction-adapter-factory';
-import { hasStartableQueuedWork } from '../queued-sale-work';
+import { hasStartableQueuedWork, saleLineWorkStatus } from '../queued-sale-work';
 import {
   appliedPaymentComposition,
   employeeDisplayName,
@@ -107,7 +108,13 @@ import type {
 import type { CatalogItemTypeFilter } from '../use-selling-catalog';
 import type { useCashierTransactionWorkspace } from '../use-cashier-transaction-workspace';
 
-import { normalizeCurrencyPresentationInput, PosCurrencyInput } from './pos-controls';
+import {
+  amountFractionDigits,
+  currencyInputFromAmount,
+  normalizeCurrencyPaymentInput,
+  PosCurrencyInput,
+  PosNumericInput,
+} from './pos-controls';
 import {
   SaleDetailSection,
   SaleFinancialSummary,
@@ -250,7 +257,8 @@ const statusMeta: Record<
 };
 
 function money(amount: string, locale: string) {
-  return formatMoney(amount, 'IDR', locale, 0);
+  // Whole IDR stays clean; a genuinely fractional authoritative amount keeps its fraction.
+  return formatMoney(amount, 'IDR', locale, Math.min(4, amountFractionDigits(amount)));
 }
 
 function wholePointValue(value: string | null | undefined): string | null {
@@ -370,35 +378,79 @@ function servicePerformerSummary(
 /** Distinct settings listed before the rest folds away, keeping long lines scannable. */
 const VISIBLE_PERFORMER_GROUPS = 3;
 
-function PerformerNames({ performers }: { performers: readonly PerformerCredit[] }) {
+/** Avatars stacked for one shared unit; more people than this collapse into the names. */
+const VISIBLE_AVATARS = 3;
+
+/**
+ * Who works one unit. The avatar carries identity so the name reads as a
+ * person. Several people on ONE unit overlap their avatars and add a
+ * "Shared work" caption; that is what tells it apart from several quantity
+ * units, which are listed as separate rows instead.
+ */
+function PerformerCredits({
+  performers,
+  allWork = false,
+}: {
+  performers: readonly PerformerCredit[];
+  /** The same person performs every unit of a quantity above one. */
+  allWork?: boolean;
+}) {
   const { copy } = useOperationalLocalization();
   if (!performers.length)
     return (
-      <span className="font-medium text-[var(--color-warning)]">{copy('No employee yet')}</span>
+      <span className="flex min-h-6 items-center">
+        <Badge variant="warning" dot>
+          {copy('No employee yet')}
+        </Badge>
+      </span>
     );
+  const shared = performers.length > 1;
   return (
-    // Bold name + muted share already separate people; a wrapped name keeps its
-    // share right after its last word.
-    <ul className="m-0 flex min-w-0 list-none flex-wrap gap-x-3 gap-y-0.5 p-0">
-      {performers.map((performer) => (
-        <li key={performer.employeeId} className="min-w-0 break-words">
-          <span className="font-medium text-[var(--color-text)]">{performer.name}</span>
-          {performer.percent ? (
-            <span className="ml-1 whitespace-nowrap tabular-nums text-[var(--color-text-muted)]">
-              {performer.percent}
+    <span className="flex min-w-0 items-start gap-2">
+      <span className="mt-0 flex shrink-0 -space-x-1.5" aria-hidden="true">
+        {performers.slice(0, VISIBLE_AVATARS).map((performer) => (
+          <DAvatar
+            key={performer.employeeId}
+            size="xs"
+            name={performer.name}
+            className="rounded-full ring-2 ring-[var(--color-surface)]"
+          />
+        ))}
+      </span>
+      <span className="min-w-0">
+        <span className="block break-words text-xs leading-6">
+          {performers.map((performer, index) => (
+            <span key={performer.employeeId}>
+              {index > 0 ? <span className="text-[var(--color-text-muted)]">, </span> : null}
+              <span className="font-medium text-[var(--color-text)]">{performer.name}</span>
+              {performer.percent ? (
+                <span className="ml-1 whitespace-nowrap text-xs tabular-nums text-[var(--color-text-muted)]">
+                  {performer.percent}
+                </span>
+              ) : null}
             </span>
+          ))}
+          {allWork ? (
+            <span className="text-xs text-[var(--color-text-muted)]"> · {copy('All work')}</span>
           ) : null}
-        </li>
-      ))}
-    </ul>
+        </span>
+        {shared ? (
+          <span className="block text-[11px] leading-4 text-[var(--color-text-muted)]">
+            {copy('Shared work')}
+          </span>
+        ) : null}
+      </span>
+    </span>
   );
 }
 
 /**
- * The performers of one service line as a compact, self-contained block: who,
- * which services it covers, and the one action that changes it.
+ * Who performs one service line, and the action that changes it, as ONE block:
+ * the action sits on the same row as the people it edits. One setting is one
+ * row; a structured "Work 1 / Work 2" list appears only when units really
+ * differ. Quantity is never repeated as names.
  */
-function ServicePerformerSummary({
+function ServicePerformers({
   itemName,
   summary,
   needsAttention,
@@ -420,83 +472,78 @@ function ServicePerformerSummary({
   const foldable = groups.length > VISIBLE_PERFORMER_GROUPS;
   const shown = foldable && !expanded ? groups.slice(0, VISIBLE_PERFORMER_GROUPS - 1) : groups;
   const hiddenCount = groups.length - shown.length;
-  const scope = varied
-    ? copy('Different for each service')
-    : unitCount > 1
-      ? `${copy('Applies to')} ${unitCount} ${copy('services')}`
-      : null;
 
   return (
-    <section
+    <div
+      role="group"
       aria-label={`${copy('Performed by')}: ${itemName}`}
-      className={`mt-2 rounded-[var(--radius-control)] px-3 py-2 text-xs ${
-        needsAttention
-          ? 'bg-[var(--color-warning)]/10 ring-1 ring-inset ring-[var(--color-warning)]/25'
-          : 'bg-[var(--color-surface-muted)]/70'
-      }`}
+      className="mt-2 flex min-w-0 items-start justify-between gap-3"
     >
-      <div className="flex min-h-7 items-center justify-between gap-2">
-        <p className="flex min-w-0 flex-wrap items-baseline gap-x-1.5">
-          <span className="font-semibold text-[var(--color-text)]">{copy('Performed by')}</span>
-          {scope ? <span className="text-[var(--color-text-muted)]">· {scope}</span> : null}
-        </p>
-        {editable ? (
+      <div className="min-w-0 flex-1">
+        {varied ? (
+          <>
+            <dl className="m-0 grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1">
+              {shown.map((group) => (
+                <Fragment key={group.units}>
+                  <dt className="whitespace-nowrap text-xs leading-6 tabular-nums text-[var(--color-text-muted)]">
+                    {copy('Work')} {group.units}
+                  </dt>
+                  <dd className="m-0 min-w-0">
+                    <PerformerCredits performers={group.performers} />
+                  </dd>
+                </Fragment>
+              ))}
+            </dl>
+            {foldable ? (
+              <button
+                type="button"
+                aria-expanded={expanded}
+                onClick={() => setExpanded((current) => !current)}
+                className="mt-1 inline-flex min-h-6 items-center gap-1 rounded-md text-xs font-semibold text-[var(--color-brand)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/30"
+              >
+                {expanded ? copy('Show less') : `${copy('Show')} ${hiddenCount} ${copy('more')}`}
+                <ChevronDown
+                  className={`size-3.5 transition-transform motion-reduce:transition-none ${expanded ? 'rotate-180' : ''}`}
+                  aria-hidden="true"
+                />
+              </button>
+            ) : null}
+          </>
+        ) : (
+          <PerformerCredits
+            performers={groups[0]?.performers ?? []}
+            allWork={unitCount > 1 && (groups[0]?.performers.length ?? 0) > 0}
+          />
+        )}
+      </div>
+      {editable ? (
+        needsAttention ? (
           <DButton
             size="sm"
-            variant={needsAttention ? 'outline' : 'ghost'}
+            variant="soft"
             disabled={disabled}
-            leftIcon={
-              needsAttention ? <UserPlus className="size-3.5" /> : <Pencil className="size-3.5" />
-            }
-            aria-label={`${copy(needsAttention ? 'Choose employee' : 'Change employee')}: ${itemName}`}
-            className="-mr-1.5 h-7 shrink-0 px-2 text-xs"
+            leftIcon={<UserPlus className="size-3.5" aria-hidden="true" />}
+            aria-label={`${copy('Choose employee')}: ${itemName}`}
+            className="-mt-0.5 h-7 shrink-0 px-2"
             onClick={onEdit}
           >
-            {copy(needsAttention ? 'Choose employee' : 'Edit employee')}
+            {copy('Choose employee')}
           </DButton>
-        ) : null}
-      </div>
-
-      {varied ? (
-        <>
-          <dl className="mt-0.5 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3">
-            {shown.map((group, index) => (
-              <div
-                key={group.units}
-                className={`col-span-2 grid grid-cols-subgrid py-1.5 ${
-                  index > 0 ? 'border-t border-[var(--color-border)]' : ''
-                }`}
-              >
-                <dt className="max-w-[7.5rem] break-words tabular-nums text-[var(--color-text-muted)]">
-                  {copy('Service')} {group.units}
-                </dt>
-                <dd className="m-0 min-w-0">
-                  <PerformerNames performers={group.performers} />
-                </dd>
-              </div>
-            ))}
-          </dl>
-          {foldable ? (
-            <button
-              type="button"
-              aria-expanded={expanded}
-              onClick={() => setExpanded((current) => !current)}
-              className="inline-flex min-h-7 items-center gap-1 rounded-md font-semibold text-[var(--color-brand)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/30"
-            >
-              {expanded ? copy('Show less') : `${copy('Show')} ${hiddenCount} ${copy('more')}`}
-              <ChevronDown
-                className={`size-3.5 transition-transform motion-reduce:transition-none ${expanded ? 'rotate-180' : ''}`}
-                aria-hidden="true"
-              />
-            </button>
-          ) : null}
-        </>
-      ) : (
-        <div className="pb-0.5">
-          <PerformerNames performers={groups[0]?.performers ?? []} />
-        </div>
-      )}
-    </section>
+        ) : (
+          <DButton
+            size="icon"
+            variant="ghost"
+            disabled={disabled}
+            title={copy('Change employee')}
+            aria-label={`${copy('Change employee')}: ${itemName}`}
+            className="-my-1 -mr-1.5 size-8 shrink-0 text-[var(--color-text-muted)]"
+            onClick={onEdit}
+          >
+            <Pencil className="size-3.5" aria-hidden="true" />
+          </DButton>
+        )
+      ) : null}
+    </div>
   );
 }
 
@@ -516,16 +563,21 @@ function isPositiveDecimal(value: string) {
   }
 }
 
-function employeeAssignmentIssues(line: SaleLine, locale: string): string[] {
+function employeeAssignmentIssues(
+  line: SaleLine,
+  locale: string,
+  // A corrected replacement is staffed on its retired historical source line.
+  workLine: SaleLine = line,
+): string[] {
   const issues: string[] = [];
   if (
     line.employeeAssignmentModeSnapshot === 'REQUIRED' &&
-    !line.participations.some((participation) => participation.assigned)
+    !workLine.participations.some((participation) => participation.assigned)
   ) {
     issues.push(`${line.itemNameSnapshot}: ${copyFor('Select an employee.', locale)}`);
   }
   if (line.allowEmployeeContributionSnapshot) {
-    const shares = line.participations.filter(
+    const shares = workLine.participations.filter(
       (participation) => participation.assigned && participation.shareRate !== null,
     );
     const total = shares.reduce(
@@ -567,15 +619,19 @@ function workflowIssues(sale: Sale, locale: string) {
       line.itemTypeSnapshot === 'SERVICE' && line.fulfillmentBehaviorSnapshot === 'TRACKED';
     if (!requiresTrackedServiceAssignment) continue;
 
-    const plannedUnits = line.workUnits?.length ?? 0;
-    if (plannedUnits > 0 && plannedUnits !== serviceWorkUnitCount(line)) {
+    const workLine =
+      (line.workLineage
+        ? sale.lines.find((candidate) => candidate.id === line.workLineage!.sourceLineId)
+        : null) ?? line;
+    const plannedUnits = workLine.workUnits?.length ?? 0;
+    if (plannedUnits > 0 && plannedUnits !== serviceWorkUnitCount(workLine)) {
       issues.push(
         `${line.itemNameSnapshot}: ${copyFor('Every work unit needs at least one employee.', locale)}`,
       );
       continue;
     }
 
-    issues.push(...employeeAssignmentIssues(line, locale));
+    issues.push(...employeeAssignmentIssues(line, locale, workLine));
   }
   return issues;
 }
@@ -949,7 +1005,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       checkoutSale && checkoutSale.payments.length
         ? paymentProgress(checkoutSale).remainingAmount
         : checkoutTotal;
-    const normalizedCheckoutTotal = normalizeCurrencyPresentationInput(openAmount);
+    const normalizedCheckoutTotal = currencyInputFromAmount(openAmount);
     setPaymentAmount(normalizedCheckoutTotal);
     setTender(normalizedCheckoutTotal);
     setPaymentError(null);
@@ -1174,7 +1230,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       );
       setQueueDetail(null);
       const latestPaymentRoutes = await workspace.refreshPaymentRoutes();
-      const normalizedAvailable = normalizeCurrencyPresentationInput(availableToPay);
+      const normalizedAvailable = currencyInputFromAmount(availableToPay);
       setPaymentMethod('CASH');
       setPaymentRouteId(
         latestPaymentRoutes.find((route) => route.paymentMethod === 'CASH')?.id ?? '',
@@ -1268,7 +1324,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const recordCheckoutPayment = (allocationOverride?: string) =>
     sendPaymentOnce(async () => {
       if (!sale || !lines.length) return;
-      const allocation = normalizeCurrencyPresentationInput(allocationOverride ?? paymentAmount);
+      const allocation = normalizeCurrencyPaymentInput(allocationOverride ?? paymentAmount);
       const progress = paymentProgress(sale);
       if (
         !isPositiveDecimal(allocation) ||
@@ -1277,7 +1333,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         return;
       const tendered =
         paymentMethod === 'CASH'
-          ? normalizeCurrencyPresentationInput(tender || allocation)
+          ? normalizeCurrencyPaymentInput(tender || allocation)
           : undefined;
       if (tendered && createDecimal(tendered).lessThan(createDecimal(allocation))) return;
       const selectedRoute =
@@ -1305,8 +1361,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       const next = paymentProgress(completedSale);
       if (!hasSuccessfulCheckout(completedSale)) {
         const waiting = completedSale.payments.some((payment) => payment.status === 'PENDING');
-        setPaymentAmount(normalizeCurrencyPresentationInput(next.remainingAmount));
-        setTender(normalizeCurrencyPresentationInput(next.remainingAmount));
+        setPaymentAmount(currencyInputFromAmount(next.remainingAmount));
+        setTender(currencyInputFromAmount(next.remainingAmount));
         setPaymentReference('');
         showToast({
           title: copy(waiting ? 'Payment waiting for confirmation' : 'Payment recorded'),
@@ -1336,8 +1392,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     sendPaymentOnce(async () => {
       const transaction = displayedQueuePaymentTarget;
       if (!transaction || !queuePaymentAmount) return;
-      const due = normalizeCurrencyPresentationInput(queuePaymentAmount);
-      const allocation = normalizeCurrencyPresentationInput(paymentAmount);
+      const due = currencyInputFromAmount(queuePaymentAmount);
+      const allocation = normalizeCurrencyPaymentInput(paymentAmount);
       if (
         !isPositiveDecimal(allocation) ||
         createDecimal(allocation).greaterThan(createDecimal(due))
@@ -1345,7 +1401,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         return;
       const tendered =
         paymentMethod === 'CASH'
-          ? normalizeCurrencyPresentationInput(tender || allocation)
+          ? normalizeCurrencyPaymentInput(tender || allocation)
           : undefined;
       if (tendered && createDecimal(tendered).lessThan(createDecimal(allocation))) return;
       const selectedRoute =
@@ -1370,8 +1426,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         const waiting = updatedSale.payments.some((payment) => payment.status === 'PENDING');
         setQueuePaymentTarget(updatedSale);
         setQueuePaymentAmount(next.remainingAmount);
-        setPaymentAmount(normalizeCurrencyPresentationInput(next.remainingAmount));
-        setTender(normalizeCurrencyPresentationInput(next.remainingAmount));
+        setPaymentAmount(currencyInputFromAmount(next.remainingAmount));
+        setTender(currencyInputFromAmount(next.remainingAmount));
         setPaymentReference('');
         if (settled) {
           setQueuePaymentTarget(null);
@@ -1400,8 +1456,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     try {
       const updatedSale = await workspace.transitionPayment(payment, status);
       const nextAllocation = paymentProgress(updatedSale);
-      setPaymentAmount(normalizeCurrencyPresentationInput(nextAllocation.remainingAmount));
-      setTender(normalizeCurrencyPresentationInput(nextAllocation.remainingAmount));
+      setPaymentAmount(currencyInputFromAmount(nextAllocation.remainingAmount));
+      setTender(currencyInputFromAmount(nextAllocation.remainingAmount));
       setPaymentReference('');
       if (hasSuccessfulCheckout(updatedSale)) {
         try {
@@ -1443,8 +1499,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       const nextAllocation = paymentProgress(updatedSale);
       setQueuePaymentTarget(updatedSale);
       setQueuePaymentAmount(nextAllocation.remainingAmount);
-      setPaymentAmount(normalizeCurrencyPresentationInput(nextAllocation.remainingAmount));
-      setTender(normalizeCurrencyPresentationInput(nextAllocation.remainingAmount));
+      setPaymentAmount(currencyInputFromAmount(nextAllocation.remainingAmount));
+      setTender(currencyInputFromAmount(nextAllocation.remainingAmount));
       setPaymentReference('');
       if (hasSuccessfulCheckout(updatedSale)) {
         setQueuePaymentTarget(null);
@@ -1836,6 +1892,11 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         onAddVariant={(variantId) => void workspace.selectVariant(variantId)}
         onQuantity={(line, next) => workspace.changeQuantity(line, next)}
         onRemove={workspace.removeLine}
+        onCorrect={(line, input) => workspace.correctLine(line, input)}
+        onPreview={(line, input) => workspace.previewLineCorrection(line, input)}
+        canCorrectProgressedLine={session.access.permissions.includes('sales:correct-progressed-line')}
+        canRefundPayment={session.access.permissions.includes('payments:refund')}
+        onCompensate={(sale, paymentId, amount) => workspace.compensateOpenPayment(sale, paymentId, amount)}
       />
 
       <ReferenceBalancePaymentDialog
@@ -3042,7 +3103,7 @@ function DiscountInfoTooltip({ label, content }: { label: string; content: React
   );
 }
 
-function ReferencePaymentDialog({
+export function ReferencePaymentDialog({
   open,
   onClose,
   sale,
@@ -3216,10 +3277,11 @@ function ReferencePaymentDialog({
   const progress = sale
     ? paymentProgress(sale)
     : { paidAmount: '0.0000', pendingAmount: '0.0000', remainingAmount: total };
+  const amountScale = amountFractionDigits(progress.remainingAmount);
   const normalizedAllocation =
     allocationMode === 'FULL'
-      ? normalizeCurrencyPresentationInput(progress.remainingAmount)
-      : normalizeCurrencyPresentationInput(appliedAmount);
+      ? currencyInputFromAmount(progress.remainingAmount)
+      : normalizeCurrencyPaymentInput(appliedAmount);
   const intent = paymentIntent(
     { totalAmount: sale?.totalAmount ?? total, payments },
     normalizedAllocation,
@@ -3233,14 +3295,14 @@ function ReferencePaymentDialog({
   const hasRecordedMoney = payments.some(
     (payment) => payment.status === 'SUCCEEDED' || payment.status === 'PENDING',
   );
-  const normalizedTender = normalizeCurrencyPresentationInput(tender || normalizedAllocation);
+  const normalizedTender = normalizeCurrencyPaymentInput(tender || normalizedAllocation);
   const cashShort =
     isCash &&
     allocationPositive &&
     createDecimal(normalizedTender).lessThan(createDecimal(normalizedAllocation));
   const cashChange =
     isCash && allocationPositive && !cashShort
-      ? createDecimal(normalizedTender).minus(createDecimal(normalizedAllocation)).toFixed(0)
+      ? createDecimal(normalizedTender).minus(createDecimal(normalizedAllocation)).toFixed(4)
       : '0';
   const fullyPaid = sale ? hasSuccessfulCheckout(sale) : false;
   const collectsPayment = payNow && !fullyPaid;
@@ -3260,7 +3322,7 @@ function ReferencePaymentDialog({
     { value: 'WALLET', icon: <ShoppingBag className="size-[15px]" /> },
   ];
   const normalizedQuickTender = [normalizedAllocation, ...quickTender]
-    .map((amount) => normalizeCurrencyPresentationInput(amount))
+    .map((amount) => normalizeCurrencyPaymentInput(amount))
     .filter(isPositiveDecimal)
     .filter((amount, index, list) => list.indexOf(amount) === index)
     .slice(0, 6);
@@ -3685,7 +3747,7 @@ function ReferencePaymentDialog({
                           const next = value as PaymentAllocationMode;
                           setAllocationMode(next);
                           if (next === 'FULL') {
-                            const remaining = normalizeCurrencyPresentationInput(
+                            const remaining = currencyInputFromAmount(
                               progress.remainingAmount,
                             );
                             onAppliedAmount(remaining);
@@ -3728,6 +3790,7 @@ function ReferencePaymentDialog({
                               className="mt-1.5 h-11 rounded-lg bg-[var(--color-surface)] text-right text-lg font-bold"
                               value={appliedAmount}
                               onChange={onAppliedAmount}
+                              fractionDigits={amountScale}
                             />
                           </label>
                           {overAllocated ? (
@@ -3741,7 +3804,7 @@ function ReferencePaymentDialog({
                                 intent={intent}
                                 format={format}
                                 onPayRemaining={() => {
-                                  const remaining = normalizeCurrencyPresentationInput(
+                                  const remaining = currencyInputFromAmount(
                                     progress.remainingAmount,
                                   );
                                   onAppliedAmount(remaining);
@@ -3982,6 +4045,7 @@ function ReferencePaymentDialog({
                           className="h-10 rounded-lg bg-[var(--color-surface)] text-right text-base font-bold"
                           value={tender}
                           onChange={onTender}
+                          fractionDigits={amountScale}
                         />
 
                         <div className="mt-2 grid grid-cols-5 gap-1.5">
@@ -3993,7 +4057,7 @@ function ReferencePaymentDialog({
                                 key={amount}
                                 type="button"
                                 onClick={() => onTender(amount)}
-                                className={`h-8 rounded-md border px-1 text-[10px] font-semibold transition-colors ${normalizeCurrencyPresentationInput(tender) === amount ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-muted)]'}`}
+                                className={`h-8 rounded-md border px-1 text-[10px] font-semibold transition-colors ${normalizeCurrencyPaymentInput(tender) === amount ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-muted)]'}`}
                               >
                                 {format(amount)}
                               </button>
@@ -4011,7 +4075,7 @@ function ReferencePaymentDialog({
                               cashShort
                                 ? createDecimal(normalizedAllocation)
                                     .minus(createDecimal(normalizedTender || '0'))
-                                    .toFixed(0)
+                                    .toFixed(4)
                                 : cashChange,
                             )}
                           </span>
@@ -4039,6 +4103,14 @@ function useRetainedValue<T>(value: T | null): T | null {
   if (value !== null && value !== retained) setRetained(value);
   return value ?? retained;
 }
+
+/** The line status a transaction state already implies, so it is not repeated per item. */
+const impliedLineWorkStatus: Partial<Record<QueueStatus, string>> = {
+  QUEUED: 'WAITING',
+  PROGRESS: 'IN_PROGRESS',
+  COMPLETED: 'COMPLETED',
+  CANCELED: 'CANCELED',
+};
 
 const fulfillmentTone: Record<string, 'neutral' | 'brand' | 'success' | 'warning' | 'danger'> = {
   WAITING: 'warning',
@@ -4154,12 +4226,6 @@ export function ReferenceTransactionDetail({
           },
         ]
       : discountRows;
-  const paymentStateLabel =
-    settlement.paymentState === 'PAID'
-      ? 'Paid'
-      : settlement.paymentState === 'PARTIALLY_PAID'
-        ? 'Partially paid'
-        : 'Unpaid';
   const legacyLoyaltyRedemption = sale.loyaltyRedemption as
     | (NonNullable<Sale['loyaltyRedemption']> & {
         requestedPoints?: string;
@@ -4342,6 +4408,11 @@ export function ReferenceTransactionDetail({
                         ? servicePerformerSummary(line, employees, locale)
                         : null;
                       const editable = attributed && status === 'PROGRESS';
+                      // The transaction's own state already says "in progress"; a line only
+                      // repeats it when it differs (waiting, completed, canceled).
+                      const showWorkStatus =
+                        saleLineWorkStatus(line) !== null &&
+                        saleLineWorkStatus(line) !== (status ? impliedLineWorkStatus[status] : undefined);
                       return (
                         <SaleLineItem
                           key={line.id}
@@ -4363,14 +4434,17 @@ export function ReferenceTransactionDetail({
                               : null
                           }
                           context={
-                            line.fulfillment || durationLabel ? (
+                            showWorkStatus || line.workLineage || durationLabel ? (
                               <>
-                                {line.fulfillment ? (
+                                {showWorkStatus ? (
                                   <StatusPill
-                                    tone={fulfillmentTone[line.fulfillment.status] ?? 'neutral'}
+                                    tone={fulfillmentTone[saleLineWorkStatus(line)!] ?? 'neutral'}
                                   >
-                                    {label(line.fulfillment.status)}
+                                    {label(saleLineWorkStatus(line)!)}
                                   </StatusPill>
+                                ) : null}
+                                {line.workLineage ? (
+                                  <span>Pekerjaan tercatat pada {line.workLineage.sourceItemName}</span>
                                 ) : null}
                                 {durationLabel ? <span>{durationLabel}</span> : null}
                               </>
@@ -4378,7 +4452,7 @@ export function ReferenceTransactionDetail({
                           }
                           detail={
                             workSummary ? (
-                              <ServicePerformerSummary
+                              <ServicePerformers
                                 itemName={line.itemNameSnapshot}
                                 summary={workSummary}
                                 needsAttention={needsAttention}
@@ -4393,26 +4467,6 @@ export function ReferenceTransactionDetail({
                     })}
                   </SaleLineItemList>
                 </SaleDetailSection>
-
-                {completionIssues.length ? (
-                  <section className="rounded-[var(--radius-control)] border border-[var(--color-warning)]/25 bg-[var(--color-warning)]/[.06] px-3 py-2.5 text-xs">
-                    <p className="font-semibold text-[var(--color-warning)]">
-                      {copy('Not ready to complete')}
-                    </p>
-                    <div className="mt-1.5 space-y-1.5 text-[var(--color-text-muted)]">
-                      {completionIssueGroups.map((group) => (
-                        <div key={group.id}>
-                          <p className="font-medium text-[var(--color-text)]">{group.label}</p>
-                          <ul className="mt-0.5 list-disc space-y-0.5 pl-4">
-                            {group.issues.map((issue) => (
-                              <li key={issue}>{issue}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                ) : null}
               </div>
               <div
                 className={`pos-detail-column ${referenceTransactionDetailLayout.summaryColumn}`}
@@ -4421,33 +4475,21 @@ export function ReferenceTransactionDetail({
                   title={copy('Order summary')}
                   context={
                     referenceTransactionDetailPresentation.showRightContext ? (
-                      <div className="space-y-3">
-                        <div className="flex items-start gap-3">
-                          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[var(--color-brand)] text-sm font-bold text-white">
-                            {customerInitials(customer)}
-                          </span>
+                      <div>
+                        <div className="flex items-center gap-3">
+                          <DAvatar size="md" fallback={customerInitials(customer)} />
                           <div className="min-w-0 flex-1">
-                            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                              <p className="truncate text-sm font-bold text-[var(--color-text)]">
-                                {customerDisplayName(customer, locale)}
-                              </p>
-                              {customerStatus(customer) ? (
-                                <Badge
-                                  variant={customerStatus(customer)!.variant}
-                                  className="shrink-0 text-[10px]"
-                                >
-                                  {copy(customerStatus(customer)!.label)}
-                                </Badge>
-                              ) : null}
-                            </div>
+                            <p className="truncate text-[15px] font-semibold leading-5 text-[var(--color-text)]">
+                              {customerDisplayName(customer, locale)}
+                            </p>
                             {customerDisplayDetail(customer) ? (
-                              <p className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">
+                              <p className="truncate text-xs text-[var(--color-text-muted)]">
                                 {customerDisplayDetail(customer)}
                               </p>
                             ) : null}
                           </div>
                         </div>
-                        <div className="flex flex-wrap gap-1.5">
+                        <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5">
                           <StatusPill
                             tone={
                               sale.status === 'VOIDED' || status === 'CANCELED'
@@ -4458,28 +4500,22 @@ export function ReferenceTransactionDetail({
                           >
                             {status ? label(statusMeta[status].value) : label('OPEN')}
                           </StatusPill>
-                          <StatusPill
-                            tone={
-                              settlement.paymentState === 'PAID'
-                                ? 'success'
-                                : settlement.paymentState === 'PARTIALLY_PAID'
-                                  ? 'warning'
-                                  : 'neutral'
-                            }
-                          >
-                            {copy(paymentStateLabel)}
-                          </StatusPill>
-                        </div>
-                        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--color-text-muted)]">
-                          {sale.invoiceNumber ? (
-                            <span className="font-mono text-[var(--color-text)]">
-                              {sale.invoiceNumber}
-                            </span>
+                          {customerStatus(customer) ? (
+                            <Badge variant={customerStatus(customer)!.variant}>
+                              {copy(customerStatus(customer)!.label)}
+                            </Badge>
                           ) : null}
-                          <span>{transactionDate}</span>
+                          <span className="text-xs text-[var(--color-text-muted)] sm:ml-auto">
+                            {sale.invoiceNumber ? (
+                              <span className="mr-2 font-mono text-[var(--color-text)]">
+                                {sale.invoiceNumber}
+                              </span>
+                            ) : null}
+                            {transactionDate}
+                          </span>
                         </div>
                         {sale.status === 'VOIDED' && cancellationReason ? (
-                          <div className="border-l-2 border-[var(--color-danger)] pl-2.5 text-xs">
+                          <div className="mt-2 border-l-2 border-[var(--color-danger)] pl-2.5 text-xs">
                             <p className="font-semibold text-[var(--color-danger)]">
                               {copy('Cancellation reason')}
                             </p>
@@ -4586,6 +4622,22 @@ export function ReferenceTransactionDetail({
                     ) : null
                   }
                 />
+                {completionIssues.length ? (
+                  <DAlert variant="warning" title={copy('Not ready to complete')}>
+                    <div className="space-y-1.5 text-[var(--color-text-muted)]">
+                      {completionIssueGroups.map((group) => (
+                        <div key={group.id}>
+                          <p className="font-medium text-[var(--color-text)]">{group.label}</p>
+                          <ul className="mt-0.5 list-disc space-y-0.5 pl-4">
+                            {group.issues.map((issue) => (
+                              <li key={issue}>{issue}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  </DAlert>
+                ) : null}
               </div>
             </div>
           </div>
@@ -4825,7 +4877,7 @@ export function ReceiptContent({
 /** Select value for "the item itself"; it becomes no variant when added. */
 const ADJUSTMENT_ITEM_OPTION = 'item-option';
 
-function ReferenceOrderAdjustmentDialog({
+export function ReferenceOrderAdjustmentDialog({
   sale,
   items,
   locale,
@@ -4836,6 +4888,11 @@ function ReferenceOrderAdjustmentDialog({
   onAddVariant,
   onQuantity,
   onRemove,
+  onCorrect,
+  onPreview,
+  canCorrectProgressedLine,
+  canRefundPayment,
+  onCompensate,
 }: {
   sale: Sale | null;
   items: readonly CatalogItem[];
@@ -4847,6 +4904,11 @@ function ReferenceOrderAdjustmentDialog({
   onAddVariant: (catalogVariantId: string | null) => void;
   onQuantity: (line: SaleLine, quantity: string) => void;
   onRemove: (line: SaleLine) => void;
+  onCorrect: (line: SaleLine, input: { catalogItemId: string; catalogVariantId?: string; quantity: string; reason: string }) => Promise<unknown>;
+  onPreview: (line: SaleLine, input: { catalogItemId: string; catalogVariantId?: string; quantity: string }) => Promise<{ saleVersion: number; currentTotalAmount: string; correctedTotalAmount: string; netSuccessfulPaidAmount: string; remainingPaymentAmount: string; overpaymentAmount: string }>;
+  canCorrectProgressedLine: boolean;
+  canRefundPayment: boolean;
+  onCompensate: (sale: Sale, paymentId: string, amount: string) => Promise<unknown>;
 }) {
   const { copy } = useOperationalLocalization();
   const [catalogSearch, setCatalogSearch] = useState('');
@@ -4864,6 +4926,30 @@ function ReferenceOrderAdjustmentDialog({
     itemId: string;
     variantId: string;
   } | null>(null);
+  const [correctionLine, setCorrectionLine] = useState<SaleLine | null>(null);
+  const [replacementItemId, setReplacementItemId] = useState('');
+  const [replacementVariantId, setReplacementVariantId] = useState('');
+  const [replacementQuantity, setReplacementQuantity] = useState('1');
+  const [correctionReason, setCorrectionReason] = useState('');
+  const [replacementSearch, setReplacementSearch] = useState('');
+  // The Sale returned by the persisted correction/compensation is the settlement authority.
+  const [appliedSale, setAppliedSale] = useState<Sale | null>(null);
+  const [correctionSaved, setCorrectionSaved] = useState(false);
+  const [correctionError, setCorrectionError] = useState(false);
+  const [compensationState, setCompensationState] = useState<'IDLE' | 'LOADING' | 'ERROR'>('IDLE');
+  const [correctionPreview, setCorrectionPreview] = useState<Awaited<ReturnType<typeof onPreview>> | null>(null);
+  const [previewState, setPreviewState] = useState<'IDLE' | 'LOADING' | 'ERROR'>('IDLE');
+  const [progressedCorrectionNotice, setProgressedCorrectionNotice] = useState<string | null>(null);
+  const previewRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    // Keep the authoritative result in view; it renders below the form.
+    if (correctionPreview) previewRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+  }, [correctionPreview]);
+  const replacementItem = items.find((item) => item.id === replacementItemId) ?? null;
+  const replacementVariants = replacementItem?.variants ?? [];
+  // Only demand a variant when the item actually offers variants to choose from.
+  const variantRequired =
+    replacementItem?.variantSelectionMode === 'REQUIRED' && replacementVariants.length > 0;
   const selectedVariantId =
     variantSelection && variantSelection.itemId === variantPicker?.item.id
       ? variantSelection.variantId
@@ -4908,10 +4994,84 @@ function ReferenceOrderAdjustmentDialog({
       value: item.id,
       label: `${item.name} (${item.code})`,
     }));
+  const correctionSource = correctionLine;
+  const correctionProgressed =
+    correctionSource != null &&
+    saleLineWorkStatus(correctionSource) !== null &&
+    saleLineWorkStatus(correctionSource) !== 'WAITING';
+  // The selected item stays in the option list so its label remains visible while searching.
+  const replacementOptions = (() => {
+    const query = replacementSearch.trim().toLocaleLowerCase();
+    const matches = items.filter(
+      (item) =>
+        item.id === replacementItemId ||
+        !query ||
+        `${item.name} ${item.code}`.toLocaleLowerCase().includes(query),
+    );
+    return matches.slice(0, 20).map((item) => ({ value: item.id, label: `${item.name} (${item.code})` }));
+  })();
+  const correctionInput = () => ({
+    catalogItemId: replacementItemId,
+    ...(replacementVariantId ? { catalogVariantId: replacementVariantId } : {}),
+    quantity: replacementQuantity,
+  });
+  const correctionReady =
+    Boolean(replacementItemId) &&
+    isPositiveDecimal(replacementQuantity) &&
+    !(variantRequired && !replacementVariantId);
+  const previewCorrection = () => {
+    if (!correctionSource) return;
+    setPreviewState('LOADING');
+    void onPreview(correctionSource, correctionInput())
+      .then((value) => {
+        setCorrectionPreview(value);
+        setPreviewState('IDLE');
+      })
+      .catch(() => setPreviewState('ERROR'));
+  };
+  const asSale = (value: unknown): Sale | null =>
+    typeof value === 'object' && value !== null && 'payments' in value && 'totalAmount' in value
+      ? (value as Sale)
+      : null;
+  const confirmCorrection = () => {
+    if (!correctionSource) return;
+    setCorrectionError(false);
+    // Keep the flow open: whether money must now be returned depends on the persisted Sale.
+    void onCorrect(correctionSource, { ...correctionInput(), reason: correctionReason.trim() })
+      .then((updated) => {
+        setAppliedSale(asSale(updated));
+        setCorrectionSaved(true);
+      })
+      .catch(() => setCorrectionError(true));
+  };
+  const authoritativeSale = appliedSale ?? sale;
+  const authoritativeSettlement = saleSettlement(authoritativeSale);
+  const settledPaid = createDecimal(authoritativeSettlement.totalPaid);
+  const settledTotal = createDecimal(authoritativeSale.totalAmount);
+  const settledOverpayment = settledPaid.greaterThan(settledTotal) ? settledPaid.minus(settledTotal) : createDecimal('0');
+  const settledBalance = settledTotal.greaterThan(settledPaid) ? settledTotal.minus(settledPaid) : createDecimal('0');
+  const settlementCashPayment = authoritativeSale.payments.find((item) => item.status === 'SUCCEEDED' && item.method === 'CASH' && createDecimal(item.appliedAmount).greaterThan(0));
+  const settlementProviderPayment = authoritativeSale.payments.find((item) => item.status === 'SUCCEEDED' && item.method !== 'CASH' && createDecimal(item.appliedAmount).greaterThan(0));
+  const compensateOverpayment = (paymentId: string) => {
+    setCompensationState('LOADING');
+    void onCompensate(authoritativeSale, paymentId, settledOverpayment.toFixed(4))
+      .then((updated) => {
+        setAppliedSale(asSale(updated) ?? appliedSale);
+        setCompensationState('IDLE');
+      })
+      .catch(() => setCompensationState('ERROR'));
+  };
+  const figure = (label: string, value: string, className = '') => (
+    <div className={`flex items-baseline justify-between gap-3 ${className}`}>
+      <dt>{label}</dt>
+      <dd className="tabular-nums">{money(value, locale)}</dd>
+    </div>
+  );
   const stepperClass =
     'flex size-8 items-center justify-center rounded-lg border border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] disabled:cursor-not-allowed disabled:opacity-40';
 
   return (
+    <>
     <Dialog
       open
       onClose={onClose}
@@ -4952,7 +5112,8 @@ function ReferenceOrderAdjustmentDialog({
         </p>
         <ul className="divide-y divide-[var(--color-border)] rounded-xl border border-[var(--color-border)]">
           {activeLines.map((line) => {
-            const lineMutable = !line.fulfillment || line.fulfillment.status === 'WAITING';
+            const lineMutable = !saleLineWorkStatus(line) || saleLineWorkStatus(line) === 'WAITING';
+            const progressed = !lineMutable;
             const canDecrease =
               lineMutable && createDecimal(line.quantity).greaterThan(createDecimal('1'));
             const before = baseline.get(line.id);
@@ -5027,11 +5188,44 @@ function ReferenceOrderAdjustmentDialog({
                   >
                     <Trash2 className="size-3.5" />
                   </button>
+                  {sale.status === 'OPEN' ? (
+                    <button
+                      type="button"
+                      disabled={isMutating}
+                      onClick={() => {
+                        if (progressed && !canCorrectProgressedLine) {
+                          setProgressedCorrectionNotice(
+                            'Koreksi setelah pengerjaan dimulai memerlukan pengguna yang berwenang.',
+                          );
+                          return;
+                        }
+                        setCorrectionLine(line);
+                        setReplacementItemId(line.catalogItemId);
+                        setReplacementVariantId(line.catalogVariantId ?? '');
+                        setReplacementQuantity(quantity(line.quantity));
+                        setReplacementSearch('');
+                        setAppliedSale(null);
+                        setCorrectionSaved(false);
+                        setCorrectionError(false);
+                        setCompensationState('IDLE');
+                        setCorrectionReason('');
+                        setCorrectionPreview(null);
+                        setPreviewState('IDLE');
+                        setProgressedCorrectionNotice(null);
+                      }}
+                      className="ml-1 rounded-lg px-2 text-xs font-semibold text-[var(--color-brand)] hover:bg-[var(--color-brand)]/10 disabled:opacity-40"
+                    >
+                      Koreksi item
+                    </button>
+                  ) : null}
                 </div>
               </li>
             );
           })}
         </ul>
+        {progressedCorrectionNotice ? (
+          <DAlert variant="warning">{progressedCorrectionNotice}</DAlert>
+        ) : null}
         {removedCount ? (
           <p className="text-xs text-[var(--color-text-muted)]">
             {removedCount} {copy('items removed')}
@@ -5134,6 +5328,205 @@ function ReferenceOrderAdjustmentDialog({
         ) : null}
       </div>
     </Dialog>
+    {correctionLine ? (
+      <Dialog
+        open
+        onClose={() => setCorrectionLine(null)}
+        title="Koreksi item"
+        description={transactionNumber(sale, locale)}
+        ariaLabel="Koreksi item"
+        closeOnOverlay={false}
+        className="pos-reference-dialog w-full max-w-lg overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
+        footer={
+          correctionSaved ? (
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button onClick={() => setCorrectionLine(null)}>Selesai</Button>
+            </div>
+          ) : (
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
+              <Button variant="ghost" className="sm:mr-auto" onClick={() => setCorrectionLine(null)}>
+                Kembali
+              </Button>
+              <Button
+                variant="outline"
+                disabled={!correctionReady || isMutating}
+                loading={previewState === 'LOADING'}
+                onClick={previewCorrection}
+              >
+                Lihat dampak
+              </Button>
+              <Button
+                disabled={!correctionPreview || !correctionReason.trim() || isMutating}
+                loading={isMutating}
+                onClick={confirmCorrection}
+              >
+                Konfirmasi koreksi
+              </Button>
+            </div>
+          )
+        }
+      >
+        {correctionSaved ? (
+          <div className="space-y-4" aria-live="polite">
+            <DAlert variant="success">Koreksi tersimpan.</DAlert>
+            <section aria-label="Penyelesaian pembayaran" className="rounded-xl bg-[var(--color-surface-muted)] p-3 text-sm">
+              <dl className="space-y-1.5 text-[var(--color-text-muted)]">
+                {figure('Total transaksi', authoritativeSale.totalAmount, 'font-semibold text-[var(--color-text)]')}
+                {figure('Sudah dibayar', settledPaid.toFixed(4))}
+              </dl>
+              <div className="mt-2 space-y-1.5 border-t border-[var(--color-border)] pt-2">
+                {settledOverpayment.greaterThan(createDecimal('0')) ? (
+                  <>
+                    <dl>{figure('Kelebihan pembayaran', settledOverpayment.toFixed(4), 'font-semibold text-[var(--color-danger)]')}</dl>
+                    <p className="text-xs text-[var(--color-text-muted)]">
+                      Transaksi belum dapat diselesaikan sampai kelebihan pembayaran dikembalikan.
+                    </p>
+                    {settlementCashPayment ? (
+                      canRefundPayment ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          loading={compensationState === 'LOADING'}
+                          disabled={isMutating}
+                          onClick={() => compensateOverpayment(settlementCashPayment.id)}
+                        >
+                          Kembalikan kelebihan pembayaran
+                        </Button>
+                      ) : (
+                        <p className="text-xs text-[var(--color-text-muted)]">
+                          Pengembalian dana memerlukan pengguna dengan izin pengembalian pembayaran.
+                        </p>
+                      )
+                    ) : settlementProviderPayment ? (
+                      <p className="text-xs text-[var(--color-text-muted)]">
+                        Pengembalian pembayaran ini memerlukan konfirmasi dari penyedia pembayaran.
+                      </p>
+                    ) : null}
+                    {compensationState === 'ERROR' ? (
+                      <DAlert variant="danger">
+                        Pengembalian kelebihan pembayaran belum dapat diselesaikan. Muat ulang transaksi lalu coba lagi.
+                      </DAlert>
+                    ) : null}
+                  </>
+                ) : (
+                  settledBalance.greaterThan(createDecimal('0')) ? (
+                    <dl>{figure('Sisa pembayaran', settledBalance.toFixed(4), 'font-semibold text-[var(--color-text)]')}</dl>
+                  ) : (
+                    <p className="font-semibold text-[var(--color-text)]">Pembayaran sudah sesuai</p>
+                  )
+                )}
+              </div>
+            </section>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <div>
+                <p className="text-xs text-[var(--color-text-muted)]">Item saat ini</p>
+                <p className="text-sm font-semibold text-[var(--color-text)]">{correctionLine.itemNameSnapshot}</p>
+                <p className="text-xs tabular-nums text-[var(--color-text-muted)]">
+                  {quantity(correctionLine.quantity)} × {money(correctionLine.effectiveUnitPrice, locale)}
+                </p>
+              </div>
+              {correctionProgressed ? (
+                <DAlert variant="warning" className="text-xs">
+                  Pengerjaan item ini sudah dimulai. Riwayat pengerjaan tetap disimpan setelah koreksi.
+                </DAlert>
+              ) : null}
+            </div>
+            <div className="space-y-3 border-t border-[var(--color-border)] pt-4">
+              <Combobox
+                label="Item pengganti"
+                ariaLabel="Item pengganti"
+                placeholder="Cari produk atau layanan"
+                idleMessage="Cari berdasarkan nama atau kode item."
+                value={replacementItemId || null}
+                options={replacementOptions}
+                clearable
+                onSearchChange={setReplacementSearch}
+                onChange={(value) => {
+                  setReplacementItemId(value === null ? '' : String(value));
+                  setReplacementVariantId('');
+                  setCorrectionPreview(null);
+                }}
+              />
+              <div className="grid gap-3 sm:grid-cols-2">
+                {replacementVariants.length ? (
+                  <Select
+                    label="Varian"
+                    value={replacementVariantId}
+                    placeholder={variantRequired ? 'Pilih varian' : 'Tanpa varian'}
+                    options={[
+                      ...(variantRequired ? [] : [{ value: '', label: 'Tanpa varian' }]),
+                      ...replacementVariants.map((variant) => ({ value: variant.id, label: variant.name })),
+                    ]}
+                    onChange={(value) => {
+                      setReplacementVariantId(String(value));
+                      setCorrectionPreview(null);
+                    }}
+                  />
+                ) : null}
+                <PosNumericInput
+                  label="Jumlah"
+                  value={replacementQuantity}
+                  onChange={(value) => {
+                    setReplacementQuantity(value);
+                    setCorrectionPreview(null);
+                  }}
+                />
+              </div>
+              <DTextarea
+                label="Alasan koreksi"
+                rows={3}
+                value={correctionReason}
+                placeholder="Contoh: Salah memilih layanan"
+                onChange={setCorrectionReason}
+              />
+            </div>
+            {previewState === 'ERROR' ? (
+              <DAlert variant="danger">
+                Koreksi tidak dapat dipratinjau. Muat ulang transaksi lalu coba lagi.
+              </DAlert>
+            ) : null}
+            {correctionError ? (
+              <DAlert variant="danger">
+                Koreksi belum dapat disimpan. Muat ulang transaksi lalu coba lagi.
+              </DAlert>
+            ) : null}
+            {correctionPreview ? (
+              <section
+                ref={previewRef}
+                aria-label="Dampak koreksi"
+                aria-live="polite"
+                className="rounded-xl bg-[var(--color-surface-muted)] p-3 text-sm"
+              >
+                <dl className="space-y-1.5 text-[var(--color-text-muted)]">
+                  {figure('Total sebelumnya', correctionPreview.currentTotalAmount)}
+                  {figure('Total setelah koreksi', correctionPreview.correctedTotalAmount, 'font-semibold text-[var(--color-text)]')}
+                  {figure('Sudah dibayar', correctionPreview.netSuccessfulPaidAmount)}
+                </dl>
+                <div className="mt-2 space-y-1.5 border-t border-[var(--color-border)] pt-2">
+                  {correctionPreview.overpaymentAmount !== '0.0000' ? (
+                    <>
+                      <dl>
+                        {figure('Kelebihan pembayaran', correctionPreview.overpaymentAmount, 'font-semibold text-[var(--color-danger)]')}
+                      </dl>
+                      {/* A preview is read-only: the refund is offered only once the correction is saved. */}
+                      <p className="text-xs text-[var(--color-text-muted)]">
+                        Setelah koreksi dikonfirmasi, {money(correctionPreview.overpaymentAmount, locale)} perlu dikembalikan kepada pelanggan sebelum transaksi dapat diselesaikan.
+                      </p>
+                    </>
+                  ) : (
+                    <dl>{figure('Sisa pembayaran', correctionPreview.remainingPaymentAmount, 'font-semibold text-[var(--color-text)]')}</dl>
+                  )}
+                </div>
+              </section>
+            ) : null}
+          </div>
+        )}
+      </Dialog>
+    ) : null}
+    </>
   );
 }
 
@@ -5191,9 +5584,10 @@ function ReferenceBalancePaymentDialog({
   const format = (amount: string) => money(amount, locale);
   const progress = paymentProgress(sale);
   const remainingToAllocate = availableToPay ?? progress.remainingAmount;
-  const normalizedAllocation = normalizeCurrencyPresentationInput(
-    appliedAmount || remainingToAllocate,
-  );
+  const amountScale = amountFractionDigits(remainingToAllocate);
+  const normalizedAllocation = appliedAmount
+    ? normalizeCurrencyPaymentInput(appliedAmount)
+    : currencyInputFromAmount(remainingToAllocate);
   const intent = paymentIntent(sale, normalizedAllocation);
   const allocationPositive = isPositiveDecimal(normalizedAllocation);
   const overAllocated =
@@ -5201,14 +5595,14 @@ function ReferenceBalancePaymentDialog({
     createDecimal(normalizedAllocation).greaterThan(createDecimal(remainingToAllocate));
   const hasPending = sale.payments.some((payment) => payment.status === 'PENDING');
   const isCash = method === 'CASH';
-  const normalizedTender = normalizeCurrencyPresentationInput(tender || normalizedAllocation);
+  const normalizedTender = normalizeCurrencyPaymentInput(tender || normalizedAllocation);
   const cashShort =
     isCash &&
     allocationPositive &&
     createDecimal(normalizedTender).lessThan(createDecimal(normalizedAllocation));
   const cashChange =
     isCash && allocationPositive && !cashShort
-      ? createDecimal(normalizedTender).minus(createDecimal(normalizedAllocation)).toFixed(0)
+      ? createDecimal(normalizedTender).minus(createDecimal(normalizedAllocation)).toFixed(4)
       : '0';
   const canPay =
     allocationPositive &&
@@ -5326,6 +5720,7 @@ function ReferenceBalancePaymentDialog({
                 className="mt-1.5 h-11 rounded-lg text-right text-lg font-bold"
                 value={appliedAmount}
                 onChange={onAppliedAmount}
+                fractionDigits={amountScale}
               />
             </label>
             {overAllocated ? (
@@ -5339,7 +5734,7 @@ function ReferenceBalancePaymentDialog({
                   intent={intent}
                   format={format}
                   onPayRemaining={() =>
-                    onAppliedAmount(normalizeCurrencyPresentationInput(remainingToAllocate))
+                    onAppliedAmount(currencyInputFromAmount(remainingToAllocate))
                   }
                 />
               </div>
@@ -5424,6 +5819,7 @@ function ReferenceBalancePaymentDialog({
                   className="mt-1.5 h-11 rounded-lg text-right text-lg font-bold"
                   value={tender}
                   onChange={onTender}
+                  fractionDigits={amountScale}
                 />
               </label>
               <div
@@ -5437,7 +5833,7 @@ function ReferenceBalancePaymentDialog({
                     cashShort
                       ? createDecimal(normalizedAllocation)
                           .minus(createDecimal(normalizedTender || '0'))
-                          .toFixed(0)
+                          .toFixed(4)
                       : cashChange,
                   )}
                 </span>

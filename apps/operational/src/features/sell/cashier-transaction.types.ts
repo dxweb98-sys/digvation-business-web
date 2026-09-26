@@ -277,6 +277,15 @@ export interface SaleLine {
     pointsEarned: string;
   } | null;
   fulfillment: SaleLineFulfillment | null;
+  /**
+   * Set on a corrected replacement billing line whose work is recorded on its retired historical
+   * source line. The replacement owns no fulfillment of its own.
+   */
+  workLineage?: {
+    sourceLineId: string;
+    sourceItemName: string;
+    status: SaleLineFulfillment['status'];
+  } | null;
   participations: SaleParticipation[];
   contributions: EmployeeContribution[];
   /** Runtime per-quantity plan; empty or absent when assigned at line level. */

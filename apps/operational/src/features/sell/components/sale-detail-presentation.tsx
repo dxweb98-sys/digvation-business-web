@@ -1,3 +1,4 @@
+import { DBadge, DCard, DCardContent, DCardFooter, DCardHeader, DSeparator } from '@digvation/ui';
 import type { ReactNode } from 'react';
 
 import './sale-detail-presentation.css';
@@ -83,20 +84,19 @@ export function StatusPill({
   icon?: ReactNode;
   children: ReactNode;
 }) {
-  const tones = {
-    neutral: 'bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]',
-    brand: 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]',
-    success: 'bg-[var(--color-success)]/10 text-[var(--color-success)]',
-    warning: 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]',
-    danger: 'bg-[var(--color-danger)]/10 text-[var(--color-danger)]',
+  // The design system owns the badge; this only maps the tone vocabulary of the detail.
+  const variants = {
+    neutral: 'default',
+    brand: 'primary',
+    success: 'success',
+    warning: 'warning',
+    danger: 'danger',
   } as const;
   return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${tones[tone]}`}
-    >
+    <DBadge variant={variants[tone]} className="gap-1 font-semibold">
       {icon}
       {children}
-    </span>
+    </DBadge>
   );
 }
 
@@ -112,20 +112,29 @@ export function SaleDetailSection({
   surface?: 'plain' | 'panel' | 'muted';
   children: ReactNode;
 }) {
-  const surfaceClass =
-    surface === 'panel'
-      ? 'pos-detail-panel'
-      : surface === 'muted'
-        ? 'pos-detail-panel pos-detail-panel--muted'
-        : '';
+  if (surface === 'plain') {
+    return (
+      <section className="pos-detail-section">
+        <div className="mb-2 flex items-baseline justify-between gap-3">
+          <h3 className="text-sm font-semibold text-[var(--color-text)]">{title}</h3>
+          {aside ? <span className="text-xs text-[var(--color-text-muted)]">{aside}</span> : null}
+        </div>
+        {children}
+      </section>
+    );
+  }
+  // A card with its title in the card header, the same shape as the summary card beside it.
   return (
-    <section className="pos-detail-section">
-      <div className="mb-2 flex items-baseline justify-between gap-3">
+    <DCard
+      variant="outlined"
+      className={`pos-detail-panel overflow-hidden ${surface === 'muted' ? 'bg-[var(--color-surface-muted)]/50' : ''}`}
+    >
+      <DCardHeader className="flex items-baseline justify-between gap-3">
         <h3 className="text-sm font-semibold text-[var(--color-text)]">{title}</h3>
         {aside ? <span className="text-xs text-[var(--color-text-muted)]">{aside}</span> : null}
-      </div>
-      <div className={surfaceClass}>{children}</div>
-    </section>
+      </DCardHeader>
+      <DCardContent className="px-4 py-0">{children}</DCardContent>
+    </DCard>
   );
 }
 
@@ -265,93 +274,120 @@ export function SaleFinancialSummary({
   paymentAttempts?: ReactNode;
 }) {
   const hasBalance = settlement.balanceDue !== '0.0000';
+  // A settled sale whose payments equal its total says so once, as a badge. The
+  // paid and balance rows only appear when they add information.
+  const settledExactly = !hasBalance && settlement.totalPaid === total;
+  // Cash received only adds information when it differs from what was applied (change was given).
+  const cashNotes = [
+    settlement.cashTendered &&
+    (settlement.cashChange || settlement.cashTendered !== settlement.totalPaid)
+      ? { label: labels.cashReceived, amount: settlement.cashTendered }
+      : null,
+    settlement.cashChange ? { label: labels.change, amount: settlement.cashChange } : null,
+  ].filter((note) => note !== null);
+  const settlementRows = !settledExactly || payment === null || payment === undefined;
+  // One card, three zones: who (header), how much (content), how it was settled (footer).
   return (
-    <section className="pos-financial-panel">
-      {context ? <div className="pos-financial-panel__context">{context}</div> : null}
-      {title ? <h3 className="text-sm font-semibold text-[var(--color-text)]">{title}</h3> : null}
-      <dl className="space-y-2 text-sm">
-        <div className="flex justify-between gap-4">
-          <dt className="text-[var(--color-text-muted)]">{labels.subtotal}</dt>
-          <dd className="tabular-nums">{format(gross)}</dd>
-        </div>
-        {discounts.map((row) => (
-          <div key={row.id} className="flex items-start justify-between gap-4">
-            <DiscountTerm
-              text={discountPresentation(row, labels.discount)}
-              context={row.source === 'PROMOTION' ? labels.discountContext(row) : null}
-            />
-            <dd className="shrink-0 tabular-nums text-[var(--color-danger)]">
-              −{format(row.amount)}
-            </dd>
-          </div>
-        ))}
-        {adjustments.map((adjustment) => (
-          <div key={adjustment.id} className="flex items-start justify-between gap-4">
-            <dt className="min-w-0 text-[var(--color-text-muted)]">
-              <span className="text-[var(--color-text)]">{adjustment.label}</span>
-              {adjustment.detail ? (
-                <span className="block break-words text-xs">{adjustment.detail}</span>
-              ) : null}
-            </dt>
-            <dd className="shrink-0 tabular-nums text-[var(--color-danger)]">
-              −{format(adjustment.amount)}
-            </dd>
-          </div>
-        ))}
-        {tax ? (
+    <DCard variant="outlined" className="pos-financial-panel overflow-hidden">
+      {context ? <DCardHeader className="py-3.5">{context}</DCardHeader> : null}
+      <DCardContent>
+        {title ? <h3 className="sr-only">{title}</h3> : null}
+        <dl className="space-y-2 text-sm">
           <div className="flex justify-between gap-4">
-            <dt className="text-[var(--color-text-muted)]">{tax.label}</dt>
-            <dd className="tabular-nums">{format(tax.amount)}</dd>
+            <dt className="text-[var(--color-text-muted)]">{labels.subtotal}</dt>
+            <dd className="tabular-nums">{format(gross)}</dd>
           </div>
-        ) : null}
-        <div className="flex items-baseline justify-between gap-4 border-t border-[var(--color-border)] pt-2.5">
-          <dt className="text-sm font-semibold">{labels.total}</dt>
-          <dd className="text-lg font-bold tabular-nums">{format(total)}</dd>
-        </div>
-      </dl>
-      <dl className="mt-4 space-y-2 border-t border-[var(--color-border)] pt-4 text-sm">
-        <div className="flex justify-between gap-4">
-          <dt className="text-[var(--color-text-muted)]">{labels.paid}</dt>
-          <dd className="tabular-nums">{format(settlement.totalPaid)}</dd>
-        </div>
-        <div className="flex justify-between gap-4 font-semibold">
-          <dt>{labels.balance}</dt>
-          <dd
-            className={`tabular-nums ${hasBalance ? 'text-[var(--color-warning)]' : 'text-[var(--color-success)]'}`}
-          >
-            {hasBalance ? format(settlement.balanceDue) : labels.settled}
-          </dd>
-        </div>
-        {settlement.cashTendered ? (
-          <div className="flex justify-between gap-4 text-xs text-[var(--color-text-muted)]">
-            <dt>{labels.cashReceived}</dt>
-            <dd className="tabular-nums">{format(settlement.cashTendered)}</dd>
+          {discounts.map((row) => (
+            <div key={row.id} className="flex items-start justify-between gap-4">
+              <DiscountTerm
+                text={discountPresentation(row, labels.discount)}
+                context={row.source === 'PROMOTION' ? labels.discountContext(row) : null}
+              />
+              <dd className="shrink-0 tabular-nums text-[var(--color-danger)]">
+                −{format(row.amount)}
+              </dd>
+            </div>
+          ))}
+          {adjustments.map((adjustment) => (
+            <div key={adjustment.id} className="flex items-start justify-between gap-4">
+              <dt className="min-w-0 text-[var(--color-text-muted)]">
+                <span className="text-[var(--color-text)]">{adjustment.label}</span>
+                {adjustment.detail ? (
+                  <span className="block break-words text-xs">{adjustment.detail}</span>
+                ) : null}
+              </dt>
+              <dd className="shrink-0 tabular-nums text-[var(--color-danger)]">
+                −{format(adjustment.amount)}
+              </dd>
+            </div>
+          ))}
+          {tax ? (
+            <div className="flex justify-between gap-4">
+              <dt className="text-[var(--color-text-muted)]">{tax.label}</dt>
+              <dd className="tabular-nums">{format(tax.amount)}</dd>
+            </div>
+          ) : null}
+        </dl>
+        <DSeparator className="my-3" />
+        <dl>
+          <div className="flex items-baseline justify-between gap-4">
+            <dt className="text-sm font-semibold">{labels.total}</dt>
+            <dd className="text-2xl font-bold leading-8 tabular-nums">{format(total)}</dd>
           </div>
-        ) : null}
-        {settlement.cashChange ? (
-          <div className="flex justify-between gap-4 text-xs text-[var(--color-text-muted)]">
-            <dt>{labels.change}</dt>
-            <dd className="tabular-nums">{format(settlement.cashChange)}</dd>
-          </div>
-        ) : null}
-      </dl>
-      {payment ? (
-        <section className="mt-4 border-t border-[var(--color-border)] pt-4">
-          <div className="mb-2 flex items-baseline justify-between gap-3">
+        </dl>
+      </DCardContent>
+
+      <DCardFooter className="bg-[var(--color-surface-muted)]/50 py-3.5">
+        <div className="flex min-h-6 items-center justify-between gap-3">
+          {payment ? (
             <h4 className="text-sm font-semibold text-[var(--color-text)]">{payment.title}</h4>
-            {payment.aside ? (
-              <span className="text-xs text-[var(--color-text-muted)]">{payment.aside}</span>
+          ) : (
+            <span />
+          )}
+          <span className="flex flex-wrap items-center justify-end gap-1.5">
+            {payment?.aside}
+            {!hasBalance ? (
+              <DBadge variant="success" dot className="font-semibold">
+                {labels.settled}
+              </DBadge>
             ) : null}
-          </div>
-          {payment.content}
-        </section>
-      ) : null}
-      {paymentAttempts ? (
-        <section className="mt-4 border-t border-[var(--color-border)] pt-4">
-          {paymentAttempts}
-        </section>
-      ) : null}
-    </section>
+          </span>
+        </div>
+        {settlementRows ? (
+          <dl className="mt-2 space-y-1.5 text-sm">
+            <div className="flex justify-between gap-4">
+              <dt className="text-[var(--color-text-muted)]">{labels.paid}</dt>
+              <dd className="tabular-nums">{format(settlement.totalPaid)}</dd>
+            </div>
+            {hasBalance ? (
+              <div className="flex justify-between gap-4 font-semibold">
+                <dt>{labels.balance}</dt>
+                <dd className="tabular-nums text-[var(--color-warning)]">
+                  {format(settlement.balanceDue)}
+                </dd>
+              </div>
+            ) : null}
+          </dl>
+        ) : null}
+        {payment ? <div className="mt-1">{payment.content}</div> : null}
+        {cashNotes.length ? (
+          <dl className="mt-1 space-y-1 text-xs text-[var(--color-text-muted)]">
+            {cashNotes.map((note) => (
+              <div key={note.label} className="flex justify-between gap-4">
+                <dt>{note.label}</dt>
+                <dd className="tabular-nums">{format(note.amount)}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : null}
+        {paymentAttempts ? (
+          <>
+            <DSeparator className="my-3" />
+            <section>{paymentAttempts}</section>
+          </>
+        ) : null}
+      </DCardFooter>
+    </DCard>
   );
 }
 

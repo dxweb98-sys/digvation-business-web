@@ -335,10 +335,19 @@ export function saleSettlement(sale: {
       (sum, payment) => sum.plus(createDecimal(String(payment.tenderedAmount))),
       createDecimal('0'),
     );
-  const cashChange = cash.reduce(
-    (sum, payment) => sum.plus(createDecimal(String(payment.changeAmount ?? '0'))),
-    createDecimal('0'),
-  );
+  // Cash returned through an immutable compensation fact is change given back to the customer.
+  const cashReturned = cash
+    .filter((payment) => createDecimal(String(payment.appliedAmount)).lessThan(0))
+    .reduce(
+      (sum, payment) => sum.minus(createDecimal(String(payment.appliedAmount))),
+      createDecimal('0'),
+    );
+  const cashChange = cash
+    .reduce(
+      (sum, payment) => sum.plus(createDecimal(String(payment.changeAmount ?? '0'))),
+      createDecimal('0'),
+    )
+    .plus(cashReturned);
   const hasPending = sale.payments.some((payment) => payment.status === 'PENDING');
   const settled = !hasPending && totalPaid.equals(createDecimal(String(sale.totalAmount)));
 
