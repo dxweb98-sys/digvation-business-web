@@ -1,4 +1,4 @@
-import { DBadge, DCard, DCardContent, DCardFooter, DCardHeader, DSeparator } from '@digvation/ui';
+import { DBadge, DCard, DCardContent, DCardHeader, DSeparator } from '@digvation/ui';
 import type { ReactNode } from 'react';
 
 import './sale-detail-presentation.css';
@@ -102,12 +102,14 @@ export function StatusPill({
 
 export function SaleDetailSection({
   title,
+  icon,
   aside,
   /** `panel` for scannable lists, `muted` for the money summary, `plain` for bare content. */
   surface = 'panel',
   children,
 }: {
   title: string;
+  icon?: ReactNode;
   aside?: ReactNode;
   surface?: 'plain' | 'panel' | 'muted';
   children: ReactNode;
@@ -123,23 +125,68 @@ export function SaleDetailSection({
       </section>
     );
   }
-  // A card with its title in the card header, the same shape as the summary card beside it.
+  // A card whose header reads like the payment sections: icon, title, then a quiet count chip.
   return (
     <DCard
       variant="outlined"
       className={`pos-detail-panel overflow-hidden ${surface === 'muted' ? 'bg-[var(--color-surface-muted)]/50' : ''}`}
     >
-      <DCardHeader className="flex items-baseline justify-between gap-3">
-        <h3 className="text-sm font-semibold text-[var(--color-text)]">{title}</h3>
-        {aside ? <span className="text-xs text-[var(--color-text-muted)]">{aside}</span> : null}
+      <DCardHeader className="flex items-center gap-2 py-3">
+        {icon ? (
+          <span className="shrink-0 text-[var(--color-text-muted)]" aria-hidden="true">
+            {icon}
+          </span>
+        ) : null}
+        <h3 className="min-w-0 truncate text-[13px] font-bold text-[var(--color-text)]">{title}</h3>
+        {aside ? (
+          <span className="shrink-0 rounded-full bg-[var(--color-surface-muted)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-text-muted)]">
+            {aside}
+          </span>
+        ) : null}
       </DCardHeader>
       <DCardContent className="px-4 py-0">{children}</DCardContent>
     </DCard>
   );
 }
 
+/**
+ * Who the transaction belongs to: a plain strip, not a card, so the money below stays the
+ * emphasis. The payment dialog uses the same strip so both screens introduce the customer alike.
+ */
+export function SaleCustomerStrip({
+  initials,
+  name,
+  detail,
+  badge,
+  aside,
+}: {
+  initials: string;
+  name: string;
+  detail?: string | null | undefined;
+  badge?: ReactNode;
+  aside?: ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-3 px-1">
+      <div className="grid size-9 shrink-0 place-items-center rounded-full bg-[var(--color-brand)]/[.12] text-xs font-bold text-[var(--color-brand)]">
+        {initials}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 items-center gap-2">
+          <p className="truncate text-sm font-bold text-[var(--color-text)]">{name}</p>
+          {badge}
+        </div>
+        {detail ? (
+          <p className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">{detail}</p>
+        ) : null}
+      </div>
+      {aside ? <div className="shrink-0 text-right">{aside}</div> : null}
+    </div>
+  );
+}
+
 export function SaleLineItemList({ children }: { children: ReactNode }) {
-  return <ul className="pos-line-list divide-y divide-[var(--color-border)]">{children}</ul>;
+  return <ul className="pos-line-list divide-y divide-[var(--color-border)]/70">{children}</ul>;
 }
 
 /**
@@ -286,108 +333,109 @@ export function SaleFinancialSummary({
     settlement.cashChange ? { label: labels.change, amount: settlement.cashChange } : null,
   ].filter((note) => note !== null);
   const settlementRows = !settledExactly || payment === null || payment === undefined;
-  // One card, three zones: who (header), how much (content), how it was settled (footer).
+  // Two white cards on the tinted rail, read top to bottom: who, how much, how it was settled.
   return (
-    <DCard variant="outlined" className="pos-financial-panel overflow-hidden">
-      {context ? <DCardHeader className="py-3.5">{context}</DCardHeader> : null}
-      <DCardContent>
-        {title ? <h3 className="sr-only">{title}</h3> : null}
-        <dl className="space-y-2 text-sm">
-          <div className="flex justify-between gap-4">
-            <dt className="text-[var(--color-text-muted)]">{labels.subtotal}</dt>
-            <dd className="tabular-nums">{format(gross)}</dd>
-          </div>
-          {discounts.map((row) => (
-            <div key={row.id} className="flex items-start justify-between gap-4">
-              <DiscountTerm
-                text={discountPresentation(row, labels.discount)}
-                context={row.source === 'PROMOTION' ? labels.discountContext(row) : null}
-              />
-              <dd className="shrink-0 tabular-nums text-[var(--color-danger)]">
-                −{format(row.amount)}
-              </dd>
-            </div>
-          ))}
-          {adjustments.map((adjustment) => (
-            <div key={adjustment.id} className="flex items-start justify-between gap-4">
-              <dt className="min-w-0 text-[var(--color-text-muted)]">
-                <span className="text-[var(--color-text)]">{adjustment.label}</span>
-                {adjustment.detail ? (
-                  <span className="block break-words text-xs">{adjustment.detail}</span>
-                ) : null}
-              </dt>
-              <dd className="shrink-0 tabular-nums text-[var(--color-danger)]">
-                −{format(adjustment.amount)}
-              </dd>
-            </div>
-          ))}
-          {tax ? (
+    <div className="pos-financial-stack">
+      {context}
+      <DCard variant="outlined" className="pos-financial-panel overflow-hidden shadow-sm">
+        <DCardContent className="p-4">
+          {title ? <h3 className="sr-only">{title}</h3> : null}
+          <p className="pos-pay-eyebrow">{labels.total}</p>
+          <p className="mt-0.5 text-3xl font-bold leading-tight tabular-nums text-[var(--color-brand)]">
+            {format(total)}
+          </p>
+          <dl className="mt-3 space-y-1.5 border-t border-[var(--color-border)] pt-3 text-[13px]">
             <div className="flex justify-between gap-4">
-              <dt className="text-[var(--color-text-muted)]">{tax.label}</dt>
-              <dd className="tabular-nums">{format(tax.amount)}</dd>
+              <dt className="text-[var(--color-text-muted)]">{labels.subtotal}</dt>
+              <dd className="font-semibold tabular-nums">{format(gross)}</dd>
             </div>
-          ) : null}
-        </dl>
-        <DSeparator className="my-3" />
-        <dl>
-          <div className="flex items-baseline justify-between gap-4">
-            <dt className="text-sm font-semibold">{labels.total}</dt>
-            <dd className="text-2xl font-bold leading-8 tabular-nums">{format(total)}</dd>
-          </div>
-        </dl>
-      </DCardContent>
-
-      <DCardFooter className="bg-[var(--color-surface-muted)]/50 py-3.5">
-        <div className="flex min-h-6 items-center justify-between gap-3">
-          {payment ? (
-            <h4 className="text-sm font-semibold text-[var(--color-text)]">{payment.title}</h4>
-          ) : (
-            <span />
-          )}
-          <span className="flex flex-wrap items-center justify-end gap-1.5">
-            {payment?.aside}
-            {!hasBalance ? (
-              <DBadge variant="success" dot className="font-semibold">
-                {labels.settled}
-              </DBadge>
-            ) : null}
-          </span>
-        </div>
-        {settlementRows ? (
-          <dl className="mt-2 space-y-1.5 text-sm">
-            <div className="flex justify-between gap-4">
-              <dt className="text-[var(--color-text-muted)]">{labels.paid}</dt>
-              <dd className="tabular-nums">{format(settlement.totalPaid)}</dd>
-            </div>
-            {hasBalance ? (
-              <div className="flex justify-between gap-4 font-semibold">
-                <dt>{labels.balance}</dt>
-                <dd className="tabular-nums text-[var(--color-warning)]">
-                  {format(settlement.balanceDue)}
+            {discounts.map((row) => (
+              <div key={row.id} className="flex items-start justify-between gap-4">
+                <DiscountTerm
+                  text={discountPresentation(row, labels.discount)}
+                  context={row.source === 'PROMOTION' ? labels.discountContext(row) : null}
+                />
+                <dd className="shrink-0 font-semibold tabular-nums text-[var(--color-danger)]">
+                  −{format(row.amount)}
                 </dd>
               </div>
-            ) : null}
-          </dl>
-        ) : null}
-        {payment ? <div className="mt-1">{payment.content}</div> : null}
-        {cashNotes.length ? (
-          <dl className="mt-1 space-y-1 text-xs text-[var(--color-text-muted)]">
-            {cashNotes.map((note) => (
-              <div key={note.label} className="flex justify-between gap-4">
-                <dt>{note.label}</dt>
-                <dd className="tabular-nums">{format(note.amount)}</dd>
+            ))}
+            {adjustments.map((adjustment) => (
+              <div key={adjustment.id} className="flex items-start justify-between gap-4">
+                <dt className="min-w-0 text-[var(--color-text-muted)]">
+                  <span className="text-[var(--color-text)]">{adjustment.label}</span>
+                  {adjustment.detail ? (
+                    <span className="block break-words text-xs">{adjustment.detail}</span>
+                  ) : null}
+                </dt>
+                <dd className="shrink-0 font-semibold tabular-nums text-[var(--color-danger)]">
+                  −{format(adjustment.amount)}
+                </dd>
               </div>
             ))}
+            {tax ? (
+              <div className="flex justify-between gap-4">
+                <dt className="text-[var(--color-text-muted)]">{tax.label}</dt>
+                <dd className="font-semibold tabular-nums">{format(tax.amount)}</dd>
+              </div>
+            ) : null}
           </dl>
-        ) : null}
-        {paymentAttempts ? (
-          <>
-            <DSeparator className="my-3" />
-            <section>{paymentAttempts}</section>
-          </>
-        ) : null}
-      </DCardFooter>
-    </DCard>
+        </DCardContent>
+      </DCard>
+
+      <DCard variant="outlined" className="pos-payment-panel overflow-hidden shadow-sm">
+        <DCardContent className="p-4">
+          <div className="flex min-h-6 items-center justify-between gap-3">
+            {payment ? (
+              <h4 className="text-sm font-bold text-[var(--color-text)]">{payment.title}</h4>
+            ) : (
+              <span />
+            )}
+            <span className="flex flex-wrap items-center justify-end gap-1.5">
+              {payment?.aside}
+              {!hasBalance ? (
+                <DBadge variant="success" dot className="font-semibold">
+                  {labels.settled}
+                </DBadge>
+              ) : null}
+            </span>
+          </div>
+          {settlementRows ? (
+            <dl className="mt-2 space-y-1.5 text-[13px]">
+              <div className="flex justify-between gap-4">
+                <dt className="text-[var(--color-text-muted)]">{labels.paid}</dt>
+                <dd className="font-semibold tabular-nums">{format(settlement.totalPaid)}</dd>
+              </div>
+              {hasBalance ? (
+                <div className="flex justify-between gap-4 font-semibold">
+                  <dt>{labels.balance}</dt>
+                  <dd className="tabular-nums text-[var(--color-warning)]">
+                    {format(settlement.balanceDue)}
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
+          ) : null}
+          {payment ? <div className="mt-1">{payment.content}</div> : null}
+          {cashNotes.length ? (
+            <dl className="mt-1 space-y-1 text-xs text-[var(--color-text-muted)]">
+              {cashNotes.map((note) => (
+                <div key={note.label} className="flex justify-between gap-4">
+                  <dt>{note.label}</dt>
+                  <dd className="tabular-nums">{format(note.amount)}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : null}
+          {paymentAttempts ? (
+            <>
+              <DSeparator className="my-3" />
+              <section>{paymentAttempts}</section>
+            </>
+          ) : null}
+        </DCardContent>
+      </DCard>
+    </div>
   );
 }
 
