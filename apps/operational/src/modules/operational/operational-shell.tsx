@@ -1,5 +1,9 @@
 import { useAuth } from '@digvation/business-auth';
-import { useConnectivity, useDeploymentBootstrap } from '@digvation/business-runtime';
+import {
+  useConnectivity,
+  useDeploymentBootstrap,
+  usePresentationBundle,
+} from '@digvation/business-runtime';
 import { DAlert, DAvatar, DButton, DDialog, DDropdown, useToast } from '@digvation/ui';
 import {
   Building2,
@@ -60,6 +64,7 @@ export function OperationalShell({
   passwordChange = unavailablePasswordChange,
 }: OperationalShellProps) {
   const bootstrap = useDeploymentBootstrap();
+  const { shellLayout } = usePresentationBundle();
   const connectivity = useConnectivity();
   const { copy, label } = useOperationalLocalization();
   const { session, logout } = useAuth();
@@ -213,7 +218,10 @@ export function OperationalShell({
     copy(operationalAccessQuery.isLoading ? 'Loading branch' : 'Choose branch');
 
   return (
-    <div className="operational-shell flex h-screen w-full min-w-0 overflow-hidden bg-[var(--color-background)]">
+    <div
+      data-shell-layout={shellLayout}
+      className="operational-shell flex h-screen w-full min-w-0 overflow-hidden bg-[var(--color-background)]"
+    >
       <aside className="operational-shell__sidebar hidden min-h-0 shrink-0 flex-col border-r border-[var(--color-border)] bg-[var(--color-surface)] shadow-[1px_0_0_var(--color-border)] md:flex md:w-[232px] lg:w-[280px]">
         <div className="flex min-h-16 items-center gap-3 border-b border-[var(--color-border)] px-5 py-3">
           <div className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-[var(--radius-control)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]">

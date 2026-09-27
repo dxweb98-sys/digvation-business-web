@@ -1,4 +1,9 @@
-import { ApplicationSplash, type DeploymentBootstrapConfig } from '@digvation/business-runtime';
+import {
+  ApplicationSplash,
+  resolvePresentationBundle,
+  type DeploymentBootstrapConfig,
+  type PresentationPreset,
+} from '@digvation/business-runtime';
 import {
   createContext,
   useCallback,
@@ -19,6 +24,7 @@ const SPLASH_LEAVE_MS = 240;
 
 export interface BackofficeStartupResult {
   branding: DeploymentBootstrapConfig['branding'];
+  presentationPreset?: PresentationPreset | undefined;
   element: ReactNode;
 }
 
@@ -45,11 +51,16 @@ function prefersReducedMotion(): boolean {
 
 export function BackofficeStartupSplash({
   branding,
+  presentationPreset,
 }: {
   branding?: DeploymentBootstrapConfig['branding'] | undefined;
+  presentationPreset?: PresentationPreset | undefined;
 }) {
+  // Rendered before the PresentationProvider mounts, so the splash resolves directly from bootstrap.
+  const { splash } = resolvePresentationBundle(presentationPreset);
   return (
     <ApplicationSplash
+      variant={splash}
       // Reserve the product line until runtime branding resolves so the composition never shifts.
       productName={branding?.productName ?? ' '}
       message={
@@ -128,7 +139,10 @@ export function BackofficeStartup({
           }`}
           onTransitionEnd={completeLeave}
         >
-          <BackofficeStartupSplash branding={result?.branding} />
+          <BackofficeStartupSplash
+            branding={result?.branding}
+            presentationPreset={result?.presentationPreset}
+          />
         </div>
       )}
     </BackofficeStartupReadyContext.Provider>

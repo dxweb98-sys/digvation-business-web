@@ -1,4 +1,4 @@
-import { useDeploymentBootstrap } from '@digvation/business-runtime';
+import { useDeploymentBootstrap, usePresentationBundle } from '@digvation/business-runtime';
 import { DCard } from '@digvation/ui';
 import type { ReactNode } from 'react';
 
@@ -61,10 +61,11 @@ function IdentityMotif({ logoUrl }: { logoUrl?: string | undefined }) {
 /** Shared split authentication card for sign-in and password recovery. */
 export function BackofficeAuthShell({ children }: { children: ReactNode }) {
   const { branding } = useDeploymentBootstrap();
+  const { loginLayout } = usePresentationBundle();
   const { t } = useBackofficeLocalization();
 
   return (
-    <main className="backoffice-login h-full overflow-y-auto">
+    <main data-login-layout={loginLayout} className="backoffice-login h-full overflow-y-auto">
       <div className="backoffice-login__viewport grid min-h-full place-items-center">
         <DCard className="backoffice-login__card w-full max-w-[880px]">
           <aside className="backoffice-login__identity">

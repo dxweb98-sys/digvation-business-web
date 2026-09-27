@@ -1,4 +1,8 @@
-import { ApplicationSplash, type DeploymentBootstrapConfig } from '@digvation/business-runtime';
+import {
+  ApplicationSplash,
+  resolvePresentationBundle,
+  type DeploymentBootstrapConfig,
+} from '@digvation/business-runtime';
 import { Building2 } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode, type TransitionEvent } from 'react';
 
@@ -32,8 +36,11 @@ export function OperationalStartupSplash({
   bootstrap: DeploymentBootstrapConfig | null;
 }) {
   const branding = bootstrap?.branding;
+  // Rendered before the PresentationProvider mounts, so the splash resolves directly from bootstrap.
+  const { splash } = resolvePresentationBundle(bootstrap?.presentationPreset);
   return (
     <ApplicationSplash
+      variant={splash}
       // Reserve the product line until runtime branding resolves so the composition never shifts.
       productName={branding?.productName ?? ' '}
       message={operationalCopy(
