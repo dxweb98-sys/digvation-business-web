@@ -32,7 +32,10 @@ export interface CartDraftAdditionalItem {
  */
 export function additionSignature(additions: readonly CartDraftAdditionalItem[]): string {
   return additions
-    .map((entry) => `${entry.componentItemId}:${entry.componentVariantId ?? ''}:${createDecimal(entry.quantity).toFixed(4)}`)
+    .map(
+      (entry) =>
+        `${entry.componentItemId}:${entry.componentVariantId ?? ''}:${createDecimal(entry.quantity).toFixed(4)}`,
+    )
     .sort()
     .join('|');
 }
@@ -234,17 +237,18 @@ export function addCartDraftSelection(
   const additional = options.additionalComponents ?? [];
   const unitAdditions = options.unitAdditions;
   // Lines carrying operator-chosen additional items describe a specific composition and never merge.
-  const existing = additional.length || unitAdditions
-    ? undefined
-    : draft.lines.find(
-    (line) =>
-      !line.additionalComponents?.length &&
-      !line.unitAdditions &&
-      line.catalogItemId === item.id &&
-      line.catalogVariantId === (variant?.id ?? undefined) &&
-      line.catalogPriceId === price.catalogPriceId &&
-      line.resolvedUnitPrice === price.amount,
-  );
+  const existing =
+    additional.length || unitAdditions
+      ? undefined
+      : draft.lines.find(
+          (line) =>
+            !line.additionalComponents?.length &&
+            !line.unitAdditions &&
+            line.catalogItemId === item.id &&
+            line.catalogVariantId === (variant?.id ?? undefined) &&
+            line.catalogPriceId === price.catalogPriceId &&
+            line.resolvedUnitPrice === price.amount,
+        );
   if (existing) {
     return setCartDraftQuantity(
       draft,

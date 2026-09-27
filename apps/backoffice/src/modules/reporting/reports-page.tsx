@@ -522,7 +522,11 @@ export function ReportsPage() {
     return [
       { key: 'label', label: copy('Component') },
       { key: 'value', label: copy('Total used'), render: (r) => qty(r.value ?? 0) },
-      { key: 'fixedQuantity', label: copy('Fixed / configured'), render: (r) => qty(r.fixedQuantity ?? 0) },
+      {
+        key: 'fixedQuantity',
+        label: copy('Fixed / configured'),
+        render: (r) => qty(r.fixedQuantity ?? 0),
+      },
       {
         key: 'selectedQuantity',
         label: copy('Selected during transaction'),

@@ -215,7 +215,9 @@ describe('Service additional-item requirement setting', () => {
     })) as HTMLInputElement;
     expect(toggle.checked).toBe(false);
     expect(
-      scope.getByText(/Operator harus memilih minimal satu item tambahan sebelum jasa dapat dimasukkan ke keranjang/),
+      scope.getByText(
+        /Operator harus memilih minimal satu item tambahan sebelum jasa dapat dimasukkan ke keranjang/,
+      ),
     ).toBeTruthy();
 
     // Wait for the variants to hydrate so saving is not blocked by a partial editor.
@@ -310,7 +312,15 @@ describe('Service composition editor', () => {
   it('reveals follow/fixed choices when the price toggle is on; follow is a read-only reference', async () => {
     const api = fakeApi({
       ...empty,
-      default: [component({ id: 'c1', componentItemId: 'med', componentName: 'Creambath Medicine', componentUsage: 'STANDALONE_AND_COMPONENT', quantity: '2.0000' })],
+      default: [
+        component({
+          id: 'c1',
+          componentItemId: 'med',
+          componentName: 'Creambath Medicine',
+          componentUsage: 'STANDALONE_AND_COMPONENT',
+          quantity: '2.0000',
+        }),
+      ],
     });
     const scope = renderDialog(api, service);
     const panel = within(await openComposition(scope));
@@ -319,7 +329,9 @@ describe('Service composition editor', () => {
       await panel.findByRole('checkbox', { name: /Tambahkan harga komponen ke harga jasa/ }),
     );
     expect(panel.getByText('Sumber harga')).toBeTruthy();
-    expect((panel.getByRole('radio', { name: 'Ikuti harga produk' }) as HTMLInputElement).checked).toBe(true);
+    expect(
+      (panel.getByRole('radio', { name: 'Ikuti harga produk' }) as HTMLInputElement).checked,
+    ).toBe(true);
 
     expect((await panel.findByTestId('component-reference-price')).textContent).toMatch(/20\.000/);
     expect((await panel.findByTestId('component-contribution')).textContent).toMatch(/40\.000/);
@@ -380,8 +392,9 @@ describe('Service composition editor', () => {
     await click(scope.getByRole('button', { name: 'Simpan' }));
     await waitFor(() => expect(api.replaceServiceComposition).toHaveBeenCalled());
     expect(
-      (api.replaceServiceComposition.mock.calls[0] as unknown as [string, { default: unknown[] }])[1]
-        .default,
+      (
+        api.replaceServiceComposition.mock.calls[0] as unknown as [string, { default: unknown[] }]
+      )[1].default,
     ).toEqual([]);
   });
 

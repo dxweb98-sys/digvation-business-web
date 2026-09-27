@@ -119,8 +119,10 @@ describe('duplicate prevention', () => {
 
   it('ignores rows without a Product', () => {
     expect(
-      duplicateComponentKeys([draft({ key: 'a', productId: null }), draft({ key: 'b', productId: null })])
-        .size,
+      duplicateComponentKeys([
+        draft({ key: 'a', productId: null }),
+        draft({ key: 'b', productId: null }),
+      ]).size,
     ).toBe(0);
   });
 });
@@ -129,7 +131,13 @@ describe('composition drafts', () => {
   const composition: ServiceComposition = {
     catalogItemId: 'svc',
     version: 3,
-    default: [apiComponent({ id: 'd1', componentVariantId: null, componentUsage: 'STANDALONE_AND_COMPONENT' })],
+    default: [
+      apiComponent({
+        id: 'd1',
+        componentVariantId: null,
+        componentUsage: 'STANDALONE_AND_COMPONENT',
+      }),
+    ],
     variantOverrides: [
       {
         catalogVariantId: 'svc-red',
@@ -204,7 +212,9 @@ describe('composition drafts', () => {
     state = setVariantCustom(state, 'svc-blue', true);
     expect(state.variants['svc-blue']?.custom).toBe(true);
     expect(state.variants['svc-blue']?.components).toHaveLength(1);
-    state = updateVariantComponents(state, 'svc-blue', [draft({ key: 'x', productVariantId: 'dye-blue' })]);
+    state = updateVariantComponents(state, 'svc-blue', [
+      draft({ key: 'x', productVariantId: 'dye-blue' }),
+    ]);
     expect(state.default[0]?.productVariantId).toBe('dye-red');
     expect(state.variants['svc-blue']?.components[0]?.productVariantId).toBe('dye-blue');
   });

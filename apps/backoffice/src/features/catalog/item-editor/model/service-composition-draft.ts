@@ -246,13 +246,12 @@ export function setVariantCustom(
       [variantKey]: custom
         ? {
             custom: true,
-            components:
-              existing?.components.length
-                ? existing.components
-                : draft.default.map((component) => ({
-                    ...component,
-                    key: `${variantKey}-${component.key}`,
-                  })),
+            components: existing?.components.length
+              ? existing.components
+              : draft.default.map((component) => ({
+                  ...component,
+                  key: `${variantKey}-${component.key}`,
+                })),
           }
         : { custom: false, components: existing?.components ?? [] },
     },

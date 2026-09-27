@@ -45,9 +45,11 @@ export function useServiceComposition({
 
   const productIds = useMemo(() => {
     const ids = new Set<string>();
-    for (const component of composition.default) if (component.productId) ids.add(component.productId);
+    for (const component of composition.default)
+      if (component.productId) ids.add(component.productId);
     for (const variant of Object.values(composition.variants))
-      for (const component of variant.components) if (component.productId) ids.add(component.productId);
+      for (const component of variant.components)
+        if (component.productId) ids.add(component.productId);
     return [...ids].sort();
   }, [composition]);
 

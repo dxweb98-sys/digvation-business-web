@@ -112,9 +112,7 @@ export interface ResolvedPrice {
 export type VariantSelectionMode = 'REQUIRED' | 'OPTIONAL';
 export type ProductUsage = 'STANDALONE_AND_COMPONENT' | 'COMPONENT_ONLY';
 export type ComponentPricingMode =
-  | 'INCLUDED_IN_SERVICE_PRICE'
-  | 'FOLLOW_PRODUCT_PRICE'
-  | 'FIXED_COMPONENT_PRICE';
+  'INCLUDED_IN_SERVICE_PRICE' | 'FOLLOW_PRODUCT_PRICE' | 'FIXED_COMPONENT_PRICE';
 
 export interface ServiceComponentEntry {
   componentItemId: string;
@@ -194,7 +192,9 @@ export class CatalogApi {
     });
   }
   getServiceComposition(itemId: string) {
-    return this.client.get<ServiceComposition>(`/api/v1/catalog/items/${itemId}/service-composition`);
+    return this.client.get<ServiceComposition>(
+      `/api/v1/catalog/items/${itemId}/service-composition`,
+    );
   }
   replaceServiceComposition(itemId: string, input: ReplaceServiceCompositionInput) {
     return this.client.put<ServiceComposition>(

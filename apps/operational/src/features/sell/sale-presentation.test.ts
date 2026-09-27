@@ -508,7 +508,9 @@ describe('cashTenderNote (physical cash only when it explains something)', () =>
   });
 
   it('single exact cash: nothing extra', () => {
-    expect(cashTenderNote(settle([cash('100000.0000', '100000.0000', '0.0000')], '100000.0000'))).toBeNull();
+    expect(
+      cashTenderNote(settle([cash('100000.0000', '100000.0000', '0.0000')], '100000.0000')),
+    ).toBeNull();
   });
 
   it('single over-tender: tender and change', () => {
@@ -555,9 +557,24 @@ describe('aggregateDiscountRows (Sale summary by adjustment identity)', () => {
 
   it('merges the same Promotion across lines into one row with the summed authoritative amount', () => {
     const merged = rows([
-      adj('a1', { saleLineId: 'l1', actualAmount: '22000.0000', promotionId: 'kilat', label: 'kilat' }),
-      adj('a2', { saleLineId: 'l2', actualAmount: '21200.0000', promotionId: 'kilat', label: 'kilat' }),
-      adj('a3', { scope: 'TRANSACTION', actualAmount: '73872.0000', promotionId: 'promo-1', label: 'Promo1' }),
+      adj('a1', {
+        saleLineId: 'l1',
+        actualAmount: '22000.0000',
+        promotionId: 'kilat',
+        label: 'kilat',
+      }),
+      adj('a2', {
+        saleLineId: 'l2',
+        actualAmount: '21200.0000',
+        promotionId: 'kilat',
+        label: 'kilat',
+      }),
+      adj('a3', {
+        scope: 'TRANSACTION',
+        actualAmount: '73872.0000',
+        promotionId: 'promo-1',
+        label: 'Promo1',
+      }),
     ]);
     expect(merged.map((row) => [row.label, row.amount])).toEqual([
       ['kilat', '43200.0000'],
@@ -575,8 +592,20 @@ describe('aggregateDiscountRows (Sale summary by adjustment identity)', () => {
 
   it('keeps manual discounts separate, with their reason', () => {
     const merged = rows([
-      adj('m1', { source: 'MANUAL_DISCOUNT', promotionId: null, label: '', reason: 'Loyal', actualAmount: '5000.0000' }),
-      adj('m2', { source: 'MANUAL_DISCOUNT', promotionId: null, label: '', reason: 'Loyal', actualAmount: '5000.0000' }),
+      adj('m1', {
+        source: 'MANUAL_DISCOUNT',
+        promotionId: null,
+        label: '',
+        reason: 'Loyal',
+        actualAmount: '5000.0000',
+      }),
+      adj('m2', {
+        source: 'MANUAL_DISCOUNT',
+        promotionId: null,
+        label: '',
+        reason: 'Loyal',
+        actualAmount: '5000.0000',
+      }),
     ]);
     expect(merged.map((row) => [row.reason, row.amount])).toEqual([
       ['Loyal', '5000.0000'],

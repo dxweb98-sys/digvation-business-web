@@ -156,7 +156,9 @@ export function CatalogItemCompositionSection({
                           size="sm"
                           className="ml-auto"
                           disabled={disabled}
-                          onClick={() => onChange(setVariantCustom(composition, variant.key, !custom))}
+                          onClick={() =>
+                            onChange(setVariantCustom(composition, variant.key, !custom))
+                          }
                         >
                           {custom ? 'Gunakan komponen default' : 'Atur khusus untuk variant ini'}
                         </DButton>
@@ -164,15 +166,16 @@ export function CatalogItemCompositionSection({
                       {custom ? (
                         <div className="mt-3 space-y-3">
                           <p className="text-xs leading-5 text-[var(--color-text-muted)]">
-                            Komponen khusus menggantikan seluruh komponen default untuk variant
-                            ini.
+                            Komponen khusus menggantikan seluruh komponen default untuk variant ini.
                           </p>
                           <ComponentList
                             {...shared}
                             label={name}
                             components={state?.components ?? []}
                             onChange={(components) =>
-                              onChange(updateVariantComponents(composition, variant.key, components))
+                              onChange(
+                                updateVariantComponents(composition, variant.key, components),
+                              )
                             }
                           />
                         </div>

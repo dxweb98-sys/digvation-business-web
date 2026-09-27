@@ -691,7 +691,9 @@ describe('ItemConfigurator — per-unit additions', () => {
     expect(screen.getByText('Unit 2 dari 12')).toBeTruthy();
     await click(unitButton(9));
     expect(screen.getByText('Unit 9 dari 12')).toBeTruthy();
-    expect((screen.getByRole('button', { name: 'Unit sebelumnya' }) as HTMLButtonElement).disabled).toBe(false);
+    expect(
+      (screen.getByRole('button', { name: 'Unit sebelumnya' }) as HTMLButtonElement).disabled,
+    ).toBe(false);
   });
 
   it('shows which required units are incomplete and which are done, for quantity 6', async () => {

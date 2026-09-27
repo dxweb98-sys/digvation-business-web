@@ -215,7 +215,11 @@ describe('CartDraft local mutations', () => {
 
 describe('CartDraft with configured quantity and additional items', () => {
   const service: CatalogItem = { ...item, id: 'hair-color', name: 'Hair Color', type: 'SERVICE' };
-  const servicePrice: ResolvedPrice = { ...price, catalogItemId: service.id, amount: '150000.0000' };
+  const servicePrice: ResolvedPrice = {
+    ...price,
+    catalogItemId: service.id,
+    amount: '150000.0000',
+  };
   const serum = {
     componentItemId: 'serum',
     quantity: '2.0000',
@@ -241,9 +245,15 @@ describe('CartDraft with configured quantity and additional items', () => {
   });
 
   it('keeps a composed Service as ONE cart line priced with its additional items', () => {
-    const draft = addCartDraftSelection(emptyCartDraft('location-1', 'IDR'), service, null, servicePrice, {
-      additionalComponents: [serum],
-    });
+    const draft = addCartDraftSelection(
+      emptyCartDraft('location-1', 'IDR'),
+      service,
+      null,
+      servicePrice,
+      {
+        additionalComponents: [serum],
+      },
+    );
     expect(draft.lines).toHaveLength(1);
     const display = draft.lines.length ? cartDraftEstimatedTotal(draft) : '0';
     // 150.000 + 2 x 5.000 = 160.000 on one line; the additional item is not a separate priced line.
@@ -252,10 +262,18 @@ describe('CartDraft with configured quantity and additional items', () => {
   });
 
   it('never merges lines that carry different additional items', () => {
-    let draft = addCartDraftSelection(emptyCartDraft('location-1', 'IDR'), service, null, servicePrice, {
+    let draft = addCartDraftSelection(
+      emptyCartDraft('location-1', 'IDR'),
+      service,
+      null,
+      servicePrice,
+      {
+        additionalComponents: [serum],
+      },
+    );
+    draft = addCartDraftSelection(draft, service, null, servicePrice, {
       additionalComponents: [serum],
     });
-    draft = addCartDraftSelection(draft, service, null, servicePrice, { additionalComponents: [serum] });
     draft = addCartDraftSelection(draft, service, null, servicePrice);
     draft = addCartDraftSelection(draft, service, null, servicePrice);
     expect(draft.lines).toHaveLength(3);
@@ -303,7 +321,12 @@ describe('editing a draft cart line', () => {
     expect(draft.lines).toHaveLength(2);
     expect(draft.lines[0]).toMatchObject({ id: lineId, quantity: '2.0000' });
     expect(cartDraftDisplayLines(draft)[0]?.totalAmount).toBe('420000.0000');
-    expect(cartDraftStartInput({ ...draft, customer: { type: 'NON_MEMBER', name: 'A', phone: '1' } as never }).lines[0]).toMatchObject({
+    expect(
+      cartDraftStartInput({
+        ...draft,
+        customer: { type: 'NON_MEMBER', name: 'A', phone: '1' } as never,
+      }).lines[0],
+    ).toMatchObject({
       quantity: '2.0000',
       additionalComponents: [{ componentItemId: 'cap', quantity: '1.0000' }],
     });
@@ -320,9 +343,15 @@ describe('editing a draft cart line', () => {
   });
 
   it('marks draft lines editable and exposes only their additions for display', () => {
-    const draft = addCartDraftSelection(emptyCartDraft('location-1', 'IDR'), base, null, basePrice, {
-      additionalComponents: [cap],
-    });
+    const draft = addCartDraftSelection(
+      emptyCartDraft('location-1', 'IDR'),
+      base,
+      null,
+      basePrice,
+      {
+        additionalComponents: [cap],
+      },
+    );
     const [line] = cartDraftDisplayLines(draft);
     expect(line).toMatchObject({
       editable: true,
@@ -334,8 +363,19 @@ describe('editing a draft cart line', () => {
 describe('per-unit additions in a cart group', () => {
   const service: CatalogItem = { ...item, id: 'hair-color', name: 'Hair Color', type: 'SERVICE' };
   const base: ResolvedPrice = { ...price, catalogItemId: service.id, amount: '200000.0000' };
-  const a = { componentItemId: 'a', quantity: '1.0000', label: 'Addition A', unitPrice: '10000.0000' };
-  const b = { componentItemId: 'b', componentVariantId: 'b-y', quantity: '1.0000', label: 'Addition B / Y', unitPrice: '15000.0000' };
+  const a = {
+    componentItemId: 'a',
+    quantity: '1.0000',
+    label: 'Addition A',
+    unitPrice: '10000.0000',
+  };
+  const b = {
+    componentItemId: 'b',
+    componentVariantId: 'b-y',
+    quantity: '1.0000',
+    label: 'Addition B / Y',
+    unitPrice: '15000.0000',
+  };
   const empty = () => emptyCartDraft('location-1', 'IDR');
   const startable = (draft: ReturnType<typeof empty>) => ({
     ...draft,
@@ -381,20 +421,35 @@ describe('per-unit additions in a cart group', () => {
     const lines = cartDraftStartInput(startable(draft)).lines;
     expect(lines).toHaveLength(2);
     expect(lines[0]).toEqual({ catalogItemId: 'hair-color', quantity: '1.0000' });
-    expect(lines[1]).toMatchObject({ quantity: '1.0000', additionalComponents: [expect.anything()] });
+    expect(lines[1]).toMatchObject({
+      quantity: '1.0000',
+      additionalComponents: [expect.anything()],
+    });
   });
 
   it('never merges a per-unit group with another line and needs a configuration for every unit', () => {
-    let draft = addCartDraftSelection(empty(), service, null, base, { quantity: '2', unitAdditions: [[a], [b]] });
-    draft = addCartDraftSelection(draft, service, null, base, { quantity: '2', unitAdditions: [[a], [b]] });
+    let draft = addCartDraftSelection(empty(), service, null, base, {
+      quantity: '2',
+      unitAdditions: [[a], [b]],
+    });
+    draft = addCartDraftSelection(draft, service, null, base, {
+      quantity: '2',
+      unitAdditions: [[a], [b]],
+    });
     expect(draft.lines).toHaveLength(2);
     expect(() =>
-      addCartDraftSelection(empty(), service, null, base, { quantity: '3', unitAdditions: [[a], [b]] }),
+      addCartDraftSelection(empty(), service, null, base, {
+        quantity: '3',
+        unitAdditions: [[a], [b]],
+      }),
     ).toThrow();
   });
 
   it('shrinking keeps the leading units untouched; growing is refused here (a new unit is configured explicitly)', () => {
-    const draft = addCartDraftSelection(empty(), service, null, base, { quantity: '3', unitAdditions: [[a], [b], []] });
+    const draft = addCartDraftSelection(empty(), service, null, base, {
+      quantity: '3',
+      unitAdditions: [[a], [b], []],
+    });
     const id = draft.lines[0]!.id;
     const smaller = setCartDraftQuantity(draft, id, '2');
     expect(smaller.lines[0]?.unitAdditions).toEqual([[a], [b]]);
@@ -402,7 +457,10 @@ describe('per-unit additions in a cart group', () => {
   });
 
   it('editing one unit replaces the same group in place without touching the other unit', () => {
-    let draft = addCartDraftSelection(empty(), service, null, base, { quantity: '2', unitAdditions: [[a], [b]] });
+    let draft = addCartDraftSelection(empty(), service, null, base, {
+      quantity: '2',
+      unitAdditions: [[a], [b]],
+    });
     const id = draft.lines[0]!.id;
     draft = replaceCartDraftLine(draft, id, service, null, base, {
       quantity: '2',
@@ -461,27 +519,60 @@ describe('persisted OPEN Sale lines in the cart', () => {
 
 describe('replacementLinesOf (one configuration becomes exact Sale lines)', () => {
   const a = { componentItemId: 'a', quantity: '1.0000', label: 'A', unitPrice: '10000.0000' };
-  const b = { componentItemId: 'b', componentVariantId: 'b-y', quantity: '2.0000', label: 'B / Y', unitPrice: '15000.0000' };
+  const b = {
+    componentItemId: 'b',
+    componentVariantId: 'b-y',
+    quantity: '2.0000',
+    label: 'B / Y',
+    unitPrice: '15000.0000',
+  };
 
   it('keeps identical units as one line', () => {
     expect(replacementLinesOf('svc', 'v1', { quantity: '2', additionalComponents: [a] })).toEqual([
-      { catalogItemId: 'svc', catalogVariantId: 'v1', quantity: '2', additionalComponents: [{ componentItemId: 'a', quantity: '1.0000' }] },
+      {
+        catalogItemId: 'svc',
+        catalogVariantId: 'v1',
+        quantity: '2',
+        additionalComponents: [{ componentItemId: 'a', quantity: '1.0000' }],
+      },
     ]);
   });
 
   it('turns different unit additions into separate lines, in order, each with its own additions and variant', () => {
     expect(
-      replacementLinesOf('svc', null, { quantity: '2', additionalComponents: [], unitAdditions: [[a], [b]] }),
+      replacementLinesOf('svc', null, {
+        quantity: '2',
+        additionalComponents: [],
+        unitAdditions: [[a], [b]],
+      }),
     ).toEqual([
-      { catalogItemId: 'svc', quantity: '1', additionalComponents: [{ componentItemId: 'a', quantity: '1.0000' }] },
-      { catalogItemId: 'svc', quantity: '1', additionalComponents: [{ componentItemId: 'b', componentVariantId: 'b-y', quantity: '2.0000' }] },
+      {
+        catalogItemId: 'svc',
+        quantity: '1',
+        additionalComponents: [{ componentItemId: 'a', quantity: '1.0000' }],
+      },
+      {
+        catalogItemId: 'svc',
+        quantity: '1',
+        additionalComponents: [
+          { componentItemId: 'b', componentVariantId: 'b-y', quantity: '2.0000' },
+        ],
+      },
     ]);
   });
 
   it('groups equal units among different ones and never merges a plain unit into a configured one', () => {
-    const lines = replacementLinesOf('svc', null, { quantity: '3', additionalComponents: [], unitAdditions: [[a], [], [a]] });
+    const lines = replacementLinesOf('svc', null, {
+      quantity: '3',
+      additionalComponents: [],
+      unitAdditions: [[a], [], [a]],
+    });
     expect(lines).toEqual([
-      { catalogItemId: 'svc', quantity: '2', additionalComponents: [{ componentItemId: 'a', quantity: '1.0000' }] },
+      {
+        catalogItemId: 'svc',
+        quantity: '2',
+        additionalComponents: [{ componentItemId: 'a', quantity: '1.0000' }],
+      },
       { catalogItemId: 'svc', quantity: '1' },
     ]);
   });

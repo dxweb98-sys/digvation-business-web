@@ -311,7 +311,10 @@ export function SaleLineItem({
             </p>
           ) : null}
           {discounts.map((discount) => (
-            <div key={discount.id} className="mt-0.5 flex items-start justify-between gap-4 text-xs">
+            <div
+              key={discount.id}
+              className="mt-0.5 flex items-start justify-between gap-4 text-xs"
+            >
               <span className="flex min-w-0 items-start gap-1.5 text-[var(--color-text-muted)]">
                 {discount.info}
                 <span className="min-w-0">

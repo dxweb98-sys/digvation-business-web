@@ -382,9 +382,10 @@ export function useSaleWorkspaceController({
       );
       return;
     }
-    const compatibleLine = configuration && !configuration.unitAdditions
-      ? currentSale.lines.find((line) => isCompatibleLine(line, catalogVariantId, configuration))
-      : undefined;
+    const compatibleLine =
+      configuration && !configuration.unitAdditions
+        ? currentSale.lines.find((line) => isCompatibleLine(line, catalogVariantId, configuration))
+        : undefined;
     if (compatibleLine) {
       changeQuantity(
         compatibleLine,

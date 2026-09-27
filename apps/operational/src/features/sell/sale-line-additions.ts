@@ -47,9 +47,13 @@ export function saleLineConfiguration(
       .filter((component) => component.componentSource === 'SALE_SELECTED')
       .map((component) => ({
         componentItemId: component.componentItemId,
-        ...(component.componentVariantId ? { componentVariantId: component.componentVariantId } : {}),
+        ...(component.componentVariantId
+          ? { componentVariantId: component.componentVariantId }
+          : {}),
         quantity: component.quantity,
-        label: [component.itemNameSnapshot, component.variantNameSnapshot].filter(Boolean).join(' / '),
+        label: [component.itemNameSnapshot, component.variantNameSnapshot]
+          .filter(Boolean)
+          .join(' / '),
         unitPrice: component.transactionUnitPrice ?? '0.0000',
       })),
   };
@@ -63,7 +67,12 @@ export function saleLineConfiguration(
 export function isSaleLineReplaceable(
   line: Pick<
     SaleLine,
-    'removedAt' | 'fulfillment' | 'participations' | 'contributions' | 'overrideAmount' | 'discountType'
+    | 'removedAt'
+    | 'fulfillment'
+    | 'participations'
+    | 'contributions'
+    | 'overrideAmount'
+    | 'discountType'
   >,
 ): boolean {
   return (

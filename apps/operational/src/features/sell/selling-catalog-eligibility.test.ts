@@ -5,21 +5,23 @@ import { isStandaloneSellable } from './selling-catalog-eligibility';
 
 describe('isStandaloneSellable', () => {
   it('keeps active standalone Products and Services selectable', () => {
-    expect(isStandaloneSellable({ lifecycle: 'ACTIVE', productUsage: 'STANDALONE_AND_COMPONENT' })).toBe(
-      true,
-    );
+    expect(
+      isStandaloneSellable({ lifecycle: 'ACTIVE', productUsage: 'STANDALONE_AND_COMPONENT' }),
+    ).toBe(true);
     // Runtime omits usage for Services and older payloads; those stay sellable.
     expect(isStandaloneSellable({ lifecycle: 'ACTIVE' })).toBe(true);
   });
 
   it('hides component-only Products from the normal selling catalog', () => {
-    expect(isStandaloneSellable({ lifecycle: 'ACTIVE', productUsage: 'COMPONENT_ONLY' })).toBe(false);
+    expect(isStandaloneSellable({ lifecycle: 'ACTIVE', productUsage: 'COMPONENT_ONLY' })).toBe(
+      false,
+    );
   });
 
   it('still requires an active lifecycle', () => {
-    expect(isStandaloneSellable({ lifecycle: 'INACTIVE', productUsage: 'STANDALONE_AND_COMPONENT' })).toBe(
-      false,
-    );
+    expect(
+      isStandaloneSellable({ lifecycle: 'INACTIVE', productUsage: 'STANDALONE_AND_COMPONENT' }),
+    ).toBe(false);
   });
 });
 

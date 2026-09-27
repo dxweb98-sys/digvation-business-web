@@ -1,4 +1,12 @@
-import { DButton, DCheckbox, DCombobox, DCurrencyInput, DDecimalInput, DRadio, DSelect } from '@digvation/ui';
+import {
+  DButton,
+  DCheckbox,
+  DCombobox,
+  DCurrencyInput,
+  DDecimalInput,
+  DRadio,
+  DSelect,
+} from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
 import { Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -50,7 +58,8 @@ export function CompositionComponentRow({
   const [search, setSearch] = useState('');
   const requirement = info?.requirement ?? 'NONE';
   const issue = componentDraftIssue(component, requirement, duplicateKeys);
-  const visibleIssue = issue && (showIssues || issue === 'DUPLICATE') ? issueMessage[issue] : undefined;
+  const visibleIssue =
+    issue && (showIssues || issue === 'DUPLICATE') ? issueMessage[issue] : undefined;
   const following = component.addsPrice && component.priceSource === 'FOLLOW_PRODUCT_PRICE';
   const fixed = component.addsPrice && component.priceSource === 'FIXED_COMPONENT_PRICE';
 
@@ -90,7 +99,9 @@ export function CompositionComponentRow({
   }, [component.productId, component.productLabel, component.productUsage, products.data]);
 
   const referenceReady =
-    following && Boolean(component.productId) && (requirement !== 'REQUIRED' || Boolean(component.productVariantId));
+    following &&
+    Boolean(component.productId) &&
+    (requirement !== 'REQUIRED' || Boolean(component.productVariantId));
   const referencePrice = useQuery({
     queryKey: [
       'catalog',

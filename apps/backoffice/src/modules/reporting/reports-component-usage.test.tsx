@@ -216,9 +216,9 @@ describe('Component usage report page', () => {
     get = fakeGet(true);
     renderReport();
     await waitFor(() =>
-      expect(
-        screen.getAllByText(/Tidak ada data laporan|No report data/i).length,
-      ).toBeGreaterThan(0),
+      expect(screen.getAllByText(/Tidak ada data laporan|No report data/i).length).toBeGreaterThan(
+        0,
+      ),
     );
     expect(screen.queryByRole('region', { name: 'Pemakaian per komponen' })).toBeNull();
   });
