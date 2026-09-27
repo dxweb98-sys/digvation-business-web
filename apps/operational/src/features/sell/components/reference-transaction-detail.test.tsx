@@ -235,6 +235,58 @@ describe('ReferenceTransactionDetail Runtime detail shapes', () => {
     expect(screen.queryByText('Poin diperoleh: +6 poin')).toBeNull();
   });
 
+  it('shows the historical member point summary next to the customer on the receipt', () => {
+    const completed = runtimeQueueDetail({
+      status: 'FINALIZED',
+      finalizedAt: '2026-09-24T02:15:00.000Z',
+      loyaltyRedemption: {
+        membershipId: 'membership-1',
+        points: '3.0000',
+        pointValue: '1000.0000',
+        amount: '3000.0000',
+      },
+    });
+    (
+      completed as Sale & {
+        loyaltySummary: {
+          earnedPoints: string;
+          redeemedPoints: string;
+          balanceAfter: string;
+        };
+      }
+    ).loyaltySummary = {
+      earnedPoints: '5.0000',
+      redeemedPoints: '3.0000',
+      balanceAfter: '122.0000',
+    };
+
+    render(
+      <DeploymentBootstrapProvider config={bootstrap}>
+        <ReceiptContent
+          sale={completed}
+          activeLines={completed.lines}
+          customer={completed.customer!}
+          locale="id-ID"
+          businessName="Digvation"
+          branchName="Main branch"
+          cashierName="Kasir"
+          transactionDate="24 Sep 2026"
+          hasDiscount={false}
+          hasTax={false}
+        />
+      </DeploymentBootstrapProvider>,
+    );
+
+    const customer = screen.getByText('Nida').closest('section');
+    expect(customer).not.toBeNull();
+    expect(within(customer!).getByText('Poin saat ini')).toBeTruthy();
+    expect(within(customer!).getByText('122')).toBeTruthy();
+    expect(within(customer!).getByText('Didapat')).toBeTruthy();
+    expect(within(customer!).getByText('+5')).toBeTruthy();
+    expect(within(customer!).getByText('Digunakan')).toBeTruthy();
+    expect(within(customer!).getByText('−3')).toBeTruthy();
+  });
+
   it('uses only finalized Runtime snapshot points on the receipt', () => {
     const completed = runtimeQueueDetail({
       status: 'FINALIZED',
