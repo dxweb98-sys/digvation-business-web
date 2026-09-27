@@ -3,7 +3,7 @@ export type BrandingMode = 'DIGVATION_DEFAULT' | 'WHITE_LABEL';
 export type ThemePreset = 'DIGVATION_LIGHT' | 'CUSTOM';
 export type ThemeRadius = 'COMPACT' | 'SOFT' | 'ROUNDED';
 export type ApplicationId = 'operational' | 'backoffice';
-export type BusinessProduct = 'POS';
+export type BusinessProduct = 'POS' | 'WORKSHOP';
 export type BusinessCapability =
   | 'FINANCE_OPERATIONS'
   | 'BUSINESS_ANALYTICS'
