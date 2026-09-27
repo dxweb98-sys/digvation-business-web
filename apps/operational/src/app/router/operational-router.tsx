@@ -11,6 +11,8 @@ import type { OperationalNavigationSection } from '../../modules/operational/ope
 import { posSellOperationalNavigation } from '../../modules/pos/pos-operational-navigation';
 import { financeOperationalNavigation } from '../../modules/finance/finance-operational-navigation';
 import { OperationalExpensesPage } from '../../modules/finance/operational-expenses-page';
+import { workshopOperationalNavigation } from '../../modules/workshop/workshop-operational-navigation';
+import { WorkshopIntakePage } from '../../modules/workshop/workshop-intake-page';
 
 export function canAccessOperationalExpenses(
   permissions: readonly string[],
@@ -24,14 +26,32 @@ export function canAccessOperationalExpenses(
   );
 }
 
+/**
+ * Intake requires canonical customer lookup/selection (`customers:read`) in
+ * addition to the Workshop action permission. POS entitlement/permissions are
+ * never required — a WORKSHOP-only entitled user must reach Intake.
+ */
+export function canAccessWorkshopIntake(
+  permissions: readonly string[],
+  hasWorkshop: boolean,
+) {
+  return (
+    hasWorkshop &&
+    permissions.includes('work-orders:create') &&
+    permissions.includes('customers:read')
+  );
+}
+
 function useOperationalSurfaceAccess() {
   const { session } = useAuth();
   const permissions = session.access.permissions;
   const hasPos = session.access.products.includes('POS');
+  const hasWorkshop = session.access.products.includes('WORKSHOP');
   const hasFinance = session.access.capabilities.includes('FINANCE_OPERATIONS');
   return {
     canSell: hasPos && permissions.includes('sales:create'),
     canAccessExpenses: canAccessOperationalExpenses(permissions, hasFinance),
+    canAccessWorkshopIntake: canAccessWorkshopIntake(permissions, hasWorkshop),
   };
 }
 
@@ -60,6 +80,17 @@ function OperationalLayout() {
           },
         ]
       : []),
+    ...(access.canAccessWorkshopIntake
+      ? [
+          {
+            label: copy(workshopOperationalNavigation.label),
+            items: workshopOperationalNavigation.items.map((item) => ({
+              ...item,
+              label: copy(item.label),
+            })),
+          },
+        ]
+      : []),
   ];
   return <OperationalShell navigationSections={navigationSections} />;
 }
@@ -68,6 +99,7 @@ function OperationalHome() {
   const access = useOperationalSurfaceAccess();
   if (access.canSell) return <Navigate to="/sell" replace />;
   if (access.canAccessExpenses) return <Navigate to="/expenses" replace />;
+  if (access.canAccessWorkshopIntake) return <Navigate to="/workshop/intake" replace />;
   return <Navigate to="/login" replace />;
 }
 
@@ -135,6 +167,15 @@ function ExpensesRoute() {
   );
 }
 
+function WorkshopIntakeRoute() {
+  const { canAccessWorkshopIntake } = useOperationalSurfaceAccess();
+  return (
+    <SurfaceGate allowed={canAccessWorkshopIntake}>
+      <WorkshopIntakePage />
+    </SurfaceGate>
+  );
+}
+
 export const operationalRouter = createBrowserRouter([
   { path: '/login', element: <Navigate to="/" replace /> },
   {
@@ -145,6 +186,7 @@ export const operationalRouter = createBrowserRouter([
       { path: '/sell', element: <SellRoute /> },
       { path: '/sell/:saleId', element: <SellRoute /> },
       { path: '/expenses', element: <ExpensesRoute /> },
+      { path: '/workshop/intake', element: <WorkshopIntakeRoute /> },
       { path: '*', element: <OperationalNotFoundRoute /> },
     ],
   },
