@@ -37,7 +37,7 @@ describe('SaleFinancialSummary', () => {
         tax={null}
         total="180000.0000"
         settlement={{
-          paymentState: 'PAID',
+          cashApplied: '0.0000', paymentState: 'PAID',
           totalPaid: '180000.0000',
           balanceDue: '0.0000',
           cashTendered: null,
@@ -92,7 +92,7 @@ describe('SaleFinancialSummary settlement', () => {
   it('says "settled" once, without repeating the paid amount, when payments equal the total', () => {
     render(
       summary({
-        paymentState: 'PAID',
+        cashApplied: '100000.0000', paymentState: 'PAID',
         totalPaid: '100000.0000',
         balanceDue: '0.0000',
         cashTendered: '100000.0000',
@@ -109,7 +109,7 @@ describe('SaleFinancialSummary settlement', () => {
   it('shows what was paid and what remains, and no settled badge, while a balance is due', () => {
     render(
       summary({
-        paymentState: 'PARTIALLY_PAID',
+        cashApplied: '0.0000', paymentState: 'PARTIALLY_PAID',
         totalPaid: '40000.0000',
         balanceDue: '60000.0000',
         cashTendered: null,
@@ -125,7 +125,7 @@ describe('SaleFinancialSummary settlement', () => {
   it('keeps cash received and change when change was given', () => {
     render(
       summary({
-        paymentState: 'PAID',
+        cashApplied: '100000.0000', paymentState: 'PAID',
         totalPaid: '100000.0000',
         balanceDue: '0.0000',
         cashTendered: '150000.0000',

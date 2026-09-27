@@ -3,9 +3,11 @@ import {
   type DeploymentBootstrapConfig,
 } from '@digvation/business-runtime';
 import { DToastProvider } from '@digvation-labs/ui';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import type { ReplaceLinePreview } from '../cashier-transaction.adapter';
 import type { CatalogItem, Sale, SaleLine } from '../cashier-transaction.types';
 import { ReferenceOrderAdjustmentDialog } from './replatformed-pos-workspace';
 
@@ -28,7 +30,11 @@ function sale(status: 'OPEN' | 'FINALIZED' = 'OPEN', fulfillmentStatus: 'WAITING
   } as unknown as Sale;
 }
 
-type CorrectionPreview = (line: SaleLine, input: { catalogItemId: string; catalogVariantId?: string; quantity: string }) => Promise<{ saleVersion: number; currentTotalAmount: string; correctedTotalAmount: string; netSuccessfulPaidAmount: string; remainingPaymentAmount: string; overpaymentAmount: string }>;
+type CorrectionPreview = (line: SaleLine, input: { lines: unknown[] }) => Promise<ReplaceLinePreview>;
+const previewOf = (overrides: Partial<ReplaceLinePreview> = {}): ReplaceLinePreview => ({
+  saleId: 'sale-1', saleVersion: 3, currency: 'IDR', currentTotalAmount: '100000.0000', correctedTotalAmount: '80000.0000',
+  netSuccessfulPaidAmount: '80000.0000', remainingPaymentAmount: '0.0000', replacements: [], ...overrides,
+});
 
 function renderDialog(options: {
   sale?: Sale;
@@ -38,15 +44,26 @@ function renderDialog(options: {
   items?: CatalogItem[];
   compensateResult?: Sale;
   compensateError?: Error;
+  preview?: ReplaceLinePreview;
+  previewError?: Error;
+  correctError?: Error;
 } = {}) {
-  const onPreview: CorrectionPreview = async () => ({ saleVersion: 3, currentTotalAmount: '100000.0000', correctedTotalAmount: '80000.0000', netSuccessfulPaidAmount: '100000.0000', remainingPaymentAmount: '0.0000', overpaymentAmount: '20000.0000' });
+  const onPreview = vi.fn<CorrectionPreview>(async () => options.preview ?? previewOf());
   const onCompensate = vi.fn(async () => {
     if (options.compensateError) throw options.compensateError;
     return options.compensateResult;
   });
-  const onCorrect = vi.fn(async () => options.correctResult);
-  const view = render(<DeploymentBootstrapProvider config={bootstrap}><DToastProvider><ReferenceOrderAdjustmentDialog sale={options.sale ?? sale()} items={options.items ?? items} locale="id-ID" isMutating={false} variantPicker={null} onClose={vi.fn()} onAdd={vi.fn()} onAddVariant={vi.fn()} onQuantity={vi.fn()} onRemove={vi.fn()} onCorrect={onCorrect} onPreview={onPreview} canCorrectProgressedLine={options.canCorrectProgressedLine ?? false} canRefundPayment={options.canRefundPayment ?? false} onCompensate={onCompensate} /></DToastProvider></DeploymentBootstrapProvider>);
-  return { onPreview, onCompensate, onCorrect, ...view };
+  const onCorrect = vi.fn(async () => {
+    if (options.correctError) throw options.correctError;
+    return options.correctResult;
+  });
+  if (options.previewError) onPreview.mockRejectedValue(options.previewError);
+  const loadConfiguratorState = vi.fn(async (item: CatalogItem) => ({
+    item, variants: [], itemPrice: '100000.0000', locale: 'id-ID', currency: 'IDR',
+  }));
+  const loadCandidates = vi.fn(async () => ({ items: [] }));
+  const view = render(<DeploymentBootstrapProvider config={bootstrap}><QueryClientProvider client={new QueryClient()}><DToastProvider><ReferenceOrderAdjustmentDialog sale={options.sale ?? sale()} items={options.items ?? items} locale="id-ID" isMutating={false} variantPicker={null} onClose={vi.fn()} onAdd={vi.fn()} onAddVariant={vi.fn()} onQuantity={vi.fn()} onRemove={vi.fn()} onCorrect={onCorrect} onPreview={onPreview} loadConfiguratorState={loadConfiguratorState} loadCandidates={loadCandidates} canCorrectProgressedLine={options.canCorrectProgressedLine ?? false} canRefundPayment={options.canRefundPayment ?? false} onCompensate={onCompensate} /></DToastProvider></QueryClientProvider></DeploymentBootstrapProvider>);
+  return { onPreview, onCompensate, onCorrect, loadConfiguratorState, ...view };
 }
 
 function correctedSale(method: 'CASH' | 'BANK_TRANSFER' = 'CASH') {
@@ -58,10 +75,18 @@ function compensatedSale() {
   return { ...base, version: 5, payments: [...base.payments, { id: 'refund-1', status: 'SUCCEEDED', method: 'CASH', appliedAmount: '-20000.0000', tenderedAmount: null, changeAmount: null }] } as unknown as Sale;
 }
 
-async function previewAndConfirm() {
+/** Opens the correction and waits until the shared configuration of the current item is ready. */
+async function openCorrection() {
   fireEvent.click(screen.getByRole('button', { name: 'Koreksi item' }));
+  await waitFor(() =>
+    expect((screen.getByRole('button', { name: 'Lihat dampak' }) as HTMLButtonElement).disabled).toBe(false),
+  );
+}
+
+async function previewAndConfirm() {
+  await openCorrection();
   fireEvent.click(screen.getByRole('button', { name: 'Lihat dampak' }));
-  await screen.findByText('Kelebihan pembayaran');
+  await screen.findByLabelText('Dampak koreksi');
   fireEvent.change(screen.getByLabelText('Alasan koreksi'), { target: { value: 'Salah pilih layanan' } });
   fireEvent.click(screen.getByRole('button', { name: 'Konfirmasi koreksi' }));
 }
@@ -91,12 +116,12 @@ describe('ReferenceOrderAdjustmentDialog progressed correction', () => {
     expect(screen.queryByRole('button', { name: 'Koreksi item' })).toBeNull();
   });
 
-  it('treats a predicted overpayment as read-only information and never offers compensation before the correction is saved', async () => {
-    const view = renderDialog({ sale: sale('OPEN', 'WAITING', 'CASH'), canRefundPayment: true, correctResult: correctedSale() });
-    fireEvent.click(screen.getByRole('button', { name: 'Koreksi item' }));
+  it('previews the remaining balance from Runtime, never a predicted overpayment, and offers no compensation before saving', async () => {
+    const view = renderDialog({ sale: sale('OPEN', 'WAITING', 'CASH'), canRefundPayment: true, correctResult: correctedSale(), preview: previewOf({ remainingPaymentAmount: '25000.0000', netSuccessfulPaidAmount: '55000.0000' }) });
+    await openCorrection();
     fireEvent.click(screen.getByRole('button', { name: 'Lihat dampak' }));
-    expect(await screen.findByText('Kelebihan pembayaran')).toBeTruthy();
-    expect(screen.getByText(/Setelah koreksi dikonfirmasi, .*20\.000.* perlu dikembalikan kepada pelanggan/)).toBeTruthy();
+    expect(await screen.findByText('Sisa pembayaran')).toBeTruthy();
+    expect(screen.queryByText('Kelebihan pembayaran')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Kembalikan kelebihan pembayaran' })).toBeNull();
     expect(view.onCompensate).not.toHaveBeenCalled();
   });
@@ -153,21 +178,20 @@ describe('ReferenceOrderAdjustmentDialog progressed correction', () => {
     expect(screen.queryByText('Item saat ini')).toBeNull();
   });
 
-  it('does not demand a variant for an item that offers none, even when its variant mode is REQUIRED', () => {
+  it('does not demand a variant for an item that offers none, even when its variant mode is REQUIRED', async () => {
     const requiredWithoutVariants = [
       { id: 'source-item', code: 'SRC', name: 'Smoothing Curly', variantSelectionMode: 'REQUIRED', variants: [] },
     ] as unknown as CatalogItem[];
     renderDialog({ items: requiredWithoutVariants });
-    fireEvent.click(screen.getByRole('button', { name: 'Koreksi item' }));
-    expect(screen.queryByText('Varian')).toBeNull();
-    expect((screen.getByRole('button', { name: 'Lihat dampak' }) as HTMLButtonElement).disabled).toBe(false);
+    await openCorrection();
+    expect(screen.queryByText('Pilih varian')).toBeNull();
   });
 
-  it('presents the correction form with canonical inputs and a way back to the adjustment', () => {
+  it('presents the correction form with the shared item configuration and a way back to the adjustment', async () => {
     renderDialog({ sale: sale('OPEN', 'WAITING') });
-    fireEvent.click(screen.getByRole('button', { name: 'Koreksi item' }));
+    await openCorrection();
     // Ordinary integer quantities are not shown with meaningless trailing zeros.
-    expect((screen.getByLabelText('Jumlah') as HTMLInputElement).value).toBe('1');
+    expect((screen.getByRole('textbox', { name: 'Jumlah' }) as HTMLInputElement).value).toBe('1');
     // The reason is multiline explanatory text and the replacement item is searchable.
     expect(screen.getByLabelText('Alasan koreksi').tagName).toBe('TEXTAREA');
     expect(screen.getByRole('combobox', { name: 'Item pengganti' })).toBeTruthy();
@@ -176,5 +200,75 @@ describe('ReferenceOrderAdjustmentDialog progressed correction', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Kembali' }));
     expect(screen.queryByText('Item saat ini')).toBeNull();
     expect(screen.getByRole('button', { name: 'Koreksi item' })).toBeTruthy();
+  });
+});
+
+describe('ReferenceOrderAdjustmentDialog — full item configuration in a correction', () => {
+  afterEach(cleanup);
+  const twoWithAdditions = () => ({
+    ...sale('OPEN', 'WAITING'),
+    lines: [
+      {
+        id: 'source-line', saleId: 'sale-1', catalogItemId: 'source-item', catalogVariantId: null, itemNameSnapshot: 'Smoothing Curly',
+        quantity: '1.0000', effectiveUnitPrice: '100000.0000', removedAt: null, fulfillment: { status: 'WAITING' },
+        compositionComponents: [],
+      },
+    ],
+  } as unknown as Sale);
+
+  it('offers the shared configuration: quantity 2 opens one configuration per unit', async () => {
+    renderDialog({ sale: twoWithAdditions() });
+    await openCorrection();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Jumlah' }), { target: { value: '2' } });
+    expect(screen.getByRole('list', { name: 'Unit' })).toBeTruthy();
+    expect(screen.getByText('Atur setiap unit')).toBeTruthy();
+    expect(screen.getByRole('switch', { name: /Gunakan item tambahan/ })).toBeTruthy();
+  });
+
+  it('sends the configuration as replacement lines: identical units stay one line with the quantity', async () => {
+    const view = renderDialog({ sale: twoWithAdditions() });
+    await openCorrection();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Jumlah' }), { target: { value: '3' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Lihat dampak' }));
+    await screen.findByLabelText('Dampak koreksi');
+    expect(view.onPreview).toHaveBeenCalledTimes(1);
+    expect(view.onPreview.mock.calls[0]![1]).toEqual({
+      lines: [{ catalogItemId: 'source-item', quantity: '3' }],
+    });
+  });
+
+  it('shows the Runtime-calculated replacement lines and totals in the impact, not a Web calculation', async () => {
+    renderDialog({
+      sale: twoWithAdditions(),
+      preview: previewOf({
+        correctedTotalAmount: '425000.0000',
+        replacements: [
+          { catalogItemId: 'i', itemName: 'Smoothing Curly', variantName: 'Curly', quantity: '1.0000', unitAmount: '210000.0000', grossAmount: '210000.0000', additions: [{ name: 'Addition A', quantity: '1.0000', unitPrice: '25000.0000', amount: '25000.0000' }] },
+          { catalogItemId: 'i', itemName: 'Smoothing Curly', variantName: 'Curly', quantity: '1.0000', unitAmount: '215000.0000', grossAmount: '215000.0000', additions: [{ name: 'Addition B', quantity: '1.0000', unitPrice: '30000.0000', amount: '30000.0000' }] },
+        ],
+      }),
+    });
+    await openCorrection();
+    fireEvent.click(screen.getByRole('button', { name: 'Lihat dampak' }));
+    const impact = await screen.findByLabelText('Dampak koreksi');
+    expect(impact.textContent).toContain('Addition A');
+    expect(impact.textContent).toContain('Addition B');
+    expect(impact.textContent).toContain('210.000');
+    expect(impact.textContent).toContain('215.000');
+    expect(impact.textContent).toContain('425.000');
+    expect(impact.textContent).not.toContain('212.500');
+  });
+
+  it('names what is missing instead of a generic preview failure, and keeps a safe fallback for unknown errors', async () => {
+    const { ApiError } = await import('@digvation/pos-api');
+    renderDialog({ previewError: new ApiError(404, 'CATALOG_ITEM_NOT_FOUND', 'gone') });
+    await openCorrection();
+    fireEvent.click(screen.getByRole('button', { name: 'Lihat dampak' }));
+    expect(await screen.findByText('Item pengganti tidak lagi tersedia.')).toBeTruthy();
+    cleanup();
+    renderDialog({ previewError: new Error('boom') });
+    await openCorrection();
+    fireEvent.click(screen.getByRole('button', { name: 'Lihat dampak' }));
+    expect(await screen.findByText('Koreksi tidak dapat dipratinjau. Muat ulang transaksi lalu coba lagi.')).toBeTruthy();
   });
 });

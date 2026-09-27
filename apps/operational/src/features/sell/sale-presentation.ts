@@ -19,6 +19,50 @@ export interface DiscountPresentationRow {
   percentage: string | null;
   /** Recorded reason of a manual discount; never used as its title. */
   reason: string | null;
+  /**
+   * Stable historical identity of what was applied. A Promotion is identified by the Promotion
+   * and its snapshotted terms, never by its label, so two unrelated promotions that share a name
+   * are never merged. Every other adjustment is its own identity.
+   */
+  identity: string;
+  promotionEffectiveFrom?: string | null;
+  promotionEffectiveUntil?: string | null;
+}
+
+/** Facts explaining one applied discount, taken from the Sale's own adjustment snapshot. */
+export interface DiscountDetails {
+  source: SaleAdjustment['source'];
+  scope: SaleAdjustment['scope'] | null;
+  /** Promotion name, or null for a manual discount. */
+  name: string | null;
+  percentage: string | null;
+  effectiveFrom: string | null;
+  effectiveUntil: string | null;
+  reason: string | null;
+}
+
+/**
+ * One row per applied Promotion or discount for the Sale summary. Rows with the same identity are
+ * one row whose amount is the sum of their own authoritative amounts; nothing is recalculated.
+ */
+export function aggregateDiscountRows(
+  rows: readonly DiscountPresentationRow[],
+): DiscountPresentationRow[] {
+  const merged = new Map<string, DiscountPresentationRow>();
+  for (const row of rows) {
+    const existing = merged.get(row.identity);
+    if (!existing) {
+      merged.set(row.identity, { ...row });
+      continue;
+    }
+    merged.set(row.identity, {
+      ...existing,
+      amount: createDecimal(existing.amount).plus(row.amount).toFixed(4),
+      // The merged row spans several lines, so it belongs to none of them.
+      saleLineId: existing.saleLineId === row.saleLineId ? existing.saleLineId : null,
+    });
+  }
+  return [...merged.values()];
 }
 
 /** Title and optional supporting note shown for one discount, identical on every surface. */
@@ -120,6 +164,7 @@ export function lineDiscountPercentage(
 export interface LineDiscountRow extends DiscountPresentationText {
   id: string;
   amount: string;
+  details: DiscountDetails;
 }
 
 /**
@@ -139,6 +184,16 @@ export function lineDiscountRows(
     .map((adjustment) => ({
       id: adjustment.id,
       amount: adjustment.actualAmount,
+      details: {
+        source: adjustment.source,
+        scope: adjustment.scope,
+        name: adjustment.source === 'PROMOTION' ? adjustment.label || 'Promo' : null,
+        percentage:
+          adjustment.type === 'PERCENTAGE' ? percentageFromRate(adjustment.configuredValue) : null,
+        effectiveFrom: adjustment.promotionEffectiveFrom ?? null,
+        effectiveUntil: adjustment.promotionEffectiveUntil ?? null,
+        reason: adjustment.source === 'MANUAL_DISCOUNT' ? adjustment.reason : null,
+      },
       ...discountPresentation(
         {
           source: adjustment.source,
@@ -157,6 +212,15 @@ export function lineDiscountRows(
     {
       id: `${line.id}-discount`,
       amount: line.lineDiscountAmount,
+      details: {
+        source: 'MANUAL_DISCOUNT' as const,
+        scope: 'ITEM' as const,
+        name: null,
+        percentage: lineDiscountPercentage(line),
+        effectiveFrom: null,
+        effectiveUntil: null,
+        reason: reasonNote(line.discountReason),
+      },
       ...lineDiscountPresentation(line, discountWord),
     },
   ];
@@ -192,6 +256,12 @@ export function saleDiscountRows(sale: DiscountPresentationSale): DiscountPresen
       percentage:
         adjustment.type === 'PERCENTAGE' ? percentageFromRate(adjustment.configuredValue) : null,
       reason: adjustment.source === 'MANUAL_DISCOUNT' ? adjustment.reason : null,
+      identity:
+        adjustment.source === 'PROMOTION' && adjustment.promotionId
+          ? `PROMOTION:${adjustment.promotionId}:${adjustment.type}:${adjustment.configuredValue}`
+          : `ADJUSTMENT:${adjustment.id}`,
+      promotionEffectiveFrom: adjustment.promotionEffectiveFrom ?? null,
+      promotionEffectiveUntil: adjustment.promotionEffectiveUntil ?? null,
     }));
 
   const hasManualTransactionRow = rows.some(
@@ -215,6 +285,9 @@ export function saleDiscountRows(sale: DiscountPresentationSale): DiscountPresen
           ? percentageFromRate(sale.orderDiscountValue)
           : null,
       reason: sale.orderDiscountReason,
+      identity: 'ORDER-DISCOUNT',
+      promotionEffectiveFrom: null,
+      promotionEffectiveUntil: null,
     });
   }
 
@@ -269,6 +342,17 @@ export function saleTaxTreatment(sale: TaxPresentationSale): TaxTreatment | null
   return [...treatments][0] ?? null;
 }
 
+/** Item-level tax label, in the same words as the summary tax row: "Pajak (11%)". */
+export function lineTaxLabel(
+  line: Pick<SaleLine, 'itemTaxRate' | 'itemTaxTreatment'>,
+  baseLabel = 'Pajak',
+  includedLabel = baseLabel === 'Tax' ? 'Tax included' : 'Pajak termasuk',
+): string {
+  const label = line.itemTaxTreatment === 'INCLUDED' ? includedLabel : baseLabel;
+  const percentage = percentageFromRate(line.itemTaxRate);
+  return percentage ? `${label} (${percentage}%)` : label;
+}
+
 export function saleTaxLabel(
   sale: TaxPresentationSale,
   baseLabel = 'Pajak',
@@ -309,6 +393,8 @@ type SettlementPayment = Pick<
 export interface SaleSettlement {
   totalPaid: string;
   balanceDue: string;
+  /** Successful positive CASH applied to the Sale: what cash settled, not what was handed over. */
+  cashApplied: string;
   cashTendered: string | null;
   cashChange: string | null;
   paymentState: 'PAID' | 'PARTIALLY_PAID' | 'UNPAID';
@@ -342,6 +428,12 @@ export function saleSettlement(sale: {
       (sum, payment) => sum.minus(createDecimal(String(payment.appliedAmount))),
       createDecimal('0'),
     );
+  const cashApplied = cash
+    .filter((payment) => createDecimal(String(payment.appliedAmount)).greaterThan(0))
+    .reduce(
+      (sum, payment) => sum.plus(createDecimal(String(payment.appliedAmount))),
+      createDecimal('0'),
+    );
   const cashChange = cash
     .reduce(
       (sum, payment) => sum.plus(createDecimal(String(payment.changeAmount ?? '0'))),
@@ -354,12 +446,27 @@ export function saleSettlement(sale: {
   return {
     totalPaid: totalPaid.toFixed(4),
     balanceDue: balance.greaterThan(0) ? balance.toFixed(4) : '0.0000',
+    cashApplied: cashApplied.toFixed(4),
     cashTendered: cash.some((payment) => payment.tenderedAmount !== null)
       ? cashTendered.toFixed(4)
       : null,
     cashChange: cashChange.greaterThan(0) ? cashChange.toFixed(4) : null,
     paymentState: settled ? 'PAID' : totalPaid.greaterThan(0) ? 'PARTIALLY_PAID' : 'UNPAID',
   };
+}
+
+/**
+ * Physical cash is worth showing only when it explains something: cash handed over beyond the cash
+ * applied to the Sale, or change given back. It is compared with CASH applied, never with the
+ * total paid across all methods, so a split payment cannot make exact cash look like news.
+ */
+export function cashTenderNote(
+  settlement: Pick<SaleSettlement, 'cashApplied' | 'cashTendered' | 'cashChange'>,
+): { tendered: string; change: string | null } | null {
+  if (!settlement.cashTendered) return null;
+  const exceedsApplied = createDecimal(settlement.cashTendered).greaterThan(settlement.cashApplied);
+  if (!exceedsApplied && !settlement.cashChange) return null;
+  return { tendered: settlement.cashTendered, change: settlement.cashChange };
 }
 
 type ProgressPayment = Pick<Payment, 'status' | 'appliedAmount'>;

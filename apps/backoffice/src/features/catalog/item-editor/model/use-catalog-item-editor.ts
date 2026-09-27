@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 
+import type { ServiceCompositionDraft } from './service-composition-draft';
 import type { VariantPriceDraft } from './variant-price-draft';
 import type { LoyaltyEarningBehavior } from '../../../../modules/loyalty/loyalty-api';
 import {
@@ -27,6 +28,7 @@ export function useCatalogItemEditor(item: CatalogItemEditorSource | null | unde
   const initialPriceRef = useRef<string | null | undefined>(undefined);
   const variantsLoadedRef = useRef(false);
   const loyaltyRuleLoadedRef = useRef(false);
+  const compositionLoadedRef = useRef(false);
   const identity = editorIdentity(item);
   const effectiveAt = useMemo(() => {
     void identity;
@@ -41,6 +43,7 @@ export function useCatalogItemEditor(item: CatalogItemEditorSource | null | unde
     initialPriceRef.current = undefined;
     variantsLoadedRef.current = false;
     loyaltyRuleLoadedRef.current = false;
+    compositionLoadedRef.current = false;
 
     dispatch({ type: 'RESET', item });
   }, [identity, item]);
@@ -76,6 +79,18 @@ export function useCatalogItemEditor(item: CatalogItemEditorSource | null | unde
     variantsLoadedRef.current = true;
     dispatch({ type: 'VARIANTS_HYDRATED', variants });
     return true;
+  }, []);
+
+  const hydrateCompositionOnce = useCallback((composition: ServiceCompositionDraft) => {
+    if (compositionLoadedRef.current) return false;
+
+    compositionLoadedRef.current = true;
+    dispatch({ type: 'COMPOSITION_HYDRATED', composition });
+    return true;
+  }, []);
+
+  const setComposition = useCallback((composition: ServiceCompositionDraft) => {
+    dispatch({ type: 'COMPOSITION_CHANGED', composition });
   }, []);
 
   const hydrateLoyaltyOnce = useCallback(
@@ -127,6 +142,7 @@ export function useCatalogItemEditor(item: CatalogItemEditorSource | null | unde
 
   return {
     form: state.form,
+    composition: state.composition,
     loyalty: state.loyalty,
     image: state.image,
     ui: state.ui,
@@ -135,6 +151,8 @@ export function useCatalogItemEditor(item: CatalogItemEditorSource | null | unde
       setFormField,
       hydrateDefaultPriceOnce,
       hydrateVariantsOnce,
+      hydrateCompositionOnce,
+      setComposition,
       hydrateLoyaltyOnce,
       getInitialPrice,
       setLoyaltyBehavior,

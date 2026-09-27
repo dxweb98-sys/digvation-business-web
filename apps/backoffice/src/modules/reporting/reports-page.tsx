@@ -27,6 +27,7 @@ const types = [
   ['business-performance', 'Business Performance Summary'],
   ['transactions', 'Transaction Report'],
   ['catalog-performance', 'Catalog Performance'],
+  ['component-usage', 'Component Usage'],
   ['employee-performance', 'Employee Performance'],
   ['attendance', 'Attendance Report'],
   ['payments', 'Payment Report'],
@@ -60,6 +61,19 @@ type Dataset = {
 };
 const details: Record<Type, string[]> = {
   'business-performance': [],
+  'component-usage': [
+    'saleNumber',
+    'occurredAt',
+    'sellingLocation',
+    'parentItemName',
+    'parentVariantName',
+    'componentName',
+    'componentVariantName',
+    'componentSource',
+    'usedQuantity',
+    'sellingUnitAmount',
+    'billedAmount',
+  ],
   transactions: [
     'saleNumber',
     'invoiceNumber',
@@ -192,6 +206,13 @@ const details: Record<Type, string[]> = {
 };
 
 const metrics: Record<Type, string[]> = {
+  'component-usage': [
+    'transactionCount',
+    'componentCount',
+    'usageCount',
+    'selectedUsageCount',
+    'billedAdditionAmount',
+  ],
   'business-performance': [
     'finalRevenue',
     'transactionCount',
@@ -233,6 +254,11 @@ const visuals: Record<Type, { trend?: string; insights: [string, string][]; rank
       ['paymentMethod', 'Payment method mix'],
     ],
   },
+  'component-usage': {
+    trend: 'Usage activity',
+    insights: [['source', 'Usage source']],
+    ranking: 'Most used components',
+  },
   'catalog-performance': {
     trend: 'Catalog activity',
     insights: [['primary', 'Catalog mix']],
@@ -260,6 +286,7 @@ const visuals: Record<Type, { trend?: string; insights: [string, string][]; rank
   },
 };
 const filterFields: Record<Type, [string, string, string[]][]> = {
+  'component-usage': [['componentSource', 'Usage source', ['FIXED_BOM', 'SALE_SELECTED']]],
   'business-performance': [['saleStatus', 'Sale status', ['OPEN', 'FINALIZED', 'VOIDED']]],
   transactions: [
     ['saleStatus', 'Sale status', ['OPEN', 'FINALIZED', 'VOIDED']],
@@ -310,6 +337,10 @@ const attendanceLabels: Record<string, string> = {
   SICK: 'Sick',
   LOCAL: 'Local',
   HRIS: 'HRIS',
+  FIXED_BOM: 'Fixed / configured',
+  SALE_SELECTED: 'Selected during transaction',
+  SERVICE_DEFAULT: 'Service default',
+  SERVICE_VARIANT_OVERRIDE: 'Service variant',
 };
 function requestedType(value: string | null): Type {
   return types.some(([candidate]) => candidate === value)
@@ -447,6 +478,15 @@ export function ReportsPage() {
         const attendanceLabel = attendanceLabels[String(v ?? '')];
         if (attendanceLabel) return copy(attendanceLabel);
       }
+      if (type === 'component-usage') {
+        if (k === 'occurredAt' && v)
+          return formatDate(new Date(String(v)), { dateStyle: 'medium', timeStyle: 'short' });
+        // Fixed BOM components are not billed: no price is shown, and never a fake zero.
+        if ((k === 'sellingUnitAmount' || k === 'billedAmount') && (v === null || v === undefined))
+          return '—';
+        const label = attendanceLabels[String(v ?? '')];
+        if (label) return copy(label);
+      }
       return money(k)
         ? formatMoney(String(v ?? 0), 'IDR')
         : count(k)
@@ -461,9 +501,54 @@ export function ReportsPage() {
     () =>
       details[type]
         .filter((k) => data?.items.some((r) => k in r))
-        .map((k) => ({ key: k, label: copy(title(k)), render: (r) => format(k, r[k]) })),
+        .map((k) => ({
+          key: k,
+          label: copy(title(k)),
+          render: (r) =>
+            type === 'component-usage' && k === 'componentSource'
+              ? // Source stays the dimension; a Service Variant recipe is shown beside it, not hidden.
+                `${format(k, r[k])}${
+                  r.fixedBomSource === 'SERVICE_VARIANT_OVERRIDE'
+                    ? ` · ${copy('Service variant')}`
+                    : ''
+                }`
+              : format(k, r[k]),
+        })),
     [copy, data?.items, format, type],
   );
+  const usageColumns = useMemo<TableColumn<Row>[]>(() => {
+    const qty = (v: Row[string]) =>
+      new Intl.NumberFormat('id-ID', { maximumFractionDigits: 4 }).format(Number(v ?? 0));
+    return [
+      { key: 'label', label: copy('Component') },
+      { key: 'value', label: copy('Total used'), render: (r) => qty(r.value ?? 0) },
+      { key: 'fixedQuantity', label: copy('Fixed / configured'), render: (r) => qty(r.fixedQuantity ?? 0) },
+      {
+        key: 'selectedQuantity',
+        label: copy('Selected during transaction'),
+        render: (r) => qty(r.selectedQuantity ?? 0),
+      },
+      {
+        key: 'billedAmount',
+        label: copy('Billed amount'),
+        render: (r) =>
+          Number(r.billedAmount ?? 0) > 0 ? formatMoney(String(r.billedAmount), 'IDR') : '—',
+      },
+      {
+        key: 'count',
+        label: copy('Transactions'),
+        render: (r) => new Intl.NumberFormat('id-ID').format(Number(r.count ?? 0)),
+      },
+      {
+        key: 'services',
+        label: copy('Used by service'),
+        render: (r) =>
+          (r.services as unknown as { label: string; quantity: string }[] | undefined)
+            ?.map((s) => `${s.label} ${qty(s.quantity)}`)
+            .join(' · ') ?? '—',
+      },
+    ];
+  }, [copy, formatMoney]);
   const update = (k: string, v: string) => {
     setFilters((c) => {
       const n = { ...c };
@@ -501,6 +586,25 @@ export function ReportsPage() {
       Type,
       [string, string, { value: string; label: string }[]][]
     >),
+    'component-usage': [
+      ...choices(filterFields['component-usage']),
+      [
+        'componentItemId',
+        'Component',
+        [
+          { value: '', label: copy('All') },
+          ...(catalog.data?.items ?? []).map((i) => ({ value: i.id, label: option(i) })),
+        ],
+      ],
+      [
+        'catalogItemId',
+        'Service',
+        [
+          { value: '', label: copy('All') },
+          ...(catalog.data?.items ?? []).map((i) => ({ value: i.id, label: option(i) })),
+        ],
+      ],
+    ],
     'catalog-performance': [
       ...choices(filterFields['catalog-performance']),
       [
@@ -772,6 +876,13 @@ export function ReportsPage() {
               onChange={(v) => update('search', v)}
             />
           ) : null}
+          {type === 'component-usage' ? (
+            <DInput
+              label={copy('Search component or item')}
+              value={filters.search ?? ''}
+              onChange={(v) => update('search', v)}
+            />
+          ) : null}
           {type === 'tax' ? (
             <DInput
               label={copy('Tax code')}
@@ -847,14 +958,16 @@ export function ReportsPage() {
           ))}
       </section>
       {visual.trend || visual.insights.length ? (
-        <section className="mt-5 grid gap-4 lg:grid-cols-3">
+        <section className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
           {visual.trend ? (
             <AnalyticsLineChart
               title={copy(visual.trend)}
               subtitle={`${copy('Selected period')}: ${from} — ${to}`}
               data={data?.analytics.trend ?? []}
               formatValue={(v) =>
-                type === 'attendance' ? integer(Number(v)) : formatMoney(v, 'IDR')
+                type === 'attendance' || type === 'component-usage'
+                  ? integer(Number(v))
+                  : formatMoney(v, 'IDR')
               }
               emptyMessage={empty}
               pointsLabel={copy('data points')}
@@ -880,12 +993,34 @@ export function ReportsPage() {
         </section>
       ) : null}
       {visual.ranking && data?.analytics.ranking.length ? (
-        <section className="mt-4 grid gap-4 lg:grid-cols-3">
+        <section className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
           <AnalyticsHorizontalBarChart
             title={copy(visual.ranking)}
             data={data.analytics.ranking}
-            formatValue={(v) => formatMoney(v, 'IDR')}
+            formatValue={(v) =>
+              type === 'component-usage'
+                ? new Intl.NumberFormat('id-ID', { maximumFractionDigits: 4 }).format(Number(v))
+                : formatMoney(v, 'IDR')
+            }
             emptyMessage={empty}
+          />
+        </section>
+      ) : null}
+      {type === 'component-usage' && data?.analytics.breakdown.length ? (
+        <section className="mt-6" aria-label={copy('Usage by component')}>
+          <div className="mb-3">
+            <h2 className="text-sm font-semibold tracking-tight">{copy('Usage by component')}</h2>
+            <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+              {copy(
+                'Quantities recorded at the time of each transaction. Billed amounts are part of the sold line, not extra revenue or cost.',
+              )}
+            </p>
+          </div>
+          <DDataTable
+            rowKey={(row) => String(row.label)}
+            data={data.analytics.breakdown as unknown as Row[]}
+            columns={usageColumns}
+            emptyMessage={copy('No report data is available for this period.')}
           />
         </section>
       ) : null}

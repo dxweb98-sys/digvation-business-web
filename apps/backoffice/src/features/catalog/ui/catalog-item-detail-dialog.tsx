@@ -13,6 +13,7 @@ import {
   Briefcase,
   Clock,
   Layers,
+  PackagePlus,
   Pencil,
   Plus,
   Power,
@@ -40,6 +41,7 @@ import {
 import { sellingModel, sellingModelCopy } from '../model/catalog-selling';
 import { sameAmount } from '../item-editor/model/variant-price-draft';
 import { CatalogItemThumbnail } from './catalog-item-thumbnail';
+import { CatalogItemFixedComponents } from './catalog-item-fixed-components';
 import { CatalogLoyaltyTile } from './catalog-loyalty-section';
 import {
   ItemPriceHistory,
@@ -423,6 +425,15 @@ export function CatalogItemDetailDialog({
                   : sellingModelCopy[model].label
               }
             />
+            <CatalogInfoTile
+              label="Item Tambahan Saat Transaksi"
+              icon={<PackagePlus className="size-3.5" aria-hidden="true" />}
+              value={
+                item.requireAdditionalItemAtSale === true
+                  ? 'Wajib menggunakan item tambahan'
+                  : 'Opsional'
+              }
+            />
             {canViewLoyalty ? <CatalogLoyaltyTile item={item} api={loyaltyApi} /> : null}
           </div>
 
@@ -441,6 +452,8 @@ export function CatalogItemDetailDialog({
             </div>
           </div>
         </CatalogPanel>
+
+        <CatalogItemFixedComponents item={item} api={api} variants={variants.data?.items ?? []} />
 
         <CatalogPanel>
           <div className="border-b border-[var(--color-border)] px-4 pt-3">

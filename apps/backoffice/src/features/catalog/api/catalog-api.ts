@@ -48,6 +48,10 @@ export interface Item {
   fulfillmentBehavior: 'INSTANT' | 'TRACKED';
   /** With active variants: REQUIRED sells variants only; OPTIONAL also sells the item itself. */
   variantSelectionMode: VariantSelectionMode;
+  /** PRODUCT only: COMPONENT_ONLY Products are used by Service compositions, never sold on their own. */
+  productUsage: ProductUsage;
+  /** Item-level (Product or Service): the operator must choose at least one additional item at sale. */
+  requireAdditionalItemAtSale?: boolean;
   version: number;
   serviceDefinition: {
     defaultDurationMinutes: number | null;
@@ -106,12 +110,54 @@ export interface ResolvedPrice {
 }
 
 export type VariantSelectionMode = 'REQUIRED' | 'OPTIONAL';
+export type ProductUsage = 'STANDALONE_AND_COMPONENT' | 'COMPONENT_ONLY';
+export type ComponentPricingMode =
+  | 'INCLUDED_IN_SERVICE_PRICE'
+  | 'FOLLOW_PRODUCT_PRICE'
+  | 'FIXED_COMPONENT_PRICE';
+
+export interface ServiceComponentEntry {
+  componentItemId: string;
+  componentVariantId: string | null;
+  quantity: string;
+  pricingMode: ComponentPricingMode;
+  fixedUnitPrice: string | null;
+}
+export interface ServiceCompositionComponent extends ServiceComponentEntry {
+  id: string;
+  position: number;
+  componentCode: string;
+  componentName: string;
+  componentUsage: ProductUsage;
+  componentVariantCode: string | null;
+  componentVariantName: string | null;
+}
+/** Default BOM plus full per-variant overrides; a variant without an override uses the default. */
+export interface ServiceComposition {
+  catalogItemId: string;
+  version: number;
+  default: ServiceCompositionComponent[];
+  variantOverrides: Array<{
+    catalogVariantId: string;
+    components: ServiceCompositionComponent[];
+  }>;
+}
+export interface ReplaceServiceCompositionInput {
+  expectedVersion: number;
+  default: ServiceComponentEntry[];
+  /** An empty component list reverts that variant to the default composition. */
+  variantOverrides: Array<{
+    catalogVariantId: string;
+    components: ServiceComponentEntry[];
+  }>;
+}
 
 export interface CreateCatalogItemInput extends Omit<
   Item,
-  'id' | 'version' | 'code' | 'serviceDefinition' | 'variantSelectionMode'
+  'id' | 'version' | 'code' | 'serviceDefinition' | 'variantSelectionMode' | 'productUsage'
 > {
   variantSelectionMode?: VariantSelectionMode;
+  productUsage?: ProductUsage;
   code?: string;
   serviceDefinition?: Item['serviceDefinition'];
 }
@@ -146,6 +192,15 @@ export class CatalogApi {
       expectedVersion: item.version,
       ...input,
     });
+  }
+  getServiceComposition(itemId: string) {
+    return this.client.get<ServiceComposition>(`/api/v1/catalog/items/${itemId}/service-composition`);
+  }
+  replaceServiceComposition(itemId: string, input: ReplaceServiceCompositionInput) {
+    return this.client.put<ServiceComposition>(
+      `/api/v1/catalog/items/${itemId}/service-composition`,
+      input,
+    );
   }
   getItemImage(itemId: string) {
     if (this.itemImages.has(itemId)) {

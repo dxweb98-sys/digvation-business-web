@@ -160,7 +160,10 @@ export function CatalogPage() {
             <p className="line-clamp-2 font-medium text-(--color-text)" title={candidate.name}>
               {candidate.name}
             </p>
-            <p className="mt-0.5 text-xs text-(--color-text-muted)">{candidate.code}</p>
+            <p className="mt-0.5 text-xs text-(--color-text-muted)">
+              {candidate.code}
+              {candidate.productUsage === 'COMPONENT_ONLY' ? ' · Khusus Komponen' : ''}
+            </p>
           </div>
         </div>
       ),
@@ -386,6 +389,7 @@ export function CatalogPage() {
         canCreatePricing={can('createPricing')}
         canCreateVariants={can('createCatalog')}
         canManageImage={can('updateCatalog')}
+        canEditComposition={can('updateCatalog')}
         onClose={() => setItem(undefined)}
         onSaved={refreshItems}
       />

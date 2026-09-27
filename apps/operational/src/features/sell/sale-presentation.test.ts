@@ -14,6 +14,8 @@ import {
   percentageFromRate,
   saleDiscountRows,
   saleSettlement,
+  cashTenderNote,
+  aggregateDiscountRows,
   saleTaxLabel,
   saleTaxPercentage,
   saleTaxTreatment,
@@ -201,6 +203,7 @@ describe('saleSettlement', () => {
     expect(saleSettlement({ totalAmount: '184815.0000', payments: [] })).toEqual({
       totalPaid: '0.0000',
       balanceDue: '184815.0000',
+      cashApplied: '0.0000',
       cashTendered: null,
       cashChange: null,
       paymentState: 'UNPAID',
@@ -219,6 +222,7 @@ describe('saleSettlement', () => {
     ).toEqual({
       totalPaid: '150000.0000',
       balanceDue: '0.0000',
+      cashApplied: '150000.0000',
       cashTendered: '200000.0000',
       cashChange: '50000.0000',
       paymentState: 'PAID',
@@ -237,6 +241,7 @@ describe('saleSettlement', () => {
     ).toEqual({
       totalPaid: '205350.0000',
       balanceDue: '0.0000',
+      cashApplied: '222000.0000',
       cashTendered: '222000.0000',
       cashChange: '16650.0000',
       paymentState: 'PAID',
@@ -255,6 +260,7 @@ describe('saleSettlement', () => {
     ).toEqual({
       totalPaid: '500000.0000',
       balanceDue: '0.0000',
+      cashApplied: '200000.0000',
       cashTendered: '250000.0000',
       cashChange: '50000.0000',
       paymentState: 'PAID',
@@ -480,5 +486,101 @@ describe('appliedPaymentComposition order', () => {
       ],
     });
     expect(result.components.map((item) => item.id)).toEqual(['bca', 'cash']);
+  });
+});
+
+describe('cashTenderNote (physical cash only when it explains something)', () => {
+  const settle = (payments: Parameters<typeof saleSettlement>[0]['payments'], total: string) =>
+    saleSettlement({ totalAmount: total, payments });
+  const cash = (applied: string, tendered: string | null, change: string | null = null) => ({
+    status: 'SUCCEEDED' as const,
+    method: 'CASH' as const,
+    appliedAmount: applied,
+    tenderedAmount: tendered,
+    changeAmount: change,
+  });
+  const bank = (applied: string) => ({
+    status: 'SUCCEEDED' as const,
+    method: 'QRIS' as const,
+    appliedAmount: applied,
+    tenderedAmount: null,
+    changeAmount: null,
+  });
+
+  it('single exact cash: nothing extra', () => {
+    expect(cashTenderNote(settle([cash('100000.0000', '100000.0000', '0.0000')], '100000.0000'))).toBeNull();
+  });
+
+  it('single over-tender: tender and change', () => {
+    expect(
+      cashTenderNote(settle([cash('100000.0000', '150000.0000', '50000.0000')], '100000.0000')),
+    ).toEqual({ tendered: '150000.0000', change: '50000.0000' });
+  });
+
+  it('split exact cash + bank: compared with CASH applied, not with the total paid across methods', () => {
+    const settlement = settle(
+      [cash('100000.0000', '100000.0000', '0.0000'), bank('69929.9000')],
+      '169929.9000',
+    );
+    expect(settlement.totalPaid).toBe('169929.9000');
+    expect(cashTenderNote(settlement)).toBeNull();
+  });
+
+  it('split over-tender cash + bank: tender and change', () => {
+    const settlement = settle(
+      [cash('100000.0000', '150000.0000', '50000.0000'), bank('69929.9000')],
+      '169929.9000',
+    );
+    expect(cashTenderNote(settlement)).toEqual({ tendered: '150000.0000', change: '50000.0000' });
+  });
+});
+
+describe('aggregateDiscountRows (Sale summary by adjustment identity)', () => {
+  const adj = (id: string, overrides: Record<string, unknown>) => ({
+    ...percentageAdjustment,
+    id,
+    scope: 'ITEM',
+    ...overrides,
+  });
+  const rows = (adjustments: unknown[]) =>
+    aggregateDiscountRows(
+      saleDiscountRows({
+        adjustments,
+        orderDiscountType: null,
+        orderDiscountValue: null,
+        orderDiscountAmount: '0.0000',
+        orderDiscountReason: null,
+      } as never),
+    );
+
+  it('merges the same Promotion across lines into one row with the summed authoritative amount', () => {
+    const merged = rows([
+      adj('a1', { saleLineId: 'l1', actualAmount: '22000.0000', promotionId: 'kilat', label: 'kilat' }),
+      adj('a2', { saleLineId: 'l2', actualAmount: '21200.0000', promotionId: 'kilat', label: 'kilat' }),
+      adj('a3', { scope: 'TRANSACTION', actualAmount: '73872.0000', promotionId: 'promo-1', label: 'Promo1' }),
+    ]);
+    expect(merged.map((row) => [row.label, row.amount])).toEqual([
+      ['kilat', '43200.0000'],
+      ['Promo1', '73872.0000'],
+    ]);
+  });
+
+  it('never merges different Promotions with the same label', () => {
+    const merged = rows([
+      adj('a1', { actualAmount: '1000.0000', promotionId: 'p-a', label: 'kilat' }),
+      adj('a2', { actualAmount: '2000.0000', promotionId: 'p-b', label: 'kilat' }),
+    ]);
+    expect(merged).toHaveLength(2);
+  });
+
+  it('keeps manual discounts separate, with their reason', () => {
+    const merged = rows([
+      adj('m1', { source: 'MANUAL_DISCOUNT', promotionId: null, label: '', reason: 'Loyal', actualAmount: '5000.0000' }),
+      adj('m2', { source: 'MANUAL_DISCOUNT', promotionId: null, label: '', reason: 'Loyal', actualAmount: '5000.0000' }),
+    ]);
+    expect(merged.map((row) => [row.reason, row.amount])).toEqual([
+      ['Loyal', '5000.0000'],
+      ['Loyal', '5000.0000'],
+    ]);
   });
 });
