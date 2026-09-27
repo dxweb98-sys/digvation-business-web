@@ -386,6 +386,15 @@ export interface SaleLoyaltyRedemption {
   amount: string;
 }
 
+export interface SaleLoyaltySummary {
+  /** Points earned by this finalized Sale, from immutable Loyalty ledger facts. */
+  earnedPoints: string;
+  /** Positive magnitude of points redeemed by this finalized Sale. */
+  redeemedPoints: string;
+  /** Historical member balance immediately after this Sale. */
+  balanceAfter: string;
+}
+
 export interface Sale {
   id: string;
   saleNumber?: string;
@@ -422,6 +431,7 @@ export interface Sale {
    * line rows or current configuration.
    */
   loyaltyEarning?: { state: 'FINALIZED'; pointsEarned: string } | null;
+  loyaltySummary?: SaleLoyaltySummary | null;
   customer?: SaleCustomer | null;
   createdByActorId?: string;
   createdByActorKind?: string;
