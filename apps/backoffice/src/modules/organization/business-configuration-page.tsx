@@ -9,6 +9,7 @@ import {
   DInput,
   DSelect,
   DSkeleton,
+  DTextarea,
   DToggle,
   DTabs,
   DTabsContent,
@@ -606,7 +607,7 @@ function Fact({ label, value }: { label: string; value: string }) {
   );
 }
 
-function LocationsSection({
+export function LocationsSection({
   items,
   loading,
   canCreate,
@@ -638,6 +639,16 @@ function LocationsSection({
       ),
     },
     { key: 'code', label: copy('Code') },
+    {
+      key: 'address',
+      label: copy('Address'),
+      render: (item) =>
+        item.address ? (
+          <span className="text-sm">{item.address}</span>
+        ) : (
+          <span className="text-sm text-slate-400">{copy('Not set')}</span>
+        ),
+    },
     {
       key: 'status',
       label: copy('Status'),
@@ -725,7 +736,7 @@ function LocationsSection({
   );
 }
 
-function LocationDialog({
+export function LocationDialog({
   location,
   items,
   api,
@@ -743,6 +754,7 @@ function LocationDialog({
   const isNew = location === null;
   const [code, setCode] = useState('');
   const [name, setName] = useState(location?.name ?? '');
+  const [address, setAddress] = useState(location?.address ?? '');
   const [main, setMain] = useState(
     Boolean(location?.isMain) || (location === null && items.length === 0),
   );
@@ -755,11 +767,13 @@ function LocationDialog({
           code: code.trim().toUpperCase(),
           name: name.trim(),
           setAsMain: main || undefined,
+          address: address.trim(),
         });
       else if (location)
         await api.updateLocation(location, {
           name: name.trim(),
           setAsMain: main && !location.isMain ? true : undefined,
+          address: address.trim(),
         });
       onChanged();
       onClose();
@@ -805,6 +819,7 @@ function LocationDialog({
           />
         )}
         <DInput label={copy('Selling location')} value={name} onChange={setName} />
+        <DTextarea label={copy('Address')} value={address} onChange={setAddress} />
         <label className="flex items-center gap-2 text-sm">
           <DCheckbox
             checked={main}

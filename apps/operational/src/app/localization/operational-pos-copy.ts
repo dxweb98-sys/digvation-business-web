@@ -200,6 +200,10 @@ const posCopy: Record<string, LocalizedCopy> = {
     'id-ID': 'Transaksi tetap berada dalam antrian.',
     'en-US': 'The transaction remains in the queue.',
   },
+  'The service was not started. Try again.': {
+    'id-ID': 'Layanan belum dimulai. Coba lagi.',
+    'en-US': 'The service was not started. Try again.',
+  },
   'Complete employee assignment': {
     'id-ID': 'Lengkapi penugasan karyawan',
     'en-US': 'Complete employee assignment',
