@@ -554,6 +554,95 @@ const copy: Record<string, LocalizedLabel> = {
     'id-ID': 'Pembayaran masih menunggu. Tunggu hingga selesai sebelum mencoba lagi.',
     'en-US': 'A payment is still pending. Wait for it to settle before trying again.',
   },
+  Workshop: { 'id-ID': 'Bengkel', 'en-US': 'Workshop' },
+  Intake: { 'id-ID': 'Penerimaan', 'en-US': 'Intake' },
+  'Keluhan / Permintaan Customer sebelum diagnosis mekanik.': {
+    'id-ID': 'Keluhan / permintaan customer sebelum diagnosis mekanik.',
+    'en-US': 'Customer complaint/request, captured before mechanic diagnosis.',
+  },
+  'Keluhan / Permintaan Customer': {
+    'id-ID': 'Keluhan / Permintaan Customer',
+    'en-US': 'Customer complaint / request',
+  },
+  'Select a Location to continue.': {
+    'id-ID': 'Pilih lokasi untuk melanjutkan.',
+    'en-US': 'Select a Location to continue.',
+  },
+  'Search customer by name or phone': {
+    'id-ID': 'Cari customer berdasarkan nama atau nomor telepon',
+    'en-US': 'Search customer by name or phone',
+  },
+  'New customer': { 'id-ID': 'Customer baru', 'en-US': 'New customer' },
+  Phone: { 'id-ID': 'Telepon', 'en-US': 'Phone' },
+  'Select a Customer first.': {
+    'id-ID': 'Pilih customer terlebih dahulu.',
+    'en-US': 'Select a Customer first.',
+  },
+  'Search vehicle by plate, chassis, or engine number': {
+    'id-ID': 'Cari kendaraan berdasarkan plat, nomor rangka, atau nomor mesin',
+    'en-US': 'Search vehicle by plate, chassis, or engine number',
+  },
+  'Add new vehicle': { 'id-ID': 'Tambah kendaraan baru', 'en-US': 'Add new vehicle' },
+  'Plate number': { 'id-ID': 'Nomor plat', 'en-US': 'Plate number' },
+  'Chassis number': { 'id-ID': 'Nomor rangka', 'en-US': 'Chassis number' },
+  'Engine number': { 'id-ID': 'Nomor mesin', 'en-US': 'Engine number' },
+  'For example, rem bunyi': {
+    'id-ID': 'Contoh: rem bunyi',
+    'en-US': 'For example, brakes are noisy',
+  },
+  'Create Work Order': { 'id-ID': 'Buat Work Order', 'en-US': 'Create Work Order' },
+  'Work Order created': { 'id-ID': 'Work Order dibuat', 'en-US': 'Work Order created' },
+  'Work Order number': { 'id-ID': 'Nomor Work Order', 'en-US': 'Work Order number' },
+  'New Work Order': { 'id-ID': 'Buat Work Order Baru', 'en-US': 'New Work Order' },
+  'Customer created.': { 'id-ID': 'Customer berhasil dibuat.', 'en-US': 'Customer created.' },
+  'Could not create Customer.': {
+    'id-ID': 'Customer tidak dapat dibuat.',
+    'en-US': 'Could not create Customer.',
+  },
+  'Could not create Work Order. Try again.': {
+    'id-ID': 'Work Order tidak dapat dibuat. Coba lagi.',
+    'en-US': 'Could not create Work Order. Try again.',
+  },
+  'Customer was not found. Search again.': {
+    'id-ID': 'Customer tidak ditemukan. Cari lagi.',
+    'en-US': 'Customer was not found. Search again.',
+  },
+  'This Customer is not active.': {
+    'id-ID': 'Customer ini tidak aktif.',
+    'en-US': 'This Customer is not active.',
+  },
+  'Vehicle was not found. Search again.': {
+    'id-ID': 'Kendaraan tidak ditemukan. Cari lagi.',
+    'en-US': 'Vehicle was not found. Search again.',
+  },
+  'This Vehicle belongs to a different Customer.': {
+    'id-ID': 'Kendaraan ini terdaftar pada customer lain.',
+    'en-US': 'This Vehicle belongs to a different Customer.',
+  },
+  'A Vehicle with this plate number already exists.': {
+    'id-ID': 'Kendaraan dengan nomor plat ini sudah ada.',
+    'en-US': 'A Vehicle with this plate number already exists.',
+  },
+  'A Vehicle with this chassis number already exists.': {
+    'id-ID': 'Kendaraan dengan nomor rangka ini sudah ada.',
+    'en-US': 'A Vehicle with this chassis number already exists.',
+  },
+  'A Vehicle with this engine number already exists.': {
+    'id-ID': 'Kendaraan dengan nomor mesin ini sudah ada.',
+    'en-US': 'A Vehicle with this engine number already exists.',
+  },
+  'Check the Vehicle details and try again.': {
+    'id-ID': 'Periksa data kendaraan lalu coba lagi.',
+    'en-US': 'Check the Vehicle details and try again.',
+  },
+  'This Location is not available to you.': {
+    'id-ID': 'Lokasi ini tidak tersedia untuk Anda.',
+    'en-US': 'This Location is not available to you.',
+  },
+  'Could not submit. Try again.': {
+    'id-ID': 'Tidak dapat mengirim. Coba lagi.',
+    'en-US': 'Could not submit. Try again.',
+  },
 };
 
 const technicalLabels: Record<string, LocalizedLabel> = {

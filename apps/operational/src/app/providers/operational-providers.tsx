@@ -29,7 +29,7 @@ function runtimeLocale(locale: string): OperationalLocale {
   return locale === 'en-US' ? 'en-US' : 'id-ID';
 }
 
-function hasImplementedOperationalSurface(session: AuthSession): boolean {
+export function hasImplementedOperationalSurface(session: AuthSession): boolean {
   const permissions = session.access.permissions;
   const hasPos =
     session.access.products.includes('POS') &&
@@ -37,7 +37,11 @@ function hasImplementedOperationalSurface(session: AuthSession): boolean {
   const hasExpenses =
     session.access.capabilities.includes('FINANCE_OPERATIONS') &&
     permissions.some((permission) => permission.startsWith('expenses:'));
-  return hasPos || hasExpenses;
+  const hasWorkshop =
+    session.access.products.includes('WORKSHOP') &&
+    permissions.includes('work-orders:create') &&
+    permissions.includes('customers:read');
+  return hasPos || hasExpenses || hasWorkshop;
 }
 
 const queryClient = new QueryClient({
