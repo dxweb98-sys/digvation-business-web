@@ -1153,6 +1153,33 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     }
   };
 
+  /**
+   * Advances a single tracked Service line from WAITING to IN_PROGRESS while the
+   * transaction is already being worked on. Only this line changes; other WAITING
+   * lines on the same Sale are untouched.
+   */
+  const startWaitingServiceLine = async (transaction: Sale, line: SaleLine) => {
+    try {
+      const updated = await workspace.transitionQueuedFulfillment(
+        transaction,
+        line,
+        'IN_PROGRESS',
+      );
+      setQueueDetail(updated);
+      showToast({
+        title: copy('Work started'),
+        description: `${line.itemNameSnapshot} ${copy('is now being worked on.')}`,
+        variant: 'success',
+      });
+    } catch {
+      showToast({
+        title: copy('Could not start work'),
+        description: copy('The service was not started. Try again.'),
+        variant: 'danger',
+      });
+    }
+  };
+
   const savePerformers = async (
     target: { sale: Sale; line: SaleLine },
     plans: ServiceLineWorkPlan[],
@@ -1887,6 +1914,10 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           if (!displayedQueueDetail) return;
           workspace.requestEmployeeOptions();
           setPerformerTarget({ sale: displayedQueueDetail, line });
+        }}
+        onStartLineWork={(line) => {
+          if (!displayedQueueDetail) return;
+          void startWaitingServiceLine(displayedQueueDetail, line);
         }}
         onComplete={() => {
           if (displayedQueueDetail) void completeQueuedTransaction(displayedQueueDetail);
@@ -4252,6 +4283,7 @@ export function ReferenceTransactionDetail({
   deliveryStatus,
   onRetryDelivery,
   onAssign,
+  onStartLineWork,
   onComplete,
   isMutating,
 }: {
@@ -4278,6 +4310,7 @@ export function ReferenceTransactionDetail({
   };
   onRetryDelivery?: (sale: Sale) => void;
   onAssign: (line: SaleLine) => void;
+  onStartLineWork: (line: SaleLine) => void;
   onComplete: () => void;
   isMutating: boolean;
 }) {
@@ -4513,6 +4546,13 @@ export function ReferenceTransactionDetail({
                       const showWorkStatus =
                         saleLineWorkStatus(line) !== null &&
                         saleLineWorkStatus(line) !== (status ? impliedLineWorkStatus[status] : undefined);
+                      // The transaction is already IN_PROGRESS, but this specific tracked
+                      // Service has not been started yet: it needs its own explicit action.
+                      const canStartLineWork =
+                        status === 'PROGRESS' &&
+                        line.itemTypeSnapshot === 'SERVICE' &&
+                        line.fulfillmentBehaviorSnapshot === 'TRACKED' &&
+                        line.fulfillment?.status === 'WAITING';
                       const additions = saleLineAdditions(line);
                       const lineBase = saleLineBase(line, additions);
                       return (
@@ -4589,6 +4629,20 @@ export function ReferenceTransactionDetail({
                                 disabled={isMutating}
                                 onEdit={() => onAssign(line)}
                               />
+                            ) : null
+                          }
+                          action={
+                            canStartLineWork ? (
+                              <DButton
+                                size="sm"
+                                variant="secondary"
+                                className="h-7 px-2.5 text-[11px]"
+                                leftIcon={<PlayCircle className="size-3.5" />}
+                                loading={isMutating}
+                                onClick={() => onStartLineWork(line)}
+                              >
+                                {copy('Start work')}
+                              </DButton>
                             ) : null
                           }
                         />

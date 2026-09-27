@@ -140,6 +140,7 @@ function renderRuntimeDetail(
   sale: Sale,
   delivery?: { status: 'FAILED'; onRetry: () => void },
   showPaymentReceipt = false,
+  onStartLineWork: (line: SaleLine) => void = vi.fn(),
 ) {
   return render(
     <DeploymentBootstrapProvider config={bootstrap}>
@@ -155,6 +156,7 @@ function renderRuntimeDetail(
         onNewSale={vi.fn()}
         onViewReceipt={vi.fn()}
         onAssign={vi.fn()}
+        onStartLineWork={onStartLineWork}
         onComplete={vi.fn()}
         isMutating={false}
         {...(delivery
@@ -389,6 +391,7 @@ describe('ReferenceTransactionDetail performer relationship', () => {
           onNewSale={vi.fn()}
           onViewReceipt={vi.fn()}
           onAssign={onAssign}
+          onStartLineWork={vi.fn()}
           onComplete={vi.fn()}
           isMutating={false}
         />
@@ -728,6 +731,96 @@ describe('ReferenceTransactionDetail discounts and promotions', () => {
     renderReceipt(twoLines()); // fixture: applied 197.580, tendered 200.000, change 2.420
     expect(screen.getByText('Uang tunai diterima')).toBeTruthy();
     expect(screen.getByText('Kembalian')).toBeTruthy();
+  });
+});
+
+describe('ReferenceTransactionDetail WAITING Service continuation', () => {
+  function waitingLine(overrides: Partial<SaleLine> = {}): SaleLine {
+    const base = runtimeQueueDetail({ operationalState: 'IN_PROGRESS' }).lines[0]!;
+    return { ...base, ...overrides };
+  }
+
+  it('exposes a start action for a tracked Service still WAITING while the transaction is IN_PROGRESS', () => {
+    const sale = runtimeQueueDetail({ operationalState: 'IN_PROGRESS' });
+    renderRuntimeDetail(sale);
+
+    expect(screen.getByRole('button', { name: /Mulai pengerjaan/ })).toBeTruthy();
+  });
+
+  it('calls the fulfillment transition with only the clicked line when it is activated', () => {
+    const onStartLineWork = vi.fn();
+    const sale = runtimeQueueDetail({ operationalState: 'IN_PROGRESS' });
+    renderRuntimeDetail(sale, undefined, false, onStartLineWork);
+
+    fireEvent.click(screen.getByRole('button', { name: /Mulai pengerjaan/ }));
+
+    expect(onStartLineWork).toHaveBeenCalledTimes(1);
+    expect((onStartLineWork.mock.calls[0]![0] as SaleLine).id).toBe('line-1');
+  });
+
+  it('lets two WAITING Service lines start independently, without affecting one another', () => {
+    const onStartLineWork = vi.fn();
+    const sale = runtimeQueueDetail({ operationalState: 'IN_PROGRESS' });
+    sale.lines.push(waitingLine({ id: 'line-2', itemNameSnapshot: 'Body Bleaching' }));
+    renderRuntimeDetail(sale, undefined, false, onStartLineWork);
+
+    const buttons = screen.getAllByRole('button', { name: /Mulai pengerjaan/ });
+    expect(buttons).toHaveLength(2);
+    fireEvent.click(buttons[1]!);
+
+    expect(onStartLineWork).toHaveBeenCalledTimes(1);
+    expect((onStartLineWork.mock.calls[0]![0] as SaleLine).id).toBe('line-2');
+  });
+
+  it('exposes the start action for a newly added tracked Service that is still WAITING', () => {
+    const sale = runtimeQueueDetail({ operationalState: 'IN_PROGRESS' });
+    sale.lines[0]!.fulfillment = { ...sale.lines[0]!.fulfillment!, status: 'IN_PROGRESS' };
+    sale.lines.push(waitingLine({ id: 'line-new', itemNameSnapshot: 'Body Bleaching' }));
+    renderRuntimeDetail(sale);
+
+    const buttons = screen.getAllByRole('button', { name: /Mulai pengerjaan/ });
+    expect(buttons).toHaveLength(1);
+  });
+
+  it('does not offer a start action for a plain Product line', () => {
+    const sale = runtimeQueueDetail({ operationalState: 'IN_PROGRESS' });
+    sale.lines[0] = {
+      ...sale.lines[0]!,
+      itemTypeSnapshot: 'PRODUCT',
+      fulfillmentBehaviorSnapshot: 'INSTANT',
+      fulfillment: null,
+    } as SaleLine;
+    renderRuntimeDetail(sale);
+
+    expect(screen.queryByRole('button', { name: /Mulai pengerjaan/ })).toBeNull();
+  });
+
+  it('does not offer a start action once the Service is already IN_PROGRESS', () => {
+    const sale = runtimeQueueDetail({ operationalState: 'IN_PROGRESS' });
+    sale.lines[0]!.fulfillment = { ...sale.lines[0]!.fulfillment!, status: 'IN_PROGRESS' };
+    renderRuntimeDetail(sale);
+
+    expect(screen.queryByRole('button', { name: /Mulai pengerjaan/ })).toBeNull();
+  });
+
+  it('does not offer a start action for a COMPLETED or CANCELED Service', () => {
+    const completed = runtimeQueueDetail({ operationalState: 'IN_PROGRESS' });
+    completed.lines[0]!.fulfillment = { ...completed.lines[0]!.fulfillment!, status: 'COMPLETED' };
+    const { unmount } = renderRuntimeDetail(completed);
+    expect(screen.queryByRole('button', { name: /Mulai pengerjaan/ })).toBeNull();
+    unmount();
+
+    const canceled = runtimeQueueDetail({ operationalState: 'IN_PROGRESS' });
+    canceled.lines[0]!.fulfillment = { ...canceled.lines[0]!.fulfillment!, status: 'CANCELED' };
+    renderRuntimeDetail(canceled);
+    expect(screen.queryByRole('button', { name: /Mulai pengerjaan/ })).toBeNull();
+  });
+
+  it('does not introduce the in-progress continuation action for a QUEUED transaction', () => {
+    const sale = runtimeQueueDetail({ operationalState: 'QUEUED' });
+    renderRuntimeDetail(sale);
+
+    expect(screen.queryByRole('button', { name: /Mulai pengerjaan/ })).toBeNull();
   });
 });
 
