@@ -4,6 +4,7 @@ export type ReportType =
   | 'business-performance'
   | 'transactions'
   | 'catalog-performance'
+  | 'component-usage'
   | 'employee-performance'
   | 'attendance'
   | 'payments'
@@ -25,6 +26,8 @@ const REPORT_PERMISSION: Record<ReportType, string> = {
   'business-performance': 'sales:read',
   transactions: 'sales:read',
   'catalog-performance': 'catalog:read',
+  // Historical component usage is a Sale fact and follows the transaction reports' access.
+  'component-usage': 'sales:read',
   'employee-performance': 'employees:read',
   attendance: 'attendance:read',
   payments: 'payments:read',
@@ -40,6 +43,7 @@ const POS_REPORTS = new Set<ReportType>([
   'business-performance',
   'transactions',
   'catalog-performance',
+  'component-usage',
   'employee-performance',
   'payments',
   'tax',

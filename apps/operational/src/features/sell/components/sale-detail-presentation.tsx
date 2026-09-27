@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import './sale-detail-presentation.css';
 
 import {
+  cashTenderNote,
   discountPresentation,
   type DiscountPresentationRow,
   type DiscountPresentationText,
@@ -185,6 +186,58 @@ export function SaleCustomerStrip({
   );
 }
 
+export interface SaleLineAdditionRow {
+  id: string;
+  name: string;
+  /** Quantity x selling unit price, already formatted. */
+  pricing: string;
+  amount: string;
+}
+
+/**
+ * Price breakdown of a line sold with transaction-selected additions, so "base + additions = line
+ * total" can be read at a glance. The line total stays on the line itself: this block only explains
+ * it, and never adds to it. Fixed BOM components are internal and are never listed here.
+ */
+export function SaleLineAdditions({
+  heading,
+  baseLabel,
+  base,
+  rows,
+}: {
+  heading: string;
+  baseLabel: string;
+  base: { pricing: string; amount: string };
+  rows: readonly SaleLineAdditionRow[];
+}) {
+  if (!rows.length) return null;
+  return (
+    <div className="pos-line-additions mt-2 rounded-lg bg-[var(--color-surface-muted)]/60 px-3 py-2">
+      <p className="text-[11px] font-semibold text-[var(--color-text-muted)]">{heading}</p>
+      <ul aria-label={heading} className="mt-1 space-y-1.5 text-xs">
+        <li className="flex items-start justify-between gap-3 text-[var(--color-text-muted)]">
+          <span className="min-w-0">
+            <span className="break-words">{baseLabel}</span>
+            <span className="block tabular-nums">{base.pricing}</span>
+          </span>
+          <span className="shrink-0 tabular-nums">{base.amount}</span>
+        </li>
+        {rows.map((row) => (
+          <li key={row.id} className="flex items-start justify-between gap-3">
+            <span className="min-w-0">
+              <span className="break-words text-[var(--color-text)]">+ {row.name}</span>
+              <span className="block tabular-nums text-[var(--color-text-muted)]">
+                {row.pricing}
+              </span>
+            </span>
+            <span className="shrink-0 tabular-nums text-[var(--color-text)]">{row.amount}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function SaleLineItemList({ children }: { children: ReactNode }) {
   return <ul className="pos-line-list divide-y divide-[var(--color-border)]/70">{children}</ul>;
 }
@@ -200,7 +253,9 @@ export function SaleLineItem({
   pricing,
   amount,
   discounts = [],
+  discountsHeading,
   earning,
+  usage,
   context,
   detail,
   action,
@@ -211,9 +266,20 @@ export function SaleLineItem({
   pricing: string;
   amount: string;
   /** Discounts on this line, each with its own title, optional note and amount. */
-  discounts?: readonly { id: string; title: string; note: string | null; amount: string }[];
+  discounts?: readonly {
+    id: string;
+    title: string;
+    note: string | null;
+    amount: string;
+    /** Small information affordance explaining where the discount comes from. */
+    info?: ReactNode;
+  }[];
+  /** Semantic name of the discount group, for example "Diskon dan Promo". */
+  discountsHeading?: string;
   /** Compact Runtime-authoritative Loyalty preview or finalized fact. */
   earning?: ReactNode;
+  /** Price breakdown of transaction-selected additions; explains the line amount, never adds to it. */
+  usage?: ReactNode;
   /** Secondary operational context such as fulfillment status and performers. */
   context?: ReactNode;
   /** A full-width block under the context row, such as who performs the service. */
@@ -237,19 +303,35 @@ export function SaleLineItem({
       {earning ? (
         <p className="mt-1 text-xs font-medium text-[var(--color-success)]">{earning}</p>
       ) : null}
-      {discounts.map((discount) => (
-        <div key={discount.id} className="mt-1 flex items-start justify-between gap-4 text-xs">
-          <span className="min-w-0 text-[var(--color-text-muted)]">
-            {discount.title}
-            {discount.note ? (
-              <span className="block break-words text-[11px] leading-4">{discount.note}</span>
-            ) : null}
-          </span>
-          <span className="shrink-0 font-medium tabular-nums text-[var(--color-danger)]">
-            −{discount.amount}
-          </span>
+      {discounts.length ? (
+        <div className="mt-1.5" role="group" aria-label={discountsHeading}>
+          {discountsHeading ? (
+            <p className="text-[11px] font-semibold text-[var(--color-text-muted)]">
+              {discountsHeading}
+            </p>
+          ) : null}
+          {discounts.map((discount) => (
+            <div
+              key={discount.id}
+              className="mt-0.5 flex items-start justify-between gap-4 text-xs"
+            >
+              <span className="flex min-w-0 items-start gap-1.5 text-[var(--color-text-muted)]">
+                {discount.info}
+                <span className="min-w-0">
+                  {discount.title}
+                  {discount.note ? (
+                    <span className="block break-words text-[11px] leading-4">{discount.note}</span>
+                  ) : null}
+                </span>
+              </span>
+              <span className="shrink-0 font-medium tabular-nums text-[var(--color-danger)]">
+                −{discount.amount}
+              </span>
+            </div>
+          ))}
         </div>
-      ))}
+      ) : null}
+      {usage}
       {context || action ? (
         <div className="mt-1.5 flex min-w-0 items-center gap-3 text-xs text-[var(--color-text-muted)]">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
@@ -325,13 +407,13 @@ export function SaleFinancialSummary({
   // paid and balance rows only appear when they add information.
   const settledExactly = !hasBalance && settlement.totalPaid === total;
   // Cash received only adds information when it differs from what was applied (change was given).
-  const cashNotes = [
-    settlement.cashTendered &&
-    (settlement.cashChange || settlement.cashTendered !== settlement.totalPaid)
-      ? { label: labels.cashReceived, amount: settlement.cashTendered }
-      : null,
-    settlement.cashChange ? { label: labels.change, amount: settlement.cashChange } : null,
-  ].filter((note) => note !== null);
+  const tender = cashTenderNote(settlement);
+  const cashNotes = tender
+    ? [
+        { label: labels.cashReceived, amount: tender.tendered },
+        ...(tender.change ? [{ label: labels.change, amount: tender.change }] : []),
+      ]
+    : [];
   const settlementRows = !settledExactly || payment === null || payment === undefined;
   // Two white cards on the tinted rail, read top to bottom: who, how much, how it was settled.
   return (

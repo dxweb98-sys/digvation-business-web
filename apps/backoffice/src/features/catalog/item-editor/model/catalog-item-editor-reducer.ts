@@ -1,3 +1,4 @@
+import type { ServiceCompositionDraft } from './service-composition-draft';
 import type { VariantPriceDraft } from './variant-price-draft';
 import type { LoyaltyEarningBehavior } from '../../../../modules/loyalty/loyalty-api';
 import {
@@ -24,6 +25,14 @@ export type CatalogItemEditorAction =
   | {
       type: 'VARIANTS_HYDRATED';
       variants: VariantPriceDraft[];
+    }
+  | {
+      type: 'COMPOSITION_HYDRATED';
+      composition: ServiceCompositionDraft;
+    }
+  | {
+      type: 'COMPOSITION_CHANGED';
+      composition: ServiceCompositionDraft;
     }
   | {
       type: 'LOYALTY_HYDRATED';
@@ -88,6 +97,12 @@ export function catalogItemEditorReducer(
           variants: action.variants,
         },
       };
+
+    case 'COMPOSITION_HYDRATED':
+      return { ...state, composition: { ...action.composition, touched: false } };
+
+    case 'COMPOSITION_CHANGED':
+      return { ...state, composition: { ...action.composition, touched: true } };
 
     case 'LOYALTY_HYDRATED':
       return {

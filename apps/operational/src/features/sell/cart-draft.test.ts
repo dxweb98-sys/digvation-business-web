@@ -2,10 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import {
   addCartDraftSelection,
+  cartDraftDisplayLines,
   cartDraftEstimatedTotal,
   cartDraftStartInput,
   emptyCartDraft,
   removeCartDraftLine,
+  replaceCartDraftLine,
+  replacementLinesOf,
   saleDisplayLines,
   setCartDraftCustomer,
   setCartDraftQuantity,
@@ -207,5 +210,370 @@ describe('CartDraft local mutations', () => {
     expect(displayed?.lineDiscountAmount).toBe('20000.0000');
     expect(displayed?.discountType).toBeNull();
     expect(displayed?.discountValue).toBeNull();
+  });
+});
+
+describe('CartDraft with configured quantity and additional items', () => {
+  const service: CatalogItem = { ...item, id: 'hair-color', name: 'Hair Color', type: 'SERVICE' };
+  const servicePrice: ResolvedPrice = {
+    ...price,
+    catalogItemId: service.id,
+    amount: '150000.0000',
+  };
+  const serum = {
+    componentItemId: 'serum',
+    quantity: '2.0000',
+    label: 'Serum',
+    unitPrice: '5000.0000',
+  };
+
+  it('adds the dialog quantity as the initial quantity and merges the same configuration', () => {
+    const empty = emptyCartDraft('location-1', 'IDR');
+    const three = addCartDraftSelection(empty, item, null, price, { quantity: '3' });
+    expect(three.lines[0]?.quantity).toBe('3.0000');
+    const five = addCartDraftSelection(three, item, null, price, { quantity: '2' });
+    expect(five.lines).toHaveLength(1);
+    expect(five.lines[0]?.quantity).toBe('5.0000');
+  });
+
+  it('rejects a non-positive configured quantity', () => {
+    expect(() =>
+      addCartDraftSelection(emptyCartDraft('location-1', 'IDR'), item, null, price, {
+        quantity: '0',
+      }),
+    ).toThrow();
+  });
+
+  it('keeps a composed Service as ONE cart line priced with its additional items', () => {
+    const draft = addCartDraftSelection(
+      emptyCartDraft('location-1', 'IDR'),
+      service,
+      null,
+      servicePrice,
+      {
+        additionalComponents: [serum],
+      },
+    );
+    expect(draft.lines).toHaveLength(1);
+    const display = draft.lines.length ? cartDraftEstimatedTotal(draft) : '0';
+    // 150.000 + 2 x 5.000 = 160.000 on one line; the additional item is not a separate priced line.
+    expect(display).toBe('160000.0000');
+    expect(draft.lines[0]).toMatchObject({ itemName: 'Hair Color', itemType: 'SERVICE' });
+  });
+
+  it('never merges lines that carry different additional items', () => {
+    let draft = addCartDraftSelection(
+      emptyCartDraft('location-1', 'IDR'),
+      service,
+      null,
+      servicePrice,
+      {
+        additionalComponents: [serum],
+      },
+    );
+    draft = addCartDraftSelection(draft, service, null, servicePrice, {
+      additionalComponents: [serum],
+    });
+    draft = addCartDraftSelection(draft, service, null, servicePrice);
+    draft = addCartDraftSelection(draft, service, null, servicePrice);
+    expect(draft.lines).toHaveLength(3);
+    // Plain lines still merge with each other.
+    expect(draft.lines[2]?.quantity).toBe('2.0000');
+  });
+
+  it('sends only canonical ids and quantities for additional items when the Sale is created', () => {
+    const draft = addCartDraftSelection(
+      setCartDraftCustomer(emptyCartDraft('location-1', 'IDR'), {
+        type: 'NON_MEMBER',
+        name: 'Ayu',
+        phone: '+628123456789',
+      }),
+      service,
+      null,
+      servicePrice,
+      { quantity: '2', additionalComponents: [{ ...serum, componentVariantId: 'serum-large' }] },
+    );
+    const [line] = cartDraftStartInput(draft).lines;
+    expect(line).toEqual({
+      catalogItemId: 'hair-color',
+      quantity: '2.0000',
+      additionalComponents: [
+        { componentItemId: 'serum', componentVariantId: 'serum-large', quantity: '2.0000' },
+      ],
+    });
+    expect(cartDraftStartInput(draft).lines).toHaveLength(1);
+  });
+});
+
+describe('editing a draft cart line', () => {
+  const base: CatalogItem = { ...item, id: 'shampoo', name: 'Shampoo', type: 'PRODUCT' };
+  const basePrice: ResolvedPrice = { ...price, catalogItemId: base.id, amount: '200000.0000' };
+  const cap = { componentItemId: 'cap', quantity: '1.0000', label: 'Cap', unitPrice: '10000.0000' };
+
+  it('replaces the whole configuration of the same line in place: base + additions = line total', () => {
+    let draft = addCartDraftSelection(emptyCartDraft('location-1', 'IDR'), base, null, basePrice);
+    draft = addCartDraftSelection(draft, item, null, price);
+    const lineId = draft.lines[0]!.id;
+    draft = replaceCartDraftLine(draft, lineId, base, null, basePrice, {
+      quantity: '2',
+      additionalComponents: [cap],
+    });
+    expect(draft.lines).toHaveLength(2);
+    expect(draft.lines[0]).toMatchObject({ id: lineId, quantity: '2.0000' });
+    expect(cartDraftDisplayLines(draft)[0]?.totalAmount).toBe('420000.0000');
+    expect(
+      cartDraftStartInput({
+        ...draft,
+        customer: { type: 'NON_MEMBER', name: 'A', phone: '1' } as never,
+      }).lines[0],
+    ).toMatchObject({
+      quantity: '2.0000',
+      additionalComponents: [{ componentItemId: 'cap', quantity: '1.0000' }],
+    });
+  });
+
+  it('turning the additions off removes them from the line', () => {
+    let draft = addCartDraftSelection(emptyCartDraft('location-1', 'IDR'), base, null, basePrice, {
+      additionalComponents: [cap],
+    });
+    const lineId = draft.lines[0]!.id;
+    draft = replaceCartDraftLine(draft, lineId, base, null, basePrice, { quantity: '1' });
+    expect(draft.lines[0]?.additionalComponents).toBeUndefined();
+    expect(cartDraftEstimatedTotal(draft)).toBe('200000.0000');
+  });
+
+  it('marks draft lines editable and exposes only their additions for display', () => {
+    const draft = addCartDraftSelection(
+      emptyCartDraft('location-1', 'IDR'),
+      base,
+      null,
+      basePrice,
+      {
+        additionalComponents: [cap],
+      },
+    );
+    const [line] = cartDraftDisplayLines(draft);
+    expect(line).toMatchObject({
+      editable: true,
+      additions: [{ label: 'Cap', quantity: '1.0000', unitPrice: '10000.0000' }],
+    });
+  });
+});
+
+describe('per-unit additions in a cart group', () => {
+  const service: CatalogItem = { ...item, id: 'hair-color', name: 'Hair Color', type: 'SERVICE' };
+  const base: ResolvedPrice = { ...price, catalogItemId: service.id, amount: '200000.0000' };
+  const a = {
+    componentItemId: 'a',
+    quantity: '1.0000',
+    label: 'Addition A',
+    unitPrice: '10000.0000',
+  };
+  const b = {
+    componentItemId: 'b',
+    componentVariantId: 'b-y',
+    quantity: '1.0000',
+    label: 'Addition B / Y',
+    unitPrice: '15000.0000',
+  };
+  const empty = () => emptyCartDraft('location-1', 'IDR');
+  const startable = (draft: ReturnType<typeof empty>) => ({
+    ...draft,
+    customer: { type: 'NON_MEMBER', name: 'A', phone: '1' } as never,
+  });
+
+  it('keeps each unit configuration and sums exact unit amounts: 210.000 + 215.000 = 425.000, never 2 x 212.500', () => {
+    const draft = addCartDraftSelection(empty(), service, null, base, {
+      quantity: '2',
+      unitAdditions: [[a], [b]],
+    });
+    const [line] = cartDraftDisplayLines(draft);
+    expect(line?.units?.map((unit) => unit.amount)).toEqual(['210000.0000', '215000.0000']);
+    expect(line?.totalAmount).toBe('425000.0000');
+    // No invented average unit price: the shown unit price is the base item's, never 212.500.
+    expect(line?.effectiveUnitPrice).toBe('200000.0000');
+    expect(JSON.stringify(line)).not.toContain('212500');
+    expect(cartDraftEstimatedTotal(draft)).toBe('425000.0000');
+  });
+
+  it('persists different units as separate lines and groups identical ones', () => {
+    const draft = addCartDraftSelection(empty(), service, null, base, {
+      quantity: '3',
+      unitAdditions: [[a], [b], [a]],
+    });
+    const lines = cartDraftStartInput(startable(draft)).lines;
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toMatchObject({
+      quantity: '2.0000',
+      additionalComponents: [{ componentItemId: 'a', quantity: '1.0000' }],
+    });
+    expect(lines[1]).toMatchObject({
+      quantity: '1.0000',
+      additionalComponents: [{ componentItemId: 'b', componentVariantId: 'b-y' }],
+    });
+  });
+
+  it('sends a unit without additions as its own plain line', () => {
+    const draft = addCartDraftSelection(empty(), service, null, base, {
+      quantity: '2',
+      unitAdditions: [[], [a]],
+    });
+    const lines = cartDraftStartInput(startable(draft)).lines;
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toEqual({ catalogItemId: 'hair-color', quantity: '1.0000' });
+    expect(lines[1]).toMatchObject({
+      quantity: '1.0000',
+      additionalComponents: [expect.anything()],
+    });
+  });
+
+  it('never merges a per-unit group with another line and needs a configuration for every unit', () => {
+    let draft = addCartDraftSelection(empty(), service, null, base, {
+      quantity: '2',
+      unitAdditions: [[a], [b]],
+    });
+    draft = addCartDraftSelection(draft, service, null, base, {
+      quantity: '2',
+      unitAdditions: [[a], [b]],
+    });
+    expect(draft.lines).toHaveLength(2);
+    expect(() =>
+      addCartDraftSelection(empty(), service, null, base, {
+        quantity: '3',
+        unitAdditions: [[a], [b]],
+      }),
+    ).toThrow();
+  });
+
+  it('shrinking keeps the leading units untouched; growing is refused here (a new unit is configured explicitly)', () => {
+    const draft = addCartDraftSelection(empty(), service, null, base, {
+      quantity: '3',
+      unitAdditions: [[a], [b], []],
+    });
+    const id = draft.lines[0]!.id;
+    const smaller = setCartDraftQuantity(draft, id, '2');
+    expect(smaller.lines[0]?.unitAdditions).toEqual([[a], [b]]);
+    expect(() => setCartDraftQuantity(smaller, id, '3')).toThrow();
+  });
+
+  it('editing one unit replaces the same group in place without touching the other unit', () => {
+    let draft = addCartDraftSelection(empty(), service, null, base, {
+      quantity: '2',
+      unitAdditions: [[a], [b]],
+    });
+    const id = draft.lines[0]!.id;
+    draft = replaceCartDraftLine(draft, id, service, null, base, {
+      quantity: '2',
+      unitAdditions: [[a], [{ ...b, quantity: '2.0000' }]],
+    });
+    expect(draft.lines).toHaveLength(1);
+    expect(draft.lines[0]?.id).toBe(id);
+    expect(draft.lines[0]?.unitAdditions?.[0]).toEqual([a]);
+    expect(cartDraftDisplayLines(draft)[0]?.units?.map((unit) => unit.amount)).toEqual([
+      '210000.0000',
+      '230000.0000',
+    ]);
+  });
+});
+
+describe('persisted OPEN Sale lines in the cart', () => {
+  const line = (overrides: Record<string, unknown> = {}) =>
+    ({
+      id: 'l1',
+      removedAt: null,
+      itemNameSnapshot: 'Hair Color',
+      itemTypeSnapshot: 'SERVICE',
+      variantNameSnapshot: null,
+      quantity: '1.0000',
+      effectiveUnitPrice: '200000.0000',
+      grossAmount: '200000.0000',
+      lineDiscountAmount: '0.0000',
+      discountType: null,
+      discountValue: null,
+      overrideAmount: null,
+      fulfillment: { status: 'WAITING' },
+      participations: [],
+      contributions: [],
+      compositionComponents: [],
+      ...overrides,
+    }) as never;
+
+  it('offers editing only for a free line of an editable Sale', () => {
+    expect(saleDisplayLines([line()], [], { canEdit: true })[0]?.editable).toBe(true);
+    // Finalized/paid-pending Sale, or no permission to change it: never offered.
+    expect(saleDisplayLines([line()], [], { canEdit: false })[0]?.editable).toBe(false);
+    expect(saleDisplayLines([line()])[0]?.editable).toBe(false);
+  });
+
+  it('never offers editing for work in progress, assigned performers or manual price/discount', () => {
+    const editable = (overrides: Record<string, unknown>) =>
+      saleDisplayLines([line(overrides)], [], { canEdit: true })[0]?.editable;
+    expect(editable({ fulfillment: { status: 'IN_PROGRESS' } })).toBe(false);
+    expect(editable({ fulfillment: { status: 'COMPLETED' } })).toBe(false);
+    expect(editable({ participations: [{ assigned: true }] })).toBe(false);
+    expect(editable({ contributions: [{}] })).toBe(false);
+    expect(editable({ overrideAmount: '1000.0000' })).toBe(false);
+    expect(editable({ discountType: 'PERCENTAGE' })).toBe(false);
+  });
+});
+
+describe('replacementLinesOf (one configuration becomes exact Sale lines)', () => {
+  const a = { componentItemId: 'a', quantity: '1.0000', label: 'A', unitPrice: '10000.0000' };
+  const b = {
+    componentItemId: 'b',
+    componentVariantId: 'b-y',
+    quantity: '2.0000',
+    label: 'B / Y',
+    unitPrice: '15000.0000',
+  };
+
+  it('keeps identical units as one line', () => {
+    expect(replacementLinesOf('svc', 'v1', { quantity: '2', additionalComponents: [a] })).toEqual([
+      {
+        catalogItemId: 'svc',
+        catalogVariantId: 'v1',
+        quantity: '2',
+        additionalComponents: [{ componentItemId: 'a', quantity: '1.0000' }],
+      },
+    ]);
+  });
+
+  it('turns different unit additions into separate lines, in order, each with its own additions and variant', () => {
+    expect(
+      replacementLinesOf('svc', null, {
+        quantity: '2',
+        additionalComponents: [],
+        unitAdditions: [[a], [b]],
+      }),
+    ).toEqual([
+      {
+        catalogItemId: 'svc',
+        quantity: '1',
+        additionalComponents: [{ componentItemId: 'a', quantity: '1.0000' }],
+      },
+      {
+        catalogItemId: 'svc',
+        quantity: '1',
+        additionalComponents: [
+          { componentItemId: 'b', componentVariantId: 'b-y', quantity: '2.0000' },
+        ],
+      },
+    ]);
+  });
+
+  it('groups equal units among different ones and never merges a plain unit into a configured one', () => {
+    const lines = replacementLinesOf('svc', null, {
+      quantity: '3',
+      additionalComponents: [],
+      unitAdditions: [[a], [], [a]],
+    });
+    expect(lines).toEqual([
+      {
+        catalogItemId: 'svc',
+        quantity: '2',
+        additionalComponents: [{ componentItemId: 'a', quantity: '1.0000' }],
+      },
+      { catalogItemId: 'svc', quantity: '1' },
+    ]);
   });
 });

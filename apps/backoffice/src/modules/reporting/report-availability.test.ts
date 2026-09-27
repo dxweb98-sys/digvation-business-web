@@ -61,6 +61,24 @@ describe('Backoffice report composition', () => {
     expect(canAccessReport(session({ permissions: ['expenses:read'] }), 'expenses')).toBe(true);
   });
 
+  it('gives component usage the transaction reports access: sales:read on a POS installation', () => {
+    expect(canAccessReport(session({ permissions: ['sales:read'] }), 'component-usage')).toBe(
+      false,
+    );
+    expect(
+      canAccessReport(
+        session({ permissions: ['sales:read'], products: ['POS'] }),
+        'component-usage',
+      ),
+    ).toBe(true);
+    expect(
+      canAccessReport(
+        session({ permissions: ['catalog:read', 'payments:read'], products: ['POS'] }),
+        'component-usage',
+      ),
+    ).toBe(false);
+  });
+
   it('keeps tax reports POS-scoped after TAX_FISCAL has made tax:read effective', () => {
     expect(canAccessReport(session({ permissions: ['tax:read'] }), 'tax')).toBe(false);
     expect(

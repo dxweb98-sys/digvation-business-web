@@ -70,6 +70,30 @@ export interface ServiceDefinition {
   allowEmployeeContribution: boolean;
 }
 
+/** Read-only Catalog context: a component already fixed for the selected Service/variant. */
+export interface FixedComponent {
+  componentItemId: string;
+  componentVariantId: string | null;
+  itemName: string;
+  variantName: string | null;
+  quantity: string;
+}
+
+/** A Product the operator may choose as an additional Service item. */
+export interface ComponentCandidateVariant extends NamedRecord {
+  catalogItemId: string;
+  resolvedPrice: ResolvedPrice | null;
+}
+export interface ComponentCandidate {
+  id: string;
+  code: string;
+  name: string;
+  productUsage: 'STANDALONE_AND_COMPONENT' | 'COMPONENT_ONLY';
+  variantSelectionMode: 'REQUIRED' | 'OPTIONAL';
+  resolvedPrice: ResolvedPrice | null;
+  variants: ComponentCandidateVariant[];
+}
+
 export interface CatalogDisplayPrice {
   amount: string;
   currency: string;
@@ -95,6 +119,10 @@ export interface CatalogItem {
   fulfillmentBehavior: 'INSTANT' | 'TRACKED';
   /** With active variants: REQUIRED sells variants only; OPTIONAL also sells the item itself. */
   variantSelectionMode?: 'REQUIRED' | 'OPTIONAL';
+  /** COMPONENT_ONLY Products are Service components and are never sold on their own. */
+  productUsage?: 'STANDALONE_AND_COMPONENT' | 'COMPONENT_ONLY';
+  /** Item-level (Product or Service): the operator must choose at least one additional item at sale. */
+  requireAdditionalItemAtSale?: boolean;
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -103,11 +131,15 @@ export interface CatalogItem {
   image?: CatalogItemImage | null;
   resolvedPrice?: ResolvedPrice | null;
   variants?: CatalogVariant[];
+  /** Effective fixed components when the item is selected without a variant. */
+  fixedComponents?: FixedComponent[];
 }
 
 export interface CatalogVariant extends NamedRecord {
   catalogItemId: string;
   resolvedPrice?: ResolvedPrice | null;
+  /** Effective fixed components for this variant (its own override, else the default). */
+  fixedComponents?: FixedComponent[];
 }
 
 export interface ResolvedPrice {
@@ -223,8 +255,35 @@ export interface ContributionPreview {
   facts: EmployeeContribution[];
 }
 
+/**
+ * Immutable Sale-time evidence of a Service's resolved composition. It is line detail, never a
+ * separate customer-facing or priced Sale line.
+ */
+export interface SaleLineCompositionComponent {
+  /** Stable id suitable for future Inventory correlation. */
+  id: string;
+  position: number;
+  componentSource: 'FIXED_BOM' | 'SALE_SELECTED';
+  /** Only for FIXED_BOM components. */
+  fixedBomSource: 'SERVICE_DEFAULT' | 'SERVICE_VARIANT_OVERRIDE' | null;
+  componentItemId: string;
+  componentVariantId: string | null;
+  itemCodeSnapshot: string;
+  itemNameSnapshot: string;
+  variantCodeSnapshot: string | null;
+  variantNameSnapshot: string | null;
+  quantity: string;
+  pricingMode: 'INCLUDED_IN_SERVICE_PRICE' | 'FOLLOW_PRODUCT_PRICE' | 'FIXED_COMPONENT_PRICE';
+  /** Product/Variant unit price at transaction time; not the billing contribution. */
+  transactionUnitPrice: string | null;
+  catalogPriceId: string | null;
+  unitContribution: string;
+  extendedContribution: string;
+}
+
 export interface SaleLine {
   id: string;
+  compositionComponents?: SaleLineCompositionComponent[];
   saleId: string;
   catalogItemId: string;
   catalogVariantId: string | null;

@@ -103,6 +103,45 @@ function createSale(overrides: Partial<Sale> = {}): Sale {
 }
 
 describe('createSaleWorkspaceViewModel', () => {
+  it('presents a composed Service as one Sale line without component lines', () => {
+    const viewModel = createSaleWorkspaceViewModel(
+      createSale({
+        totalAmount: '190000.0000',
+        lines: [
+          createLine({
+            resolvedUnitPrice: '190000.0000',
+            effectiveUnitPrice: '190000.0000',
+            compositionComponents: [
+              {
+                id: 'component-1',
+                position: 0,
+                componentSource: 'SALE_SELECTED',
+                fixedBomSource: null,
+                componentItemId: 'med',
+                componentVariantId: null,
+                itemCodeSnapshot: 'MED',
+                itemNameSnapshot: 'Creambath Medicine',
+                variantCodeSnapshot: null,
+                variantNameSnapshot: null,
+                quantity: '2.0000',
+                pricingMode: 'FOLLOW_PRODUCT_PRICE',
+                transactionUnitPrice: '20000.0000',
+                catalogPriceId: null,
+                unitContribution: '20000.0000',
+                extendedContribution: '40000.0000',
+              },
+            ],
+          }),
+        ],
+      }),
+      'ONLINE',
+      'CLEAN',
+    );
+
+    expect(viewModel.activeLines).toHaveLength(1);
+    expect(viewModel.activeLines[0]?.itemNameSnapshot).toBe('Hair Cut');
+  });
+
   it('derives payment amounts without becoming client monetary authority', () => {
     const viewModel = createSaleWorkspaceViewModel(
       createSale({

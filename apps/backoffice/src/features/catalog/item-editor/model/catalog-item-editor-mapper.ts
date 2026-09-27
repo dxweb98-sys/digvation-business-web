@@ -13,7 +13,15 @@ export function buildCatalogItemBaseInput({
       : undefined;
 
   return {
+    ...(form.type === 'PRODUCT'
+      ? {
+          productUsage: form.directlySellable
+            ? ('STANDALONE_AND_COMPONENT' as const)
+            : ('COMPONENT_ONLY' as const),
+        }
+      : {}),
     variantSelectionMode: form.variantSelectionMode,
+    requireAdditionalItemAtSale: form.requireAdditionalItemAtSale,
     name: form.name.trim(),
     categoryId: form.categoryId,
     description: form.description.trim() || null,

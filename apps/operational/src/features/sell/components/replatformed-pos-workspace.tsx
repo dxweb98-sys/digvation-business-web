@@ -69,7 +69,11 @@ import {
   useOperationalLocalization,
 } from '../../../app/localization/operational-localization';
 import { cashierTransactionKeys } from '../cashier-transaction-keys';
-import { cashierTransactionErrorMessage } from '../cashier-transaction-errors';
+import { cashierTransactionErrorMessage, correctionErrorMessage } from '../cashier-transaction-errors';
+import type { ReplaceLinePreview, ReplaceSaleLineInput } from '../cashier-transaction.adapter';
+import { replacementLinesOf } from '../cart-draft';
+import { saleLineConfiguration } from '../sale-line-additions';
+import { ItemConfigurator, type ItemConfiguration, type ItemConfiguratorState } from './item-configurator';
 import { CustomerMemberApi, type MemberLookupResult } from '../customer-member-api';
 import type { CartDisplayLine } from '../cart-draft';
 import {
@@ -83,6 +87,10 @@ import {
   formatServiceDuration,
   lineDiscountPercentage,
   saleDiscountRows,
+  aggregateDiscountRows,
+  lineTaxLabel,
+  cashTenderNote,
+  type DiscountDetails,
   discountPresentation,
   lineDiscountRows,
   paymentIntent,
@@ -93,6 +101,7 @@ import {
 } from '../sale-presentation';
 import type {
   CatalogItem,
+  ComponentCandidate,
   CompletedSaleSummary,
   Employee,
   Payment,
@@ -119,12 +128,15 @@ import {
   SaleCustomerStrip,
   SaleDetailSection,
   SaleFinancialSummary,
+  SaleLineAdditions,
   SaleLineItem,
   SaleLineItemList,
   SalePaymentComposition,
   SalePaymentList,
   StatusPill,
 } from './sale-detail-presentation';
+import { saleLineAdditions, saleLineBase } from '../sale-line-additions';
+import { CartLineBreakdown } from './cart-line-breakdown';
 import {
   PaymentIntentHint,
   PaymentLeaveNotice,
@@ -147,7 +159,7 @@ import {
   type PerformerAllocation,
   type ServiceLineWorkPlan,
 } from '../service-performer-allocation';
-import type { VariantPickerState } from './variant-picker';
+import type { VariantPickerState } from '../variant-selection';
 import {
   isCompletedSaleSummary,
   presentableTransaction,
@@ -1717,6 +1729,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
             if (serverLine) workspace.changeQuantity(serverLine, next);
           }
         }}
+        onEdit={(line, options) => void workspace.editCartLine(line.id, options)}
         onRemove={(line) => {
           if (workspace.cart.isLocalDraft) workspace.removeDraftLine(line.id);
           else {
@@ -1761,6 +1774,14 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           setCheckoutOpen(false);
           setCartOpen(true);
         }}
+        {...(sale && sale.status === 'OPEN' && workspace.viewModel.monetaryMutation.state === 'AVAILABLE'
+          ? {
+              onEditOrder: () => {
+                setCheckoutOpen(false);
+                setCartOpen(true);
+              },
+            }
+          : {})}
         sale={sale}
         lines={lines}
         total={total}
@@ -1895,6 +1916,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         onRemove={workspace.removeLine}
         onCorrect={(line, input) => workspace.correctLine(line, input)}
         onPreview={(line, input) => workspace.previewLineCorrection(line, input)}
+        loadConfiguratorState={workspace.loadConfiguratorState}
+        loadCandidates={workspace.loadComponentCandidates}
         canCorrectProgressedLine={session.access.permissions.includes('sales:correct-progressed-line')}
         canRefundPayment={session.access.permissions.includes('payments:refund')}
         onCompensate={(sale, paymentId, amount) => workspace.compensateOpenPayment(sale, paymentId, amount)}
@@ -2626,6 +2649,7 @@ function ReferenceFloatingCart({
   isPointBalanceLoading,
   onChooseCustomer,
   onQuantity,
+  onEdit,
   onRemove,
   onCheckout,
 }: {
@@ -2648,6 +2672,7 @@ function ReferenceFloatingCart({
   isPointBalanceLoading: boolean;
   onChooseCustomer: () => void;
   onQuantity: (line: CartDisplayLine, quantity: string) => void;
+  onEdit: (line: CartDisplayLine, options?: { addUnit?: boolean }) => void;
   onRemove: (line: CartDisplayLine) => void;
   onCheckout: () => void;
 }) {
@@ -2681,6 +2706,7 @@ function ReferenceFloatingCart({
       isPointBalanceLoading={isPointBalanceLoading}
       onChooseCustomer={onChooseCustomer}
       onQuantity={onQuantity}
+      onEdit={onEdit}
       onRemove={onRemove}
       onCheckout={onCheckout}
     />
@@ -2789,6 +2815,7 @@ function ReferenceCartPanel({
   isPointBalanceLoading,
   onChooseCustomer,
   onQuantity,
+  onEdit,
   onRemove,
   onCheckout,
 }: {
@@ -2809,6 +2836,7 @@ function ReferenceCartPanel({
   isPointBalanceLoading: boolean;
   onChooseCustomer: () => void;
   onQuantity: (line: CartDisplayLine, quantity: string) => void;
+  onEdit: (line: CartDisplayLine, options?: { addUnit?: boolean }) => void;
   onRemove: (line: CartDisplayLine) => void;
   onCheckout: () => void;
 }) {
@@ -2822,6 +2850,12 @@ function ReferenceCartPanel({
         ? createDecimal(line.quantity).plus(createDecimal('1'))
         : createDecimal(line.quantity).minus(createDecimal('1'));
     if (next.lessThan(createDecimal('1'))) return;
+    // A local line that carries additions never gains a unit by copying: the new unit is
+    // configured in the editor, so a required addition cannot be satisfied silently.
+    if (direction === 'up' && line.editable && (line.additions?.length || line.units?.length)) {
+      onEdit(line, { addUnit: true });
+      return;
+    }
     onQuantity(line, next.toFixed(4));
   };
   return (
@@ -2913,15 +2947,35 @@ function ReferenceCartPanel({
                         ) : null}
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      aria-label={`${copy('Remove')} ${line.itemNameSnapshot}`}
-                      onClick={() => onRemove(line)}
-                      className="shrink-0 rounded-lg p-1.5 text-[var(--color-text-muted)] hover:bg-[var(--color-danger)]/10 hover:text-[var(--color-danger)]"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
+                    <div className="flex shrink-0 items-center gap-0.5">
+                      {line.editable ? (
+                        <button
+                          type="button"
+                          aria-label={`${copy('Edit item')} ${line.itemNameSnapshot}`}
+                          onClick={() => onEdit(line)}
+                          className="rounded-lg p-1.5 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)]"
+                        >
+                          <Pencil className="size-3.5" />
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        aria-label={`${copy('Remove')} ${line.itemNameSnapshot}`}
+                        onClick={() => onRemove(line)}
+                        className="shrink-0 rounded-lg p-1.5 text-[var(--color-text-muted)] hover:bg-[var(--color-danger)]/10 hover:text-[var(--color-danger)]"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </div>
                   </div>
+                  <CartLineBreakdown
+                    line={line}
+                    heading={copy('Additional items')}
+                    baseLabel={copy('Item price')}
+                    unitLabel={(index) => `${copy('Unit')} ${index}`}
+                    format={(amount) => money(amount, locale)}
+                    formatQuantity={quantity}
+                  />
                   <div className="mt-3 flex items-center justify-between gap-3">
                     <div className="inline-grid grid-cols-[36px_48px_36px] items-center overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] shadow-[inset_0_1px_0_rgb(15_23_42_/_0.02)]">
                       <button
@@ -3066,6 +3120,53 @@ function usePaymentDialogStep(open: boolean) {
   return [step, setStep] as const;
 }
 
+/**
+ * Facts explaining one applied Promotion or discount, read from the Sale's own adjustment
+ * snapshot. Shared by the Payment Dialog and the Transaction Detail so both explain a discount in
+ * the same words; it never looks up the current Promotion.
+ */
+function DiscountDetailsContent({ details, locale }: { details: DiscountDetails; locale: string }) {
+  const { copy } = useOperationalLocalization();
+  const when = (value: string) =>
+    new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(
+      new Date(value),
+    );
+  return (
+    <div className="space-y-1">
+      <p className="font-semibold">
+        {details.name ?? copy(details.source === 'PROMOTION' ? 'Promotion' : 'Manual discount')}
+      </p>
+      {details.percentage ? (
+        <p>
+          {copy('Discount')}: {details.percentage}%
+        </p>
+      ) : null}
+      {details.scope ? (
+        <p>
+          {copy(
+            details.scope === 'TRANSACTION'
+              ? 'Whole transaction'
+              : details.scope === 'ITEM'
+                ? 'Item-level'
+                : 'Category-level',
+          )}
+        </p>
+      ) : null}
+      {details.effectiveFrom ? (
+        <p>
+          {copy('Start')}: {when(details.effectiveFrom)}
+        </p>
+      ) : null}
+      {details.effectiveUntil ? (
+        <p>
+          {copy('End')}: {when(details.effectiveUntil)}
+        </p>
+      ) : null}
+      {details.reason ? <p>{details.reason}</p> : null}
+    </div>
+  );
+}
+
 function DiscountInfoTooltip({ label, content }: { label: string; content: ReactNode }) {
   const [open, setOpen] = useState(false);
 
@@ -3107,6 +3208,7 @@ function DiscountInfoTooltip({ label, content }: { label: string; content: React
 export function ReferencePaymentDialog({
   open,
   onClose,
+  onEditOrder,
   sale,
   lines,
   total,
@@ -3151,6 +3253,11 @@ export function ReferencePaymentDialog({
 }: {
   open: boolean;
   onClose: () => void;
+  /**
+   * Returns from Payment to editing the order. Offered only while Runtime still allows changing
+   * the Sale (OPEN, nothing pending); Payment never locks the order by itself.
+   */
+  onEditOrder?: () => void;
   sale: Sale | null;
   lines: readonly CartDisplayLine[];
   total: string;
@@ -3458,6 +3565,17 @@ export function ReferencePaymentDialog({
                   <span className="shrink-0 rounded-full bg-[var(--color-surface-muted)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-text-muted)]">
                     {lines.length} {copy('items')}
                   </span>
+                  {onEditOrder ? (
+                    <button
+                      type="button"
+                      onClick={onEditOrder}
+                      disabled={isSubmitting}
+                      className="ml-1 inline-flex shrink-0 items-center gap-1 rounded-lg border border-[var(--color-border)] px-2 py-1 text-xs font-semibold text-[var(--color-brand)] transition-colors hover:bg-[var(--color-brand)]/8 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <Pencil className="size-3" aria-hidden="true" />
+                      {copy('Return to order')}
+                    </button>
+                  ) : null}
                 </div>
                 <div className="shrink-0 text-right">
                   <p className="pos-pay-eyebrow">{copy('Subtotal')}</p>
@@ -3476,34 +3594,18 @@ export function ReferencePaymentDialog({
                         .toFixed(4)
                     : line.totalAmount;
                   const promotionTooltip = (
-                    <div className="space-y-1">
-                      {line.promotion?.name ? (
-                        <p className="font-semibold">{line.promotion.name}</p>
-                      ) : null}
-                      {discountPercentage ? (
-                        <p>
-                          {copy('Discount')}: {discountPercentage}%
-                        </p>
-                      ) : null}
-                      {line.promotion?.effectiveFrom ? (
-                        <p>
-                          {copy('Start')}:{' '}
-                          {new Intl.DateTimeFormat(locale, {
-                            dateStyle: 'medium',
-                            timeStyle: 'short',
-                          }).format(new Date(line.promotion.effectiveFrom))}
-                        </p>
-                      ) : null}
-                      {line.promotion?.effectiveUntil ? (
-                        <p>
-                          {copy('End')}:{' '}
-                          {new Intl.DateTimeFormat(locale, {
-                            dateStyle: 'medium',
-                            timeStyle: 'short',
-                          }).format(new Date(line.promotion.effectiveUntil))}
-                        </p>
-                      ) : null}
-                    </div>
+                    <DiscountDetailsContent
+                      locale={locale}
+                      details={{
+                        source: 'PROMOTION',
+                        scope: null,
+                        name: line.promotion?.name ?? null,
+                        percentage: discountPercentage,
+                        effectiveFrom: line.promotion?.effectiveFrom ?? null,
+                        effectiveUntil: line.promotion?.effectiveUntil ?? null,
+                        reason: null,
+                      }}
+                    />
                   );
                   return (
                     <div key={line.id} className="px-4 py-3">
@@ -3538,6 +3640,14 @@ export function ReferencePaymentDialog({
                           </p>
                         </div>
                       </div>
+                      <CartLineBreakdown
+                        line={line}
+                        heading={`${copy('Additional items')}: ${line.itemNameSnapshot}`}
+                        baseLabel={copy('Item price')}
+                        unitLabel={(index) => `${copy('Unit')} ${index}`}
+                        format={format}
+                        formatQuantity={quantity}
+                      />
                     </div>
                   );
                 })}
@@ -4196,7 +4306,7 @@ export function ReferenceTransactionDetail({
   }).format(new Date(sale.finalizedAt ?? sale.updatedAt));
   const identity = transactionNumber(sale, locale);
   const format = (amount: string) => money(amount, locale);
-  const discountRows = saleDiscountRows(sale);
+  const discountRows = aggregateDiscountRows(saleDiscountRows(sale));
   const summaryDiscounts =
     discountRows.length === 0 && hasDiscount
       ? [
@@ -4209,6 +4319,7 @@ export function ReferenceTransactionDetail({
             amount: sale.discountAmount,
             percentage: null,
             reason: null,
+            identity: 'SALE-DISCOUNT',
           },
         ]
       : discountRows;
@@ -4402,6 +4513,8 @@ export function ReferenceTransactionDetail({
                       const showWorkStatus =
                         saleLineWorkStatus(line) !== null &&
                         saleLineWorkStatus(line) !== (status ? impliedLineWorkStatus[status] : undefined);
+                      const additions = saleLineAdditions(line);
+                      const lineBase = saleLineBase(line, additions);
                       return (
                         <SaleLineItem
                           key={line.id}
@@ -4409,10 +4522,37 @@ export function ReferenceTransactionDetail({
                           variant={line.variantNameSnapshot}
                           pricing={`${quantity(line.quantity)} × ${format(line.effectiveUnitPrice)}`}
                           amount={format(line.grossAmount)}
+                          discountsHeading={copy('Discounts and promotions')}
                           discounts={lineDiscountRows(sale, line, copy('Discount')).map((row) => ({
-                            ...row,
+                            id: row.id,
+                            title: row.title,
+                            note: row.note,
                             amount: format(row.amount),
+                            info: (
+                              <DiscountInfoTooltip
+                                label={copy('Discount details')}
+                                content={<DiscountDetailsContent details={row.details} locale={locale} />}
+                              />
+                            ),
                           }))}
+                          usage={
+                            additions.length ? (
+                              <SaleLineAdditions
+                                heading={copy('Additional items')}
+                                baseLabel={copy('Item price')}
+                                base={{
+                                  pricing: `${quantity(line.quantity)} × ${format(lineBase.unitPrice)}`,
+                                  amount: format(lineBase.amount),
+                                }}
+                                rows={additions.map((addition) => ({
+                                  id: addition.id,
+                                  name: addition.name,
+                                  pricing: `${quantity(addition.quantity)} × ${format(addition.unitPrice)}`,
+                                  amount: format(addition.amount),
+                                }))}
+                              />
+                            ) : null
+                          }
                           earning={
                             line.loyaltyEarning
                               ? `${
@@ -4479,6 +4619,23 @@ export function ReferenceTransactionDetail({
                               </Badge>
                             ) : null
                           }
+                          aside={
+                            // Invoice (when it exists) above the transaction date, on the right of the
+                            // customer identity. It is rendered here once and nowhere else.
+                            <div className="flex flex-col items-end gap-0.5">
+                              {sale.invoiceNumber ? (
+                                <span
+                                  className="max-w-[9.5rem] break-all font-mono text-xs font-semibold leading-4 text-[var(--color-text)] sm:max-w-none"
+                                  data-testid="transaction-invoice-number"
+                                >
+                                  {sale.invoiceNumber}
+                                </span>
+                              ) : null}
+                              <span className="text-xs text-[var(--color-text-muted)]">
+                                {transactionDate}
+                              </span>
+                            </div>
+                          }
                         />
                         <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1.5 px-1">
                           <StatusPill
@@ -4491,14 +4648,6 @@ export function ReferenceTransactionDetail({
                           >
                             {status ? label(statusMeta[status].value) : label('OPEN')}
                           </StatusPill>
-                          <span className="text-xs text-[var(--color-text-muted)] sm:ml-auto">
-                            {sale.invoiceNumber ? (
-                              <span className="mr-2 font-mono text-[var(--color-text)]">
-                                {sale.invoiceNumber}
-                              </span>
-                            ) : null}
-                            {transactionDate}
-                          </span>
                         </div>
                         {sale.status === 'VOIDED' && cancellationReason ? (
                           <div className="mt-2 border-l-2 border-[var(--color-danger)] pl-2.5 text-xs">
@@ -4677,7 +4826,7 @@ export function ReceiptContent({
   hasTax: boolean;
 }) {
   const { copy, label } = useOperationalLocalization();
-  const discountRows = saleDiscountRows(sale);
+  const discountRows = aggregateDiscountRows(saleDiscountRows(sale));
   const composition = appliedPaymentComposition(sale);
   const settlement = saleSettlement(sale);
   const legacyLoyaltyRedemption = sale.loyaltyRedemption as
@@ -4718,6 +4867,8 @@ export function ReceiptContent({
       <section className="space-y-2.5">
         {activeLines.map((line) => {
           const lineDiscounts = lineDiscountRows(sale, line, copy('Discount'));
+          const additions = saleLineAdditions(line);
+          const receiptBase = saleLineBase(line, additions);
           return (
             <div key={line.id} className="text-xs leading-4">
               <div className="flex items-start justify-between gap-3">
@@ -4729,25 +4880,51 @@ export function ReceiptContent({
                 </div>
                 <p className="shrink-0 font-bold">{money(line.grossAmount, locale)}</p>
               </div>
-              <p className="mt-1 text-slate-500">
-                {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
-              </p>
-              {lineDiscounts.map((discount) => (
-                <div
-                  key={discount.id}
-                  className="mt-1 flex items-start justify-between gap-3 text-slate-500"
-                >
-                  <span className="min-w-0">
-                    {discount.title}
-                    {discount.note ? (
-                      <span className="block break-words text-[10px] leading-3">
-                        {discount.note}
-                      </span>
-                    ) : null}
-                  </span>
-                  <span className="shrink-0">−{money(discount.amount, locale)}</span>
+              {additions.length ? (
+                <>
+                  <div className="mt-1 flex items-start justify-between gap-3 text-slate-500">
+                    <span>
+                      {quantity(line.quantity)} × {money(receiptBase.unitPrice, locale)}
+                    </span>
+                    <span className="shrink-0">{money(receiptBase.amount, locale)}</span>
+                  </div>
+                  {/* Customer receipt: only additions chosen during the transaction, as a breakdown of the line total. */}
+                  {additions.map((addition) => (
+                    <div key={addition.id} className="mt-1 pl-2">
+                      <p className="break-words">+ {addition.name}</p>
+                      <div className="flex items-start justify-between gap-3 text-slate-500">
+                        <span>
+                          {quantity(addition.quantity)} × {money(addition.unitPrice, locale)}
+                        </span>
+                        <span className="shrink-0">{money(addition.amount, locale)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <p className="mt-1 text-slate-500">
+                  {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
+                </p>
+              )}
+              {isPositiveDecimal(line.itemTaxAmount ?? "0") ? (
+                <div className="mt-1 flex items-start justify-between gap-3 text-slate-500">
+                  <span>{lineTaxLabel(line, copy('Tax'))}</span>
+                  <span className="shrink-0">{money(line.itemTaxAmount ?? "0", locale)}</span>
                 </div>
-              ))}
+              ) : null}
+              {lineDiscounts.length ? (
+                <div className="mt-1 text-slate-500">
+                  <p className="text-[10px] font-semibold">{copy('Discounts and promotions')}</p>
+                  {lineDiscounts.map((discount) => (
+                    <div key={discount.id} className="pl-2">
+                      <p className="break-words">- {discount.title}</p>
+                      {discount.note ? (
+                        <p className="break-words text-[10px] leading-3">{discount.note}</p>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
               {line.loyaltyEarning?.state === 'FINALIZED' ? (
                 <div className="mt-1 flex items-start justify-between gap-3 text-slate-500">
                   <span>{copy('Points earned')}</span>
@@ -4768,10 +4945,21 @@ export function ReceiptContent({
           <dt className="text-slate-500">{copy('Subtotal')}</dt>
           <dd>{money(sale.grossAmount, locale)}</dd>
         </div>
+        {hasTax ? (
+          <div className="flex justify-between gap-3">
+            <dt className="text-slate-500">{saleTaxLabel(sale, copy('Tax'))}</dt>
+            <dd>{money(sale.taxAmount, locale)}</dd>
+          </div>
+        ) : null}
+        {discountRows.length ? (
+          <p className="pt-0.5 text-[10px] font-semibold text-slate-500">
+            {copy('Discounts and promotions')}
+          </p>
+        ) : null}
         {discountRows.map((row) => {
           const text = discountPresentation(row, copy('Discount'));
           return (
-            <div key={row.id} className="flex items-start justify-between gap-3">
+            <div key={row.id} className="flex items-start justify-between gap-3 pl-2">
               <dt className="min-w-0 text-slate-500">
                 {text.title}
                 {text.note ? (
@@ -4797,12 +4985,6 @@ export function ReceiptContent({
               </span>
             </dt>
             <dd className="shrink-0">−{money(redeemedAmount!, locale)}</dd>
-          </div>
-        ) : null}
-        {hasTax ? (
-          <div className="flex justify-between gap-3">
-            <dt className="text-slate-500">{saleTaxLabel(sale, copy('Tax'))}</dt>
-            <dd>{money(sale.taxAmount, locale)}</dd>
           </div>
         ) : null}
         <div className="mt-2 flex justify-between gap-3 border-t border-slate-200 pt-2 text-sm font-black">
@@ -4837,16 +5019,16 @@ export function ReceiptContent({
             <span>{money(composition.totalPaid, locale)}</span>
           </div>
         ) : null}
-        {settlement.cashTendered ? (
+        {cashTenderNote(settlement) ? (
           <div className="flex justify-between gap-3">
             <span className="text-slate-500">{copy('Cash received')}</span>
-            <span>{money(settlement.cashTendered, locale)}</span>
+            <span>{money(settlement.cashTendered!, locale)}</span>
           </div>
         ) : null}
-        {settlement.cashChange ? (
+        {cashTenderNote(settlement)?.change ? (
           <div className="flex justify-between gap-3">
             <span className="text-slate-500">{copy('Change')}</span>
-            <span>{money(settlement.cashChange, locale)}</span>
+            <span>{money(settlement.cashChange!, locale)}</span>
           </div>
         ) : null}
       </section>
@@ -4876,6 +5058,8 @@ export function ReferenceOrderAdjustmentDialog({
   onRemove,
   onCorrect,
   onPreview,
+  loadConfiguratorState,
+  loadCandidates,
   canCorrectProgressedLine,
   canRefundPayment,
   onCompensate,
@@ -4890,8 +5074,13 @@ export function ReferenceOrderAdjustmentDialog({
   onAddVariant: (catalogVariantId: string | null) => void;
   onQuantity: (line: SaleLine, quantity: string) => void;
   onRemove: (line: SaleLine) => void;
-  onCorrect: (line: SaleLine, input: { catalogItemId: string; catalogVariantId?: string; quantity: string; reason: string }) => Promise<unknown>;
-  onPreview: (line: SaleLine, input: { catalogItemId: string; catalogVariantId?: string; quantity: string }) => Promise<{ saleVersion: number; currentTotalAmount: string; correctedTotalAmount: string; netSuccessfulPaidAmount: string; remainingPaymentAmount: string; overpaymentAmount: string }>;
+  /** One atomic correction with a full item configuration; it may become several Sale lines. */
+  onCorrect: (line: SaleLine, input: { lines: ReplaceSaleLineInput['lines']; reason: string }) => Promise<unknown>;
+  /** Runtime-calculated impact of the same correction; nothing is saved. */
+  onPreview: (line: SaleLine, input: { lines: ReplaceSaleLineInput['lines'] }) => Promise<ReplaceLinePreview>;
+  /** Everything the shared item configuration needs for one item at this location. */
+  loadConfiguratorState: (item: CatalogItem) => Promise<ItemConfiguratorState>;
+  loadCandidates: (q: string) => Promise<{ items: ComponentCandidate[] }>;
   canCorrectProgressedLine: boolean;
   canRefundPayment: boolean;
   onCompensate: (sale: Sale, paymentId: string, amount: string) => Promise<unknown>;
@@ -4914,28 +5103,37 @@ export function ReferenceOrderAdjustmentDialog({
   } | null>(null);
   const [correctionLine, setCorrectionLine] = useState<SaleLine | null>(null);
   const [replacementItemId, setReplacementItemId] = useState('');
-  const [replacementVariantId, setReplacementVariantId] = useState('');
-  const [replacementQuantity, setReplacementQuantity] = useState('1');
+  // The shared item configuration of the replacement: the same model as adding or editing an item.
+  const [configuratorState, setConfiguratorState] = useState<ItemConfiguratorState | null>(null);
+  const [configuratorLoading, setConfiguratorLoading] = useState(false);
+  const [replacementConfiguration, setReplacementConfiguration] = useState<ItemConfiguration | null>(null);
   const [correctionReason, setCorrectionReason] = useState('');
   const [replacementSearch, setReplacementSearch] = useState('');
   // The Sale returned by the persisted correction/compensation is the settlement authority.
   const [appliedSale, setAppliedSale] = useState<Sale | null>(null);
   const [correctionSaved, setCorrectionSaved] = useState(false);
-  const [correctionError, setCorrectionError] = useState(false);
+  const [correctionError, setCorrectionError] = useState<string | null>(null);
   const [compensationState, setCompensationState] = useState<'IDLE' | 'LOADING' | 'ERROR'>('IDLE');
-  const [correctionPreview, setCorrectionPreview] = useState<Awaited<ReturnType<typeof onPreview>> | null>(null);
+  const [correctionPreview, setCorrectionPreview] = useState<ReplaceLinePreview | null>(null);
   const [previewState, setPreviewState] = useState<'IDLE' | 'LOADING' | 'ERROR'>('IDLE');
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const [progressedCorrectionNotice, setProgressedCorrectionNotice] = useState<string | null>(null);
   const previewRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
     // Keep the authoritative result in view; it renders below the form.
     if (correctionPreview) previewRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
   }, [correctionPreview]);
-  const replacementItem = items.find((item) => item.id === replacementItemId) ?? null;
-  const replacementVariants = replacementItem?.variants ?? [];
-  // Only demand a variant when the item actually offers variants to choose from.
-  const variantRequired =
-    replacementItem?.variantSelectionMode === 'REQUIRED' && replacementVariants.length > 0;
+  const loadReplacementState = (itemId: string) => {
+    const item = items.find((entry) => entry.id === itemId);
+    setConfiguratorState(null);
+    setReplacementConfiguration(null);
+    if (!item) return;
+    setConfiguratorLoading(true);
+    void loadConfiguratorState(item)
+      .then((state) => setConfiguratorState((current) => (current === null ? state : current)))
+      .catch(() => undefined)
+      .finally(() => setConfiguratorLoading(false));
+  };
   const selectedVariantId =
     variantSelection && variantSelection.itemId === variantPicker?.item.id
       ? variantSelection.variantId
@@ -4996,24 +5194,35 @@ export function ReferenceOrderAdjustmentDialog({
     );
     return matches.slice(0, 20).map((item) => ({ value: item.id, label: `${item.name} (${item.code})` }));
   })();
-  const correctionInput = () => ({
-    catalogItemId: replacementItemId,
-    ...(replacementVariantId ? { catalogVariantId: replacementVariantId } : {}),
-    quantity: replacementQuantity,
-  });
-  const correctionReady =
-    Boolean(replacementItemId) &&
-    isPositiveDecimal(replacementQuantity) &&
-    !(variantRequired && !replacementVariantId);
+  const replacementLines = () =>
+    replacementConfiguration && configuratorState
+      ? replacementLinesOf(
+          configuratorState.item.id,
+          replacementConfiguration.catalogVariantId,
+          replacementConfiguration,
+        )
+      : [];
+  // Ready exactly when the shared configuration is valid: every unit satisfied, price resolved.
+  const correctionReady = Boolean(configuratorState && replacementConfiguration);
   const previewCorrection = () => {
-    if (!correctionSource) return;
+    if (!correctionSource || !correctionReady) return;
     setPreviewState('LOADING');
-    void onPreview(correctionSource, correctionInput())
+    setPreviewError(null);
+    void onPreview(correctionSource, { lines: replacementLines() })
       .then((value) => {
         setCorrectionPreview(value);
         setPreviewState('IDLE');
       })
-      .catch(() => setPreviewState('ERROR'));
+      .catch((error: unknown) => {
+        setPreviewError(
+          correctionErrorMessage(
+            error,
+            'Koreksi tidak dapat dipratinjau. Muat ulang transaksi lalu coba lagi.',
+            locale,
+          ),
+        );
+        setPreviewState('ERROR');
+      });
   };
   const asSale = (value: unknown): Sale | null =>
     typeof value === 'object' && value !== null && 'payments' in value && 'totalAmount' in value
@@ -5021,14 +5230,22 @@ export function ReferenceOrderAdjustmentDialog({
       : null;
   const confirmCorrection = () => {
     if (!correctionSource) return;
-    setCorrectionError(false);
+    setCorrectionError(null);
     // Keep the flow open: whether money must now be returned depends on the persisted Sale.
-    void onCorrect(correctionSource, { ...correctionInput(), reason: correctionReason.trim() })
+    void onCorrect(correctionSource, { lines: replacementLines(), reason: correctionReason.trim() })
       .then((updated) => {
         setAppliedSale(asSale(updated));
         setCorrectionSaved(true);
       })
-      .catch(() => setCorrectionError(true));
+      .catch((error: unknown) =>
+        setCorrectionError(
+          correctionErrorMessage(
+            error,
+            'Koreksi belum dapat disimpan. Muat ulang transaksi lalu coba lagi.',
+            locale,
+          ),
+        ),
+      );
   };
   const authoritativeSale = appliedSale ?? sale;
   const authoritativeSettlement = saleSettlement(authoritativeSale);
@@ -5187,12 +5404,12 @@ export function ReferenceOrderAdjustmentDialog({
                         }
                         setCorrectionLine(line);
                         setReplacementItemId(line.catalogItemId);
-                        setReplacementVariantId(line.catalogVariantId ?? '');
-                        setReplacementQuantity(quantity(line.quantity));
+                        loadReplacementState(line.catalogItemId);
                         setReplacementSearch('');
                         setAppliedSale(null);
                         setCorrectionSaved(false);
-                        setCorrectionError(false);
+                        setCorrectionError(null);
+                        setPreviewError(null);
                         setCompensationState('IDLE');
                         setCorrectionReason('');
                         setCorrectionPreview(null);
@@ -5431,36 +5648,36 @@ export function ReferenceOrderAdjustmentDialog({
                 clearable
                 onSearchChange={setReplacementSearch}
                 onChange={(value) => {
-                  setReplacementItemId(value === null ? '' : String(value));
-                  setReplacementVariantId('');
+                  const nextId = value === null ? '' : String(value);
+                  setReplacementItemId(nextId);
                   setCorrectionPreview(null);
+                  setPreviewError(null);
+                  loadReplacementState(nextId);
                 }}
               />
-              <div className="grid gap-3 sm:grid-cols-2">
-                {replacementVariants.length ? (
-                  <Select
-                    label="Varian"
-                    value={replacementVariantId}
-                    placeholder={variantRequired ? 'Pilih varian' : 'Tanpa varian'}
-                    options={[
-                      ...(variantRequired ? [] : [{ value: '', label: 'Tanpa varian' }]),
-                      ...replacementVariants.map((variant) => ({ value: variant.id, label: variant.name })),
-                    ]}
-                    onChange={(value) => {
-                      setReplacementVariantId(String(value));
-                      setCorrectionPreview(null);
-                    }}
-                  />
-                ) : null}
-                <PosNumericInput
-                  label="Jumlah"
-                  value={replacementQuantity}
-                  onChange={(value) => {
-                    setReplacementQuantity(value);
+              {configuratorState ? (
+                <ItemConfigurator
+                  // A different item starts a fresh configuration; the same item starts from the line.
+                  key={configuratorState.item.id}
+                  presentation="inline"
+                  {...configuratorState}
+                  loadCandidates={loadCandidates}
+                  {...(correctionSource && correctionSource.catalogItemId === configuratorState.item.id
+                    ? {
+                        initial: {
+                          ...saleLineConfiguration(correctionSource),
+                        },
+                      }
+                    : {})}
+                  onConfigurationChange={(configuration) => {
+                    setReplacementConfiguration(configuration);
                     setCorrectionPreview(null);
+                    setPreviewError(null);
                   }}
                 />
-              </div>
+              ) : configuratorLoading ? (
+                <p className="text-sm text-[var(--color-text-muted)]">Memuat konfigurasi item…</p>
+              ) : null}
               <DTextarea
                 label="Alasan koreksi"
                 rows={3}
@@ -5469,16 +5686,10 @@ export function ReferenceOrderAdjustmentDialog({
                 onChange={setCorrectionReason}
               />
             </div>
-            {previewState === 'ERROR' ? (
-              <DAlert variant="danger">
-                Koreksi tidak dapat dipratinjau. Muat ulang transaksi lalu coba lagi.
-              </DAlert>
+            {previewState === 'ERROR' && previewError ? (
+              <DAlert variant="danger">{previewError}</DAlert>
             ) : null}
-            {correctionError ? (
-              <DAlert variant="danger">
-                Koreksi belum dapat disimpan. Muat ulang transaksi lalu coba lagi.
-              </DAlert>
-            ) : null}
+            {correctionError ? <DAlert variant="danger">{correctionError}</DAlert> : null}
             {correctionPreview ? (
               <section
                 ref={previewRef}
@@ -5486,25 +5697,37 @@ export function ReferenceOrderAdjustmentDialog({
                 aria-live="polite"
                 className="rounded-xl bg-[var(--color-surface-muted)] p-3 text-sm"
               >
+                <ul aria-label="Hasil koreksi" className="mb-3 space-y-2 border-b border-[var(--color-border)] pb-3">
+                  {correctionPreview.replacements.map((replacement, index) => (
+                    <li key={`${replacement.catalogItemId}-${index}`} className="text-xs">
+                      <div className="flex items-start justify-between gap-3">
+                        <span className="min-w-0 font-semibold text-[var(--color-text)]">
+                          {replacement.itemName}
+                          {replacement.variantName ? ` · ${replacement.variantName}` : ''}
+                          <span className="block font-normal tabular-nums text-[var(--color-text-muted)]">
+                            {quantity(replacement.quantity)} × {money(replacement.unitAmount, locale)}
+                          </span>
+                        </span>
+                        <span className="shrink-0 font-semibold tabular-nums">
+                          {money(replacement.grossAmount, locale)}
+                        </span>
+                      </div>
+                      {replacement.additions.map((addition) => (
+                        <p key={addition.name} className="mt-0.5 pl-3 text-[var(--color-text-muted)]">
+                          + {addition.name} × {quantity(addition.quantity)} · {money(addition.amount, locale)}
+                        </p>
+                      ))}
+                    </li>
+                  ))}
+                </ul>
                 <dl className="space-y-1.5 text-[var(--color-text-muted)]">
                   {figure('Total sebelumnya', correctionPreview.currentTotalAmount)}
                   {figure('Total setelah koreksi', correctionPreview.correctedTotalAmount, 'font-semibold text-[var(--color-text)]')}
                   {figure('Sudah dibayar', correctionPreview.netSuccessfulPaidAmount)}
                 </dl>
                 <div className="mt-2 space-y-1.5 border-t border-[var(--color-border)] pt-2">
-                  {correctionPreview.overpaymentAmount !== '0.0000' ? (
-                    <>
-                      <dl>
-                        {figure('Kelebihan pembayaran', correctionPreview.overpaymentAmount, 'font-semibold text-[var(--color-danger)]')}
-                      </dl>
-                      {/* A preview is read-only: the refund is offered only once the correction is saved. */}
-                      <p className="text-xs text-[var(--color-text-muted)]">
-                        Setelah koreksi dikonfirmasi, {money(correctionPreview.overpaymentAmount, locale)} perlu dikembalikan kepada pelanggan sebelum transaksi dapat diselesaikan.
-                      </p>
-                    </>
-                  ) : (
-                    <dl>{figure('Sisa pembayaran', correctionPreview.remainingPaymentAmount, 'font-semibold text-[var(--color-text)]')}</dl>
-                  )}
+                  {/* A total below the successful payments is refused by Runtime, so a preview never shows one. */}
+                  <dl>{figure('Sisa pembayaran', correctionPreview.remainingPaymentAmount, 'font-semibold text-[var(--color-text)]')}</dl>
                 </div>
               </section>
             ) : null}

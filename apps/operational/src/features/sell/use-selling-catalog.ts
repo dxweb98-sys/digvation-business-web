@@ -5,6 +5,7 @@ import { referenceQueryPolicy } from '../../app/data/operational-cache-policy';
 import type { SellingCatalogQuery } from './cashier-transaction.adapter';
 import { cashierTransactionKeys } from './cashier-transaction-keys';
 import type { CatalogItem, CatalogVariant } from './cashier-transaction.types';
+import { isStandaloneSellable } from './selling-catalog-eligibility';
 import type { OperationalProjectionQuery } from './operational-projection-client';
 
 export type CatalogItemTypeFilter = 'ALL' | 'PRODUCT' | 'SERVICE';
@@ -47,7 +48,7 @@ export function useSellingCatalog({
   });
 
   const activeItems = useMemo(
-    () => (catalogQuery.data?.items ?? []).filter((item) => item.lifecycle === 'ACTIVE'),
+    () => (catalogQuery.data?.items ?? []).filter(isStandaloneSellable),
     [catalogQuery.data],
   );
   const items = useMemo(() => {
@@ -83,5 +84,7 @@ export function useSellingCatalog({
     setSearch,
     setItemType,
     loadActiveVariants,
+    /** Any sellable item by id, regardless of the current search or type filter. */
+    findItem: (itemId: string) => activeItems.find((item) => item.id === itemId) ?? null,
   };
 }

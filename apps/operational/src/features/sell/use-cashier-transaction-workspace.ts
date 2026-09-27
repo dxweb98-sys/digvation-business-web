@@ -13,7 +13,17 @@ import {
   resolveOperationalLocale,
 } from '../../app/localization/operational-localization';
 import { useCashierSession } from '../../app/providers/cashier-session-provider';
-import type { VariantPickerContext, VariantPickerState } from './components/variant-picker';
+import {
+  additionSignature,
+  groupUnitAdditions,
+  type CartDraftAdditionalItem,
+} from './cart-draft';
+import { MAX_CONFIGURATION_UNITS, opensItemConfigurator } from './item-configurator-model';
+import type {
+  ItemConfiguration,
+  ItemConfiguratorState,
+} from './components/item-configurator';
+import type { VariantPickerContext, VariantPickerState } from './variant-selection';
 import {
   createCashierTransactionAdapter,
   isLocalCashierDemoEnabled,
@@ -31,6 +41,8 @@ import type {
   SaleLine,
 } from './cashier-transaction.types';
 import { isCompletedSaleSummary } from './completed-sale-visibility';
+import type { ReplaceSaleLineInput } from './cashier-transaction.adapter';
+import { saleLineConfiguration } from './sale-line-additions';
 import { fetchResolvedPrice, fetchResolvedVariantPrices } from './resolved-price-query';
 import type { ServiceLineWorkPlan } from './service-performer-allocation';
 import { createSaleWorkspaceViewModel } from './sale-workspace-view-model';
@@ -50,6 +62,16 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
   const navigate = useNavigate();
   const { selectedLocationId, selectLocation, rememberSale } = useCashierSession();
   const [variantPicker, setVariantPicker] = useState<VariantPickerState | null>(null);
+  const [itemConfigurator, setItemConfigurator] = useState<
+    | (ItemConfiguratorState & {
+        context: VariantPickerContext;
+        targetSaleId?: string;
+        /** Set when reopening a local cart line: the configuration replaces that line. */
+        editLineId?: string;
+        initial?: ItemConfiguration;
+      })
+    | null
+  >(null);
   const [lineTaskId, setLineTaskId] = useState<string | null>(null);
   const [isCompletionOpen, setCompletionOpen] = useState(false);
   const [queueContextSale, setQueueContextSale] = useState<Sale | null>(null);
@@ -199,6 +221,11 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     context: VariantPickerContext,
     targetSaleId?: string,
     catalogVariant: CatalogVariant | null = null,
+    selection: {
+      quantity?: string;
+      additionalComponents?: readonly CartDraftAdditionalItem[];
+      unitAdditions?: readonly (readonly CartDraftAdditionalItem[])[];
+    } = {},
   ) => {
     if (context === 'TRANSACTION_ADJUSTMENT') {
       if (!targetSaleId) {
@@ -210,18 +237,42 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
         queueContextSale?.id === targetSaleId
           ? queueContextSale
           : (findCachedQueueSale(targetSaleId) ?? (await loadQueueContext(targetSaleId)));
-      const updated = await command.runMutation(() =>
-        transactionAdapter.addSaleLine(
-          target.id,
-          {
-            expectedVersion: target.version,
-            catalogItemId: item.id,
-            ...(catalogVariantId ? { catalogVariantId } : {}),
-            quantity: '1',
-          },
-          `cashier-adjust-add-line-${crypto.randomUUID()}`,
-        ),
-      );
+      // Units with different additions are separate lines; identical units share one.
+      const groups = selection.unitAdditions
+        ? groupUnitAdditions(selection.unitAdditions).map((group) => ({
+            quantity: String(group.quantity),
+            additions: group.additionalComponents,
+          }))
+        : [{ quantity: selection.quantity ?? '1', additions: selection.additionalComponents ?? [] }];
+      const updated = await command.runMutation(async () => {
+        let expectedVersion = target.version;
+        let latest: Sale | null = null;
+        for (const group of groups) {
+          latest = await transactionAdapter.addSaleLine(
+            target.id,
+            {
+              expectedVersion,
+              catalogItemId: item.id,
+              ...(catalogVariantId ? { catalogVariantId } : {}),
+              quantity: group.quantity,
+              ...(group.additions.length
+                ? {
+                    additionalComponents: group.additions.map((entry) => ({
+                      componentItemId: entry.componentItemId,
+                      ...(entry.componentVariantId
+                        ? { componentVariantId: entry.componentVariantId }
+                        : {}),
+                      quantity: entry.quantity,
+                    })),
+                  }
+                : {}),
+            },
+            `cashier-adjust-add-line-${crypto.randomUUID()}`,
+          );
+          expectedVersion = latest.version;
+        }
+        return latest!;
+      });
       cacheQueueContext(updated);
       return;
     }
@@ -241,10 +292,60 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
       catalogItem: item,
       catalogVariant,
       resolvedPrice,
+      ...(selection.quantity ? { quantity: selection.quantity } : {}),
+      ...(selection.additionalComponents
+        ? { additionalComponents: selection.additionalComponents }
+        : {}),
+      ...(selection.unitAdditions ? { unitAdditions: selection.unitAdditions } : {}),
     });
   };
 
-  const selectItem = async (item: CatalogItem, context: VariantPickerContext = 'CART') => {
+  /**
+   * Everything the shared item configuration needs about one item at this location: its active
+   * variants and the Runtime-resolved prices. Used by adding, editing and correcting an item, so
+   * they can never disagree about what a selection costs.
+   */
+  const buildConfiguratorState = async (
+    item: CatalogItem,
+    knownVariants?: CatalogVariant[],
+  ): Promise<ItemConfiguratorState> => {
+    const variants = knownVariants ?? (await catalog.loadActiveVariants(item));
+    const priceInput = {
+      sellingLocationId: selectedLocationId ?? '',
+      currency: runtime.currency,
+    };
+    const resolvedVariants = variants.length
+      ? await fetchResolvedVariantPrices(queryClient, transactionAdapter, {
+          catalogItemId: item.id,
+          catalogVariantIds: variants.map((variant) => variant.id),
+          ...priceInput,
+        })
+      : { pricesByVariantId: {}, unavailableVariantIds: [] };
+    const ownPrice = await fetchResolvedPrice(queryClient, transactionAdapter, {
+      catalogItemId: item.id,
+      ...priceInput,
+    }).then(
+      (price) => price.amount,
+      () => null,
+    );
+    return {
+      item,
+      variants,
+      itemOption:
+        variants.length > 0 && item.variantSelectionMode === 'OPTIONAL' ? { price: ownPrice } : null,
+      itemPrice: variants.length === 0 ? ownPrice : null,
+      pricesByVariantId: resolvedVariants.pricesByVariantId,
+      unavailableVariantIds: resolvedVariants.unavailableVariantIds,
+      locale: runtime.locale,
+      currency: runtime.currency,
+    };
+  };
+
+  const selectItem = async (
+    item: CatalogItem,
+    context: VariantPickerContext = 'CART',
+    edit?: { lineId: string; initial: ItemConfiguration },
+  ) => {
     command.clearNotice();
     try {
       const targetSaleId =
@@ -255,6 +356,19 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
         );
       }
       const variants = await catalog.loadActiveVariants(item);
+      if (opensItemConfigurator(context, item)) {
+        if (!selectedLocationId) {
+          saleWorkspace.addItem(item.id);
+          return;
+        }
+        setItemConfigurator({
+          ...(await buildConfiguratorState(item, variants)),
+          context,
+          ...(targetSaleId ? { targetSaleId } : {}),
+          ...(edit ? { editLineId: edit.lineId, initial: edit.initial } : {}),
+        });
+        return;
+      }
       if (variants.length > 0) {
         const resolvedVariants = selectedLocationId
           ? await fetchResolvedVariantPrices(queryClient, transactionAdapter, {
@@ -297,6 +411,115 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     } catch (error) {
       command.reportError(error);
     }
+  };
+
+  const confirmItemConfiguration = async (configuration: ItemConfiguration) => {
+    if (!itemConfigurator) return;
+    const { item, context, targetSaleId, variants, editLineId } = itemConfigurator;
+    const catalogVariant =
+      variants.find((variant) => variant.id === configuration.catalogVariantId) ?? null;
+    setItemConfigurator(null);
+    try {
+      // A line of the persisted OPEN Sale is edited through Runtime, never with Web-side state.
+      const persistedLine = editLineId
+        ? saleWorkspace.sale?.lines.find((line) => line.id === editLineId && line.removedAt === null)
+        : undefined;
+      if (persistedLine) {
+        saleWorkspace.replaceSaleLine(persistedLine, {
+          catalogItemId: item.id,
+          catalogVariantId: configuration.catalogVariantId,
+          quantity: configuration.quantity,
+          additionalComponents: configuration.additionalComponents,
+          ...(configuration.unitAdditions ? { unitAdditions: configuration.unitAdditions } : {}),
+        });
+        return;
+      }
+      if (editLineId && selectedLocationId) {
+        const resolvedPrice = await fetchResolvedPrice(queryClient, transactionAdapter, {
+          catalogItemId: item.id,
+          ...(configuration.catalogVariantId
+            ? { catalogVariantId: configuration.catalogVariantId }
+            : {}),
+          sellingLocationId: selectedLocationId,
+          currency: runtime.currency,
+        });
+        saleWorkspace.replaceDraftLine(editLineId, {
+          catalogItem: item,
+          catalogVariant,
+          resolvedPrice,
+          quantity: configuration.quantity,
+          additionalComponents: configuration.additionalComponents,
+          ...(configuration.unitAdditions ? { unitAdditions: configuration.unitAdditions } : {}),
+        });
+        return;
+      }
+      await addCatalogItem(
+        item,
+        configuration.catalogVariantId ?? undefined,
+        context,
+        targetSaleId,
+        catalogVariant,
+        {
+          quantity: configuration.quantity,
+          additionalComponents: configuration.additionalComponents,
+          ...(configuration.unitAdditions ? { unitAdditions: configuration.unitAdditions } : {}),
+        },
+      );
+    } catch (error) {
+      command.reportError(error);
+    }
+  };
+
+  /** Reopens a local cart line in the configurator, prefilled with what the operator chose. */
+  const editCartLine = async (lineId: string, options: { addUnit?: boolean } = {}) => {
+    // What is being edited: a local draft line, or a line of the persisted OPEN Sale.
+    const draftLine = saleWorkspace.getDraftLine(lineId);
+    const persistedLine = draftLine
+      ? undefined
+      : saleWorkspace.sale?.lines.find((entry) => entry.id === lineId && entry.removedAt === null);
+    const item = draftLine?.catalogItem ?? (persistedLine ? catalog.findItem(persistedLine.catalogItemId) : null);
+    if (!item) {
+      if (persistedLine)
+        command.reportError(new Error(copy('This item is no longer available for editing.')));
+      return;
+    }
+    const source = draftLine
+      ? {
+          catalogVariantId: draftLine.catalogVariantId ?? null,
+          quantity: draftLine.quantity,
+          additionalComponents: [...(draftLine.additionalComponents ?? [])],
+          unitAdditions: draftLine.unitAdditions,
+        }
+      : { ...saleLineConfiguration(persistedLine!), unitAdditions: undefined };
+    const whole = Number(source.quantity);
+    const perUnit: (readonly CartDraftAdditionalItem[])[] | undefined = source.unitAdditions
+      ? [...source.unitAdditions]
+      : Number.isInteger(whole) && whole >= 1 && whole <= MAX_CONFIGURATION_UNITS
+        ? Array.from({ length: whole }, () => source.additionalComponents)
+        : undefined;
+    // "+" on a line that carries additions opens the editor with one more, still empty, unit.
+    const grown = options.addUnit && perUnit ? [...perUnit, []] : perUnit;
+    await selectItem(item, 'CART', {
+      lineId,
+      initial: {
+        catalogVariantId: source.catalogVariantId,
+        quantity: grown ? String(grown.length) : source.quantity,
+        additionalComponents: [...source.additionalComponents],
+        ...(grown && new Set(grown.map((entry) => additionSignature(entry))).size > 1
+          ? { unitAdditions: grown.map((entry) => [...entry]) }
+          : {}),
+      },
+    });
+  };
+
+  const loadComponentCandidates = (q: string) => {
+    if (!selectedLocationId || !transactionAdapter.getComponentCandidates)
+      return Promise.resolve({ items: [] });
+    return transactionAdapter.getComponentCandidates({
+      sellingLocationId: selectedLocationId,
+      currency: runtime.currency,
+      ...(q ? { q } : {}),
+    });
   };
 
   const selectVariant = async (catalogVariantId: string | null) => {
@@ -417,42 +640,41 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
       .catch((error) => command.reportError(error));
   };
 
+  /**
+   * Corrects one line of an OPEN Sale with a full item configuration (variant, quantity, additions,
+   * per-unit additions) through Runtime's atomic replace-line command. One source line may become
+   * several lines; the Sale is never left half-changed.
+   */
   const correctLine = async (
     line: SaleLine,
-    input: {
-      catalogItemId: string;
-      catalogVariantId?: string;
-      quantity: string;
-      reason: string;
-    },
+    input: { lines: ReplaceSaleLineInput['lines']; reason: string },
   ) => {
-    const sale = queueContextSale?.id === line.saleId
-      ? queueContextSale
-      : saleWorkspace.sale;
-    if (!sale || !transactionAdapter.correctSaleLine)
+    const sale = queueContextSale?.id === line.saleId ? queueContextSale : saleWorkspace.sale;
+    if (!sale || !transactionAdapter.replaceSaleLine)
       throw new Error(copy('Item correction is not available.'));
     const updated = await command.runMutation(() =>
-      transactionAdapter.correctSaleLine!(sale.id, line.id, {
-        expectedVersion: sale.version,
-        ...input,
-      }, `cashier-correct-line-${crypto.randomUUID()}`),
+      transactionAdapter.replaceSaleLine!(
+        sale.id,
+        line.id,
+        { expectedVersion: sale.version, lines: input.lines, reason: input.reason },
+        `cashier-correct-line-${crypto.randomUUID()}`,
+      ),
     );
     cacheQueueContext(updated);
     return updated;
   };
 
+  /** Runtime-calculated impact of the correction; nothing is saved. */
   const previewLineCorrection = async (
     line: SaleLine,
-    input: { catalogItemId: string; catalogVariantId?: string; quantity: string },
+    input: { lines: ReplaceSaleLineInput['lines'] },
   ) => {
-    const sale = queueContextSale?.id === line.saleId
-      ? queueContextSale
-      : saleWorkspace.sale;
-    if (!sale || !transactionAdapter.previewSaleLineCorrection)
-      throw new Error(copy('Preview koreksi item belum tersedia.'));
-    return transactionAdapter.previewSaleLineCorrection(sale.id, line.id, {
+    const sale = queueContextSale?.id === line.saleId ? queueContextSale : saleWorkspace.sale;
+    if (!sale || !transactionAdapter.previewReplaceSaleLine)
+      throw new Error(copy('Item correction is not available.'));
+    return transactionAdapter.previewReplaceSaleLine(sale.id, line.id, {
       expectedVersion: sale.version,
-      ...input,
+      lines: input.lines,
     });
   };
 
@@ -797,6 +1019,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
           ? cashierTransactionErrorMessage(catalog.error, runtime.locale)
           : null),
     variantPicker,
+    itemConfigurator,
     lineTask,
     contributionPreview: contributionPreviewQuery.data ?? null,
     isContributionPreviewLoading: contributionPreviewQuery.isLoading,
@@ -816,6 +1039,11 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     cachedCardPrice,
     requestEmployeeOptions: () => setEmployeeOptionsEnabled(true),
     closeVariantPicker: () => setVariantPicker(null),
+    closeItemConfigurator: () => setItemConfigurator(null),
+    confirmItemConfiguration,
+    loadConfiguratorState: buildConfiguratorState,
+    editCartLine,
+    loadComponentCandidates,
     changeQuantity,
     removeLine,
     correctLine,

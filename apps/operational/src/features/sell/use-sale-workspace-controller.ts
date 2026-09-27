@@ -9,19 +9,23 @@ import {
   operationalCopy,
   resolveOperationalLocale,
 } from '../../app/localization/operational-localization';
-import type { SaleTransactionClient } from './cashier-transaction.adapter';
+import type { ReplaceSaleLineInput, SaleTransactionClient } from './cashier-transaction.adapter';
 import {
   addCartDraftSelection,
+  groupUnitAdditions,
+  replacementLinesOf,
   cartDraftDisplayLines,
   cartDraftEstimatedTotal,
   cartDraftStartInput,
   draftCustomerSnapshot,
   emptyCartDraft,
   removeCartDraftLine,
+  replaceCartDraftLine,
   saleDisplayLines,
   setCartDraftCustomer,
   setCartDraftQuantity,
   type CartDraft,
+  type CartDraftAdditionalItem,
 } from './cart-draft';
 import { isKnownApiFailure } from './cashier-transaction-errors';
 import { cashierTransactionKeys } from './cashier-transaction-keys';
@@ -44,6 +48,9 @@ interface AddItemIntent {
   catalogItemId: string;
   catalogVariantId?: string;
   quantity: string;
+  additionalComponents?: readonly CartDraftAdditionalItem[];
+  /** Units with different additions: each distinct configuration becomes its own Sale line. */
+  unitAdditions?: readonly (readonly CartDraftAdditionalItem[])[];
   addIdempotencyKey: string;
   saleId: string;
   expectedVersion: number;
@@ -53,6 +60,10 @@ interface AddItemConfiguration {
   catalogItem: CatalogItem;
   catalogVariant: CatalogVariant | null;
   resolvedPrice: ResolvedPrice;
+  /** Initial primary quantity chosen in the Item Configurator; defaults to one. */
+  quantity?: string;
+  additionalComponents?: readonly CartDraftAdditionalItem[];
+  unitAdditions?: readonly (readonly CartDraftAdditionalItem[])[];
 }
 
 interface CommitDraftIntent {
@@ -88,6 +99,12 @@ function isCompatibleLine(
   configuration: AddItemConfiguration,
 ): boolean {
   const service = configuration.catalogItem.serviceDefinition;
+  // A line with operator-chosen additional items describes its own composition; never merge.
+  if (
+    configuration.additionalComponents?.length ||
+    line.compositionComponents?.some((component) => component.componentSource === 'SALE_SELECTED')
+  )
+    return false;
   return (
     line.removedAt === null &&
     line.catalogItemId === configuration.catalogItem.id &&
@@ -158,16 +175,41 @@ export function useSaleWorkspaceController({
         if (connectivity === 'OFFLINE')
           throw new Error(copy('Reconnect before changing this transaction.'));
 
-        return client.addSaleLine(
-          intent.saleId,
-          {
-            expectedVersion: intent.expectedVersion,
-            catalogItemId: intent.catalogItemId,
-            ...(intent.catalogVariantId ? { catalogVariantId: intent.catalogVariantId } : {}),
-            quantity: intent.quantity,
-          },
-          intent.addIdempotencyKey,
-        );
+        // Different unit configurations are separate lines (one line = one unambiguous unit price);
+        // identical units share one line. Each call continues from the version the last one returned.
+        const groups = intent.unitAdditions
+          ? groupUnitAdditions(intent.unitAdditions).map((group) => ({
+              quantity: String(group.quantity),
+              additions: group.additionalComponents,
+            }))
+          : [{ quantity: intent.quantity, additions: intent.additionalComponents ?? [] }];
+        let expectedVersion = intent.expectedVersion;
+        let result: Sale | null = null;
+        for (const [index, group] of groups.entries()) {
+          result = await client.addSaleLine(
+            intent.saleId,
+            {
+              expectedVersion,
+              catalogItemId: intent.catalogItemId,
+              ...(intent.catalogVariantId ? { catalogVariantId: intent.catalogVariantId } : {}),
+              quantity: group.quantity,
+              ...(group.additions.length
+                ? {
+                    additionalComponents: group.additions.map((entry) => ({
+                      componentItemId: entry.componentItemId,
+                      ...(entry.componentVariantId
+                        ? { componentVariantId: entry.componentVariantId }
+                        : {}),
+                      quantity: entry.quantity,
+                    })),
+                  }
+                : {}),
+            },
+            index === 0 ? intent.addIdempotencyKey : `${intent.addIdempotencyKey}:${index}`,
+          );
+          expectedVersion = result.version;
+        }
+        return result!;
       }),
     onSuccess: (sale) => {
       command.commitSale(sale);
@@ -263,6 +305,30 @@ export function useSaleWorkspaceController({
     onError: async (error, intent) => command.recoverFailure(error, intent.saleId),
   });
 
+  const replaceLineMutation = useMutation({
+    mutationFn: (intent: {
+      saleId: string;
+      saleLineId: string;
+      expectedVersion: number;
+      lines: ReplaceSaleLineInput['lines'];
+      idempotencyKey: string;
+    }) =>
+      command.runMutation(async () => {
+        if (connectivity === 'OFFLINE')
+          throw new Error(copy('Reconnect before changing this transaction.'));
+        if (!client.replaceSaleLine)
+          throw new Error(copy('Editing this item is not available here.'));
+        return client.replaceSaleLine(
+          intent.saleId,
+          intent.saleLineId,
+          { expectedVersion: intent.expectedVersion, lines: intent.lines },
+          intent.idempotencyKey,
+        );
+      }),
+    onSuccess: command.commitSale,
+    onError: async (error, intent) => command.recoverFailure(error, intent.saleId),
+  });
+
   const removeMutation = useMutation({
     mutationFn: (intent: { saleId: string; saleLineId: string; expectedVersion: number }) =>
       command.runMutation(async () => {
@@ -305,21 +371,38 @@ export function useSaleWorkspaceController({
           configuration.catalogItem,
           configuration.catalogVariant,
           configuration.resolvedPrice,
+          {
+            ...(configuration.quantity ? { quantity: configuration.quantity } : {}),
+            ...(configuration.additionalComponents
+              ? { additionalComponents: configuration.additionalComponents }
+              : {}),
+            ...(configuration.unitAdditions ? { unitAdditions: configuration.unitAdditions } : {}),
+          },
         ),
       );
       return;
     }
-    const compatibleLine = configuration
-      ? currentSale.lines.find((line) => isCompatibleLine(line, catalogVariantId, configuration))
-      : undefined;
+    const compatibleLine =
+      configuration && !configuration.unitAdditions
+        ? currentSale.lines.find((line) => isCompatibleLine(line, catalogVariantId, configuration))
+        : undefined;
     if (compatibleLine) {
-      changeQuantity(compatibleLine, createDecimal(compatibleLine.quantity).plus('1').toFixed(4));
+      changeQuantity(
+        compatibleLine,
+        createDecimal(compatibleLine.quantity)
+          .plus(configuration?.quantity ?? '1')
+          .toFixed(4),
+      );
       return;
     }
     const intent: AddItemIntent = {
       catalogItemId,
       ...(catalogVariantId ? { catalogVariantId } : {}),
-      quantity: '1',
+      quantity: configuration?.quantity ?? '1',
+      ...(configuration?.additionalComponents?.length
+        ? { additionalComponents: configuration.additionalComponents }
+        : {}),
+      ...(configuration?.unitAdditions ? { unitAdditions: configuration.unitAdditions } : {}),
       addIdempotencyKey: createIdempotencyKey('add-line'),
       saleId: currentSale.id,
       expectedVersion: currentSale.version,
@@ -405,7 +488,10 @@ export function useSaleWorkspaceController({
   const activeSaleLines = viewModel.activeLines;
   const draftLines = cartDraftDisplayLines(draft);
   const cartLines = saleQuery.data
-    ? saleDisplayLines(activeSaleLines, saleQuery.data.adjustments ?? [])
+    ? saleDisplayLines(activeSaleLines, saleQuery.data.adjustments ?? [], {
+        canEdit:
+          saleQuery.data.status === 'OPEN' && viewModel.monetaryMutation.state === 'AVAILABLE',
+      })
     : draftLines;
   const cartTotal = saleQuery.data?.totalAmount ?? cartDraftEstimatedTotal(draft);
 
@@ -439,6 +525,64 @@ export function useSaleWorkspaceController({
         setRetryCommitIntent(null);
         setDraft((current) =>
           current ? setCartDraftQuantity(current, lineId, quantity) : current,
+        );
+      } catch (error) {
+        command.reportError(error);
+      }
+    },
+    /**
+     * Edits a persisted OPEN Sale line in place through Runtime's own boundary: one atomic step,
+     * recalculated authoritatively, refused by Runtime when it would fall below successful
+     * payments. Nothing about the edit is decided in Web after the Sale exists.
+     */
+    replaceSaleLine: (
+      line: SaleLine,
+      configuration: {
+        catalogItemId: string;
+        catalogVariantId: string | null;
+        quantity: string;
+        additionalComponents: readonly CartDraftAdditionalItem[];
+        unitAdditions?: readonly (readonly CartDraftAdditionalItem[])[];
+      },
+    ) => {
+      const sale = saleQuery.data;
+      if (!sale || viewModel.monetaryMutation.state !== 'AVAILABLE') return;
+      replaceLineMutation.mutate({
+        saleId: sale.id,
+        saleLineId: line.id,
+        expectedVersion: sale.version,
+        idempotencyKey: createIdempotencyKey('replace-line'),
+        lines: replacementLinesOf(
+          configuration.catalogItemId,
+          configuration.catalogVariantId,
+          configuration,
+        ),
+      });
+    },
+    getDraftLine: (lineId: string) => draft?.lines.find((line) => line.id === lineId) ?? null,
+    /** Replaces the whole configuration of one local draft line; nothing is merged or persisted. */
+    replaceDraftLine: (lineId: string, configuration: AddItemConfiguration) => {
+      try {
+        setRetryCommitIntent(null);
+        setDraft((current) =>
+          current
+            ? replaceCartDraftLine(
+                current,
+                lineId,
+                configuration.catalogItem,
+                configuration.catalogVariant,
+                configuration.resolvedPrice,
+                {
+                  ...(configuration.quantity ? { quantity: configuration.quantity } : {}),
+                  ...(configuration.additionalComponents
+                    ? { additionalComponents: configuration.additionalComponents }
+                    : {}),
+                  ...(configuration.unitAdditions
+                    ? { unitAdditions: configuration.unitAdditions }
+                    : {}),
+                },
+              )
+            : current,
         );
       } catch (error) {
         command.reportError(error);
