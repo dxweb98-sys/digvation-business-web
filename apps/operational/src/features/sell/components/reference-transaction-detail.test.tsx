@@ -141,6 +141,7 @@ function renderRuntimeDetail(
   delivery?: { status: 'FAILED'; onRetry: () => void },
   showPaymentReceipt = false,
   onStartLineWork: (line: SaleLine) => void = vi.fn(),
+  branchAddress: string | null = null,
 ) {
   return render(
     <DeploymentBootstrapProvider config={bootstrap}>
@@ -150,6 +151,7 @@ function renderRuntimeDetail(
         employees={[]}
         businessName="Digvation"
         branchName="Main branch"
+        branchAddress={branchAddress}
         cashierName="Kasir"
         showPaymentReceipt={showPaymentReceipt}
         onClose={vi.fn()}
@@ -315,6 +317,43 @@ describe('ReferenceTransactionDetail Runtime detail shapes', () => {
     expect(retry).not.toBeNull();
     retry?.click();
     expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('ReferenceTransactionDetail receipt location identity', () => {
+  const finalizedWithPayment = () =>
+    runtimeQueueDetail({
+      status: 'FINALIZED',
+      finalizedAt: '2026-09-24T02:15:00.000Z',
+    });
+
+  it('renders the resolved selling-location address under the branch name', () => {
+    renderRuntimeDetail(
+      finalizedWithPayment(),
+      undefined,
+      true,
+      undefined,
+      'Jl. Alam Sutera Boulevard No. 10',
+    );
+
+    expect(
+      screen.getAllByText('Jl. Alam Sutera Boulevard No. 10').length,
+    ).toBeGreaterThan(0);
+  });
+
+  it('never prints a fake or placeholder address line when none is configured', () => {
+    renderRuntimeDetail(finalizedWithPayment(), undefined, true, undefined, null);
+
+    expect(screen.queryByText(/Alamat belum diatur/i)).toBeNull();
+    expect(screen.queryByText(/^Jl\./)).toBeNull();
+  });
+
+  it('does not render an address line for whitespace-only address input', () => {
+    renderRuntimeDetail(finalizedWithPayment(), undefined, true, undefined, '   ');
+
+    for (const branch of screen.getAllByText('Main branch')) {
+      expect(branch.closest('header')!.querySelector('p.mt-0\\.5')).toBeNull();
+    }
   });
 });
 

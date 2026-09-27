@@ -68,6 +68,8 @@ import {
   resolveOperationalLocale,
   useOperationalLocalization,
 } from '../../../app/localization/operational-localization';
+import { useOperationalAccessContext } from '../../../modules/operational/operational-access-api';
+import { resolveReceiptLocation } from '../../../modules/operational/operational-location-selection';
 import { cashierTransactionKeys } from '../cashier-transaction-keys';
 import { cashierTransactionErrorMessage, correctionErrorMessage } from '../cashier-transaction-errors';
 import type { ReplaceLinePreview, ReplaceSaleLineInput } from '../cashier-transaction.adapter';
@@ -897,6 +899,13 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
 
   const displayedQueueDetail =
     receiptSaleId && sale?.id === receiptSaleId && hasSuccessfulPayment(sale) ? sale : queueDetail;
+  const operationalAccessQuery = useOperationalAccessContext();
+  const receiptLocation = displayedQueueDetail
+    ? resolveReceiptLocation(
+        displayedQueueDetail.sellingLocationId,
+        operationalAccessQuery.data?.locations ?? [],
+      )
+    : null;
   const receiptDeliveryStatusQuery = useQuery({
     queryKey: ['operational-receipt-delivery', displayedQueueDetail?.id ?? null],
     queryFn: () => adapter.getReceiptDeliveryStatus(displayedQueueDetail!.id),
@@ -1884,7 +1893,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         locale={workspace.locale}
         employees={workspace.employees}
         businessName={runtime.branding.businessName ?? runtime.branding.productName}
-        branchName={copy('Main branch')}
+        branchName={receiptLocation?.name ?? copy('Main branch')}
+        branchAddress={receiptLocation?.address ?? null}
         cashierName={session.identity.displayName}
         {...(displayedQueueDetail && cancellationReasons[displayedQueueDetail.id]
           ? { cancellationReason: cancellationReasons[displayedQueueDetail.id] }
@@ -4273,6 +4283,7 @@ export function ReferenceTransactionDetail({
   employees,
   businessName,
   branchName,
+  branchAddress = null,
   cashierName,
   cancellationReason,
   showPaymentReceipt,
@@ -4292,6 +4303,7 @@ export function ReferenceTransactionDetail({
   employees: readonly Employee[];
   businessName: string;
   branchName: string;
+  branchAddress?: string | null;
   cashierName: string;
   cancellationReason?: string;
   showPaymentReceipt: boolean;
@@ -4502,6 +4514,7 @@ export function ReferenceTransactionDetail({
                 locale={locale}
                 businessName={businessName}
                 branchName={branchName}
+                branchAddress={branchAddress}
                 cashierName={cashierName}
                 transactionDate={transactionDate}
                 hasDiscount={hasDiscount}
@@ -4843,6 +4856,7 @@ export function ReferenceTransactionDetail({
                 locale={locale}
                 businessName={businessName}
                 branchName={branchName}
+                branchAddress={branchAddress}
                 cashierName={cashierName}
                 transactionDate={transactionDate}
                 hasDiscount={hasDiscount}
@@ -4863,6 +4877,7 @@ export function ReceiptContent({
   locale,
   businessName,
   branchName,
+  branchAddress = null,
   cashierName,
   transactionDate,
   hasDiscount,
@@ -4874,6 +4889,7 @@ export function ReceiptContent({
   locale: string;
   businessName: string;
   branchName: string;
+  branchAddress?: string | null;
   cashierName: string;
   transactionDate: string;
   hasDiscount: boolean;
@@ -4900,6 +4916,9 @@ export function ReceiptContent({
       <header className="text-center">
         <h2 className="text-lg font-black tracking-tight">{businessName}</h2>
         <p className="mt-1 text-xs text-slate-500">{branchName}</p>
+        {branchAddress?.trim() ? (
+          <p className="mt-0.5 text-[11px] text-slate-500">{branchAddress.trim()}</p>
+        ) : null}
         <div className="my-4 border-t border-dashed border-slate-300" />
         <p className="font-mono text-xs font-semibold">{transactionNumber(sale, locale)}</p>
         <p className="mt-1 text-[11px] text-slate-500">{transactionDate}</p>

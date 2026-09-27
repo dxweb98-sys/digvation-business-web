@@ -61,6 +61,7 @@ export interface SellingLocation {
   status: 'ACTIVE' | 'INACTIVE';
   version: number;
   isMain: boolean;
+  address: string | null;
 }
 
 export interface Page<T> {
@@ -152,7 +153,12 @@ export class BusinessSettingsApi {
     );
   }
 
-  createLocation(input: { code: string; name: string; setAsMain?: boolean | undefined }) {
+  createLocation(input: {
+    code: string;
+    name: string;
+    setAsMain?: boolean | undefined;
+    address?: string | null;
+  }) {
     return this.client.post<SellingLocation>('/api/v1/locations', input);
   }
 
@@ -162,6 +168,7 @@ export class BusinessSettingsApi {
       name?: string;
       status?: SellingLocation['status'];
       setAsMain?: boolean | undefined;
+      address?: string | null;
     },
   ) {
     return this.client.patch<SellingLocation>(`/api/v1/locations/${location.id}`, {
