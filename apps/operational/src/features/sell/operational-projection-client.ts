@@ -2,6 +2,8 @@ import type { ApiClient } from '@digvation/business-api';
 
 import type {
   AddSaleLineInput,
+  ReplaceLinePreview,
+  ReplaceSaleLineInput,
   CreatePaymentInput,
   CreateSaleInput,
   SaleTransactionPort,
@@ -12,6 +14,7 @@ import type {
 } from './cashier-transaction.adapter';
 import type {
   ApiPage,
+  ComponentCandidate,
   ContributionPreview,
   Employee,
   OperationalCatalogProjection,
@@ -27,6 +30,11 @@ function idempotencyHeaders(operation: string) {
 }
 
 export interface OperationalProjectionQuery {
+  /** Products (including component-only ones) the operator may add to a Service. */
+  getComponentCandidates?(
+    input: SellingCatalogDisplayInput & { q?: string },
+    signal?: AbortSignal,
+  ): Promise<{ items: ComponentCandidate[] }>;
   getOperationalCatalog?(
     input: SellingCatalogDisplayInput,
     signal?: AbortSignal,
@@ -100,6 +108,18 @@ export function attachOperationalProjection(
     );
   };
 
+  operational.getComponentCandidates = (input, signal) => {
+    const query = new URLSearchParams({
+      locationId: input.sellingLocationId,
+      currency: input.currency,
+    });
+    if (input.q) query.set('q', input.q);
+    return client.get<{ items: ComponentCandidate[] }>(
+      `${OPERATIONAL_PREFIX}/component-candidates?${query.toString()}`,
+      { signal },
+    );
+  };
+
   operational.listEmployees = (signal) =>
     client.get<ApiPage<Employee>>(`${OPERATIONAL_PREFIX}/employees`, { signal });
 
@@ -159,6 +179,28 @@ export function attachOperationalProjection(
     client.post<Sale>(`${OPERATIONAL_PREFIX}/transactions/${saleId}/lines`, input, {
       headers: { 'Idempotency-Key': idempotencyKey },
     });
+
+  operational.replaceSaleLine = (
+    saleId: string,
+    saleLineId: string,
+    input: ReplaceSaleLineInput,
+    idempotencyKey: string,
+  ) =>
+    client.post<Sale>(
+      `${OPERATIONAL_PREFIX}/transactions/${saleId}/lines/${saleLineId}/replace`,
+      input,
+      { headers: { 'Idempotency-Key': idempotencyKey } },
+    );
+
+  operational.previewReplaceSaleLine = (
+    saleId: string,
+    saleLineId: string,
+    input: ReplaceSaleLineInput,
+  ) =>
+    client.post<ReplaceLinePreview>(
+      `${OPERATIONAL_PREFIX}/transactions/${saleId}/lines/${saleLineId}/replace-preview`,
+      input,
+    );
 
   operational.setSaleLineQuantity = (
     saleId: string,

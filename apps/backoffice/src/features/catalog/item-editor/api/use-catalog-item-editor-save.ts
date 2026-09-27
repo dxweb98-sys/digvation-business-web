@@ -14,6 +14,7 @@ import {
   buildCatalogItemBaseInput,
   normalizeOptionalCatalogCode,
 } from '../model/catalog-item-editor-mapper';
+import { compositionSubmission } from '../model/service-composition-draft';
 import {
   sameAmount,
   variantPriceSubmissions,
@@ -40,6 +41,8 @@ export function useCatalogItemEditorSave({
   existingImagePresent,
   disabled,
   variantsHaveIssues,
+  shouldSaveComposition,
+  compositionHasIssues,
   onSaved,
   onClose,
 }: {
@@ -60,6 +63,8 @@ export function useCatalogItemEditorSave({
   existingImagePresent: boolean;
   disabled: boolean;
   variantsHaveIssues: boolean;
+  shouldSaveComposition: boolean;
+  compositionHasIssues: boolean;
   onSaved: () => void;
   onClose: () => void;
 }) {
@@ -75,7 +80,7 @@ export function useCatalogItemEditorSave({
   return useCallback(async () => {
     if (disabled) return;
 
-    if (variantsHaveIssues) {
+    if (variantsHaveIssues || (shouldSaveComposition && compositionHasIssues)) {
       editor.actions.setShowIssues(true);
       return;
     }
@@ -117,11 +122,12 @@ export function useCatalogItemEditorSave({
           });
         }
       } else if (item) {
-        persistedItem = await api.updateItem(item, baseInput);
-
         const nextPrice = editor.form.defaultPrice.trim();
         const initialItemPrice = editor.actions.getInitialPrice();
 
+        // The parent price goes first: Runtime requires it to exist when the item becomes sellable
+        // both by itself and through its variants. A price on an item that is still REQUIRED is
+        // valid, so a failure after this step never leaves an invalid item behind.
         if (
           canEditPrice &&
           sellsItemItself(model) &&
@@ -139,6 +145,8 @@ export function useCatalogItemEditorSave({
 
           await (initialItemPrice ? api.changePrice(input) : api.createPrice(input));
         }
+
+        persistedItem = await api.updateItem(item, baseInput);
       }
 
       if (persistedItem && canCreateVariants) {
@@ -164,6 +172,33 @@ export function useCatalogItemEditorSave({
             amount: submission.amount,
             effectiveFrom,
           });
+        }
+      }
+
+      if (persistedItem && shouldSaveComposition) {
+        try {
+          await api.replaceServiceComposition(
+            persistedItem.id,
+            compositionSubmission(
+              editor.composition,
+              editor.form.variants.map((draft) => ({
+                key: draft.key,
+                variantId: draft.id ?? createdVariantIds.get(draft.key) ?? null,
+              })),
+              persistedItem.version,
+            ),
+          );
+          void client.invalidateQueries({ queryKey: ['catalog', 'service-composition'] });
+        } catch (error) {
+          if (!isSessionExpiredError(error)) {
+            showToast({
+              variant: 'danger',
+              title: normalizeBackofficeApiError(
+                error,
+                'Jasa tersimpan, tetapi komponen belum diperbarui.',
+              ).safeMessage,
+            });
+          }
         }
       }
 
@@ -255,6 +290,8 @@ export function useCatalogItemEditorSave({
     onSaved,
     parsedDefaultDuration,
     refreshPricingViews,
+    shouldSaveComposition,
+    compositionHasIssues,
     shouldSaveLoyalty,
     showToast,
     variantsHaveIssues,

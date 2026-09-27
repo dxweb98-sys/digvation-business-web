@@ -48,6 +48,39 @@ export function cashierTransactionErrorMessage(error: unknown, locale?: string):
   return copyForLocale('Transaction could not be processed. Try again.', locale);
 }
 
+/**
+ * Stable Runtime codes an item correction can meet, each mapped to what the operator can act on.
+ * Only a known, safe code is surfaced; anything else falls back to the caller's generic message.
+ */
+const CORRECTION_ERROR_COPY: Record<string, string> = {
+  CATALOG_ITEM_NOT_FOUND: 'The replacement item is no longer available.',
+  CATALOG_VARIANT_NOT_FOUND: 'The selected variant is no longer available.',
+  PRICE_NOT_FOUND: 'Item price was not found for this location.',
+  CATALOG_PRICE_NOT_FOUND: 'Item price was not found for this location.',
+  SALE_LINE_NOT_FOUND: 'The transaction item was not found.',
+  SALE_VERSION_CONFLICT: 'The transaction changed. Reload it before correcting.',
+  SALE_PAYMENT_OVERAPPLIED: 'The corrected total would be lower than the payments already received.',
+  SALE_LINE_NOT_MUTABLE:
+    'This item can no longer be changed here: work has started, a performer is assigned, or a manual price or discount is set.',
+  SALE_NOT_OPEN: 'The transaction is already closed and cannot be changed.',
+  SALE_PAYMENT_PENDING: 'A payment is still waiting for confirmation.',
+  SERVICE_ADDITIONAL_ITEM_REQUIRED: 'Choose an additional item for every unit that requires one.',
+  SERVICE_ADDITIONAL_ITEM_NOT_FOUND: 'An additional item is no longer available.',
+  SERVICE_ADDITIONAL_ITEM_IN_FIXED_BOM: 'An additional item is already part of this item.',
+  SERVICE_ADDITIONAL_ITEM_DUPLICATE: 'An additional item was chosen twice.',
+  ADDITIONAL_ITEM_IS_BASE_ITEM: 'An item cannot be its own additional item.',
+  SERVICE_COMPOSITION_COMPONENT_INACTIVE: 'An additional item is no longer active.',
+  SERVICE_COMPOSITION_COMPONENT_NOT_FOUND: 'An additional item is no longer available.',
+  SERVICE_COMPONENT_PRICE_NOT_FOUND: 'An additional item has no selling price at this location.',
+  SERVICE_COMPOSITION_VARIANT_REQUIRED: 'Choose a variant for the additional item.',
+  SERVICE_COMPOSITION_VARIANT_INVALID: 'The chosen variant of an additional item is not valid.',
+};
+
+export function correctionErrorMessage(error: unknown, fallback: string, locale?: string): string {
+  const known = error instanceof ApiError ? CORRECTION_ERROR_COPY[error.code] : undefined;
+  return known ? copyForLocale(known, locale) : fallback;
+}
+
 export function isApiErrorCode(error: unknown, code: string): boolean {
   return error instanceof ApiError && error.code === code;
 }

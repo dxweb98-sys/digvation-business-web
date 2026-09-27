@@ -37,6 +37,7 @@ const existingItem: Item = {
   lifecycle: 'ACTIVE',
   fulfillmentBehavior: 'INSTANT',
   variantSelectionMode: 'REQUIRED',
+  productUsage: 'STANDALONE_AND_COMPONENT',
   version: 1,
   serviceDefinition: null,
 };
@@ -116,6 +117,7 @@ function renderDialog(
               canCreatePricing
               canCreateVariants
               canManageImage={false}
+              canEditComposition={false}
               onClose={onClose}
               onSaved={vi.fn()}
             />
@@ -331,6 +333,50 @@ describe('CatalogItemDialog variant pricing', () => {
     expect(api.changeVariantPrices).toHaveBeenCalledWith(
       expect.objectContaining({ amount: '18000', catalogVariantIds: ['v-1'] }),
     );
+  });
+
+  it('adds the first parent price to an existing item before saving the item, without touching variants', async () => {
+    // An existing sell-direct item that has no parent price yet: the price is applied first so
+    // Runtime never sees an OPTIONAL item without the price it needs.
+    const api = fakeApi();
+    const { dialog } = renderDialog(api, { ...existingItem, variantSelectionMode: 'OPTIONAL' });
+    const scope = () => within(dialog());
+    await openPricingTab(scope());
+    await waitFor(() => expect(api.listDefaultPrices).toHaveBeenCalled());
+    await act(async () => undefined);
+    await type(scope().getByLabelText('Harga tanpa varian (IDR)'), '12000');
+    await act(async () => fireEvent.click(scope().getByRole('button', { name: 'Simpan' })));
+
+    await waitFor(() => expect(api.updateItem).toHaveBeenCalledTimes(1));
+    expect(api.createPrice).toHaveBeenCalledTimes(1);
+    expect(api.createPrice).toHaveBeenCalledWith(
+      expect.objectContaining({ catalogVariantId: null, amount: '12000' }),
+    );
+    expect(api.changePrice).not.toHaveBeenCalled();
+    expect(api.createPrice.mock.invocationCallOrder[0]!).toBeLessThan(
+      api.updateItem.mock.invocationCallOrder[0]!,
+    );
+    // No fake variant is created and no variant price is written.
+    expect(api.createVariant).not.toHaveBeenCalled();
+    expect(api.changeVariantPrices).not.toHaveBeenCalled();
+  });
+
+  it('does not save the item when the parent price cannot be saved first', async () => {
+    const api = fakeApi({
+      createPrice: vi.fn(async () => {
+        throw new Error('price rejected');
+      }),
+    });
+    const { dialog } = renderDialog(api, { ...existingItem, variantSelectionMode: 'OPTIONAL' });
+    const scope = () => within(dialog());
+    await openPricingTab(scope());
+    await waitFor(() => expect(api.listDefaultPrices).toHaveBeenCalled());
+    await act(async () => undefined);
+    await type(scope().getByLabelText('Harga tanpa varian (IDR)'), '12000');
+    await act(async () => fireEvent.click(scope().getByRole('button', { name: 'Simpan' })));
+
+    await waitFor(() => expect(api.createPrice).toHaveBeenCalledTimes(1));
+    expect(api.updateItem).not.toHaveBeenCalled();
   });
 
   it('changes the price without a variant and leaves every variant price untouched', async () => {

@@ -1,4 +1,4 @@
-import { DInput, DSelect, DTextarea } from '@digvation/ui';
+import { DCheckbox, DInput, DSelect, DTextarea } from '@digvation/ui';
 
 import type {
   LoyaltyConfiguration,
@@ -40,6 +40,8 @@ export function CatalogItemAdditionalInfoSection({
     categoryId,
     description,
     defaultDurationMinutes,
+    directlySellable,
+    requireAdditionalItemAtSale,
   } = editor.form;
   const { setFormField } = editor.actions;
 
@@ -63,10 +65,7 @@ export function CatalogItemAdditionalInfoSection({
           onChange={(value) => setFormField('categoryId', value as string | null)}
           clearable
           options={categoryOptions.map((category) => ({
-            label:
-              category.status === 'ACTIVE'
-                ? category.name
-                : `${category.name} · Nonaktif`,
+            label: category.status === 'ACTIVE' ? category.name : `${category.name} · Nonaktif`,
             value: category.id,
           }))}
         />
@@ -81,14 +80,60 @@ export function CatalogItemAdditionalInfoSection({
             type="number"
             min={1}
             placeholder="30"
-            error={
-              validDefaultDuration
-                ? undefined
-                : 'Durasi harus berupa angka bulat positif.'
-            }
+            error={validDefaultDuration ? undefined : 'Durasi harus berupa angka bulat positif.'}
             hint="Opsional"
           />
         </div>
+      ) : null}
+
+      <fieldset className="mt-4" aria-label="Item tambahan saat transaksi">
+        <legend className="mb-2 text-xs font-medium text-[var(--color-text-muted)]">
+          Item tambahan saat transaksi
+        </legend>
+        <label className="flex items-start gap-3">
+          <DCheckbox
+            checked={requireAdditionalItemAtSale}
+            onChange={() =>
+              setFormField('requireAdditionalItemAtSale', !requireAdditionalItemAtSale)
+            }
+            className="mt-0.5"
+          />
+          <span className="min-w-0">
+            <span className="block text-sm font-medium text-[var(--color-text)]">
+              Wajib menggunakan item tambahan saat transaksi
+            </span>
+            <span className="mt-0.5 block text-xs leading-5 text-[var(--color-text-muted)]">
+              Operator harus memilih minimal satu item tambahan sebelum{' '}
+              {type === 'SERVICE' ? 'jasa' : 'produk'} dapat dimasukkan ke keranjang. Jika tidak
+              dicentang, item tambahan tetap bisa dipakai secara opsional.
+            </span>
+          </span>
+        </label>
+      </fieldset>
+
+      {type === 'PRODUCT' ? (
+        <fieldset className="mt-4" aria-label="Penggunaan Produk">
+          <legend className="mb-2 text-xs font-medium text-[var(--color-text-muted)]">
+            Penggunaan Produk
+          </legend>
+          <label className="flex items-start gap-3">
+            <DCheckbox
+              checked={directlySellable}
+              onChange={() => setFormField('directlySellable', !directlySellable)}
+              className="mt-0.5"
+            />
+            <span className="min-w-0">
+              <span className="block text-sm font-medium text-[var(--color-text)]">
+                Dapat dijual langsung
+              </span>
+              <span className="mt-0.5 block text-xs leading-5 text-[var(--color-text-muted)]">
+                {directlySellable
+                  ? 'Produk tersedia di kasir dan dapat dipakai sebagai komponen jasa.'
+                  : 'Produk hanya digunakan sebagai komponen jasa.'}
+              </span>
+            </span>
+          </label>
+        </fieldset>
       ) : null}
 
       {canViewLoyalty ? (

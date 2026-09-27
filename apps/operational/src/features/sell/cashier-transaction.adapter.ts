@@ -27,6 +27,13 @@ export interface CreateSaleInput {
   currency: string;
 }
 
+/** An additional Product the operator chose while selling a Service. */
+export interface SaleSelectedComponentInput {
+  componentItemId: string;
+  componentVariantId?: string;
+  quantity: string;
+}
+
 export interface StartSaleInput extends CreateSaleInput {
   /** The Sale is created together with the Customer it belongs to. */
   customer: SaleCustomerSelection;
@@ -34,6 +41,7 @@ export interface StartSaleInput extends CreateSaleInput {
     catalogItemId: string;
     catalogVariantId?: string;
     quantity: string;
+    additionalComponents?: SaleSelectedComponentInput[];
   }>;
 }
 
@@ -47,6 +55,23 @@ export interface AddSaleLineInput {
   catalogItemId: string;
   catalogVariantId?: string;
   quantity: string;
+  additionalComponents?: SaleSelectedComponentInput[];
+}
+
+/**
+ * Edits an OPEN Sale line in place. Several replacement lines exist only when the units of the
+ * original line are configured differently: one Sale line always carries one unit price.
+ */
+export interface ReplaceSaleLineInput {
+  expectedVersion: number;
+  /** Why the item is corrected; recorded in the activity trail. */
+  reason?: string;
+  lines: Array<{
+    catalogItemId: string;
+    catalogVariantId?: string;
+    quantity: string;
+    additionalComponents?: SaleSelectedComponentInput[];
+  }>;
 }
 
 export interface LoyaltyRedemptionInput {
@@ -66,6 +91,30 @@ export interface SaleTaxConfiguration {
 export interface SetSaleLineQuantityInput {
   expectedVersion: number;
   quantity: string;
+}
+
+/** Deliberate pre-finalization replacement; Runtime remains money authority. */
+/**
+ * What replacing one OPEN Sale line would do, calculated by Runtime with the same rules as the
+ * real command. Successful payments never change; a total below them is refused, not previewed.
+ */
+export interface ReplaceLinePreview {
+  saleId: string;
+  saleVersion: number;
+  currency: string;
+  currentTotalAmount: string;
+  correctedTotalAmount: string;
+  netSuccessfulPaidAmount: string;
+  remainingPaymentAmount: string;
+  replacements: Array<{
+    catalogItemId: string;
+    itemName: string;
+    variantName: string | null;
+    quantity: string;
+    unitAmount: string;
+    grossAmount: string;
+    additions: Array<{ name: string; quantity: string; unitPrice: string; amount: string }>;
+  }>;
 }
 
 export interface PriceOverrideInput {
@@ -119,6 +168,11 @@ export interface CreatePaymentInput {
 export interface PaymentTransitionInput {
   expectedVersion: number;
   status: Exclude<PaymentStatus, 'PENDING'>;
+}
+
+export interface OpenSalePaymentCompensationInput {
+  expectedVersion: number;
+  amount: string;
 }
 
 export interface SellingCatalogDisplayInput {
@@ -175,6 +229,17 @@ export interface SaleTransactionClient {
     idempotencyKey: string,
   ): Promise<Sale>;
   addSaleLine(saleId: string, input: AddSaleLineInput, idempotencyKey: string): Promise<Sale>;
+  replaceSaleLine?(
+    saleId: string,
+    saleLineId: string,
+    input: ReplaceSaleLineInput,
+    idempotencyKey: string,
+  ): Promise<Sale>;
+  previewReplaceSaleLine?(
+    saleId: string,
+    saleLineId: string,
+    input: ReplaceSaleLineInput,
+  ): Promise<ReplaceLinePreview>;
   applyLoyaltyRedemption(
     saleId: string,
     input: LoyaltyRedemptionInput,
@@ -242,6 +307,12 @@ export interface SaleTransactionClient {
     saleId: string,
     paymentId: string,
     input: PaymentTransitionInput,
+  ): Promise<Sale>;
+  compensateOpenSalePayment?(
+    saleId: string,
+    paymentId: string,
+    input: OpenSalePaymentCompensationInput,
+    idempotencyKey: string,
   ): Promise<Sale>;
   finalizeSale(saleId: string, expectedVersion: number, idempotencyKey: string): Promise<Sale>;
   voidSale(saleId: string, expectedVersion: number, idempotencyKey: string): Promise<Sale>;
@@ -399,6 +470,19 @@ export class HttpCashierTransactionAdapter
     });
   }
 
+  public replaceSaleLine(
+    saleId: string,
+    saleLineId: string,
+    input: ReplaceSaleLineInput,
+    idempotencyKey: string,
+  ): Promise<Sale> {
+    return this.client.post<Sale>(
+      `${API_PREFIX}/sales/${saleId}/lines/${saleLineId}/replace`,
+      input,
+      { headers: { 'Idempotency-Key': idempotencyKey } },
+    );
+  }
+
   public applyLoyaltyRedemption(
     saleId: string,
     input: LoyaltyRedemptionInput,
@@ -438,6 +522,17 @@ export class HttpCashierTransactionAdapter
     return this.client.post<Sale>(`${API_PREFIX}/sales/${saleId}/lines/${saleLineId}/remove`, {
       expectedVersion,
     });
+  }
+
+  public previewReplaceSaleLine(
+    saleId: string,
+    saleLineId: string,
+    input: ReplaceSaleLineInput,
+  ): Promise<ReplaceLinePreview> {
+    return this.client.post<ReplaceLinePreview>(
+      `${API_PREFIX}/sales/${saleId}/lines/${saleLineId}/replace-preview`,
+      input,
+    );
   }
 
   public setSaleLinePriceOverride(
@@ -598,6 +693,19 @@ export class HttpCashierTransactionAdapter
     return this.client.post<Sale>(
       `${API_PREFIX}/sales/${saleId}/payments/${paymentId}/status`,
       input,
+    );
+  }
+
+  public compensateOpenSalePayment(
+    saleId: string,
+    paymentId: string,
+    input: OpenSalePaymentCompensationInput,
+    idempotencyKey: string,
+  ): Promise<Sale> {
+    return this.client.post<Sale>(
+      `${API_PREFIX}/sales/${saleId}/payments/${paymentId}/compensate-open`,
+      input,
+      { headers: { 'Idempotency-Key': idempotencyKey } },
     );
   }
 

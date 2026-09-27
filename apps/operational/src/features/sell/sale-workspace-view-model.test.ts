@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Payment, Sale, SaleLine } from './cashier-transaction.types';
+import { hasStartableQueuedWork, saleLineWorkStatus } from './queued-sale-work';
 import { createSaleWorkspaceViewModel } from './sale-workspace-view-model';
 
 const SALE_ID = '33333333-3333-4333-8333-333333333333';
@@ -102,6 +103,45 @@ function createSale(overrides: Partial<Sale> = {}): Sale {
 }
 
 describe('createSaleWorkspaceViewModel', () => {
+  it('presents a composed Service as one Sale line without component lines', () => {
+    const viewModel = createSaleWorkspaceViewModel(
+      createSale({
+        totalAmount: '190000.0000',
+        lines: [
+          createLine({
+            resolvedUnitPrice: '190000.0000',
+            effectiveUnitPrice: '190000.0000',
+            compositionComponents: [
+              {
+                id: 'component-1',
+                position: 0,
+                componentSource: 'SALE_SELECTED',
+                fixedBomSource: null,
+                componentItemId: 'med',
+                componentVariantId: null,
+                itemCodeSnapshot: 'MED',
+                itemNameSnapshot: 'Creambath Medicine',
+                variantCodeSnapshot: null,
+                variantNameSnapshot: null,
+                quantity: '2.0000',
+                pricingMode: 'FOLLOW_PRODUCT_PRICE',
+                transactionUnitPrice: '20000.0000',
+                catalogPriceId: null,
+                unitContribution: '20000.0000',
+                extendedContribution: '40000.0000',
+              },
+            ],
+          }),
+        ],
+      }),
+      'ONLINE',
+      'CLEAN',
+    );
+
+    expect(viewModel.activeLines).toHaveLength(1);
+    expect(viewModel.activeLines[0]?.itemNameSnapshot).toBe('Hair Cut');
+  });
+
   it('derives payment amounts without becoming client monetary authority', () => {
     const viewModel = createSaleWorkspaceViewModel(
       createSale({
@@ -278,5 +318,53 @@ describe('createSaleWorkspaceViewModel', () => {
       'CLEAN',
     );
     expect(paid.voidMutation).toEqual({ state: 'DISABLED', reason: 'NOT_VOIDABLE' });
+  });
+
+  describe('corrected replacement following historical source work', () => {
+    const REPLACEMENT_ID = '99999999-9999-4999-8999-999999999999';
+    function correctedSale(sourceStatus: 'IN_PROGRESS' | 'COMPLETED') {
+      const source = createLine({
+        removedAt: '2026-09-02T00:04:00.000Z',
+        fulfillmentBehaviorSnapshot: 'TRACKED',
+        employeeAssignmentModeSnapshot: 'REQUIRED',
+        allowEmployeeContributionSnapshot: true,
+        fulfillment: {
+          saleId: SALE_ID, saleLineId: LINE_ID, status: sourceStatus,
+          startedAt: '2026-09-02T00:02:00.000Z', completedAt: sourceStatus === 'COMPLETED' ? '2026-09-02T00:03:00.000Z' : null, canceledAt: null,
+        },
+        participations: [{ saleId: SALE_ID, saleLineId: LINE_ID, employeeId: EMPLOYEE_ID, assigned: true, shareRate: '1.000000000000000000' }],
+      });
+      // The replacement owns no fulfillment, assignment or contribution of its own.
+      const replacement = createLine({
+        id: REPLACEMENT_ID,
+        itemNameSnapshot: 'Hair Color',
+        fulfillmentBehaviorSnapshot: 'TRACKED',
+        employeeAssignmentModeSnapshot: 'REQUIRED',
+        allowEmployeeContributionSnapshot: true,
+        fulfillment: null,
+        workLineage: { sourceLineId: LINE_ID, sourceItemName: 'Hair Cut', status: sourceStatus },
+      });
+      return createSale({ lines: [source, replacement], payments: [createPayment()] });
+    }
+
+    it('is ready to finalize once the source work is COMPLETED and settlement is exact, without a second work action', () => {
+      const sale = correctedSale('COMPLETED');
+      const viewModel = createSaleWorkspaceViewModel(sale, 'ONLINE', 'CLEAN');
+      expect(viewModel.domainReadiness).toEqual({ ready: true, blockers: [] });
+      expect(viewModel.finalizeMutation).toEqual({ state: 'AVAILABLE' });
+      expect(hasStartableQueuedWork({ ...sale, operationalState: 'QUEUED' })).toBe(false);
+    });
+
+    it('stays blocked on incomplete work while the source is IN_PROGRESS', () => {
+      const viewModel = createSaleWorkspaceViewModel(correctedSale('IN_PROGRESS'), 'ONLINE', 'CLEAN');
+      expect(viewModel.domainReadiness.blockers.map((blocker) => blocker.code)).toEqual(['FULFILLMENT_INCOMPLETE']);
+      expect(viewModel.domainReadiness.blockers.map((blocker) => blocker.code)).not.toContain('ASSIGNMENT_REQUIRED');
+    });
+
+    it('presents the work status of the source lineage instead of a misleading waiting state', () => {
+      const replacement = correctedSale('COMPLETED').lines[1]!;
+      expect(saleLineWorkStatus(replacement)).toBe('COMPLETED');
+      expect(saleLineWorkStatus(createLine())).toBeNull();
+    });
   });
 });

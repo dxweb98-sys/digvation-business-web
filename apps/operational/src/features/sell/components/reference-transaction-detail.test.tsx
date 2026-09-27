@@ -2,10 +2,10 @@ import {
   DeploymentBootstrapProvider,
   type DeploymentBootstrapConfig,
 } from '@digvation/business-runtime';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { Sale } from '../cashier-transaction.types';
+import type { Employee, Sale, SaleLine } from '../cashier-transaction.types';
 import { presentableTransaction } from '../completed-sale-visibility';
 import {
   ReceiptContent,
@@ -313,5 +313,450 @@ describe('ReferenceTransactionDetail Runtime detail shapes', () => {
     expect(retry).not.toBeNull();
     retry?.click();
     expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('ReferenceTransactionDetail performer relationship', () => {
+  const people = [
+    { id: 'emp-andini', code: 'AND', displayName: 'Andini', status: 'ACTIVE' },
+    { id: 'emp-rindu', code: 'RIN', displayName: 'Rindu Putri', status: 'ACTIVE' },
+    { id: 'emp-sari', code: 'SAR', displayName: 'Sari', status: 'ACTIVE' },
+  ] as unknown as Employee[];
+
+  function withPerformers(): Sale {
+    const base = runtimeQueueDetail({ operationalState: 'IN_PROGRESS' });
+    const template = base.lines[0]!;
+    const participation = (lineId: string, employeeId: string) => ({
+      saleId: base.id,
+      saleLineId: lineId,
+      employeeId,
+      assigned: true,
+      shareRate: '1.000000000000000000',
+    });
+    const unit = (unitNumber: number, ...employeeIds: string[]) => ({
+      unitNumber,
+      employeeIds,
+      performers: employeeIds.map((employeeId) => ({ employeeId, shareRate: null })),
+    });
+    const service = (id: string, name: string, quantity: string) => ({
+      ...template,
+      id,
+      itemNameSnapshot: name,
+      variantNameSnapshot: null,
+      quantity,
+      participations: [],
+      workUnits: [],
+    });
+    return {
+      ...base,
+      lines: [
+        {
+          ...service('line-color', 'Hair Color', '2.0000'),
+          participations: [participation('line-color', 'emp-andini'), participation('line-color', 'emp-rindu')],
+          workUnits: [unit(1, 'emp-andini'), unit(2, 'emp-rindu')],
+        },
+        {
+          ...service('line-curly', 'Smoothing Curly', '1.0000'),
+          participations: [participation('line-curly', 'emp-sari')],
+        },
+        service('line-bleach', 'Body Bleaching', '1.0000'),
+        {
+          ...service('line-same', 'Facial Treatment', '2.0000'),
+          participations: [participation('line-same', 'emp-andini')],
+          workUnits: [unit(1, 'emp-andini'), unit(2, 'emp-andini')],
+        },
+        {
+          ...service('line-shared', 'Creambath', '1.0000'),
+          participations: [participation('line-shared', 'emp-andini'), participation('line-shared', 'emp-rindu')],
+          workUnits: [unit(1, 'emp-andini', 'emp-rindu')],
+        },
+      ],
+    } as unknown as Sale;
+  }
+
+  function renderDetail(onAssign: (line: SaleLine) => void = vi.fn()) {
+    return render(
+      <DeploymentBootstrapProvider config={bootstrap}>
+        <ReferenceTransactionDetail
+          sale={withPerformers()}
+          locale="id-ID"
+          employees={people}
+          businessName="Digvation"
+          branchName="Main branch"
+          cashierName="Kasir"
+          showPaymentReceipt={false}
+          onClose={vi.fn()}
+          onNewSale={vi.fn()}
+          onViewReceipt={vi.fn()}
+          onAssign={onAssign}
+          onComplete={vi.fn()}
+          isMutating={false}
+        />
+      </DeploymentBootstrapProvider>,
+    );
+  }
+
+  const groupOf = (name: RegExp) => screen.getByRole('group', { name });
+
+  it('ties each unit of a quantity-2 service to its own performer, in a structured list', () => {
+    renderDetail();
+    const color = groupOf(/Hair Color/);
+    expect(within(color).getByText(/Pengerjaan 1/)).toBeTruthy();
+    expect(within(color).getByText('Andini')).toBeTruthy();
+    expect(within(color).getByText(/Pengerjaan 2/)).toBeTruthy();
+    expect(within(color).getByText('Rindu Putri')).toBeTruthy();
+  });
+
+  it('keeps a single performer compact: only the name, no unit numbering, no other performers', () => {
+    renderDetail();
+    const curly = groupOf(/Smoothing Curly/);
+    expect(within(curly).getByText('Sari')).toBeTruthy();
+    expect(within(curly).queryByText(/Pengerjaan/)).toBeNull();
+    expect(within(curly).queryByText('Andini')).toBeNull();
+  });
+
+  it('summarises the same performer on every unit instead of repeating the name', () => {
+    renderDetail();
+    const same = groupOf(/Facial Treatment/);
+    expect(within(same).getAllByText('Andini')).toHaveLength(1);
+    expect(within(same).getByText(/Semua pengerjaan/)).toBeTruthy();
+    expect(within(same).queryByText(/Pengerjaan \d/)).toBeNull();
+  });
+
+  it('shows several contributors on ONE unit as shared work, distinct from a quantity of two', () => {
+    renderDetail();
+    const shared = groupOf(/Creambath/);
+    expect(within(shared).getByText('Andini')).toBeTruthy();
+    expect(within(shared).getByText('Rindu Putri')).toBeTruthy();
+    expect(within(shared).getByText(/Dikerjakan bersama/)).toBeTruthy();
+    // Not presented as two separate work units.
+    expect(within(shared).queryByText(/Pengerjaan \d/)).toBeNull();
+    expect(within(shared).queryByText(/Semua pengerjaan/)).toBeNull();
+  });
+
+  it('makes a missing performer clear and actionable, with the action beside the item status', () => {
+    renderDetail();
+    const bleach = groupOf(/Body Bleaching/);
+    expect(within(bleach).getByText('Belum ada karyawan')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Pilih karyawan: Body Bleaching/ })).toBeTruthy();
+    // Services that already have performers offer a plain change action.
+    expect(screen.getByRole('button', { name: /Ubah karyawan: Hair Color/ })).toBeTruthy();
+  });
+
+  it('edits exactly the item whose action was clicked', () => {
+    const onAssign = vi.fn();
+    renderDetail(onAssign);
+    fireEvent.click(screen.getByRole('button', { name: /Ubah karyawan: Hair Color/ }));
+    expect(onAssign).toHaveBeenCalledTimes(1);
+    expect((onAssign.mock.calls[0]![0] as SaleLine).itemNameSnapshot).toBe('Hair Color');
+    fireEvent.click(screen.getByRole('button', { name: /Pilih karyawan: Body Bleaching/ }));
+    expect(onAssign).toHaveBeenCalledTimes(2);
+    expect((onAssign.mock.calls[1]![0] as SaleLine).itemNameSnapshot).toBe('Body Bleaching');
+  });
+});
+
+describe('ReferenceTransactionDetail selected additions', () => {
+  type Usage = NonNullable<SaleLine['compositionComponents']>[number];
+  const usage = (overrides: Partial<Usage> & { id: string; itemNameSnapshot: string }): Usage => ({
+    position: 0,
+    componentSource: 'FIXED_BOM',
+    fixedBomSource: 'SERVICE_DEFAULT',
+    componentItemId: 'product',
+    componentVariantId: null,
+    itemCodeSnapshot: 'P',
+    variantCodeSnapshot: null,
+    variantNameSnapshot: null,
+    quantity: '1.0000',
+    pricingMode: 'INCLUDED_IN_SERVICE_PRICE',
+    // Present on purpose: a fixed BOM snapshot price must never surface.
+    transactionUnitPrice: '88888.0000',
+    catalogPriceId: null,
+    unitContribution: '0.0000',
+    extendedContribution: '0.0000',
+    ...overrides,
+  });
+  const developer = usage({ id: 'u-dev', itemNameSnapshot: 'Developer 20 vol' });
+  const redBrand = usage({
+    id: 'u-red',
+    itemNameSnapshot: 'Red Coloring Brand',
+    variantNameSnapshot: 'Intense',
+    componentSource: 'SALE_SELECTED',
+    fixedBomSource: null,
+    pricingMode: 'FOLLOW_PRODUCT_PRICE',
+    transactionUnitPrice: '10000.0000',
+    unitContribution: '10000.0000',
+    extendedContribution: '10000.0000',
+    position: 1,
+  });
+
+  /** Hair Color line: base 200.000 + one 10.000 addition = 210.000 per unit. */
+  const withUsage = (components: Usage[], quantity = '1.0000') => {
+    const sale = runtimeQueueDetail();
+    const line = sale.lines[0]!;
+    const additionUnit = components
+      .filter((component) => component.componentSource === 'SALE_SELECTED')
+      .reduce((sum, component) => sum + Number(component.extendedContribution), 0);
+    line.compositionComponents = components;
+    line.quantity = quantity;
+    line.effectiveUnitPrice = (200000 + additionUnit).toFixed(4);
+    line.grossAmount = ((200000 + additionUnit) * Number(quantity)).toFixed(4);
+    return sale;
+  };
+  const additionsList = () => screen.getByRole('list', { name: 'Item tambahan' });
+
+  it('explains the line as base + selected additions, and never lists fixed BOM', () => {
+    renderRuntimeDetail(withUsage([developer, redBrand]));
+
+    const rows = within(additionsList()).getAllByRole('listitem');
+    expect(rows).toHaveLength(2);
+    // Base first, then the addition attached to its parent line.
+    expect(within(rows[0]!).getByText('Harga item')).toBeTruthy();
+    expect(rows[0]!.textContent).toContain('200.000');
+    expect(rows[1]!.textContent).toContain('+ Red Coloring Brand / Intense');
+    expect(rows[1]!.textContent).toContain('1 × Rp 10.000');
+    expect(rows[1]!.textContent).toContain('10.000');
+    expect(additionsList().closest('li.pos-line-item')?.textContent).toContain('Hair Color');
+    // The line total stays the line amount (200.000 + 10.000).
+    expect(additionsList().closest('li.pos-line-item')?.textContent).toContain('210.000');
+    expect(document.body.textContent).not.toContain('Developer 20 vol');
+    expect(document.body.textContent).not.toMatch(/88[.,]888/);
+  });
+
+  it('shows nothing for a line that only has fixed BOM components, or none', () => {
+    const { unmount } = renderRuntimeDetail(withUsage([developer]));
+    expect(screen.queryByText('Item tambahan')).toBeNull();
+    expect(document.body.textContent).not.toContain('Developer 20 vol');
+    unmount();
+    renderRuntimeDetail(withUsage([]));
+    expect(screen.queryByText('Item tambahan')).toBeNull();
+  });
+
+  it('applies the line quantity exactly once: base + additions still equals the line amount', () => {
+    const sale = withUsage([redBrand], '2.0000');
+    const second = { ...structuredClone(sale.lines[0]!), id: 'line-2', itemNameSnapshot: 'Highlight' };
+    second.compositionComponents = [];
+    sale.lines.push(second);
+    renderRuntimeDetail(sale);
+
+    const lists = screen.getAllByRole('list', { name: 'Item tambahan' });
+    expect(lists).toHaveLength(1);
+    const rows = within(lists[0]!).getAllByRole('listitem');
+    // 2 x 200.000 = 400.000 base, 2 x 10.000 = 20.000 addition, 420.000 line.
+    expect(rows[0]!.textContent).toContain('400.000');
+    expect(rows[1]!.textContent).toContain('2 × ');
+    expect(rows[1]!.textContent).toContain('20.000');
+    expect(lists[0]!.closest('li.pos-line-item')?.textContent).toContain('420.000');
+    expect(lists[0]!.closest('li.pos-line-item')?.textContent).not.toContain('Highlight');
+  });
+
+  it('shows the selected additions on the customer receipt as a breakdown, never fixed BOM', () => {
+    const sale = withUsage([developer, redBrand]);
+    sale.status = 'FINALIZED';
+    sale.finalizedAt = '2026-09-24T02:15:00.000Z';
+    sale.loyaltyRedemption = null;
+    render(
+      <DeploymentBootstrapProvider config={bootstrap}>
+        <ReceiptContent
+          sale={sale}
+          activeLines={sale.lines}
+          customer={sale.customer!}
+          locale="id-ID"
+          businessName="Digvation"
+          branchName="Main branch"
+          cashierName="Kasir"
+          transactionDate="24 Sep 2026"
+          hasDiscount={false}
+          hasTax={false}
+        />
+      </DeploymentBootstrapProvider>,
+    );
+    expect(screen.getByText(/\+ Red Coloring Brand \/ Intense/)).toBeTruthy();
+    expect(screen.queryByText(/Developer 20 vol/)).toBeNull();
+    expect(screen.queryByText(/Digunakan/)).toBeNull();
+    expect(document.body.textContent).not.toMatch(/88[.,]888/);
+    expect(document.body.textContent).toContain('210.000');
+  });
+
+  it('keeps units with different additions apart: each line lists only its own addition with exact amounts', () => {
+    const sale = withUsage([redBrand]);
+    const second = structuredClone(sale.lines[0]!);
+    second.id = 'line-2';
+    second.effectiveUnitPrice = '215000.0000';
+    second.grossAmount = '215000.0000';
+    second.compositionComponents = [
+      {
+        ...redBrand,
+        id: 'u-blue',
+        itemNameSnapshot: 'Blue Toner',
+        variantNameSnapshot: null,
+        transactionUnitPrice: '15000.0000',
+        unitContribution: '15000.0000',
+        extendedContribution: '15000.0000',
+      },
+    ];
+    sale.lines.push(second);
+    renderRuntimeDetail(sale);
+
+    const lists = screen.getAllByRole('list', { name: 'Item tambahan' });
+    expect(lists).toHaveLength(2);
+    expect(lists[0]!.textContent).toContain('Red Coloring Brand / Intense');
+    expect(lists[0]!.textContent).not.toContain('Blue Toner');
+    expect(lists[1]!.textContent).toContain('Blue Toner');
+    expect(lists[1]!.textContent).not.toContain('Red Coloring');
+    // Both lines reconcile: 200.000 + 10.000 and 200.000 + 15.000, never an averaged 212.500.
+    expect(lists[0]!.closest('li.pos-line-item')?.textContent).toContain('210.000');
+    expect(lists[1]!.closest('li.pos-line-item')?.textContent).toContain('215.000');
+    expect(document.body.textContent).not.toContain('212.500');
+  });
+});
+
+describe('ReferenceTransactionDetail discounts and promotions', () => {
+  const adjustment = (id: string, overrides: Record<string, unknown>) => ({
+    id,
+    source: 'PROMOTION',
+    scope: 'ITEM',
+    type: 'PERCENTAGE',
+    configuredValue: '0.1000',
+    requestedValue: null,
+    actualAmount: '0.0000',
+    promotionId: 'promo-kilat',
+    promotionEffectiveFrom: '2026-09-01T00:00:00.000Z',
+    promotionEffectiveUntil: '2026-09-30T00:00:00.000Z',
+    label: 'kilat',
+    saleLineId: null,
+    actorId: null,
+    actorKind: null,
+    reason: null,
+    createdAt: '2026-09-24T02:00:00.000Z',
+    ...overrides,
+  });
+  const twoLines = () => {
+    const sale = runtimeQueueDetail();
+    const second = structuredClone(sale.lines[0]!);
+    second.id = 'line-2';
+    second.itemNameSnapshot = 'Hair Color Two';
+    sale.lines.push(second);
+    sale.adjustments = [
+      adjustment('a1', { saleLineId: 'line-1', actualAmount: '22000.0000' }),
+      adjustment('a2', { saleLineId: 'line-2', actualAmount: '21200.0000' }),
+      adjustment('a3', { scope: 'TRANSACTION', promotionId: 'promo-1', label: 'Promo1', configuredValue: '0.1900', actualAmount: '73872.0000' }),
+    ] as never;
+    return sale;
+  };
+
+  it('groups each item discount under "Diskon dan Promo" with an information affordance', () => {
+    renderRuntimeDetail(twoLines());
+    const groups = screen.getAllByRole('group', { name: 'Diskon dan Promo' });
+    expect(groups.length).toBeGreaterThanOrEqual(2);
+    expect(groups[0]!.textContent).toContain('kilat (10%)');
+    expect(groups[0]!.textContent).toContain('22.000');
+    expect(within(groups[0]!).getByRole('button', { name: 'Rincian diskon dan promo' })).toBeTruthy();
+  });
+
+  it('shows the promotion facts from the Sale snapshot when the information button is opened', () => {
+    renderRuntimeDetail(twoLines());
+    const group = screen.getAllByRole('group', { name: 'Diskon dan Promo' })[0]!;
+    fireEvent.click(within(group).getByRole('button', { name: 'Rincian diskon dan promo' }));
+    expect(document.body.textContent).toContain('Diskon: 10%');
+    expect(document.body.textContent).toContain('Per item');
+    expect(document.body.textContent).toContain('Mulai: 1 Sep 2026');
+    expect(document.body.textContent).toContain('Berakhir: 30 Sep 2026');
+  });
+
+  it('lists a Promotion applied to two lines once in the summary, summed, with the transaction promotion apart', () => {
+    renderRuntimeDetail(twoLines());
+    const summary = document.querySelector('.pos-financial-panel')!;
+    const kilat = within(summary as HTMLElement).getAllByText(/kilat \(10%\)/);
+    expect(kilat).toHaveLength(1);
+    expect(summary.textContent).toContain('43.200');
+    expect(summary.textContent).toContain('Promo1 (19%)');
+    expect(summary.textContent).toContain('73.872');
+  });
+
+  const renderReceipt = (sale: Sale, hasTax = false) => {
+    sale.status = 'FINALIZED';
+    sale.finalizedAt = '2026-09-24T02:15:00.000Z';
+    return render(
+      <DeploymentBootstrapProvider config={bootstrap}>
+        <ReceiptContent
+          sale={sale}
+          activeLines={sale.lines}
+          customer={sale.customer!}
+          locale="id-ID"
+          businessName="Digvation"
+          branchName="Main branch"
+          cashierName="Kasir"
+          transactionDate="24 Sep 2026"
+          hasDiscount
+          hasTax={hasTax}
+        />
+      </DeploymentBootstrapProvider>,
+    );
+  };
+
+  it('receipt: names the promotion under each item without amounts, and sums it once in the summary', () => {
+    renderReceipt(twoLines());
+    expect(screen.getAllByText('Diskon dan Promo')).toHaveLength(3); // two items + summary
+    expect(screen.getAllByText(/kilat \(10%\)/)).toHaveLength(3);
+    expect(document.body.textContent).toContain('43.200');
+    expect(document.body.textContent).not.toContain('22.000');
+    expect(document.body.textContent).toContain('73.872');
+  });
+
+  it('receipt summary reads Subtotal, Pajak, Diskon dan Promo, Total in that order', () => {
+    const sale = twoLines();
+    sale.taxAmount = '34000.5600';
+    renderReceipt(sale, true);
+    const text = document.body.textContent ?? '';
+    const subtotal = text.indexOf('Subtotal');
+    const tax = text.indexOf('Pajak', subtotal);
+    const discounts = text.indexOf('Diskon dan Promo', tax);
+    const total = text.indexOf('TOTAL', discounts);
+    expect(subtotal).toBeGreaterThan(-1);
+    expect(tax).toBeGreaterThan(subtotal);
+    expect(discounts).toBeGreaterThan(tax);
+    expect(total).toBeGreaterThan(discounts);
+  });
+
+  it('receipt: exact cash shows no redundant tender row, over-tender shows tender and change', () => {
+    const exact = twoLines();
+    exact.payments[0]!.tenderedAmount = exact.payments[0]!.appliedAmount;
+    exact.payments[0]!.changeAmount = '0.0000';
+    const first = renderReceipt(exact);
+    expect(screen.queryByText('Uang tunai diterima')).toBeNull();
+    first.unmount();
+    renderReceipt(twoLines()); // fixture: applied 197.580, tendered 200.000, change 2.420
+    expect(screen.getByText('Uang tunai diterima')).toBeTruthy();
+    expect(screen.getByText('Kembalian')).toBeTruthy();
+  });
+});
+
+describe('ReferenceTransactionDetail invoice placement', () => {
+  it('shows the invoice number once, in the customer identity block, on the right and above the date', () => {
+    renderRuntimeDetail(runtimeQueueDetail());
+    const invoice = screen.getAllByText('INV-20260924-000197');
+    expect(invoice).toHaveLength(1);
+    const node = screen.getByTestId('transaction-invoice-number');
+    expect(node).toBe(invoice[0]);
+    // Same block as the customer name and phone...
+    const identity = node.closest('.px-1')!;
+    expect(identity.textContent).toContain('Nida');
+    expect(identity.textContent).toContain('+628123456789');
+    // ...right-aligned, with the transaction date directly underneath it.
+    const column = node.parentElement!;
+    expect(column.className).toContain('items-end');
+    expect(node.nextElementSibling?.textContent).toContain('24 Sep 2026');
+    // Never in the global dialog header.
+    const title = screen.getByText('Detail transaksi');
+    expect(title.closest('header, [role="dialog"] > div')?.contains(node)).toBe(false);
+    expect(title.parentElement?.textContent).not.toContain('INV-');
+    expect(screen.getByText('TRX-20260924-000197')).toBeTruthy();
+  });
+
+  it('reserves nothing for an invoice that does not exist yet, and keeps the date on the right', () => {
+    renderRuntimeDetail(runtimeQueueDetail({ invoiceNumber: null } as never));
+    expect(screen.queryByTestId('transaction-invoice-number')).toBeNull();
+    expect(screen.queryByText(/INV-/)).toBeNull();
+    expect(screen.getByText(/24 Sep 2026/)).toBeTruthy();
   });
 });

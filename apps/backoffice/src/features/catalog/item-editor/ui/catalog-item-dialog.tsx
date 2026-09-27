@@ -2,11 +2,13 @@ import { DBadge, DDialog } from '@digvation/ui';
 import { useEffect, useMemo, useState } from 'react';
 import { useCatalogItemEditorData } from '../api/use-catalog-item-editor-data';
 import { useCatalogItemEditorSave } from '../api/use-catalog-item-editor-save';
+import { useServiceComposition } from '../api/use-service-composition';
 import { deriveCatalogItemEditorValidation } from '../model/catalog-item-editor-validation';
 import { useCatalogItemEditor } from '../model/use-catalog-item-editor';
 import type { LoyaltyApi } from '../../../../modules/loyalty/loyalty-api';
 import type { CatalogApi, Category, Item } from '../../api/catalog-api';
 import { CatalogItemAdditionalInfoSection } from './catalog-item-additional-info-section';
+import { CatalogItemCompositionSection } from './catalog-item-composition-section';
 import { CatalogItemInformationSection } from './catalog-item-information-section';
 import { CatalogItemPricingSection } from './catalog-item-pricing-section';
 import { CatalogItemSaveSummarySection } from './catalog-item-save-summary-section';
@@ -33,6 +35,7 @@ export function CatalogItemDialog({
   canCreatePricing,
   canCreateVariants,
   canManageImage,
+  canEditComposition,
   onClose,
   onSaved,
 }: {
@@ -47,6 +50,7 @@ export function CatalogItemDialog({
   canCreatePricing: boolean;
   canCreateVariants: boolean;
   canManageImage: boolean;
+  canEditComposition: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -54,14 +58,14 @@ export function CatalogItemDialog({
   const editorIdentity = item === undefined ? 'closed' : item === null ? 'new' : item.id;
   const [editorTabState, setEditorTabState] = useState<{
     identity: string;
-    value: 'additional' | 'pricing';
+    value: 'additional' | 'pricing' | 'composition';
   }>({
     identity: editorIdentity,
     value: 'additional',
   });
   const activeEditorTab =
     editorTabState.identity === editorIdentity ? editorTabState.value : 'additional';
-  const setActiveEditorTab = (value: 'additional' | 'pricing') => {
+  const setActiveEditorTab = (value: 'additional' | 'pricing' | 'composition') => {
     setEditorTabState({ identity: editorIdentity, value });
   };
   const { formatMoney } = useCatalogLocalization();
@@ -156,6 +160,16 @@ export function CatalogItemDialog({
   }, [fresh, variantPricesLoading, existingVariants.data, hydrateVariantsOnce]);
 
   const canEditPrice = fresh ? canCreatePricing : canViewPricing && canCreatePricing;
+  const showComposition = editor.form.type === 'SERVICE' && canEditComposition;
+  const serviceComposition = useServiceComposition({
+    item,
+    api,
+    enabled: showComposition,
+    composition: editor.composition,
+    variantKeys: editor.form.variants.map((variant) => variant.key),
+    hydrate: editor.actions.hydrateCompositionOnce,
+  });
+  const compositionHasIssues = serviceComposition.hasIssues;
   const {
     parsedDefaultDuration,
     validDefaultDuration,
@@ -221,6 +235,8 @@ export function CatalogItemDialog({
     existingImagePresent: Boolean(existingImage.data),
     disabled,
     variantsHaveIssues,
+    shouldSaveComposition: showComposition && editor.composition.touched,
+    compositionHasIssues,
     onSaved,
     onClose,
   });
@@ -261,6 +277,12 @@ export function CatalogItemDialog({
               return;
             }
 
+            if (showComposition && compositionHasIssues) {
+              editor.actions.setShowIssues(true);
+              setActiveEditorTab('composition');
+              return;
+            }
+
             void save();
           }}
           disabled={saving || !name.trim()}
@@ -290,11 +312,29 @@ export function CatalogItemDialog({
                     },
                   ]
                 : []),
+              ...(showComposition
+                ? [{ value: 'composition' as const, label: 'Komponen Jasa' }]
+                : []),
             ]}
             onChange={setActiveEditorTab}
           />
 
-          {activeEditorTab === 'additional' || !showSellingSection ? (
+          {activeEditorTab === 'composition' && showComposition ? (
+            <div role="tabpanel" aria-label="Komponen Jasa">
+              <CatalogItemCompositionSection
+                composition={editor.composition}
+                variants={editor.form.variants}
+                infoByProduct={serviceComposition.infoByProduct}
+                loading={!fresh && serviceComposition.loading}
+                showIssues={showIssues}
+                disabled={saving}
+                api={api}
+                currency={currency}
+                effectiveAt={effectiveAt}
+                onChange={editor.actions.setComposition}
+              />
+            </div>
+          ) : activeEditorTab === 'additional' || !showSellingSection ? (
             <div role="tabpanel" aria-label="Informasi Tambahan">
               <CatalogItemAdditionalInfoSection
                 editor={editor}

@@ -232,8 +232,8 @@ export function AnalyticsHorizontalBarChart({
                 <span
                   className={
                     index === 0
-                      ? 'truncate font-semibold'
-                      : 'truncate text-[var(--color-text-muted)]'
+                      ? 'min-w-0 truncate font-semibold'
+                      : 'min-w-0 truncate text-[var(--color-text-muted)]'
                   }
                 >
                   {index + 1}. {point.label}

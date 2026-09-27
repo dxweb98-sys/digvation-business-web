@@ -1,5 +1,4 @@
-/* Section surfaces carry the priority: identity is tinted, the order list stays plain
-   white for scanning, and the money summary sits on a muted surface. */
+/* The identity header of a transaction is tinted; the order and summary are DCards. */
 .pos-detail-header {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-panel);
@@ -11,55 +10,48 @@
   padding: 16px;
 }
 
-.pos-detail-panel {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-panel);
-  background-color: var(--color-surface);
-  padding: 2px 14px;
-}
-
-.pos-detail-panel--muted {
-  border-color: color-mix(in srgb, var(--color-border) 80%, transparent);
-  background-color: color-mix(in srgb, var(--color-surface-muted) 45%, var(--color-surface));
-  padding: 14px;
-}
-
-.pos-financial-panel {
-  border: 1px solid color-mix(in srgb, var(--color-border) 80%, transparent);
-  border-radius: var(--radius-panel);
-  background-color: color-mix(in srgb, var(--color-surface-muted) 45%, var(--color-surface));
-  padding: 14px;
-}
-
-.pos-financial-panel > h3 + dl {
-  margin-top: 14px;
-}
-
-.pos-financial-panel__context {
-  margin: -14px -14px 14px;
-  border-bottom: 1px solid var(--color-border);
-  background-color: color-mix(in srgb, var(--color-surface-muted) 45%, var(--color-surface));
-  padding: 14px;
-}
-
+/*
+ * Order on the left, the tinted money rail on the right: the same shape as the payment
+ * dialog, so both screens read as one family. The rail stacks under the order on narrow widths.
+ */
 .pos-detail-columns {
   display: grid;
-  gap: 16px;
-}
-
-@media (min-width: 1024px) {
-  .pos-detail-columns {
-    grid-template-columns: minmax(0, 1.35fr) minmax(18rem, 0.85fr);
-    align-items: start;
-    gap: 20px;
-  }
 }
 
 .pos-detail-column {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 20px;
+  gap: 12px;
+  padding: 16px;
+}
+
+.pos-transaction-detail-summary {
+  border-top: 1px solid var(--color-border);
+  background-color: color-mix(in srgb, var(--color-surface-muted) 60%, transparent);
+}
+
+.pos-financial-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@media (min-width: 640px) {
+  .pos-detail-column {
+    padding: 20px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .pos-detail-columns {
+    grid-template-columns: minmax(0, 1.35fr) minmax(20rem, 0.85fr);
+  }
+
+  .pos-transaction-detail-summary {
+    border-top: 0;
+    border-left: 1px solid var(--color-border);
+  }
 }
 
 /* Order rows: tight inside an item, clearly wider between items. */
