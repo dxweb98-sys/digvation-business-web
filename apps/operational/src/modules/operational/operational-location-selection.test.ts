@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveOperationalLocationSelection } from './operational-location-selection';
+import {
+  resolveOperationalLocationSelection,
+  resolveReceiptLocation,
+} from './operational-location-selection';
 
 const locations = [
-  { id: 'branch-a', code: 'A', name: 'Branch A' },
-  { id: 'branch-b', code: 'B', name: 'Branch B' },
+  { id: 'branch-a', code: 'A', name: 'Branch A', address: null },
+  { id: 'branch-b', code: 'B', name: 'Branch B', address: null },
 ];
 
 describe('resolveOperationalLocationSelection', () => {
@@ -27,5 +30,28 @@ describe('resolveOperationalLocationSelection', () => {
 
   it('discards a stored selection that is no longer permitted', () => {
     expect(resolveOperationalLocationSelection(locations, 'outside-scope', null)).toBeNull();
+  });
+});
+
+describe('resolveReceiptLocation', () => {
+  const multiLocation = [
+    { id: 'branch-a', code: 'A', name: 'Branch A', address: 'Jl. A No. 1' },
+    { id: 'branch-b', code: 'B', name: 'Branch B', address: null },
+  ];
+
+  it("resolves the Sale's own selling location, not the first or main location", () => {
+    expect(resolveReceiptLocation('branch-b', multiLocation)).toMatchObject({
+      id: 'branch-b',
+      name: 'Branch B',
+    });
+  });
+
+  it('carries the address of the resolved location, never another location', () => {
+    expect(resolveReceiptLocation('branch-a', multiLocation)?.address).toBe('Jl. A No. 1');
+    expect(resolveReceiptLocation('branch-b', multiLocation)?.address).toBeNull();
+  });
+
+  it('returns null instead of inventing a location when the id is not found', () => {
+    expect(resolveReceiptLocation('unknown-location', multiLocation)).toBeNull();
   });
 });

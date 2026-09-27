@@ -297,6 +297,7 @@ export const backofficeCopy: Record<string, { id: string; en: string }> = {
   'Save location': { id: 'Simpan lokasi', en: 'Save location' },
   'Location code': { id: 'Kode lokasi', en: 'Location code' },
   'Location name': { id: 'Nama lokasi', en: 'Location name' },
+  Address: { id: 'Alamat', en: 'Address' },
   'Deactivate selling location?': {
     id: 'Nonaktifkan lokasi penjualan?',
     en: 'Deactivate selling location?',

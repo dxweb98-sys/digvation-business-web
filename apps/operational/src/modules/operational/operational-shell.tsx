@@ -1,8 +1,6 @@
-import { ApiClient } from '@digvation/business-api';
 import { useAuth } from '@digvation/business-auth';
 import { useConnectivity, useDeploymentBootstrap } from '@digvation/business-runtime';
 import { DAlert, DAvatar, DButton, DDialog, DDropdown, useToast } from '@digvation/ui';
-import { useQuery } from '@tanstack/react-query';
 import {
   Building2,
   Check,
@@ -18,11 +16,10 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 
-import { referenceQueryPolicy } from '../../app/data/operational-cache-policy';
 import { useOperationalLocalization } from '../../app/localization/operational-localization';
 import { getAppVersion } from '../../app/version/app-version';
 import { OperationalNotificationBell } from '../notifications/operational-notification-bell';
-import { OperationalAccessApi, operationalAccessKeys } from './operational-access-api';
+import { useOperationalAccessContext } from './operational-access-api';
 import {
   PasswordChangeUnavailableError,
   unavailablePasswordChange,
@@ -65,7 +62,7 @@ export function OperationalShell({
   const bootstrap = useDeploymentBootstrap();
   const connectivity = useConnectivity();
   const { copy, label } = useOperationalLocalization();
-  const { session, authPort, logout } = useAuth();
+  const { session, logout } = useAuth();
   const { showToast } = useToast();
   const [isLoggingOut, setLoggingOut] = useState(false);
   const [isAccountDialogOpen, setAccountDialogOpen] = useState(false);
@@ -82,23 +79,7 @@ export function OperationalShell({
   const navigate = useNavigate();
   const routerLocation = useLocation();
   const version = getAppVersion();
-  const operationalAccess = useMemo(
-    () =>
-      new OperationalAccessApi(
-        new ApiClient({
-          baseUrl: bootstrap.apiBaseUrl,
-          ...(authPort.getAccessToken
-            ? { getAccessToken: authPort.getAccessToken.bind(authPort) }
-            : {}),
-        }),
-      ),
-    [authPort, bootstrap.apiBaseUrl],
-  );
-  const operationalAccessQuery = useQuery({
-    queryKey: operationalAccessKeys.context(),
-    queryFn: ({ signal }) => operationalAccess.context(signal),
-    ...referenceQueryPolicy,
-  });
+  const operationalAccessQuery = useOperationalAccessContext();
   const locations = useMemo(
     () => operationalAccessQuery.data?.locations ?? [],
     [operationalAccessQuery.data],

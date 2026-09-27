@@ -68,6 +68,8 @@ import {
   resolveOperationalLocale,
   useOperationalLocalization,
 } from '../../../app/localization/operational-localization';
+import { useOperationalAccessContext } from '../../../modules/operational/operational-access-api';
+import { resolveReceiptLocation } from '../../../modules/operational/operational-location-selection';
 import { cashierTransactionKeys } from '../cashier-transaction-keys';
 import { cashierTransactionErrorMessage, correctionErrorMessage } from '../cashier-transaction-errors';
 import type { ReplaceLinePreview, ReplaceSaleLineInput } from '../cashier-transaction.adapter';
@@ -897,6 +899,13 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
 
   const displayedQueueDetail =
     receiptSaleId && sale?.id === receiptSaleId && hasSuccessfulPayment(sale) ? sale : queueDetail;
+  const operationalAccessQuery = useOperationalAccessContext();
+  const receiptLocation = displayedQueueDetail
+    ? resolveReceiptLocation(
+        displayedQueueDetail.sellingLocationId,
+        operationalAccessQuery.data?.locations ?? [],
+      )
+    : null;
   const receiptDeliveryStatusQuery = useQuery({
     queryKey: ['operational-receipt-delivery', displayedQueueDetail?.id ?? null],
     queryFn: () => adapter.getReceiptDeliveryStatus(displayedQueueDetail!.id),
@@ -1150,6 +1159,33 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         variant: 'danger',
       });
       return false;
+    }
+  };
+
+  /**
+   * Advances a single tracked Service line from WAITING to IN_PROGRESS while the
+   * transaction is already being worked on. Only this line changes; other WAITING
+   * lines on the same Sale are untouched.
+   */
+  const startWaitingServiceLine = async (transaction: Sale, line: SaleLine) => {
+    try {
+      const updated = await workspace.transitionQueuedFulfillment(
+        transaction,
+        line,
+        'IN_PROGRESS',
+      );
+      setQueueDetail(updated);
+      showToast({
+        title: copy('Work started'),
+        description: `${line.itemNameSnapshot} ${copy('is now being worked on.')}`,
+        variant: 'success',
+      });
+    } catch {
+      showToast({
+        title: copy('Could not start work'),
+        description: copy('The service was not started. Try again.'),
+        variant: 'danger',
+      });
     }
   };
 
@@ -1857,7 +1893,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         locale={workspace.locale}
         employees={workspace.employees}
         businessName={runtime.branding.businessName ?? runtime.branding.productName}
-        branchName={copy('Main branch')}
+        branchName={receiptLocation?.name ?? copy('Main branch')}
+        branchAddress={receiptLocation?.address ?? null}
         cashierName={session.identity.displayName}
         {...(displayedQueueDetail && cancellationReasons[displayedQueueDetail.id]
           ? { cancellationReason: cancellationReasons[displayedQueueDetail.id] }
@@ -1887,6 +1924,10 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           if (!displayedQueueDetail) return;
           workspace.requestEmployeeOptions();
           setPerformerTarget({ sale: displayedQueueDetail, line });
+        }}
+        onStartLineWork={(line) => {
+          if (!displayedQueueDetail) return;
+          void startWaitingServiceLine(displayedQueueDetail, line);
         }}
         onComplete={() => {
           if (displayedQueueDetail) void completeQueuedTransaction(displayedQueueDetail);
@@ -4242,6 +4283,7 @@ export function ReferenceTransactionDetail({
   employees,
   businessName,
   branchName,
+  branchAddress = null,
   cashierName,
   cancellationReason,
   showPaymentReceipt,
@@ -4252,6 +4294,7 @@ export function ReferenceTransactionDetail({
   deliveryStatus,
   onRetryDelivery,
   onAssign,
+  onStartLineWork,
   onComplete,
   isMutating,
 }: {
@@ -4260,6 +4303,7 @@ export function ReferenceTransactionDetail({
   employees: readonly Employee[];
   businessName: string;
   branchName: string;
+  branchAddress?: string | null;
   cashierName: string;
   cancellationReason?: string;
   showPaymentReceipt: boolean;
@@ -4278,6 +4322,7 @@ export function ReferenceTransactionDetail({
   };
   onRetryDelivery?: (sale: Sale) => void;
   onAssign: (line: SaleLine) => void;
+  onStartLineWork: (line: SaleLine) => void;
   onComplete: () => void;
   isMutating: boolean;
 }) {
@@ -4469,6 +4514,7 @@ export function ReferenceTransactionDetail({
                 locale={locale}
                 businessName={businessName}
                 branchName={branchName}
+                branchAddress={branchAddress}
                 cashierName={cashierName}
                 transactionDate={transactionDate}
                 hasDiscount={hasDiscount}
@@ -4513,6 +4559,13 @@ export function ReferenceTransactionDetail({
                       const showWorkStatus =
                         saleLineWorkStatus(line) !== null &&
                         saleLineWorkStatus(line) !== (status ? impliedLineWorkStatus[status] : undefined);
+                      // The transaction is already IN_PROGRESS, but this specific tracked
+                      // Service has not been started yet: it needs its own explicit action.
+                      const canStartLineWork =
+                        status === 'PROGRESS' &&
+                        line.itemTypeSnapshot === 'SERVICE' &&
+                        line.fulfillmentBehaviorSnapshot === 'TRACKED' &&
+                        line.fulfillment?.status === 'WAITING';
                       const additions = saleLineAdditions(line);
                       const lineBase = saleLineBase(line, additions);
                       return (
@@ -4589,6 +4642,20 @@ export function ReferenceTransactionDetail({
                                 disabled={isMutating}
                                 onEdit={() => onAssign(line)}
                               />
+                            ) : null
+                          }
+                          action={
+                            canStartLineWork ? (
+                              <DButton
+                                size="sm"
+                                variant="secondary"
+                                className="h-7 px-2.5 text-[11px]"
+                                leftIcon={<PlayCircle className="size-3.5" />}
+                                loading={isMutating}
+                                onClick={() => onStartLineWork(line)}
+                              >
+                                {copy('Start work')}
+                              </DButton>
                             ) : null
                           }
                         />
@@ -4789,6 +4856,7 @@ export function ReferenceTransactionDetail({
                 locale={locale}
                 businessName={businessName}
                 branchName={branchName}
+                branchAddress={branchAddress}
                 cashierName={cashierName}
                 transactionDate={transactionDate}
                 hasDiscount={hasDiscount}
@@ -4809,6 +4877,7 @@ export function ReceiptContent({
   locale,
   businessName,
   branchName,
+  branchAddress = null,
   cashierName,
   transactionDate,
   hasDiscount,
@@ -4820,6 +4889,7 @@ export function ReceiptContent({
   locale: string;
   businessName: string;
   branchName: string;
+  branchAddress?: string | null;
   cashierName: string;
   transactionDate: string;
   hasDiscount: boolean;
@@ -4846,6 +4916,9 @@ export function ReceiptContent({
       <header className="text-center">
         <h2 className="text-lg font-black tracking-tight">{businessName}</h2>
         <p className="mt-1 text-xs text-slate-500">{branchName}</p>
+        {branchAddress?.trim() ? (
+          <p className="mt-0.5 text-[11px] text-slate-500">{branchAddress.trim()}</p>
+        ) : null}
         <div className="my-4 border-t border-dashed border-slate-300" />
         <p className="font-mono text-xs font-semibold">{transactionNumber(sale, locale)}</p>
         <p className="mt-1 text-[11px] text-slate-500">{transactionDate}</p>
