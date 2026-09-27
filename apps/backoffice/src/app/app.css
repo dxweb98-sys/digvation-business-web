@@ -1,6 +1,7 @@
 @import 'tailwindcss';
 /* Shared runtime presentation (startup splash) is composed by this app. */
 @source '../../../../packages/runtime/src';
+@import '../../../../packages/runtime/src/presentation.css';
 
 html,
 body,
@@ -63,6 +64,53 @@ body {
 @media (min-width: 1024px) {
   .backoffice-shell__sidebar {
     width: 280px;
+  }
+}
+
+/* ---------------------------------------------------------------- FOCUSED shell layout (AEGIS) */
+
+.backoffice-shell[data-shell-layout='FOCUSED'] .backoffice-shell__sidebar {
+  box-shadow: none;
+  border-right-width: 2px;
+  background-color: var(--color-surface-muted);
+  transition: width var(--motion-duration-transition) var(--motion-ease-standard);
+}
+
+.backoffice-shell[data-shell-layout='FOCUSED'] .backoffice-shell__header {
+  border-bottom-width: 2px;
+  box-shadow: none;
+}
+
+.backoffice-shell[data-shell-layout='FOCUSED'] .backoffice-shell__section-label {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text);
+  opacity: 0.7;
+}
+
+.backoffice-shell[data-shell-layout='FOCUSED'] .backoffice-shell__nav-link {
+  border-left: 3px solid transparent;
+  padding-left: calc(0.75rem - 3px);
+  transition:
+    background-color var(--motion-duration-feedback) var(--motion-ease-standard),
+    border-color var(--motion-duration-feedback) var(--motion-ease-standard);
+}
+
+.backoffice-shell[data-shell-layout='FOCUSED'] .backoffice-shell__nav-link[aria-current='page'] {
+  border-left-color: var(--color-brand);
+  background-color: color-mix(in srgb, var(--color-brand) 12%, transparent);
+  font-weight: 600;
+}
+
+@media (min-width: 768px) {
+  .backoffice-shell[data-shell-layout='FOCUSED'] .backoffice-shell__sidebar {
+    width: 216px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .backoffice-shell[data-shell-layout='FOCUSED'] .backoffice-shell__sidebar {
+    width: 256px;
   }
 }
 
@@ -149,6 +197,34 @@ textarea {
 
 .backoffice-login__form {
   padding: 28px 24px 32px;
+}
+
+/* ---------------------------------------------------------------- FOCUSED login layout (AEGIS) */
+
+.backoffice-login[data-login-layout='FOCUSED'] .backoffice-login__card {
+  box-shadow: var(--shadow-md);
+}
+
+.backoffice-login[data-login-layout='FOCUSED'] .backoffice-login__identity {
+  background-image: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--color-brand) 14%, var(--color-surface)) 0%,
+    color-mix(in srgb, var(--color-brand) 5%, var(--color-surface)) 100%
+  );
+}
+
+.backoffice-login[data-login-layout='FOCUSED'] .backoffice-auth__tile {
+  border-width: 2px;
+  border-color: color-mix(in srgb, var(--color-brand) 22%, var(--color-border));
+  box-shadow: var(--shadow-md);
+}
+
+.backoffice-login[data-login-layout='FOCUSED'] .backoffice-auth__tile--brand .backoffice-auth__bar--wide {
+  background-color: color-mix(in srgb, var(--color-brand) 34%, var(--color-surface));
+}
+
+.backoffice-login[data-login-layout='FOCUSED'] .backoffice-auth__indicator {
+  background-color: color-mix(in srgb, var(--color-success) 24%, var(--color-surface));
 }
 
 .backoffice-login__form-content {

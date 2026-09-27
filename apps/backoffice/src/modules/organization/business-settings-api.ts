@@ -1,4 +1,5 @@
 import type { ApiClient } from '@digvation/business-api';
+import type { PresentationPreset } from '@digvation/business-runtime';
 
 export const BUSINESS_CONFIGURATION_CHANGED_EVENT = 'digvation:business-configuration-changed';
 
@@ -33,6 +34,13 @@ export interface BusinessTaxConfiguration {
   enabled: boolean;
   /** Decimal fraction from Runtime; "0.11" means 11%. */
   rate: string;
+  version: number;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface PresentationConfiguration {
+  presentationPreset: PresentationPreset;
   version: number;
   createdAt: string | null;
   updatedAt: string | null;
@@ -123,6 +131,29 @@ export class BusinessSettingsApi {
       this.client.patch<BusinessTaxConfiguration>('/api/v1/business-configuration/tax', {
         expectedVersion: tax.version,
         ...input,
+      }),
+    );
+  }
+
+  /**
+   * Integration point: Runtime's presentation persistence lands under
+   * `/api/v1/business-configuration/presentation`, sibling to `/tax` above.
+   * Verify this exact path once the Runtime-side ticket lands.
+   */
+  getPresentation() {
+    return this.client.get<PresentationConfiguration>(
+      '/api/v1/business-configuration/presentation',
+    );
+  }
+
+  updatePresentation(
+    presentation: PresentationConfiguration,
+    presentationPreset: PresentationPreset,
+  ) {
+    return configurationChanged(
+      this.client.patch<PresentationConfiguration>('/api/v1/business-configuration/presentation', {
+        expectedVersion: presentation.version,
+        presentationPreset,
       }),
     );
   }

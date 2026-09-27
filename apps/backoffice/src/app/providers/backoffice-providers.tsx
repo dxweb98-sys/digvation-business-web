@@ -2,6 +2,7 @@ import {
   AuthenticatedRuntimeProjectionProvider,
   ConnectivityProvider,
   DeploymentBootstrapProvider,
+  PresentationProvider,
   useConnectivity,
   type DeploymentBootstrapConfig,
 } from '@digvation/business-runtime';
@@ -91,11 +92,13 @@ function AuthenticatedBackofficeProviders({ router }: Pick<BackofficeProvidersPr
   if (status === 'hydrating') return null;
 
   const content = (
-    <QueryClientProvider client={queryClient}>
-      <BusinessLocationProvider>
-        <ConnectedBackofficeRouter router={router} />
-      </BusinessLocationProvider>
-    </QueryClientProvider>
+    <PresentationProvider>
+      <QueryClientProvider client={queryClient}>
+        <BusinessLocationProvider>
+          <ConnectedBackofficeRouter router={router} />
+        </BusinessLocationProvider>
+      </QueryClientProvider>
+    </PresentationProvider>
   );
 
   if (!session) return content;

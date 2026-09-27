@@ -12,11 +12,27 @@ export {
   AuthenticatedRuntimeProjectionProvider,
   DeploymentBootstrapProvider,
   useDeploymentBootstrap,
+  useOptionalAuthenticatedRuntimeProjection,
   useRuntime,
 } from './runtime-context';
 export { HttpDeploymentBootstrapAdapter } from './runtime-config.adapter';
 export { runtimeConfigSchema } from './runtime-config.schema';
 export { resolveBootstrapWorkspace } from './workspace-resolution';
+export {
+  PRESENTATION_BUNDLES,
+  isPresentationPreset,
+  resolvePresentationBundle,
+  resolvePresentationPreset,
+} from './presentation';
+export type {
+  AppearancePreset,
+  LoginLayoutPreset,
+  MotionPreset,
+  PresentationBundle,
+  ShellLayoutPreset,
+  SplashPreset,
+} from './presentation';
+export { PresentationProvider, usePresentationBundle } from './presentation-context';
 export type {
   ApplicationAvailabilityConfig,
   ApplicationId,
@@ -37,6 +53,7 @@ export type {
   EffectiveBusinessPreferences,
   EffectiveBusinessProfileConfiguration,
   EffectiveEntitlementConfig,
+  PresentationPreset,
   ThemeColorConfig,
   ThemeConfig,
   ThemePreset,

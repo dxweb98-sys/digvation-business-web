@@ -117,6 +117,16 @@ export function AuthenticatedRuntimeProjectionProvider({
 }
 
 /**
+ * Returns the authenticated projection when available, or `null` before
+ * authentication. Unlike `useRuntime()`, this never throws — it is the
+ * correct read for infrastructure (such as the presentation resolver) that
+ * must work identically pre- and post-auth.
+ */
+export function useOptionalAuthenticatedRuntimeProjection(): AuthenticatedRuntimeProjection | null {
+  return useContext(AuthenticatedRuntimeProjectionContext);
+}
+
+/**
  * @deprecated Prefer `useDeploymentBootstrap()` for deployment data and the
  * authenticated session for business/access/preferences. This compatibility
  * view exists only while accepted screens migrate off the former aggregate.

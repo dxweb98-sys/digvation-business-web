@@ -1,5 +1,5 @@
 import type { AuthSession } from '@digvation/business-auth';
-import { useDeploymentBootstrap } from '@digvation/business-runtime';
+import { useDeploymentBootstrap, usePresentationBundle } from '@digvation/business-runtime';
 import { DAvatar, DButton, DDropdown } from '@digvation/ui';
 import {
   BadgePercent,
@@ -119,6 +119,7 @@ const navigationSections: ReadonlyArray<{
 
 export function BackofficeShell() {
   const bootstrap = useDeploymentBootstrap();
+  const { shellLayout } = usePresentationBundle();
   const { t, formatDate } = useBackofficeLocalization();
   const { session, logout } = useBackofficeAuth();
   const location = useLocation();
@@ -147,7 +148,10 @@ export function BackofficeShell() {
   });
 
   return (
-    <div className="backoffice-shell flex h-screen w-full min-w-0 overflow-hidden bg-[var(--color-background)]">
+    <div
+      data-shell-layout={shellLayout}
+      className="backoffice-shell flex h-screen w-full min-w-0 overflow-hidden bg-[var(--color-background)]"
+    >
       <aside className="backoffice-shell__sidebar hidden min-h-0 shrink-0 flex-col border-r border-[var(--color-border)] bg-[var(--color-surface)] shadow-[1px_0_0_var(--color-border)] md:flex md:w-[232px] lg:w-[280px]">
         <div className="flex min-h-16 items-center gap-3 border-b border-[var(--color-border)] px-5 py-3">
           <div className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-[var(--radius-control)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]">
@@ -210,7 +214,7 @@ export function BackofficeShell() {
       </aside>
 
       <main className="backoffice-shell__main flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden">
-        <header className="flex h-16 w-full shrink-0 items-center justify-between gap-4 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-5 shadow-[0_1px_0_var(--color-border)] md:px-6 lg:px-8">
+        <header className="backoffice-shell__header flex h-16 w-full shrink-0 items-center justify-between gap-4 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-5 shadow-[0_1px_0_var(--color-border)] md:px-6 lg:px-8">
           <div className="flex min-w-0 items-center gap-2">
             <div className="backoffice-shell__mobile-navigation md:hidden">
               <DDropdown
@@ -339,7 +343,7 @@ function NavigationGroups({ session }: { session: AuthSession }) {
         if (!items.length) return null;
         return (
           <div key={section.label} className="mt-3">
-            <p className="px-3 pb-1 text-[12px] font-semibold text-[var(--color-text-muted)]">
+            <p className="backoffice-shell__section-label px-3 pb-1 text-[12px] font-semibold text-[var(--color-text-muted)]">
               {t(section.label)}
             </p>
             <div className="space-y-0.5 pl-3">
@@ -368,7 +372,7 @@ function NavigationLink({ item, nested = false }: { item: NavigationItem; nested
       to={item.to}
       className={({ isActive }) =>
         [
-          'flex h-9 items-center justify-start gap-2 rounded-[var(--radius-control)] text-sm font-medium transition-colors duration-150',
+          'backoffice-shell__nav-link flex h-9 items-center justify-start gap-2 rounded-[var(--radius-control)] text-sm font-medium transition-colors duration-150',
           nested ? 'px-3' : 'px-3',
           isActive
             ? 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]'

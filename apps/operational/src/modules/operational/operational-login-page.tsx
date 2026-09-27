@@ -3,7 +3,7 @@ import { Building2 } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent, type TransitionEvent } from 'react';
 
 import type { AuthPort, AuthSession } from '@digvation/business-auth';
-import { useDeploymentBootstrap } from '@digvation/business-runtime';
+import { useDeploymentBootstrap, usePresentationBundle } from '@digvation/business-runtime';
 import { useOperationalLocalization } from '../../app/localization/operational-localization';
 import './operational-login-page.css';
 
@@ -85,6 +85,7 @@ type FieldErrors = { identifier?: string; password?: string };
  */
 export function OperationalLoginPage({ authPort, onAuthenticated }: OperationalLoginPageProps) {
   const { branding } = useDeploymentBootstrap();
+  const { loginLayout } = usePresentationBundle();
   const { copy } = useOperationalLocalization();
   const { showToast } = useToast();
   const [identifier, setIdentifier] = useState('');
@@ -166,6 +167,7 @@ export function OperationalLoginPage({ authPort, onAuthenticated }: OperationalL
 
   return (
     <main
+      data-login-layout={loginLayout}
       className={`operational-login operational-view-enter h-full overflow-y-auto transition-[opacity,transform] duration-200 ease-out ${
         isLeaving ? 'pointer-events-none -translate-y-1 opacity-0' : 'translate-y-0 opacity-100'
       }`}

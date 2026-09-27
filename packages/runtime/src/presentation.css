@@ -1,0 +1,46 @@
+/*
+ * Presentation appearance + motion tokens (DIG-59). Keyed on the `data-*`
+ * attributes PresentationProvider applies to `documentElement`. DEFAULT
+ * reproduces today's Digvation appearance exactly (no rules below fire for
+ * it). AEGIS overrides the same semantic CSS custom properties the
+ * deployment bootstrap theme already defines, so deployment-supplied inline
+ * colors (branding/locked identity) naturally win over this preset — inline
+ * style always outranks a stylesheet rule regardless of attribute
+ * specificity. This file must stay a bounded, finite token set: no arbitrary
+ * per-tenant values, no raw CSS from configuration.
+ */
+
+:root[data-appearance='AEGIS'] {
+  --color-surface-muted: color-mix(in srgb, var(--color-text) 6%, var(--color-surface));
+  --color-border: color-mix(in srgb, var(--color-text) 18%, var(--color-surface));
+  --color-text-muted: color-mix(in srgb, var(--color-text) 62%, var(--color-surface));
+  --radius-control: 6px;
+  --radius-card: 8px;
+  --radius-panel: 10px;
+  --shadow-sm: 0 1px 2px color-mix(in srgb, var(--color-text) 14%, transparent);
+  --shadow-md: 0 4px 10px color-mix(in srgb, var(--color-text) 16%, transparent);
+  --shadow-lg: 0 10px 24px color-mix(in srgb, var(--color-text) 18%, transparent);
+}
+
+/* Bounded duration/easing families only — never arbitrary per-tenant values. */
+:root {
+  --motion-duration-entrance: 180ms;
+  --motion-duration-transition: 200ms;
+  --motion-duration-feedback: 120ms;
+  --motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+}
+
+:root[data-motion='ASSERTIVE'] {
+  --motion-duration-entrance: 260ms;
+  --motion-duration-transition: 240ms;
+  --motion-duration-feedback: 90ms;
+  --motion-ease-standard: cubic-bezier(0.32, 0, 0.1, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-duration-entrance: 0ms;
+    --motion-duration-transition: 0ms;
+    --motion-duration-feedback: 0ms;
+  }
+}

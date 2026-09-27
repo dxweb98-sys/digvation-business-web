@@ -1,6 +1,7 @@
 @import 'tailwindcss';
 /* Shared runtime presentation (startup splash) is composed by this app. */
 @source '../../../../packages/runtime/src';
+@import '../../../../packages/runtime/src/presentation.css';
 
 html,
 body,
@@ -51,6 +52,25 @@ body {
 @media (min-width: 1024px) {
   .operational-shell__sidebar {
     width: 280px;
+  }
+}
+
+/* ---------------------------------------------------------------- FOCUSED shell layout (AEGIS) */
+
+.operational-shell[data-shell-layout='FOCUSED'] .operational-shell__sidebar {
+  box-shadow: none;
+  border-right-width: 2px;
+}
+
+@media (min-width: 768px) {
+  .operational-shell[data-shell-layout='FOCUSED'] .operational-shell__sidebar {
+    width: 216px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .operational-shell[data-shell-layout='FOCUSED'] .operational-shell__sidebar {
+    width: 256px;
   }
 }
 

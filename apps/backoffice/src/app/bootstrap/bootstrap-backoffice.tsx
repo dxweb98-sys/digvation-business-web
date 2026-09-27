@@ -27,6 +27,7 @@ export async function bootstrapBackoffice(): Promise<BackofficeStartupResult> {
 
   return {
     branding: bootstrap.branding,
+    presentationPreset: bootstrap.presentationPreset,
     element: (
       <BackofficeProviders
         bootstrap={bootstrap}

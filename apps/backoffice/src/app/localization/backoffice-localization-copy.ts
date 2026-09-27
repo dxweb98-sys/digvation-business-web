@@ -278,6 +278,25 @@ export const backofficeCopy: Record<string, { id: string; en: string }> = {
     id: 'Atur bahasa default dan tampilan waktu untuk bisnis ini.',
     en: 'Set the default language and time presentation for this business.',
   },
+  'Presentation theme': { id: 'Tema Tampilan', en: 'Presentation theme' },
+  'Choose how this workspace looks. Products and access stay unchanged.': {
+    id: 'Pilih tampilan ruang kerja ini. Produk dan akses tidak berubah.',
+    en: 'Choose how this workspace looks. Products and access stay unchanged.',
+  },
+  'The current Digvation look and feel.': {
+    id: 'Tampilan standar Digvation.',
+    en: 'The current Digvation look and feel.',
+  },
+  Aegis: { id: 'Aegis', en: 'Aegis' },
+  'A firm, distinctive presentation focused on the operational experience.': {
+    id: 'Tampilan tegas dan berkarakter dengan fokus pada pengalaman operasional.',
+    en: 'A firm, distinctive presentation focused on the operational experience.',
+  },
+  'Presentation updated.': { id: 'Tampilan berhasil diperbarui.', en: 'Presentation updated.' },
+  'Could not update presentation.': {
+    id: 'Tampilan tidak dapat diperbarui.',
+    en: 'Could not update presentation.',
+  },
   Configuration: { id: 'Konfigurasi', en: 'Configuration' },
   'Selling locations': { id: 'Lokasi penjualan', en: 'Selling locations' },
   'Edit profile': { id: 'Ubah profil', en: 'Edit profile' },

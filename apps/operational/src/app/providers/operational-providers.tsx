@@ -8,6 +8,7 @@ import {
   AuthenticatedRuntimeProjectionProvider,
   ConnectivityProvider,
   DeploymentBootstrapProvider,
+  PresentationProvider,
   useConnectivity,
   type DeploymentBootstrapConfig,
 } from '@digvation/business-runtime';
@@ -109,7 +110,11 @@ function OperationalAuthBoundary({ session, authPort, router }: OperationalAuthB
   };
 
   if (!authenticatedSession) {
-    return <OperationalLoginPage authPort={authPort} onAuthenticated={handleAuthenticated} />;
+    return (
+      <PresentationProvider>
+        <OperationalLoginPage authPort={authPort} onAuthenticated={handleAuthenticated} />
+      </PresentationProvider>
+    );
   }
 
   const allowed =
@@ -131,26 +136,28 @@ function OperationalAuthBoundary({ session, authPort, router }: OperationalAuthB
 
   return (
     <AuthenticatedRuntimeProjectionProvider projection={authenticatedSession}>
-      <AuthProvider
-        session={authenticatedSession}
-        authPort={authPort}
-        onLogout={() => setLoggingOut(true)}
-      >
-        <DLocalizationProvider locale={runtimeLocale(authenticatedSession.preferences.locale)}>
-          <OperationalSessionProvider>
-            <PosOperationalSessionProvider>
-              <div
-                className={`operational-view-enter min-h-screen transition-[opacity,transform] duration-150 ease-out ${
-                  isLoggingOut ? 'pointer-events-none -translate-y-1 opacity-0' : 'opacity-100'
-                }`}
-                onTransitionEnd={completeLogoutTransition}
-              >
-                <ConnectedOperationalRouter router={router} />
-              </div>
-            </PosOperationalSessionProvider>
-          </OperationalSessionProvider>
-        </DLocalizationProvider>
-      </AuthProvider>
+      <PresentationProvider>
+        <AuthProvider
+          session={authenticatedSession}
+          authPort={authPort}
+          onLogout={() => setLoggingOut(true)}
+        >
+          <DLocalizationProvider locale={runtimeLocale(authenticatedSession.preferences.locale)}>
+            <OperationalSessionProvider>
+              <PosOperationalSessionProvider>
+                <div
+                  className={`operational-view-enter min-h-screen transition-[opacity,transform] duration-150 ease-out ${
+                    isLoggingOut ? 'pointer-events-none -translate-y-1 opacity-0' : 'opacity-100'
+                  }`}
+                  onTransitionEnd={completeLogoutTransition}
+                >
+                  <ConnectedOperationalRouter router={router} />
+                </div>
+              </PosOperationalSessionProvider>
+            </OperationalSessionProvider>
+          </DLocalizationProvider>
+        </AuthProvider>
+      </PresentationProvider>
     </AuthenticatedRuntimeProjectionProvider>
   );
 }

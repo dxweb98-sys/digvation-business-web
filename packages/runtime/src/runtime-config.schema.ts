@@ -58,4 +58,5 @@ export const runtimeConfigSchema = z.object({
     locale: z.enum(['id-ID', 'en-US']),
     country: z.string().regex(/^[A-Z]{2}$/),
   }),
+  presentationPreset: z.enum(['DEFAULT', 'AEGIS']).optional(),
 });
