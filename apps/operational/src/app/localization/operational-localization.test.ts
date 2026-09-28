@@ -41,4 +41,13 @@ describe('operational localization', () => {
     expect(operationalLabel('OPERATIONAL', 'id-ID')).toBe('Operational');
     expect(operationalLabel('SYSTEM', 'id-ID')).toBe('Sistem');
   });
+
+  it('translates the Workshop work-status lifecycle vocabulary', () => {
+    expect(operationalLabel('WAITING', 'id-ID')).toBe('Menunggu');
+    expect(operationalLabel('ASSIGNED', 'id-ID')).toBe('Ditugaskan');
+    expect(operationalLabel('IN_PROGRESS', 'id-ID')).toBe('Dikerjakan');
+    expect(operationalLabel('PAUSED', 'id-ID')).toBe('Dijeda');
+    expect(operationalLabel('DONE', 'id-ID')).toBe('Selesai');
+    expect(operationalLabel('CANCELLED', 'id-ID')).toBe('Dibatalkan');
+  });
 });

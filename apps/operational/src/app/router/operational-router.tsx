@@ -13,6 +13,7 @@ import { financeOperationalNavigation } from '../../modules/finance/finance-oper
 import { OperationalExpensesPage } from '../../modules/finance/operational-expenses-page';
 import { workshopOperationalNavigation } from '../../modules/workshop/workshop-operational-navigation';
 import { WorkshopIntakePage } from '../../modules/workshop/workshop-intake-page';
+import { WorkshopQueuePage } from '../../modules/workshop/workshop-queue-page';
 
 export function canAccessOperationalExpenses(
   permissions: readonly string[],
@@ -42,6 +43,14 @@ export function canAccessWorkshopIntake(
   );
 }
 
+/**
+ * Queue visibility is independent of Intake — a user may read the queue
+ * without being able to create new Work Orders, and vice versa.
+ */
+export function canAccessWorkshopQueue(permissions: readonly string[], hasWorkshop: boolean) {
+  return hasWorkshop && permissions.includes('workshop-queue:read');
+}
+
 function useOperationalSurfaceAccess() {
   const { session } = useAuth();
   const permissions = session.access.permissions;
@@ -52,6 +61,7 @@ function useOperationalSurfaceAccess() {
     canSell: hasPos && permissions.includes('sales:create'),
     canAccessExpenses: canAccessOperationalExpenses(permissions, hasFinance),
     canAccessWorkshopIntake: canAccessWorkshopIntake(permissions, hasWorkshop),
+    canAccessWorkshopQueue: canAccessWorkshopQueue(permissions, hasWorkshop),
   };
 }
 
@@ -80,17 +90,23 @@ function OperationalLayout() {
           },
         ]
       : []),
-    ...(access.canAccessWorkshopIntake
-      ? [
-          {
-            label: copy(workshopOperationalNavigation.label),
-            items: workshopOperationalNavigation.items.map((item) => ({
-              ...item,
-              label: copy(item.label),
-            })),
-          },
-        ]
-      : []),
+    ...(() => {
+      const workshopItems = workshopOperationalNavigation.items.filter((item) =>
+        item.to === '/workshop/intake'
+          ? access.canAccessWorkshopIntake
+          : item.to === '/workshop/queue'
+            ? access.canAccessWorkshopQueue
+            : false,
+      );
+      return workshopItems.length
+        ? [
+            {
+              label: copy(workshopOperationalNavigation.label),
+              items: workshopItems.map((item) => ({ ...item, label: copy(item.label) })),
+            },
+          ]
+        : [];
+    })(),
   ];
   return <OperationalShell navigationSections={navigationSections} />;
 }
@@ -100,6 +116,7 @@ function OperationalHome() {
   if (access.canSell) return <Navigate to="/sell" replace />;
   if (access.canAccessExpenses) return <Navigate to="/expenses" replace />;
   if (access.canAccessWorkshopIntake) return <Navigate to="/workshop/intake" replace />;
+  if (access.canAccessWorkshopQueue) return <Navigate to="/workshop/queue" replace />;
   return <Navigate to="/login" replace />;
 }
 
@@ -176,6 +193,15 @@ function WorkshopIntakeRoute() {
   );
 }
 
+function WorkshopQueueRoute() {
+  const { canAccessWorkshopQueue } = useOperationalSurfaceAccess();
+  return (
+    <SurfaceGate allowed={canAccessWorkshopQueue}>
+      <WorkshopQueuePage />
+    </SurfaceGate>
+  );
+}
+
 export const operationalRouter = createBrowserRouter([
   { path: '/login', element: <Navigate to="/" replace /> },
   {
@@ -187,6 +213,7 @@ export const operationalRouter = createBrowserRouter([
       { path: '/sell/:saleId', element: <SellRoute /> },
       { path: '/expenses', element: <ExpensesRoute /> },
       { path: '/workshop/intake', element: <WorkshopIntakeRoute /> },
+      { path: '/workshop/queue', element: <WorkshopQueueRoute /> },
       { path: '*', element: <OperationalNotFoundRoute /> },
     ],
   },

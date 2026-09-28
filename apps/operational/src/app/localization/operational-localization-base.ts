@@ -643,6 +643,56 @@ const copy: Record<string, LocalizedLabel> = {
     'id-ID': 'Tidak dapat mengirim. Coba lagi.',
     'en-US': 'Could not submit. Try again.',
   },
+  Queue: { 'id-ID': 'Antrean', 'en-US': 'Queue' },
+  'Work Orders waiting or in progress at the active location.': {
+    'id-ID': 'Work Order yang menunggu atau sedang dikerjakan pada lokasi aktif.',
+    'en-US': 'Work Orders waiting or in progress at the active location.',
+  },
+  'Search by Work Order number': {
+    'id-ID': 'Cari berdasarkan nomor Work Order',
+    'en-US': 'Search by Work Order number',
+  },
+  'All statuses': { 'id-ID': 'Semua status', 'en-US': 'All statuses' },
+  'No Work Orders match the current filters.': {
+    'id-ID': 'Tidak ada Work Order yang sesuai dengan filter saat ini.',
+    'en-US': 'No Work Orders match the current filters.',
+  },
+  'Could not load the Workshop queue.': {
+    'id-ID': 'Antrean bengkel tidak dapat dimuat.',
+    'en-US': 'Could not load the Workshop queue.',
+  },
+  'Try loading the queue again.': {
+    'id-ID': 'Coba muat ulang antrean.',
+    'en-US': 'Try loading the queue again.',
+  },
+  Vehicle: { 'id-ID': 'Kendaraan', 'en-US': 'Vehicle' },
+  Created: { 'id-ID': 'Dibuat', 'en-US': 'Created' },
+  Pause: { 'id-ID': 'Jeda', 'en-US': 'Pause' },
+  Resume: { 'id-ID': 'Lanjutkan', 'en-US': 'Resume' },
+  'Cancel work order': { 'id-ID': 'Batalkan Work Order', 'en-US': 'Cancel work order' },
+  'Explain why this Work Order is cancelled.': {
+    'id-ID': 'Jelaskan alasan pembatalan Work Order ini.',
+    'en-US': 'Explain why this Work Order is cancelled.',
+  },
+  Back: { 'id-ID': 'Kembali', 'en-US': 'Back' },
+  'Confirm cancellation': { 'id-ID': 'Konfirmasi pembatalan', 'en-US': 'Confirm cancellation' },
+  'Work Order cancelled.': { 'id-ID': 'Work Order dibatalkan.', 'en-US': 'Work Order cancelled.' },
+  'This Work Order changed elsewhere. Reload and try again.': {
+    'id-ID': 'Work Order ini telah berubah di tempat lain. Muat ulang dan coba lagi.',
+    'en-US': 'This Work Order changed elsewhere. Reload and try again.',
+  },
+  'This action is no longer available for the current Work Order status.': {
+    'id-ID': 'Aksi ini tidak lagi tersedia untuk status Work Order saat ini.',
+    'en-US': 'This action is no longer available for the current Work Order status.',
+  },
+  'Enter a reason to cancel this Work Order.': {
+    'id-ID': 'Isi alasan untuk membatalkan Work Order ini.',
+    'en-US': 'Enter a reason to cancel this Work Order.',
+  },
+  'Could not update the Work Order. Try again.': {
+    'id-ID': 'Work Order tidak dapat diperbarui. Coba lagi.',
+    'en-US': 'Could not update the Work Order. Try again.',
+  },
 };
 
 const technicalLabels: Record<string, LocalizedLabel> = {
@@ -661,6 +711,9 @@ const technicalLabels: Record<string, LocalizedLabel> = {
   CANCELLED: { 'id-ID': 'Dibatalkan', 'en-US': 'Cancelled' },
   PENDING: { 'id-ID': 'Menunggu', 'en-US': 'Pending' },
   WAITING: { 'id-ID': 'Menunggu', 'en-US': 'Waiting' },
+  ASSIGNED: { 'id-ID': 'Ditugaskan', 'en-US': 'Assigned' },
+  PAUSED: { 'id-ID': 'Dijeda', 'en-US': 'Paused' },
+  DONE: { 'id-ID': 'Selesai', 'en-US': 'Done' },
   SUCCEEDED: { 'id-ID': 'Berhasil', 'en-US': 'Succeeded' },
   FAILED: { 'id-ID': 'Gagal', 'en-US': 'Failed' },
   REJECTED: { 'id-ID': 'Ditolak', 'en-US': 'Rejected' },
