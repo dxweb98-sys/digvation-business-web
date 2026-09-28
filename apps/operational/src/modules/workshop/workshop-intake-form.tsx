@@ -547,6 +547,7 @@ export function WorkshopIntakeDialog({
       onClose={closeDialog}
       closeOnOverlay={false}
       size="xl"
+      ariaLabel={created ? copy('Work Order created') : copy('Create Work Order')}
       title={
         <span className="text-xl font-bold tracking-tight">
           {created ? copy('Work Order created') : copy('Create Work Order')}
