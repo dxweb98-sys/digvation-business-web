@@ -28,7 +28,14 @@ function isSameDay(a: Date, b: Date) {
  * users with `workshop-queue:read`, and it never blocks the Intake action:
  * loading and failure stay inside this section.
  */
-export function WorkshopRecentWorkOrders({ onOpenQueue }: { onOpenQueue: () => void }) {
+export function WorkshopRecentWorkOrders({
+  onOpenQueue,
+  highlightId,
+}: {
+  onOpenQueue: () => void;
+  /** The Work Order just created, marked in the list. */
+  highlightId?: string | null;
+}) {
   const bootstrap = useDeploymentBootstrap();
   const { authPort } = useAuth();
   const { selectedLocationId } = useOperationalSession();
@@ -108,7 +115,14 @@ export function WorkshopRecentWorkOrders({ onOpenQueue }: { onOpenQueue: () => v
             {items.map((workOrder) => {
               const createdAt = new Date(workOrder.createdAt);
               return (
-                <li key={workOrder.id} className="flex items-start justify-between gap-4 py-3">
+                <li
+                  key={workOrder.id}
+                  className={
+                    workOrder.id === highlightId
+                      ? 'flex items-start justify-between gap-4 bg-(--color-brand)/5 px-2 py-3'
+                      : 'flex items-start justify-between gap-4 px-2 py-3'
+                  }
+                >
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-(--color-text)">
                       {workOrder.workOrderNumber}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { canCreateWorkshopCustomer } from './workshop-intake-page';
-import { formatPhoneForDisplay } from './workshop-intake-dialog';
+import { formatPhoneForDisplay } from './workshop-intake-form';
 
 describe('Workshop Intake customer-creation access', () => {
   it('gates new-Customer creation on customers:manage only', () => {
