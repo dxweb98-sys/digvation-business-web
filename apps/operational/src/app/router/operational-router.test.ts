@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   canAccessOperationalExpenses,
   canAccessWorkshopIntake,
+  canAccessWorkshopQueue,
   OperationalNotFoundRoute,
   operationalRouter,
 } from './operational-router';
@@ -42,6 +43,25 @@ describe('Workshop Intake navigation access', () => {
   });
 });
 
+describe('Workshop Queue navigation access', () => {
+  it('exposes Queue to a WORKSHOP-entitled user with workshop-queue:read', () => {
+    expect(canAccessWorkshopQueue(['workshop-queue:read'], true)).toBe(true);
+  });
+
+  it('denies Queue when WORKSHOP is not entitled, even with the permission present', () => {
+    expect(canAccessWorkshopQueue(['workshop-queue:read'], false)).toBe(false);
+  });
+
+  it('denies Queue without workshop-queue:read', () => {
+    expect(canAccessWorkshopQueue(['work-orders:create'], true)).toBe(false);
+  });
+
+  it('is independent of Intake access — Queue does not require work-orders:create', () => {
+    expect(canAccessWorkshopQueue(['workshop-queue:read'], true)).toBe(true);
+    expect(canAccessWorkshopIntake(['workshop-queue:read'], true)).toBe(false);
+  });
+});
+
 describe('Operational route registration', () => {
   it('registers the Workshop Intake route alongside existing POS/Finance routes', () => {
     const paths = operationalRouter.routes
@@ -49,7 +69,13 @@ describe('Operational route registration', () => {
       .map((route) => route.path);
 
     expect(paths).toEqual(
-      expect.arrayContaining(['/sell', '/sell/:saleId', '/expenses', '/workshop/intake']),
+      expect.arrayContaining([
+        '/sell',
+        '/sell/:saleId',
+        '/expenses',
+        '/workshop/intake',
+        '/workshop/queue',
+      ]),
     );
   });
 });
