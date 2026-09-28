@@ -1,4 +1,4 @@
-import type { WorkshopWorkOrderStatus } from './workshop-queue-api';
+import type { WorkshopWorkOrderStatus } from '../api/workshop-queue-api';
 
 export type WorkshopQueueAction = 'pause' | 'resume' | 'complete' | 'cancel';
 

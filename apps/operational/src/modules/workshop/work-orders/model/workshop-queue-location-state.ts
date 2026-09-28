@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import type { WorkshopQueueWorkOrder } from './workshop-queue-api';
+import type { WorkshopQueueWorkOrder } from '../api/workshop-queue-api';
 
 /**
  * Queue UI state that belongs to ONE active Operational location: the page

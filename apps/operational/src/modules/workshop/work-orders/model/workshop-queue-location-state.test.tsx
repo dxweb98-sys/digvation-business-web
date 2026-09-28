@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import type { WorkshopQueueWorkOrder } from './workshop-queue-api';
+import type { WorkshopQueueWorkOrder } from '../api/workshop-queue-api';
 import { useLocationBoundQueueState } from './workshop-queue-location-state';
 
 const LOCATION_A = '11111111-1111-4111-8111-111111111111';

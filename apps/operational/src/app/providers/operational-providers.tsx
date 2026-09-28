@@ -25,6 +25,7 @@ import { operationalCopy, type OperationalLocale } from '../localization/operati
 import { OperationalLoginPage } from '../../modules/operational/operational-login-page';
 import { OperationalSessionProvider } from '../../modules/operational/operational-session-provider';
 import { PosOperationalSessionProvider } from '../../modules/pos/pos-operational-session-provider';
+import { canAccessWorkOrderWorkspace } from '../../modules/workshop/work-orders';
 
 function runtimeLocale(locale: string): OperationalLocale {
   return locale === 'en-US' ? 'en-US' : 'id-ID';
@@ -38,10 +39,7 @@ export function hasImplementedOperationalSurface(session: AuthSession): boolean 
   const hasExpenses =
     session.access.capabilities.includes('FINANCE_OPERATIONS') &&
     permissions.some((permission) => permission.startsWith('expenses:'));
-  const hasWorkshop =
-    session.access.products.includes('WORKSHOP') &&
-    permissions.includes('work-orders:create') &&
-    permissions.includes('customers:read');
+  const hasWorkshop = canAccessWorkOrderWorkspace(permissions, session.access.products.includes('WORKSHOP'));
   return hasPos || hasExpenses || hasWorkshop;
 }
 

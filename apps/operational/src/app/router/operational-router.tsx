@@ -11,9 +11,11 @@ import type { OperationalNavigationSection } from '../../modules/operational/ope
 import { posSellOperationalNavigation } from '../../modules/pos/pos-operational-navigation';
 import { financeOperationalNavigation } from '../../modules/finance/finance-operational-navigation';
 import { OperationalExpensesPage } from '../../modules/finance/operational-expenses-page';
-import { workshopOperationalNavigation } from '../../modules/workshop/workshop-operational-navigation';
-import { WorkshopIntakePage } from '../../modules/workshop/workshop-intake-page';
-import { WorkshopQueuePage } from '../../modules/workshop/workshop-queue-page';
+import {
+  canAccessWorkOrderWorkspace,
+  WorkOrdersPage,
+  workOrderNavigation,
+} from '../../modules/workshop/work-orders';
 
 export function canAccessOperationalExpenses(
   permissions: readonly string[],
@@ -27,30 +29,6 @@ export function canAccessOperationalExpenses(
   );
 }
 
-/**
- * Intake requires canonical customer lookup/selection (`customers:read`) in
- * addition to the Workshop action permission. POS entitlement/permissions are
- * never required — a WORKSHOP-only entitled user must reach Intake.
- */
-export function canAccessWorkshopIntake(
-  permissions: readonly string[],
-  hasWorkshop: boolean,
-) {
-  return (
-    hasWorkshop &&
-    permissions.includes('work-orders:create') &&
-    permissions.includes('customers:read')
-  );
-}
-
-/**
- * Queue visibility is independent of Intake — a user may read the queue
- * without being able to create new Work Orders, and vice versa.
- */
-export function canAccessWorkshopQueue(permissions: readonly string[], hasWorkshop: boolean) {
-  return hasWorkshop && permissions.includes('workshop-queue:read');
-}
-
 function useOperationalSurfaceAccess() {
   const { session } = useAuth();
   const permissions = session.access.permissions;
@@ -60,8 +38,7 @@ function useOperationalSurfaceAccess() {
   return {
     canSell: hasPos && permissions.includes('sales:create'),
     canAccessExpenses: canAccessOperationalExpenses(permissions, hasFinance),
-    canAccessWorkshopIntake: canAccessWorkshopIntake(permissions, hasWorkshop),
-    canAccessWorkshopQueue: canAccessWorkshopQueue(permissions, hasWorkshop),
+    canAccessWorkOrders: canAccessWorkOrderWorkspace(permissions, hasWorkshop),
   };
 }
 
@@ -90,23 +67,14 @@ function OperationalLayout() {
           },
         ]
       : []),
-    ...(() => {
-      const workshopItems = workshopOperationalNavigation.items.filter((item) =>
-        item.to === '/workshop/intake'
-          ? access.canAccessWorkshopIntake
-          : item.to === '/workshop/queue'
-            ? access.canAccessWorkshopQueue
-            : false,
-      );
-      return workshopItems.length
-        ? [
-            {
-              label: copy(workshopOperationalNavigation.label),
-              items: workshopItems.map((item) => ({ ...item, label: copy(item.label) })),
-            },
-          ]
-        : [];
-    })(),
+    ...(access.canAccessWorkOrders
+      ? [
+          {
+            label: copy(workOrderNavigation.label),
+            items: workOrderNavigation.items.map((item) => ({ ...item, label: copy(item.label) })),
+          },
+        ]
+      : []),
   ];
   return <OperationalShell navigationSections={navigationSections} />;
 }
@@ -115,8 +83,7 @@ function OperationalHome() {
   const access = useOperationalSurfaceAccess();
   if (access.canSell) return <Navigate to="/sell" replace />;
   if (access.canAccessExpenses) return <Navigate to="/expenses" replace />;
-  if (access.canAccessWorkshopIntake) return <Navigate to="/workshop/intake" replace />;
-  if (access.canAccessWorkshopQueue) return <Navigate to="/workshop/queue" replace />;
+  if (access.canAccessWorkOrders) return <Navigate to="/workshop/work-orders" replace />;
   return <Navigate to="/login" replace />;
 }
 
@@ -184,20 +151,11 @@ function ExpensesRoute() {
   );
 }
 
-function WorkshopIntakeRoute() {
-  const { canAccessWorkshopIntake } = useOperationalSurfaceAccess();
+function WorkOrdersRoute() {
+  const { canAccessWorkOrders } = useOperationalSurfaceAccess();
   return (
-    <SurfaceGate allowed={canAccessWorkshopIntake}>
-      <WorkshopIntakePage />
-    </SurfaceGate>
-  );
-}
-
-function WorkshopQueueRoute() {
-  const { canAccessWorkshopQueue } = useOperationalSurfaceAccess();
-  return (
-    <SurfaceGate allowed={canAccessWorkshopQueue}>
-      <WorkshopQueuePage />
+    <SurfaceGate allowed={canAccessWorkOrders}>
+      <WorkOrdersPage />
     </SurfaceGate>
   );
 }
@@ -212,8 +170,10 @@ export const operationalRouter = createBrowserRouter([
       { path: '/sell', element: <SellRoute /> },
       { path: '/sell/:saleId', element: <SellRoute /> },
       { path: '/expenses', element: <ExpensesRoute /> },
-      { path: '/workshop/intake', element: <WorkshopIntakeRoute /> },
-      { path: '/workshop/queue', element: <WorkshopQueueRoute /> },
+      { path: '/workshop/work-orders', element: <WorkOrdersRoute /> },
+      // Former Intake and Queue URLs land on the single Work Order workspace.
+      { path: '/workshop/intake', element: <Navigate to="/workshop/work-orders" replace /> },
+      { path: '/workshop/queue', element: <Navigate to="/workshop/work-orders" replace /> },
       { path: '*', element: <OperationalNotFoundRoute /> },
     ],
   },
