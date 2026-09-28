@@ -1,6 +1,22 @@
 import { describe, expect, it } from 'vitest';
 
-import { availableWorkshopQueueActions, canReadWorkshopQueue } from './workshop-queue-actions';
+import {
+  WORKSHOP_QUEUE_ERROR_COPY,
+  availableWorkshopQueueActions,
+  canReadWorkshopQueue,
+} from './workshop-queue-actions';
+
+describe('Workshop queue error copy', () => {
+  it('is keyed by the Runtime error codes, including the Runtime cancellation-reason code', () => {
+    // Runtime rejects a blank cancellation reason with exactly this code.
+    expect(WORKSHOP_QUEUE_ERROR_COPY.WORKSHOP_CANCELLATION_REASON_REQUIRED).toBeDefined();
+    expect(WORKSHOP_QUEUE_ERROR_COPY.WORKSHOP_WORK_STATUS_TRANSITION_INVALID).toBeDefined();
+  });
+
+  it('does not keep a code Runtime never returns', () => {
+    expect(WORKSHOP_QUEUE_ERROR_COPY).not.toHaveProperty('CANCELLATION_REASON_REQUIRED');
+  });
+});
 
 describe('Workshop queue action availability', () => {
   it('offers pause/complete/cancel for IN_PROGRESS with matching permissions', () => {

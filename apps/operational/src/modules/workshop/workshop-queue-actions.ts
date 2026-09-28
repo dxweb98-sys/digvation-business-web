@@ -39,6 +39,16 @@ export function availableWorkshopQueueActions(
   }
 }
 
+/**
+ * User-facing copy for the Runtime error codes the queue can present. Keys are
+ * the exact codes Runtime returns; Runtime owns the error vocabulary.
+ */
+export const WORKSHOP_QUEUE_ERROR_COPY: Record<string, string> = {
+  WORKSHOP_WORK_STATUS_TRANSITION_INVALID:
+    'This action is no longer available for the current Work Order status.',
+  WORKSHOP_CANCELLATION_REASON_REQUIRED: 'Enter a reason to cancel this Work Order.',
+};
+
 export function canReadWorkshopQueue(permissions: readonly string[]): boolean {
   return permissions.includes('workshop-queue:read');
 }

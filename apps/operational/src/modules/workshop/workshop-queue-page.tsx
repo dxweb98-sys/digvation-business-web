@@ -21,8 +21,10 @@ import { useOperationalLocalization } from '../../app/localization/operational-l
 import { useOperationalSession } from '../operational/operational-session-provider';
 import {
   availableWorkshopQueueActions,
+  WORKSHOP_QUEUE_ERROR_COPY,
   type WorkshopQueueAction,
 } from './workshop-queue-actions';
+import { useLocationBoundQueueState } from './workshop-queue-location-state';
 import {
   WorkshopQueueApi,
   type WorkshopQueueWorkOrder,
@@ -51,12 +53,6 @@ function apiErrorStatus(error: unknown): number | undefined {
   return (error as { status?: number } | undefined)?.status;
 }
 
-const ERROR_COPY: Record<string, string> = {
-  WORKSHOP_WORK_STATUS_TRANSITION_INVALID:
-    'This action is no longer available for the current Work Order status.',
-  CANCELLATION_REASON_REQUIRED: 'Enter a reason to cancel this Work Order.',
-};
-
 export function WorkshopQueuePage() {
   const bootstrap = useDeploymentBootstrap();
   const { session, authPort } = useAuth();
@@ -65,12 +61,21 @@ export function WorkshopQueuePage() {
   const { showToast } = useToast();
   const queryClient = useQueryClient();
 
-  const [offset, setOffset] = useState(0);
+  // Offset, the open detail and the cancellation form belong to the active
+  // Operational location and reset when it changes; search and status filter
+  // are page-level and are kept.
+  const {
+    offset,
+    setOffset,
+    selected,
+    setSelected,
+    cancelReason,
+    setCancelReason,
+    isCancelling,
+    setCancelling,
+  } = useLocationBoundQueueState(selectedLocationId);
   const [workOrderNumberQuery, setWorkOrderNumberQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<WorkshopWorkOrderStatus | ''>('');
-  const [selected, setSelected] = useState<WorkshopQueueWorkOrder | null>(null);
-  const [cancelReason, setCancelReason] = useState('');
-  const [isCancelling, setCancelling] = useState(false);
 
   const permissions = session.access.permissions;
   const canRead = permissions.includes('workshop-queue:read');
@@ -111,7 +116,9 @@ export function WorkshopQueuePage() {
   });
 
   function applyAuthoritative(workOrder: WorkshopQueueWorkOrder) {
-    setSelected(workOrder);
+    // A command that finishes after the user switched location must not
+    // re-open the previous location's Work Order.
+    if (workOrder.sellingLocationId === selectedLocationId) setSelected(workOrder);
     void queryClient.invalidateQueries({ queryKey: ['workshop-queue'] });
   }
 
@@ -128,7 +135,9 @@ export function WorkshopQueuePage() {
     const code = apiErrorCode(error);
     showToast({
       variant: 'danger',
-      title: copy(ERROR_COPY[code ?? ''] ?? 'Could not update the Work Order. Try again.'),
+      title: copy(
+        WORKSHOP_QUEUE_ERROR_COPY[code ?? ''] ?? 'Could not update the Work Order. Try again.',
+      ),
     });
   }
 
