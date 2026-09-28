@@ -86,12 +86,10 @@ describe('PresentationProvider', () => {
     });
   });
 
-  it('lets the authenticated tenant selection override the bootstrap suggestion post-auth', () => {
+  it('resolves identically post-auth, from the same bootstrap value, regardless of the authenticated projection', () => {
     const { getByTestId } = render(
-      <DeploymentBootstrapProvider config={bootstrap({ presentationPreset: 'DEFAULT' })}>
-        <AuthenticatedRuntimeProjectionProvider
-          projection={projection({ presentationPreset: 'AEGIS' })}
-        >
+      <DeploymentBootstrapProvider config={bootstrap({ presentationPreset: 'AEGIS' })}>
+        <AuthenticatedRuntimeProjectionProvider projection={projection()}>
           <PresentationProvider>
             <Probe />
           </PresentationProvider>
@@ -125,5 +123,22 @@ describe('PresentationProvider', () => {
     const postAuthBundle = postAuth.getByTestId('probe').dataset.bundle;
 
     expect(postAuthBundle).toBe(preAuthBundle);
+  });
+
+  it('never reads presentationPreset off the authenticated projection — there is no such field to override with', () => {
+    const withoutPresentationField: AuthenticatedRuntimeProjection = projection();
+    expect('presentationPreset' in withoutPresentationField).toBe(false);
+
+    const { getByTestId } = render(
+      <DeploymentBootstrapProvider config={bootstrap({ presentationPreset: 'DEFAULT' })}>
+        <AuthenticatedRuntimeProjectionProvider projection={withoutPresentationField}>
+          <PresentationProvider>
+            <Probe />
+          </PresentationProvider>
+        </AuthenticatedRuntimeProjectionProvider>
+      </DeploymentBootstrapProvider>,
+    );
+
+    expect(JSON.parse(getByTestId('probe').dataset.bundle ?? '{}').appearance).toBe('DEFAULT');
   });
 });

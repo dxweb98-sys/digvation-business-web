@@ -81,11 +81,11 @@ body {
   box-shadow: none;
 }
 
+/* Weight/color shift instead of tracked-out capitals — hierarchy without decoration. */
 .backoffice-shell[data-shell-layout='FOCUSED'] .backoffice-shell__section-label {
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  font-weight: var(--presentation-label-weight, 600);
   color: var(--color-text);
-  opacity: 0.7;
+  opacity: 0.72;
 }
 
 .backoffice-shell[data-shell-layout='FOCUSED'] .backoffice-shell__nav-link {
@@ -202,15 +202,26 @@ textarea {
 /* ---------------------------------------------------------------- FOCUSED login layout (AEGIS) */
 
 .backoffice-login[data-login-layout='FOCUSED'] .backoffice-login__card {
+  border: 1px solid var(--color-border);
   box-shadow: var(--shadow-md);
 }
 
+/* Flat brand-tinted surface with one defined edge — no gradient wash. */
 .backoffice-login[data-login-layout='FOCUSED'] .backoffice-login__identity {
-  background-image: linear-gradient(
-    160deg,
-    color-mix(in srgb, var(--color-brand) 14%, var(--color-surface)) 0%,
-    color-mix(in srgb, var(--color-brand) 5%, var(--color-surface)) 100%
-  );
+  background-image: none;
+  background-color: color-mix(in srgb, var(--color-brand) 6%, var(--color-surface));
+  border-bottom-width: 2px;
+}
+
+@media (min-width: 768px) {
+  .backoffice-login[data-login-layout='FOCUSED'] .backoffice-login__identity {
+    border-bottom: 0;
+    border-right-width: 2px;
+  }
+}
+
+.backoffice-login[data-login-layout='FOCUSED'] .backoffice-login__identity::before {
+  display: none;
 }
 
 .backoffice-login[data-login-layout='FOCUSED'] .backoffice-auth__tile {

@@ -261,7 +261,7 @@ export function OperationalShell({
       </aside>
 
       <main className="operational-shell__main flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden">
-        <header className="flex h-16 w-full shrink-0 items-center justify-between gap-4 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-5 shadow-[0_1px_0_var(--color-border)] md:px-6 lg:px-8">
+        <header className="operational-shell__header flex h-16 w-full shrink-0 items-center justify-between gap-4 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-5 shadow-[0_1px_0_var(--color-border)] md:px-6 lg:px-8">
           <div className="flex min-w-0 items-center gap-2 md:gap-3">
             <div className="operational-shell__mobile-navigation md:hidden">
               <DDropdown
@@ -562,7 +562,7 @@ function OperationalNavigationGroups({
     <>
       {navigationSections.map((section) => (
         <div key={section.label} className="mt-3 first:mt-0">
-          <p className="px-3 pb-1 text-[12px] font-semibold text-[var(--color-text-muted)]">
+          <p className="operational-shell__section-label px-3 pb-1 text-[12px] font-semibold text-[var(--color-text-muted)]">
             {section.label}
           </p>
           <div className="space-y-0.5 pl-3">
@@ -572,7 +572,7 @@ function OperationalNavigationGroups({
                 to={to}
                 className={({ isActive }) =>
                   [
-                    'flex h-9 items-center justify-start gap-2 rounded-[var(--radius-control)] px-3 text-sm font-medium transition-colors duration-150',
+                    'operational-shell__nav-link flex h-9 items-center justify-start gap-2 rounded-[var(--radius-control)] px-3 text-sm font-medium transition-colors duration-150',
                     isActive
                       ? 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]'
                       : 'text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)]',

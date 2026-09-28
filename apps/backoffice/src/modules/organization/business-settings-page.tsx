@@ -11,10 +11,10 @@ import {
   type TableColumn,
 } from '@digvation/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Building2, CircleOff, MapPinPlus, Palette, Pencil } from 'lucide-react';
+import { Building2, CircleOff, MapPinPlus, Pencil } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-import { useRuntime, type PresentationPreset } from '@digvation/business-runtime';
+import { useRuntime } from '@digvation/business-runtime';
 import { canPerformBackofficeAction } from '../../auth/backoffice-access';
 import { isSessionExpiredError, useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
@@ -23,13 +23,11 @@ import { useBackofficeLocalization } from '../../app/localization/backoffice-loc
 import {
   BusinessSettingsApi,
   type BusinessProfile,
-  type PresentationConfiguration,
   type SellingLocation,
 } from './business-settings-api';
 
 const businessSettingsKeys = {
   profile: ['business-settings', 'profile'] as const,
-  presentation: ['business-settings', 'presentation'] as const,
   locations: ['business-settings', 'locations'] as const,
 };
 
@@ -59,10 +57,6 @@ export function BusinessSettingsPage() {
   const canUpdateProfile = session
     ? canPerformBackofficeAction(session, 'updateBusinessProfile')
     : false;
-  // Presentation is application UI context, not a distinct authorization boundary;
-  // it reuses the Business Profile update authority per the accepted DIG-59 decision.
-  const canViewPresentation = canViewProfile;
-  const canUpdatePresentation = canUpdateProfile;
   const canViewLocations = session
     ? canPerformBackofficeAction(session, 'viewSellingLocations')
     : false;
@@ -77,11 +71,6 @@ export function BusinessSettingsPage() {
     queryFn: () => api.getProfile(),
     enabled: canViewProfile,
   });
-  const presentationQuery = useQuery({
-    queryKey: businessSettingsKeys.presentation,
-    queryFn: () => api.getPresentation(),
-    enabled: canViewPresentation,
-  });
   const locationsQuery = useQuery({
     queryKey: [...businessSettingsKeys.locations, locationsOffset, locationsPageSize],
     queryFn: () =>
@@ -94,10 +83,6 @@ export function BusinessSettingsPage() {
   const invalidateProfile = () =>
     void queryClient.invalidateQueries({
       queryKey: businessSettingsKeys.profile,
-    });
-  const invalidatePresentation = () =>
-    void queryClient.invalidateQueries({
-      queryKey: businessSettingsKeys.presentation,
     });
   const invalidateLocations = () =>
     void queryClient.invalidateQueries({
@@ -125,15 +110,6 @@ export function BusinessSettingsPage() {
           isLoading={profileQuery.isLoading}
           canUpdate={canUpdateProfile}
           onEdit={setEditingProfile}
-        />
-      ) : null}
-      {canViewPresentation ? (
-        <PresentationCard
-          api={api}
-          presentation={presentationQuery.data}
-          isLoading={presentationQuery.isLoading}
-          canUpdate={canUpdatePresentation}
-          onChanged={invalidatePresentation}
         />
       ) : null}
       {canViewLocations ? (
@@ -243,114 +219,6 @@ function ProfileCard({
         <DSkeleton className="mt-5 h-6 w-52" />
       ) : (
         <p className="mt-5 text-lg font-semibold">{profile?.name ?? copy('Not configured')}</p>
-      )}
-    </section>
-  );
-}
-
-const PRESENTATION_OPTIONS: ReadonlyArray<{
-  preset: PresentationPreset;
-  label: string;
-  description: string;
-}> = [
-  {
-    preset: 'DEFAULT',
-    label: 'Default',
-    description: 'The current Digvation look and feel.',
-  },
-  {
-    preset: 'AEGIS',
-    label: 'Aegis',
-    description: 'A firm, distinctive presentation focused on the operational experience.',
-  },
-];
-
-/**
- * Presentation / Tampilan: the only client-facing control for DIG-59 in v1 —
- * a single finite preset choice. No Appearance/Motion/Splash/Layout advanced
- * controls; those are resolved internally from the chosen preset.
- */
-function PresentationCard({
-  api,
-  presentation,
-  isLoading,
-  canUpdate,
-  onChanged,
-}: {
-  api: BusinessSettingsApi;
-  presentation?: PresentationConfiguration | undefined;
-  isLoading: boolean;
-  canUpdate: boolean;
-  onChanged: () => void;
-}) {
-  const { copy } = useBackofficeLocalization();
-  const { showToast } = useToast();
-  const [isSaving, setSaving] = useState<PresentationPreset | null>(null);
-  const current = presentation?.presentationPreset ?? 'DEFAULT';
-
-  const select = async (preset: PresentationPreset) => {
-    if (!presentation || !canUpdate || preset === current || isSaving) return;
-    setSaving(preset);
-    try {
-      await api.updatePresentation(presentation, preset);
-      onChanged();
-      showToast({ variant: 'success', title: copy('Presentation updated.') });
-    } catch (error) {
-      if (!isSessionExpiredError(error))
-        showToast({
-          variant: 'danger',
-          title: normalizeBackofficeApiError(error, copy('Could not update presentation.'))
-            .safeMessage,
-        });
-    } finally {
-      setSaving(null);
-    }
-  };
-
-  return (
-    <section className="mt-6 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 sm:p-6">
-      <div className="flex gap-3">
-        <span className="grid size-9 place-items-center rounded-[var(--radius-control)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]">
-          <Palette className="size-[18px]" />
-        </span>
-        <div>
-          <h2 className="font-semibold">{copy('Presentation theme')}</h2>
-          <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-            {copy('Choose how this workspace looks. Products and access stay unchanged.')}
-          </p>
-        </div>
-      </div>
-      {isLoading ? (
-        <DSkeleton className="mt-5 h-16 w-full" />
-      ) : (
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          {PRESENTATION_OPTIONS.map((option) => {
-            const isSelected = option.preset === current;
-            return (
-              <button
-                key={option.preset}
-                type="button"
-                disabled={!canUpdate || Boolean(isSaving)}
-                onClick={() => void select(option.preset)}
-                className={`rounded-[var(--radius-control)] border p-4 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] disabled:cursor-not-allowed disabled:opacity-60 ${
-                  isSelected
-                    ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/5'
-                    : 'border-[var(--color-border)] hover:bg-[var(--color-surface-muted)]'
-                }`}
-              >
-                <span className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-semibold text-[var(--color-text)]">
-                    {copy(option.label)}
-                  </span>
-                  {isSelected ? <DBadge variant="secondary">{copy('Active')}</DBadge> : null}
-                </span>
-                <span className="mt-1.5 block text-xs leading-5 text-[var(--color-text-muted)]">
-                  {copy(option.description)}
-                </span>
-              </button>
-            );
-          })}
-        </div>
       )}
     </section>
   );
