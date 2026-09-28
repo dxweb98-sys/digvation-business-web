@@ -2,6 +2,7 @@ import { ApiClient } from '@digvation/business-api';
 import { useAuth } from '@digvation/business-auth';
 import { useDeploymentBootstrap } from '@digvation/business-runtime';
 import {
+  cn,
   DAlert,
   DButton,
   DCombobox,
@@ -13,7 +14,7 @@ import {
 } from '@digvation/ui';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Check, Plus } from 'lucide-react';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 
 import { useOperationalLocalization } from '../../app/localization/operational-localization';
 import { useOperationalSession } from '../operational/operational-session-provider';
@@ -26,6 +27,12 @@ import {
 
 export function canCreateWorkshopCustomer(permissions: readonly string[]) {
   return permissions.includes('customers:manage');
+}
+
+/** Display only: +6281234567890 -> 0812 3456 7890. The stored value is unchanged. */
+export function formatPhoneForDisplay(phoneE164: string): string {
+  const local = phoneE164.startsWith('+62') ? `0${phoneE164.slice(3)}` : phoneE164;
+  return local.replace(/\D/g, '').replace(/(\d{4})(?=\d)/g, '$1 ');
 }
 
 function newIdempotencyKey(): string {
@@ -50,51 +57,83 @@ const ERROR_COPY: Record<string, string> = {
   IDEMPOTENCY_KEY_REQUIRED: 'Could not submit. Try again.',
 };
 
-/** One labelled block of the dialog; the label doubles as the field label. */
-function Field({ label, action, children }: { label: string; action?: ReactNode; children: ReactNode }) {
+type StepState = 'active' | 'done' | 'locked';
+
+/**
+ * One step of the intake flow. Hierarchy comes from type and dividers, not
+ * from boxes: the active step is large and open, a completed step shrinks to
+ * its label plus the chosen value, a locked step is a quiet label.
+ */
+function Step({
+  number,
+  title,
+  state,
+  action,
+  hint,
+  first,
+  contentRef,
+  children,
+}: {
+  number: string;
+  title: string;
+  state: StepState;
+  action?: ReactNode;
+  hint?: string;
+  first?: boolean;
+  contentRef?: RefObject<HTMLDivElement | null>;
+  children?: ReactNode;
+}) {
   return (
-    <section className="space-y-2">
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold text-(--color-text)">{label}</h3>
-        {action}
+    <section
+      data-step-state={state}
+      className={cn(!first && 'mt-5 border-t border-(--color-border) pt-5')}
+    >
+      <div className="flex min-h-8 items-center gap-2.5">
+        {state === 'done' ? (
+          <Check className="h-4 w-4 shrink-0 text-(--color-success)" aria-hidden="true" />
+        ) : (
+          <span
+            className={cn(
+              'text-xs font-semibold tabular-nums',
+              state === 'active' ? 'text-(--color-brand)' : 'text-(--color-text-muted)',
+            )}
+          >
+            {number}
+          </span>
+        )}
+        <h3
+          className={cn(
+            state === 'active' && 'text-base font-semibold text-(--color-text)',
+            state === 'done' && 'text-sm font-medium text-(--color-text-muted)',
+            state === 'locked' && 'text-base font-medium text-(--color-text-muted)/70',
+          )}
+        >
+          {title}
+        </h3>
+        {action ? <div className="ml-auto">{action}</div> : null}
       </div>
-      {children}
+      {state === 'locked' && hint ? (
+        <p className="mt-1 text-sm text-(--color-text-muted)/70">{hint}</p>
+      ) : null}
+      {children ? (
+        <div ref={contentRef} className="mt-2">
+          {children}
+        </div>
+      ) : null}
     </section>
   );
 }
 
-/** The chosen Customer / Vehicle, shown once, with a way to change it. */
-function SelectedSummary({
-  title,
-  detail,
-  onChange,
-  changeLabel,
-}: {
-  title: string;
-  detail: string;
-  onChange: () => void;
-  changeLabel: string;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-(--color-border) bg-(--color-surface-muted) px-3 py-2.5">
-      <div className="min-w-0">
-        <p className="truncate text-base font-semibold text-(--color-text)">{title}</p>
-        <p className="truncate text-sm text-(--color-text-muted)">{detail}</p>
-      </div>
-      <DButton variant="ghost" size="sm" onClick={onChange}>
-        {changeLabel}
-      </DButton>
-    </div>
-  );
-}
-
-/** A subordinate inline form (new Customer / new Vehicle) inside the dialog. */
-function InlineForm({ children }: { children: ReactNode }) {
-  return (
-    <div className="space-y-3 rounded-lg border border-(--color-border) bg-(--color-surface-muted) p-3">
-      {children}
-    </div>
-  );
+/**
+ * Moves attention to the step that just became active. A search combobox is
+ * deliberately not focused: it opens its option list on focus, which would
+ * cover the step's own actions ("Pelanggan baru", "Tambah kendaraan").
+ */
+function focusFirstField(ref: RefObject<HTMLDivElement | null>) {
+  window.setTimeout(() => {
+    const field = ref.current?.querySelector<HTMLElement>('input, textarea');
+    if (field && field.getAttribute('role') !== 'combobox') field.focus();
+  }, 0);
 }
 
 export function WorkshopIntakeDialog({
@@ -131,6 +170,15 @@ export function WorkshopIntakeDialog({
   const [idempotencyKey, setIdempotencyKey] = useState(newIdempotencyKey);
   const [created, setCreated] = useState<WorkshopWorkOrder | null>(null);
 
+  const customerStepRef = useRef<HTMLDivElement>(null);
+  const vehicleStepRef = useRef<HTMLDivElement>(null);
+  const complaintStepRef = useRef<HTMLDivElement>(null);
+
+  // Attention follows the flow: open on the customer search.
+  useEffect(() => {
+    focusFirstField(customerStepRef);
+  }, []);
+
   const api = useMemo(
     () =>
       new WorkshopIntakeApi(
@@ -166,6 +214,7 @@ export function WorkshopIntakeDialog({
       clearNewCustomerForm();
       clearVehicle();
       showToast({ variant: 'success', title: copy('Customer created.') });
+      focusFirstField(vehicleStepRef);
     },
     onError: () => showToast({ variant: 'danger', title: copy('Could not create Customer.') }),
   });
@@ -197,6 +246,7 @@ export function WorkshopIntakeDialog({
     setCustomerRequest('');
     setIdempotencyKey(newIdempotencyKey());
     createWorkOrder.reset();
+    focusFirstField(customerStepRef);
   }
 
   const vehicleReady = isNewVehicle
@@ -222,7 +272,12 @@ export function WorkshopIntakeDialog({
         open
         onClose={onClose}
         size="md"
-        title={copy('Work Order created')}
+        title={
+          <span className="inline-flex items-center gap-2">
+            <Check className="h-5 w-5 text-(--color-success)" aria-hidden="true" />
+            {copy('Work Order created')}
+          </span>
+        }
         footer={
           <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             {onOpenQueue ? (
@@ -240,36 +295,43 @@ export function WorkshopIntakeDialog({
           </div>
         }
       >
-        <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-(--color-success)/10 text-(--color-success)">
-              <Check className="h-5 w-5" aria-hidden="true" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-xs text-(--color-text-muted)">{copy('Work Order number')}</p>
-              <p className="truncate text-xl font-bold text-(--color-text)">
-                {created.workOrderNumber}
-              </p>
-            </div>
+        <p className="text-3xl font-bold tracking-tight text-(--color-text)">
+          {created.workOrderNumber}
+        </p>
+        <dl className="mt-5 grid grid-cols-2 gap-x-6 border-t border-(--color-border) pt-4 text-sm">
+          <div>
+            <dt className="text-(--color-text-muted)">{copy('Customer')}</dt>
+            <dd className="mt-0.5 text-base font-medium text-(--color-text)">
+              {created.customerNameSnapshot}
+            </dd>
           </div>
-          <dl className="space-y-2 rounded-lg border border-(--color-border) bg-(--color-surface-muted) p-3 text-sm">
-            <div className="flex justify-between gap-4">
-              <dt className="text-(--color-text-muted)">{copy('Customer')}</dt>
-              <dd className="text-right font-medium text-(--color-text)">
-                {created.customerNameSnapshot}
-              </dd>
-            </div>
-            <div className="flex justify-between gap-4">
-              <dt className="text-(--color-text-muted)">{copy('Vehicle')}</dt>
-              <dd className="text-right font-medium text-(--color-text)">
-                {created.vehiclePlateSnapshot}
-              </dd>
-            </div>
-          </dl>
-        </div>
+          <div>
+            <dt className="text-(--color-text-muted)">{copy('Vehicle')}</dt>
+            <dd className="mt-0.5 text-base font-medium text-(--color-text)">
+              {created.vehiclePlateSnapshot}
+            </dd>
+          </div>
+        </dl>
       </DDialog>
     );
   }
+
+  const customerState: StepState = selectedCustomer ? 'done' : 'active';
+  const vehicleState: StepState = !selectedCustomer
+    ? 'locked'
+    : selectedVehicle
+      ? 'done'
+      : 'active';
+  const complaintState: StepState = selectedCustomer && vehicleReady ? 'active' : 'locked';
+
+  const linkAction = (label: string, onClick: () => void, withPlus = true) => (
+    <DButton variant="link" size="sm" className="px-0" onClick={onClick}>
+      <span className="inline-flex items-center gap-1">
+        {withPlus ? <Plus className="h-4 w-4" aria-hidden="true" /> : null}
+        {label}
+      </span>
+    </DButton>
+  );
 
   return (
     <DDialog
@@ -278,8 +340,9 @@ export function WorkshopIntakeDialog({
       closeOnOverlay={false}
       size="lg"
       title={copy('Create Work Order')}
+      description={copy('Record the vehicle intake details.')}
       footer={
-        <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-between">
           <DButton variant="secondary" className={buttonFit} onClick={onClose}>
             {copy('Cancel')}
           </DButton>
@@ -294,165 +357,192 @@ export function WorkshopIntakeDialog({
         </div>
       }
     >
-      <div className="space-y-5">
-        {!selectedLocationId ? (
-          <DAlert variant="warning" title={copy('Select a Location to continue.')} />
-        ) : null}
+      {!selectedLocationId ? (
+        <DAlert className="mb-4" variant="warning" title={copy('Select a Location to continue.')} />
+      ) : null}
 
-        <Field label={copy('Customer')}>
-          {selectedCustomer ? (
-            <SelectedSummary
-              title={selectedCustomer.name}
-              detail={selectedCustomer.phoneE164}
-              changeLabel={copy('Change')}
-              onChange={() => {
-                setSelectedCustomer(null);
+      <Step
+        first
+        number="01"
+        title={copy('Customer')}
+        state={customerState}
+        contentRef={customerStepRef}
+        action={
+          selectedCustomer
+            ? linkAction(
+                copy('Change'),
+                () => {
+                  setSelectedCustomer(null);
+                  clearVehicle();
+                  focusFirstField(customerStepRef);
+                },
+                false,
+              )
+            : undefined
+        }
+      >
+        {selectedCustomer ? (
+          <div>
+            <p className="text-base font-semibold text-(--color-text)">{selectedCustomer.name}</p>
+            <p className="text-sm text-(--color-text-muted)">
+              {formatPhoneForDisplay(selectedCustomer.phoneE164)}
+            </p>
+          </div>
+        ) : isNewCustomer ? (
+          <div className="space-y-3">
+            <DInput label={copy('Name')} value={newCustomerName} onChange={setNewCustomerName} />
+            <DInput
+              label={copy('Phone number')}
+              type="tel"
+              value={newCustomerPhone}
+              onChange={setNewCustomerPhone}
+              placeholder="+628123456789"
+            />
+            <div className="flex justify-end gap-2">
+              <DButton variant="ghost" size="sm" onClick={clearNewCustomerForm}>
+                {copy('Cancel')}
+              </DButton>
+              <DButton
+                size="sm"
+                loading={createCustomer.isPending}
+                disabled={!newCustomerName.trim() || !newCustomerPhone.trim()}
+                onClick={() => createCustomer.mutate()}
+              >
+                {copy('Save customer')}
+              </DButton>
+            </div>
+          </div>
+        ) : (
+          <>
+            <DCombobox
+              ariaLabel={copy('Customer')}
+              placeholder={copy('Search name or phone number')}
+              value={null}
+              onChange={(value) => {
+                const customer = customerOptions.find((c) => c.id === value) ?? null;
+                setSelectedCustomer(customer);
                 clearVehicle();
+                if (customer) focusFirstField(vehicleStepRef);
+              }}
+              fetchOptions={async (search) => {
+                const page = await api.searchCustomers(search);
+                setCustomerOptions(page.items);
+                return page.items.map(
+                  (customer): SelectOption => ({
+                    value: customer.id,
+                    label: `${customer.name} — ${formatPhoneForDisplay(customer.phoneE164)}`,
+                  }),
+                );
               }}
             />
-          ) : isNewCustomer ? (
-            <InlineForm>
-              <DInput label={copy('Name')} value={newCustomerName} onChange={setNewCustomerName} />
-              <DInput
-                label={copy('Phone number')}
-                type="tel"
-                value={newCustomerPhone}
-                onChange={setNewCustomerPhone}
-                placeholder="+628123456789"
-              />
-              <div className="flex justify-end gap-2">
-                <DButton variant="ghost" size="sm" onClick={clearNewCustomerForm}>
-                  {copy('Cancel')}
-                </DButton>
-                <DButton
-                  size="sm"
-                  loading={createCustomer.isPending}
-                  disabled={!newCustomerName.trim() || !newCustomerPhone.trim()}
-                  onClick={() => createCustomer.mutate()}
-                >
-                  {copy('Save customer')}
-                </DButton>
-              </div>
-            </InlineForm>
-          ) : (
-            <>
-              <DCombobox
-                ariaLabel={copy('Customer')}
-                placeholder={copy('Search name or phone number')}
-                value={null}
-                onChange={(value) => {
-                  setSelectedCustomer(customerOptions.find((c) => c.id === value) ?? null);
-                  clearVehicle();
-                }}
-                fetchOptions={async (search) => {
-                  const page = await api.searchCustomers(search);
-                  setCustomerOptions(page.items);
-                  return page.items.map(
-                    (customer): SelectOption => ({
-                      value: customer.id,
-                      label: `${customer.name} — ${customer.phoneE164}`,
-                    }),
-                  );
-                }}
-              />
-              {canCreateCustomer ? (
-                <DButton
-                  variant="link"
-                  size="sm"
-                  onClick={() => setNewCustomer(true)}
-                  className="px-0"
-                >
-                  <span className="inline-flex items-center gap-1">
-                    <Plus className="h-4 w-4" aria-hidden="true" />
-                    {copy('New customer')}
-                  </span>
-                </DButton>
-              ) : null}
-            </>
-          )}
-        </Field>
+            {canCreateCustomer
+              ? linkAction(copy('New customer'), () => {
+                  setNewCustomer(true);
+                  focusFirstField(customerStepRef);
+                })
+              : null}
+          </>
+        )}
+      </Step>
 
-        <Field label={copy('Vehicle')}>
-          {!selectedCustomer ? (
-            <p className="rounded-lg border border-dashed border-(--color-border) px-3 py-3 text-sm text-(--color-text-muted)">
-              {copy('Select a Customer first.')}
-            </p>
-          ) : isNewVehicle ? (
-            <InlineForm>
-              <DInput label={copy('Plate number')} value={plateNumber} onChange={setPlateNumber} />
-              <div className="grid gap-3 sm:grid-cols-2">
-                <DInput
-                  label={copy('Chassis number')}
-                  value={chassisNumber}
-                  onChange={setChassisNumber}
-                />
-                <DInput
-                  label={copy('Engine number')}
-                  value={engineNumber}
-                  onChange={setEngineNumber}
-                />
-              </div>
-              <DButton variant="link" size="sm" className="px-0" onClick={clearVehicle}>
-                {copy('Use a saved vehicle')}
-              </DButton>
-            </InlineForm>
-          ) : selectedVehicle ? (
-            <SelectedSummary
-              title={selectedVehicle.plateNumber}
-              detail={`${copy('Chassis number')} ${selectedVehicle.chassisNumber} · ${copy('Engine number')} ${selectedVehicle.engineNumber}`}
-              changeLabel={copy('Change')}
-              onChange={() => setSelectedVehicle(null)}
-            />
-          ) : (
-            <>
-              <DCombobox
-                ariaLabel={copy('Vehicle')}
-                placeholder={copy('Search plate, chassis, or engine number')}
-                value={null}
-                refetchKey={selectedCustomer.id}
-                onChange={(value) =>
-                  setSelectedVehicle(vehicleOptions.find((v) => v.id === value) ?? null)
-                }
-                fetchOptions={async (search) => {
-                  const page = await api.listVehicles(selectedCustomer.id, search);
-                  setVehicleOptions(page.items);
-                  return page.items.map(
-                    (vehicle): SelectOption => ({
-                      value: vehicle.id,
-                      label: vehicle.plateNumber,
-                    }),
-                  );
-                }}
-              />
-              <DButton
-                variant="link"
-                size="sm"
-                className="px-0"
-                onClick={() => {
+      <Step
+        number="02"
+        title={copy('Vehicle')}
+        state={vehicleState}
+        hint={copy('Select a Customer first.')}
+        contentRef={vehicleStepRef}
+        action={
+          selectedVehicle
+            ? linkAction(
+                copy('Change'),
+                () => {
                   setSelectedVehicle(null);
-                  setNewVehicle(true);
-                }}
-              >
-                <span className="inline-flex items-center gap-1">
-                  <Plus className="h-4 w-4" aria-hidden="true" />
-                  {copy('Add new vehicle')}
-                </span>
-              </DButton>
-            </>
-          )}
-        </Field>
+                  focusFirstField(vehicleStepRef);
+                },
+                false,
+              )
+            : undefined
+        }
+      >
+        {!selectedCustomer ? null : isNewVehicle ? (
+          <div className="space-y-3">
+            <DInput label={copy('Plate number')} value={plateNumber} onChange={setPlateNumber} />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <DInput
+                label={copy('Chassis number')}
+                value={chassisNumber}
+                onChange={setChassisNumber}
+              />
+              <DInput
+                label={copy('Engine number')}
+                value={engineNumber}
+                onChange={setEngineNumber}
+              />
+            </div>
+            {linkAction(copy('Use a saved vehicle'), clearVehicle, false)}
+          </div>
+        ) : selectedVehicle ? (
+          <div>
+            <p className="text-xl font-bold tracking-wide text-(--color-text)">
+              {selectedVehicle.plateNumber}
+            </p>
+            <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 text-sm text-(--color-text-muted)">
+              <dt>{copy('Chassis number')}</dt>
+              <dd className="truncate text-(--color-text)">{selectedVehicle.chassisNumber}</dd>
+              <dt>{copy('Engine number')}</dt>
+              <dd className="truncate text-(--color-text)">{selectedVehicle.engineNumber}</dd>
+            </dl>
+          </div>
+        ) : (
+          <>
+            <DCombobox
+              ariaLabel={copy('Vehicle')}
+              placeholder={copy('Search plate, chassis, or engine number')}
+              value={null}
+              refetchKey={selectedCustomer.id}
+              onChange={(value) => {
+                const vehicle = vehicleOptions.find((v) => v.id === value) ?? null;
+                setSelectedVehicle(vehicle);
+                if (vehicle) focusFirstField(complaintStepRef);
+              }}
+              fetchOptions={async (search) => {
+                const page = await api.listVehicles(selectedCustomer.id, search);
+                setVehicleOptions(page.items);
+                return page.items.map(
+                  (vehicle): SelectOption => ({
+                    value: vehicle.id,
+                    label: vehicle.plateNumber,
+                  }),
+                );
+              }}
+            />
+            {linkAction(copy('Add new vehicle'), () => {
+              setSelectedVehicle(null);
+              setNewVehicle(true);
+              focusFirstField(vehicleStepRef);
+            })}
+          </>
+        )}
+      </Step>
 
-        <Field label={copy('Keluhan / Permintaan Customer')}>
+      <Step
+        number="03"
+        title={copy('Keluhan')}
+        state={complaintState}
+        hint={copy('Select a Vehicle first.')}
+        contentRef={complaintStepRef}
+      >
+        {complaintState === 'active' ? (
           <DTextarea
-            aria-label={copy('Keluhan / Permintaan Customer')}
+            label={copy('What is the customer complaint?')}
             value={customerRequest}
             onChange={setCustomerRequest}
             placeholder={copy('For example, rem bunyi')}
           />
-        </Field>
+        ) : null}
+      </Step>
 
-        {errorMessage ? <DAlert variant="danger" title={errorMessage} /> : null}
-      </div>
+      {errorMessage ? <DAlert className="mt-5" variant="danger" title={errorMessage} /> : null}
     </DDialog>
   );
 }
