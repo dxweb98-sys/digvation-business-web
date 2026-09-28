@@ -555,7 +555,7 @@ export function WorkshopIntakeDialog({
       footer={footer}
       noPadding
       overlayClassName="items-center p-3 sm:items-center sm:p-4"
-      className="max-h-[94vh] rounded-2xl sm:max-h-[88vh] sm:max-w-[860px] sm:rounded-2xl"
+      className="max-h-[94vh] rounded-2xl [&>div:first-child]:hidden sm:max-h-[88vh] sm:max-w-[860px] sm:rounded-2xl"
     >
       {created ? (
         <div className="px-5 py-7 text-center sm:px-7" aria-live="polite">
