@@ -19,7 +19,7 @@ import {
   useToast,
 } from '@digvation/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CarFront, Check, Plus, Search, UserRound } from 'lucide-react';
+import { CarFront, Check, Search, UserRound } from 'lucide-react';
 import { Fragment, useDeferredValue, useMemo, useState, type ReactNode } from 'react';
 
 import { useOperationalLocalization } from '../../app/localization/operational-localization';
