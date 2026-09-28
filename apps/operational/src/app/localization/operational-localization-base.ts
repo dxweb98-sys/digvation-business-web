@@ -572,9 +572,22 @@ const copy: Record<string, LocalizedLabel> = {
   'New customer': { 'id-ID': 'Pelanggan baru', 'en-US': 'New customer' },
   'Find customer': { 'id-ID': 'Cari pelanggan', 'en-US': 'Find customer' },
   'Find an existing customer or add a new customer.': {
-    'id-ID': 'Cari pelanggan yang sudah ada atau tambahkan pelanggan baru.',
+    'id-ID': 'Cari pelanggan yang sudah ada atau buat pelanggan baru.',
     'en-US': 'Find an existing customer or add a new customer.',
   },
+  'Create Intake': { 'id-ID': 'Buat Penerimaan', 'en-US': 'Create Intake' },
+  'Customer name or phone number...': {
+    'id-ID': 'Nama atau nomor telepon...',
+    'en-US': 'Customer name or phone number...',
+  },
+  'View all': { 'id-ID': 'Lihat semua', 'en-US': 'View all' },
+  'Example: Budi Santoso': { 'id-ID': 'Contoh: Budi Santoso', 'en-US': 'Example: Budi Santoso' },
+  'Enter a valid phone number': {
+    'id-ID': 'Nomor telepon tidak valid',
+    'en-US': 'Enter a valid phone number',
+  },
+  'Enter chassis number': { 'id-ID': 'Masukkan nomor rangka', 'en-US': 'Enter chassis number' },
+  'Enter engine number': { 'id-ID': 'Masukkan nomor mesin', 'en-US': 'Enter engine number' },
   'Available customers': { 'id-ID': 'Pelanggan', 'en-US': 'Available customers' },
   'Could not load customers.': {
     'id-ID': 'Gagal memuat pelanggan.',
@@ -585,7 +598,8 @@ const copy: Record<string, LocalizedLabel> = {
     'en-US': 'No customers found. Try another search.',
   },
   'Customer not found? Use the New customer tab to add one.': {
-    'id-ID': 'Tidak menemukan pelanggan? Gunakan tab Pelanggan baru untuk menambahkannya.',
+    'id-ID':
+      'Tidak menemukan pelanggan? Gunakan tab Pelanggan baru untuk menambahkan pelanggan baru.',
     'en-US': 'Customer not found? Use the New customer tab to add one.',
   },
   'Continue to Vehicle': {
