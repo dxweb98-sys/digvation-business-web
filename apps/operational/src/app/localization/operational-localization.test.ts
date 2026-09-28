@@ -54,6 +54,14 @@ describe('operational localization', () => {
   it('keeps one Workshop vocabulary: Pelanggan, Cabang, Work Order, and the lifecycle verbs', () => {
     const id = (key: string) => operationalCopy(key, 'id-ID');
     expect(id('New customer')).toBe('Pelanggan baru');
+    expect(id('Find customer')).toBe('Cari pelanggan');
+    expect(id('Continue to Vehicle')).toBe('Lanjut ke Kendaraan');
+    expect(id('Continue to Complaint')).toBe('Lanjut ke Keluhan');
+    expect(id('Complaint & Summary')).toBe('Keluhan & Ringkasan');
+    expect(id('New vehicle')).toBe('Kendaraan baru');
+    expect(id('Search Work Orders, customers, or vehicles')).toBe(
+      'Cari no. Work Order, pelanggan, atau kendaraan',
+    );
     expect(id('Select a Location to continue.')).toBe('Pilih cabang aktif dulu.');
     expect(id('Work Orders at the active branch.')).toBe('Work Order di cabang aktif.');
     expect(id('Pause')).toBe('Jeda');

@@ -7,9 +7,11 @@ import {
   DBadge,
   DButton,
   DDataTable,
+  DInput,
   type TableColumn,
 } from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
+import { ArrowRight, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 
@@ -40,9 +42,8 @@ const STATUS_TABS: readonly (WorkshopWorkOrderStatus | '')[] = [
 ];
 
 /**
- * Penerimaan is the Workshop intake management surface. Existing Work Orders
- * stay visible behind the creation flow; creating a new Work Order happens in
- * a centered DDialog rather than replacing the page or opening a side drawer.
+ * Penerimaan remains the Workshop management surface. Existing Work Orders
+ * stay visible while creation runs inside the centered intake DDialog.
  */
 export function WorkshopIntakePage() {
   const bootstrap = useDeploymentBootstrap();
@@ -93,9 +94,9 @@ export function WorkshopIntakePage() {
       key: 'workOrderNumber',
       label: copy('Work Order number'),
       render: (row) => (
-        <div>
+        <div className="min-w-36">
           <p className="font-semibold text-(--color-text)">{row.workOrderNumber}</p>
-          <div className="mt-1">
+          <div className="mt-1.5">
             <DBadge variant={STATUS_BADGE_VARIANT[row.workStatus]}>{label(row.workStatus)}</DBadge>
           </div>
         </div>
@@ -104,19 +105,27 @@ export function WorkshopIntakePage() {
     {
       key: 'createdAt',
       label: copy('Created'),
-      render: (row) =>
-        formatDate(new Date(row.createdAt), {
-          dateStyle: 'medium',
-          timeStyle: 'short',
-        }),
+      render: (row) => {
+        const createdAt = new Date(row.createdAt);
+        return (
+          <div className="min-w-28 text-sm tabular-nums">
+            <p className="text-(--color-text)">
+              {formatDate(createdAt, { day: '2-digit', month: 'short', year: 'numeric' })}
+            </p>
+            <p className="mt-0.5 text-(--color-text-muted)">
+              {formatDate(createdAt, { hour: '2-digit', minute: '2-digit' })}
+            </p>
+          </div>
+        );
+      },
     },
     {
       key: 'customerNameSnapshot',
       label: copy('Customer'),
       render: (row) => (
-        <div>
+        <div className="min-w-40">
           <p className="font-medium text-(--color-text)">{row.customerNameSnapshot}</p>
-          <p className="text-sm text-(--color-text-muted)">{row.customerPhoneSnapshot}</p>
+          <p className="mt-0.5 text-sm text-(--color-text-muted)">{row.customerPhoneSnapshot}</p>
         </div>
       ),
     },
@@ -124,15 +133,22 @@ export function WorkshopIntakePage() {
       key: 'vehiclePlateSnapshot',
       label: copy('Vehicle'),
       render: (row) => (
-        <span className="font-semibold tracking-wide text-(--color-text)">
-          {row.vehiclePlateSnapshot}
-        </span>
+        <div className="min-w-32">
+          <p className="font-semibold tracking-wide text-(--color-text)">{row.vehiclePlateSnapshot}</p>
+          <p className="mt-0.5 max-w-44 truncate text-xs text-(--color-text-muted)">
+            {row.vehicleChassisNumberSnapshot}
+          </p>
+        </div>
       ),
     },
     {
       key: 'customerRequest',
       label: copy('Keluhan'),
-      render: (row) => <span className="line-clamp-2">{row.customerRequest}</span>,
+      render: (row) => (
+        <span className="line-clamp-2 min-w-44 text-sm text-(--color-text-muted)">
+          {row.customerRequest}
+        </span>
+      ),
     },
   ];
 
@@ -143,8 +159,10 @@ export function WorkshopIntakePage() {
           <p className="text-xs font-bold uppercase tracking-[0.14em] text-(--color-brand)">
             {copy('Workshop')}
           </p>
-          <h1 className="mt-1 text-2xl font-bold text-(--color-text)">{copy('Intake')}</h1>
-          <p className="mt-1 text-sm text-(--color-text-muted)">
+          <h1 className="mt-1 text-3xl font-bold tracking-tight text-(--color-text)">
+            {copy('Intake')}
+          </h1>
+          <p className="mt-1.5 text-sm text-(--color-text-muted)">
             {copy('Keluhan / Permintaan Customer sebelum diagnosis mekanik.')}
           </p>
         </div>
@@ -163,8 +181,8 @@ export function WorkshopIntakePage() {
       ) : null}
 
       {canReadQueue ? (
-        <section className="mt-6 overflow-hidden rounded-xl border border-(--color-border) bg-(--color-surface)">
-          <div className="overflow-x-auto border-b border-(--color-border) px-3 md:px-4">
+        <section className="mt-6 overflow-hidden rounded-2xl border border-(--color-border) bg-(--color-surface) shadow-sm [&_[data-ds-component=data-table]]:rounded-none [&_[data-ds-component=data-table]]:border-0">
+          <div className="overflow-x-auto border-b border-(--color-border) px-3 sm:px-4">
             <div className="flex min-w-max gap-1">
               {STATUS_TABS.map((status) => {
                 const active = statusFilter === status;
@@ -177,7 +195,7 @@ export function WorkshopIntakePage() {
                       setOffset(0);
                     }}
                     className={cn(
-                      'relative px-3 py-3 text-sm font-medium transition-colors',
+                      'relative px-3.5 py-3.5 text-sm font-semibold transition-colors',
                       active
                         ? 'text-(--color-brand)'
                         : 'text-(--color-text-muted) hover:text-(--color-text)',
@@ -194,6 +212,26 @@ export function WorkshopIntakePage() {
                 );
               })}
             </div>
+          </div>
+
+          <div className="flex flex-col gap-3 border-b border-(--color-border) bg-(--color-surface-muted)/20 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+            <DInput
+              type="search"
+              value={query}
+              onChange={(value) => {
+                setQuery(value);
+                setOffset(0);
+              }}
+              leftIcon={<Search className="size-4" aria-hidden="true" />}
+              placeholder={copy('Search Work Orders, customers, or vehicles')}
+              containerClassName="w-full sm:max-w-xl"
+            />
+            <DButton variant="secondary" size="sm" className="w-full sm:w-auto" onClick={openQueue}>
+              <span className="inline-flex items-center gap-1.5">
+                {copy('Open queue')}
+                <ArrowRight className="size-4" aria-hidden="true" />
+              </span>
+            </DButton>
           </div>
 
           {workOrders.isError ? (
@@ -214,13 +252,6 @@ export function WorkshopIntakePage() {
               data={workOrders.data?.items ?? []}
               loading={workOrders.isLoading || !selectedLocationId}
               rowKey="id"
-              searchable
-              searchPlaceholder={copy('Search by Work Order number')}
-              searchValue={query}
-              onSearchChange={(value) => {
-                setQuery(value);
-                setOffset(0);
-              }}
               pagination={{
                 page: Math.floor(offset / PAGE_SIZE) + 1,
                 pageSize: PAGE_SIZE,
@@ -234,12 +265,6 @@ export function WorkshopIntakePage() {
               }
             />
           )}
-
-          <div className="flex justify-end border-t border-(--color-border) px-4 py-3">
-            <DButton variant="link" size="sm" className="px-0" onClick={openQueue}>
-              {copy('Open queue')}
-            </DButton>
-          </div>
         </section>
       ) : null}
 

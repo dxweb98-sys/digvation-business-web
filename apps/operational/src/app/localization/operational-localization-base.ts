@@ -570,6 +570,59 @@ const copy: Record<string, LocalizedLabel> = {
     'en-US': 'Choose an active branch first.',
   },
   'New customer': { 'id-ID': 'Pelanggan baru', 'en-US': 'New customer' },
+  'Find customer': { 'id-ID': 'Cari pelanggan', 'en-US': 'Find customer' },
+  'Find an existing customer or add a new customer.': {
+    'id-ID': 'Cari pelanggan yang sudah ada atau tambahkan pelanggan baru.',
+    'en-US': 'Find an existing customer or add a new customer.',
+  },
+  'Available customers': { 'id-ID': 'Pelanggan', 'en-US': 'Available customers' },
+  'Could not load customers.': {
+    'id-ID': 'Gagal memuat pelanggan.',
+    'en-US': 'Could not load customers.',
+  },
+  'No customers found. Try another search.': {
+    'id-ID': 'Pelanggan tidak ditemukan. Coba kata pencarian lain.',
+    'en-US': 'No customers found. Try another search.',
+  },
+  'Customer not found? Use the New customer tab to add one.': {
+    'id-ID': 'Tidak menemukan pelanggan? Gunakan tab Pelanggan baru untuk menambahkannya.',
+    'en-US': 'Customer not found? Use the New customer tab to add one.',
+  },
+  'Continue to Vehicle': {
+    'id-ID': 'Lanjut ke Kendaraan',
+    'en-US': 'Continue to Vehicle',
+  },
+  'Continue to Complaint': {
+    'id-ID': 'Lanjut ke Keluhan',
+    'en-US': 'Continue to Complaint',
+  },
+  'Complaint & Summary': {
+    'id-ID': 'Keluhan & Ringkasan',
+    'en-US': 'Complaint & Summary',
+  },
+  'Choose vehicle': { 'id-ID': 'Pilih kendaraan', 'en-US': 'Choose vehicle' },
+  'Select a saved vehicle or add a new vehicle.': {
+    'id-ID': 'Pilih kendaraan tersimpan atau tambahkan kendaraan baru.',
+    'en-US': 'Select a saved vehicle or add a new vehicle.',
+  },
+  'New vehicle': { 'id-ID': 'Kendaraan baru', 'en-US': 'New vehicle' },
+  'Available vehicles': { 'id-ID': 'Kendaraan', 'en-US': 'Available vehicles' },
+  'Could not load vehicles.': {
+    'id-ID': 'Gagal memuat kendaraan.',
+    'en-US': 'Could not load vehicles.',
+  },
+  'No saved vehicles found. Use the New vehicle tab to add one.': {
+    'id-ID': 'Kendaraan tersimpan tidak ditemukan. Gunakan tab Kendaraan baru untuk menambahkannya.',
+    'en-US': 'No saved vehicles found. Use the New vehicle tab to add one.',
+  },
+  'Review the customer and vehicle, then record the complaint.': {
+    'id-ID': 'Periksa pelanggan dan kendaraan, lalu catat keluhannya.',
+    'en-US': 'Review the customer and vehicle, then record the complaint.',
+  },
+  'Search Work Orders, customers, or vehicles': {
+    'id-ID': 'Cari no. Work Order, pelanggan, atau kendaraan',
+    'en-US': 'Search Work Orders, customers, or vehicles',
+  },
   Phone: { 'id-ID': 'Telepon', 'en-US': 'Phone' },
   'Select a Customer first.': {
     'id-ID': 'Pilih pelanggan dulu.',
