@@ -235,6 +235,7 @@ export function WorkshopIntakeDialog({
     onSuccess: async (workOrder) => {
       setCreated(workOrder);
       await queryClient.invalidateQueries({ queryKey: ['workshop-vehicles'] });
+      void queryClient.invalidateQueries({ queryKey: ['workshop-queue'] });
     },
   });
 

@@ -24,6 +24,7 @@ import {
   WORKSHOP_QUEUE_ERROR_COPY,
   type WorkshopQueueAction,
 } from './workshop-queue-actions';
+import { STATUS_BADGE_VARIANT } from './workshop-status-presentation';
 import { useLocationBoundQueueState } from './workshop-queue-location-state';
 import {
   WorkshopQueueApi,
@@ -32,18 +33,6 @@ import {
 } from './workshop-queue-api';
 
 const PAGE_SIZE = 20;
-
-const STATUS_BADGE_VARIANT: Record<
-  WorkshopWorkOrderStatus,
-  'outline' | 'success' | 'warning' | 'danger' | 'info'
-> = {
-  WAITING: 'outline',
-  ASSIGNED: 'info',
-  IN_PROGRESS: 'warning',
-  PAUSED: 'outline',
-  DONE: 'success',
-  CANCELLED: 'danger',
-};
 
 function apiErrorCode(error: unknown): string | undefined {
   return (error as { code?: string } | undefined)?.code;
