@@ -14,7 +14,7 @@
     "productName": "Digvation",
     "companyName": "Digvation Indonesia"
   },
-  "presentationPreset": "AEGIS",
+  "presentationPreset": "DEFAULT",
   "theme": {
     "preset": "DIGVATION_LIGHT",
     "radius": "SOFT"
