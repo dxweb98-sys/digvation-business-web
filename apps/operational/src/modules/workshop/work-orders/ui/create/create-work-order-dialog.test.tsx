@@ -23,13 +23,13 @@ vi.mock('@digvation/business-auth', () => ({
 vi.mock('@digvation/business-runtime', () => ({
   useDeploymentBootstrap: () => ({ apiBaseUrl: 'http://runtime.test' }),
 }));
-vi.mock('../operational/operational-session-provider', () => ({
+vi.mock('../../../../operational/operational-session-provider', () => ({
   useOperationalSession: () => ({ selectedLocationId: LOCATION }),
 }));
-vi.mock('../../app/localization/operational-localization', () => ({
+vi.mock('../../../../../app/localization/operational-localization', () => ({
   useOperationalLocalization: () => ({ copy: (value: string) => value }),
 }));
-vi.mock('./workshop-intake-api', () => ({
+vi.mock('../../api/workshop-intake-api', () => ({
   WorkshopIntakeApi: class {
     searchCustomers = mocks.searchCustomers;
     listVehicles = mocks.listVehicles;
@@ -38,7 +38,7 @@ vi.mock('./workshop-intake-api', () => ({
   },
 }));
 
-import { WorkshopIntakeDialog } from './workshop-intake-form';
+import { CreateWorkOrderDialog } from './create-work-order-dialog';
 
 const budi = { id: 'c-1', name: 'Budi Santoso', phoneE164: '+6281234567890' };
 const sari = { id: 'c-2', name: 'Sari Dewi', phoneE164: '+6281298765432' };
@@ -63,13 +63,13 @@ function renderDialog() {
   return render(
     <DToastProvider>
       <QueryClientProvider client={client}>
-        <WorkshopIntakeDialog open onClose={() => undefined} />
+        <CreateWorkOrderDialog open onClose={() => undefined} />
       </QueryClientProvider>
     </DToastProvider>,
   );
 }
 
-describe('WorkshopIntakeDialog', () => {
+describe('CreateWorkOrderDialog', () => {
   afterEach(cleanup);
 
   beforeEach(() => {
@@ -101,7 +101,7 @@ describe('WorkshopIntakeDialog', () => {
 
     const next = deferred<{ items: unknown[]; total: number }>();
     mocks.searchCustomers.mockReturnValueOnce(next.promise);
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Find customer' }), {
+    fireEvent.change(screen.getByRole('textbox', { name: 'Find customer' }), {
       target: { value: 'sari' },
     });
 
@@ -185,5 +185,61 @@ describe('WorkshopIntakeDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Back' }));
     const selected = await screen.findByRole('radio', { name: /B 1234 ABC/ });
     expect((selected as HTMLInputElement).checked).toBe(true);
+  });
+
+  it('offers a single clear control on search and none on normal inputs', async () => {
+    mocks.searchCustomers.mockResolvedValue({ items: [budi], total: 1 });
+    renderDialog();
+    await screen.findByText('Budi Santoso');
+    const clearButtons = () => screen.queryAllByRole('button', { name: /clear|hapus|bersihkan/i });
+
+    expect(clearButtons()).toHaveLength(0);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Find customer' }), {
+      target: { value: 'bu' },
+    });
+    expect(clearButtons().length).toBeLessThanOrEqual(1);
+
+    fireEvent.click(screen.getByRole('tab', { name: 'New customer' }));
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Budi' } });
+    fireEvent.change(screen.getByLabelText('Phone number'), { target: { value: '0812' } });
+    expect(clearButtons()).toHaveLength(0);
+  });
+
+  it('combines the three plate segments into the existing plate string', async () => {
+    mocks.searchCustomers.mockResolvedValue({ items: [budi], total: 1 });
+    mocks.listVehicles.mockResolvedValue({ items: [], total: 0 });
+    mocks.createWorkOrder.mockResolvedValue({
+      id: 'w-1',
+      workOrderNumber: 'WO-1',
+      customerNameSnapshot: 'Budi Santoso',
+      vehiclePlateSnapshot: 'B 1234 ABC',
+    });
+    renderDialog();
+
+    fireEvent.click(await screen.findByRole('radio', { name: /Budi Santoso/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Continue to Vehicle/ }));
+    fireEvent.click(await screen.findByRole('tab', { name: 'New vehicle' }));
+
+    fireEvent.change(screen.getByLabelText('Plate number — B'), { target: { value: 'b' } });
+    fireEvent.change(screen.getByLabelText('Plate number — 1234'), { target: { value: '12a34' } });
+    fireEvent.change(screen.getByLabelText('Plate number — ABC'), { target: { value: 'abc' } });
+    fireEvent.change(screen.getByLabelText('Chassis number'), { target: { value: 'CH-9' } });
+    fireEvent.change(screen.getByLabelText('Engine number'), { target: { value: 'EN-9' } });
+    fireEvent.click(screen.getByRole('button', { name: /Continue to Complaint/ }));
+
+    fireEvent.change(await screen.findByLabelText('Keluhan'), { target: { value: 'rem bunyi' } });
+    expect(screen.getByText('B 1234 ABC')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Create Work Order' }));
+
+    await waitFor(() =>
+      expect(mocks.createWorkOrder).toHaveBeenCalledWith(
+        expect.objectContaining({
+          plateNumber: 'B 1234 ABC',
+          chassisNumber: 'CH-9',
+          engineNumber: 'EN-9',
+        }),
+        expect.any(String),
+      ),
+    );
   });
 });

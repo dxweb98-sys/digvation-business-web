@@ -1,4 +1,4 @@
-import type { WorkshopWorkOrderStatus } from './workshop-queue-api';
+import type { WorkshopWorkOrderStatus } from '../api/workshop-queue-api';
 
 /** Shared by the Queue and the Intake recent-Work-Orders list. */
 export const STATUS_BADGE_VARIANT: Record<

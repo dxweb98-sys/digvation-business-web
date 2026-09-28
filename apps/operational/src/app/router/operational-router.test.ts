@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   canAccessOperationalExpenses,
-  canAccessWorkshopIntake,
-  canAccessWorkshopQueue,
   OperationalNotFoundRoute,
   operationalRouter,
 } from './operational-router';
@@ -14,69 +12,25 @@ describe('Operational expense navigation access', () => {
   });
 });
 
-describe('Workshop Intake navigation access', () => {
-  it('exposes Intake to a WORKSHOP-entitled user with work-orders:create and customers:read', () => {
-    expect(
-      canAccessWorkshopIntake(['work-orders:create', 'customers:read'], true),
-    ).toBe(true);
-  });
-
-  it('does not require POS entitlement or permissions', () => {
-    // hasWorkshop=true with no POS-related permission is enough.
-    expect(
-      canAccessWorkshopIntake(['work-orders:create', 'customers:read'], true),
-    ).toBe(true);
-  });
-
-  it('denies Intake when WORKSHOP is not entitled, even with the permissions present', () => {
-    expect(
-      canAccessWorkshopIntake(['work-orders:create', 'customers:read'], false),
-    ).toBe(false);
-  });
-
-  it('denies Intake without work-orders:create', () => {
-    expect(canAccessWorkshopIntake(['customers:read'], true)).toBe(false);
-  });
-
-  it('denies Intake without customers:read, since intake requires customer lookup', () => {
-    expect(canAccessWorkshopIntake(['work-orders:create'], true)).toBe(false);
-  });
-});
-
-describe('Workshop Queue navigation access', () => {
-  it('exposes Queue to a WORKSHOP-entitled user with workshop-queue:read', () => {
-    expect(canAccessWorkshopQueue(['workshop-queue:read'], true)).toBe(true);
-  });
-
-  it('denies Queue when WORKSHOP is not entitled, even with the permission present', () => {
-    expect(canAccessWorkshopQueue(['workshop-queue:read'], false)).toBe(false);
-  });
-
-  it('denies Queue without workshop-queue:read', () => {
-    expect(canAccessWorkshopQueue(['work-orders:create'], true)).toBe(false);
-  });
-
-  it('is independent of Intake access — Queue does not require work-orders:create', () => {
-    expect(canAccessWorkshopQueue(['workshop-queue:read'], true)).toBe(true);
-    expect(canAccessWorkshopIntake(['workshop-queue:read'], true)).toBe(false);
-  });
-});
-
 describe('Operational route registration', () => {
-  it('registers the Workshop Intake route alongside existing POS/Finance routes', () => {
+  it('registers one Work Order workspace alongside existing POS/Finance routes', () => {
     const paths = operationalRouter.routes
       .flatMap((route) => route.children ?? [])
       .map((route) => route.path);
 
     expect(paths).toEqual(
-      expect.arrayContaining([
-        '/sell',
-        '/sell/:saleId',
-        '/expenses',
-        '/workshop/intake',
-        '/workshop/queue',
-      ]),
+      expect.arrayContaining(['/sell', '/sell/:saleId', '/expenses', '/workshop/work-orders']),
     );
+  });
+
+  it('sends the former Intake and Queue URLs to the Work Order workspace', () => {
+    const children = operationalRouter.routes.flatMap((route) => route.children ?? []);
+    for (const path of ['/workshop/intake', '/workshop/queue']) {
+      const route = children.find((item) => item.path === path);
+      const element = route?.element as { props?: { to?: string; replace?: boolean } } | undefined;
+      expect(element?.props?.to).toBe('/workshop/work-orders');
+      expect(element?.props?.replace).toBe(true);
+    }
   });
 });
 

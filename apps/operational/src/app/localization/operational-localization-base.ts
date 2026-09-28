@@ -575,12 +575,19 @@ const copy: Record<string, LocalizedLabel> = {
     'id-ID': 'Cari pelanggan yang sudah ada atau buat pelanggan baru.',
     'en-US': 'Find an existing customer or add a new customer.',
   },
-  'Create Intake': { 'id-ID': 'Buat Penerimaan', 'en-US': 'Create Intake' },
+  'Work Order': { 'id-ID': 'Work Order', 'en-US': 'Work Order' },
+  'Track workshop jobs from vehicle arrival to completion.': {
+    'id-ID': 'Pantau pekerjaan bengkel dari kendaraan masuk hingga selesai.',
+    'en-US': 'Track workshop jobs from vehicle arrival to completion.',
+  },
   'Customer name or phone number...': {
     'id-ID': 'Nama atau nomor telepon...',
     'en-US': 'Customer name or phone number...',
   },
-  'View all': { 'id-ID': 'Lihat semua', 'en-US': 'View all' },
+  'Write the complaint or request from the customer.': {
+    'id-ID': 'Tulis keluhan atau permintaan pelanggan.',
+    'en-US': 'Write the complaint or request from the customer.',
+  },
   'Example: Budi Santoso': { 'id-ID': 'Contoh: Budi Santoso', 'en-US': 'Example: Budi Santoso' },
   'Enter a valid phone number': {
     'id-ID': 'Nomor telepon tidak valid',
