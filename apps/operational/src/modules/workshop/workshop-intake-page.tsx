@@ -198,15 +198,15 @@ export function WorkshopIntakePage() {
 
           {workOrders.isError ? (
             <div className="p-4">
-              <DAlert
-                variant="danger"
-                title={copy('Could not load the Workshop queue.')}
-                action={
-                  <DButton variant="secondary" size="sm" onClick={() => void workOrders.refetch()}>
-                    {copy('Retry')}
-                  </DButton>
-                }
-              />
+              <DAlert variant="danger" title={copy('Could not load the Workshop queue.')} />
+              <DButton
+                variant="secondary"
+                size="sm"
+                className="mt-3"
+                onClick={() => void workOrders.refetch()}
+              >
+                {copy('Retry')}
+              </DButton>
             </div>
           ) : (
             <DDataTable
