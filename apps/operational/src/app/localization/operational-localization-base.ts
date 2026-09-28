@@ -221,6 +221,7 @@ const copy: Record<string, LocalizedLabel> = {
     'en-US': 'Transaction needs attention',
   },
   Retry: { 'id-ID': 'Coba lagi', 'en-US': 'Retry' },
+  Continue: { 'id-ID': 'Lanjutkan', 'en-US': 'Continue' },
   Reviewed: { 'id-ID': 'Sudah ditinjau', 'en-US': 'Reviewed' },
   'Queue transactions': { 'id-ID': 'Antrian transaksi', 'en-US': 'Queue transactions' },
   'No queued transactions.': {
