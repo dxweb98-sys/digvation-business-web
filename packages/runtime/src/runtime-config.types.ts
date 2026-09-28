@@ -89,10 +89,10 @@ export interface DeploymentBootstrapConfig {
   theme: ThemeConfig;
   defaults: DeploymentBootstrapDefaults;
   /**
-   * Deployment-suggested presentation, resolved before authentication. Absent
-   * means DEFAULT. This is a suggestion only; the authenticated tenant's
-   * persisted selection (see `AuthenticatedRuntimeProjection.presentationPreset`)
-   * overrides it once available. Never a product/capability/permission signal.
+   * The sole presentation authority, end-to-end. Deployment-controlled only —
+   * there is no tenant-editable override. Applies identically pre- and
+   * post-auth (splash, login, and every authenticated shell). Absent means
+   * DEFAULT. Never a product/capability/permission signal.
    */
   presentationPreset?: PresentationPreset | undefined;
 }
@@ -156,11 +156,4 @@ export interface AuthenticatedRuntimeProjection {
     readonly timeFormat: string;
   };
   readonly contextVersion: string;
-  /**
-   * Persisted tenant presentation selection, projected into the authenticated
-   * session so every surface can resolve presentation immediately after
-   * authentication without a separate request. Optional until Runtime
-   * projects it; absent falls back to the deployment bootstrap suggestion.
-   */
-  readonly presentationPreset?: PresentationPreset | undefined;
 }

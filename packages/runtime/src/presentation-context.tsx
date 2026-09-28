@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react';
 
 import { resolvePresentationBundle, type PresentationBundle } from './presentation';
-import { useDeploymentBootstrap, useOptionalAuthenticatedRuntimeProjection } from './runtime-context';
+import { useDeploymentBootstrap } from './runtime-context';
 
 interface PresentationContextValue {
   bundle: PresentationBundle;
@@ -10,21 +10,21 @@ interface PresentationContextValue {
 const PresentationContext = createContext<PresentationContextValue | null>(null);
 
 /**
- * Resolves the effective PresentationPreset — the authenticated tenant's
- * persisted selection overrides the deployment bootstrap suggestion, which
- * falls back to DEFAULT — into the finite dimension bundle, and applies it as
- * `data-*` attributes on `documentElement` so CSS can key off it (mirroring
- * the existing `data-theme-preset`/`data-theme-radius` mechanism). Mount this
- * once, inside `DeploymentBootstrapProvider`, wrapping both pre- and
- * post-auth views, so pre-auth surfaces (splash/login) already resolve
- * correctly and post-auth resolution never causes a visible jump for the
- * common DEFAULT case.
+ * Resolves the effective PresentationPreset from the deployment bootstrap
+ * config only — presentation is deployment-controlled end-to-end, identically
+ * pre- and post-auth. There is no tenant-editable override: the same
+ * `presentationPreset` from `runtime-config.json` applies everywhere. Absent
+ * falls back to DEFAULT. Resolves into the finite dimension bundle and
+ * applies it as `data-*` attributes on `documentElement` so CSS can key off
+ * it (mirroring the existing `data-theme-preset`/`data-theme-radius`
+ * mechanism). Mount this once, inside `DeploymentBootstrapProvider`, wrapping
+ * both pre- and post-auth views, so pre-auth surfaces (splash/login) already
+ * resolve correctly and there is never a visible jump at authentication.
  */
 export function PresentationProvider({ children }: { children: ReactNode }) {
   const bootstrap = useDeploymentBootstrap();
-  const projection = useOptionalAuthenticatedRuntimeProjection();
 
-  const effectivePreset = projection?.presentationPreset ?? bootstrap.presentationPreset;
+  const effectivePreset = bootstrap.presentationPreset;
   const bundle = useMemo(() => resolvePresentationBundle(effectivePreset), [effectivePreset]);
 
   useEffect(() => {
