@@ -123,22 +123,31 @@ export function WorkshopQueuePage() {
   }
 
   function commandError(error: unknown) {
-    const status = apiErrorStatus(error);
-    if (status === 409) {
+    const code = apiErrorCode(error);
+    const known = WORKSHOP_QUEUE_ERROR_COPY[code ?? ''];
+    // Runtime answers both an invalid transition and a stale `expectedVersion`
+    // with 409; the code decides the message, a bare 409 is the stale version.
+    if (known || apiErrorStatus(error) === 409) {
       showToast({
         variant: 'danger',
-        title: copy('This Work Order changed elsewhere. Reload and try again.'),
+        title: copy(known ?? 'This Work Order was just changed. Open it again.'),
       });
+      // The open detail still carries the old version, so a retry would fail
+      // the same way. Close it; the refreshed queue holds the current one.
+      if (code !== 'WORKSHOP_CANCELLATION_REASON_REQUIRED') closeDetail();
       void queryClient.invalidateQueries({ queryKey: ['workshop-queue'] });
       return;
     }
-    const code = apiErrorCode(error);
     showToast({
       variant: 'danger',
-      title: copy(
-        WORKSHOP_QUEUE_ERROR_COPY[code ?? ''] ?? 'Could not update the Work Order. Try again.',
-      ),
+      title: copy('Could not update the Work Order. Try again.'),
     });
+  }
+
+  function closeDetail() {
+    setSelected(null);
+    setCancelling(false);
+    setCancelReason('');
   }
 
   const pause = useMutation({
@@ -181,7 +190,7 @@ export function WorkshopQueuePage() {
   const ACTION_LABEL: Record<WorkshopQueueAction, string> = {
     pause: copy('Pause'),
     resume: copy('Resume'),
-    complete: copy('Mark complete'),
+    complete: copy('Complete'),
     cancel: copy('Cancel work order'),
   };
 
@@ -190,7 +199,7 @@ export function WorkshopQueuePage() {
       <div className="p-5 md:p-6 lg:p-8">
         <DConnectionError
           title={copy('Could not load the Workshop queue.')}
-          message={copy('Try loading the queue again.')}
+          message={copy('Check your connection, then try again.')}
           onRetry={() => void queue.refetch()}
         />
       </div>
@@ -234,7 +243,7 @@ export function WorkshopQueuePage() {
         </p>
         <h1 className="mt-1 text-2xl font-bold text-(--color-text)">{copy('Queue')}</h1>
         <p className="mt-1 text-sm text-(--color-text-muted)">
-          {copy('Work Orders waiting or in progress at the active location.')}
+          {copy('Work Orders at the active branch.')}
         </p>
       </header>
 
@@ -278,17 +287,17 @@ export function WorkshopQueuePage() {
             total: queue.data?.total ?? 0,
           }}
           onPageChange={(page) => setOffset((page - 1) * PAGE_SIZE)}
-          emptyMessage={copy('No Work Orders match the current filters.')}
+          emptyMessage={
+            workOrderNumberQuery.trim() || statusFilter
+              ? copy('No Work Orders match the current filters.')
+              : copy('No Work Orders at this branch yet.')
+          }
         />
       </section>
 
       <DDialog
         open={Boolean(detail)}
-        onClose={() => {
-          setSelected(null);
-          setCancelling(false);
-          setCancelReason('');
-        }}
+        onClose={closeDetail}
         title={detail ? detail.workOrderNumber : ''}
         className="w-full max-w-lg"
       >
@@ -330,7 +339,7 @@ export function WorkshopQueuePage() {
                   label={copy('Reason')}
                   value={cancelReason}
                   onChange={setCancelReason}
-                  placeholder={copy('Explain why this Work Order is cancelled.')}
+                  placeholder={copy('For example, the customer changed their mind.')}
                 />
                 <div className="flex justify-end gap-2">
                   <DButton
@@ -350,7 +359,7 @@ export function WorkshopQueuePage() {
                     disabled={!cancelReason.trim()}
                     onClick={() => cancel.mutate()}
                   >
-                    {copy('Confirm cancellation')}
+                    {copy('Yes, cancel')}
                   </DButton>
                 </div>
               </div>
@@ -370,7 +379,9 @@ export function WorkshopQueuePage() {
               </div>
             ) : (
               <p className="text-sm text-(--color-text-muted)">
-                {copy('No further status changes are available.')}
+                {detail.workStatus === 'DONE' || detail.workStatus === 'CANCELLED'
+                  ? copy('No more actions for this Work Order.')
+                  : copy('You do not have permission to change this Work Order.')}
               </p>
             )}
           </div>

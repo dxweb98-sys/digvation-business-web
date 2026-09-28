@@ -50,4 +50,26 @@ describe('operational localization', () => {
     expect(operationalLabel('DONE', 'id-ID')).toBe('Selesai');
     expect(operationalLabel('CANCELLED', 'id-ID')).toBe('Dibatalkan');
   });
+
+  it('keeps one Workshop vocabulary: Pelanggan, Cabang, Work Order, and the lifecycle verbs', () => {
+    const id = (key: string) => operationalCopy(key, 'id-ID');
+    expect(id('New customer')).toBe('Pelanggan baru');
+    expect(id('Select a Location to continue.')).toBe('Pilih cabang aktif dulu.');
+    expect(id('Work Orders at the active branch.')).toBe('Work Order di cabang aktif.');
+    expect(id('Pause')).toBe('Jeda');
+    expect(id('Resume')).toBe('Lanjutkan');
+    expect(id('Complete')).toBe('Selesaikan');
+    expect(id('Cancel work order')).toBe('Batalkan Work Order');
+    expect(id('Yes, cancel')).toBe('Ya, batalkan');
+    // Every Workshop message must be translated, never fall back to English.
+    for (const key of [
+      'No Work Orders at this branch yet.',
+      'No more actions for this Work Order.',
+      'You do not have permission to change this Work Order.',
+      'This Work Order was just changed. Open it again.',
+      'Check your connection, then try again.',
+    ]) {
+      expect(id(key)).not.toBe(key);
+    }
+  });
 });

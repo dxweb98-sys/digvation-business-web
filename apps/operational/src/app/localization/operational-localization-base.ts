@@ -557,33 +557,33 @@ const copy: Record<string, LocalizedLabel> = {
   Workshop: { 'id-ID': 'Bengkel', 'en-US': 'Workshop' },
   Intake: { 'id-ID': 'Penerimaan', 'en-US': 'Intake' },
   'Keluhan / Permintaan Customer sebelum diagnosis mekanik.': {
-    'id-ID': 'Keluhan / permintaan customer sebelum diagnosis mekanik.',
-    'en-US': 'Customer complaint/request, captured before mechanic diagnosis.',
+    'id-ID': 'Catat pelanggan, kendaraan, dan keluhan sebelum diperiksa mekanik.',
+    'en-US': 'Record the customer, vehicle, and complaint before the mechanic\'s diagnosis.',
   },
   'Keluhan / Permintaan Customer': {
-    'id-ID': 'Keluhan / Permintaan Customer',
-    'en-US': 'Customer complaint / request',
+    'id-ID': 'Keluhan pelanggan',
+    'en-US': 'Customer complaint',
   },
   'Select a Location to continue.': {
-    'id-ID': 'Pilih lokasi untuk melanjutkan.',
-    'en-US': 'Select a Location to continue.',
+    'id-ID': 'Pilih cabang aktif dulu.',
+    'en-US': 'Choose an active branch first.',
   },
   'Search customer by name or phone': {
-    'id-ID': 'Cari customer berdasarkan nama atau nomor telepon',
+    'id-ID': 'Cari pelanggan (nama atau telepon)',
     'en-US': 'Search customer by name or phone',
   },
-  'New customer': { 'id-ID': 'Customer baru', 'en-US': 'New customer' },
+  'New customer': { 'id-ID': 'Pelanggan baru', 'en-US': 'New customer' },
   Phone: { 'id-ID': 'Telepon', 'en-US': 'Phone' },
   'Select a Customer first.': {
-    'id-ID': 'Pilih customer terlebih dahulu.',
+    'id-ID': 'Pilih pelanggan dulu.',
     'en-US': 'Select a Customer first.',
   },
   'Search vehicle by plate, chassis, or engine number': {
-    'id-ID': 'Cari kendaraan berdasarkan plat, nomor rangka, atau nomor mesin',
+    'id-ID': 'Cari kendaraan (plat, no. rangka, atau no. mesin)',
     'en-US': 'Search vehicle by plate, chassis, or engine number',
   },
-  'Add new vehicle': { 'id-ID': 'Tambah kendaraan baru', 'en-US': 'Add new vehicle' },
-  'Plate number': { 'id-ID': 'Nomor plat', 'en-US': 'Plate number' },
+  'Add new vehicle': { 'id-ID': 'Tambah kendaraan', 'en-US': 'Add new vehicle' },
+  'Plate number': { 'id-ID': 'Plat nomor', 'en-US': 'Plate number' },
   'Chassis number': { 'id-ID': 'Nomor rangka', 'en-US': 'Chassis number' },
   'Engine number': { 'id-ID': 'Nomor mesin', 'en-US': 'Engine number' },
   'For example, rem bunyi': {
@@ -593,22 +593,22 @@ const copy: Record<string, LocalizedLabel> = {
   'Create Work Order': { 'id-ID': 'Buat Work Order', 'en-US': 'Create Work Order' },
   'Work Order created': { 'id-ID': 'Work Order dibuat', 'en-US': 'Work Order created' },
   'Work Order number': { 'id-ID': 'Nomor Work Order', 'en-US': 'Work Order number' },
-  'New Work Order': { 'id-ID': 'Buat Work Order Baru', 'en-US': 'New Work Order' },
-  'Customer created.': { 'id-ID': 'Customer berhasil dibuat.', 'en-US': 'Customer created.' },
+  'New Work Order': { 'id-ID': 'Work Order baru', 'en-US': 'New Work Order' },
+  'Customer created.': { 'id-ID': 'Pelanggan ditambahkan.', 'en-US': 'Customer created.' },
   'Could not create Customer.': {
-    'id-ID': 'Customer tidak dapat dibuat.',
+    'id-ID': 'Pelanggan belum tersimpan. Coba lagi.',
     'en-US': 'Could not create Customer.',
   },
   'Could not create Work Order. Try again.': {
-    'id-ID': 'Work Order tidak dapat dibuat. Coba lagi.',
+    'id-ID': 'Work Order belum tersimpan. Coba lagi.',
     'en-US': 'Could not create Work Order. Try again.',
   },
   'Customer was not found. Search again.': {
-    'id-ID': 'Customer tidak ditemukan. Cari lagi.',
+    'id-ID': 'Pelanggan tidak ditemukan. Cari lagi.',
     'en-US': 'Customer was not found. Search again.',
   },
   'This Customer is not active.': {
-    'id-ID': 'Customer ini tidak aktif.',
+    'id-ID': 'Pelanggan ini nonaktif.',
     'en-US': 'This Customer is not active.',
   },
   'Vehicle was not found. Search again.': {
@@ -616,82 +616,104 @@ const copy: Record<string, LocalizedLabel> = {
     'en-US': 'Vehicle was not found. Search again.',
   },
   'This Vehicle belongs to a different Customer.': {
-    'id-ID': 'Kendaraan ini terdaftar pada customer lain.',
+    'id-ID': 'Kendaraan ini terdaftar atas pelanggan lain.',
     'en-US': 'This Vehicle belongs to a different Customer.',
   },
   'A Vehicle with this plate number already exists.': {
-    'id-ID': 'Kendaraan dengan nomor plat ini sudah ada.',
+    'id-ID': 'Plat nomor ini sudah terdaftar.',
     'en-US': 'A Vehicle with this plate number already exists.',
   },
   'A Vehicle with this chassis number already exists.': {
-    'id-ID': 'Kendaraan dengan nomor rangka ini sudah ada.',
+    'id-ID': 'Nomor rangka ini sudah terdaftar.',
     'en-US': 'A Vehicle with this chassis number already exists.',
   },
   'A Vehicle with this engine number already exists.': {
-    'id-ID': 'Kendaraan dengan nomor mesin ini sudah ada.',
+    'id-ID': 'Nomor mesin ini sudah terdaftar.',
     'en-US': 'A Vehicle with this engine number already exists.',
   },
   'Check the Vehicle details and try again.': {
-    'id-ID': 'Periksa data kendaraan lalu coba lagi.',
+    'id-ID': 'Periksa data kendaraan, lalu coba lagi.',
     'en-US': 'Check the Vehicle details and try again.',
   },
   'This Location is not available to you.': {
-    'id-ID': 'Lokasi ini tidak tersedia untuk Anda.',
+    'id-ID': 'Anda tidak punya akses ke cabang ini.',
     'en-US': 'This Location is not available to you.',
   },
   'Could not submit. Try again.': {
-    'id-ID': 'Tidak dapat mengirim. Coba lagi.',
+    'id-ID': 'Data belum terkirim. Coba lagi.',
     'en-US': 'Could not submit. Try again.',
   },
   Queue: { 'id-ID': 'Antrean', 'en-US': 'Queue' },
-  'Work Orders waiting or in progress at the active location.': {
-    'id-ID': 'Work Order yang menunggu atau sedang dikerjakan pada lokasi aktif.',
-    'en-US': 'Work Orders waiting or in progress at the active location.',
+  'Work Orders at the active branch.': {
+    'id-ID': 'Work Order di cabang aktif.',
+    'en-US': 'Work Orders at the active branch.',
   },
   'Search by Work Order number': {
-    'id-ID': 'Cari berdasarkan nomor Work Order',
+    'id-ID': 'Cari nomor Work Order',
     'en-US': 'Search by Work Order number',
   },
   'All statuses': { 'id-ID': 'Semua status', 'en-US': 'All statuses' },
   'No Work Orders match the current filters.': {
-    'id-ID': 'Tidak ada Work Order yang sesuai dengan filter saat ini.',
+    'id-ID': 'Tidak ada Work Order yang cocok. Ubah pencarian atau filter.',
     'en-US': 'No Work Orders match the current filters.',
   },
+  'No Work Orders at this branch yet.': {
+    'id-ID': 'Belum ada Work Order di cabang ini.',
+    'en-US': 'No Work Orders at this branch yet.',
+  },
   'Could not load the Workshop queue.': {
-    'id-ID': 'Antrean bengkel tidak dapat dimuat.',
+    'id-ID': 'Gagal memuat antrean',
     'en-US': 'Could not load the Workshop queue.',
   },
-  'Try loading the queue again.': {
-    'id-ID': 'Coba muat ulang antrean.',
-    'en-US': 'Try loading the queue again.',
+  'Check your connection, then try again.': {
+    'id-ID': 'Periksa koneksi, lalu coba lagi.',
+    'en-US': 'Check your connection, then try again.',
   },
   Vehicle: { 'id-ID': 'Kendaraan', 'en-US': 'Vehicle' },
   Created: { 'id-ID': 'Dibuat', 'en-US': 'Created' },
   Pause: { 'id-ID': 'Jeda', 'en-US': 'Pause' },
   Resume: { 'id-ID': 'Lanjutkan', 'en-US': 'Resume' },
-  'Cancel work order': { 'id-ID': 'Batalkan Work Order', 'en-US': 'Cancel work order' },
-  'Explain why this Work Order is cancelled.': {
-    'id-ID': 'Jelaskan alasan pembatalan Work Order ini.',
-    'en-US': 'Explain why this Work Order is cancelled.',
+  Complete: { 'id-ID': 'Selesaikan', 'en-US': 'Complete' },
+  'Cancel work order': {
+    'id-ID': 'Batalkan Work Order',
+    'en-US': 'Cancel work order',
+  },
+  'For example, the customer changed their mind.': {
+    'id-ID': 'Contoh: pelanggan tidak jadi servis',
+    'en-US': 'For example, the customer changed their mind.',
   },
   Back: { 'id-ID': 'Kembali', 'en-US': 'Back' },
-  'Confirm cancellation': { 'id-ID': 'Konfirmasi pembatalan', 'en-US': 'Confirm cancellation' },
-  'Work Order cancelled.': { 'id-ID': 'Work Order dibatalkan.', 'en-US': 'Work Order cancelled.' },
-  'This Work Order changed elsewhere. Reload and try again.': {
-    'id-ID': 'Work Order ini telah berubah di tempat lain. Muat ulang dan coba lagi.',
-    'en-US': 'This Work Order changed elsewhere. Reload and try again.',
+  'Yes, cancel': {
+    'id-ID': 'Ya, batalkan',
+    'en-US': 'Yes, cancel',
+  },
+  'Work Order cancelled.': {
+    'id-ID': 'Work Order dibatalkan.',
+    'en-US': 'Work Order cancelled.',
+  },
+  'This Work Order was just changed. Open it again.': {
+    'id-ID': 'Work Order ini baru saja berubah. Buka lagi untuk melihat data terbaru.',
+    'en-US': 'This Work Order was just changed. Open it again.',
   },
   'This action is no longer available for the current Work Order status.': {
-    'id-ID': 'Aksi ini tidak lagi tersedia untuk status Work Order saat ini.',
+    'id-ID': 'Status Work Order sudah berubah, aksi ini tidak tersedia lagi.',
     'en-US': 'This action is no longer available for the current Work Order status.',
   },
   'Enter a reason to cancel this Work Order.': {
-    'id-ID': 'Isi alasan untuk membatalkan Work Order ini.',
+    'id-ID': 'Isi alasan pembatalan.',
     'en-US': 'Enter a reason to cancel this Work Order.',
   },
   'Could not update the Work Order. Try again.': {
-    'id-ID': 'Work Order tidak dapat diperbarui. Coba lagi.',
+    'id-ID': 'Perubahan belum tersimpan. Coba lagi.',
     'en-US': 'Could not update the Work Order. Try again.',
+  },
+  'No more actions for this Work Order.': {
+    'id-ID': 'Tidak ada aksi lagi untuk Work Order ini.',
+    'en-US': 'No more actions for this Work Order.',
+  },
+  'You do not have permission to change this Work Order.': {
+    'id-ID': 'Anda tidak punya izin mengubah Work Order ini.',
+    'en-US': 'You do not have permission to change this Work Order.',
   },
 };
 
