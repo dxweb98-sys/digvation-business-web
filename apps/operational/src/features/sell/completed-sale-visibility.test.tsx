@@ -187,6 +187,7 @@ describe('completed queue card', () => {
           issues={[]}
           onStartWork={noop}
           onAdjust={noop}
+          canAdjust
           onPay={noop}
           onCancel={noop}
           onView={noop}
