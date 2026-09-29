@@ -7,10 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { Employee, Sale, SaleLine } from '../cashier-transaction.types';
 import { presentableTransaction } from '../completed-sale-visibility';
-import {
-  ReceiptContent,
-  ReferenceTransactionDetail,
-} from './replatformed-pos-workspace';
+import { ReceiptContent, ReferenceTransactionDetail } from './replatformed-pos-workspace';
 
 const bootstrap = {
   apiBaseUrl: '',
@@ -336,9 +333,7 @@ describe('ReferenceTransactionDetail receipt location identity', () => {
       'Jl. Alam Sutera Boulevard No. 10',
     );
 
-    expect(
-      screen.getAllByText('Jl. Alam Sutera Boulevard No. 10').length,
-    ).toBeGreaterThan(0);
+    expect(screen.getAllByText('Jl. Alam Sutera Boulevard No. 10').length).toBeGreaterThan(0);
   });
 
   it('never prints a fake or placeholder address line when none is configured', () => {
@@ -393,7 +388,10 @@ describe('ReferenceTransactionDetail performer relationship', () => {
       lines: [
         {
           ...service('line-color', 'Hair Color', '2.0000'),
-          participations: [participation('line-color', 'emp-andini'), participation('line-color', 'emp-rindu')],
+          participations: [
+            participation('line-color', 'emp-andini'),
+            participation('line-color', 'emp-rindu'),
+          ],
           workUnits: [unit(1, 'emp-andini'), unit(2, 'emp-rindu')],
         },
         {
@@ -408,7 +406,10 @@ describe('ReferenceTransactionDetail performer relationship', () => {
         },
         {
           ...service('line-shared', 'Creambath', '1.0000'),
-          participations: [participation('line-shared', 'emp-andini'), participation('line-shared', 'emp-rindu')],
+          participations: [
+            participation('line-shared', 'emp-andini'),
+            participation('line-shared', 'emp-rindu'),
+          ],
           workUnits: [unit(1, 'emp-andini', 'emp-rindu')],
         },
       ],
@@ -575,7 +576,11 @@ describe('ReferenceTransactionDetail selected additions', () => {
 
   it('applies the line quantity exactly once: base + additions still equals the line amount', () => {
     const sale = withUsage([redBrand], '2.0000');
-    const second = { ...structuredClone(sale.lines[0]!), id: 'line-2', itemNameSnapshot: 'Highlight' };
+    const second = {
+      ...structuredClone(sale.lines[0]!),
+      id: 'line-2',
+      itemNameSnapshot: 'Highlight',
+    };
     second.compositionComponents = [];
     sale.lines.push(second);
     renderRuntimeDetail(sale);
@@ -681,7 +686,13 @@ describe('ReferenceTransactionDetail discounts and promotions', () => {
     sale.adjustments = [
       adjustment('a1', { saleLineId: 'line-1', actualAmount: '22000.0000' }),
       adjustment('a2', { saleLineId: 'line-2', actualAmount: '21200.0000' }),
-      adjustment('a3', { scope: 'TRANSACTION', promotionId: 'promo-1', label: 'Promo1', configuredValue: '0.1900', actualAmount: '73872.0000' }),
+      adjustment('a3', {
+        scope: 'TRANSACTION',
+        promotionId: 'promo-1',
+        label: 'Promo1',
+        configuredValue: '0.1900',
+        actualAmount: '73872.0000',
+      }),
     ] as never;
     return sale;
   };
@@ -692,7 +703,9 @@ describe('ReferenceTransactionDetail discounts and promotions', () => {
     expect(groups.length).toBeGreaterThanOrEqual(2);
     expect(groups[0]!.textContent).toContain('kilat (10%)');
     expect(groups[0]!.textContent).toContain('22.000');
-    expect(within(groups[0]!).getByRole('button', { name: 'Rincian diskon dan promo' })).toBeTruthy();
+    expect(
+      within(groups[0]!).getByRole('button', { name: 'Rincian diskon dan promo' }),
+    ).toBeTruthy();
   });
 
   it('shows the promotion facts from the Sale snapshot when the information button is opened', () => {
@@ -890,5 +903,109 @@ describe('ReferenceTransactionDetail invoice placement', () => {
     expect(screen.queryByTestId('transaction-invoice-number')).toBeNull();
     expect(screen.queryByText(/INV-/)).toBeNull();
     expect(screen.getByText(/24 Sep 2026/)).toBeTruthy();
+  });
+});
+
+describe('ReferenceTransactionDetail Sale-level earned points', () => {
+  const finalized = (overrides: Partial<Sale> = {}) =>
+    runtimeQueueDetail({
+      status: 'FINALIZED',
+      finalizedAt: '2026-09-24T02:15:00.000Z',
+      loyaltyRedemption: null,
+      ...overrides,
+    });
+  const renderReceipt = (sale: Sale) =>
+    render(
+      <DeploymentBootstrapProvider config={bootstrap}>
+        <ReceiptContent
+          sale={sale}
+          activeLines={sale.lines}
+          customer={sale.customer!}
+          locale="id-ID"
+          businessName="Digvation"
+          branchName="Main branch"
+          cashierName="Kasir"
+          transactionDate="24 Sep 2026"
+          hasDiscount={false}
+          hasTax={false}
+        />
+      </DeploymentBootstrapProvider>,
+    );
+
+  it('detail shows the TRANSACTION_TOTAL total with no per-line earning', () => {
+    renderRuntimeDetail(
+      finalized({ loyaltyEarning: { state: 'FINALIZED', pointsEarned: '2.0000' } }),
+    );
+
+    const row = screen.getByTestId('transaction-points-earned');
+    expect(within(row).getByText('Poin diperoleh')).toBeTruthy();
+    expect(within(row).getByText('+2')).toBeTruthy();
+    expect(screen.queryByText(/Poin diperoleh: \+/)).toBeNull();
+  });
+
+  it('detail keeps PER_ITEM line earning and adds the transaction total', () => {
+    const sale = finalized({
+      loyaltyEarning: { state: 'FINALIZED', pointsEarned: '34.0000' },
+    });
+    setLineLoyaltyEarning(sale, { state: 'FINALIZED', pointsEarned: '34.0000' });
+    renderRuntimeDetail(sale);
+
+    expect(screen.getByText('Poin diperoleh: +34 poin')).toBeTruthy();
+    expect(within(screen.getByTestId('transaction-points-earned')).getByText('+34')).toBeTruthy();
+  });
+
+  it('detail shows no earned row (and no +0) when nothing was earned', () => {
+    renderRuntimeDetail(finalized({ loyaltyEarning: null }));
+    expect(screen.queryByTestId('transaction-points-earned')).toBeNull();
+    cleanup();
+    renderRuntimeDetail(
+      finalized({ loyaltyEarning: { state: 'FINALIZED', pointsEarned: '0.0000' } }),
+    );
+    expect(screen.queryByTestId('transaction-points-earned')).toBeNull();
+    expect(screen.queryByText('+0')).toBeNull();
+  });
+
+  it('detail preserves redemption while showing the earned total', () => {
+    renderRuntimeDetail(
+      finalized({
+        loyaltyRedemption: {
+          membershipId: 'membership-1',
+          points: '1',
+          pointValue: '1000.0000',
+          amount: '1000.0000',
+        },
+        loyaltyEarning: { state: 'FINALIZED', pointsEarned: '1.0000' },
+      }),
+    );
+
+    expect(screen.getByText('Penggunaan poin')).toBeTruthy();
+    expect(screen.getByText(/1 poin digunakan/)).toBeTruthy();
+    expect(within(screen.getByTestId('transaction-points-earned')).getByText('+1')).toBeTruthy();
+  });
+
+  it('detail does not show an OPEN Sale as earned', () => {
+    renderRuntimeDetail(
+      runtimeQueueDetail({
+        loyaltyRedemption: null,
+        loyaltyEarning: { state: 'FINALIZED', pointsEarned: '2.0000' },
+      }),
+    );
+    expect(screen.queryByTestId('transaction-points-earned')).toBeNull();
+  });
+
+  it('receipt preview shows +2 for a Sale with no line snapshots', () => {
+    renderReceipt(finalized({ loyaltyEarning: { state: 'FINALIZED', pointsEarned: '2.0000' } }));
+
+    const row = screen.getByTestId('receipt-points-earned');
+    expect(within(row).getByText('Poin diperoleh')).toBeTruthy();
+    expect(within(row).getByText('+2')).toBeTruthy();
+  });
+
+  it('receipt preview omits the row without an EARN fact, whatever the lines say', () => {
+    const sale = finalized({ loyaltyEarning: null });
+    setLineLoyaltyEarning(sale, { state: 'FINALIZED', pointsEarned: '6.0000' });
+    renderReceipt(sale);
+
+    expect(screen.queryByTestId('receipt-points-earned')).toBeNull();
   });
 });

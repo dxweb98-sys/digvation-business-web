@@ -344,6 +344,20 @@ function customerStatus(customer: SaleCustomer | null): {
     : { label: 'Non-member', variant: 'outline' };
 }
 
+/**
+ * Total points a FINALIZED Sale earned, exactly as Runtime reports its immutable EARN fact. It is
+ * the one value shown by Transaction Detail and the receipt; it is never summed from line rows
+ * (a TRANSACTION_TOTAL Sale has none) and never shown as +0.
+ */
+export function saleEarnedPoints(
+  sale: Pick<Sale, 'status' | 'loyaltyEarning' | 'customer'>,
+): string | null {
+  const earning = sale.loyaltyEarning;
+  if (sale.status !== 'FINALIZED' || earning?.state !== 'FINALIZED') return null;
+  if (sale.customer && sale.customer.type !== 'MEMBER') return null;
+  return isPositiveDecimal(earning.pointsEarned) ? earning.pointsEarned : null;
+}
+
 interface PerformerCredit {
   employeeId: string;
   name: string;
@@ -4382,6 +4396,7 @@ export function ReferenceTransactionDetail({
   const redeemedAmount =
     sale.loyaltyRedemption?.amount ?? legacyLoyaltyRedemption?.redemptionAmount ?? null;
   const hasLoyaltyRedemption = Boolean(redeemedPoints && redeemedAmount);
+  const earnedPoints = saleEarnedPoints(sale);
   const receiptDelivery = deliveryStatus?.delivery ?? null;
   const receiptDeliveryBusy =
     receiptDelivery?.status === 'QUEUED' || receiptDelivery?.status === 'SENDING';
@@ -4718,6 +4733,19 @@ export function ReferenceTransactionDetail({
                             {status ? label(statusMeta[status].value) : label('OPEN')}
                           </StatusPill>
                         </div>
+                        {earnedPoints ? (
+                          <div
+                            className="mt-2.5 flex items-center justify-between gap-3 rounded-lg bg-[var(--color-success)]/10 px-3 py-2 text-xs"
+                            data-testid="transaction-points-earned"
+                          >
+                            <span className="font-semibold text-[var(--color-text)]">
+                              {copy('Points earned')}
+                            </span>
+                            <span className="font-bold text-[var(--color-success)]">
+                              +{pointQuantity(earnedPoints, locale)}
+                            </span>
+                          </div>
+                        ) : null}
                         {sale.status === 'VOIDED' && cancellationReason ? (
                           <div className="mt-2 border-l-2 border-[var(--color-danger)] pl-2.5 text-xs">
                             <p className="font-semibold text-[var(--color-danger)]">
@@ -4934,6 +4962,15 @@ export function ReceiptContent({
         <p className="mt-1">{customerDisplayName(customer, locale)}</p>
         {customerDisplayDetail(customer) ? (
           <p className="text-slate-500">{customerDisplayDetail(customer)}</p>
+        ) : null}
+        {saleEarnedPoints(sale) ? (
+          <div
+            className="mt-1.5 flex items-start justify-between gap-3 font-semibold"
+            data-testid="receipt-points-earned"
+          >
+            <span>{copy('Points earned')}</span>
+            <span className="shrink-0">+{pointQuantity(saleEarnedPoints(sale)!, locale)}</span>
+          </div>
         ) : null}
       </section>
 
