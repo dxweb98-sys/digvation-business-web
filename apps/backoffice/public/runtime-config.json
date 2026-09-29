@@ -1,9 +1,9 @@
 {
-  "apiBaseUrl": "http://127.0.0.1:4003",
+  "apiBaseUrl": "http://127.0.0.1:4004",
   "deploymentProfile": "DEDICATED",
   "workspaceResolution": {
     "mode": "FIXED",
-    "workspace": "dgv-salon"
+    "workspace": "dgv-bengkel"
   },
   "applications": {
     "operational": true,
