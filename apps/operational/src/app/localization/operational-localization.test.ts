@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { WORKSHOP_BILLING_ERROR_COPY } from '../../modules/workshop/work-orders/model/workshop-billing-model';
 import { WORKSHOP_LINES_ERROR_COPY } from '../../modules/workshop/work-orders/model/work-order-lines-model';
 
 import {
@@ -127,7 +128,26 @@ describe('operational localization', () => {
       'Quantity changed',
       'Items can no longer be changed on this Work Order.',
       'One of the items was already changed. Open the Work Order again.',
+      'Billing summary',
+      'Not charged',
+      'Not validated',
+      'Validated',
+      'Needs revalidation',
+      'Validate billing',
+      'Revalidate billing',
+      'Items or tax settings changed after the billing was last validated.',
+      'Make sure the Work Order items and billing amounts are correct.',
+      'Billing validated.',
+      'Could not load the billing summary.',
+      'Could not validate the billing. Try again.',
+      'The billing changed. Review the new amounts and try again.',
+      'Billing cannot be validated while the Work Order is in this status.',
+      'This billing is already validated.',
+      'The items use different currencies, so billing cannot be calculated.',
+      'Billing is not available yet. Reload the Work Order.',
+      'You do not have permission to validate this billing.',
       ...Object.values(WORKSHOP_LINES_ERROR_COPY),
+      ...Object.values(WORKSHOP_BILLING_ERROR_COPY),
     ];
     for (const key of keys) {
       expect(operationalCopy(key, 'id-ID')).not.toBe(key);

@@ -12,6 +12,7 @@ import { CreateWorkOrderDialog } from './create/create-work-order-dialog';
 import { MechanicPickerDialog } from './mechanic-picker-dialog';
 import { buildWorkOrderColumns } from './work-order-columns';
 import { WorkOrderDetailDialog } from './work-order-detail-dialog';
+import { WorkOrderBillingSection } from './work-order-billing-section';
 import { WorkOrderItemsSection } from './work-order-items-section';
 
 /**
@@ -145,6 +146,15 @@ export function WorkOrdersPage() {
               permissions={workspace.permissions}
               onAccepted={workspace.applyAuthoritative}
               onStale={workspace.reloadOpenWorkOrder}
+            />
+          ) : null
+        }
+        billingSection={
+          workspace.selected ? (
+            <WorkOrderBillingSection
+              key={workspace.selected.id}
+              workOrder={workspace.selected}
+              permissions={workspace.permissions}
             />
           ) : null
         }

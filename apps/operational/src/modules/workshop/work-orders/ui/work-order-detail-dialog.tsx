@@ -44,6 +44,7 @@ export function WorkOrderDetailDialog({
   onAction,
   onOpenMechanicPicker,
   itemsSection,
+  billingSection,
   onCancelReasonChange,
   onCancelBack,
   onCancelConfirm,
@@ -59,6 +60,8 @@ export function WorkOrderDetailDialog({
   onOpenMechanicPicker: () => void;
   /** Accepted Work Order items; rendered by the workspace, which owns their data. */
   itemsSection?: ReactNode;
+  /** Billing summary of the open Work Order; a consequence of its items. */
+  billingSection?: ReactNode;
   onCancelReasonChange: (value: string) => void;
   onCancelBack: () => void;
   onCancelConfirm: () => void;
@@ -71,6 +74,9 @@ export function WorkOrderDetailDialog({
   const lastItemsSection = useRef(itemsSection);
   if (workOrder) lastItemsSection.current = itemsSection;
   const shownItemsSection = workOrder ? itemsSection : lastItemsSection.current;
+  const lastBillingSection = useRef(billingSection);
+  if (workOrder) lastBillingSection.current = billingSection;
+  const shownBillingSection = workOrder ? billingSection : lastBillingSection.current;
 
   const actions = shown ? availableWorkshopQueueActions(shown.workStatus, permissions) : [];
   const cancelAction = actions.includes('cancel');
@@ -207,6 +213,10 @@ export function WorkOrderDetailDialog({
 
           {shownItemsSection ? (
             <div className="border-t border-(--color-border) pt-4">{shownItemsSection}</div>
+          ) : null}
+
+          {shownBillingSection ? (
+            <div className="border-t border-(--color-border) pt-4">{shownBillingSection}</div>
           ) : null}
 
           <div className="space-y-4 border-t border-(--color-border) pt-4">
