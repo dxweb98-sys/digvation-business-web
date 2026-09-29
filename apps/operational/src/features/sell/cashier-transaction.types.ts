@@ -409,6 +409,12 @@ export interface Sale {
   promotionCode?: string | null;
   adjustments?: SaleAdjustment[];
   loyaltyRedemption?: SaleLoyaltyRedemption | null;
+  /**
+   * Total points this FINALIZED Sale earned: Runtime's immutable Loyalty EARN fact. Valid for
+   * PER_ITEM and TRANSACTION_TOTAL alike; null when the Sale earned nothing. Never derived from
+   * line rows or current configuration.
+   */
+  loyaltyEarning?: { state: 'FINALIZED'; pointsEarned: string } | null;
   customer?: SaleCustomer | null;
   createdByActorId?: string;
   createdByActorKind?: string;
