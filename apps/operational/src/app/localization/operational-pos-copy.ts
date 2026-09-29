@@ -410,6 +410,18 @@ const posCopy: Record<string, LocalizedCopy> = {
     'id-ID': 'Ubah jumlah atau hapus item yang belum dimulai, lalu simpan penyesuaian.',
     'en-US': 'Change quantity or remove items that have not started, then confirm.',
   },
+  'Finish the payment of this transaction before starting a new one.': {
+    'id-ID': 'Selesaikan pembayaran transaksi ini sebelum memulai transaksi baru.',
+    'en-US': 'Finish the payment of this transaction before starting a new one.',
+  },
+  'This transaction has work to complete before it can be finished.': {
+    'id-ID': 'Transaksi ini memiliki pengerjaan yang harus diselesaikan terlebih dahulu.',
+    'en-US': 'This transaction has work to complete before it can be finished.',
+  },
+  'Payment is preserved. Try completing the transaction again.': {
+    'id-ID': 'Pembayaran tersimpan. Coba selesaikan transaksi lagi.',
+    'en-US': 'Payment is preserved. Try completing the transaction again.',
+  },
   'Add item from catalog': {
     'id-ID': 'Tambah item dari katalog',
     'en-US': 'Add item from catalog',
@@ -761,6 +773,12 @@ const posCopy: Record<string, LocalizedCopy> = {
     'en-US': 'Payment attempts',
   },
   'Item quantity': { 'id-ID': 'Jumlah', 'en-US': 'Quantity' },
+  'Sold by': { 'id-ID': 'Dijual oleh', 'en-US': 'Sold by' },
+  'No salesperson': { 'id-ID': 'Tanpa penjual', 'en-US': 'No salesperson' },
+  'Optional. The salesperson earns commission when the sale is completed.': {
+    'id-ID': 'Opsional. Penjual memperoleh komisi saat transaksi selesai.',
+    'en-US': 'Optional. The salesperson earns commission when the sale is completed.',
+  },
   'Included components': { 'id-ID': 'Komponen termasuk', 'en-US': 'Included components' },
   'Required additional items': { 'id-ID': 'Item tambahan wajib', 'en-US': 'Required additional items' },
   'Choose at least one additional item.': { 'id-ID': 'Pilih minimal satu item tambahan.', 'en-US': 'Choose at least one additional item.' },

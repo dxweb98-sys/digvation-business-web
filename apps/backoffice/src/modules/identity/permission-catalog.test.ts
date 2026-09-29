@@ -39,4 +39,28 @@ describe('groupAccessPermissions', () => {
       groupAccessPermissions([permission('sales:create', 'OPERATIONAL')], 'en', 'create'),
     ).toMatchObject([{ key: 'OPERATIONAL', modules: [{ key: 'SALES' }] }]);
   });
+
+  it('groups the progressed-adjustment permission under Operational > Sales without special casing', () => {
+    const adjust: AccessPermission = {
+      ...permission('sales:adjust-progressed', 'OPERATIONAL'),
+      label: {
+        id: 'Sesuaikan transaksi yang sedang dikerjakan',
+        en: 'Adjust in-progress transactions',
+      },
+      order: 35,
+    };
+    const groups = groupAccessPermissions(
+      [permission('sales:update', 'OPERATIONAL'), adjust],
+      'en',
+      '',
+    );
+    expect(groups).toMatchObject([{ key: 'OPERATIONAL', modules: [{ key: 'SALES' }] }]);
+    expect(groups[0]?.modules[0]?.permissions.map(({ key }) => key)).toEqual([
+      'sales:update',
+      'sales:adjust-progressed',
+    ]);
+    // It stays searchable by its business label and by its canonical code.
+    expect(groupAccessPermissions([adjust], 'en', 'in-progress')).toHaveLength(1);
+    expect(groupAccessPermissions([adjust], 'id', 'sedang dikerjakan')).toHaveLength(1);
+  });
 });

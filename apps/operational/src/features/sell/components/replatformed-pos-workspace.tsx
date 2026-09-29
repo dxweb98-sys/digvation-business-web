@@ -176,6 +176,14 @@ import {
 } from '../member-cart-presentation';
 import './replatformed-pos-workspace.css';
 import { CustomerMemberDialog } from './customer-member-dialog';
+import { useCustomerPickerSession } from '../customer-picker-session';
+import { canAdjustOrder } from '../sale-adjustment-access';
+import {
+  completeSettledCheckout,
+  hasTrackedWork,
+  isFullySettled,
+  isInstantOnly,
+} from '../sale-lifecycle';
 
 type Workspace = ReturnType<typeof useCashierTransactionWorkspace>;
 type QueueStatus = 'QUEUED' | 'PROGRESS' | 'COMPLETED' | 'CANCELED';
@@ -721,11 +729,7 @@ function processIssues(
 }
 
 function hasSuccessfulCheckout(sale: Sale): boolean {
-  if (sale.payments.some((payment) => payment.status === 'PENDING')) return false;
-  const settledAmount = sale.payments
-    .filter((payment) => payment.status === 'SUCCEEDED')
-    .reduce((sum, payment) => sum.plus(createDecimal(payment.appliedAmount)), createDecimal('0'));
-  return settledAmount.equals(createDecimal(sale.totalAmount));
+  return isFullySettled(sale);
 }
 
 function successfulPayments(sale: Sale) {
@@ -802,6 +806,13 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const [cartOpen, setCartOpen] = useState(false);
   const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<MemberLookupResult | null>(null);
+  const customerPickerSession = useCustomerPickerSession();
+  // A new transaction must never inherit the previous customer's picker draft or selected Member.
+  // Query caches are keyed by identity and stay warm; only this presentation state is cleared.
+  const startNewCustomerTransaction = () => {
+    setSelectedMember(null);
+    customerPickerSession.startNewTransaction();
+  };
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [payNow, setPayNow] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
@@ -1118,6 +1129,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     setCheckoutOpen(false);
 
     workspace.clearProcessedDraft();
+    startNewCustomerTransaction();
 
     // The receipt belongs to a settled transaction; a partly paid one keeps its balance in the queue.
     if (wasPaid && destination === 'QUEUE') {
@@ -1141,6 +1153,44 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
               : `${transactionNumber(completedSale, workspace.locale)} ${copy('Added to queue. Payment has not been received.')}`,
       variant: 'success',
     });
+  };
+
+  /** An all-INSTANT Sale that finalized at checkout: show its completed receipt, no queue. */
+  const commitInstantCheckout = (finalized: Sale) => {
+    setQueueTab('COMPLETED');
+    setQueueOpen(true);
+    setCartOpen(false);
+    setCheckoutOpen(false);
+
+    workspace.clearProcessedDraft();
+    startNewCustomerTransaction();
+
+    // Same rule as completing queued work: the finalize response is the immediate receipt.
+    if (canReadCompleted || hasSuccessfulPayment(finalized)) {
+      setQueueDetail(finalized);
+      setReceiptSaleId(hasSuccessfulPayment(finalized) ? finalized.id : null);
+    } else {
+      setQueueDetail(null);
+      setReceiptSaleId(null);
+    }
+    showToast({
+      title: copy('Transaction completed'),
+      description: `${transactionNumber(finalized, workspace.locale)} ${copy('has been completed.')}`,
+      variant: 'success',
+    });
+  };
+
+  /**
+   * The one place that decides what an exactly settled checkout becomes: tracked work queues,
+   * an all-INSTANT Sale finalizes immediately. Throws so the caller can keep the payment and retry.
+   */
+  const finishSettledCheckout = async (settled: Sale) => {
+    const result = await completeSettledCheckout(settled, {
+      queue: workspace.queueSale,
+      finalizeInstant: workspace.finalizeInstantSale,
+    });
+    if (result.kind === 'FINALIZED') commitInstantCheckout(result.sale);
+    else if (result.kind === 'QUEUED') commitCheckoutToQueue(result.sale, true, 'QUEUE');
   };
 
   const startQueuedWork = async (transaction: Sale) => {
@@ -1278,6 +1328,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
 
   const openAdjustment = async (transaction: Sale) => {
     if (transaction.status !== 'OPEN') return;
+    // Runtime enforces this too; never open a dialog that can only end in a refusal.
+    if (!canAdjustOrder(transaction, session.access.permissions)) return;
     setQueueDetail(null);
     try {
       const hydrated = await workspace.hydrateQueuedSale(transaction.id);
@@ -1377,6 +1429,11 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const queueCheckout = async (destination: FulfillmentDestination) => {
     if (!sale || !lines.length) return;
     try {
+      // An all-INSTANT Sale has no queue: it only completes once exactly settled.
+      if (!hasTrackedWork(sale)) {
+        if (hasSuccessfulCheckout(sale)) await finishSettledCheckout(sale);
+        return;
+      }
       const submitted = await workspace.queueSale(sale);
       commitCheckoutToQueue(submitted, hasSuccessfulCheckout(sale), destination);
       if (destination === 'START_PROCESS') await startQueuedWork(submitted);
@@ -1443,13 +1500,14 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       }
 
       try {
-        const submitted = await workspace.queueSale(completedSale);
-        commitCheckoutToQueue(submitted, true, 'QUEUE');
+        await finishSettledCheckout(completedSale);
       } catch (error) {
         showToast({
           title: copy('Payment complete'),
           description: `${cashierTransactionErrorMessage(error)} ${copy(
-            'Payment is preserved. Try adding the transaction to the queue again.',
+            hasTrackedWork(completedSale)
+              ? 'Payment is preserved. Try adding the transaction to the queue again.'
+              : 'Payment is preserved. Try completing the transaction again.',
           )}`,
           variant: 'warning',
         });
@@ -1529,14 +1587,15 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       setPaymentReference('');
       if (hasSuccessfulCheckout(updatedSale)) {
         try {
-          const submitted = await workspace.queueSale(updatedSale);
-          commitCheckoutToQueue(submitted, true, 'QUEUE');
+          await finishSettledCheckout(updatedSale);
           return;
         } catch (error) {
           showToast({
             title: copy('Payment complete'),
             description: `${cashierTransactionErrorMessage(error)} ${copy(
-              'Payment is preserved. Try adding the transaction to the queue again.',
+              hasTrackedWork(updatedSale)
+                ? 'Payment is preserved. Try adding the transaction to the queue again.'
+                : 'Payment is preserved. Try completing the transaction again.',
             )}`,
             variant: 'warning',
           });
@@ -1649,6 +1708,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           locale={workspace.locale}
           onStartWork={(transaction) => void startQueuedWork(transaction)}
           onAdjust={openAdjustment}
+          canAdjust={(transaction) => canAdjustOrder(transaction, session.access.permissions)}
           onPay={(transaction) => void openQueuePayment(transaction)}
           onCancel={requestCancel}
           onView={(transaction) => {
@@ -1803,6 +1863,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         canReadMembers={canReadMembers}
         canEnrollMember={canEnrollMember}
         canReadLoyalty={canReadLoyalty}
+        resetKey={customerPickerSession.revision}
         onClose={() => setCustomerPickerOpen(false)}
         onChoose={(selection, member) => {
           const previousMember = selectedMember;
@@ -1924,10 +1985,19 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           setReceiptSaleId(null);
         }}
         onNewSale={() => {
+          // A partly paid all-INSTANT Sale has no queue: keep it as the active transaction.
+          if (workspace.isNewSaleBlocked) {
+            showToast({
+              title: copy('Transaction not finished'),
+              description: copy('Finish the payment of this transaction before starting a new one.'),
+              variant: 'warning',
+            });
+            return;
+          }
           setQueueDetail(null);
           setReceiptSaleId(null);
           setCartOpen(false);
-          workspace.newSale();
+          if (workspace.newSale()) startNewCustomerTransaction();
         }}
         onViewReceipt={(transaction) => {
           setQueueDetail(transaction);
@@ -1978,7 +2048,11 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         onPreview={(line, input) => workspace.previewLineCorrection(line, input)}
         loadConfiguratorState={workspace.loadConfiguratorState}
         loadCandidates={workspace.loadComponentCandidates}
-        canCorrectProgressedLine={session.access.permissions.includes('sales:correct-progressed-line')}
+        canAdjust={
+          displayedAdjustmentTarget
+            ? canAdjustOrder(displayedAdjustmentTarget, session.access.permissions)
+            : true
+        }
         canRefundPayment={session.access.permissions.includes('payments:refund')}
         onCompensate={(sale, paymentId, amount) => workspace.compensateOpenPayment(sale, paymentId, amount)}
       />
@@ -2258,6 +2332,7 @@ function ReferenceQueueBoard({
   locale,
   onStartWork,
   onAdjust,
+  canAdjust,
   onPay,
   onCancel,
   onView,
@@ -2275,6 +2350,7 @@ function ReferenceQueueBoard({
   locale: string;
   onStartWork: (sale: Sale) => void;
   onAdjust: (sale: Sale) => void;
+  canAdjust: (sale: Sale) => boolean;
   onPay: (sale: Sale) => void;
   onCancel: (sale: Sale) => void;
   onView: (sale: Sale) => void;
@@ -2387,6 +2463,7 @@ function ReferenceQueueBoard({
                                   issues={issues[sale.id] ?? []}
                                   onStartWork={onStartWork}
                                   onAdjust={onAdjust}
+                                  canAdjust={canAdjust(sale)}
                                   onPay={onPay}
                                   onCancel={onCancel}
                                   onView={onView}
@@ -2488,6 +2565,7 @@ export function ReferenceQueueCard({
   issues,
   onStartWork,
   onAdjust,
+  canAdjust,
   onPay,
   onCancel,
   onView,
@@ -2500,6 +2578,8 @@ export function ReferenceQueueCard({
   issues: string[];
   onStartWork: (sale: Sale) => void;
   onAdjust: (sale: Sale) => void;
+  /** False when the session lacks the permission to adjust this Sale in its current state. */
+  canAdjust: boolean;
   onPay: (sale: Sale) => void;
   onCancel: (sale: Sale) => void;
   onView: (sale: Sale) => void;
@@ -2548,11 +2628,15 @@ export function ReferenceQueueCard({
                 },
               ]
             : []),
-          {
-            label: copy('Adjust order'),
-            icon: <ShoppingBag className="size-3.5" />,
-            onSelect: () => onAdjust(sale),
-          },
+          ...(canAdjust
+            ? [
+                {
+                  label: copy('Adjust order'),
+                  icon: <ShoppingBag className="size-3.5" />,
+                  onSelect: () => onAdjust(sale),
+                },
+              ]
+            : []),
           ...(isPositiveDecimal(balanceDue)
             ? [
                 {
@@ -2572,11 +2656,15 @@ export function ReferenceQueueCard({
       : []),
     ...(status === 'PROGRESS'
       ? [
-          {
-            label: copy('Adjust order'),
-            icon: <ShoppingBag className="size-3.5" />,
-            onSelect: () => onAdjust(sale),
-          },
+          ...(canAdjust
+            ? [
+                {
+                  label: copy('Adjust order'),
+                  icon: <ShoppingBag className="size-3.5" />,
+                  onSelect: () => onAdjust(sale),
+                },
+              ]
+            : []),
           ...(isPositiveDecimal(balanceDue)
             ? [
                 {
@@ -3006,6 +3094,11 @@ function ReferenceCartPanel({
                           </span>
                         ) : null}
                       </div>
+                      {line.soldByName ? (
+                        <p className="mt-0.5 text-[11px] text-[var(--color-text-muted)]">
+                          {copy('Sold by')} {line.soldByName}
+                        </p>
+                      ) : null}
                     </div>
                     <div className="flex shrink-0 items-center gap-0.5">
                       {line.editable ? (
@@ -3473,7 +3566,9 @@ export function ReferencePaymentDialog({
       ? createDecimal(normalizedTender).minus(createDecimal(normalizedAllocation)).toFixed(4)
       : '0';
   const fullyPaid = sale ? hasSuccessfulCheckout(sale) : false;
-  const collectsPayment = payNow && !fullyPaid;
+  // An all-INSTANT Sale has no queue to defer to: payment is collected now, in as many parts as needed.
+  const instantOnly = sale ? isInstantOnly(sale) : false;
+  const collectsPayment = (payNow || instantOnly) && !fullyPaid;
   const canPay =
     lines.length > 0 &&
     Boolean(activeRoute) &&
@@ -3503,7 +3598,8 @@ export function ReferencePaymentDialog({
       setStep('edit');
       return;
     }
-    if (hasRecordedMoney && !fullyPaid) {
+    // Leaving a partly paid all-INSTANT Sale keeps it open; there is no queue to collect from later.
+    if (hasRecordedMoney && !fullyPaid && !instantOnly) {
       setStep('leave');
       return;
     }
@@ -3544,7 +3640,7 @@ export function ReferencePaymentDialog({
           onClick={onQueue}
           className="w-full justify-center whitespace-nowrap"
         >
-          {copy('Add to queue')}
+          {copy(instantOnly ? 'Complete transaction' : 'Add to queue')}
         </DButton>
       )}
     </div>
@@ -3871,10 +3967,11 @@ export function ReferencePaymentDialog({
                 <div className="pos-pay-section__head">
                   <p className="pos-pay-section__title">
                     <Clock className="size-4 shrink-0 text-[var(--color-brand)]" aria-hidden="true" />
-                    {copy('Payment timing')}
+                    {copy(instantOnly ? 'Payment' : 'Payment timing')}
                   </p>
                 </div>
                 <div className="pos-pay-section__body">
+                  {instantOnly ? null : (
                   <div className="grid gap-2 sm:grid-cols-2">
                     {[
                       {
@@ -3907,6 +4004,7 @@ export function ReferencePaymentDialog({
                       </label>
                     ))}
                   </div>
+                  )}
 
                   {collectsPayment ? (
                     <div className="mt-3 border-t border-[var(--color-border)] pt-3">
@@ -4592,7 +4690,16 @@ export function ReferenceTransactionDetail({
                         <SaleLineItem
                           key={line.id}
                           name={line.itemNameSnapshot}
-                          variant={line.variantNameSnapshot}
+                          variant={
+                            [
+                              line.variantNameSnapshot,
+                              line.soldByEmployeeNameSnapshot
+                                ? `${copy('Sold by')} ${line.soldByEmployeeNameSnapshot}`
+                                : null,
+                            ]
+                              .filter(Boolean)
+                              .join(' · ') || null
+                          }
                           pricing={`${quantity(line.quantity)} × ${format(line.effectiveUnitPrice)}`}
                           amount={format(line.grossAmount)}
                           discountsHeading={copy('Discounts and promotions')}
@@ -5164,7 +5271,7 @@ export function ReferenceOrderAdjustmentDialog({
   sale,
   items,
   locale,
-  isMutating,
+  isMutating: mutating,
   variantPicker,
   onClose,
   onAdd,
@@ -5175,7 +5282,7 @@ export function ReferenceOrderAdjustmentDialog({
   onPreview,
   loadConfiguratorState,
   loadCandidates,
-  canCorrectProgressedLine,
+  canAdjust,
   canRefundPayment,
   onCompensate,
 }: {
@@ -5196,11 +5303,14 @@ export function ReferenceOrderAdjustmentDialog({
   /** Everything the shared item configuration needs for one item at this location. */
   loadConfiguratorState: (item: CatalogItem) => Promise<ItemConfiguratorState>;
   loadCandidates: (q: string) => Promise<{ items: ComponentCandidate[] }>;
-  canCorrectProgressedLine: boolean;
+  /** Session may adjust this Sale in its current state (see `canAdjustOrder`). */
+  canAdjust: boolean;
   canRefundPayment: boolean;
   onCompensate: (sale: Sale, paymentId: string, amount: string) => Promise<unknown>;
 }) {
   const { copy } = useOperationalLocalization();
+  // Without the adjustment permission every mutating control is off; closing stays available.
+  const isMutating = mutating || !canAdjust;
   const [catalogSearch, setCatalogSearch] = useState('');
   const [catalogOpen, setCatalogOpen] = useState(false);
   // Quantities when the dialog opened; only rows that differ show what changed.
@@ -5232,7 +5342,6 @@ export function ReferenceOrderAdjustmentDialog({
   const [correctionPreview, setCorrectionPreview] = useState<ReplaceLinePreview | null>(null);
   const [previewState, setPreviewState] = useState<'IDLE' | 'LOADING' | 'ERROR'>('IDLE');
   const [previewError, setPreviewError] = useState<string | null>(null);
-  const [progressedCorrectionNotice, setProgressedCorrectionNotice] = useState<string | null>(null);
   const previewRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
     // Keep the authoritative result in view; it renders below the form.
@@ -5294,10 +5403,6 @@ export function ReferenceOrderAdjustmentDialog({
       label: `${item.name} (${item.code})`,
     }));
   const correctionSource = correctionLine;
-  const correctionProgressed =
-    correctionSource != null &&
-    saleLineWorkStatus(correctionSource) !== null &&
-    saleLineWorkStatus(correctionSource) !== 'WAITING';
   // The selected item stays in the option list so its label remains visible while searching.
   const replacementOptions = (() => {
     const query = replacementSearch.trim().toLocaleLowerCase();
@@ -5314,7 +5419,11 @@ export function ReferenceOrderAdjustmentDialog({
       ? replacementLinesOf(
           configuratorState.item.id,
           replacementConfiguration.catalogVariantId,
-          replacementConfiguration,
+          {
+            ...replacementConfiguration,
+            // Carried explicitly so a correction never silently drops the salesperson.
+            soldByEmployeeId: replacementConfiguration.soldBy?.employeeId ?? null,
+          },
         )
       : [];
   // Ready exactly when the shared configuration is valid: every unit satisfied, price resolved.
@@ -5413,7 +5522,7 @@ export function ReferenceOrderAdjustmentDialog({
                 {copy('Cancel')}
               </Button>
             )}
-            <Button disabled={isMutating} onClick={onClose}>
+            <Button disabled={mutating} onClick={onClose}>
               {copy('Save adjustment')}
             </Button>
           </div>
@@ -5509,14 +5618,15 @@ export function ReferenceOrderAdjustmentDialog({
                   {sale.status === 'OPEN' ? (
                     <button
                       type="button"
-                      disabled={isMutating}
+                      // Runtime never replaces a tracked line whose work has started; no permission
+                      // overrides that, so the action is simply unavailable for it.
+                      disabled={isMutating || progressed}
+                      title={
+                        progressed
+                          ? 'Item yang sudah dikerjakan tidak dapat dikoreksi.'
+                          : undefined
+                      }
                       onClick={() => {
-                        if (progressed && !canCorrectProgressedLine) {
-                          setProgressedCorrectionNotice(
-                            'Koreksi setelah pengerjaan dimulai memerlukan pengguna yang berwenang.',
-                          );
-                          return;
-                        }
                         setCorrectionLine(line);
                         setReplacementItemId(line.catalogItemId);
                         loadReplacementState(line.catalogItemId);
@@ -5529,7 +5639,6 @@ export function ReferenceOrderAdjustmentDialog({
                         setCorrectionReason('');
                         setCorrectionPreview(null);
                         setPreviewState('IDLE');
-                        setProgressedCorrectionNotice(null);
                       }}
                       className="ml-1 rounded-lg px-2 text-xs font-semibold text-[var(--color-brand)] hover:bg-[var(--color-brand)]/10 disabled:opacity-40"
                     >
@@ -5541,9 +5650,6 @@ export function ReferenceOrderAdjustmentDialog({
             );
           })}
         </ul>
-        {progressedCorrectionNotice ? (
-          <DAlert variant="warning">{progressedCorrectionNotice}</DAlert>
-        ) : null}
         {removedCount ? (
           <p className="text-xs text-[var(--color-text-muted)]">
             {removedCount} {copy('items removed')}
@@ -5746,11 +5852,6 @@ export function ReferenceOrderAdjustmentDialog({
                   {quantity(correctionLine.quantity)} × {money(correctionLine.effectiveUnitPrice, locale)}
                 </p>
               </div>
-              {correctionProgressed ? (
-                <DAlert variant="warning" className="text-xs">
-                  Pengerjaan item ini sudah dimulai. Riwayat pengerjaan tetap disimpan setelah koreksi.
-                </DAlert>
-              ) : null}
             </div>
             <div className="space-y-3 border-t border-[var(--color-border)] pt-4">
               <Combobox

@@ -38,6 +38,9 @@ import {
 import { useBusinessConfigurationI18n } from './business-configuration-i18n';
 import { LoyaltyApi } from '../loyalty/loyalty-api';
 import { LoyaltyConfigurationSection } from '../loyalty/loyalty-configuration-section';
+import { CatalogApi } from '../../features/catalog/api/catalog-api';
+import { ProductCommissionApi } from '../commission/product-commission-api';
+import { ProductCommissionSection } from '../commission/product-commission-section';
 
 const keys = {
   configuration: ['business-settings', 'configuration'] as const,
@@ -58,6 +61,21 @@ export function BusinessConfigurationPage() {
   const loyaltyApi = useMemo(
     () => new LoyaltyApi(createApiClient(runtime.apiBaseUrl)),
     [createApiClient, runtime.apiBaseUrl],
+  );
+  const commissionApi = useMemo(
+    () => new ProductCommissionApi(createApiClient(runtime.apiBaseUrl)),
+    [createApiClient, runtime.apiBaseUrl],
+  );
+  const catalogApi = useMemo(
+    () => new CatalogApi(createApiClient(runtime.apiBaseUrl)),
+    [createApiClient, runtime.apiBaseUrl],
+  );
+  const hasPosProduct = Boolean(session?.effectiveEntitlements.products.includes('POS'));
+  const canViewCommission = Boolean(
+    hasPosProduct && session && canPerformBackofficeAction(session, 'viewCommission'),
+  );
+  const canConfigureCommission = Boolean(
+    hasPosProduct && session && canPerformBackofficeAction(session, 'configureCommission'),
   );
   const hasLoyaltyCapability = Boolean(
     session?.effectiveEntitlements.capabilities.includes('LOYALTY_POINTS'),
@@ -110,7 +128,9 @@ export function BusinessConfigurationPage() {
       ? 'locations'
       : canViewLoyalty
         ? 'loyalty'
-        : 'profile';
+        : canViewCommission
+          ? 'commission'
+          : 'profile';
 
   return (
     <BackofficePage>
@@ -136,6 +156,9 @@ export function BusinessConfigurationPage() {
             <DTabsTrigger value="numbering">{copy('Numbering')}</DTabsTrigger>
           ) : null}
           {canViewLoyalty ? <DTabsTrigger value="loyalty">Loyalty</DTabsTrigger> : null}
+          {canViewCommission ? (
+            <DTabsTrigger value="commission">Komisi Produk</DTabsTrigger>
+          ) : null}
         </DTabsList>
 
         <DTabsContent value="profile" className="mt-5">
@@ -182,6 +205,18 @@ export function BusinessConfigurationPage() {
         {canViewLoyalty ? (
           <DTabsContent value="loyalty" className="mt-5">
             <LoyaltyConfigurationSection api={loyaltyApi} canConfigure={canConfigureLoyalty} />
+          </DTabsContent>
+        ) : null}
+
+        {canViewCommission ? (
+          <DTabsContent value="commission" className="mt-5">
+            <ProductCommissionSection
+              api={commissionApi}
+              canConfigure={canConfigureCommission}
+              loadProducts={(q) =>
+                catalogApi.listItems({ type: 'PRODUCT', lifecycle: 'ACTIVE', limit: 20, ...(q ? { q } : {}) })
+              }
+            />
           </DTabsContent>
         ) : null}
 
