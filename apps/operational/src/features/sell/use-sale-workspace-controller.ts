@@ -144,6 +144,9 @@ export function useSaleWorkspaceController({
   const [retryIntent, setRetryIntent] = useState<AddItemIntent | null>(null);
   const [draft, setDraft] = useState<CartDraft | null>(null);
   const [retryCommitIntent, setRetryCommitIntent] = useState<CommitDraftIntent | null>(null);
+  // The Sale just created from the draft. The draft is cleared before the route delivers the Sale,
+  // so it carries the customer across that gap and the transaction identity never disappears.
+  const [handoverSale, setHandoverSale] = useState<Sale | null>(null);
   const previousLocationIdRef = useRef(selectedLocationId);
   const draftCommitGateRef = useRef(createDraftCommitGate<Sale>());
 
@@ -153,6 +156,8 @@ export function useSaleWorkspaceController({
     enabled: Boolean(routeSaleId),
     ...transactionQueryPolicy,
   });
+
+  if (handoverSale && saleQuery.data?.id === handoverSale.id) setHandoverSale(null);
 
   useEffect(() => {
     const sale = saleQuery.data;
@@ -164,6 +169,7 @@ export function useSaleWorkspaceController({
   useEffect(() => {
     if (previousLocationIdRef.current !== selectedLocationId) {
       previousLocationIdRef.current = selectedLocationId;
+      setHandoverSale(null);
       setDraft(null);
       setRetryCommitIntent(null);
     }
@@ -231,6 +237,7 @@ export function useSaleWorkspaceController({
     onSuccess: (sale) => {
       command.commitSale(sale);
       selectLocation(sale.sellingLocationId);
+      setHandoverSale(sale);
       setDraft(null);
       setRetryCommitIntent(null);
       navigate(`/sell/${sale.id}`, { replace: true });
@@ -440,7 +447,9 @@ export function useSaleWorkspaceController({
    * exists, and the local draft holds it only until then.
    */
   const activeCustomer: SaleCustomer | null =
-    saleQuery.data?.customer ?? draftCustomerSnapshot(draft?.customer ?? null);
+    saleQuery.data?.customer ??
+    handoverSale?.customer ??
+    draftCustomerSnapshot(draft?.customer ?? null);
 
   const changeCustomer = async (selection: SaleCustomerSelection) => {
     const sale = saleQuery.data;
@@ -594,6 +603,7 @@ export function useSaleWorkspaceController({
     },
     commitDraft,
     clearDraft: () => {
+      setHandoverSale(null);
       setDraft(null);
       setRetryCommitIntent(null);
     },

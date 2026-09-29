@@ -169,6 +169,11 @@ import {
   restrictedQueueSummary,
   useCanReadCompletedSaleDetails,
 } from '../completed-sale-visibility';
+import {
+  activeMemberOf,
+  needsMemberIdentityLookup,
+  presentedCustomer,
+} from '../member-cart-presentation';
 import './replatformed-pos-workspace.css';
 import { CustomerMemberDialog } from './customer-member-dialog';
 
@@ -868,10 +873,9 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const canReadLoyalty =
     hasLoyaltyCapability &&
     (session.access.permissions.includes('loyalty:read') || canRedeemLoyalty);
-  const activeSelectedMember =
-    activeCustomer?.type === 'MEMBER' && selectedMember?.customerId === activeCustomer.referenceId
-      ? selectedMember
-      : null;
+  const activeSelectedMember = activeMemberOf(activeCustomer, selectedMember);
+  // Draft customer identity is completed from the picked Member; a Sale's own customer wins once it exists.
+  const cartCustomer = presentedCustomer(activeCustomer, activeSelectedMember, Boolean(sale));
 
   const memberIdentityQuery = useQuery({
     queryKey: [
@@ -880,12 +884,11 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       activeCustomer?.phoneE164 ?? null,
     ],
     queryFn: ({ signal }) => customerMemberApi.searchMembers(activeCustomer!.phoneE164, signal),
-    enabled: Boolean(
-      canReadMembers &&
-      activeCustomer?.type === 'MEMBER' &&
-      activeCustomer.referenceId &&
-      activeSelectedMember === null,
-    ),
+    enabled: needsMemberIdentityLookup({
+      canReadMembers,
+      customer: activeCustomer,
+      activeMember: activeSelectedMember,
+    }),
     staleTime: 30_000,
   });
 
@@ -1769,7 +1772,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         isTaxPreviewLoading={isTaxPreviewLoading}
         isTaxPreviewUnavailable={isTaxPreviewUnavailable}
         locale={workspace.locale}
-        customer={activeCustomer}
+        customer={cartCustomer}
         memberNumber={activeSelectedMember?.memberNumber ?? null}
         pointBalance={memberBalanceQuery.data?.pointsBalance ?? null}
         isPointBalanceLoading={memberBalanceQuery.isLoading}
@@ -1794,7 +1797,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
 
       <CustomerMemberDialog
         open={customerPickerOpen}
-        customer={activeCustomer}
+        customer={cartCustomer}
         isSaving={workspace.isCustomerPending}
         api={customerMemberApi}
         canReadMembers={canReadMembers}
@@ -1847,7 +1850,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         taxAmount={workspace.cart.taxAmount}
         taxLabel={sale ? saleTaxLabel(sale, copy('Tax')) : copy('Tax')}
         locale={workspace.locale}
-        customer={activeCustomer}
+        customer={cartCustomer}
         paymentRoutes={workspace.paymentRoutes}
         isPaymentRoutesLoading={workspace.isLoadingPaymentRoutes}
         method={paymentMethod}
