@@ -26,6 +26,24 @@ export function canSelectInitialItems(
   );
 }
 
+/**
+ * Accepted items may be adjusted while the Work Order is open (not DONE or
+ * CANCELLED) by someone who may update Work Order items. Runtime enforces the
+ * same rule.
+ */
+export function canAdjustItems(
+  status: WorkshopWorkOrderStatus,
+  permissions: readonly string[],
+): boolean {
+  return (
+    (status === 'WAITING' ||
+      status === 'ASSIGNED' ||
+      status === 'IN_PROGRESS' ||
+      status === 'PAUSED') &&
+    permissions.includes('work-order-items:update')
+  );
+}
+
 export function isValidQuantity(value: string): boolean {
   return QUANTITY_PATTERN.test(value) && Number(value) > 0;
 }
@@ -215,6 +233,9 @@ export const WORKSHOP_LINES_ERROR_COPY: Record<string, string> = {
   SERVICE_ADDITIONAL_ITEM_DUPLICATE: 'Each additional item can be chosen only once.',
   ADDITIONAL_ITEM_IS_BASE_ITEM: 'A service cannot be its own additional item.',
   SERVICE_COMPONENT_PRICE_NOT_FOUND: 'An included part has no price right now. Choose another item.',
+  WORKSHOP_LINE_ADJUSTMENT_STATE_INVALID: 'Items can no longer be changed on this Work Order.',
+  WORKSHOP_LINE_ADJUSTMENT_INVALID: 'One of the items was already changed. Open the Work Order again.',
+  WORKSHOP_LINE_ADJUSTMENT_QUANTITY_INVALID: 'Enter a quantity above zero.',
   FORBIDDEN: 'You do not have permission to select items for this Work Order.',
 };
 
@@ -223,4 +244,6 @@ export const WORKSHOP_LINES_STALE_CODES: readonly string[] = [
   'VERSION_CONFLICT',
   'WORKSHOP_WORK_ORDER_LINES_ALREADY_ACCEPTED',
   'WORKSHOP_WORK_ORDER_LINES_STATE_INVALID',
+  'WORKSHOP_LINE_ADJUSTMENT_STATE_INVALID',
+  'WORKSHOP_LINE_ADJUSTMENT_INVALID',
 ];

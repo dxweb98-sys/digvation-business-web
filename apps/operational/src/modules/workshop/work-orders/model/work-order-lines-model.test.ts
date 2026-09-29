@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { PickerItem, PickerVariant } from '../api/workshop-lines-api';
 import {
   addToDraft,
+  canAdjustItems,
   canSelectInitialItems,
   draftLineFor,
   draftReady,
@@ -48,6 +49,22 @@ describe('canSelectInitialItems', () => {
   it('needs work-order-items:update and disappears once items are accepted', () => {
     expect(canSelectInitialItems('WAITING', ['work-orders:read'], 0)).toBe(false);
     expect(canSelectInitialItems('WAITING', allowed, 2)).toBe(false);
+  });
+});
+
+describe('canAdjustItems', () => {
+  const allowed = ['work-order-items:update'];
+
+  it.each(['WAITING', 'ASSIGNED', 'IN_PROGRESS', 'PAUSED'] as const)('is offered while %s', (status) => {
+    expect(canAdjustItems(status, allowed)).toBe(true);
+  });
+
+  it.each(['DONE', 'CANCELLED'] as const)('is never offered while %s', (status) => {
+    expect(canAdjustItems(status, allowed)).toBe(false);
+  });
+
+  it('needs work-order-items:update', () => {
+    expect(canAdjustItems('IN_PROGRESS', ['work-orders:read'])).toBe(false);
   });
 });
 

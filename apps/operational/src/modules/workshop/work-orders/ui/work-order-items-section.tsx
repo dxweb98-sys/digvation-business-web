@@ -1,6 +1,6 @@
 import { formatMoney } from '@digvation/business-money';
 import { DAlert, DBadge, DButton, DSkeleton } from '@digvation/ui';
-import { ListPlus } from 'lucide-react';
+import { ListPlus, Pencil, Plus } from 'lucide-react';
 
 import { useOperationalLocalization } from '../../../../app/localization/operational-localization';
 import type {
@@ -8,9 +8,16 @@ import type {
   WorkshopWorkOrderLine,
 } from '../api/workshop-lines-api';
 import type { WorkshopQueueWorkOrder } from '../api/workshop-queue-api';
+import { IconActionButton } from '../../shared/ui/icon-action-button';
 import { useWorkOrderItems } from '../model/use-work-order-items';
-import { canSelectInitialItems, formatQuantity } from '../model/work-order-lines-model';
+import {
+  canAdjustItems,
+  canSelectInitialItems,
+  formatQuantity,
+} from '../model/work-order-lines-model';
+import { AdjustItemsDialog } from './adjust-items-dialog';
 import { InitialItemsDialog } from './initial-items-dialog';
+import { WorkOrderItemHistory } from './work-order-item-history';
 
 /** One accepted item, rendered strictly from the snapshot Runtime returned. */
 function AcceptedLine({ line }: { line: WorkshopWorkOrderLine }) {
@@ -53,9 +60,9 @@ function AcceptedLine({ line }: { line: WorkshopWorkOrderLine }) {
 }
 
 /**
- * The accepted initial items of one Work Order, and the one-time selection
- * that creates them. Accepted items are read-only here: later changes are not
- * part of this screen.
+ * The effective items of one Work Order: the one-time initial selection, and
+ * (while the Work Order is open) adding, changing and removing items through
+ * one staged dialog. Every value shown comes from Runtime.
  */
 export function WorkOrderItemsSection({
   workOrder,
@@ -71,13 +78,36 @@ export function WorkOrderItemsSection({
   const { copy } = useOperationalLocalization();
   const items = useWorkOrderItems({ workOrder, onAccepted, onStale });
   const lines = items.detail.data?.lines;
-  const mayOfferPicker =
-    lines !== undefined && canSelectInitialItems(workOrder.workStatus, permissions, 0);
-  const canSelect = mayOfferPicker && lines.length === 0;
+  const adjustments = items.detail.data?.adjustments ?? [];
+  // Removed Lines still count: Runtime accepts the initial set only once.
+  const canSelect =
+    lines !== undefined &&
+    canSelectInitialItems(workOrder.workStatus, permissions, lines.length + adjustments.length);
+  const canAdjust = lines !== undefined && canAdjustItems(workOrder.workStatus, permissions);
 
   return (
     <section aria-label={copy('Work Order items')} className="space-y-2">
-      <h3 className="text-[11px] font-semibold text-(--color-text-muted)">{copy('Work Order items')}</h3>
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-[11px] font-semibold text-(--color-text-muted)">
+          {copy('Work Order items')}
+        </h3>
+        {canAdjust && lines.length > 0 ? (
+          <div className="flex items-center gap-1">
+            <IconActionButton
+              icon={Plus}
+              touch
+              label={copy('Add item')}
+              onClick={() => items.openAdjust({ addFirst: true })}
+            />
+            <IconActionButton
+              icon={Pencil}
+              touch
+              label={copy('Change items')}
+              onClick={() => items.openAdjust()}
+            />
+          </div>
+        ) : null}
+      </div>
 
       {items.detail.isError && !lines ? (
         <div>
@@ -105,6 +135,7 @@ export function WorkOrderItemsSection({
           <p className="text-[12px] text-(--color-text-muted)">
             {copy('Prices are recorded when items are saved.')}
           </p>
+          <WorkOrderItemHistory entries={adjustments} />
         </>
       ) : (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed border-(--color-border) px-3.5 py-3">
@@ -116,12 +147,41 @@ export function WorkOrderItemsSection({
                 {copy('Select items')}
               </span>
             </DButton>
+          ) : canAdjust ? (
+            <DButton
+              variant="secondary"
+              size="sm"
+              onClick={() => items.openAdjust({ addFirst: true })}
+            >
+              <span className="inline-flex items-center gap-1.5">
+                <Plus className="size-4" aria-hidden="true" />
+                {copy('Add item')}
+              </span>
+            </DButton>
           ) : null}
         </div>
       )}
 
-      {mayOfferPicker ? (
+      {lines !== undefined && adjustments.length > 0 && lines.length === 0 ? (
+        <WorkOrderItemHistory entries={adjustments} />
+      ) : null}
+
+      {canAdjust ? (
+        <AdjustItemsDialog
+          open={items.adjustOpen && !items.pickerOpen}
+          lines={lines}
+          draft={items.draft}
+          pending={items.adjustPending}
+          onChange={items.changeDraft}
+          onAddItem={items.openPicker}
+          onClose={items.closeAdjust}
+          onSave={() => items.saveAdjustment(lines)}
+        />
+      ) : null}
+
+      {canSelect || canAdjust ? (
         <InitialItemsDialog
+          mode={items.adjustOpen ? 'add' : 'initial'}
           open={items.pickerOpen}
           items={items.catalog.data?.items}
           loading={items.catalog.isLoading}
@@ -133,7 +193,9 @@ export function WorkOrderItemsSection({
           onWantCandidates={items.wantCandidates}
           onRetry={() => void items.catalog.refetch()}
           onClose={items.closePicker}
-          onConfirm={items.accept}
+          onConfirm={(selection, drafts) =>
+            items.adjustOpen ? items.stageAdded(drafts) : items.accept(selection)
+          }
         />
       ) : null}
     </section>
