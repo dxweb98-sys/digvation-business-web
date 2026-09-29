@@ -74,6 +74,15 @@ describe('WorkOrderDetailDialog', () => {
     expect(screen.getByText('Rem berbunyi')).toBeTruthy();
   });
 
+  it('shows the items section supplied by the workspace and keeps it through the close transition', () => {
+    const section = <p>items-section</p>;
+    const { rerender } = render(<WorkOrderDetailDialog {...props({ itemsSection: section })} />);
+    expect(screen.getByText('items-section')).toBeTruthy();
+
+    rerender(<WorkOrderDetailDialog {...props({ workOrder: null, itemsSection: null })} />);
+    expect(screen.getByText('items-section')).toBeTruthy();
+  });
+
   it('keeps the cancellation form while closing instead of collapsing it', () => {
     const { rerender } = render(
       <WorkOrderDetailDialog {...props({ isCancelling: true, cancelReason: 'Berubah pikiran' })} />,

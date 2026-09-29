@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { WORKSHOP_LINES_ERROR_COPY } from '../../modules/workshop/work-orders/model/work-order-lines-model';
+
 import {
   operationalCopy,
   operationalLabel,
@@ -94,6 +96,23 @@ describe('operational localization', () => {
       'Check your connection, then try again.',
     ]) {
       expect(id(key)).not.toBe(key);
+    }
+  });
+  it('translates every Work Order item selection message, including Runtime error copy', () => {
+    const keys = [
+      'Work Order items',
+      'No items selected yet.',
+      'Select items',
+      'Spare part',
+      'Search services or spare parts',
+      'Selected items',
+      'Save items',
+      'Items saved.',
+      'Prices are recorded when items are saved.',
+      ...Object.values(WORKSHOP_LINES_ERROR_COPY),
+    ];
+    for (const key of keys) {
+      expect(operationalCopy(key, 'id-ID')).not.toBe(key);
     }
   });
 });
