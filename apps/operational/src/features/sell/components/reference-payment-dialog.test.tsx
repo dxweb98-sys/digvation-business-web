@@ -36,16 +36,33 @@ const route: PaymentRoute = {
   updatedAt: '2026-09-25T00:00:00.000Z',
 };
 
-function saleFor(amount: string) {
+/** `tracked` keeps the original Service-work assumption; `instant` is a Product-only Sale. */
+type SaleKind = 'tracked' | 'instant';
+type PaymentFixture = { status: 'SUCCEEDED' | 'PENDING'; appliedAmount: string };
+
+function saleFor(amount: string, kind: SaleKind = 'tracked', payments: PaymentFixture[] = []) {
   return {
     id: 'sale-1',
     saleNumber: 'TRX-1',
     currency: 'IDR',
     status: 'OPEN',
-    operationalState: 'QUEUED',
+    operationalState: kind === 'tracked' ? 'QUEUED' : 'UNSUBMITTED',
     version: 1,
     totalAmount: amount,
-    payments: [],
+    payments: payments.map((payment, index) => ({
+      id: `payment-${index}`,
+      method: 'CASH',
+      tenderedAmount: null,
+      changeAmount: null,
+      ...payment,
+    })),
+    lines: [
+      {
+        id: 'line-1',
+        removedAt: null,
+        fulfillmentBehaviorSnapshot: kind === 'tracked' ? 'TRACKED' : 'INSTANT',
+      },
+    ],
   } as unknown as Sale;
 }
 
@@ -67,15 +84,23 @@ function PaymentHarness({
   amount = '105224.0000',
   lines: customLines,
   onEditOrder,
+  kind = 'tracked',
+  payments = [],
+  onQueue = vi.fn(),
+  onClose = vi.fn(),
 }: {
   onConfirm: (amount: string) => Promise<void>;
   amount?: string;
   lines?: never[];
   onEditOrder?: () => void;
+  kind?: SaleKind;
+  payments?: PaymentFixture[];
+  onQueue?: () => void;
+  onClose?: () => void;
 }) {
   const [appliedAmount, setAppliedAmount] = useState(() => currencyInputFromAmount(amount));
   const [tender, setTender] = useState('');
-  const sale = saleFor(amount);
+  const sale = saleFor(amount, kind, payments);
   const lines = customLines ?? linesFor(amount);
 
   return (
@@ -83,7 +108,7 @@ function PaymentHarness({
       <DToastProvider>
         <ReferencePaymentDialog
           open
-          onClose={vi.fn()}
+          onClose={onClose}
           {...(onEditOrder ? { onEditOrder } : {})}
           sale={sale}
           lines={lines}
@@ -114,7 +139,7 @@ function PaymentHarness({
           isSubmitting={false}
           paymentError={null}
           onConfirmPayment={onConfirm}
-          onQueue={vi.fn()}
+          onQueue={onQueue}
           onQueueWithBalance={vi.fn()}
           loyaltyRedemption={null}
           loyaltyPointBalance={null}
@@ -292,5 +317,68 @@ describe('ReferencePaymentDialog returning to the order', () => {
     // A terminal Sale is given no way back: the caller passes no handler.
     render(<PaymentHarness onConfirm={vi.fn(async () => undefined)} />);
     expect(screen.queryByRole('button', { name: 'Ubah pesanan' })).toBeNull();
+  });
+});
+
+describe('ReferencePaymentDialog for an all-INSTANT (Product-only) Sale', () => {
+  it('offers no Pay later and no queue wording, only payment', () => {
+    render(<PaymentHarness onConfirm={vi.fn(async () => undefined)} kind="instant" amount="200000.0000" />);
+    expect(screen.queryByText('Bayar nanti')).toBeNull();
+    expect(screen.queryByText('Bayar sekarang')).toBeNull();
+    expect(screen.queryByText(/antrian/i)).toBeNull();
+    expect(screen.queryByText(/Mulai pengerjaan/i)).toBeNull();
+    expect(screen.getByRole('button', { name: /^Bayar/ })).toBeTruthy();
+  });
+
+  it('keeps Pay later and the queue for a Sale with tracked work', () => {
+    render(<PaymentHarness onConfirm={vi.fn(async () => undefined)} kind="tracked" amount="200000.0000" />);
+    expect(screen.getByText('Bayar nanti')).toBeTruthy();
+  });
+
+  it('after a partial payment shows paid and remaining and keeps payment controls available', () => {
+    render(
+      <PaymentHarness
+        onConfirm={vi.fn(async () => undefined)}
+        kind="instant"
+        amount="200000.0000"
+        payments={[{ status: 'SUCCEEDED', appliedAmount: '100000.0000' }]}
+      />,
+    );
+    expect(document.body.textContent).toMatch(/Sisa/);
+    expect(document.body.textContent).toMatch(/100[.,]000/);
+    expect(screen.getByRole('button', { name: /^Bayar/ })).toBeTruthy();
+    expect(screen.queryByText(/antrian/i)).toBeNull();
+  });
+
+  it('closing a partly paid Product Sale keeps it open, with no queue-and-collect-later step', () => {
+    const onClose = vi.fn();
+    render(
+      <PaymentHarness
+        onConfirm={vi.fn(async () => undefined)}
+        kind="instant"
+        amount="200000.0000"
+        payments={[{ status: 'SUCCEEDED', appliedAmount: '100000.0000' }]}
+        onClose={onClose}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Tinggalkan pembayaran' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(/kumpulkan nanti|collect later/i)).toBeNull();
+  });
+
+  it('a settled Product Sale offers to complete the transaction, never to add it to a queue', () => {
+    const onQueue = vi.fn();
+    render(
+      <PaymentHarness
+        onConfirm={vi.fn(async () => undefined)}
+        kind="instant"
+        amount="200000.0000"
+        payments={[{ status: 'SUCCEEDED', appliedAmount: '200000.0000' }]}
+        onQueue={onQueue}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: /Masukkan ke antrian|Tambahkan ke antrian/ })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Selesaikan transaksi' }));
+    expect(onQueue).toHaveBeenCalledTimes(1);
   });
 });
