@@ -211,16 +211,10 @@ export function EmployeeDetailDialog({
                   value={
                     employee.position ? (
                       <DBadge
-                        variant={
-                          employee.position.status === 'ACTIVE' &&
-                          employee.position.serviceAssignmentEnabled
-                            ? 'success'
-                            : 'secondary'
-                        }
+                        variant={employee.canPerformServices ? 'success' : 'secondary'}
                       >
                         {copy(
-                          employee.position.status === 'ACTIVE' &&
-                            employee.position.serviceAssignmentEnabled
+                          employee.canPerformServices
                             ? 'Can perform services'
                             : 'Cannot perform services',
                         )}
@@ -228,6 +222,14 @@ export function EmployeeDetailDialog({
                     ) : (
                       copy('Not set')
                     )
+                  }
+                />
+                <Field
+                  label={copy('Product sales')}
+                  value={
+                    <DBadge variant={employee.canSellProducts ? 'success' : 'secondary'}>
+                      {copy(employee.canSellProducts ? 'Can sell products' : 'Cannot sell products')}
+                    </DBadge>
                   }
                 />
                 <Field

@@ -3006,6 +3006,11 @@ function ReferenceCartPanel({
                           </span>
                         ) : null}
                       </div>
+                      {line.soldByName ? (
+                        <p className="mt-0.5 text-[11px] text-[var(--color-text-muted)]">
+                          {copy('Sold by')} {line.soldByName}
+                        </p>
+                      ) : null}
                     </div>
                     <div className="flex shrink-0 items-center gap-0.5">
                       {line.editable ? (
@@ -4592,7 +4597,16 @@ export function ReferenceTransactionDetail({
                         <SaleLineItem
                           key={line.id}
                           name={line.itemNameSnapshot}
-                          variant={line.variantNameSnapshot}
+                          variant={
+                            [
+                              line.variantNameSnapshot,
+                              line.soldByEmployeeNameSnapshot
+                                ? `${copy('Sold by')} ${line.soldByEmployeeNameSnapshot}`
+                                : null,
+                            ]
+                              .filter(Boolean)
+                              .join(' · ') || null
+                          }
                           pricing={`${quantity(line.quantity)} × ${format(line.effectiveUnitPrice)}`}
                           amount={format(line.grossAmount)}
                           discountsHeading={copy('Discounts and promotions')}
@@ -5314,7 +5328,11 @@ export function ReferenceOrderAdjustmentDialog({
       ? replacementLinesOf(
           configuratorState.item.id,
           replacementConfiguration.catalogVariantId,
-          replacementConfiguration,
+          {
+            ...replacementConfiguration,
+            // Carried explicitly so a correction never silently drops the salesperson.
+            soldByEmployeeId: replacementConfiguration.soldBy?.employeeId ?? null,
+          },
         )
       : [];
   // Ready exactly when the shared configuration is valid: every unit satisfied, price resolved.

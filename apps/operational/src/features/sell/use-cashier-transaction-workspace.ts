@@ -17,6 +17,7 @@ import {
   additionSignature,
   groupUnitAdditions,
   type CartDraftAdditionalItem,
+  type CartDraftSalesperson,
 } from './cart-draft';
 import { MAX_CONFIGURATION_UNITS, opensItemConfigurator } from './item-configurator-model';
 import type {
@@ -225,6 +226,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
       quantity?: string;
       additionalComponents?: readonly CartDraftAdditionalItem[];
       unitAdditions?: readonly (readonly CartDraftAdditionalItem[])[];
+      soldBy?: CartDraftSalesperson | null;
     } = {},
   ) => {
     if (context === 'TRANSACTION_ADJUSTMENT') {
@@ -255,6 +257,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
               catalogItemId: item.id,
               ...(catalogVariantId ? { catalogVariantId } : {}),
               quantity: group.quantity,
+              ...(selection.soldBy ? { soldByEmployeeId: selection.soldBy.employeeId } : {}),
               ...(group.additions.length
                 ? {
                     additionalComponents: group.additions.map((entry) => ({
@@ -297,6 +300,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
         ? { additionalComponents: selection.additionalComponents }
         : {}),
       ...(selection.unitAdditions ? { unitAdditions: selection.unitAdditions } : {}),
+      ...(selection.soldBy ? { soldBy: selection.soldBy } : {}),
     });
   };
 
@@ -328,9 +332,25 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
       (price) => price.amount,
       () => null,
     );
+    // Only a Product can have a salesperson. Runtime decides who is eligible; Web never filters.
+    const salespeople =
+      item.type === 'PRODUCT'
+        ? await queryClient
+            .fetchQuery({
+              queryKey: cashierTransactionKeys.productSalespeople(),
+              queryFn: ({ signal }) => transactionAdapter.listProductSalespeople(signal),
+              ...referenceQueryPolicy,
+            })
+            .then(
+              (page) =>
+                page.items.map((employee) => ({ id: employee.id, name: employee.displayName })),
+              () => [],
+            )
+        : undefined;
     return {
       item,
       variants,
+      ...(salespeople ? { salespeople } : {}),
       itemOption:
         variants.length > 0 && item.variantSelectionMode === 'OPTIONAL' ? { price: ownPrice } : null,
       itemPrice: variants.length === 0 ? ownPrice : null,
@@ -431,6 +451,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
           quantity: configuration.quantity,
           additionalComponents: configuration.additionalComponents,
           ...(configuration.unitAdditions ? { unitAdditions: configuration.unitAdditions } : {}),
+          soldByEmployeeId: configuration.soldBy?.employeeId ?? null,
         });
         return;
       }
@@ -450,6 +471,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
           quantity: configuration.quantity,
           additionalComponents: configuration.additionalComponents,
           ...(configuration.unitAdditions ? { unitAdditions: configuration.unitAdditions } : {}),
+          soldBy: configuration.soldBy ?? null,
         });
         return;
       }
@@ -463,6 +485,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
           quantity: configuration.quantity,
           additionalComponents: configuration.additionalComponents,
           ...(configuration.unitAdditions ? { unitAdditions: configuration.unitAdditions } : {}),
+          ...(configuration.soldBy ? { soldBy: configuration.soldBy } : {}),
         },
       );
     } catch (error) {
@@ -489,6 +512,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
           quantity: draftLine.quantity,
           additionalComponents: [...(draftLine.additionalComponents ?? [])],
           unitAdditions: draftLine.unitAdditions,
+          soldBy: draftLine.soldBy ?? null,
         }
       : { ...saleLineConfiguration(persistedLine!), unitAdditions: undefined };
     const whole = Number(source.quantity);
@@ -505,6 +529,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
         catalogVariantId: source.catalogVariantId,
         quantity: grown ? String(grown.length) : source.quantity,
         additionalComponents: [...source.additionalComponents],
+        ...(source.soldBy ? { soldBy: source.soldBy } : {}),
         ...(grown && new Set(grown.map((entry) => additionSignature(entry))).size > 1
           ? { unitAdditions: grown.map((entry) => [...entry]) }
           : {}),

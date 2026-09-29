@@ -46,6 +46,8 @@ export type BackofficeAction =
   | 'manageMember'
   | 'viewLoyalty'
   | 'configureLoyalty'
+  | 'viewCommission'
+  | 'configureCommission'
   | 'createFinancialAccount'
   | 'updateFinancialAccount'
   | 'updatePaymentRouting'
@@ -131,6 +133,8 @@ const actionPermissions: Record<BackofficeAction, readonly string[]> = {
   manageMember: ['customers:manage', 'membership:update'],
   viewLoyalty: ['loyalty:read'],
   configureLoyalty: ['loyalty:configure'],
+  viewCommission: ['commission:read'],
+  configureCommission: ['commission:configure'],
   createFinancialAccount: ['financial-accounts:create'],
   updateFinancialAccount: ['financial-accounts:update'],
   updatePaymentRouting: ['payment-routing:update'],

@@ -577,3 +577,133 @@ describe('replacementLinesOf (one configuration becomes exact Sale lines)', () =
     ]);
   });
 });
+
+describe('CartDraft Product salesperson attribution', () => {
+  const andi = { employeeId: 'emp-andi', name: 'Andi' };
+  const budi = { employeeId: 'emp-budi', name: 'Budi' };
+  const service: CatalogItem = { ...item, id: 'svc-1', type: 'SERVICE', fulfillmentBehavior: 'TRACKED' };
+  const start = (draft: ReturnType<typeof emptyCartDraft>) =>
+    cartDraftStartInput(setCartDraftCustomer(draft, { type: 'NON_MEMBER', name: 'Siti', phone: '0812' }));
+
+  it('merges the same Product sold by the same salesperson', () => {
+    const empty = emptyCartDraft('location-1', 'IDR');
+    const once = addCartDraftSelection(empty, item, null, price, { soldBy: andi });
+    const twice = addCartDraftSelection(once, item, null, price, { soldBy: andi, quantity: '2' });
+    expect(twice.lines).toHaveLength(1);
+    expect(twice.lines[0]?.quantity).toBe('3.0000');
+    expect(twice.lines[0]?.soldBy).toEqual(andi);
+  });
+
+  it('keeps the same Product sold by different salespeople as distinct lines', () => {
+    const empty = emptyCartDraft('location-1', 'IDR');
+    const draft = addCartDraftSelection(
+      addCartDraftSelection(empty, item, null, price, { soldBy: andi }),
+      item,
+      null,
+      price,
+      { soldBy: budi },
+    );
+    expect(draft.lines).toHaveLength(2);
+    expect(new Set(draft.lines.map((line) => line.id)).size).toBe(2);
+    expect(draft.lines.map((line) => line.soldBy?.employeeId)).toEqual(['emp-andi', 'emp-budi']);
+  });
+
+  it('never merges a Product with a salesperson into one without, in either order', () => {
+    const empty = emptyCartDraft('location-1', 'IDR');
+    const sellerFirst = addCartDraftSelection(
+      addCartDraftSelection(empty, item, null, price, { soldBy: andi }),
+      item,
+      null,
+      price,
+    );
+    const plainFirst = addCartDraftSelection(
+      addCartDraftSelection(empty, item, null, price),
+      item,
+      null,
+      price,
+      { soldBy: andi },
+    );
+    expect(sellerFirst.lines).toHaveLength(2);
+    expect(plainFirst.lines).toHaveLength(2);
+  });
+
+  it('still merges two lines that both have no salesperson', () => {
+    const empty = emptyCartDraft('location-1', 'IDR');
+    const draft = addCartDraftSelection(
+      addCartDraftSelection(empty, item, null, price, { soldBy: null }),
+      item,
+      null,
+      price,
+    );
+    expect(draft.lines).toHaveLength(1);
+    expect(draft.lines[0]).not.toHaveProperty('soldBy');
+  });
+
+  it('keeps the salesperson through a quantity change', () => {
+    const added = addCartDraftSelection(emptyCartDraft('location-1', 'IDR'), item, null, price, {
+      soldBy: andi,
+      quantity: '2',
+    });
+    const changed = setCartDraftQuantity(added, added.lines[0]!.id, '5');
+    expect(changed.lines[0]).toMatchObject({ quantity: '5.0000', soldBy: andi });
+  });
+
+  it('keeps the salesperson when a line is reopened and replaced, and lets it change or clear', () => {
+    const added = addCartDraftSelection(emptyCartDraft('location-1', 'IDR'), item, null, price, {
+      soldBy: andi,
+    });
+    const id = added.lines[0]!.id;
+    const kept = replaceCartDraftLine(added, id, item, null, price, { soldBy: andi, quantity: '3' });
+    expect(kept.lines[0]).toMatchObject({ id, quantity: '3.0000', soldBy: andi });
+    expect(replaceCartDraftLine(added, id, item, null, price, { soldBy: budi }).lines[0]?.soldBy).toEqual(budi);
+    expect(replaceCartDraftLine(added, id, item, null, price, { soldBy: null }).lines[0]).not.toHaveProperty(
+      'soldBy',
+    );
+  });
+
+  it('carries the salesperson from the local draft into the Runtime Sale start input', () => {
+    const empty = emptyCartDraft('location-1', 'IDR');
+    const draft = addCartDraftSelection(
+      addCartDraftSelection(empty, item, null, price, { soldBy: andi, quantity: '2' }),
+      item,
+      null,
+      price,
+    );
+    expect(start(draft).lines).toEqual([
+      { catalogItemId: 'item-1', quantity: '2.0000', soldByEmployeeId: 'emp-andi' },
+      { catalogItemId: 'item-1', quantity: '1.0000' },
+    ]);
+  });
+
+  it('never attributes a salesperson to a Service line', () => {
+    const draft = addCartDraftSelection(
+      emptyCartDraft('location-1', 'IDR'),
+      service,
+      null,
+      { ...price, catalogItemId: service.id },
+      { soldBy: andi },
+    );
+    expect(draft.lines[0]).not.toHaveProperty('soldBy');
+    expect(start(draft).lines[0]).not.toHaveProperty('soldByEmployeeId');
+  });
+
+  it('presents the salesperson name on the cart line', () => {
+    const draft = addCartDraftSelection(emptyCartDraft('location-1', 'IDR'), item, null, price, {
+      soldBy: andi,
+    });
+    expect(cartDraftDisplayLines(draft)[0]?.soldByName).toBe('Andi');
+  });
+
+  it('carries the salesperson explicitly into every recreated replacement line', () => {
+    expect(
+      replacementLinesOf('item-1', null, {
+        quantity: '2',
+        additionalComponents: [],
+        soldByEmployeeId: 'emp-andi',
+      }),
+    ).toEqual([{ catalogItemId: 'item-1', quantity: '2', soldByEmployeeId: 'emp-andi' }]);
+    expect(
+      replacementLinesOf('item-1', null, { quantity: '2', additionalComponents: [], soldByEmployeeId: null }),
+    ).toEqual([{ catalogItemId: 'item-1', quantity: '2' }]);
+  });
+});

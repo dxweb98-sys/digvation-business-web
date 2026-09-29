@@ -42,6 +42,8 @@ export interface StartSaleInput extends CreateSaleInput {
     catalogVariantId?: string;
     quantity: string;
     additionalComponents?: SaleSelectedComponentInput[];
+    /** Optional Product salesperson; Runtime validates eligibility and rejects it on a Service. */
+    soldByEmployeeId?: string;
   }>;
 }
 
@@ -56,6 +58,7 @@ export interface AddSaleLineInput {
   catalogVariantId?: string;
   quantity: string;
   additionalComponents?: SaleSelectedComponentInput[];
+  soldByEmployeeId?: string;
 }
 
 /**
@@ -71,6 +74,8 @@ export interface ReplaceSaleLineInput {
     catalogVariantId?: string;
     quantity: string;
     additionalComponents?: SaleSelectedComponentInput[];
+    /** Optional Product salesperson; Runtime validates eligibility and rejects it on a Service. */
+    soldByEmployeeId?: string;
   }>;
 }
 
@@ -206,6 +211,8 @@ export interface SellingCatalogQuery {
 
 export interface EmployeeQuery {
   listEmployees(signal?: AbortSignal): Promise<ApiPage<Employee>>;
+  /** Runtime-filtered ACTIVE, Product-sales-eligible employees; never a client-side filter. */
+  listProductSalespeople(signal?: AbortSignal): Promise<ApiPage<Employee>>;
 }
 export interface PaymentRouteQuery {
   listPaymentRoutes(
@@ -422,6 +429,13 @@ export class HttpCashierTransactionAdapter
 
   public listEmployees(signal?: AbortSignal): Promise<ApiPage<Employee>> {
     return this.client.get<ApiPage<Employee>>(pagePath(`${API_PREFIX}/employees`), { signal });
+  }
+
+  public listProductSalespeople(signal?: AbortSignal): Promise<ApiPage<Employee>> {
+    return this.client.get<ApiPage<Employee>>(
+      `${pagePath(`${API_PREFIX}/employees`)}&canSellProducts=true`,
+      { signal },
+    );
   }
 
   public listSales(signal?: AbortSignal): Promise<ApiPage<QueueSale>> {

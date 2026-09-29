@@ -59,6 +59,9 @@ export interface Employee {
   positionId?: string | null;
   position?: EmployeePosition | null;
   status: RecordStatus;
+  /** Product salesperson eligibility; distinct from Service performer eligibility. */
+  productSalesEligible?: boolean;
+  canSellProducts?: boolean;
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -293,6 +296,10 @@ export interface SaleLine {
   itemTypeSnapshot: 'PRODUCT' | 'SERVICE';
   variantCodeSnapshot: string | null;
   variantNameSnapshot: string | null;
+  /** Optional Product salesperson; never a Service performer or contributor. */
+  soldByEmployeeId?: string | null;
+  soldByEmployeeCodeSnapshot?: string | null;
+  soldByEmployeeNameSnapshot?: string | null;
   fulfillmentBehaviorSnapshot: 'INSTANT' | 'TRACKED';
   employeeAssignmentModeSnapshot: EmployeeAssignmentMode | null;
   allowEmployeeContributionSnapshot: boolean;

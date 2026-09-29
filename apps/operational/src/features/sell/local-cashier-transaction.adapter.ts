@@ -159,6 +159,10 @@ export class LocalCashierTransactionAdapter implements SaleTransactionPort {
     return page(this.employees);
   }
 
+  public async listProductSalespeople(): Promise<ApiPage<Employee>> {
+    return page(this.employees.filter((employee) => employee.canSellProducts === true));
+  }
+
   public async listSales(): Promise<ApiPage<Sale>> {
     return page(
       [...this.sales.values()].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)),

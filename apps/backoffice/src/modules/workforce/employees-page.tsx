@@ -2,6 +2,7 @@ import { useRuntime } from '@digvation/business-runtime';
 import {
   DBadge,
   DButton,
+  DCheckbox,
   DDataTable,
   DDatePicker,
   DDialog,
@@ -27,6 +28,11 @@ import { canAccessBackoffice, canPerformBackofficeAction } from '../../auth/back
 import { isSessionExpiredError, useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import { AttendancePanel } from './attendance-panel';
 import { EmployeeDetailDialog } from './employee-detail-dialog';
+import {
+  createEmployeePayload,
+  employeeEditorForm,
+  updateEmployeePayload,
+} from './employee-editor-model';
 import {
   EmployeesApi,
   type Employee,
@@ -359,10 +365,15 @@ function EmployeeEditor({
   const { copy } = useWorkforceLocalization();
   const { showToast } = useToast();
   const fresh = employee === null;
-  const [code, setCode] = useState(employee?.code ?? '');
-  const [displayName, setDisplayName] = useState(employee?.displayName ?? '');
-  const [positionId, setPositionId] = useState(employee?.positionId ?? '');
-  const [joinedOn, setJoinedOn] = useState(employee?.joinedOn ?? '');
+  const initial = employeeEditorForm(employee);
+  const [code, setCode] = useState(initial.code);
+  const [displayName, setDisplayName] = useState(initial.displayName);
+  const [positionId, setPositionId] = useState(initial.positionId);
+  const [joinedOn, setJoinedOn] = useState(initial.joinedOn);
+  const [servicePerformerEligible, setServicePerformerEligible] = useState(
+    initial.servicePerformerEligible,
+  );
+  const [productSalesEligible, setProductSalesEligible] = useState(initial.productSalesEligible);
 
   const positions = useQuery({
     queryKey: ['employees', 'positions', 'editor'],
@@ -373,19 +384,18 @@ function EmployeeEditor({
   const save = async () => {
     if (!displayName.trim()) return;
     try {
+      const form = {
+        code,
+        displayName,
+        positionId,
+        joinedOn,
+        servicePerformerEligible,
+        productSalesEligible,
+      };
       if (fresh) {
-        await api.create({
-          ...(code.trim() ? { code: code.trim().toUpperCase() } : {}),
-          displayName: displayName.trim(),
-          positionId: positionId || null,
-          ...(joinedOn ? { joinedOn } : {}),
-        });
+        await api.create(createEmployeePayload(form));
       } else if (employee) {
-        await api.update(employee, {
-          displayName: displayName.trim(),
-          ...(positionId !== (employee.positionId ?? '') ? { positionId: positionId || null } : {}),
-          joinedOn: joinedOn || null,
-        });
+        await api.update(employee, updateEmployeePayload(employee, form));
       }
       onSaved();
       showToast({
@@ -476,6 +486,41 @@ function EmployeeEditor({
             variant="date"
             placeholder={copy('Select join date')}
           />
+          <fieldset className="grid gap-3 sm:col-span-2">
+            <legend className="mb-1 text-sm font-medium text-[var(--color-text)]">
+              {copy('Work eligibility')}
+            </legend>
+            <label className="flex items-start gap-3">
+              <DCheckbox
+                checked={servicePerformerEligible}
+                onChange={() => setServicePerformerEligible((value) => !value)}
+                className="mt-0.5"
+              />
+              <span className="min-w-0">
+                <span className="block text-sm font-medium text-[var(--color-text)]">
+                  {copy('Eligible as Service performer')}
+                </span>
+                <span className="block text-sm text-[var(--color-text-muted)]">
+                  {copy('The employee can be assigned to service work when the position allows it.')}
+                </span>
+              </span>
+            </label>
+            <label className="flex items-start gap-3">
+              <DCheckbox
+                checked={productSalesEligible}
+                onChange={() => setProductSalesEligible((value) => !value)}
+                className="mt-0.5"
+              />
+              <span className="min-w-0">
+                <span className="block text-sm font-medium text-[var(--color-text)]">
+                  {copy('Eligible for Product sales attribution')}
+                </span>
+                <span className="block text-sm text-[var(--color-text-muted)]">
+                  {copy('The employee can be chosen as the seller of a Product in a sale.')}
+                </span>
+              </span>
+            </label>
+          </fieldset>
         </div>
       )}
     </DDialog>
