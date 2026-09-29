@@ -254,6 +254,11 @@ export function useWorkOrderWorkspace() {
     commandPending,
     runAction,
     mechanics,
+    applyAuthoritative,
+    reloadOpenWorkOrder: () => {
+      closeDetail();
+      void queryClient.invalidateQueries({ queryKey: ['workshop-queue'] });
+    },
     pickerOpen,
     openPicker: () => setPickerOpen(true),
     closePicker: () => setPickerOpen(false),

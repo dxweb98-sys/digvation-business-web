@@ -43,6 +43,7 @@ export function WorkOrderDetailDialog({
   onClose,
   onAction,
   onOpenMechanicPicker,
+  itemsSection,
   onCancelReasonChange,
   onCancelBack,
   onCancelConfirm,
@@ -56,6 +57,8 @@ export function WorkOrderDetailDialog({
   onClose: () => void;
   onAction: (workOrder: WorkshopQueueWorkOrder, action: WorkshopQueueAction) => void;
   onOpenMechanicPicker: () => void;
+  /** Accepted Work Order items; rendered by the workspace, which owns their data. */
+  itemsSection?: ReactNode;
   onCancelReasonChange: (value: string) => void;
   onCancelBack: () => void;
   onCancelConfirm: () => void;
@@ -64,6 +67,10 @@ export function WorkOrderDetailDialog({
   const lastWorkOrder = useRef(workOrder);
   if (workOrder) lastWorkOrder.current = workOrder;
   const shown = workOrder ?? lastWorkOrder.current;
+  // The items section is kept for the close transition for the same reason.
+  const lastItemsSection = useRef(itemsSection);
+  if (workOrder) lastItemsSection.current = itemsSection;
+  const shownItemsSection = workOrder ? itemsSection : lastItemsSection.current;
 
   const actions = shown ? availableWorkshopQueueActions(shown.workStatus, permissions) : [];
   const cancelAction = actions.includes('cancel');
@@ -197,6 +204,10 @@ export function WorkOrderDetailDialog({
               </div>
             )}
           </IdentityBlock>
+
+          {shownItemsSection ? (
+            <div className="border-t border-(--color-border) pt-4">{shownItemsSection}</div>
+          ) : null}
 
           <div className="space-y-4 border-t border-(--color-border) pt-4">
             <DetailField label={copy('Keluhan')}>
