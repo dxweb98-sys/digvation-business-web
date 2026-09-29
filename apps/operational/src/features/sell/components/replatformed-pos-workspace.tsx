@@ -74,6 +74,7 @@ import { cashierTransactionKeys } from '../cashier-transaction-keys';
 import { cashierTransactionErrorMessage, correctionErrorMessage } from '../cashier-transaction-errors';
 import type { ReplaceLinePreview, ReplaceSaleLineInput } from '../cashier-transaction.adapter';
 import { replacementLinesOf } from '../cart-draft';
+import { visibleCatalogItems } from '../selling-catalog-eligibility';
 import { saleLineConfiguration } from '../sale-line-additions';
 import { ItemConfigurator, type ItemConfiguration, type ItemConfiguratorState } from './item-configurator';
 import { CustomerMemberApi, type MemberLookupResult } from '../customer-member-api';
@@ -168,6 +169,11 @@ import {
   restrictedQueueSummary,
   useCanReadCompletedSaleDetails,
 } from '../completed-sale-visibility';
+import {
+  activeMemberOf,
+  needsMemberIdentityLookup,
+  presentedCustomer,
+} from '../member-cart-presentation';
 import './replatformed-pos-workspace.css';
 import { CustomerMemberDialog } from './customer-member-dialog';
 
@@ -341,6 +347,20 @@ function customerStatus(customer: SaleCustomer | null): {
   return customer.type === 'MEMBER'
     ? { label: 'Member', variant: 'primary' }
     : { label: 'Non-member', variant: 'outline' };
+}
+
+/**
+ * Total points a FINALIZED Sale earned, exactly as Runtime reports its immutable EARN fact. It is
+ * the one value shown by Transaction Detail and the receipt; it is never summed from line rows
+ * (a TRANSACTION_TOTAL Sale has none) and never shown as +0.
+ */
+export function saleEarnedPoints(
+  sale: Pick<Sale, 'status' | 'loyaltyEarning' | 'customer'>,
+): string | null {
+  const earning = sale.loyaltyEarning;
+  if (sale.status !== 'FINALIZED' || earning?.state !== 'FINALIZED') return null;
+  if (sale.customer && sale.customer.type !== 'MEMBER') return null;
+  return isPositiveDecimal(earning.pointsEarned) ? earning.pointsEarned : null;
 }
 
 interface PerformerCredit {
@@ -853,10 +873,9 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const canReadLoyalty =
     hasLoyaltyCapability &&
     (session.access.permissions.includes('loyalty:read') || canRedeemLoyalty);
-  const activeSelectedMember =
-    activeCustomer?.type === 'MEMBER' && selectedMember?.customerId === activeCustomer.referenceId
-      ? selectedMember
-      : null;
+  const activeSelectedMember = activeMemberOf(activeCustomer, selectedMember);
+  // Draft customer identity is completed from the picked Member; a Sale's own customer wins once it exists.
+  const cartCustomer = presentedCustomer(activeCustomer, activeSelectedMember, Boolean(sale));
 
   const memberIdentityQuery = useQuery({
     queryKey: [
@@ -865,12 +884,11 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       activeCustomer?.phoneE164 ?? null,
     ],
     queryFn: ({ signal }) => customerMemberApi.searchMembers(activeCustomer!.phoneE164, signal),
-    enabled: Boolean(
-      canReadMembers &&
-      activeCustomer?.type === 'MEMBER' &&
-      activeCustomer.referenceId &&
-      activeSelectedMember === null,
-    ),
+    enabled: needsMemberIdentityLookup({
+      canReadMembers,
+      customer: activeCustomer,
+      activeMember: activeSelectedMember,
+    }),
     staleTime: 30_000,
   });
 
@@ -925,14 +943,15 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       ),
     [workspace.categories, workspace.items],
   );
-  const visibleItems = useMemo(() => {
-    const needle = search.trim().toLowerCase();
-    return workspace.items.filter(
-      (item) =>
-        (!selectedCategory || item.categoryId === selectedCategory) &&
-        (!needle || `${item.name} ${item.code}`.toLowerCase().includes(needle)),
-    );
-  }, [search, selectedCategory, workspace.items]);
+  const visibleItems = useMemo(
+    () =>
+      visibleCatalogItems(workspace.items, {
+        search,
+        categoryId: selectedCategory,
+        locale: workspace.locale,
+      }),
+    [search, selectedCategory, workspace.items, workspace.locale],
+  );
   const groups = useMemo(() => {
     const locationRecords = (transactionsQuery.data?.items ?? []).filter(
       (record) => record.sellingLocationId === workspace.selectedLocationId,
@@ -1678,7 +1697,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
               <SearchInput
                 value={search}
                 onChange={setSearch}
-                placeholder={copy('Search items...')}
+                placeholder={copy('Search item or variant...')}
                 debounceMs={0}
                 expandedWidth="min(280px, calc(100vw - 140px))"
               />
@@ -1753,7 +1772,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         isTaxPreviewLoading={isTaxPreviewLoading}
         isTaxPreviewUnavailable={isTaxPreviewUnavailable}
         locale={workspace.locale}
-        customer={activeCustomer}
+        customer={cartCustomer}
         memberNumber={activeSelectedMember?.memberNumber ?? null}
         pointBalance={memberBalanceQuery.data?.pointsBalance ?? null}
         isPointBalanceLoading={memberBalanceQuery.isLoading}
@@ -1778,7 +1797,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
 
       <CustomerMemberDialog
         open={customerPickerOpen}
-        customer={activeCustomer}
+        customer={cartCustomer}
         isSaving={workspace.isCustomerPending}
         api={customerMemberApi}
         canReadMembers={canReadMembers}
@@ -1831,7 +1850,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         taxAmount={workspace.cart.taxAmount}
         taxLabel={sale ? saleTaxLabel(sale, copy('Tax')) : copy('Tax')}
         locale={workspace.locale}
-        customer={activeCustomer}
+        customer={cartCustomer}
         paymentRoutes={workspace.paymentRoutes}
         isPaymentRoutesLoading={workspace.isLoadingPaymentRoutes}
         method={paymentMethod}
@@ -4380,6 +4399,7 @@ export function ReferenceTransactionDetail({
   const redeemedAmount =
     sale.loyaltyRedemption?.amount ?? legacyLoyaltyRedemption?.redemptionAmount ?? null;
   const hasLoyaltyRedemption = Boolean(redeemedPoints && redeemedAmount);
+  const earnedPoints = saleEarnedPoints(sale);
   const receiptDelivery = deliveryStatus?.delivery ?? null;
   const receiptDeliveryBusy =
     receiptDelivery?.status === 'QUEUED' || receiptDelivery?.status === 'SENDING';
@@ -4716,6 +4736,19 @@ export function ReferenceTransactionDetail({
                             {status ? label(statusMeta[status].value) : label('OPEN')}
                           </StatusPill>
                         </div>
+                        {earnedPoints ? (
+                          <div
+                            className="mt-2.5 flex items-center justify-between gap-3 rounded-lg bg-[var(--color-success)]/10 px-3 py-2 text-xs"
+                            data-testid="transaction-points-earned"
+                          >
+                            <span className="font-semibold text-[var(--color-text)]">
+                              {copy('Points earned')}
+                            </span>
+                            <span className="font-bold text-[var(--color-success)]">
+                              +{pointQuantity(earnedPoints, locale)}
+                            </span>
+                          </div>
+                        ) : null}
                         {sale.status === 'VOIDED' && cancellationReason ? (
                           <div className="mt-2 border-l-2 border-[var(--color-danger)] pl-2.5 text-xs">
                             <p className="font-semibold text-[var(--color-danger)]">
@@ -4932,6 +4965,15 @@ export function ReceiptContent({
         <p className="mt-1">{customerDisplayName(customer, locale)}</p>
         {customerDisplayDetail(customer) ? (
           <p className="text-slate-500">{customerDisplayDetail(customer)}</p>
+        ) : null}
+        {saleEarnedPoints(sale) ? (
+          <div
+            className="mt-1.5 flex items-start justify-between gap-3 font-semibold"
+            data-testid="receipt-points-earned"
+          >
+            <span>{copy('Points earned')}</span>
+            <span className="shrink-0">+{pointQuantity(saleEarnedPoints(sale)!, locale)}</span>
+          </div>
         ) : null}
       </section>
 

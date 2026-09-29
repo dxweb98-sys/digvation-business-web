@@ -1,5 +1,6 @@
 import { useRuntime } from '@digvation/business-runtime';
 
+import { operationalMemberCopy } from './operational-member-copy';
 import { operationalPosCopy } from './operational-pos-copy';
 
 export type OperationalLocale = 'id-ID' | 'en-US';
@@ -214,7 +215,10 @@ const copy: Record<string, LocalizedLabel> = {
   Product: { 'id-ID': 'Produk', 'en-US': 'Product' },
   Service: { 'id-ID': 'Layanan', 'en-US': 'Service' },
   All: { 'id-ID': 'Semua', 'en-US': 'All' },
-  'Search items...': { 'id-ID': 'Cari item...', 'en-US': 'Search items...' },
+  'Search item or variant...': {
+    'id-ID': 'Cari item atau varian...',
+    'en-US': 'Search item or variant...',
+  },
   'No items found': { 'id-ID': 'Item tidak ditemukan', 'en-US': 'No items found' },
   'Transaction needs attention': {
     'id-ID': 'Transaksi perlu diperiksa',
@@ -613,7 +617,12 @@ export function resolveOperationalLocale(locale: string | undefined): Operationa
 }
 
 export function operationalCopy(value: string, locale: OperationalLocale): string {
-  return copy[value]?.[locale] ?? operationalPosCopy(value, locale) ?? value;
+  return (
+    copy[value]?.[locale] ??
+    operationalPosCopy(value, locale) ??
+    operationalMemberCopy(value, locale) ??
+    value
+  );
 }
 
 export function operationalLabel(value: string, locale: OperationalLocale): string {
