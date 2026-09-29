@@ -37,6 +37,26 @@ const workforceCopy: Record<string, { id: string; en: string }> = {
   'Position not set': { id: 'Jabatan belum diatur', en: 'Position not set' },
   'Not set': { id: 'Belum diatur', en: 'Not set' },
   'Service assignment': { id: 'Penugasan layanan', en: 'Service assignment' },
+  'Work eligibility': { id: 'Kelayakan kerja', en: 'Work eligibility' },
+  'Eligible as Service performer': {
+    id: 'Dapat menjadi pelaksana layanan',
+    en: 'Eligible as Service performer',
+  },
+  'The employee can be assigned to service work when the position allows it.': {
+    id: 'Karyawan dapat ditugaskan pada layanan jika jabatannya mengizinkan.',
+    en: 'The employee can be assigned to service work when the position allows it.',
+  },
+  'Eligible for Product sales attribution': {
+    id: 'Dapat dicatat sebagai penjual produk',
+    en: 'Eligible for Product sales attribution',
+  },
+  'The employee can be chosen as the seller of a Product in a sale.': {
+    id: 'Karyawan dapat dipilih sebagai penjual produk pada transaksi.',
+    en: 'The employee can be chosen as the seller of a Product in a sale.',
+  },
+  'Product sales': { id: 'Penjualan produk', en: 'Product sales' },
+  'Can sell products': { id: 'Dapat menjual produk', en: 'Can sell products' },
+  'Cannot sell products': { id: 'Tidak dapat menjual produk', en: 'Cannot sell products' },
   'Can perform services': { id: 'Dapat mengerjakan layanan', en: 'Can perform services' },
   'Cannot perform services': {
     id: 'Tidak dapat mengerjakan layanan',

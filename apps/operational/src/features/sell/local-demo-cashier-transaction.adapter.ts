@@ -423,6 +423,10 @@ export class LocalDemoCashierTransactionAdapter
     return page(employees);
   }
 
+  public async listProductSalespeople(): Promise<ApiPage<Employee>> {
+    return page(employees.filter((employee) => employee.canSellProducts === true));
+  }
+
   public async listSales(): Promise<ApiPage<Sale>> {
     return page([...state.sales.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)));
   }

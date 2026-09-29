@@ -60,8 +60,27 @@ export function groupUnitAdditions(
   return [...groups.values()];
 }
 
+/**
+ * Optional Product salesperson attribution. It is line identity for commission purposes and is
+ * distinct from Service performers and contributors. `name` is display only.
+ */
+export interface CartDraftSalesperson {
+  employeeId: string;
+  name: string;
+}
+
+/** Two attributions are the same only when both are absent or name the same Employee. */
+export function sameSalesperson(
+  left: Pick<CartDraftSalesperson, 'employeeId'> | null | undefined,
+  right: Pick<CartDraftSalesperson, 'employeeId'> | null | undefined,
+): boolean {
+  return (left?.employeeId ?? null) === (right?.employeeId ?? null);
+}
+
 export interface CartDraftLine {
   id: string;
+  /** Product only: who sold this line. Absent means no salesperson, never a default Employee. */
+  soldBy?: CartDraftSalesperson;
   /**
    * Set only when the units of a whole-number quantity are configured differently. One entry per
    * unit (length = quantity); `additionalComponents` is then unused. Identical units never use this.
@@ -117,6 +136,8 @@ export interface CartDisplayLine {
   itemNameSnapshot: string;
   itemTypeSnapshot: CatalogItem['type'];
   variantNameSnapshot: string | null;
+  /** Display only: the Product salesperson, when one is attributed. */
+  soldByName?: string | null;
   quantity: string;
   effectiveUnitPrice: string;
   totalAmount: string;
@@ -191,6 +212,8 @@ export function replacementLinesOf(
     quantity: string;
     additionalComponents: readonly CartDraftAdditionalItem[];
     unitAdditions?: readonly (readonly CartDraftAdditionalItem[])[];
+    /** Carried explicitly into every recreated line: a replacement never silently drops it. */
+    soldByEmployeeId?: string | null;
   },
 ): ReplaceSaleLineInput['lines'] {
   const groups = configuration.unitAdditions
@@ -204,6 +227,7 @@ export function replacementLinesOf(
     ...(catalogVariantId ? { catalogVariantId } : {}),
     quantity: group.quantity,
     ...(group.additions.length ? { additionalComponents: group.additions.map(startAddition) } : {}),
+    ...(configuration.soldByEmployeeId ? { soldByEmployeeId: configuration.soldByEmployeeId } : {}),
   }));
 }
 
@@ -212,6 +236,8 @@ export interface CartDraftSelectionOptions {
   additionalComponents?: readonly CartDraftAdditionalItem[];
   /** One entry per unit, only when the units differ; then `additionalComponents` is not used. */
   unitAdditions?: readonly (readonly CartDraftAdditionalItem[])[];
+  /** Product only. Part of the line identity: different salespeople never merge. */
+  soldBy?: CartDraftSalesperson | null;
 }
 
 function additionalContribution(additional: readonly CartDraftAdditionalItem[]) {
@@ -244,6 +270,7 @@ export function addCartDraftSelection(
           (line) =>
             !line.additionalComponents?.length &&
             !line.unitAdditions &&
+            sameSalesperson(line.soldBy, options.soldBy) &&
             line.catalogItemId === item.id &&
             line.catalogVariantId === (variant?.id ?? undefined) &&
             line.catalogPriceId === price.catalogPriceId &&
@@ -258,13 +285,13 @@ export function addCartDraftSelection(
   }
 
   const id = `draft:${item.id}:${variant?.id ?? 'base'}:${price.catalogPriceId}${
-    additional.length || unitAdditions ? `:${crypto.randomUUID()}` : ''
-  }`;
+    options.soldBy ? `:seller:${options.soldBy.employeeId}` : ''
+  }${additional.length || unitAdditions ? `:${crypto.randomUUID()}` : ''}`;
   return {
     ...draft,
     lines: [
       ...draft.lines,
-      buildDraftLine(id, item, variant, price, quantity, additional, unitAdditions),
+      buildDraftLine(id, item, variant, price, quantity, additional, unitAdditions, options.soldBy),
     ],
   };
 }
@@ -277,12 +304,16 @@ function buildDraftLine(
   quantity: string,
   additional: readonly CartDraftAdditionalItem[],
   unitAdditions?: readonly (readonly CartDraftAdditionalItem[])[],
+  soldBy?: CartDraftSalesperson | null,
 ): CartDraftLine {
   if (unitAdditions && unitAdditions.length !== Number(quantity))
     throw new Error('Every unit needs its own configuration.');
+  // Only a Product can have a salesperson; a Service line never carries one.
+  const seller = item.type === 'PRODUCT' && soldBy ? soldBy : undefined;
   return {
     id,
     catalogItem: item,
+    ...(seller ? { soldBy: seller } : {}),
     ...(unitAdditions ? { unitAdditions } : {}),
     ...(additional.length
       ? {
@@ -330,6 +361,7 @@ export function replaceCartDraftLine(
             quantity,
             options.additionalComponents ?? [],
             options.unitAdditions,
+            options.soldBy,
           )
         : line,
     ),
@@ -426,6 +458,7 @@ export function cartDraftDisplayLines(draft: CartDraft | null): CartDisplayLine[
     itemNameSnapshot: line.itemName,
     itemTypeSnapshot: line.itemType,
     variantNameSnapshot: line.variantName,
+    soldByName: line.soldBy?.name ?? null,
     quantity: line.quantity,
     ...draftLineBreakdown(line),
     editable: Boolean(line.catalogItem),
@@ -469,6 +502,7 @@ export function saleDisplayLines(
       itemTypeSnapshot: line.itemTypeSnapshot,
       variantNameSnapshot:
         [line.variantNameSnapshot, promotionLabel].filter(Boolean).join(' · ') || null,
+      soldByName: line.soldByEmployeeNameSnapshot ?? null,
       quantity: line.quantity,
       ...saleLineBreakdown(line),
       // Offered only while the Sale is OPEN and free of a pending payment, and the line is free.
@@ -518,6 +552,7 @@ export function cartDraftStartInput(draft: CartDraft): StartSaleInput {
       const base = {
         catalogItemId: line.catalogItemId,
         ...(line.catalogVariantId ? { catalogVariantId: line.catalogVariantId } : {}),
+        ...(line.soldBy ? { soldByEmployeeId: line.soldBy.employeeId } : {}),
       };
       // One persisted line is one unambiguous unit price. Units with different additions become
       // separate lines (identical ones stay grouped), so no average price is ever invented.

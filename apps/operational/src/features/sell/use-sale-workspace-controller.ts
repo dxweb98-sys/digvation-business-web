@@ -26,6 +26,7 @@ import {
   setCartDraftQuantity,
   type CartDraft,
   type CartDraftAdditionalItem,
+  type CartDraftSalesperson,
 } from './cart-draft';
 import { isKnownApiFailure } from './cashier-transaction-errors';
 import { cashierTransactionKeys } from './cashier-transaction-keys';
@@ -51,12 +52,13 @@ interface AddItemIntent {
   additionalComponents?: readonly CartDraftAdditionalItem[];
   /** Units with different additions: each distinct configuration becomes its own Sale line. */
   unitAdditions?: readonly (readonly CartDraftAdditionalItem[])[];
+  soldByEmployeeId?: string;
   addIdempotencyKey: string;
   saleId: string;
   expectedVersion: number;
 }
 
-interface AddItemConfiguration {
+export interface AddItemConfiguration {
   catalogItem: CatalogItem;
   catalogVariant: CatalogVariant | null;
   resolvedPrice: ResolvedPrice;
@@ -64,6 +66,8 @@ interface AddItemConfiguration {
   quantity?: string;
   additionalComponents?: readonly CartDraftAdditionalItem[];
   unitAdditions?: readonly (readonly CartDraftAdditionalItem[])[];
+  /** Product only, optional. Part of line identity: a different salesperson never merges. */
+  soldBy?: CartDraftSalesperson | null;
 }
 
 interface CommitDraftIntent {
@@ -93,7 +97,7 @@ function isPositiveQuantity(value: string): boolean {
   return whole !== '0' || /[1-9]/.test(fraction);
 }
 
-function isCompatibleLine(
+export function isCompatibleLine(
   line: SaleLine,
   catalogVariantId: string | undefined,
   configuration: AddItemConfiguration,
@@ -109,6 +113,7 @@ function isCompatibleLine(
     line.removedAt === null &&
     line.catalogItemId === configuration.catalogItem.id &&
     line.catalogVariantId === (catalogVariantId ?? null) &&
+    (line.soldByEmployeeId ?? null) === (configuration.soldBy?.employeeId ?? null) &&
     line.catalogPriceId === configuration.resolvedPrice.catalogPriceId &&
     line.resolvedUnitPrice === configuration.resolvedPrice.amount &&
     line.effectiveUnitPrice === configuration.resolvedPrice.amount &&
@@ -199,6 +204,7 @@ export function useSaleWorkspaceController({
               catalogItemId: intent.catalogItemId,
               ...(intent.catalogVariantId ? { catalogVariantId: intent.catalogVariantId } : {}),
               quantity: group.quantity,
+              ...(intent.soldByEmployeeId ? { soldByEmployeeId: intent.soldByEmployeeId } : {}),
               ...(group.additions.length
                 ? {
                     additionalComponents: group.additions.map((entry) => ({
@@ -384,6 +390,7 @@ export function useSaleWorkspaceController({
               ? { additionalComponents: configuration.additionalComponents }
               : {}),
             ...(configuration.unitAdditions ? { unitAdditions: configuration.unitAdditions } : {}),
+            ...(configuration.soldBy ? { soldBy: configuration.soldBy } : {}),
           },
         ),
       );
@@ -410,6 +417,7 @@ export function useSaleWorkspaceController({
         ? { additionalComponents: configuration.additionalComponents }
         : {}),
       ...(configuration?.unitAdditions ? { unitAdditions: configuration.unitAdditions } : {}),
+      ...(configuration?.soldBy ? { soldByEmployeeId: configuration.soldBy.employeeId } : {}),
       addIdempotencyKey: createIdempotencyKey('add-line'),
       saleId: currentSale.id,
       expectedVersion: currentSale.version,
@@ -552,6 +560,7 @@ export function useSaleWorkspaceController({
         quantity: string;
         additionalComponents: readonly CartDraftAdditionalItem[];
         unitAdditions?: readonly (readonly CartDraftAdditionalItem[])[];
+        soldByEmployeeId?: string | null;
       },
     ) => {
       const sale = saleQuery.data;
@@ -589,6 +598,7 @@ export function useSaleWorkspaceController({
                   ...(configuration.unitAdditions
                     ? { unitAdditions: configuration.unitAdditions }
                     : {}),
+                  soldBy: configuration.soldBy ?? null,
                 },
               )
             : current,

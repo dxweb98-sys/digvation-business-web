@@ -123,6 +123,9 @@ export function attachOperationalProjection(
   operational.listEmployees = (signal) =>
     client.get<ApiPage<Employee>>(`${OPERATIONAL_PREFIX}/employees`, { signal });
 
+  operational.listProductSalespeople = (signal) =>
+    client.get<ApiPage<Employee>>(`${OPERATIONAL_PREFIX}/product-salespeople`, { signal });
+
   operational.listPaymentRoutes = (input, signal) => {
     const query = new URLSearchParams({
       sellingLocationId: input.sellingLocationId,

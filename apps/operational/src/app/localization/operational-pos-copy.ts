@@ -773,6 +773,12 @@ const posCopy: Record<string, LocalizedCopy> = {
     'en-US': 'Payment attempts',
   },
   'Item quantity': { 'id-ID': 'Jumlah', 'en-US': 'Quantity' },
+  'Sold by': { 'id-ID': 'Dijual oleh', 'en-US': 'Sold by' },
+  'No salesperson': { 'id-ID': 'Tanpa penjual', 'en-US': 'No salesperson' },
+  'Optional. The salesperson earns commission when the sale is completed.': {
+    'id-ID': 'Opsional. Penjual memperoleh komisi saat transaksi selesai.',
+    'en-US': 'Optional. The salesperson earns commission when the sale is completed.',
+  },
   'Included components': { 'id-ID': 'Komponen termasuk', 'en-US': 'Included components' },
   'Required additional items': { 'id-ID': 'Item tambahan wajib', 'en-US': 'Required additional items' },
   'Choose at least one additional item.': { 'id-ID': 'Pilih minimal satu item tambahan.', 'en-US': 'Choose at least one additional item.' },

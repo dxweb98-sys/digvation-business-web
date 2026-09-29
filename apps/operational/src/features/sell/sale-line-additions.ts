@@ -38,11 +38,24 @@ export function saleLineAdditions(
  * Per-unit prices and contributions stay Runtime facts; only what the operator chose is read.
  */
 export function saleLineConfiguration(
-  line: Pick<SaleLine, 'catalogVariantId' | 'quantity' | 'compositionComponents'>,
+  line: Pick<
+    SaleLine,
+    | 'catalogVariantId'
+    | 'quantity'
+    | 'compositionComponents'
+    | 'soldByEmployeeId'
+    | 'soldByEmployeeNameSnapshot'
+  >,
 ) {
   return {
     catalogVariantId: line.catalogVariantId,
     quantity: line.quantity,
+    soldBy: line.soldByEmployeeId
+      ? {
+          employeeId: line.soldByEmployeeId,
+          name: line.soldByEmployeeNameSnapshot ?? '',
+        }
+      : null,
     additionalComponents: (line.compositionComponents ?? [])
       .filter((component) => component.componentSource === 'SALE_SELECTED')
       .map((component) => ({

@@ -23,6 +23,7 @@ export const cashierTransactionKeys = {
       currency,
     ] as const,
   employees: () => ['cashier-transaction', 'employees'] as const,
+  productSalespeople: () => ['cashier-transaction', 'product-salespeople'] as const,
   paymentRoutes: (sellingLocationId: string, currency: string) =>
     ['cashier-transaction', 'payment-routes', sellingLocationId, currency] as const,
   taxConfiguration: () => ['cashier-transaction', 'tax-configuration'] as const,

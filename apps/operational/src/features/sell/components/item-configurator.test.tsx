@@ -720,3 +720,106 @@ describe('ItemConfigurator — per-unit additions', () => {
     expect(addButton().disabled).toBe(false);
   });
 });
+
+
+describe('ItemConfigurator — Product salesperson', () => {
+  const salespeople = [
+    { id: 'emp-andi', name: 'Andi' },
+    { id: 'emp-budi', name: 'Budi' },
+  ];
+  const field = () => screen.queryByLabelText('Dijual oleh', { selector: 'button' });
+  const chooseSalesperson = async (name: string) => {
+    await click(field()!);
+    await click(await screen.findByRole('option', { name }));
+  };
+
+  it('shows the optional "Dijual oleh" field for a Product and lists only the offered candidates', async () => {
+    renderConfigurator({ item: shampoo, salespeople });
+    expect(field()).not.toBeNull();
+    await click(field()!);
+    expect(offered('Andi')).toBe(true);
+    expect(offered('Budi')).toBe(true);
+    expect(offered('Citra')).toBe(false);
+  });
+
+  it('does not show the field for a Service', () => {
+    renderConfigurator({ item: service(), salespeople, variants: [], itemPrice: '75000.0000' });
+    expect(field()).toBeNull();
+  });
+
+  it('does not show the field when Runtime offered no salesperson list at all', () => {
+    renderConfigurator({ item: shampoo });
+    expect(field()).toBeNull();
+  });
+
+  it('allows adding without a salesperson and sends no salesperson', async () => {
+    const { onConfirm } = renderConfigurator({ item: shampoo, salespeople });
+    await click(addButton());
+    expect(onConfirm).toHaveBeenCalledWith({
+      catalogVariantId: null,
+      quantity: '1',
+      additionalComponents: [],
+    });
+  });
+
+  it('sends the chosen salesperson and keeps it through a quantity change', async () => {
+    const { onConfirm, dialog } = renderConfigurator({ item: shampoo, salespeople });
+    await chooseSalesperson('Andi');
+    await click(dialog().getByRole('button', { name: 'Tambah jumlah' }));
+    await click(dialog().getByRole('button', { name: 'Tambah jumlah' }));
+    await click(addButton());
+    expect(onConfirm).toHaveBeenCalledWith({
+      catalogVariantId: null,
+      quantity: '3',
+      additionalComponents: [],
+      soldBy: { employeeId: 'emp-andi', name: 'Andi' },
+    });
+  });
+
+  it('reopens a line with its previous salesperson and lets it change', async () => {
+    const onConfirm = vi.fn();
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ItemConfigurator
+          item={shampoo}
+          variants={[]}
+          itemPrice="50000.0000"
+          salespeople={salespeople}
+          initial={{
+            catalogVariantId: null,
+            quantity: '2',
+            additionalComponents: [],
+            soldBy: { employeeId: 'emp-andi', name: 'Andi' },
+          }}
+          onConfirm={onConfirm}
+        />
+      </QueryClientProvider>,
+    );
+    expect(field()!.textContent).toMatch(/Andi/);
+    await chooseSalesperson('Budi');
+    await click(screen.getByRole('button', { name: /^Simpan perubahan/ }));
+    expect(onConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({ soldBy: { employeeId: 'emp-budi', name: 'Budi' } }),
+    );
+  });
+
+  it('keeps a reopened salesperson visible even when they are no longer a candidate', () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ItemConfigurator
+          item={shampoo}
+          variants={[]}
+          itemPrice="50000.0000"
+          salespeople={[{ id: 'emp-budi', name: 'Budi' }]}
+          initial={{
+            catalogVariantId: null,
+            quantity: '1',
+            additionalComponents: [],
+            soldBy: { employeeId: 'emp-andi', name: 'Andi' },
+          }}
+        />
+      </QueryClientProvider>,
+    );
+    expect(field()!.textContent).toMatch(/Andi/);
+  });
+});
