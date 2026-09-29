@@ -410,6 +410,18 @@ const posCopy: Record<string, LocalizedCopy> = {
     'id-ID': 'Ubah jumlah atau hapus item yang belum dimulai, lalu simpan penyesuaian.',
     'en-US': 'Change quantity or remove items that have not started, then confirm.',
   },
+  'Finish the payment of this transaction before starting a new one.': {
+    'id-ID': 'Selesaikan pembayaran transaksi ini sebelum memulai transaksi baru.',
+    'en-US': 'Finish the payment of this transaction before starting a new one.',
+  },
+  'This transaction has work to complete before it can be finished.': {
+    'id-ID': 'Transaksi ini memiliki pengerjaan yang harus diselesaikan terlebih dahulu.',
+    'en-US': 'This transaction has work to complete before it can be finished.',
+  },
+  'Payment is preserved. Try completing the transaction again.': {
+    'id-ID': 'Pembayaran tersimpan. Coba selesaikan transaksi lagi.',
+    'en-US': 'Payment is preserved. Try completing the transaction again.',
+  },
   'Add item from catalog': {
     'id-ID': 'Tambah item dari katalog',
     'en-US': 'Add item from catalog',

@@ -19,6 +19,7 @@ import {
   type CartDraftAdditionalItem,
 } from './cart-draft';
 import { MAX_CONFIGURATION_UNITS, opensItemConfigurator } from './item-configurator-model';
+import { blocksNewTransaction, hasTrackedWork } from './sale-lifecycle';
 import type {
   ItemConfiguration,
   ItemConfiguratorState,
@@ -543,16 +544,26 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     }
   };
 
+  /** A partly paid all-INSTANT Sale has no queue to live in: it must not be abandoned. */
+  const isNewSaleBlocked = blocksNewTransaction(saleWorkspace.sale);
+
   const newSale = () => {
+    if (isNewSaleBlocked) {
+      command.reportError(
+        new Error(copy('Finish the payment of this transaction before starting a new one.')),
+      );
+      return false;
+    }
     if (saleWorkspace.sale?.status === 'OPEN') {
       const confirmed = window.confirm(
         copy('Start a new transaction? The current transaction will remain open.'),
       );
-      if (!confirmed) return;
+      if (!confirmed) return false;
     }
     navigate('/sell');
     closeQueueContext();
     saleWorkspace.clearDraft();
+    return true;
   };
 
   const clearProcessedDraft = () => {
@@ -856,6 +867,32 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     }
   };
 
+  /**
+   * Completes an exactly settled all-INSTANT Sale straight from checkout: the same authoritative
+   * finalize command, with no queue, no work state and no fake fulfillment. Sales with tracked
+   * work never take this path.
+   */
+  const finalizeInstantSale = async (sale: Sale) => {
+    command.clearNotice();
+    try {
+      const current = (await command.refetchSale(sale.id)) ?? sale;
+      if (hasTrackedWork(current))
+        throw new Error(copy('This transaction has work to complete before it can be finished.'));
+      const updated = await command.runMutation(() =>
+        transactionAdapter.finalizeSale(
+          current.id,
+          current.version,
+          `cashier-finalize-${crypto.randomUUID()}`,
+        ),
+      );
+      command.commitSale(updated);
+      return updated;
+    } catch (error) {
+      command.reportError(error);
+      throw error;
+    }
+  };
+
   const finalizeQueuedSale = async (sale: Sale) => {
     command.clearNotice();
     try {
@@ -1086,6 +1123,8 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     voidSale: core.voidSale,
     voidQueuedSale,
     newSale,
+    isNewSaleBlocked,
+    finalizeInstantSale,
     clearProcessedDraft,
     openQueueContext,
     closeQueueContext,

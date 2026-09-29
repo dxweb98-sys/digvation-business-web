@@ -178,6 +178,12 @@ import './replatformed-pos-workspace.css';
 import { CustomerMemberDialog } from './customer-member-dialog';
 import { useCustomerPickerSession } from '../customer-picker-session';
 import { canAdjustOrder } from '../sale-adjustment-access';
+import {
+  completeSettledCheckout,
+  hasTrackedWork,
+  isFullySettled,
+  isInstantOnly,
+} from '../sale-lifecycle';
 
 type Workspace = ReturnType<typeof useCashierTransactionWorkspace>;
 type QueueStatus = 'QUEUED' | 'PROGRESS' | 'COMPLETED' | 'CANCELED';
@@ -723,11 +729,7 @@ function processIssues(
 }
 
 function hasSuccessfulCheckout(sale: Sale): boolean {
-  if (sale.payments.some((payment) => payment.status === 'PENDING')) return false;
-  const settledAmount = sale.payments
-    .filter((payment) => payment.status === 'SUCCEEDED')
-    .reduce((sum, payment) => sum.plus(createDecimal(payment.appliedAmount)), createDecimal('0'));
-  return settledAmount.equals(createDecimal(sale.totalAmount));
+  return isFullySettled(sale);
 }
 
 function successfulPayments(sale: Sale) {
@@ -1153,6 +1155,44 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     });
   };
 
+  /** An all-INSTANT Sale that finalized at checkout: show its completed receipt, no queue. */
+  const commitInstantCheckout = (finalized: Sale) => {
+    setQueueTab('COMPLETED');
+    setQueueOpen(true);
+    setCartOpen(false);
+    setCheckoutOpen(false);
+
+    workspace.clearProcessedDraft();
+    startNewCustomerTransaction();
+
+    // Same rule as completing queued work: the finalize response is the immediate receipt.
+    if (canReadCompleted || hasSuccessfulPayment(finalized)) {
+      setQueueDetail(finalized);
+      setReceiptSaleId(hasSuccessfulPayment(finalized) ? finalized.id : null);
+    } else {
+      setQueueDetail(null);
+      setReceiptSaleId(null);
+    }
+    showToast({
+      title: copy('Transaction completed'),
+      description: `${transactionNumber(finalized, workspace.locale)} ${copy('has been completed.')}`,
+      variant: 'success',
+    });
+  };
+
+  /**
+   * The one place that decides what an exactly settled checkout becomes: tracked work queues,
+   * an all-INSTANT Sale finalizes immediately. Throws so the caller can keep the payment and retry.
+   */
+  const finishSettledCheckout = async (settled: Sale) => {
+    const result = await completeSettledCheckout(settled, {
+      queue: workspace.queueSale,
+      finalizeInstant: workspace.finalizeInstantSale,
+    });
+    if (result.kind === 'FINALIZED') commitInstantCheckout(result.sale);
+    else if (result.kind === 'QUEUED') commitCheckoutToQueue(result.sale, true, 'QUEUE');
+  };
+
   const startQueuedWork = async (transaction: Sale) => {
     const line = transaction.lines.find(
       (candidate) =>
@@ -1389,6 +1429,11 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const queueCheckout = async (destination: FulfillmentDestination) => {
     if (!sale || !lines.length) return;
     try {
+      // An all-INSTANT Sale has no queue: it only completes once exactly settled.
+      if (!hasTrackedWork(sale)) {
+        if (hasSuccessfulCheckout(sale)) await finishSettledCheckout(sale);
+        return;
+      }
       const submitted = await workspace.queueSale(sale);
       commitCheckoutToQueue(submitted, hasSuccessfulCheckout(sale), destination);
       if (destination === 'START_PROCESS') await startQueuedWork(submitted);
@@ -1455,13 +1500,14 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       }
 
       try {
-        const submitted = await workspace.queueSale(completedSale);
-        commitCheckoutToQueue(submitted, true, 'QUEUE');
+        await finishSettledCheckout(completedSale);
       } catch (error) {
         showToast({
           title: copy('Payment complete'),
           description: `${cashierTransactionErrorMessage(error)} ${copy(
-            'Payment is preserved. Try adding the transaction to the queue again.',
+            hasTrackedWork(completedSale)
+              ? 'Payment is preserved. Try adding the transaction to the queue again.'
+              : 'Payment is preserved. Try completing the transaction again.',
           )}`,
           variant: 'warning',
         });
@@ -1541,14 +1587,15 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       setPaymentReference('');
       if (hasSuccessfulCheckout(updatedSale)) {
         try {
-          const submitted = await workspace.queueSale(updatedSale);
-          commitCheckoutToQueue(submitted, true, 'QUEUE');
+          await finishSettledCheckout(updatedSale);
           return;
         } catch (error) {
           showToast({
             title: copy('Payment complete'),
             description: `${cashierTransactionErrorMessage(error)} ${copy(
-              'Payment is preserved. Try adding the transaction to the queue again.',
+              hasTrackedWork(updatedSale)
+                ? 'Payment is preserved. Try adding the transaction to the queue again.'
+                : 'Payment is preserved. Try completing the transaction again.',
             )}`,
             variant: 'warning',
           });
@@ -1938,11 +1985,19 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           setReceiptSaleId(null);
         }}
         onNewSale={() => {
+          // A partly paid all-INSTANT Sale has no queue: keep it as the active transaction.
+          if (workspace.isNewSaleBlocked) {
+            showToast({
+              title: copy('Transaction not finished'),
+              description: copy('Finish the payment of this transaction before starting a new one.'),
+              variant: 'warning',
+            });
+            return;
+          }
           setQueueDetail(null);
           setReceiptSaleId(null);
           setCartOpen(false);
-          workspace.newSale();
-          startNewCustomerTransaction();
+          if (workspace.newSale()) startNewCustomerTransaction();
         }}
         onViewReceipt={(transaction) => {
           setQueueDetail(transaction);
@@ -3506,7 +3561,9 @@ export function ReferencePaymentDialog({
       ? createDecimal(normalizedTender).minus(createDecimal(normalizedAllocation)).toFixed(4)
       : '0';
   const fullyPaid = sale ? hasSuccessfulCheckout(sale) : false;
-  const collectsPayment = payNow && !fullyPaid;
+  // An all-INSTANT Sale has no queue to defer to: payment is collected now, in as many parts as needed.
+  const instantOnly = sale ? isInstantOnly(sale) : false;
+  const collectsPayment = (payNow || instantOnly) && !fullyPaid;
   const canPay =
     lines.length > 0 &&
     Boolean(activeRoute) &&
@@ -3536,7 +3593,8 @@ export function ReferencePaymentDialog({
       setStep('edit');
       return;
     }
-    if (hasRecordedMoney && !fullyPaid) {
+    // Leaving a partly paid all-INSTANT Sale keeps it open; there is no queue to collect from later.
+    if (hasRecordedMoney && !fullyPaid && !instantOnly) {
       setStep('leave');
       return;
     }
@@ -3577,7 +3635,7 @@ export function ReferencePaymentDialog({
           onClick={onQueue}
           className="w-full justify-center whitespace-nowrap"
         >
-          {copy('Add to queue')}
+          {copy(instantOnly ? 'Complete transaction' : 'Add to queue')}
         </DButton>
       )}
     </div>
@@ -3904,10 +3962,11 @@ export function ReferencePaymentDialog({
                 <div className="pos-pay-section__head">
                   <p className="pos-pay-section__title">
                     <Clock className="size-4 shrink-0 text-[var(--color-brand)]" aria-hidden="true" />
-                    {copy('Payment timing')}
+                    {copy(instantOnly ? 'Payment' : 'Payment timing')}
                   </p>
                 </div>
                 <div className="pos-pay-section__body">
+                  {instantOnly ? null : (
                   <div className="grid gap-2 sm:grid-cols-2">
                     {[
                       {
@@ -3940,6 +3999,7 @@ export function ReferencePaymentDialog({
                       </label>
                     ))}
                   </div>
+                  )}
 
                   {collectsPayment ? (
                     <div className="mt-3 border-t border-[var(--color-border)] pt-3">
