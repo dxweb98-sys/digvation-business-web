@@ -29,6 +29,7 @@ import {
   OperationalMembersApi,
   type Member,
   type MemberDetail,
+  type MemberTransaction,
   type PointLedgerEntry,
   type PointLedgerType,
 } from './operational-members-api';
@@ -324,7 +325,7 @@ function MemberDetailDialog({
 
 function MemberDetailBody({ detail }: { detail: MemberDetail }) {
   const { copy, label, locale, formatDate, formatMoney } = useOperationalLocalization();
-  const { membership, loyalty, latestTransaction } = detail;
+  const { membership, loyalty, recentTransactions, transactionTotal } = detail;
   const [tab, setTab] = useState<'activity' | 'transactions'>(
     loyalty ? 'activity' : 'transactions',
   );
@@ -408,46 +409,26 @@ function MemberDetailBody({ detail }: { detail: MemberDetail }) {
         ) : null}
 
         <DTabsContent value="transactions" className="mt-3 min-h-0 flex-1 overflow-y-auto">
-          {latestTransaction ? (
-            <div className="rounded-2xl border border-(--color-border) px-4 py-3 text-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="font-mono text-xs font-semibold">{latestTransaction.saleNumber}</p>
-                  {latestTransaction.finalizedAt ? (
-                    <p className="mt-0.5 text-xs text-(--color-text-muted)">
-                      {dateTime(latestTransaction.finalizedAt)}
-                    </p>
-                  ) : null}
-                </div>
-                <p className="shrink-0 font-bold">
-                  {formatMoney(latestTransaction.totalAmount, latestTransaction.currency)}
+          {recentTransactions.length ? (
+            <>
+              <ul className="space-y-2">
+                {recentTransactions.map((transaction) => (
+                  <MemberTransactionCard
+                    key={transaction.saleId}
+                    transaction={transaction}
+                    showPoints={Boolean(loyalty)}
+                    locale={locale}
+                    dateTime={dateTime}
+                    formatMoney={formatMoney}
+                  />
+                ))}
+              </ul>
+              {transactionTotal > recentTransactions.length ? (
+                <p className="mt-3 text-xs text-(--color-text-muted)">
+                  {copy('Showing')} {recentTransactions.length} {copy('most recent transactions')}
                 </p>
-              </div>
-              {loyalty && (latestTransaction.pointsEarned || latestTransaction.pointsRedeemed) ? (
-                <dl className="mt-2 space-y-1 text-xs">
-                  {latestTransaction.pointsEarned ? (
-                    <div className="flex justify-between gap-3">
-                      <dt className="text-(--color-text-muted)">
-                        {copy('Points earned in this transaction')}
-                      </dt>
-                      <dd className="font-semibold text-(--color-success)">
-                        {formatPointValue(latestTransaction.pointsEarned, locale, true)}
-                      </dd>
-                    </div>
-                  ) : null}
-                  {latestTransaction.pointsRedeemed ? (
-                    <div className="flex justify-between gap-3">
-                      <dt className="text-(--color-text-muted)">
-                        {copy('Points used in this transaction')}
-                      </dt>
-                      <dd className="font-semibold text-(--color-danger)">
-                        {formatPointValue(`-${latestTransaction.pointsRedeemed}`, locale, true)}
-                      </dd>
-                    </div>
-                  ) : null}
-                </dl>
               ) : null}
-            </div>
+            </>
           ) : (
             <p className="text-sm text-(--color-text-muted)">
               {copy('No completed transaction yet.')}
@@ -456,6 +437,64 @@ function MemberDetailBody({ detail }: { detail: MemberDetail }) {
         </DTabsContent>
       </DTabs>
     </div>
+  );
+}
+
+function MemberTransactionCard({
+  transaction,
+  showPoints,
+  locale,
+  dateTime,
+  formatMoney,
+}: {
+  transaction: MemberTransaction;
+  /** Points are Loyalty facts: shown only when Loyalty is part of the business. */
+  showPoints: boolean;
+  locale: string;
+  dateTime: (iso: string) => string;
+  formatMoney: (amount: string, currency: string) => string;
+}) {
+  const { copy } = useOperationalLocalization();
+  return (
+    <li className="rounded-2xl border border-(--color-border) px-4 py-3 text-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-mono text-xs font-semibold">{transaction.saleNumber}</p>
+          {transaction.finalizedAt ? (
+            <p className="mt-0.5 text-xs text-(--color-text-muted)">
+              {dateTime(transaction.finalizedAt)}
+            </p>
+          ) : null}
+        </div>
+        <p className="shrink-0 font-bold">
+          {formatMoney(transaction.totalAmount, transaction.currency)}
+        </p>
+      </div>
+      {showPoints && (transaction.pointsEarned || transaction.pointsRedeemed) ? (
+        <dl className="mt-2 space-y-1 text-xs">
+          {transaction.pointsEarned ? (
+            <div className="flex justify-between gap-3">
+              <dt className="text-(--color-text-muted)">
+                {copy('Points earned in this transaction')}
+              </dt>
+              <dd className="font-semibold text-(--color-success)">
+                {formatPointValue(transaction.pointsEarned, locale, true)}
+              </dd>
+            </div>
+          ) : null}
+          {transaction.pointsRedeemed ? (
+            <div className="flex justify-between gap-3">
+              <dt className="text-(--color-text-muted)">
+                {copy('Points used in this transaction')}
+              </dt>
+              <dd className="font-semibold text-(--color-danger)">
+                {formatPointValue(`-${transaction.pointsRedeemed}`, locale, true)}
+              </dd>
+            </div>
+          ) : null}
+        </dl>
+      ) : null}
+    </li>
   );
 }
 

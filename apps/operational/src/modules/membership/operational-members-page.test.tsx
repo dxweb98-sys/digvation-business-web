@@ -11,6 +11,7 @@ import type {
   Member,
   MemberDetail,
   MemberPage,
+  MemberTransaction,
   OperationalMembersApi,
 } from './operational-members-api';
 import { OperationalMembersView } from './operational-members-page';
@@ -98,15 +99,18 @@ const detailFor = (member: Member): MemberDetail => ({
       },
     ],
   },
-  latestTransaction: {
-    saleId: 's1',
-    saleNumber: 'TRX-20260928-000012',
-    currency: 'IDR',
-    totalAmount: '197580.0000',
-    finalizedAt: '2026-09-28T02:15:00.000Z',
-    pointsEarned: '6.0000',
-    pointsRedeemed: '4.0000',
-  },
+  recentTransactions: [
+    {
+      saleId: 's1',
+      saleNumber: 'TRX-20260928-000012',
+      currency: 'IDR',
+      totalAmount: '197580.0000',
+      finalizedAt: '2026-09-28T02:15:00.000Z',
+      pointsEarned: '6.0000',
+      pointsRedeemed: '4.0000',
+    },
+  ],
+  transactionTotal: 1,
 });
 
 function fakeApi(overrides: Partial<Record<keyof OperationalMembersApi, unknown>> = {}) {
@@ -259,7 +263,8 @@ describe('Operational Member detail', () => {
     const detail = vi.fn().mockResolvedValue({
       membership: rina,
       loyalty: null,
-      latestTransaction: null,
+      recentTransactions: [],
+      transactionTotal: 0,
     });
     renderView(fakeApi({ detail }));
     const dialog = within(await openRina());
@@ -373,4 +378,117 @@ describe('Operational Member profile editing', () => {
     ).toEqual(['Rina Wijaya', '+6281234567890']);
     expect(dialog.queryByLabelText(/NIK|poin|member/i)).toBeNull();
   });
+});
+
+const tx = (n: string, overrides: Partial<MemberTransaction> = {}): MemberTransaction => ({
+  saleId: `sale-${n}`,
+  saleNumber: `TRX-20260929-000${n}`,
+  currency: 'IDR',
+  totalAmount: '100000.0000',
+  finalizedAt: `2026-09-29T0${n.slice(-1)}:00:00.000Z`,
+  pointsEarned: null,
+  pointsRedeemed: null,
+  ...overrides,
+});
+
+async function openTransactions(detail: MemberDetail) {
+  renderView(fakeApi({ detail: vi.fn().mockResolvedValue(detail) }));
+  const dialog = within(await openRina());
+  await dialog.findByText('MEMBER-001');
+  fireEvent.click(dialog.getByRole('tab', { name: 'Transaksi' }));
+  return dialog;
+}
+
+const withTransactions = (
+  recentTransactions: MemberTransaction[],
+  transactionTotal = recentTransactions.length,
+  loyalty: MemberDetail['loyalty'] = detailFor(rina).loyalty,
+): MemberDetail => ({ ...detailFor(rina), loyalty, recentTransactions, transactionTotal });
+
+describe('Operational Member transaction history', () => {
+  it('shows the empty state when the Member has no finalized transaction', async () => {
+    const dialog = await openTransactions(withTransactions([]));
+    expect(await dialog.findByText('Belum ada transaksi selesai.')).toBeTruthy();
+  });
+
+  it('renders every returned transaction with its own number, date and amount', async () => {
+    const dialog = await openTransactions(
+      withTransactions([
+        tx('013', { totalAmount: '349570.0000' }),
+        tx('011', { totalAmount: '150000.0000' }),
+        tx('008', { totalAmount: '250000.0000' }),
+      ]),
+    );
+    const rows = (await dialog.findAllByRole('listitem')).map((row) => row.textContent ?? '');
+    expect(rows).toHaveLength(3);
+    // Order is exactly as Runtime returned it (newest first); nothing is resorted.
+    expect(rows[0]).toContain('TRX-20260929-000013');
+    expect(rows[0]).toMatch(/349[.,]570/);
+    expect(rows[1]).toContain('TRX-20260929-000011');
+    expect(rows[1]).toMatch(/150[.,]000/);
+    expect(rows[2]).toContain('TRX-20260929-000008');
+    expect(rows[2]).toMatch(/250[.,]000/);
+    for (const row of rows) expect(row).toMatch(/2026|Sep/);
+  });
+
+  it('associates earned and redeemed points with the correct Sale only', async () => {
+    const dialog = await openTransactions(
+      withTransactions([
+        tx('013', { pointsEarned: '2.0000' }),
+        tx('011', { pointsRedeemed: '1.0000' }),
+        tx('008'),
+      ]),
+    );
+    const rows = (await dialog.findAllByRole('listitem')).map((row) => row.textContent ?? '');
+    expect(rows[0]).toContain('Poin diperoleh dari transaksi ini');
+    expect(rows[0]).toMatch(/\+2/);
+    expect(rows[0]).not.toContain('Poin digunakan');
+    expect(rows[1]).toContain('Poin digunakan pada transaksi ini');
+    expect(rows[1]).toMatch(/[-−]1/);
+    expect(rows[1]).not.toContain('Poin diperoleh');
+    // No point section at all when a Sale neither earned nor redeemed.
+    expect(rows[2]).not.toContain('Poin');
+  });
+
+  it('still lists transactions, without any point rows, when Loyalty is not entitled', async () => {
+    const dialog = await openTransactions(
+      withTransactions([tx('013', { pointsEarned: '2.0000', pointsRedeemed: '1.0000' })], 1, null),
+    );
+    expect(await dialog.findByText('TRX-20260929-000013')).toBeTruthy();
+    expect(dialog.queryByText('Poin diperoleh dari transaksi ini')).toBeNull();
+    expect(dialog.queryByText('Poin digunakan pada transaksi ini')).toBeNull();
+  });
+
+  it('keeps the whole list inside the scrolling Transactions panel, with summary and footer fixed', async () => {
+    const dialog = await openTransactions(withTransactions([tx('013'), tx('011')]));
+    const panel = dialog.getByRole('tabpanel');
+    expect(panel.className).toContain('overflow-y-auto');
+    for (const row of await dialog.findAllByRole('listitem'))
+      expect(panel.contains(row)).toBe(true);
+    expect(panel.contains(dialog.getByRole('tablist'))).toBe(false);
+    expect(panel.contains(dialog.getByText('Poin saat ini'))).toBe(false);
+    for (const name of ['Tutup']) {
+      expect(dialog.getByRole('button', { name }).closest('.overflow-y-auto')).toBeNull();
+    }
+  });
+
+  it('discloses a bounded view only when more history exists than is shown', async () => {
+    const ten = [...Array(10).keys()].map((index) => tx(String(20 - index).padStart(3, '0')));
+    const more = await openTransactions(withTransactions(ten, 27));
+    expect(await more.findByText('Menampilkan 10 transaksi terbaru')).toBeTruthy();
+  });
+
+  it.each([
+    [1, 1],
+    [3, 3],
+    [10, 10],
+  ])(
+    'shows no bounded-view note when all %i of %i transactions are shown',
+    async (shown, total) => {
+      const list = [...Array(shown).keys()].map((index) => tx(String(30 - index).padStart(3, '0')));
+      const dialog = await openTransactions(withTransactions(list, total));
+      await dialog.findAllByRole('listitem');
+      expect(dialog.queryByText(/transaksi terbaru/)).toBeNull();
+    },
+  );
 });
