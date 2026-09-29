@@ -166,6 +166,37 @@ const workforceCopy: Record<string, { id: string; en: string }> = {
     id: 'Riwayat absensi tidak dapat dimuat.',
     en: 'Could not load attendance history.',
   },
+  'Workshop mechanic': { id: 'Mekanik bengkel', en: 'Workshop mechanic' },
+  'Mechanic status': { id: 'Status mekanik', en: 'Mechanic status' },
+  'Active mechanic': { id: 'Mekanik aktif', en: 'Active mechanic' },
+  'Not a mechanic': { id: 'Bukan mekanik', en: 'Not a mechanic' },
+  'Employee is inactive': { id: 'Karyawan tidak aktif', en: 'Employee is inactive' },
+  'Active as a mechanic': { id: 'Aktif sebagai mekanik', en: 'Active as a mechanic' },
+  'This employee can be selected and assigned to workshop Work Orders.': {
+    id: 'Karyawan ini dapat dipilih dan ditugaskan ke Work Order bengkel.',
+    en: 'This employee can be selected and assigned to workshop Work Orders.',
+  },
+  'Turn this on if this employee works as a workshop mechanic.': {
+    id: 'Aktifkan jika karyawan ini bertugas sebagai mekanik bengkel.',
+    en: 'Turn this on if this employee works as a workshop mechanic.',
+  },
+  'The employee must be active before they can be assigned as a mechanic.': {
+    id: 'Karyawan harus aktif terlebih dahulu sebelum dapat ditugaskan sebagai mekanik.',
+    en: 'The employee must be active before they can be assigned as a mechanic.',
+  },
+  'Could not load the mechanic setting.': {
+    id: 'Pengaturan mekanik belum bisa dimuat.',
+    en: 'Could not load the mechanic setting.',
+  },
+  'Mechanic setting saved.': { id: 'Pengaturan mekanik disimpan.', en: 'Mechanic setting saved.' },
+  'Could not save the mechanic setting. Try again.': {
+    id: 'Pengaturan mekanik belum tersimpan. Coba lagi.',
+    en: 'Could not save the mechanic setting. Try again.',
+  },
+  'This setting was just changed. Reopen the employee and try again.': {
+    id: 'Pengaturan ini baru saja berubah. Buka lagi data karyawan lalu coba lagi.',
+    en: 'This setting was just changed. Reopen the employee and try again.',
+  },
   'Service assignment eligibility is controlled by the employee position.': {
     id: 'Penugasan layanan mengikuti jabatan karyawan.',
     en: 'Service assignment follows the employee position.',

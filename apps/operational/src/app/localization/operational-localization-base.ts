@@ -796,6 +796,55 @@ const copy: Record<string, LocalizedLabel> = {
     'id-ID': 'Anda tidak punya izin mengubah Work Order ini.',
     'en-US': 'You do not have permission to change this Work Order.',
   },
+  Mechanic: { 'id-ID': 'Mekanik', 'en-US': 'Mechanic' },
+  'Not assigned yet': { 'id-ID': 'Belum ada mekanik', 'en-US': 'Not assigned yet' },
+  'Assign mechanic': { 'id-ID': 'Tugaskan mekanik', 'en-US': 'Assign mechanic' },
+  'Replace mechanic': { 'id-ID': 'Ganti mekanik', 'en-US': 'Replace mechanic' },
+  'Choose a mechanic': { 'id-ID': 'Pilih mekanik', 'en-US': 'Choose a mechanic' },
+  Assign: { 'id-ID': 'Tugaskan', 'en-US': 'Assign' },
+  Replace: { 'id-ID': 'Ganti', 'en-US': 'Replace' },
+  'Working on': { 'id-ID': 'Sedang mengerjakan', 'en-US': 'Working on' },
+  'Waiting for work': { 'id-ID': 'Belum ada pekerjaan berjalan', 'en-US': 'Waiting for work' },
+  'open Work Orders': { 'id-ID': 'Work Order aktif', 'en-US': 'open Work Orders' },
+  'Not enabled as a workshop mechanic.': {
+    'id-ID': 'Belum diaktifkan sebagai mekanik bengkel.',
+    'en-US': 'Not enabled as a workshop mechanic.',
+  },
+  'No mechanics yet. Enable mechanics from the Employee page in Backoffice.': {
+    'id-ID': 'Belum ada mekanik. Aktifkan mekanik dari halaman Karyawan di Backoffice.',
+    'en-US': 'No mechanics yet. Enable mechanics from the Employee page in Backoffice.',
+  },
+  'Could not load mechanics.': {
+    'id-ID': 'Daftar mekanik belum bisa dimuat.',
+    'en-US': 'Could not load mechanics.',
+  },
+  'Mechanic assigned.': { 'id-ID': 'Mekanik ditugaskan.', 'en-US': 'Mechanic assigned.' },
+  'Mechanic replaced.': { 'id-ID': 'Mekanik diganti.', 'en-US': 'Mechanic replaced.' },
+  'Work Order started.': { 'id-ID': 'Work Order dimulai.', 'en-US': 'Work Order started.' },
+  'This mechanic is already working on another Work Order. Pause or finish it first.': {
+    'id-ID': 'Mekanik ini sedang mengerjakan Work Order lain. Jeda atau selesaikan dulu.',
+    'en-US': 'This mechanic is already working on another Work Order. Pause or finish it first.',
+  },
+  'This mechanic cannot take workshop work right now.': {
+    'id-ID': 'Mekanik ini belum bisa menerima pekerjaan bengkel.',
+    'en-US': 'This mechanic cannot take workshop work right now.',
+  },
+  'Assign a mechanic before starting this Work Order.': {
+    'id-ID': 'Tugaskan mekanik sebelum memulai Work Order ini.',
+    'en-US': 'Assign a mechanic before starting this Work Order.',
+  },
+  'The mechanic cannot be changed at this stage.': {
+    'id-ID': 'Mekanik tidak bisa diganti pada tahap ini.',
+    'en-US': 'The mechanic cannot be changed at this stage.',
+  },
+  'This mechanic already has this Work Order.': {
+    'id-ID': 'Mekanik ini sudah ditugaskan di Work Order ini.',
+    'en-US': 'This mechanic already has this Work Order.',
+  },
+  'The mechanic was not found.': {
+    'id-ID': 'Mekanik tidak ditemukan.',
+    'en-US': 'The mechanic was not found.',
+  },
 };
 
 const technicalLabels: Record<string, LocalizedLabel> = {
@@ -815,6 +864,9 @@ const technicalLabels: Record<string, LocalizedLabel> = {
   PENDING: { 'id-ID': 'Menunggu', 'en-US': 'Pending' },
   WAITING: { 'id-ID': 'Menunggu', 'en-US': 'Waiting' },
   ASSIGNED: { 'id-ID': 'Ditugaskan', 'en-US': 'Assigned' },
+  AVAILABLE: { 'id-ID': 'Tersedia', 'en-US': 'Available' },
+  BUSY: { 'id-ID': 'Sibuk', 'en-US': 'Busy' },
+  INELIGIBLE: { 'id-ID': 'Tidak tersedia', 'en-US': 'Unavailable' },
   PAUSED: { 'id-ID': 'Dijeda', 'en-US': 'Paused' },
   DONE: { 'id-ID': 'Selesai', 'en-US': 'Done' },
   SUCCEEDED: { 'id-ID': 'Berhasil', 'en-US': 'Succeeded' },
