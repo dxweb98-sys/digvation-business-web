@@ -11,6 +11,9 @@ import type { OperationalNavigationSection } from '../../modules/operational/ope
 import { posSellOperationalNavigation } from '../../modules/pos/pos-operational-navigation';
 import { financeOperationalNavigation } from '../../modules/finance/finance-operational-navigation';
 import { OperationalExpensesPage } from '../../modules/finance/operational-expenses-page';
+import { membershipOperationalNavigation } from '../../modules/membership/membership-operational-navigation';
+import { canReadOperationalMembers } from '../../modules/membership/operational-members-access';
+import { OperationalMembersPage } from '../../modules/membership/operational-members-page';
 
 export function canAccessOperationalExpenses(
   permissions: readonly string[],
@@ -32,6 +35,7 @@ function useOperationalSurfaceAccess() {
   return {
     canSell: hasPos && permissions.includes('sales:create'),
     canAccessExpenses: canAccessOperationalExpenses(permissions, hasFinance),
+    canAccessMembers: canReadOperationalMembers(permissions, session.access.capabilities),
   };
 }
 
@@ -46,6 +50,17 @@ function OperationalLayout() {
           {
             label: copy(posSellOperationalNavigation.label),
             items: salesItems.map((item) => ({ ...item, label: copy(item.label) })),
+          },
+        ]
+      : []),
+    ...(access.canAccessMembers
+      ? [
+          {
+            label: copy(membershipOperationalNavigation.label),
+            items: membershipOperationalNavigation.items.map((item) => ({
+              ...item,
+              label: copy(item.label),
+            })),
           },
         ]
       : []),
@@ -68,6 +83,7 @@ function OperationalHome() {
   const access = useOperationalSurfaceAccess();
   if (access.canSell) return <Navigate to="/sell" replace />;
   if (access.canAccessExpenses) return <Navigate to="/expenses" replace />;
+  if (access.canAccessMembers) return <Navigate to="/members" replace />;
   return <Navigate to="/login" replace />;
 }
 
@@ -135,6 +151,15 @@ function ExpensesRoute() {
   );
 }
 
+function MembersRoute() {
+  const { canAccessMembers } = useOperationalSurfaceAccess();
+  return (
+    <SurfaceGate allowed={canAccessMembers}>
+      <OperationalMembersPage />
+    </SurfaceGate>
+  );
+}
+
 export const operationalRouter = createBrowserRouter([
   { path: '/login', element: <Navigate to="/" replace /> },
   {
@@ -145,6 +170,7 @@ export const operationalRouter = createBrowserRouter([
       { path: '/sell', element: <SellRoute /> },
       { path: '/sell/:saleId', element: <SellRoute /> },
       { path: '/expenses', element: <ExpensesRoute /> },
+      { path: '/members', element: <MembersRoute /> },
       { path: '*', element: <OperationalNotFoundRoute /> },
     ],
   },
