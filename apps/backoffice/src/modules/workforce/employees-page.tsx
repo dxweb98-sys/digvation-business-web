@@ -501,7 +501,9 @@ function EmployeeEditor({
                   {copy('Eligible as Service performer')}
                 </span>
                 <span className="block text-sm text-[var(--color-text-muted)]">
-                  {copy('The employee can be assigned to service work when the position allows it.')}
+                  {copy(
+                    'The employee can be assigned to service work when the position allows it.',
+                  )}
                 </span>
               </span>
             </label>

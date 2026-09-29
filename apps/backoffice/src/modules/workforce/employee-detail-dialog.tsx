@@ -210,9 +210,7 @@ export function EmployeeDetailDialog({
                   label={copy('Service assignment')}
                   value={
                     employee.position ? (
-                      <DBadge
-                        variant={employee.canPerformServices ? 'success' : 'secondary'}
-                      >
+                      <DBadge variant={employee.canPerformServices ? 'success' : 'secondary'}>
                         {copy(
                           employee.canPerformServices
                             ? 'Can perform services'
@@ -228,7 +226,9 @@ export function EmployeeDetailDialog({
                   label={copy('Product sales')}
                   value={
                     <DBadge variant={employee.canSellProducts ? 'success' : 'secondary'}>
-                      {copy(employee.canSellProducts ? 'Can sell products' : 'Cannot sell products')}
+                      {copy(
+                        employee.canSellProducts ? 'Can sell products' : 'Cannot sell products',
+                      )}
                     </DBadge>
                   }
                 />

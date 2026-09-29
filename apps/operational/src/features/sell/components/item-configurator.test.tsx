@@ -721,7 +721,6 @@ describe('ItemConfigurator — per-unit additions', () => {
   });
 });
 
-
 describe('ItemConfigurator — Product salesperson', () => {
   const salespeople = [
     { id: 'emp-andi', name: 'Andi' },

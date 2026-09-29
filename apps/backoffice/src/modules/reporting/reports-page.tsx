@@ -342,7 +342,8 @@ const filterFields: Record<Type, [string, string, string[]][]> = {
 };
 const title = (k: string) => k.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
 const money = (k: string) =>
-  /amount|revenue|gross|discount|tax|cash|difference|base|value|commission/i.test(k) && !/count|rate/i.test(k);
+  /amount|revenue|gross|discount|tax|cash|difference|base|value|commission/i.test(k) &&
+  !/count|rate/i.test(k);
 const count = (k: string) => /count|attempts|items|transactions|records/i.test(k);
 const quantity = (k: string) => /quantity/i.test(k);
 const dateKey = /^\d{4}-\d{2}-\d{2}$/;

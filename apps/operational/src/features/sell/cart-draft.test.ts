@@ -581,9 +581,16 @@ describe('replacementLinesOf (one configuration becomes exact Sale lines)', () =
 describe('CartDraft Product salesperson attribution', () => {
   const andi = { employeeId: 'emp-andi', name: 'Andi' };
   const budi = { employeeId: 'emp-budi', name: 'Budi' };
-  const service: CatalogItem = { ...item, id: 'svc-1', type: 'SERVICE', fulfillmentBehavior: 'TRACKED' };
+  const service: CatalogItem = {
+    ...item,
+    id: 'svc-1',
+    type: 'SERVICE',
+    fulfillmentBehavior: 'TRACKED',
+  };
   const start = (draft: ReturnType<typeof emptyCartDraft>) =>
-    cartDraftStartInput(setCartDraftCustomer(draft, { type: 'NON_MEMBER', name: 'Siti', phone: '0812' }));
+    cartDraftStartInput(
+      setCartDraftCustomer(draft, { type: 'NON_MEMBER', name: 'Siti', phone: '0812' }),
+    );
 
   it('merges the same Product sold by the same salesperson', () => {
     const empty = emptyCartDraft('location-1', 'IDR');
@@ -653,12 +660,17 @@ describe('CartDraft Product salesperson attribution', () => {
       soldBy: andi,
     });
     const id = added.lines[0]!.id;
-    const kept = replaceCartDraftLine(added, id, item, null, price, { soldBy: andi, quantity: '3' });
+    const kept = replaceCartDraftLine(added, id, item, null, price, {
+      soldBy: andi,
+      quantity: '3',
+    });
     expect(kept.lines[0]).toMatchObject({ id, quantity: '3.0000', soldBy: andi });
-    expect(replaceCartDraftLine(added, id, item, null, price, { soldBy: budi }).lines[0]?.soldBy).toEqual(budi);
-    expect(replaceCartDraftLine(added, id, item, null, price, { soldBy: null }).lines[0]).not.toHaveProperty(
-      'soldBy',
-    );
+    expect(
+      replaceCartDraftLine(added, id, item, null, price, { soldBy: budi }).lines[0]?.soldBy,
+    ).toEqual(budi);
+    expect(
+      replaceCartDraftLine(added, id, item, null, price, { soldBy: null }).lines[0],
+    ).not.toHaveProperty('soldBy');
   });
 
   it('carries the salesperson from the local draft into the Runtime Sale start input', () => {
@@ -703,7 +715,11 @@ describe('CartDraft Product salesperson attribution', () => {
       }),
     ).toEqual([{ catalogItemId: 'item-1', quantity: '2', soldByEmployeeId: 'emp-andi' }]);
     expect(
-      replacementLinesOf('item-1', null, { quantity: '2', additionalComponents: [], soldByEmployeeId: null }),
+      replacementLinesOf('item-1', null, {
+        quantity: '2',
+        additionalComponents: [],
+        soldByEmployeeId: null,
+      }),
     ).toEqual([{ catalogItemId: 'item-1', quantity: '2' }]);
   });
 });
