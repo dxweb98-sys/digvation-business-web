@@ -176,6 +176,7 @@ import {
 } from '../member-cart-presentation';
 import './replatformed-pos-workspace.css';
 import { CustomerMemberDialog } from './customer-member-dialog';
+import { useCustomerPickerSession } from '../customer-picker-session';
 
 type Workspace = ReturnType<typeof useCashierTransactionWorkspace>;
 type QueueStatus = 'QUEUED' | 'PROGRESS' | 'COMPLETED' | 'CANCELED';
@@ -802,6 +803,13 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const [cartOpen, setCartOpen] = useState(false);
   const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<MemberLookupResult | null>(null);
+  const customerPickerSession = useCustomerPickerSession();
+  // A new transaction must never inherit the previous customer's picker draft or selected Member.
+  // Query caches are keyed by identity and stay warm; only this presentation state is cleared.
+  const startNewCustomerTransaction = () => {
+    setSelectedMember(null);
+    customerPickerSession.startNewTransaction();
+  };
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [payNow, setPayNow] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
@@ -1118,6 +1126,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     setCheckoutOpen(false);
 
     workspace.clearProcessedDraft();
+    startNewCustomerTransaction();
 
     // The receipt belongs to a settled transaction; a partly paid one keeps its balance in the queue.
     if (wasPaid && destination === 'QUEUE') {
@@ -1803,6 +1812,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         canReadMembers={canReadMembers}
         canEnrollMember={canEnrollMember}
         canReadLoyalty={canReadLoyalty}
+        resetKey={customerPickerSession.revision}
         onClose={() => setCustomerPickerOpen(false)}
         onChoose={(selection, member) => {
           const previousMember = selectedMember;
@@ -1928,6 +1938,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           setReceiptSaleId(null);
           setCartOpen(false);
           workspace.newSale();
+          startNewCustomerTransaction();
         }}
         onViewReceipt={(transaction) => {
           setQueueDetail(transaction);
