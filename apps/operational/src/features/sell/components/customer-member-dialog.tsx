@@ -11,6 +11,13 @@ import {
   type MemberLookupResult,
 } from '../customer-member-api';
 import type { SaleCustomer, SaleCustomerSelection } from '../cashier-transaction.types';
+import {
+  isCompleteNik,
+  NIK_LENGTH,
+  sanitizeNikInput,
+  sanitizePhoneInput,
+  toCanonicalPhone,
+} from '../customer-input';
 
 type CustomerDialogMode = 'CUSTOMER' | 'MEMBER' | 'ENROLL';
 
@@ -34,6 +41,9 @@ const localCopy: Record<string, { 'id-ID': string; 'en-US': string }> = {
     'en-US': 'A regular customer records name and WhatsApp for this transaction without accumulating loyalty points.',
   },
   'Customer name': { 'id-ID': 'Nama Pelanggan', 'en-US': 'Customer Name' },
+  'Name placeholder': { 'id-ID': 'Contoh: Andir Saputra', 'en-US': 'Example: Andir Saputra' },
+  'Phone placeholder': { 'id-ID': 'Contoh: 0812 3456 7890', 'en-US': 'Example: 0812 3456 7890' },
+  'NIK placeholder': { 'id-ID': '16 digit NIK', 'en-US': '16-digit NIK' },
   'WhatsApp / phone': { 'id-ID': 'Nomor WhatsApp / Telepon', 'en-US': 'WhatsApp / Phone' },
   'Required': { 'id-ID': 'Wajib diisi', 'en-US': 'Required' },
   'Want to earn points and rewards?': { 'id-ID': 'Ingin catat poin belanja & reward loyalty pelanggan?', 'en-US': 'Want to earn points and rewards?' },
@@ -105,6 +115,7 @@ export function CustomerMemberDialog({
   canReadMembers,
   canEnrollMember,
   canReadLoyalty,
+  resetKey = 0,
   onClose,
   onChoose,
 }: {
@@ -115,6 +126,11 @@ export function CustomerMemberDialog({
   canReadMembers: boolean;
   canEnrollMember: boolean;
   canReadLoyalty: boolean;
+  /**
+   * Parent-owned transaction boundary. When it changes the temporary draft is discarded; it stays
+   * untouched while the same transaction continues (close, reopen, tab switches, failed saves).
+   */
+  resetKey?: number;
   onClose: () => void;
   onChoose: (selection: SaleCustomerSelection, member?: MemberLookupResult) => void;
 }) {
@@ -128,6 +144,19 @@ export function CustomerMemberDialog({
   const [selectedMember, setSelectedMember] = useState<MemberLookupResult | null>(null);
   const [enrollError, setEnrollError] = useState<string | null>(null);
   const [isEnrolling, setEnrolling] = useState(false);
+  const [appliedResetKey, setAppliedResetKey] = useState(resetKey);
+  // A new transaction starts with a clean picker. An enrollment in flight is never interrupted:
+  // the reset is applied as soon as it settles.
+  if (resetKey !== appliedResetKey && !isEnrolling) {
+    setAppliedResetKey(resetKey);
+    setMode('CUSTOMER');
+    setQuery('');
+    setName('');
+    setPhone('');
+    setNik('');
+    setSelectedMember(null);
+    setEnrollError(null);
+  }
 
   const memberSearchReady = query.trim().length >= 2;
   const memberQuery = useQuery({
@@ -147,13 +176,16 @@ export function CustomerMemberDialog({
     setMode(next);
   };
 
+  // The visible phone stays as typed (for example 08…); only the boundary uses E.164.
+  const canonicalPhone = toCanonicalPhone(phone);
+
   const submitCustomer = () => {
-    if (!name.trim() || !phone.trim() || isSaving) return;
-    onChoose({ type: 'NON_MEMBER', name: name.trim(), phone: phone.trim() });
+    if (!name.trim() || !canonicalPhone || isSaving) return;
+    onChoose({ type: 'NON_MEMBER', name: name.trim(), phone: canonicalPhone });
   };
 
   const enroll = async () => {
-    if (!name.trim() || !phone.trim() || !nik.trim() || isEnrolling) return;
+    if (!name.trim() || !canonicalPhone || !isCompleteNik(nik) || isEnrolling) return;
     const submittedNik = nik;
     setNik('');
     setEnrollError(null);
@@ -161,7 +193,7 @@ export function CustomerMemberDialog({
     try {
       const member = await api.enrollNew({
         name: name.trim(),
-        phone: phone.trim(),
+        phone: canonicalPhone,
         nik: submittedNik,
       });
       onChoose(memberSaleSelection(member), member);
@@ -173,9 +205,9 @@ export function CustomerMemberDialog({
   };
 
   const memberItems = memberQuery.data?.items ?? [];
-  const customerReady = Boolean(name.trim() && phone.trim()) && !isSaving;
+  const customerReady = Boolean(name.trim() && canonicalPhone) && !isSaving;
   const enrollmentReady =
-    Boolean(name.trim() && phone.trim() && nik.trim()) && !isEnrolling && !isSaving;
+    Boolean(name.trim() && canonicalPhone && isCompleteNik(nik)) && !isEnrolling && !isSaving;
 
   const footer =
     mode === 'CUSTOMER' ? (
@@ -298,14 +330,16 @@ export function CustomerMemberDialog({
             <div className="space-y-3">
               <DInput
                 label={text('Customer name')}
+                placeholder={text('Name placeholder')}
                 value={name}
                 onChange={setName}
                 disabled={isSaving}
               />
               <DInput
                 label={text('WhatsApp / phone')}
+                placeholder={text('Phone placeholder')}
                 value={phone}
-                onChange={setPhone}
+                onChange={(value) => setPhone(sanitizePhoneInput(value))}
                 inputMode="tel"
                 disabled={isSaving}
               />
@@ -513,22 +547,26 @@ export function CustomerMemberDialog({
                 <div className="space-y-3">
                   <DInput
                     label={text('Full name')}
+                    placeholder={text('Name placeholder')}
                     value={name}
                     onChange={setName}
                     disabled={isEnrolling}
                   />
                   <DInput
                     label={text('WhatsApp / phone')}
+                    placeholder={text('Phone placeholder')}
                     value={phone}
-                    onChange={setPhone}
+                    onChange={(value) => setPhone(sanitizePhoneInput(value))}
                     inputMode="tel"
                     disabled={isEnrolling}
                   />
                   <DInput
                     label={text('NIK')}
+                    placeholder={text('NIK placeholder')}
                     value={nik}
-                    onChange={setNik}
+                    onChange={(value) => setNik(sanitizeNikInput(value))}
                     inputMode="numeric"
+                    maxLength={NIK_LENGTH}
                     disabled={isEnrolling}
                     hint={text('NIK hint')}
                   />
