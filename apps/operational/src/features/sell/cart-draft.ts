@@ -180,6 +180,21 @@ export function draftCustomerSnapshot(
 }
 
 /**
+ * Ephemeral presentation for a MEMBER chosen on a cart that has no Sale yet: the picker already
+ * holds the member, so the cart shows it immediately. It is display-only; the selection stays
+ * `MEMBER + referenceId`, and once a Sale exists its own customer is returned untouched.
+ */
+export function presentDraftMember(
+  customer: SaleCustomer | null,
+  member: { customerId: string; customer: { name: string; phoneE164: string } } | null,
+  hasSale: boolean,
+): SaleCustomer | null {
+  if (hasSale || !customer || customer.type !== 'MEMBER' || !member) return customer;
+  if (member.customerId !== customer.referenceId) return customer;
+  return { ...customer, name: member.customer.name, phoneE164: member.customer.phoneE164 };
+}
+
+/**
  * The Sale lines that one item configuration becomes: units with different additions are separate
  * lines (one line always has one unit price), identical units share a line. Used identically by
  * adding an item and by editing or correcting one, so both mean exactly the same thing.

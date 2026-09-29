@@ -7,6 +7,10 @@ import { useState } from 'react';
 import { useOperationalLocalization } from '../../../app/localization/operational-localization';
 import {
   memberSaleSelection,
+  NIK_LENGTH,
+  sanitizeNikInput,
+  sanitizePhoneInput,
+  toIndonesianE164,
   type CustomerMemberApi,
   type MemberLookupResult,
 } from '../customer-member-api';
@@ -35,6 +39,10 @@ const localCopy: Record<string, { 'id-ID': string; 'en-US': string }> = {
   },
   'Customer name': { 'id-ID': 'Nama Pelanggan', 'en-US': 'Customer Name' },
   'WhatsApp / phone': { 'id-ID': 'Nomor WhatsApp / Telepon', 'en-US': 'WhatsApp / Phone' },
+  'Customer name placeholder': { 'id-ID': 'Contoh: Budi Santoso', 'en-US': 'e.g. Budi Santoso' },
+  'Full name placeholder': { 'id-ID': 'Nama lengkap pelanggan', 'en-US': "Customer's full name" },
+  'Phone placeholder': { 'id-ID': 'Contoh: 081234567890', 'en-US': 'e.g. 081234567890' },
+  'NIK placeholder': { 'id-ID': '16 digit angka', 'en-US': '16 digits' },
   'Required': { 'id-ID': 'Wajib diisi', 'en-US': 'Required' },
   'Want to earn points and rewards?': { 'id-ID': 'Ingin catat poin belanja & reward loyalty pelanggan?', 'en-US': 'Want to earn points and rewards?' },
   'Want to register this customer as a member?': { 'id-ID': 'Ingin daftarkan pelanggan ini sebagai member?', 'en-US': 'Want to register this customer as a member?' },
@@ -152,8 +160,15 @@ export function CustomerMemberDialog({
     onChoose({ type: 'NON_MEMBER', name: name.trim(), phone: phone.trim() });
   };
 
+  const enrollmentReady =
+    Boolean(name.trim()) &&
+    toIndonesianE164(phone) !== null &&
+    nik.length === NIK_LENGTH &&
+    !isEnrolling &&
+    !isSaving;
+
   const enroll = async () => {
-    if (!name.trim() || !phone.trim() || !nik.trim() || isEnrolling) return;
+    if (!enrollmentReady) return;
     const submittedNik = nik;
     setNik('');
     setEnrollError(null);
@@ -174,8 +189,6 @@ export function CustomerMemberDialog({
 
   const memberItems = memberQuery.data?.items ?? [];
   const customerReady = Boolean(name.trim() && phone.trim()) && !isSaving;
-  const enrollmentReady =
-    Boolean(name.trim() && phone.trim() && nik.trim()) && !isEnrolling && !isSaving;
 
   const footer =
     mode === 'CUSTOMER' ? (
@@ -261,21 +274,21 @@ export function CustomerMemberDialog({
           >
             <DTabsTrigger value="CUSTOMER" className="min-w-0 px-2">
               <span className="flex min-w-0 items-center justify-center gap-2">
-                <User className="size-3.5 shrink-0" aria-hidden="true" />
-                <span className="truncate">{text('Regular customer')}</span>
+                <User className="hidden size-3.5 shrink-0 sm:block" aria-hidden="true" />
+                <span className="text-center leading-tight sm:truncate">{text('Regular customer')}</span>
               </span>
             </DTabsTrigger>
             <DTabsTrigger value="MEMBER" className="min-w-0 px-2">
               <span className="flex min-w-0 items-center justify-center gap-2">
-                <Users className="size-3.5 shrink-0" aria-hidden="true" />
-                <span className="truncate">{text('Registered member')}</span>
+                <Users className="hidden size-3.5 shrink-0 sm:block" aria-hidden="true" />
+                <span className="text-center leading-tight sm:truncate">{text('Registered member')}</span>
               </span>
             </DTabsTrigger>
             {canEnrollMember ? (
               <DTabsTrigger value="ENROLL" className="min-w-0 px-2">
                 <span className="flex min-w-0 items-center justify-center gap-2">
-                  <UserPlus className="size-3.5 shrink-0" aria-hidden="true" />
-                  <span className="truncate">{text('Enroll member')}</span>
+                  <UserPlus className="hidden size-3.5 shrink-0 sm:block" aria-hidden="true" />
+                  <span className="text-center leading-tight sm:truncate">{text('Enroll member')}</span>
                 </span>
               </DTabsTrigger>
             ) : null}
@@ -300,13 +313,18 @@ export function CustomerMemberDialog({
                 label={text('Customer name')}
                 value={name}
                 onChange={setName}
+                placeholder={text('Customer name placeholder')}
+                autoComplete="off"
                 disabled={isSaving}
               />
               <DInput
                 label={text('WhatsApp / phone')}
                 value={phone}
-                onChange={setPhone}
+                onChange={(value) => setPhone(sanitizePhoneInput(value))}
+                placeholder={text('Phone placeholder')}
+                type="tel"
                 inputMode="tel"
+                autoComplete="off"
                 disabled={isSaving}
               />
             </div>
@@ -515,20 +533,28 @@ export function CustomerMemberDialog({
                     label={text('Full name')}
                     value={name}
                     onChange={setName}
+                    placeholder={text('Full name placeholder')}
+                    autoComplete="off"
                     disabled={isEnrolling}
                   />
                   <DInput
                     label={text('WhatsApp / phone')}
                     value={phone}
-                    onChange={setPhone}
+                    onChange={(value) => setPhone(sanitizePhoneInput(value))}
+                    placeholder={text('Phone placeholder')}
+                    type="tel"
                     inputMode="tel"
+                    autoComplete="off"
                     disabled={isEnrolling}
                   />
                   <DInput
                     label={text('NIK')}
                     value={nik}
-                    onChange={setNik}
+                    onChange={(value) => setNik(sanitizeNikInput(value))}
+                    placeholder={text('NIK placeholder')}
                     inputMode="numeric"
+                    maxLength={NIK_LENGTH}
+                    autoComplete="off"
                     disabled={isEnrolling}
                     hint={text('NIK hint')}
                   />

@@ -7,10 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { Employee, Sale, SaleLine } from '../cashier-transaction.types';
 import { presentableTransaction } from '../completed-sale-visibility';
-import {
-  ReceiptContent,
-  ReferenceTransactionDetail,
-} from './replatformed-pos-workspace';
+import { ReceiptContent, ReferenceTransactionDetail } from './replatformed-pos-workspace';
 
 const bootstrap = {
   apiBaseUrl: '',
@@ -336,9 +333,7 @@ describe('ReferenceTransactionDetail receipt location identity', () => {
       'Jl. Alam Sutera Boulevard No. 10',
     );
 
-    expect(
-      screen.getAllByText('Jl. Alam Sutera Boulevard No. 10').length,
-    ).toBeGreaterThan(0);
+    expect(screen.getAllByText('Jl. Alam Sutera Boulevard No. 10').length).toBeGreaterThan(0);
   });
 
   it('never prints a fake or placeholder address line when none is configured', () => {
@@ -393,7 +388,10 @@ describe('ReferenceTransactionDetail performer relationship', () => {
       lines: [
         {
           ...service('line-color', 'Hair Color', '2.0000'),
-          participations: [participation('line-color', 'emp-andini'), participation('line-color', 'emp-rindu')],
+          participations: [
+            participation('line-color', 'emp-andini'),
+            participation('line-color', 'emp-rindu'),
+          ],
           workUnits: [unit(1, 'emp-andini'), unit(2, 'emp-rindu')],
         },
         {
@@ -408,7 +406,10 @@ describe('ReferenceTransactionDetail performer relationship', () => {
         },
         {
           ...service('line-shared', 'Creambath', '1.0000'),
-          participations: [participation('line-shared', 'emp-andini'), participation('line-shared', 'emp-rindu')],
+          participations: [
+            participation('line-shared', 'emp-andini'),
+            participation('line-shared', 'emp-rindu'),
+          ],
           workUnits: [unit(1, 'emp-andini', 'emp-rindu')],
         },
       ],
@@ -575,7 +576,11 @@ describe('ReferenceTransactionDetail selected additions', () => {
 
   it('applies the line quantity exactly once: base + additions still equals the line amount', () => {
     const sale = withUsage([redBrand], '2.0000');
-    const second = { ...structuredClone(sale.lines[0]!), id: 'line-2', itemNameSnapshot: 'Highlight' };
+    const second = {
+      ...structuredClone(sale.lines[0]!),
+      id: 'line-2',
+      itemNameSnapshot: 'Highlight',
+    };
     second.compositionComponents = [];
     sale.lines.push(second);
     renderRuntimeDetail(sale);
@@ -681,7 +686,13 @@ describe('ReferenceTransactionDetail discounts and promotions', () => {
     sale.adjustments = [
       adjustment('a1', { saleLineId: 'line-1', actualAmount: '22000.0000' }),
       adjustment('a2', { saleLineId: 'line-2', actualAmount: '21200.0000' }),
-      adjustment('a3', { scope: 'TRANSACTION', promotionId: 'promo-1', label: 'Promo1', configuredValue: '0.1900', actualAmount: '73872.0000' }),
+      adjustment('a3', {
+        scope: 'TRANSACTION',
+        promotionId: 'promo-1',
+        label: 'Promo1',
+        configuredValue: '0.1900',
+        actualAmount: '73872.0000',
+      }),
     ] as never;
     return sale;
   };
@@ -692,7 +703,9 @@ describe('ReferenceTransactionDetail discounts and promotions', () => {
     expect(groups.length).toBeGreaterThanOrEqual(2);
     expect(groups[0]!.textContent).toContain('kilat (10%)');
     expect(groups[0]!.textContent).toContain('22.000');
-    expect(within(groups[0]!).getByRole('button', { name: 'Rincian diskon dan promo' })).toBeTruthy();
+    expect(
+      within(groups[0]!).getByRole('button', { name: 'Rincian diskon dan promo' }),
+    ).toBeTruthy();
   });
 
   it('shows the promotion facts from the Sale snapshot when the information button is opened', () => {
@@ -890,5 +903,49 @@ describe('ReferenceTransactionDetail invoice placement', () => {
     expect(screen.queryByTestId('transaction-invoice-number')).toBeNull();
     expect(screen.queryByText(/INV-/)).toBeNull();
     expect(screen.getByText(/24 Sep 2026/)).toBeTruthy();
+  });
+});
+
+describe('ReferenceTransactionDetail receipt delivery availability', () => {
+  function renderReceiptPreview(available: boolean) {
+    return render(
+      <DeploymentBootstrapProvider config={bootstrap}>
+        <ReferenceTransactionDetail
+          sale={runtimeQueueDetail({
+            status: 'FINALIZED',
+            finalizedAt: '2026-09-24T02:15:00.000Z',
+          })}
+          locale="id-ID"
+          employees={[]}
+          businessName="Digvation"
+          branchName="Main branch"
+          cashierName="Kasir"
+          showPaymentReceipt
+          onClose={vi.fn()}
+          onNewSale={vi.fn()}
+          onViewReceipt={vi.fn()}
+          onSendReceipt={vi.fn()}
+          deliveryStatus={{ available, delivery: null }}
+          onAssign={vi.fn()}
+          onStartLineWork={vi.fn()}
+          onComplete={vi.fn()}
+          isMutating={false}
+        />
+      </DeploymentBootstrapProvider>,
+    );
+  }
+
+  it('offers no WhatsApp send when delivery is unavailable, yet Print remains', () => {
+    renderReceiptPreview(false);
+
+    expect(screen.queryByRole('button', { name: 'Kirim via WhatsApp' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Cetak' })).toBeTruthy();
+  });
+
+  it('offers WhatsApp send alongside Print when delivery is available', () => {
+    renderReceiptPreview(true);
+
+    expect(screen.getByRole('button', { name: 'Kirim via WhatsApp' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Cetak' })).toBeTruthy();
   });
 });

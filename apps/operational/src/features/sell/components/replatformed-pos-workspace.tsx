@@ -71,9 +71,13 @@ import {
 import { useOperationalAccessContext } from '../../../modules/operational/operational-access-api';
 import { resolveReceiptLocation } from '../../../modules/operational/operational-location-selection';
 import { cashierTransactionKeys } from '../cashier-transaction-keys';
-import { cashierTransactionErrorMessage, correctionErrorMessage } from '../cashier-transaction-errors';
+import {
+  cashierTransactionErrorMessage,
+  correctionErrorMessage,
+  isApiErrorCode,
+} from '../cashier-transaction-errors';
 import type { ReplaceLinePreview, ReplaceSaleLineInput } from '../cashier-transaction.adapter';
-import { replacementLinesOf } from '../cart-draft';
+import { presentDraftMember, replacementLinesOf } from '../cart-draft';
 import { visibleCatalogItems } from '../selling-catalog-eligibility';
 import { saleLineConfiguration } from '../sale-line-additions';
 import { ItemConfigurator, type ItemConfiguration, type ItemConfiguratorState } from './item-configurator';
@@ -805,6 +809,9 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const [receiptSaleId, setReceiptSaleId] = useState<string | null>(null);
   const [isSendingReceipt, setSendingReceipt] = useState(false);
   const [sendingReceiptId, setSendingReceiptId] = useState<string | null>(null);
+  // Learned from Runtime's own answers (status query, unavailable error), never polled per card.
+  // Unknown (null) keeps the action available so a working channel is not hidden.
+  const [receiptChannelAvailable, setReceiptChannelAvailable] = useState<boolean | null>(null);
   // Effective permission, never a role name: without it completed transactions
   // show no amount, detail or receipt, and can only be sent to the customer.
   const canReadCompleted = useCanReadCompletedSaleDetails();
@@ -832,7 +839,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         .toFixed(2)
         .replace(/\.?0+$/, '')}%)`
     : copy('Tax');
-  const activeCustomer = workspace.customer;
+  const activeCustomer = presentDraftMember(workspace.customer, selectedMember, Boolean(sale));
   const customerMemberApi = useMemo(
     () =>
       new CustomerMemberApi(
@@ -909,7 +916,11 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     : null;
   const receiptDeliveryStatusQuery = useQuery({
     queryKey: ['operational-receipt-delivery', displayedQueueDetail?.id ?? null],
-    queryFn: () => adapter.getReceiptDeliveryStatus(displayedQueueDetail!.id),
+    queryFn: async () => {
+      const status = await adapter.getReceiptDeliveryStatus(displayedQueueDetail!.id);
+      setReceiptChannelAvailable(status.available);
+      return status;
+    },
     enabled: Boolean(displayedQueueDetail?.status === 'FINALIZED'),
     refetchInterval: displayedQueueDetail?.status === 'FINALIZED' ? 3_000 : false,
     staleTime: 1_000,
@@ -1059,6 +1070,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         variant: 'success',
       });
     } catch (error) {
+      if (isApiErrorCode(error, 'RECEIPT_DELIVERY_CHANNEL_UNAVAILABLE'))
+        setReceiptChannelAvailable(false);
       showToast({
         title: copy('Not available yet'),
         description: cashierTransactionErrorMessage(error),
@@ -1656,6 +1669,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           canReadCompleted={canReadCompleted}
           onSendReceipt={(transaction) => void sendReceipt(transaction)}
           sendingReceiptId={sendingReceiptId}
+          canSendReceipt={receiptChannelAvailable !== false}
         />
       )}
 
@@ -2248,6 +2262,7 @@ function ReferenceQueueBoard({
   canReadCompleted,
   onSendReceipt,
   sendingReceiptId,
+  canSendReceipt = true,
 }: {
   open: boolean;
   onOpenChange: (value: boolean) => void;
@@ -2265,6 +2280,7 @@ function ReferenceQueueBoard({
   canReadCompleted: boolean;
   onSendReceipt: (sale: Pick<QueueSale, 'id' | 'saleNumber'>) => void;
   sendingReceiptId: string | null;
+  canSendReceipt?: boolean;
 }) {
   const { copy, label } = useOperationalLocalization();
   const statuses = Object.keys(statusMeta) as QueueStatus[];
@@ -2356,6 +2372,7 @@ function ReferenceQueueBoard({
                                     summary={summary}
                                     locale={locale}
                                     isSending={sendingReceiptId === sale.id}
+                                    canSendReceipt={canSendReceipt}
                                     onSendReceipt={onSendReceipt}
                                   />
                                 );
@@ -2374,6 +2391,7 @@ function ReferenceQueueBoard({
                                   onCancel={onCancel}
                                   onView={onView}
                                   onViewReceipt={onViewReceipt}
+                                  canSendReceipt={canSendReceipt}
                                   onSendReceipt={onSendReceipt}
                                 />
                               );
@@ -2411,11 +2429,13 @@ export function RestrictedCompletedQueueCard({
   summary,
   locale,
   isSending,
+  canSendReceipt = true,
   onSendReceipt,
 }: {
   summary: CompletedSaleSummary;
   locale: string;
   isSending: boolean;
+  canSendReceipt?: boolean;
   onSendReceipt: (sale: Pick<QueueSale, 'id' | 'saleNumber'>) => void;
 }) {
   const { copy, label } = useOperationalLocalization();
@@ -2452,9 +2472,13 @@ export function RestrictedCompletedQueueCard({
           className="h-8 shrink-0 px-3 text-[11px]"
           leftIcon={<Send className="size-3.5" />}
           loading={isSending}
-          disabled={isSending || !summary.customer}
+          disabled={isSending || !summary.customer || !canSendReceipt}
           aria-label={`${copy('Send receipt to customer')} ${number}`}
-          {...(summary.customer ? {} : { title: copy('Customer data is not available') })}
+          {...(!canSendReceipt
+            ? { title: copy('Not available yet') }
+            : summary.customer
+              ? {}
+              : { title: copy('Customer data is not available') })}
           onClick={() => onSendReceipt(summary)}
         >
           {copy('Send receipt')}
@@ -2475,6 +2499,7 @@ export function ReferenceQueueCard({
   onCancel,
   onView,
   onViewReceipt,
+  canSendReceipt = true,
   onSendReceipt,
 }: {
   sale: Sale;
@@ -2487,6 +2512,7 @@ export function ReferenceQueueCard({
   onCancel: (sale: Sale) => void;
   onView: (sale: Sale) => void;
   onViewReceipt: (sale: Sale) => void;
+  canSendReceipt?: boolean;
   onSendReceipt: (sale: Sale) => void;
 }) {
   const { copy, label } = useOperationalLocalization();
@@ -2511,7 +2537,7 @@ export function ReferenceQueueCard({
           },
         ]
       : []),
-    ...(status === 'COMPLETED' && sale.customer
+    ...(status === 'COMPLETED' && sale.customer && canSendReceipt
       ? [
           {
             label: copy('Send receipt to customer'),
@@ -2840,7 +2866,7 @@ function ReferenceFloatingCart({
   );
 }
 
-function ReferenceCartPanel({
+export function ReferenceCartPanel({
   lines,
   total,
   gross,

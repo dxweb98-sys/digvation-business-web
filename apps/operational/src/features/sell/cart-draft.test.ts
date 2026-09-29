@@ -6,6 +6,7 @@ import {
   cartDraftEstimatedTotal,
   cartDraftStartInput,
   emptyCartDraft,
+  presentDraftMember,
   removeCartDraftLine,
   replaceCartDraftLine,
   replacementLinesOf,
@@ -575,5 +576,54 @@ describe('replacementLinesOf (one configuration becomes exact Sale lines)', () =
       },
       { catalogItemId: 'svc', quantity: '1' },
     ]);
+  });
+});
+
+describe('presentDraftMember (local draft presentation only)', () => {
+  const draftMember = {
+    type: 'MEMBER' as const,
+    referenceId: 'customer-1',
+    name: '',
+    phoneE164: '',
+  };
+  const picked = {
+    customerId: 'customer-1',
+    customer: { name: 'Rina Wijaya', phoneE164: '+6281234567890' },
+  };
+
+  it('shows the picked member immediately on a cart without a Sale', () => {
+    expect(presentDraftMember(draftMember, picked, false)).toEqual({
+      ...draftMember,
+      name: 'Rina Wijaya',
+      phoneE164: '+6281234567890',
+    });
+  });
+
+  it('never overrides the persisted Sale customer', () => {
+    const persisted = { ...draftMember, name: 'Authoritative Name', phoneE164: '+62811' };
+    expect(presentDraftMember(persisted, picked, true)).toBe(persisted);
+  });
+
+  it('ignores a different member, non-member customers and no selection', () => {
+    expect(presentDraftMember(draftMember, { ...picked, customerId: 'other' }, false)).toBe(
+      draftMember,
+    );
+    const nonMember = {
+      type: 'NON_MEMBER' as const,
+      referenceId: null,
+      name: 'Budi',
+      phoneE164: '0812',
+    };
+    expect(presentDraftMember(nonMember, picked, false)).toBe(nonMember);
+    expect(presentDraftMember(draftMember, null, false)).toBe(draftMember);
+    expect(presentDraftMember(null, picked, false)).toBeNull();
+  });
+
+  it('keeps the canonical MEMBER selection free of name and phone', () => {
+    const draft = setCartDraftCustomer(emptyCartDraft('location-1', 'IDR'), {
+      type: 'MEMBER',
+      referenceId: 'customer-1',
+    });
+    expect(draft.customer).toEqual({ type: 'MEMBER', referenceId: 'customer-1' });
   });
 });

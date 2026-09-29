@@ -205,3 +205,64 @@ describe('completed queue card', () => {
     expect(onSendReceipt).toHaveBeenCalledWith(sale);
   });
 });
+
+describe('receipt delivery availability in the completed queue', () => {
+  const noop = () => {};
+
+  function renderFullCard(canSendReceipt: boolean) {
+    const sale = completedSale();
+    const view = render(
+      <DeploymentBootstrapProvider config={bootstrap}>
+        <ReferenceQueueCard
+          sale={sale}
+          status="COMPLETED"
+          locale="id-ID"
+          issues={[]}
+          onStartWork={noop}
+          onAdjust={noop}
+          onPay={noop}
+          onCancel={noop}
+          onView={noop}
+          onViewReceipt={noop}
+          canSendReceipt={canSendReceipt}
+          onSendReceipt={noop}
+        />
+      </DeploymentBootstrapProvider>,
+    );
+    fireEvent.click(within(view.container).getByRole('button', { name: /TRX-20260919-000042/ }));
+    return view;
+  }
+
+  it('hides the send action from the full card menu when delivery is known unavailable', () => {
+    const { baseElement } = renderFullCard(false);
+    expect(within(baseElement).queryByText(/Kirim struk ke customer/)).toBeNull();
+    expect(within(baseElement).queryByText('Lihat struk')).not.toBeNull();
+  });
+
+  it('keeps the send action when availability is unknown or available', () => {
+    const { baseElement } = renderFullCard(true);
+    expect(within(baseElement).queryByText(/Kirim struk ke customer/)).not.toBeNull();
+  });
+
+  it('disables the restricted card send button when delivery is known unavailable', () => {
+    const summary = completedSaleSummary(completedSale());
+    const onSendReceipt = vi.fn();
+    const { container } = render(
+      <DeploymentBootstrapProvider config={bootstrap}>
+        <RestrictedCompletedQueueCard
+          summary={summary}
+          locale="id-ID"
+          isSending={false}
+          canSendReceipt={false}
+          onSendReceipt={onSendReceipt}
+        />
+      </DeploymentBootstrapProvider>,
+    );
+    const button = within(container).getByRole('button', {
+      name: /Kirim struk ke customer/,
+    }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    fireEvent.click(button);
+    expect(onSendReceipt).not.toHaveBeenCalled();
+  });
+});
