@@ -28,6 +28,7 @@ const types = [
   ['transactions', 'Transaction Report'],
   ['catalog-performance', 'Catalog Performance'],
   ['component-usage', 'Component Usage'],
+  ['product-commission', 'Product Commission'],
   ['employee-performance', 'Employee Performance'],
   ['attendance', 'Attendance Report'],
   ['payments', 'Payment Report'],
@@ -61,6 +62,18 @@ type Dataset = {
 };
 const details: Record<Type, string[]> = {
   'business-performance': [],
+  'product-commission': [
+    'occurredAt',
+    'saleNumber',
+    'sellingLocation',
+    'employeeName',
+    'productName',
+    'variantName',
+    'entryType',
+    'quantity',
+    'commissionPerUnit',
+    'commissionAmount',
+  ],
   'component-usage': [
     'saleNumber',
     'occurredAt',
@@ -206,6 +219,7 @@ const details: Record<Type, string[]> = {
 };
 
 const metrics: Record<Type, string[]> = {
+  'product-commission': ['earnedAmount', 'reversedAmount', 'netCommission', 'earnedQuantity'],
   'component-usage': [
     'transactionCount',
     'componentCount',
@@ -254,6 +268,7 @@ const visuals: Record<Type, { trend?: string; insights: [string, string][]; rank
       ['paymentMethod', 'Payment method mix'],
     ],
   },
+  'product-commission': { insights: [], ranking: 'Net commission by employee' },
   'component-usage': {
     trend: 'Usage activity',
     insights: [['source', 'Usage source']],
@@ -286,6 +301,7 @@ const visuals: Record<Type, { trend?: string; insights: [string, string][]; rank
   },
 };
 const filterFields: Record<Type, [string, string, string[]][]> = {
+  'product-commission': [['commissionEntryType', 'Entry type', ['EARN', 'REVERSAL']]],
   'component-usage': [['componentSource', 'Usage source', ['FIXED_BOM', 'SALE_SELECTED']]],
   'business-performance': [['saleStatus', 'Sale status', ['OPEN', 'FINALIZED', 'VOIDED']]],
   transactions: [
@@ -326,7 +342,8 @@ const filterFields: Record<Type, [string, string, string[]][]> = {
 };
 const title = (k: string) => k.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
 const money = (k: string) =>
-  /amount|revenue|gross|discount|tax|cash|difference|base|value/i.test(k) && !/count|rate/i.test(k);
+  /amount|revenue|gross|discount|tax|cash|difference|base|value|commission/i.test(k) &&
+  !/count|rate/i.test(k);
 const count = (k: string) => /count|attempts|items|transactions|records/i.test(k);
 const quantity = (k: string) => /quantity/i.test(k);
 const dateKey = /^\d{4}-\d{2}-\d{2}$/;
@@ -337,6 +354,8 @@ const attendanceLabels: Record<string, string> = {
   SICK: 'Sick',
   LOCAL: 'Local',
   HRIS: 'HRIS',
+  EARN: 'Commission earned',
+  REVERSAL: 'Commission reversed',
   FIXED_BOM: 'Fixed / configured',
   SALE_SELECTED: 'Selected during transaction',
   SERVICE_DEFAULT: 'Service default',
@@ -478,6 +497,13 @@ export function ReportsPage() {
         const attendanceLabel = attendanceLabels[String(v ?? '')];
         if (attendanceLabel) return copy(attendanceLabel);
       }
+      if (type === 'product-commission') {
+        if (k === 'occurredAt' && v)
+          return formatDate(new Date(String(v)), { dateStyle: 'medium', timeStyle: 'short' });
+        if (k === 'variantName' && !v) return '—';
+        const entryLabel = attendanceLabels[String(v ?? '')];
+        if (k === 'entryType' && entryLabel) return copy(entryLabel);
+      }
       if (type === 'component-usage') {
         if (k === 'occurredAt' && v)
           return formatDate(new Date(String(v)), { dateStyle: 'medium', timeStyle: 'short' });
@@ -590,6 +616,25 @@ export function ReportsPage() {
       Type,
       [string, string, { value: string; label: string }[]][]
     >),
+    'product-commission': [
+      ...choices(filterFields['product-commission']),
+      [
+        'employeeId',
+        'Employee',
+        [
+          { value: '', label: copy('All') },
+          ...(employees.data?.items ?? []).map((i) => ({ value: i.id, label: option(i) })),
+        ],
+      ],
+      [
+        'catalogItemId',
+        'Product',
+        [
+          { value: '', label: copy('All') },
+          ...(catalog.data?.items ?? []).map((i) => ({ value: i.id, label: option(i) })),
+        ],
+      ],
+    ],
     'component-usage': [
       ...choices(filterFields['component-usage']),
       [
@@ -876,6 +921,13 @@ export function ReportsPage() {
           {type === 'attendance' ? (
             <DInput
               label={copy('Search employee code or name')}
+              value={filters.search ?? ''}
+              onChange={(v) => update('search', v)}
+            />
+          ) : null}
+          {type === 'product-commission' ? (
+            <DInput
+              label={copy('Search sale, employee or product')}
               value={filters.search ?? ''}
               onChange={(v) => update('search', v)}
             />

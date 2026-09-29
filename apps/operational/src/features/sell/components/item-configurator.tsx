@@ -23,7 +23,7 @@ import {
   operationalCopy,
   resolveOperationalLocale,
 } from '../../../app/localization/operational-localization';
-import type { CartDraftAdditionalItem } from '../cart-draft';
+import type { CartDraftAdditionalItem, CartDraftSalesperson } from '../cart-draft';
 import type { CatalogItem, CatalogVariant, ComponentCandidate } from '../cashier-transaction.types';
 import {
   additionalItemsOf,
@@ -49,8 +49,19 @@ import {
 } from '../item-configurator-model';
 import { additionSignature } from '../cart-draft';
 
+/** A Runtime-approved Product salesperson candidate. */
+export interface SalespersonOption {
+  id: string;
+  name: string;
+}
+
 export interface ItemConfiguratorState {
   item: CatalogItem;
+  /**
+   * Runtime-filtered ACTIVE, Product-sales-eligible employees. Only meaningful for a Product;
+   * absent for a Service, which has performers instead of a salesperson.
+   */
+  salespeople?: readonly SalespersonOption[];
   /** Active variants; empty when the item is sold directly. */
   variants: readonly CatalogVariant[];
   /** Present only when the item itself is also sold without a variant. */
@@ -70,6 +81,8 @@ export interface ItemConfiguration {
   additionalComponents: CartDraftAdditionalItem[];
   /** One entry per unit, present only when the units of a whole quantity are configured differently. */
   unitAdditions?: CartDraftAdditionalItem[][];
+  /** Product only and optional; absent means no salesperson. */
+  soldBy?: CartDraftSalesperson | null;
 }
 
 interface ItemConfiguratorProps extends ItemConfiguratorState {
@@ -275,6 +288,7 @@ export function ItemConfigurator({
   itemPrice,
   pricesByVariantId = {},
   unavailableVariantIds = [],
+  salespeople,
   locale = 'id-ID',
   currency = 'IDR',
   initial,
@@ -296,6 +310,16 @@ export function ItemConfigurator({
     !initial ? null : (initial.catalogVariantId ?? (itemOption ? ITEM_OPTION : null)),
   );
   const [quantity, setQuantity] = useState(() => (initial ? trimQuantity(initial.quantity) : '1'));
+  // Optional Product salesperson. Null is a valid, complete choice.
+  const [soldBy, setSoldBy] = useState<CartDraftSalesperson | null>(initial?.soldBy ?? null);
+  const showSalesperson = item.type === 'PRODUCT' && salespeople !== undefined;
+  const salespersonOptions = useMemo(() => {
+    const options = (salespeople ?? []).map((entry) => ({ value: entry.id, label: entry.name }));
+    // A reopened line keeps its seller visible even if they are no longer a candidate.
+    return soldBy && !options.some((option) => option.value === soldBy.employeeId)
+      ? [{ value: soldBy.employeeId, label: soldBy.name }, ...options]
+      : options;
+  }, [salespeople, soldBy]);
   // Every quantity unit has its own additions: a whole quantity of 2 can be two different
   // configurations. Fractional or very large quantities are a single configuration.
   const [units, setUnits] = useState<UnitConfig[]>(() => {
@@ -484,6 +508,7 @@ export function ItemConfigurator({
     // Identical units stay one configuration; different ones are kept apart.
     additionalComponents: heterogeneous ? [] : (unitAdditions[0] ?? []),
     ...(heterogeneous ? { unitAdditions } : {}),
+    ...(showSalesperson && soldBy ? { soldBy } : {}),
   };
   // Embedded use (an item correction): the host reads the configuration as it changes.
   const emitted = readiness.ready ? JSON.stringify(configurationPayload) : null;
@@ -554,6 +579,29 @@ export function ItemConfigurator({
           onChange={changeQuantity}
         />
       </section>
+
+      {showSalesperson ? (
+        <section aria-label={copy('Sold by')}>
+          <Select
+            label={copy('Sold by')}
+            value={soldBy?.employeeId ?? null}
+            placeholder={copy('No salesperson')}
+            clearable
+            searchable
+            options={salespersonOptions}
+            onChange={(value) => {
+              const chosen = salespersonOptions.find((option) => option.value === value);
+              setSoldBy(
+                typeof value === 'string' && chosen
+                  ? { employeeId: value, name: chosen.label }
+                  : null,
+              );
+            }}
+            hint={copy('Optional. The salesperson earns commission when the sale is completed.')}
+            className="w-full"
+          />
+        </section>
+      ) : null}
 
       {unitCount > 1 && loadCandidates ? (
         <section aria-label={copy('Unit configuration')} className="space-y-2">

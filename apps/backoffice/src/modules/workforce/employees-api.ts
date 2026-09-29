@@ -22,6 +22,13 @@ export interface Employee {
   displayName: string;
   positionId: string | null;
   position: EmployeePosition | null;
+  /** Employee-level opt-in to be a Service performer. Position rules still apply. */
+  servicePerformerEligible: boolean;
+  canPerformServices: boolean;
+  /** Employee-level opt-in for Product sales attribution. Independent from Service eligibility. */
+  productSalesEligible: boolean;
+  /** Effective Runtime fact: ACTIVE and productSalesEligible. */
+  canSellProducts: boolean;
   joinedOn: string | null;
   status: RecordStatus;
   version: number;
@@ -112,12 +119,16 @@ export interface CreateEmployeeInput {
   code?: string;
   displayName: string;
   positionId?: string | null;
+  servicePerformerEligible?: boolean;
+  productSalesEligible?: boolean;
   joinedOn?: string | null;
 }
 
 export interface UpdateEmployeeInput {
   displayName?: string;
   positionId?: string | null;
+  servicePerformerEligible?: boolean;
+  productSalesEligible?: boolean;
   status?: Employee['status'];
   joinedOn?: string | null;
   statusReason?: string | null;

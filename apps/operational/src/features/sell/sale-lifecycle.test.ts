@@ -66,6 +66,17 @@ describe('lifecycle classification', () => {
     expect(isInstantOnly(saleWith(['PRODUCT', 'REMOVED_SERVICE']))).toBe(true);
   });
 
+  it('a Product salesperson (DIG-240 attribution) never changes the lifecycle classification', () => {
+    const attributed = saleWith(['PRODUCT'], [paid('200000.0000')]);
+    (attributed.lines[0] as unknown as Record<string, unknown>).soldByEmployeeId = 'emp-andi';
+    expect(hasTrackedWork(attributed)).toBe(false);
+    expect(isInstantOnly(attributed)).toBe(true);
+    expect(checkoutCompletionOf(attributed)).toBe('FINALIZE');
+    const mixedAttributed = saleWith(['PRODUCT', 'SERVICE'], [paid('200000.0000')]);
+    (mixedAttributed.lines[0] as unknown as Record<string, unknown>).soldByEmployeeId = 'emp-andi';
+    expect(checkoutCompletionOf(mixedAttributed)).toBe('QUEUE');
+  });
+
   it('an empty Sale is neither instant-only nor tracked', () => {
     expect(isInstantOnly(saleWith([]))).toBe(false);
     expect(hasTrackedWork(saleWith([]))).toBe(false);
