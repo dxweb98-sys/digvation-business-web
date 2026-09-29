@@ -8,11 +8,22 @@ import { useMemo, useState } from 'react';
 import { useOperationalLocalization } from '../../../../app/localization/operational-localization';
 import {
   WorkshopLinesApi,
+  type WorkshopLineAdjustmentInput,
   type WorkshopLineSelectionInput,
   type WorkshopWorkOrderDetail,
 } from '../api/workshop-lines-api';
 import type { WorkshopQueueWorkOrder } from '../api/workshop-queue-api';
-import { WORKSHOP_LINES_ERROR_COPY, WORKSHOP_LINES_STALE_CODES } from './work-order-lines-model';
+import {
+  addDraftItems,
+  buildAdjustmentInputs,
+  EMPTY_ADJUSTMENT_DRAFT,
+  type AdjustmentDraft,
+} from './work-order-line-adjustment-model';
+import {
+  WORKSHOP_LINES_ERROR_COPY,
+  WORKSHOP_LINES_STALE_CODES,
+  type DraftLine,
+} from './work-order-lines-model';
 
 const detailKey = (id: string) => ['workshop-work-order', id] as const;
 
@@ -21,9 +32,10 @@ function errorCode(error: unknown): string | undefined {
 }
 
 /**
- * Accepted Lines of one Work Order and the one-time initial selection. The
- * Work Order detail read is the only source of accepted values; a Catalog
- * lookup here only feeds the picker and is never trusted on submit.
+ * Effective items of one Work Order, the one-time initial selection and later
+ * adjustments. The Work Order detail read is the only source of accepted
+ * values; a Catalog lookup here only feeds the picker and is never trusted on
+ * submit. Adjustments are staged in the browser and sent as one atomic set.
  */
 export function useWorkOrderItems({
   workOrder,
@@ -31,7 +43,7 @@ export function useWorkOrderItems({
   onStale,
 }: {
   workOrder: WorkshopQueueWorkOrder;
-  /** The authoritative Work Order returned by acceptance (new version included). */
+  /** The authoritative Work Order returned by Runtime (new version included). */
   onAccepted: (workOrder: WorkshopWorkOrderDetail) => void;
   /** The open version is out of date; the workspace should reload from Runtime. */
   onStale: () => void;
@@ -43,6 +55,8 @@ export function useWorkOrderItems({
   const queryClient = useQueryClient();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [candidatesWanted, setCandidatesWanted] = useState(false);
+  const [adjustOpen, setAdjustOpen] = useState(false);
+  const [draft, setDraft] = useState<AdjustmentDraft>(EMPTY_ADJUSTMENT_DRAFT);
   const currency = session.business.currency;
   const locationId = workOrder.sellingLocationId;
 
@@ -87,37 +101,60 @@ export function useWorkOrderItems({
     setCandidatesWanted(false);
   }
 
+  function closeAdjust() {
+    setAdjustOpen(false);
+    setDraft(EMPTY_ADJUSTMENT_DRAFT);
+    closePicker();
+  }
+
+  function openAdjust({ addFirst = false }: { addFirst?: boolean } = {}) {
+    setDraft(EMPTY_ADJUSTMENT_DRAFT);
+    setAdjustOpen(true);
+    if (addFirst) setPickerOpen(true);
+  }
+
+  function saved(result: WorkshopWorkOrderDetail, message: string) {
+    queryClient.setQueryData(detailKey(workOrder.id), result);
+    void queryClient.invalidateQueries({ queryKey: ['workshop-queue'] });
+    closeAdjust();
+    onAccepted(result);
+    showToast({ variant: 'success', title: copy(message) });
+  }
+
+  function failed(error: unknown) {
+    const code = errorCode(error) ?? '';
+    const known = WORKSHOP_LINES_ERROR_COPY[code];
+    const stale = WORKSHOP_LINES_STALE_CODES.includes(code);
+    showToast({
+      variant: 'danger',
+      title: copy(
+        known ??
+          (stale
+            ? 'This Work Order was just changed. Open it again.'
+            : 'Could not save the items. Try again.'),
+      ),
+    });
+    if (stale) {
+      closeAdjust();
+      void queryClient.invalidateQueries({ queryKey: detailKey(workOrder.id) });
+      onStale();
+    } else if (known && pickerOpen) {
+      void catalog.refetch();
+    }
+  }
+
   const accept = useMutation({
     mutationFn: (lines: WorkshopLineSelectionInput[]) =>
       api.acceptInitialLines(workOrder.id, workOrder.version, lines),
-    onSuccess: (accepted) => {
-      queryClient.setQueryData(detailKey(workOrder.id), accepted);
-      void queryClient.invalidateQueries({ queryKey: ['workshop-queue'] });
-      closePicker();
-      onAccepted(accepted);
-      showToast({ variant: 'success', title: copy('Items saved.') });
-    },
-    onError: (error) => {
-      const code = errorCode(error) ?? '';
-      const known = WORKSHOP_LINES_ERROR_COPY[code];
-      const stale = WORKSHOP_LINES_STALE_CODES.includes(code);
-      showToast({
-        variant: 'danger',
-        title: copy(
-          known ??
-            (stale
-              ? 'This Work Order was just changed. Open it again.'
-              : 'Could not save the items. Try again.'),
-        ),
-      });
-      if (stale) {
-        closePicker();
-        void queryClient.invalidateQueries({ queryKey: detailKey(workOrder.id) });
-        onStale();
-      } else if (known) {
-        void catalog.refetch();
-      }
-    },
+    onSuccess: (accepted) => saved(accepted, 'Items saved.'),
+    onError: failed,
+  });
+
+  const adjust = useMutation({
+    mutationFn: (adjustments: WorkshopLineAdjustmentInput[]) =>
+      api.adjustLines(workOrder.id, workOrder.version, adjustments),
+    onSuccess: (adjusted) => saved(adjusted, 'Items updated.'),
+    onError: failed,
   });
 
   return {
@@ -130,5 +167,18 @@ export function useWorkOrderItems({
     wantCandidates: () => setCandidatesWanted(true),
     accept: (lines: WorkshopLineSelectionInput[]) => accept.mutate(lines),
     acceptPending: accept.isPending,
+    adjustOpen,
+    openAdjust,
+    closeAdjust,
+    draft,
+    changeDraft: setDraft,
+    /** Picker result while adjusting: staged in the draft, saved only with the whole set. */
+    stageAdded: (items: readonly DraftLine[]) => {
+      setDraft((current) => addDraftItems(current, items));
+      closePicker();
+    },
+    saveAdjustment: (lines: Parameters<typeof buildAdjustmentInputs>[0]) =>
+      adjust.mutate(buildAdjustmentInputs(lines, draft)),
+    adjustPending: adjust.isPending,
   };
 }

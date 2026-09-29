@@ -173,7 +173,9 @@ describe('InitialItemsDialog', () => {
     fireEvent.click(saveButton());
     expect(onConfirm).toHaveBeenCalledWith([
       { catalogItemId: 'prt-tire', catalogVariantId: 'v-90', quantity: '1' },
-    ]);
+    ],
+      expect.any(Array),
+    );
   });
 
   it('sets the quantity while configuring and steps it in the draft', () => {
@@ -188,7 +190,9 @@ describe('InitialItemsDialog', () => {
     fireEvent.click(saveButton());
     expect(onConfirm).toHaveBeenCalledWith([
       { catalogItemId: 'prt-tire', catalogVariantId: 'v-80', quantity: '3' },
-    ]);
+    ],
+      expect.any(Array),
+    );
   });
 
   it('keeps the draft while searching and filtering', () => {

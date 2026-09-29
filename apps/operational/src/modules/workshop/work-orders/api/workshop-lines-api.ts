@@ -34,8 +34,30 @@ export interface WorkshopWorkOrderLine {
   components: WorkshopWorkOrderLineComponent[];
 }
 
+export type WorkshopLineAdjustmentType = 'ADD' | 'QUANTITY_CHANGE' | 'REMOVE';
+
+/** One durable item change. Item facts are the accepted snapshot of the affected Line. */
+export interface WorkshopLineAdjustmentEntry {
+  id: string;
+  sequence: number;
+  type: WorkshopLineAdjustmentType;
+  lineId: string;
+  itemCode: string;
+  itemName: string;
+  itemType: WorkshopItemType;
+  variantName: string | null;
+  /** Null for ADD. */
+  previousQuantity: string | null;
+  /** Effective quantity after the change; 0 for REMOVE. */
+  quantity: string;
+  workOrderVersion: number;
+  adjustedAt: string;
+}
+
+/** Effective Lines (accepted Lines with adjustments applied) and the change history. */
 export interface WorkshopWorkOrderDetail extends WorkshopQueueWorkOrder {
   lines: WorkshopWorkOrderLine[];
+  adjustments: WorkshopLineAdjustmentEntry[];
 }
 
 /** Selection intent only; Runtime resolves every name, type, price and composition fact. */
@@ -49,6 +71,11 @@ export interface WorkshopLineSelectionInput {
     quantity: string;
   }[];
 }
+
+export type WorkshopLineAdjustmentInput =
+  | ({ type: 'ADD' } & WorkshopLineSelectionInput)
+  | { type: 'QUANTITY_CHANGE'; lineId: string; quantity: string }
+  | { type: 'REMOVE'; lineId: string };
 
 /** Authoritative Catalog price as the shared Operational projection resolved it. */
 export interface PickerPrice {
@@ -132,5 +159,12 @@ export class WorkshopLinesApi {
       expectedVersion,
       lines,
     });
+  }
+
+  adjustLines(id: string, expectedVersion: number, adjustments: WorkshopLineAdjustmentInput[]) {
+    return this.client.post<WorkshopWorkOrderDetail>(
+      `/api/v1/workshop/work-orders/${id}/lines/adjustments`,
+      { expectedVersion, adjustments },
+    );
   }
 }

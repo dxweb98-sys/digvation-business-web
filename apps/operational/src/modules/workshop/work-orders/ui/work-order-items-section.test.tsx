@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   getCatalog: vi.fn(),
   getAdditionalItemCandidates: vi.fn(),
   acceptInitialLines: vi.fn(),
+  adjustLines: vi.fn(),
 }));
 
 vi.mock('@digvation/business-api', () => ({ ApiClient: class {} }));
@@ -30,6 +31,7 @@ vi.mock('../api/workshop-lines-api', () => ({
     getCatalog = mocks.getCatalog;
     getAdditionalItemCandidates = mocks.getAdditionalItemCandidates;
     acceptInitialLines = mocks.acceptInitialLines;
+    adjustLines = mocks.adjustLines;
   },
 }));
 
@@ -57,9 +59,14 @@ const queueOrder = (overrides: Partial<WorkshopQueueWorkOrder> = {}): WorkshopQu
   ...overrides,
 });
 
-const detail = (lines: WorkshopWorkOrderDetail['lines'], version = 4): WorkshopWorkOrderDetail => ({
+const detail = (
+  lines: WorkshopWorkOrderDetail['lines'],
+  version = 4,
+  adjustments: WorkshopWorkOrderDetail['adjustments'] = [],
+): WorkshopWorkOrderDetail => ({
   ...queueOrder({ version }),
   lines,
+  adjustments,
 });
 
 const ACCEPTED: WorkshopWorkOrderDetail['lines'] = [
@@ -179,7 +186,7 @@ describe('WorkOrderItemsSection', () => {
     expect(screen.queryByRole('button', { name: /Select items/ })).toBeNull();
   });
 
-  it('renders accepted items strictly from the Runtime snapshot and offers no edit or remove control', async () => {
+  it('renders accepted items strictly from the Runtime snapshot', async () => {
     mocks.getDetail.mockResolvedValue(detail(ACCEPTED));
     renderSection();
 
@@ -191,8 +198,6 @@ describe('WorkOrderItemsSection', () => {
     expect(screen.getByText('Includes: Filter')).toBeTruthy();
     expect(screen.getByText('Service')).toBeTruthy();
     expect(screen.getByText('Spare part')).toBeTruthy();
-
-    expect(screen.queryByRole('button', { name: /Select items|Remove|Edit|Replace|Ubah|Hapus/ })).toBeNull();
     // Snapshot rendering never asks Catalog for current names or prices.
     expect(mocks.getCatalog).not.toHaveBeenCalled();
   });
@@ -253,5 +258,224 @@ describe('WorkOrderItemsSection', () => {
     renderSection();
     fireEvent.click(await screen.findByRole('button', { name: 'Retry' }));
     expect(await screen.findByText('Ban Luar')).toBeTruthy();
+  });
+
+  describe('adjusting accepted items', () => {
+    const openOrder = (workStatus: WorkshopQueueWorkOrder['workStatus'] = 'IN_PROGRESS') =>
+      queueOrder({ workStatus });
+
+    it.each(['WAITING', 'ASSIGNED', 'IN_PROGRESS', 'PAUSED'] as const)(
+      'offers add and change while %s for someone who may update items',
+      async (workStatus) => {
+        mocks.getDetail.mockResolvedValue(detail(ACCEPTED));
+        renderSection({ workOrder: openOrder(workStatus) });
+        await screen.findByText('Ban Luar');
+        expect(screen.getByRole('button', { name: 'Add item' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Change items' })).toBeTruthy();
+      },
+    );
+
+    it.each([
+      { name: 'DONE', props: { workOrder: queueOrder({ workStatus: 'DONE' }) } },
+      { name: 'CANCELLED', props: { workOrder: queueOrder({ workStatus: 'CANCELLED' }) } },
+      { name: 'a user without work-order-items:update', props: { permissions: ['work-orders:read'] } },
+    ])('offers no item action for $name', async ({ props }) => {
+      mocks.getDetail.mockResolvedValue(detail(ACCEPTED));
+      renderSection(props);
+      await screen.findByText('Ban Luar');
+      expect(
+        screen.queryByRole('button', { name: /Add item|Change items|Select items|Remove item/ }),
+      ).toBeNull();
+    });
+
+    it('changes a quantity and sends one semantic adjustment with the open version', async () => {
+      mocks.getDetail.mockResolvedValue(detail(ACCEPTED));
+      mocks.adjustLines.mockResolvedValue(detail(ACCEPTED, 5));
+      const { onAccepted } = renderSection({ workOrder: openOrder() });
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Change items' }));
+      expect(screen.getByRole('button', { name: 'Save changes' }).hasAttribute('disabled')).toBe(true);
+      fireEvent.change(screen.getByLabelText('Quantity Ban Luar - Ukuran 90'), {
+        target: { value: '3' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+      await waitFor(() =>
+        expect(mocks.adjustLines).toHaveBeenCalledWith('wo-1', 4, [
+          { type: 'QUANTITY_CHANGE', lineId: 'l2', quantity: '3' },
+        ]),
+      );
+      await waitFor(() => expect(onAccepted).toHaveBeenCalledWith(expect.objectContaining({ version: 5 })));
+      expect(await screen.findByText('Items updated.')).toBeTruthy();
+    });
+
+    it('stages a removal that can be restored, and saves it as REMOVE', async () => {
+      mocks.getDetail.mockResolvedValue(detail(ACCEPTED));
+      mocks.adjustLines.mockResolvedValue(detail([ACCEPTED[0]!], 5));
+      renderSection({ workOrder: openOrder() });
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Change items' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Remove item Ban Luar - Ukuran 90' }));
+      expect(screen.getByText('Will be removed')).toBeTruthy();
+      fireEvent.click(screen.getByRole('button', { name: 'Restore item Ban Luar - Ukuran 90' }));
+      expect(screen.getByRole('button', { name: 'Save changes' }).hasAttribute('disabled')).toBe(true);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Remove item Ban Luar - Ukuran 90' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+      await waitFor(() =>
+        expect(mocks.adjustLines).toHaveBeenCalledWith('wo-1', 4, [{ type: 'REMOVE', lineId: 'l2' }]),
+      );
+    });
+
+    it('adds an item through the shared picker and saves it together with other changes', async () => {
+      mocks.getDetail.mockResolvedValue(detail(ACCEPTED));
+      mocks.adjustLines.mockResolvedValue(detail(ACCEPTED, 5));
+      renderSection({ workOrder: openOrder() });
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Add item' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Add Oli Mesin 1L' }));
+      fireEvent.change(screen.getByLabelText('Quantity Oli Mesin 1L'), { target: { value: '2' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Add to list' }));
+
+      // Back in the adjustment dialog with the item staged, not yet saved.
+      expect(await screen.findByText('New')).toBeTruthy();
+      expect(mocks.adjustLines).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole('button', { name: 'Remove item Ban Luar - Ukuran 90' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+      await waitFor(() =>
+        expect(mocks.adjustLines).toHaveBeenCalledWith('wo-1', 4, [
+          { type: 'REMOVE', lineId: 'l2' },
+          { type: 'ADD', catalogItemId: 'prt-oil', quantity: '2' },
+        ]),
+      );
+    });
+
+    it('sends nothing when the adjustment is cancelled', async () => {
+      mocks.getDetail.mockResolvedValue(detail(ACCEPTED));
+      renderSection({ workOrder: openOrder() });
+      fireEvent.click(await screen.findByRole('button', { name: 'Change items' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Remove item Ban Luar - Ukuran 90' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      expect(mocks.adjustLines).not.toHaveBeenCalled();
+      // Reopening starts from a clean draft.
+      fireEvent.click(await screen.findByRole('button', { name: 'Change items' }));
+      expect(screen.queryByText('Will be removed')).toBeNull();
+    });
+
+    it('blocks saving an invalid quantity', async () => {
+      mocks.getDetail.mockResolvedValue(detail(ACCEPTED));
+      renderSection({ workOrder: openOrder() });
+      fireEvent.click(await screen.findByRole('button', { name: 'Change items' }));
+      fireEvent.change(screen.getByLabelText('Quantity Ban Luar - Ukuran 90'), {
+        target: { value: '0' },
+      });
+      expect(screen.getByRole('alert').textContent).toContain('Enter a quantity above zero.');
+      expect(screen.getByRole('button', { name: 'Save changes' }).hasAttribute('disabled')).toBe(true);
+    });
+
+    it('reloads the Work Order when the adjustment hits a version conflict', async () => {
+      mocks.getDetail.mockResolvedValue(detail(ACCEPTED));
+      mocks.adjustLines.mockRejectedValue({ status: 409, code: 'VERSION_CONFLICT' });
+      const { onStale, onAccepted } = renderSection({ workOrder: openOrder() });
+      fireEvent.click(await screen.findByRole('button', { name: 'Change items' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Remove item Ban Luar - Ukuran 90' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+      await waitFor(() => expect(onStale).toHaveBeenCalled());
+      expect(onAccepted).not.toHaveBeenCalled();
+      expect(await screen.findByText('This Work Order was just changed. Open it again.')).toBeTruthy();
+    });
+
+    it('lets an open Work Order without items receive its first item', async () => {
+      mocks.getDetail.mockResolvedValue(detail([]));
+      renderSection({ workOrder: openOrder('IN_PROGRESS') });
+      await screen.findByText('No items selected yet.');
+      expect(screen.queryByRole('button', { name: /Select items/ })).toBeNull();
+      expect(screen.getByRole('button', { name: /Add item/ })).toBeTruthy();
+    });
+
+    it('does not offer the one-time initial selection again after every item was removed', async () => {
+      const history: WorkshopWorkOrderDetail['adjustments'] = [
+        {
+          id: 'a1',
+          sequence: 1,
+          type: 'REMOVE',
+          lineId: 'l1',
+          itemCode: 'X',
+          itemName: 'Filter Oli',
+          itemType: 'PRODUCT',
+          variantName: null,
+          previousQuantity: '1.0000',
+          quantity: '0.0000',
+          workOrderVersion: 5,
+          adjustedAt: '2026-09-30T02:00:00.000Z',
+        },
+      ];
+      mocks.getDetail.mockResolvedValue(detail([], 5, history));
+      renderSection({ workOrder: queueOrder({ workStatus: 'WAITING', version: 5 }) });
+      await screen.findByText('No items selected yet.');
+      expect(screen.queryByRole('button', { name: /Select items/ })).toBeNull();
+      expect(screen.getByRole('button', { name: /Add item/ })).toBeTruthy();
+    });
+
+    it('presents the change history as secondary, newest first', async () => {
+      const history: WorkshopWorkOrderDetail['adjustments'] = [
+        {
+          id: 'a1',
+          sequence: 1,
+          type: 'ADD',
+          lineId: 'l3',
+          itemCode: 'F',
+          itemName: 'Filter Oli',
+          itemType: 'PRODUCT',
+          variantName: null,
+          previousQuantity: null,
+          quantity: '1.0000',
+          workOrderVersion: 5,
+          adjustedAt: '2026-09-30T02:00:00.000Z',
+        },
+        {
+          id: 'a2',
+          sequence: 2,
+          type: 'QUANTITY_CHANGE',
+          lineId: 'l2',
+          itemCode: 'BAN',
+          itemName: 'Ban Luar',
+          itemType: 'PRODUCT',
+          variantName: null,
+          previousQuantity: '1.0000',
+          quantity: '2.0000',
+          workOrderVersion: 5,
+          adjustedAt: '2026-09-30T02:00:00.000Z',
+        },
+        {
+          id: 'a3',
+          sequence: 3,
+          type: 'REMOVE',
+          lineId: 'l4',
+          itemCode: 'B',
+          itemName: 'Baut Kuras',
+          itemType: 'PRODUCT',
+          variantName: null,
+          previousQuantity: '1.0000',
+          quantity: '0.0000',
+          workOrderVersion: 6,
+          adjustedAt: '2026-09-30T03:00:00.000Z',
+        },
+      ];
+      mocks.getDetail.mockResolvedValue(detail(ACCEPTED, 6, history));
+      renderSection({ workOrder: queueOrder({ workStatus: 'DONE', version: 6 }) });
+
+      const toggle = await screen.findByRole('button', { name: /Item change history \(3\)/ });
+      expect(screen.queryByText(/Baut Kuras/)).toBeNull();
+      fireEvent.click(toggle);
+      const entries = screen.getAllByRole('listitem').map((item) => item.textContent ?? '');
+      const trace = entries.filter((text) => /Filter Oli|Ban Luar 1 → 2|Baut Kuras/.test(text));
+      expect(trace[0]).toContain('Baut Kuras');
+      expect(trace[1]).toContain('Ban Luar 1 → 2');
+      expect(trace[2]).toContain('Filter Oli x1');
+      // A terminal Work Order keeps its history but offers no edit action.
+      expect(screen.queryByRole('button', { name: /Add item|Change items/ })).toBeNull();
+    });
   });
 });

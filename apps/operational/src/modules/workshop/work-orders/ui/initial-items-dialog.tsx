@@ -45,6 +45,7 @@ import {
   type DraftLine,
 } from '../model/work-order-lines-model';
 import { IconActionButton } from '../../shared/ui/icon-action-button';
+import { FOCUS_RING, QuantityStepper } from './quantity-stepper';
 
 type TypeFilter = 'ALL' | WorkshopItemType;
 const TYPE_FILTERS: readonly TypeFilter[] = ['ALL', 'SERVICE', 'PRODUCT'];
@@ -52,9 +53,6 @@ const OWN_ITEM = '__item__';
 
 /** Every Catalog row ends in the same slot so prices line up whatever the action is. */
 const ACTION_SLOT = 'grid size-10 shrink-0 place-items-center sm:size-8';
-
-const FOCUS_RING =
-  'outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-(--color-brand)/25';
 
 function useTypeLabel() {
   const { copy } = useOperationalLocalization();
@@ -88,63 +86,6 @@ function includesText(components: readonly PickerFixedComponent[]) {
       ].join(' '),
     )
     .join(', ');
-}
-
-/** [ − ] 1 [ + ]. Typing stays possible for decimal quantities; the buttons step by one. */
-function QuantityStepper({
-  value,
-  name,
-  onChange,
-}: {
-  value: string;
-  name: string;
-  onChange: (next: string) => void;
-}) {
-  const { copy } = useOperationalLocalization();
-  const valid = isValidQuantity(value);
-  const button = cn(
-    'grid size-10 place-items-center text-(--color-text-muted) transition-colors sm:size-9',
-    'hover:bg-(--color-surface-muted) hover:text-(--color-text) disabled:pointer-events-none disabled:opacity-40',
-    FOCUS_RING,
-  );
-  return (
-    <div
-      className={cn(
-        'inline-flex items-center overflow-hidden rounded-lg border bg-(--color-surface)',
-        valid ? 'border-(--color-border)' : 'border-(--color-danger)',
-      )}
-    >
-      <button
-        type="button"
-        className={button}
-        aria-label={`${copy('Decrease quantity')} ${name}`}
-        disabled={!valid || Number(value) <= 1}
-        onClick={() => onChange(stepQuantity(value, -1))}
-      >
-        <Minus className="size-4" aria-hidden="true" />
-      </button>
-      <input
-        inputMode="decimal"
-        aria-label={`${copy('Quantity')} ${name}`}
-        aria-invalid={!valid}
-        value={value}
-        onChange={(event) => onChange(normalizeDecimalInput(event.target.value, { scale: 4 }))}
-        className={cn(
-          'h-10 w-14 bg-transparent text-center text-sm font-semibold tabular-nums text-(--color-text) sm:h-9',
-          FOCUS_RING,
-        )}
-      />
-      <button
-        type="button"
-        className={button}
-        aria-label={`${copy('Increase quantity')} ${name}`}
-        disabled={!valid}
-        onClick={() => onChange(stepQuantity(value, 1))}
-      >
-        <Plus className="size-4" aria-hidden="true" />
-      </button>
-    </div>
-  );
 }
 
 function additionalOptions(candidates: readonly PickerCandidate[]) {
@@ -519,6 +460,7 @@ export function InitialItemsDialog({
   onRetry,
   onClose,
   onConfirm,
+  mode = 'initial',
 }: {
   open: boolean;
   items: readonly PickerItem[] | undefined;
@@ -531,7 +473,10 @@ export function InitialItemsDialog({
   onWantCandidates: () => void;
   onRetry: () => void;
   onClose: () => void;
-  onConfirm: (lines: WorkshopLineSelectionInput[]) => void;
+  /** Receives the selection intent and the browser drafts it came from (names for display). */
+  onConfirm: (lines: WorkshopLineSelectionInput[], drafts: readonly DraftLine[]) => void;
+  /** `add` reuses the same picker to add items to an already accepted Work Order. */
+  mode?: 'initial' | 'add';
 }) {
   const { copy, locale } = useOperationalLocalization();
   const [search, setSearch] = useState('');
@@ -572,9 +517,17 @@ export function InitialItemsDialog({
       open={open}
       onClose={onClose}
       size="lg"
-      ariaLabel={copy('Select items')}
-      title={<span className="text-lg font-bold tracking-tight">{copy('Select items')}</span>}
-      description={copy('Choose the services and spare parts for this Work Order.')}
+      ariaLabel={mode === 'add' ? copy('Add item') : copy('Select items')}
+      title={
+        <span className="text-lg font-bold tracking-tight">
+          {mode === 'add' ? copy('Add item') : copy('Select items')}
+        </span>
+      }
+      description={
+        mode === 'add'
+          ? copy('Choose what to add to this Work Order.')
+          : copy('Choose the services and spare parts for this Work Order.')
+      }
       footer={
         <div className="flex items-center justify-between gap-3">
           <span className="text-[13px] text-(--color-text-muted)" aria-live="polite">
@@ -587,9 +540,9 @@ export function InitialItemsDialog({
             <DButton
               loading={pending}
               disabled={!draftReady(draft)}
-              onClick={() => onConfirm(toSelectionInput(draft))}
+              onClick={() => onConfirm(toSelectionInput(draft), draft)}
             >
-              {copy('Save items')}
+              {mode === 'add' ? copy('Add to list') : copy('Save items')}
             </DButton>
           </div>
         </div>
