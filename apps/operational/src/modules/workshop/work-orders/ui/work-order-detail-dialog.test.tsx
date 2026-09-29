@@ -23,6 +23,7 @@ const workOrder: WorkshopQueueWorkOrder = {
   vehicleChassisNumberSnapshot: 'MH1JFZ1',
   customerRequest: 'Rem berbunyi',
   cancellationReason: null,
+  mechanic: { employeeId: 'emp-1', displayName: 'Andi Mekanik', assignedAt: '2026-09-28T20:00:00.000Z' },
   version: 3,
   createdAt: '2026-09-28T19:23:00.000Z',
   updatedAt: '2026-09-28T19:23:00.000Z',
@@ -38,6 +39,7 @@ function props(overrides: Partial<Parameters<typeof WorkOrderDetailDialog>[0]> =
     commandPending: false,
     onClose: vi.fn(),
     onAction: vi.fn(),
+    onOpenMechanicPicker: vi.fn(),
     onCancelReasonChange: vi.fn(),
     onCancelBack: vi.fn(),
     onCancelConfirm: vi.fn(),
@@ -72,6 +74,15 @@ describe('WorkOrderDetailDialog', () => {
     expect(screen.getByText('Rem berbunyi')).toBeTruthy();
   });
 
+  it('shows the items section supplied by the workspace and keeps it through the close transition', () => {
+    const section = <p>items-section</p>;
+    const { rerender } = render(<WorkOrderDetailDialog {...props({ itemsSection: section })} />);
+    expect(screen.getByText('items-section')).toBeTruthy();
+
+    rerender(<WorkOrderDetailDialog {...props({ workOrder: null, itemsSection: null })} />);
+    expect(screen.getByText('items-section')).toBeTruthy();
+  });
+
   it('keeps the cancellation form while closing instead of collapsing it', () => {
     const { rerender } = render(
       <WorkOrderDetailDialog {...props({ isCancelling: true, cancelReason: 'Berubah pikiran' })} />,
@@ -97,6 +108,82 @@ describe('WorkOrderDetailDialog', () => {
   it('requires a reason before confirming the cancellation', () => {
     render(<WorkOrderDetailDialog {...props({ isCancelling: true })} />);
     expect((screen.getByRole('button', { name: 'Yes, cancel' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  describe('mechanic assignment', () => {
+    const waiting = { ...workOrder, workStatus: 'WAITING' as const, mechanic: null };
+    const assign = ['workshop-assignments:update'];
+
+    it('shows the canonical mechanic name for an assigned Work Order', () => {
+      render(<WorkOrderDetailDialog {...props()} />);
+      expect(screen.getByText('Mechanic')).toBeTruthy();
+      expect(screen.getByText('Andi Mekanik')).toBeTruthy();
+    });
+
+    it('shows a clear unassigned state with an assign action when permitted', () => {
+      const onOpenMechanicPicker = vi.fn();
+      render(
+        <WorkOrderDetailDialog
+          {...props({ workOrder: waiting, permissions: assign, onOpenMechanicPicker })}
+        />,
+      );
+      expect(screen.getByText('Not assigned yet')).toBeTruthy();
+      fireEvent.click(screen.getByRole('button', { name: 'Assign mechanic' }));
+      expect(onOpenMechanicPicker).toHaveBeenCalledTimes(1);
+    });
+
+    it('hides the assign action without workshop-assignments:update but still shows the state', () => {
+      render(
+        <WorkOrderDetailDialog {...props({ workOrder: waiting, permissions: ['work-orders:cancel'] })} />,
+      );
+      expect(screen.getByText('Not assigned yet')).toBeTruthy();
+      expect(screen.queryByRole('button', { name: 'Assign mechanic' })).toBeNull();
+    });
+
+    it('offers an icon-only replace action while ASSIGNED and PAUSED', () => {
+      const onOpenMechanicPicker = vi.fn();
+      for (const workStatus of ['ASSIGNED', 'PAUSED'] as const) {
+        cleanup();
+        render(
+          <WorkOrderDetailDialog
+            {...props({
+              workOrder: { ...workOrder, workStatus },
+              permissions: assign,
+              onOpenMechanicPicker,
+            })}
+          />,
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Replace mechanic' }));
+      }
+      expect(onOpenMechanicPicker).toHaveBeenCalledTimes(2);
+    });
+
+    it('offers no replace action while IN_PROGRESS or without the permission', () => {
+      render(<WorkOrderDetailDialog {...props({ permissions: assign })} />);
+      expect(screen.queryByRole('button', { name: 'Replace mechanic' })).toBeNull();
+      cleanup();
+      render(
+        <WorkOrderDetailDialog
+          {...props({
+            workOrder: { ...workOrder, workStatus: 'ASSIGNED' },
+            permissions: ['workshop-execution:update'],
+          })}
+        />,
+      );
+      expect(screen.queryByRole('button', { name: 'Replace mechanic' })).toBeNull();
+    });
+
+    it('starts an ASSIGNED Work Order from the footer', () => {
+      const onAction = vi.fn();
+      const assigned = { ...workOrder, workStatus: 'ASSIGNED' as const };
+      render(
+        <WorkOrderDetailDialog
+          {...props({ workOrder: assigned, permissions: ['workshop-execution:update'], onAction })}
+        />,
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+      expect(onAction).toHaveBeenCalledWith(assigned, 'start');
+    });
   });
 
   it('offers no actions for a finished Work Order', () => {

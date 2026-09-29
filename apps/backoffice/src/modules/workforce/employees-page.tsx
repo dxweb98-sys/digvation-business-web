@@ -61,6 +61,9 @@ export function EmployeesPage() {
   const canCreate = Boolean(session && canPerformBackofficeAction(session, 'createEmployee'));
   const canUpdate = Boolean(session && canPerformBackofficeAction(session, 'updateEmployee'));
   const attendanceEnabled = Boolean(session && canAccessBackoffice(session, 'attendance'));
+  // Workshop mechanic eligibility is a Workshop-owned extension of the Employee;
+  // it is offered only when the Workshop product is entitled.
+  const workshopMechanicEnabled = Boolean(session?.access.products.includes('WORKSHOP'));
   const canManageAttendance = Boolean(
     attendanceEnabled && session && canPerformBackofficeAction(session, 'manageAttendance'),
   );
@@ -284,6 +287,7 @@ export function EmployeesPage() {
         isError={Boolean(detailId && detail.isError)}
         api={api}
         attendanceEnabled={attendanceEnabled}
+        {...(workshopMechanicEnabled ? { workshopMechanic: { canUpdate } } : {})}
         onClose={() => setDetailId(null)}
       />
 

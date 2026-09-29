@@ -9,8 +9,10 @@ import {
   WORK_ORDER_STATUS_FILTERS,
 } from '../model/use-work-order-workspace';
 import { CreateWorkOrderDialog } from './create/create-work-order-dialog';
+import { MechanicPickerDialog } from './mechanic-picker-dialog';
 import { buildWorkOrderColumns } from './work-order-columns';
 import { WorkOrderDetailDialog } from './work-order-detail-dialog';
+import { WorkOrderItemsSection } from './work-order-items-section';
 
 /**
  * The single Work Order workspace: create, list, filter by lifecycle status,
@@ -134,12 +136,37 @@ export function WorkOrdersPage() {
         commandPending={workspace.commandPending}
         onClose={workspace.closeDetail}
         onAction={workspace.runAction}
+        onOpenMechanicPicker={workspace.openPicker}
+        itemsSection={
+          workspace.selected ? (
+            <WorkOrderItemsSection
+              key={workspace.selected.id}
+              workOrder={workspace.selected}
+              permissions={workspace.permissions}
+              onAccepted={workspace.applyAuthoritative}
+              onStale={workspace.reloadOpenWorkOrder}
+            />
+          ) : null
+        }
         onCancelReasonChange={workspace.setCancelReason}
         onCancelBack={() => {
           workspace.setCancelling(false);
           workspace.setCancelReason('');
         }}
         onCancelConfirm={workspace.confirmCancel}
+      />
+
+      <MechanicPickerDialog
+        open={workspace.pickerOpen && Boolean(workspace.selected)}
+        mode={workspace.selected?.mechanic ? 'replace' : 'assign'}
+        currentEmployeeId={workspace.selected?.mechanic?.employeeId ?? null}
+        mechanics={workspace.mechanics.data?.items}
+        loading={workspace.mechanics.isLoading}
+        failed={workspace.mechanics.isError}
+        pending={workspace.assignPending}
+        onRetry={() => void workspace.mechanics.refetch()}
+        onClose={workspace.closePicker}
+        onConfirm={workspace.assignMechanic}
       />
 
       {workspace.canCreate ? (

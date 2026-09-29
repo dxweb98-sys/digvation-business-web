@@ -8,6 +8,23 @@ export type WorkshopWorkOrderStatus =
   | 'DONE'
   | 'CANCELLED';
 
+export interface WorkshopWorkOrderMechanic {
+  employeeId: string;
+  displayName: string;
+  assignedAt: string;
+}
+
+export type WorkshopMechanicAvailability = 'AVAILABLE' | 'BUSY' | 'INELIGIBLE';
+
+/** Runtime derives availability; the browser only presents it. */
+export interface WorkshopMechanicCandidate {
+  employeeId: string;
+  displayName: string;
+  availability: WorkshopMechanicAvailability;
+  activeWorkOrder: { id: string; workOrderNumber: string } | null;
+  openWorkOrderCount: number;
+}
+
 export interface WorkshopQueueWorkOrder {
   id: string;
   workOrderNumber: string;
@@ -19,6 +36,7 @@ export interface WorkshopQueueWorkOrder {
   vehicleChassisNumberSnapshot: string;
   customerRequest: string;
   cancellationReason: string | null;
+  mechanic: WorkshopWorkOrderMechanic | null;
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -52,10 +70,8 @@ export interface WorkshopQueueQuery {
  * refreshed, authoritative Work Order rather than something the caller could
  * use to synthesize local state that survives a Runtime failure.
  *
- * `start` (ASSIGNED -> IN_PROGRESS) is deliberately not exposed here: DIG-26
- * owns the lifecycle vocabulary but DIG-27 owns technician assignment, and a
- * public start command cannot be safe until a real WorkOrderAssignment
- * exists. Do not add one without confirming Runtime has actually opened it.
+ * Starting and resuming are rejected by Runtime while the assigned mechanic
+ * already works on another Work Order; the browser never predicts that.
  */
 export class WorkshopQueueApi {
   constructor(private readonly client: ApiClient) {}
@@ -72,6 +88,23 @@ export class WorkshopQueueApi {
     return this.client.get<Page<WorkshopQueueWorkOrder>>(
       `/api/v1/workshop/work-orders?${params.toString()}`,
     );
+  }
+
+  listMechanics() {
+    return this.client.get<Page<WorkshopMechanicCandidate>>('/api/v1/workshop/mechanics');
+  }
+
+  assignMechanic(id: string, expectedVersion: number, mechanicEmployeeId: string) {
+    return this.client.post<WorkshopQueueWorkOrder>(
+      `/api/v1/workshop/work-orders/${id}/mechanic`,
+      { expectedVersion, mechanicEmployeeId },
+    );
+  }
+
+  start(id: string, expectedVersion: number) {
+    return this.client.post<WorkshopQueueWorkOrder>(`/api/v1/workshop/work-orders/${id}/start`, {
+      expectedVersion,
+    });
   }
 
   pause(id: string, expectedVersion: number) {

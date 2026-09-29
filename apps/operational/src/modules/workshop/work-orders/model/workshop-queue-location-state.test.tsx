@@ -18,6 +18,7 @@ const workOrderFromA: WorkshopQueueWorkOrder = {
   vehicleChassisNumberSnapshot: 'CHS1',
   customerRequest: 'rem bunyi',
   cancellationReason: null,
+  mechanic: null,
   version: 3,
   createdAt: '2026-09-28T00:00:00.000Z',
   updatedAt: '2026-09-28T00:00:00.000Z',

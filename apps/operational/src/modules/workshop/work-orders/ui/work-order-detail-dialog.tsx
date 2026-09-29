@@ -1,4 +1,5 @@
 import { DBadge, DButton, DDialog, DTextarea } from '@digvation/ui';
+import { UserRoundPlus, UserRoundCog } from 'lucide-react';
 import { useRef, type ReactNode } from 'react';
 
 import { useOperationalLocalization } from '../../../../app/localization/operational-localization';
@@ -9,8 +10,10 @@ import {
   VehicleIdentity,
   VehicleMarker,
 } from '../../shared/ui/identity-blocks';
+import { IconActionButton } from '../../shared/ui/icon-action-button';
 import {
   availableWorkshopQueueActions,
+  mechanicAssignmentMode,
   type WorkshopQueueAction,
 } from '../model/workshop-queue-actions';
 import type { WorkshopQueueWorkOrder } from '../api/workshop-queue-api';
@@ -39,6 +42,8 @@ export function WorkOrderDetailDialog({
   commandPending,
   onClose,
   onAction,
+  onOpenMechanicPicker,
+  itemsSection,
   onCancelReasonChange,
   onCancelBack,
   onCancelConfirm,
@@ -51,6 +56,9 @@ export function WorkOrderDetailDialog({
   commandPending: boolean;
   onClose: () => void;
   onAction: (workOrder: WorkshopQueueWorkOrder, action: WorkshopQueueAction) => void;
+  onOpenMechanicPicker: () => void;
+  /** Accepted Work Order items; rendered by the workspace, which owns their data. */
+  itemsSection?: ReactNode;
   onCancelReasonChange: (value: string) => void;
   onCancelBack: () => void;
   onCancelConfirm: () => void;
@@ -59,12 +67,19 @@ export function WorkOrderDetailDialog({
   const lastWorkOrder = useRef(workOrder);
   if (workOrder) lastWorkOrder.current = workOrder;
   const shown = workOrder ?? lastWorkOrder.current;
+  // The items section is kept for the close transition for the same reason.
+  const lastItemsSection = useRef(itemsSection);
+  if (workOrder) lastItemsSection.current = itemsSection;
+  const shownItemsSection = workOrder ? itemsSection : lastItemsSection.current;
 
   const actions = shown ? availableWorkshopQueueActions(shown.workStatus, permissions) : [];
   const cancelAction = actions.includes('cancel');
   const lifecycleActions = actions.filter((action) => action !== 'cancel');
 
+  const assignmentMode = shown ? mechanicAssignmentMode(shown.workStatus, permissions) : null;
+
   const actionLabel: Record<WorkshopQueueAction, string> = {
+    start: copy('Start'),
     pause: copy('Pause'),
     resume: copy('Resume'),
     complete: copy('Complete'),
@@ -102,7 +117,7 @@ export function WorkOrderDetailDialog({
         {lifecycleActions.map((action) => (
           <DButton
             key={action}
-            variant={action === 'complete' ? 'primary' : 'secondary'}
+            variant={action === 'complete' || action === 'start' ? 'primary' : 'secondary'}
             loading={commandPending}
             onClick={() => onAction(shown, action)}
           >
@@ -155,6 +170,44 @@ export function WorkOrderDetailDialog({
               copy={copy}
             />
           </IdentityBlock>
+
+          <IdentityBlock
+            leading={
+              shown.mechanic ? (
+                <CustomerMarker name={shown.mechanic.displayName} />
+              ) : (
+                <span className="grid size-10 shrink-0 place-items-center rounded-full bg-(--color-surface-muted) text-(--color-text-muted)">
+                  <UserRoundPlus className="size-5" aria-hidden="true" />
+                </span>
+              )
+            }
+            label={copy('Mechanic')}
+            {...(shown.mechanic && assignmentMode === 'replace'
+              ? { replaceLabel: copy('Replace mechanic'), onReplace: onOpenMechanicPicker }
+              : {})}
+          >
+            {shown.mechanic ? (
+              <p className="truncate text-sm font-semibold text-(--color-text)">
+                {shown.mechanic.displayName}
+              </p>
+            ) : (
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm text-(--color-text-muted)">{copy('Not assigned yet')}</p>
+                {assignmentMode ? (
+                  <DButton variant="secondary" size="sm" onClick={onOpenMechanicPicker}>
+                    <span className="inline-flex items-center gap-1.5">
+                      <UserRoundCog className="size-4" aria-hidden="true" />
+                      {copy('Assign mechanic')}
+                    </span>
+                  </DButton>
+                ) : null}
+              </div>
+            )}
+          </IdentityBlock>
+
+          {shownItemsSection ? (
+            <div className="border-t border-(--color-border) pt-4">{shownItemsSection}</div>
+          ) : null}
 
           <div className="space-y-4 border-t border-(--color-border) pt-4">
             <DetailField label={copy('Keluhan')}>

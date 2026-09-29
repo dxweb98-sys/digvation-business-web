@@ -84,6 +84,13 @@ export interface EmployeeAttendancePage {
   offset: number;
 }
 
+/** Workshop-owned mechanic eligibility of a canonical Employee; identity stays in Workforce. */
+export interface WorkshopMechanicProfile {
+  employeeId: string;
+  eligible: boolean;
+  version: number;
+}
+
 export interface EmployeeQuery {
   q?: string;
   status?: Employee['status'];
@@ -181,6 +188,23 @@ export class EmployeesApi {
       expectedVersion: position.version,
       ...input,
     });
+  }
+
+  listWorkshopMechanicProfiles() {
+    return this.client.get<{ items: WorkshopMechanicProfile[] }>(
+      '/api/v1/workshop/mechanic-profiles',
+    );
+  }
+
+  setWorkshopMechanicProfile(
+    employeeId: string,
+    eligible: boolean,
+    expectedVersion: number | undefined,
+  ) {
+    return this.client.put<WorkshopMechanicProfile>(
+      `/api/v1/workshop/mechanic-profiles/${employeeId}`,
+      { eligible, ...(expectedVersion === undefined ? {} : { expectedVersion }) },
+    );
   }
 
   listAttendance(query: AttendanceQuery) {

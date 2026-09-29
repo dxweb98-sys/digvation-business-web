@@ -18,7 +18,11 @@ import {
 } from '../api/workshop-queue-api';
 import { canCreateWorkOrder, canReadWorkOrders } from './work-order-access';
 import { useLocationBoundQueueState } from './workshop-queue-location-state';
-import { WORKSHOP_QUEUE_ERROR_COPY, type WorkshopQueueAction } from './workshop-queue-actions';
+import {
+  WORKSHOP_KEEP_OPEN_ERROR_CODES,
+  WORKSHOP_QUEUE_ERROR_COPY,
+  type WorkshopQueueAction,
+} from './workshop-queue-actions';
 
 export const DEFAULT_PAGE_SIZE = 10;
 
@@ -61,6 +65,7 @@ export function useWorkOrderWorkspace() {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<WorkshopWorkOrderStatus | ''>('');
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const permissions = session.access.permissions;
   const canRead = canReadWorkOrders(permissions);
@@ -96,7 +101,18 @@ export function useWorkOrderWorkspace() {
     refetchInterval: QUEUE_REFRESH_INTERVAL_MS,
   });
 
+  // Candidates are read fresh each time the picker opens: availability changes
+  // whenever another session starts or pauses work, and Runtime is the authority.
+  const mechanics = useQuery({
+    queryKey: ['workshop-mechanics', selectedLocationId],
+    enabled: pickerOpen,
+    queryFn: () => api.listMechanics(),
+    staleTime: 0,
+    gcTime: 0,
+  });
+
   function openDetail(workOrder: WorkshopQueueWorkOrder) {
+    setPickerOpen(false);
     setCancelling(false);
     setCancelReason('');
     setSelected(workOrder);
@@ -105,6 +121,7 @@ export function useWorkOrderWorkspace() {
   // Only request the close. The cancellation form is reset when the next Work
   // Order opens, so nothing collapses while the dialog is still fading out.
   function closeDetail() {
+    setPickerOpen(false);
     setSelected(null);
   }
 
@@ -127,8 +144,9 @@ export function useWorkOrderWorkspace() {
       });
       // The open detail still carries the old version, so a retry would fail
       // the same way. Close it; the refreshed list holds the current one.
-      if (code !== 'WORKSHOP_CANCELLATION_REASON_REQUIRED') closeDetail();
+      if (!WORKSHOP_KEEP_OPEN_ERROR_CODES.includes(code ?? '')) closeDetail();
       void queryClient.invalidateQueries({ queryKey: ['workshop-queue'] });
+      void queryClient.invalidateQueries({ queryKey: ['workshop-mechanics'] });
       return;
     }
     showToast({
@@ -137,6 +155,28 @@ export function useWorkOrderWorkspace() {
     });
   }
 
+  const start = useMutation({
+    mutationFn: (workOrder: WorkshopQueueWorkOrder) => api.start(workOrder.id, workOrder.version),
+    onSuccess: (workOrder) => {
+      applyAuthoritative(workOrder);
+      showToast({ variant: 'success', title: copy('Work Order started.') });
+    },
+    onError: commandError,
+  });
+  const assign = useMutation({
+    mutationFn: (mechanicEmployeeId: string) =>
+      api.assignMechanic(selected!.id, selected!.version, mechanicEmployeeId),
+    onSuccess: (workOrder) => {
+      const replaced = Boolean(selected?.mechanic);
+      applyAuthoritative(workOrder);
+      setPickerOpen(false);
+      showToast({
+        variant: 'success',
+        title: copy(replaced ? 'Mechanic replaced.' : 'Mechanic assigned.'),
+      });
+    },
+    onError: commandError,
+  });
   const pause = useMutation({
     mutationFn: (workOrder: WorkshopQueueWorkOrder) => api.pause(workOrder.id, workOrder.version),
     onSuccess: applyAuthoritative,
@@ -165,10 +205,15 @@ export function useWorkOrderWorkspace() {
   });
 
   const commandPending =
-    pause.isPending || resume.isPending || complete.isPending || cancel.isPending;
+    start.isPending ||
+    pause.isPending ||
+    resume.isPending ||
+    complete.isPending ||
+    cancel.isPending;
 
   function runAction(workOrder: WorkshopQueueWorkOrder, action: WorkshopQueueAction) {
-    if (action === 'pause') pause.mutate(workOrder);
+    if (action === 'start') start.mutate(workOrder);
+    else if (action === 'pause') pause.mutate(workOrder);
     else if (action === 'resume') resume.mutate(workOrder);
     else if (action === 'complete') complete.mutate(workOrder);
     else if (action === 'cancel') setCancelling(true);
@@ -208,5 +253,16 @@ export function useWorkOrderWorkspace() {
     confirmCancel: () => cancel.mutate(),
     commandPending,
     runAction,
+    mechanics,
+    applyAuthoritative,
+    reloadOpenWorkOrder: () => {
+      closeDetail();
+      void queryClient.invalidateQueries({ queryKey: ['workshop-queue'] });
+    },
+    pickerOpen,
+    openPicker: () => setPickerOpen(true),
+    closePicker: () => setPickerOpen(false),
+    assignPending: assign.isPending,
+    assignMechanic: (mechanicEmployeeId: string) => assign.mutate(mechanicEmployeeId),
   };
 }

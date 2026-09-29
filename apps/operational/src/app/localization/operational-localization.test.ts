@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { WORKSHOP_LINES_ERROR_COPY } from '../../modules/workshop/work-orders/model/work-order-lines-model';
+
 import {
   operationalCopy,
   operationalLabel,
@@ -42,6 +44,22 @@ describe('operational localization', () => {
     expect(operationalLabel('SYSTEM', 'id-ID')).toBe('Sistem');
   });
 
+  it('translates mechanic assignment copy and availability without leaking raw values', () => {
+    expect(operationalCopy('Mechanic', 'id-ID')).toBe('Mekanik');
+    expect(operationalCopy('Not assigned yet', 'id-ID')).toBe('Belum ada mekanik');
+    expect(operationalCopy('Assign mechanic', 'id-ID')).toBe('Tugaskan mekanik');
+    expect(operationalLabel('AVAILABLE', 'id-ID')).toBe('Tersedia');
+    expect(operationalLabel('BUSY', 'id-ID')).toBe('Sibuk');
+    expect(operationalLabel('INELIGIBLE', 'id-ID')).toBe('Tidak tersedia');
+    expect(
+      operationalCopy(
+        'This mechanic is already working on another Work Order. Pause or finish it first.',
+        'id-ID',
+      ),
+    ).toBe('Mekanik ini sedang mengerjakan Work Order lain. Jeda atau selesaikan dulu.');
+    expect(operationalCopy('Assign mechanic', 'en-US')).toBe('Assign mechanic');
+  });
+
   it('translates the Workshop work-status lifecycle vocabulary', () => {
     expect(operationalLabel('WAITING', 'id-ID')).toBe('Menunggu');
     expect(operationalLabel('ASSIGNED', 'id-ID')).toBe('Ditugaskan');
@@ -78,6 +96,23 @@ describe('operational localization', () => {
       'Check your connection, then try again.',
     ]) {
       expect(id(key)).not.toBe(key);
+    }
+  });
+  it('translates every Work Order item selection message, including Runtime error copy', () => {
+    const keys = [
+      'Work Order items',
+      'No items selected yet.',
+      'Select items',
+      'Spare part',
+      'Search services or spare parts',
+      'Selected items',
+      'Save items',
+      'Items saved.',
+      'Prices are recorded when items are saved.',
+      ...Object.values(WORKSHOP_LINES_ERROR_COPY),
+    ];
+    for (const key of keys) {
+      expect(operationalCopy(key, 'id-ID')).not.toBe(key);
     }
   });
 });

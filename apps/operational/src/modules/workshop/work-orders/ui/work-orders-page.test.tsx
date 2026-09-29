@@ -12,7 +12,10 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@digvation/business-api', () => ({ ApiClient: class {} }));
 vi.mock('@digvation/business-auth', () => ({
-  useAuth: () => ({ authPort: {}, session: { access: { permissions: mocks.permissions } } }),
+  useAuth: () => ({
+    authPort: {},
+    session: { access: { permissions: mocks.permissions }, business: { currency: 'IDR' } },
+  }),
 }));
 vi.mock('@digvation/business-runtime', () => ({
   useDeploymentBootstrap: () => ({ apiBaseUrl: 'http://runtime.test' }),
@@ -30,6 +33,11 @@ vi.mock('../../../../app/localization/operational-localization', () => ({
 vi.mock('../api/workshop-queue-api', () => ({
   WorkshopQueueApi: class {
     list = mocks.list;
+  },
+}));
+vi.mock('../api/workshop-lines-api', () => ({
+  WorkshopLinesApi: class {
+    getDetail = () => Promise.resolve({ lines: [] });
   },
 }));
 vi.mock('./create/create-work-order-dialog', () => ({
@@ -54,6 +62,7 @@ function workOrder(index: number) {
     vehicleChassisNumberSnapshot: 'CH',
     customerRequest: `rem bunyi ${index}`,
     cancellationReason: null,
+    mechanic: null,
     version: 1,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),

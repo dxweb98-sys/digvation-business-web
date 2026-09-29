@@ -15,12 +15,15 @@ export function IconActionButton({
   onClick,
   disabled,
   tone = 'default',
+  touch = false,
 }: {
   icon: LucideIcon;
   label: string;
   onClick: () => void;
   disabled?: boolean;
-  tone?: 'default' | 'danger';
+  tone?: 'default' | 'danger' | 'brand';
+  /** Larger hit area for controls used on touch screens. */
+  touch?: boolean;
 }) {
   return (
     <DTooltip content={label}>
@@ -30,10 +33,14 @@ export function IconActionButton({
         disabled={disabled}
         onClick={onClick}
         className={cn(
-          'grid size-8 shrink-0 place-items-center rounded-lg border border-transparent text-(--color-text-muted) outline-none transition-colors',
+          touch ? 'size-10 sm:size-8' : 'size-8',
+          'grid shrink-0 place-items-center rounded-lg border border-transparent text-(--color-text-muted) outline-none transition-colors',
           'hover:border-(--color-border) hover:bg-(--color-surface-muted) focus-visible:border-(--color-brand) focus-visible:ring-2 focus-visible:ring-(--color-brand)/20',
           'disabled:pointer-events-none disabled:opacity-40',
-          tone === 'danger' ? 'hover:text-(--color-danger)' : 'hover:text-(--color-text)',
+          tone === 'danger' && 'hover:text-(--color-danger)',
+          tone === 'default' && 'hover:text-(--color-text)',
+          tone === 'brand' &&
+            'border-(--color-brand)/30 text-(--color-brand) hover:border-(--color-brand) hover:bg-(--color-brand)/10',
         )}
       >
         <Icon className="size-4" aria-hidden="true" />
