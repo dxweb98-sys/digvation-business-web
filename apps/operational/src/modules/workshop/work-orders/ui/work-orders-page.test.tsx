@@ -54,6 +54,7 @@ function workOrder(index: number) {
     vehicleChassisNumberSnapshot: 'CH',
     customerRequest: `rem bunyi ${index}`,
     cancellationReason: null,
+    mechanic: null,
     version: 1,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),

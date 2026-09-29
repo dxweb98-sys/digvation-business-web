@@ -42,6 +42,22 @@ describe('operational localization', () => {
     expect(operationalLabel('SYSTEM', 'id-ID')).toBe('Sistem');
   });
 
+  it('translates mechanic assignment copy and availability without leaking raw values', () => {
+    expect(operationalCopy('Mechanic', 'id-ID')).toBe('Mekanik');
+    expect(operationalCopy('Not assigned yet', 'id-ID')).toBe('Belum ada mekanik');
+    expect(operationalCopy('Assign mechanic', 'id-ID')).toBe('Tugaskan mekanik');
+    expect(operationalLabel('AVAILABLE', 'id-ID')).toBe('Tersedia');
+    expect(operationalLabel('BUSY', 'id-ID')).toBe('Sibuk');
+    expect(operationalLabel('INELIGIBLE', 'id-ID')).toBe('Tidak tersedia');
+    expect(
+      operationalCopy(
+        'This mechanic is already working on another Work Order. Pause or finish it first.',
+        'id-ID',
+      ),
+    ).toBe('Mekanik ini sedang mengerjakan Work Order lain. Jeda atau selesaikan dulu.');
+    expect(operationalCopy('Assign mechanic', 'en-US')).toBe('Assign mechanic');
+  });
+
   it('translates the Workshop work-status lifecycle vocabulary', () => {
     expect(operationalLabel('WAITING', 'id-ID')).toBe('Menunggu');
     expect(operationalLabel('ASSIGNED', 'id-ID')).toBe('Ditugaskan');

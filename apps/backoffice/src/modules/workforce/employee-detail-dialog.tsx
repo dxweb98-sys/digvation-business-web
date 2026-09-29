@@ -7,9 +7,11 @@ import {
   DRangeDatePicker,
   DSelect,
   DSkeleton,
+  DToggle,
+  useToast,
   type TableColumn,
 } from '@digvation/ui';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState, type ReactNode } from 'react';
 
 import type {
@@ -19,6 +21,7 @@ import type {
   EmployeeAttendance,
   EmployeeDetail,
   EmployeeStatusHistoryEntry,
+  WorkshopMechanicProfile,
 } from './employees-api';
 import { AttendanceBadge } from './attendance-panel';
 import { useWorkforceLocalization } from './workforce-localization';
@@ -35,6 +38,7 @@ export function EmployeeDetailDialog({
   isError,
   api,
   attendanceEnabled,
+  workshopMechanic,
   onClose,
 }: {
   open: boolean;
@@ -43,6 +47,8 @@ export function EmployeeDetailDialog({
   isError: boolean;
   api: EmployeesApi;
   attendanceEnabled: boolean;
+  /** Present only when the Workshop product is entitled; `canUpdate` follows employees:update. */
+  workshopMechanic?: { canUpdate: boolean };
   onClose: () => void;
 }) {
   const { copy, formatDate, locale } = useWorkforceLocalization();
@@ -241,6 +247,14 @@ export function EmployeeDetailDialog({
               </DetailGrid>
             </section>
 
+            {workshopMechanic ? (
+              <WorkshopMechanicSection
+                api={api}
+                employee={employee}
+                canUpdate={workshopMechanic.canUpdate}
+              />
+            ) : null}
+
             {attendanceEnabled ? (
               <section className="border-b border-[var(--color-border)] py-5">
                 <h3 className="text-base font-semibold text-[var(--color-text)]">
@@ -414,6 +428,111 @@ export function EmployeeDetailDialog({
         )
       )}
     </DDialog>
+  );
+}
+
+const mechanicProfilesKey = ['workshop', 'mechanic-profiles'] as const;
+
+/**
+ * Workshop-specific extension of the canonical Employee. Only eligibility is
+ * stored by Workshop; identity and status are shown from Workforce above.
+ */
+function WorkshopMechanicSection({
+  api,
+  employee,
+  canUpdate,
+}: {
+  api: EmployeesApi;
+  employee: EmployeeDetail;
+  canUpdate: boolean;
+}) {
+  const { copy } = useWorkforceLocalization();
+  const { showToast } = useToast();
+  const queryClient = useQueryClient();
+  const profiles = useQuery({
+    queryKey: mechanicProfilesKey,
+    queryFn: () => api.listWorkshopMechanicProfiles(),
+  });
+  const profile: WorkshopMechanicProfile | undefined = profiles.data?.items.find(
+    (item) => item.employeeId === employee.id,
+  );
+  const eligible = profile?.eligible ?? false;
+
+  const save = useMutation({
+    mutationFn: (next: boolean) =>
+      api.setWorkshopMechanicProfile(employee.id, next, profile?.version),
+    onSuccess: () => {
+      showToast({ variant: 'success', title: copy('Mechanic setting saved.') });
+    },
+    onError: (error) => {
+      const stale = (error as { status?: number } | undefined)?.status === 409;
+      showToast({
+        variant: 'danger',
+        title: copy(
+          stale
+            ? 'This setting was just changed. Reopen the employee and try again.'
+            : 'Could not save the mechanic setting. Try again.',
+        ),
+      });
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: mechanicProfilesKey }),
+  });
+
+  // Workforce stays the authority on Employee status: an inactive Employee is
+  // never presented as an available mechanic, whatever the Workshop profile says.
+  const employeeActive = employee.status === 'ACTIVE';
+  const activeMechanic = employeeActive && eligible;
+  const statusLabel = !employeeActive
+    ? 'Employee is inactive'
+    : eligible
+      ? 'Active mechanic'
+      : 'Not a mechanic';
+  const statusHelper = !employeeActive
+    ? 'The employee must be active before they can be assigned as a mechanic.'
+    : eligible
+      ? 'This employee can be selected and assigned to workshop Work Orders.'
+      : 'Turn this on if this employee works as a workshop mechanic.';
+
+  return (
+    <section className="border-b border-[var(--color-border)] py-5">
+      <h3 className="text-base font-semibold text-[var(--color-text)]">
+        {copy('Workshop mechanic')}
+      </h3>
+      <div className="mt-4">
+        {profiles.isLoading ? (
+          <DSkeleton className="h-8 w-64" />
+        ) : profiles.isError ? (
+          <p className="text-sm text-[var(--color-text-muted)]">
+            {copy('Could not load the mechanic setting.')}
+          </p>
+        ) : (
+          <div className="space-y-4">
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+                {copy('Mechanic status')}
+              </p>
+              <div className="mt-1.5">
+                <DBadge variant={activeMechanic ? 'success' : 'secondary'}>
+                  {copy(statusLabel)}
+                </DBadge>
+              </div>
+              <p className="mt-1.5 max-w-3xl text-sm text-[var(--color-text-muted)]">
+                {copy(statusHelper)}
+              </p>
+            </div>
+            {canUpdate && employeeActive ? (
+              <DToggle
+                checked={save.isPending ? Boolean(save.variables) : eligible}
+                disabled={save.isPending}
+                label={copy('Active as a mechanic')}
+                ariaLabel={copy('Active as a mechanic')}
+                onChange={(next) => save.mutate(next)}
+              />
+            ) : null}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 
