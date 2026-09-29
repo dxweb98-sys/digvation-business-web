@@ -1,5 +1,6 @@
 import { useRuntime } from '@digvation/business-runtime';
 
+import { operationalMemberCopy } from './operational-member-copy';
 import { operationalPosCopy } from './operational-pos-copy';
 
 export type OperationalLocale = 'id-ID' | 'en-US';
@@ -616,7 +617,12 @@ export function resolveOperationalLocale(locale: string | undefined): Operationa
 }
 
 export function operationalCopy(value: string, locale: OperationalLocale): string {
-  return copy[value]?.[locale] ?? operationalPosCopy(value, locale) ?? value;
+  return (
+    copy[value]?.[locale] ??
+    operationalPosCopy(value, locale) ??
+    operationalMemberCopy(value, locale) ??
+    value
+  );
 }
 
 export function operationalLabel(value: string, locale: OperationalLocale): string {
