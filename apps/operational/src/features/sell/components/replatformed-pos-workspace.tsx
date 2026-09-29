@@ -74,6 +74,7 @@ import { cashierTransactionKeys } from '../cashier-transaction-keys';
 import { cashierTransactionErrorMessage, correctionErrorMessage } from '../cashier-transaction-errors';
 import type { ReplaceLinePreview, ReplaceSaleLineInput } from '../cashier-transaction.adapter';
 import { replacementLinesOf } from '../cart-draft';
+import { visibleCatalogItems } from '../selling-catalog-eligibility';
 import { saleLineConfiguration } from '../sale-line-additions';
 import { ItemConfigurator, type ItemConfiguration, type ItemConfiguratorState } from './item-configurator';
 import { CustomerMemberApi, type MemberLookupResult } from '../customer-member-api';
@@ -925,14 +926,15 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       ),
     [workspace.categories, workspace.items],
   );
-  const visibleItems = useMemo(() => {
-    const needle = search.trim().toLowerCase();
-    return workspace.items.filter(
-      (item) =>
-        (!selectedCategory || item.categoryId === selectedCategory) &&
-        (!needle || `${item.name} ${item.code}`.toLowerCase().includes(needle)),
-    );
-  }, [search, selectedCategory, workspace.items]);
+  const visibleItems = useMemo(
+    () =>
+      visibleCatalogItems(workspace.items, {
+        search,
+        categoryId: selectedCategory,
+        locale: workspace.locale,
+      }),
+    [search, selectedCategory, workspace.items, workspace.locale],
+  );
   const groups = useMemo(() => {
     const locationRecords = (transactionsQuery.data?.items ?? []).filter(
       (record) => record.sellingLocationId === workspace.selectedLocationId,
@@ -1678,7 +1680,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
               <SearchInput
                 value={search}
                 onChange={setSearch}
-                placeholder={copy('Search items...')}
+                placeholder={copy('Search item or variant...')}
                 debounceMs={0}
                 expandedWidth="min(280px, calc(100vw - 140px))"
               />

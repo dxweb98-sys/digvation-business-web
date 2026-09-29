@@ -214,7 +214,10 @@ const copy: Record<string, LocalizedLabel> = {
   Product: { 'id-ID': 'Produk', 'en-US': 'Product' },
   Service: { 'id-ID': 'Layanan', 'en-US': 'Service' },
   All: { 'id-ID': 'Semua', 'en-US': 'All' },
-  'Search items...': { 'id-ID': 'Cari item...', 'en-US': 'Search items...' },
+  'Search item or variant...': {
+    'id-ID': 'Cari item atau varian...',
+    'en-US': 'Search item or variant...',
+  },
   'No items found': { 'id-ID': 'Item tidak ditemukan', 'en-US': 'No items found' },
   'Transaction needs attention': {
     'id-ID': 'Transaksi perlu diperiksa',

@@ -5,7 +5,7 @@ import { referenceQueryPolicy } from '../../app/data/operational-cache-policy';
 import type { SellingCatalogQuery } from './cashier-transaction.adapter';
 import { cashierTransactionKeys } from './cashier-transaction-keys';
 import type { CatalogItem, CatalogVariant } from './cashier-transaction.types';
-import { isStandaloneSellable } from './selling-catalog-eligibility';
+import { catalogItemMatchesSearch, isStandaloneSellable } from './selling-catalog-eligibility';
 import type { OperationalProjectionQuery } from './operational-projection-client';
 
 export type CatalogItemTypeFilter = 'ALL' | 'PRODUCT' | 'SERVICE';
@@ -55,8 +55,7 @@ export function useSellingCatalog({
     const normalizedSearch = search.trim().toLocaleLowerCase(locale);
     return activeItems.filter((item) => {
       if (itemType !== 'ALL' && item.type !== itemType) return false;
-      if (!normalizedSearch) return true;
-      return `${item.name} ${item.code}`.toLocaleLowerCase(locale).includes(normalizedSearch);
+      return catalogItemMatchesSearch(item, normalizedSearch, locale);
     });
   }, [activeItems, itemType, locale, search]);
 
