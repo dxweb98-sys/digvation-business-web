@@ -39,7 +39,7 @@ export interface PointLedgerEntry {
   createdAt: string;
 }
 
-export interface MemberLatestTransaction {
+export interface MemberTransaction {
   saleId: string;
   saleNumber: string;
   currency: string;
@@ -53,7 +53,10 @@ export interface MemberDetail {
   membership: Member;
   /** Null when Loyalty Points is not part of the business's entitlements. */
   loyalty: { pointsBalance: string; recentActivity: PointLedgerEntry[] } | null;
-  latestTransaction: MemberLatestTransaction | null;
+  /** Most recent finalized Sales of this Member, newest first. Bounded by Runtime (10). */
+  recentTransactions: MemberTransaction[];
+  /** All finalized Sales of this Member, to disclose when only the most recent are shown. */
+  transactionTotal: number;
 }
 
 export const MEMBER_PAGE_SIZE = 20;
