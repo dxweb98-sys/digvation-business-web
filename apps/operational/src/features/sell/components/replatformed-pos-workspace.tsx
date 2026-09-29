@@ -177,6 +177,7 @@ import {
 import './replatformed-pos-workspace.css';
 import { CustomerMemberDialog } from './customer-member-dialog';
 import { useCustomerPickerSession } from '../customer-picker-session';
+import { canAdjustOrder } from '../sale-adjustment-access';
 
 type Workspace = ReturnType<typeof useCashierTransactionWorkspace>;
 type QueueStatus = 'QUEUED' | 'PROGRESS' | 'COMPLETED' | 'CANCELED';
@@ -1287,6 +1288,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
 
   const openAdjustment = async (transaction: Sale) => {
     if (transaction.status !== 'OPEN') return;
+    // Runtime enforces this too; never open a dialog that can only end in a refusal.
+    if (!canAdjustOrder(transaction, session.access.permissions)) return;
     setQueueDetail(null);
     try {
       const hydrated = await workspace.hydrateQueuedSale(transaction.id);
@@ -1658,6 +1661,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           locale={workspace.locale}
           onStartWork={(transaction) => void startQueuedWork(transaction)}
           onAdjust={openAdjustment}
+          canAdjust={(transaction) => canAdjustOrder(transaction, session.access.permissions)}
           onPay={(transaction) => void openQueuePayment(transaction)}
           onCancel={requestCancel}
           onView={(transaction) => {
@@ -1989,7 +1993,11 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         onPreview={(line, input) => workspace.previewLineCorrection(line, input)}
         loadConfiguratorState={workspace.loadConfiguratorState}
         loadCandidates={workspace.loadComponentCandidates}
-        canCorrectProgressedLine={session.access.permissions.includes('sales:correct-progressed-line')}
+        canAdjust={
+          displayedAdjustmentTarget
+            ? canAdjustOrder(displayedAdjustmentTarget, session.access.permissions)
+            : true
+        }
         canRefundPayment={session.access.permissions.includes('payments:refund')}
         onCompensate={(sale, paymentId, amount) => workspace.compensateOpenPayment(sale, paymentId, amount)}
       />
@@ -2269,6 +2277,7 @@ function ReferenceQueueBoard({
   locale,
   onStartWork,
   onAdjust,
+  canAdjust,
   onPay,
   onCancel,
   onView,
@@ -2286,6 +2295,7 @@ function ReferenceQueueBoard({
   locale: string;
   onStartWork: (sale: Sale) => void;
   onAdjust: (sale: Sale) => void;
+  canAdjust: (sale: Sale) => boolean;
   onPay: (sale: Sale) => void;
   onCancel: (sale: Sale) => void;
   onView: (sale: Sale) => void;
@@ -2398,6 +2408,7 @@ function ReferenceQueueBoard({
                                   issues={issues[sale.id] ?? []}
                                   onStartWork={onStartWork}
                                   onAdjust={onAdjust}
+                                  canAdjust={canAdjust(sale)}
                                   onPay={onPay}
                                   onCancel={onCancel}
                                   onView={onView}
@@ -2499,6 +2510,7 @@ export function ReferenceQueueCard({
   issues,
   onStartWork,
   onAdjust,
+  canAdjust,
   onPay,
   onCancel,
   onView,
@@ -2511,6 +2523,8 @@ export function ReferenceQueueCard({
   issues: string[];
   onStartWork: (sale: Sale) => void;
   onAdjust: (sale: Sale) => void;
+  /** False when the session lacks the permission to adjust this Sale in its current state. */
+  canAdjust: boolean;
   onPay: (sale: Sale) => void;
   onCancel: (sale: Sale) => void;
   onView: (sale: Sale) => void;
@@ -2559,11 +2573,15 @@ export function ReferenceQueueCard({
                 },
               ]
             : []),
-          {
-            label: copy('Adjust order'),
-            icon: <ShoppingBag className="size-3.5" />,
-            onSelect: () => onAdjust(sale),
-          },
+          ...(canAdjust
+            ? [
+                {
+                  label: copy('Adjust order'),
+                  icon: <ShoppingBag className="size-3.5" />,
+                  onSelect: () => onAdjust(sale),
+                },
+              ]
+            : []),
           ...(isPositiveDecimal(balanceDue)
             ? [
                 {
@@ -2583,11 +2601,15 @@ export function ReferenceQueueCard({
       : []),
     ...(status === 'PROGRESS'
       ? [
-          {
-            label: copy('Adjust order'),
-            icon: <ShoppingBag className="size-3.5" />,
-            onSelect: () => onAdjust(sale),
-          },
+          ...(canAdjust
+            ? [
+                {
+                  label: copy('Adjust order'),
+                  icon: <ShoppingBag className="size-3.5" />,
+                  onSelect: () => onAdjust(sale),
+                },
+              ]
+            : []),
           ...(isPositiveDecimal(balanceDue)
             ? [
                 {
@@ -5175,7 +5197,7 @@ export function ReferenceOrderAdjustmentDialog({
   sale,
   items,
   locale,
-  isMutating,
+  isMutating: mutating,
   variantPicker,
   onClose,
   onAdd,
@@ -5186,7 +5208,7 @@ export function ReferenceOrderAdjustmentDialog({
   onPreview,
   loadConfiguratorState,
   loadCandidates,
-  canCorrectProgressedLine,
+  canAdjust,
   canRefundPayment,
   onCompensate,
 }: {
@@ -5207,11 +5229,14 @@ export function ReferenceOrderAdjustmentDialog({
   /** Everything the shared item configuration needs for one item at this location. */
   loadConfiguratorState: (item: CatalogItem) => Promise<ItemConfiguratorState>;
   loadCandidates: (q: string) => Promise<{ items: ComponentCandidate[] }>;
-  canCorrectProgressedLine: boolean;
+  /** Session may adjust this Sale in its current state (see `canAdjustOrder`). */
+  canAdjust: boolean;
   canRefundPayment: boolean;
   onCompensate: (sale: Sale, paymentId: string, amount: string) => Promise<unknown>;
 }) {
   const { copy } = useOperationalLocalization();
+  // Without the adjustment permission every mutating control is off; closing stays available.
+  const isMutating = mutating || !canAdjust;
   const [catalogSearch, setCatalogSearch] = useState('');
   const [catalogOpen, setCatalogOpen] = useState(false);
   // Quantities when the dialog opened; only rows that differ show what changed.
@@ -5243,7 +5268,6 @@ export function ReferenceOrderAdjustmentDialog({
   const [correctionPreview, setCorrectionPreview] = useState<ReplaceLinePreview | null>(null);
   const [previewState, setPreviewState] = useState<'IDLE' | 'LOADING' | 'ERROR'>('IDLE');
   const [previewError, setPreviewError] = useState<string | null>(null);
-  const [progressedCorrectionNotice, setProgressedCorrectionNotice] = useState<string | null>(null);
   const previewRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
     // Keep the authoritative result in view; it renders below the form.
@@ -5305,10 +5329,6 @@ export function ReferenceOrderAdjustmentDialog({
       label: `${item.name} (${item.code})`,
     }));
   const correctionSource = correctionLine;
-  const correctionProgressed =
-    correctionSource != null &&
-    saleLineWorkStatus(correctionSource) !== null &&
-    saleLineWorkStatus(correctionSource) !== 'WAITING';
   // The selected item stays in the option list so its label remains visible while searching.
   const replacementOptions = (() => {
     const query = replacementSearch.trim().toLocaleLowerCase();
@@ -5424,7 +5444,7 @@ export function ReferenceOrderAdjustmentDialog({
                 {copy('Cancel')}
               </Button>
             )}
-            <Button disabled={isMutating} onClick={onClose}>
+            <Button disabled={mutating} onClick={onClose}>
               {copy('Save adjustment')}
             </Button>
           </div>
@@ -5520,14 +5540,15 @@ export function ReferenceOrderAdjustmentDialog({
                   {sale.status === 'OPEN' ? (
                     <button
                       type="button"
-                      disabled={isMutating}
+                      // Runtime never replaces a tracked line whose work has started; no permission
+                      // overrides that, so the action is simply unavailable for it.
+                      disabled={isMutating || progressed}
+                      title={
+                        progressed
+                          ? 'Item yang sudah dikerjakan tidak dapat dikoreksi.'
+                          : undefined
+                      }
                       onClick={() => {
-                        if (progressed && !canCorrectProgressedLine) {
-                          setProgressedCorrectionNotice(
-                            'Koreksi setelah pengerjaan dimulai memerlukan pengguna yang berwenang.',
-                          );
-                          return;
-                        }
                         setCorrectionLine(line);
                         setReplacementItemId(line.catalogItemId);
                         loadReplacementState(line.catalogItemId);
@@ -5540,7 +5561,6 @@ export function ReferenceOrderAdjustmentDialog({
                         setCorrectionReason('');
                         setCorrectionPreview(null);
                         setPreviewState('IDLE');
-                        setProgressedCorrectionNotice(null);
                       }}
                       className="ml-1 rounded-lg px-2 text-xs font-semibold text-[var(--color-brand)] hover:bg-[var(--color-brand)]/10 disabled:opacity-40"
                     >
@@ -5552,9 +5572,6 @@ export function ReferenceOrderAdjustmentDialog({
             );
           })}
         </ul>
-        {progressedCorrectionNotice ? (
-          <DAlert variant="warning">{progressedCorrectionNotice}</DAlert>
-        ) : null}
         {removedCount ? (
           <p className="text-xs text-[var(--color-text-muted)]">
             {removedCount} {copy('items removed')}
@@ -5757,11 +5774,6 @@ export function ReferenceOrderAdjustmentDialog({
                   {quantity(correctionLine.quantity)} × {money(correctionLine.effectiveUnitPrice, locale)}
                 </p>
               </div>
-              {correctionProgressed ? (
-                <DAlert variant="warning" className="text-xs">
-                  Pengerjaan item ini sudah dimulai. Riwayat pengerjaan tetap disimpan setelah koreksi.
-                </DAlert>
-              ) : null}
             </div>
             <div className="space-y-3 border-t border-[var(--color-border)] pt-4">
               <Combobox

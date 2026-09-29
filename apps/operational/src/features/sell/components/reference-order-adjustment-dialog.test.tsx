@@ -38,7 +38,7 @@ const previewOf = (overrides: Partial<ReplaceLinePreview> = {}): ReplaceLinePrev
 
 function renderDialog(options: {
   sale?: Sale;
-  canCorrectProgressedLine?: boolean;
+  canAdjust?: boolean;
   canRefundPayment?: boolean;
   correctResult?: Sale;
   items?: CatalogItem[];
@@ -48,6 +48,7 @@ function renderDialog(options: {
   previewError?: Error;
   correctError?: Error;
 } = {}) {
+  const onAdd = vi.fn();
   const onPreview = vi.fn<CorrectionPreview>(async () => options.preview ?? previewOf());
   const onCompensate = vi.fn(async () => {
     if (options.compensateError) throw options.compensateError;
@@ -62,8 +63,8 @@ function renderDialog(options: {
     item, variants: [], itemPrice: '100000.0000', locale: 'id-ID', currency: 'IDR',
   }));
   const loadCandidates = vi.fn(async () => ({ items: [] }));
-  const view = render(<DeploymentBootstrapProvider config={bootstrap}><QueryClientProvider client={new QueryClient()}><DToastProvider><ReferenceOrderAdjustmentDialog sale={options.sale ?? sale()} items={options.items ?? items} locale="id-ID" isMutating={false} variantPicker={null} onClose={vi.fn()} onAdd={vi.fn()} onAddVariant={vi.fn()} onQuantity={vi.fn()} onRemove={vi.fn()} onCorrect={onCorrect} onPreview={onPreview} loadConfiguratorState={loadConfiguratorState} loadCandidates={loadCandidates} canCorrectProgressedLine={options.canCorrectProgressedLine ?? false} canRefundPayment={options.canRefundPayment ?? false} onCompensate={onCompensate} /></DToastProvider></QueryClientProvider></DeploymentBootstrapProvider>);
-  return { onPreview, onCompensate, onCorrect, loadConfiguratorState, ...view };
+  const view = render(<DeploymentBootstrapProvider config={bootstrap}><QueryClientProvider client={new QueryClient()}><DToastProvider><ReferenceOrderAdjustmentDialog sale={options.sale ?? sale()} items={options.items ?? items} locale="id-ID" isMutating={false} variantPicker={null} onClose={vi.fn()} onAdd={onAdd} onAddVariant={vi.fn()} onQuantity={vi.fn()} onRemove={vi.fn()} onCorrect={onCorrect} onPreview={onPreview} loadConfiguratorState={loadConfiguratorState} loadCandidates={loadCandidates} canAdjust={options.canAdjust ?? true} canRefundPayment={options.canRefundPayment ?? false} onCompensate={onCompensate} /></DToastProvider></QueryClientProvider></DeploymentBootstrapProvider>);
+  return { onAdd, onPreview, onCompensate, onCorrect, loadConfiguratorState, ...view };
 }
 
 function correctedSale(method: 'CASH' | 'BANK_TRANSFER' = 'CASH') {
@@ -93,18 +94,37 @@ async function previewAndConfirm() {
 
 describe('ReferenceOrderAdjustmentDialog progressed correction', () => {
   afterEach(cleanup);
-  it('keeps OPEN IN_PROGRESS sales eligible, while explaining missing progressed-line authorization without exposing a permission key', () => {
-    renderDialog({ sale: sale('OPEN', 'IN_PROGRESS') });
-    fireEvent.click(screen.getByRole('button', { name: 'Koreksi item' }));
-    expect(screen.getByText('Koreksi setelah pengerjaan dimulai memerlukan pengguna yang berwenang.')).toBeTruthy();
-    expect(screen.queryByText('sales:correct-progressed-line')).toBeNull();
+  it('presents an already-progressed tracked line as not correctable, whatever the permissions', () => {
+    for (const status of ['IN_PROGRESS', 'COMPLETED'] as const) {
+      const { unmount } = renderDialog({ sale: sale('OPEN', status), canAdjust: true });
+      const correct = screen.getByRole('button', { name: 'Koreksi item' }) as HTMLButtonElement;
+      expect(correct.disabled).toBe(true);
+      expect(correct.title).toBe('Item yang sudah dikerjakan tidak dapat dikoreksi.');
+      fireEvent.click(correct);
+      expect(screen.queryByText('Item saat ini')).toBeNull();
+      // No permission-key text and no dead authorization message anywhere.
+      expect(document.body.textContent).not.toMatch(/correct-progressed-line/);
+      expect(document.body.textContent).not.toMatch(/memerlukan pengguna yang berwenang/);
+      unmount();
+    }
   });
 
-  it('allows an authorized progressed correction and warns that work history is retained', () => {
-    renderDialog({ sale: sale('OPEN', 'COMPLETED'), canCorrectProgressedLine: true });
-    fireEvent.click(screen.getByRole('button', { name: 'Koreksi item' }));
-    expect(screen.getByText('Pengerjaan item ini sudah dimulai. Riwayat pengerjaan tetap disimpan setelah koreksi.')).toBeTruthy();
-    expect((screen.getByRole('button', { name: 'Konfirmasi koreksi' }) as HTMLButtonElement).disabled).toBe(true);
+  it('turns every mutating control off when the session may not adjust this Sale', () => {
+    renderDialog({ sale: sale('OPEN', 'WAITING'), canAdjust: false });
+    expect((screen.getByRole('button', { name: 'Koreksi item' }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+    expect(
+      (screen.getByRole('button', { name: /Tambah jumlah Smoothing Curly/ }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    expect(
+      (screen.getByRole('button', { name: /Hapus Smoothing Curly/ }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+    // Closing stays possible.
+    expect((screen.getByRole('button', { name: 'Simpan penyesuaian' }) as HTMLButtonElement).disabled).toBe(
+      false,
+    );
   });
 
   it('keeps WAITING lines on the ordinary correction path and hides correction for FINALIZED sales', () => {
@@ -112,7 +132,7 @@ describe('ReferenceOrderAdjustmentDialog progressed correction', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Koreksi item' }));
     expect(screen.getByText('Item saat ini')).toBeTruthy();
     unmount();
-    renderDialog({ sale: sale('FINALIZED', 'COMPLETED'), canCorrectProgressedLine: true });
+    renderDialog({ sale: sale('FINALIZED', 'COMPLETED') });
     expect(screen.queryByRole('button', { name: 'Koreksi item' })).toBeNull();
   });
 
@@ -172,9 +192,10 @@ describe('ReferenceOrderAdjustmentDialog progressed correction', () => {
     const source = { ...base.lines[0]!, id: 'source-line', removedAt: '2026-09-02T00:04:00.000Z' };
     const replacement = { ...base.lines[0]!, id: 'replacement-line', catalogItemId: 'replacement-item', itemNameSnapshot: 'Hair Color', fulfillment: null, workLineage: { sourceLineId: 'source-line', sourceItemName: 'Smoothing Curly', status: 'COMPLETED' } };
     renderDialog({ sale: { ...base, lines: [source, replacement] } as unknown as Sale });
-    fireEvent.click(screen.getByRole('button', { name: 'Koreksi item' }));
-    // Without progressed-line authorization, the corrected replacement is guarded like the worked line it follows.
-    expect(screen.getByText('Koreksi setelah pengerjaan dimulai memerlukan pengguna yang berwenang.')).toBeTruthy();
+    // The corrected replacement is guarded like the worked line it follows: unavailable, no matter the permissions.
+    const correct = screen.getByRole('button', { name: 'Koreksi item' }) as HTMLButtonElement;
+    expect(correct.disabled).toBe(true);
+    fireEvent.click(correct);
     expect(screen.queryByText('Item saat ini')).toBeNull();
   });
 
@@ -270,5 +291,46 @@ describe('ReferenceOrderAdjustmentDialog — full item configuration in a correc
     await openCorrection();
     fireEvent.click(screen.getByRole('button', { name: 'Lihat dampak' }));
     expect(await screen.findByText('Koreksi tidak dapat dipratinjau. Muat ulang transaksi lalu coba lagi.')).toBeTruthy();
+  });
+});
+
+describe('ReferenceOrderAdjustmentDialog adding to an in-progress order', () => {
+  afterEach(cleanup);
+  const catalog = [
+    { id: 'shampoo', code: 'SHP', name: 'Shampoo Premium', type: 'PRODUCT', variantSelectionMode: 'NONE', variants: [] },
+    { id: 'cut', code: 'CUT', name: 'Hair Cut', type: 'SERVICE', variantSelectionMode: 'NONE', variants: [] },
+  ] as unknown as CatalogItem[];
+
+  async function addFromCatalog(name: RegExp, view: ReturnType<typeof renderDialog>) {
+    fireEvent.click(screen.getByRole('button', { name: 'Tambah item dari katalog' }));
+    const input = screen.getByRole('combobox', { name: 'Tambah item dari katalog' });
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: 'S' } });
+    fireEvent.click(await screen.findByRole('option', { name }));
+    return view;
+  }
+
+  it('lets an authorized operator add a Product', async () => {
+    const view = renderDialog({ sale: sale('OPEN', 'IN_PROGRESS'), items: catalog, canAdjust: true });
+    await addFromCatalog(/Shampoo Premium/, view);
+    expect(view.onAdd).toHaveBeenCalledWith(expect.objectContaining({ id: 'shampoo' }));
+  });
+
+  it('lets an authorized operator add a Service', async () => {
+    const view = renderDialog({ sale: sale('OPEN', 'IN_PROGRESS'), items: catalog, canAdjust: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Tambah item dari katalog' }));
+    const input = screen.getByRole('combobox', { name: 'Tambah item dari katalog' });
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: 'Hair' } });
+    fireEvent.click(await screen.findByRole('option', { name: /Hair Cut/ }));
+    expect(view.onAdd).toHaveBeenCalledWith(expect.objectContaining({ id: 'cut' }));
+  });
+
+  it('cannot add anything without the adjustment permission', () => {
+    const view = renderDialog({ sale: sale('OPEN', 'IN_PROGRESS'), items: catalog, canAdjust: false });
+    const add = screen.getByRole('button', { name: 'Tambah item dari katalog' }) as HTMLButtonElement;
+    expect(add.disabled).toBe(true);
+    fireEvent.click(add);
+    expect(view.onAdd).not.toHaveBeenCalled();
   });
 });
