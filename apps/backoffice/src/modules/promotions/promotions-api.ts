@@ -2,6 +2,8 @@ import type { ApiClient } from '@digvation/business-api';
 
 export type PromotionMode = 'AUTOMATIC' | 'CODE';
 export type PromotionScope = 'ITEM' | 'CATEGORY' | 'TRANSACTION';
+/** MEMBERS_ONLY applies only to Sales with an active Member; Runtime decides eligibility. */
+export type PromotionAudience = 'ALL' | 'MEMBERS_ONLY';
 export type PromotionDiscountType = 'PERCENTAGE' | 'FIXED_AMOUNT';
 export type PromotionStatus = 'ACTIVE' | 'SCHEDULED' | 'EXPIRED' | 'DISABLED';
 
@@ -27,7 +29,7 @@ export interface Promotion {
   mode: PromotionMode;
   code: string | null;
   scope: PromotionScope;
-  audience: 'ALL';
+  audience: PromotionAudience;
   discountType: PromotionDiscountType;
   discountValue: string;
   currency: string | null;
@@ -51,6 +53,8 @@ export interface PromotionWriteInput {
   mode: PromotionMode;
   code: string | null;
   scope: PromotionScope;
+  /** Omitted: ALL on create, unchanged on update. */
+  audience?: PromotionAudience;
   discountType: PromotionDiscountType;
   discountValue: string;
   currency: string | null;

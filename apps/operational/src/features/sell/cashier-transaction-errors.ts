@@ -19,6 +19,7 @@ const PROMOTION_ERROR_COPY: Record<string, string> = {
   PROMOTION_CURRENCY_MISMATCH: 'This promo code is not valid for the transaction currency.',
   PROMOTION_MINIMUM_NOT_MET: 'The minimum purchase has not been met.',
   PROMOTION_TARGET_NOT_ELIGIBLE: 'This promo code does not apply to the items in this transaction.',
+  PROMOTION_MEMBER_REQUIRED: 'This promotion is for active members only.',
 };
 
 export function cashierTransactionErrorMessage(error: unknown, locale?: string): string {
