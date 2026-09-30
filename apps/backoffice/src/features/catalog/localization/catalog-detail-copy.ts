@@ -1,5 +1,5 @@
 export const catalogDetailCopy: Record<string, { id: string; en: string }> = {
-'Item image': { id: 'Gambar item', en: 'Item image' },
+  'Item image': { id: 'Gambar item', en: 'Item image' },
   'Catalog item image': { id: 'Gambar item katalog', en: 'Catalog item image' },
   'JPEG, PNG, or WebP. Maximum 1 MB. One primary image is kept per item.': {
     id: 'JPEG, PNG, atau WebP. Maksimum 1 MB.',
@@ -57,13 +57,4 @@ export const catalogDetailCopy: Record<string, { id: string; en: string }> = {
   Page: { id: 'Halaman', en: 'Page' },
   Previous: { id: 'Sebelumnya', en: 'Previous' },
   Next: { id: 'Berikutnya', en: 'Next' },
-  'Category added.': { id: 'Kategori ditambahkan.', en: 'Category added.' },
-  'Category updated.': { id: 'Kategori diperbarui.', en: 'Category updated.' },
-  'Variant added.': { id: 'Varian ditambahkan.', en: 'Variant added.' },
-  'Variant updated.': { id: 'Varian diperbarui.', en: 'Variant updated.' },
-  'Could not save category.': {
-    id: 'Kategori tidak dapat disimpan.',
-    en: 'Could not save category.',
-  },
-  'Could not save variant.': { id: 'Varian tidak dapat disimpan.', en: 'Could not save variant.' },
 };

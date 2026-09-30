@@ -15,11 +15,7 @@ import { CatalogItemSaveSummarySection } from './catalog-item-save-summary-secti
 import { CatalogItemVariantsSection } from './catalog-item-variants-section';
 import { useCatalogLocalization } from '../../localization/use-catalog-localization';
 import { variantPriceState } from '../../model/catalog-price-history';
-import {
-  CatalogPanel,
-  DialogFooter,
-  Status,
-} from '../../ui/catalog-shared';
+import { CatalogPanel, DialogFooter, Status } from '../../ui/catalog-shared';
 import { CatalogTabs } from '../../ui/catalog-tabs';
 import { editableAmount } from '../model/variant-price-draft';
 
@@ -34,6 +30,7 @@ export function CatalogItemDialog({
   canViewPricing,
   canCreatePricing,
   canCreateVariants,
+  canUpdateVariants,
   canManageImage,
   canEditComposition,
   onClose,
@@ -49,6 +46,7 @@ export function CatalogItemDialog({
   canViewPricing: boolean;
   canCreatePricing: boolean;
   canCreateVariants: boolean;
+  canUpdateVariants: boolean;
   canManageImage: boolean;
   canEditComposition: boolean;
   onClose: () => void;
@@ -74,11 +72,7 @@ export function CatalogItemDialog({
   const { name } = editor.form;
   const { touched: loyaltyTouched, behavior: loyaltyBehavior } = editor.loyalty;
   const { showIssues, saving } = editor.ui;
-  const {
-    hydrateDefaultPriceOnce,
-    hydrateVariantsOnce,
-    hydrateLoyaltyOnce,
-  } = editor.actions;
+  const { hydrateDefaultPriceOnce, hydrateVariantsOnce, hydrateLoyaltyOnce } = editor.actions;
   const effectiveAt = editor.effectiveAt;
 
   const {
@@ -102,21 +96,14 @@ export function CatalogItemDialog({
   });
 
   useEffect(() => {
-    if (
-      !canViewLoyalty ||
-      loyaltyConfiguration.isLoading ||
-      (item && loyaltyRules.isLoading)
-    ) {
+    if (!canViewLoyalty || loyaltyConfiguration.isLoading || (item && loyaltyRules.isLoading)) {
       return;
     }
 
     const behavior =
-      loyaltyRule?.behavior ??
-      loyaltyConfiguration.data?.defaultEarningBehavior ??
-      'FIXED';
+      loyaltyRule?.behavior ?? loyaltyConfiguration.data?.defaultEarningBehavior ?? 'FIXED';
     const points =
-      loyaltyRule?.fixedPointsPerUnit ??
-      loyaltyConfiguration.data?.defaultFixedPointsPerUnit;
+      loyaltyRule?.fixedPointsPerUnit ?? loyaltyConfiguration.data?.defaultFixedPointsPerUnit;
 
     hydrateLoyaltyOnce(behavior, points !== undefined ? String(points) : '');
   }, [
@@ -146,6 +133,7 @@ export function CatalogItemDialog({
         return {
           key: variant.id,
           id: variant.id,
+          record: variant,
           code: variant.code,
           name: variant.name,
           price: persistedPrice ? editableAmount(persistedPrice) : '',
@@ -227,6 +215,7 @@ export function CatalogItemDialog({
     model,
     parsedDefaultDuration,
     canCreateVariants,
+    canUpdateVariants,
     canCreatePricing,
     canEditPrice,
     canManageImage,
@@ -262,8 +251,7 @@ export function CatalogItemDialog({
         <DialogFooter
           onClose={onClose}
           onSave={() => {
-            const loyaltyInvalid =
-              canConfigureLoyalty && loyaltyTouched && !loyaltyDraftValid;
+            const loyaltyInvalid = canConfigureLoyalty && loyaltyTouched && !loyaltyDraftValid;
 
             if (!validDefaultDuration || loyaltyInvalid) {
               editor.actions.setShowIssues(true);
@@ -376,6 +364,7 @@ export function CatalogItemDialog({
                 canViewPricing={canViewPricing}
                 canEditPrice={canEditPrice}
                 canCreateVariants={canCreateVariants}
+                canUpdateVariants={canUpdateVariants}
                 variantPricesLoading={variantPricesLoading}
                 inactiveVariantCount={inactiveVariantCount}
               />

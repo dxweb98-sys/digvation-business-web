@@ -1,3 +1,5 @@
+import type { Variant } from '../../api/catalog-api';
+
 /**
  * Draft variant prices edited inside the Add/Edit item dialog before Runtime persists them.
  * Every variant carries its own final price; there is no inherited item price.
@@ -6,6 +8,8 @@ export interface VariantPriceDraft {
   key: string;
   /** Persisted variant id; null for a variant that is created on save. */
   id: string | null;
+  /** The variant as loaded, for its version and to detect name/code corrections. */
+  record?: Variant;
   code: string;
   name: string;
   price: string;
@@ -66,19 +70,39 @@ export function applyPriceToAllVariants(
   return drafts.map((draft) => ({ ...draft, price }));
 }
 
-export type VariantDraftIssue = 'NAME_REQUIRED' | 'PRICE_REQUIRED' | 'PRICE_INVALID';
+export type VariantDraftIssue =
+  'NAME_REQUIRED' | 'CODE_REQUIRED' | 'CODE_INVALID' | 'PRICE_REQUIRED' | 'PRICE_INVALID';
 
-/** A new variant needs a name and, when pricing is managed here, an explicit valid price. */
+/** Same format Runtime enforces for variant codes. */
+const VARIANT_CODE = /^[A-Z0-9][A-Z0-9._-]{0,63}$/;
+
+/**
+ * Every variant needs a name. A new variant may leave its code blank for Runtime to generate;
+ * an existing variant keeps a code. When pricing is managed here, a valid price is required.
+ */
 export function variantDraftIssue(
   draft: VariantPriceDraft,
   requirePrice: boolean,
 ): VariantDraftIssue | null {
-  if (!draft.id && !draft.name.trim()) return 'NAME_REQUIRED';
+  if (!draft.name.trim()) return 'NAME_REQUIRED';
+  const code = draft.code.trim().toUpperCase();
+  if (!code) {
+    if (draft.id) return 'CODE_REQUIRED';
+  } else if (!VARIANT_CODE.test(code)) return 'CODE_INVALID';
   if (!draft.price.trim()) {
     // Existing variants without a price may stay unchanged; new variants may not.
     return requirePrice && (!draft.id || draft.persistedPrice !== null) ? 'PRICE_REQUIRED' : null;
   }
   return isValidSellingPrice(draft.price) ? null : 'PRICE_INVALID';
+}
+
+/** Name/code correction for an existing variant, or null when its identity is unchanged. */
+export function variantIdentityChange(draft: VariantPriceDraft) {
+  if (!draft.record) return null;
+  const code = draft.code.trim().toUpperCase();
+  const name = draft.name.trim();
+  if (code === draft.record.code && name === draft.record.name) return null;
+  return { code, name };
 }
 
 /**
