@@ -1,14 +1,10 @@
 import { formatMoney } from '@digvation/business-money';
-import { DAlert, DBadge, DButton, DSkeleton } from '@digvation/ui';
-import { ListPlus, Pencil, Plus } from 'lucide-react';
+import { DAlert, DButton, DSkeleton } from '@digvation/ui';
+import { ListPlus, Pencil, Plus, Wrench } from 'lucide-react';
 
 import { useOperationalLocalization } from '../../../../app/localization/operational-localization';
-import type {
-  WorkshopWorkOrderDetail,
-  WorkshopWorkOrderLine,
-} from '../api/workshop-lines-api';
+import type { WorkshopWorkOrderDetail, WorkshopWorkOrderLine } from '../api/workshop-lines-api';
 import type { WorkshopQueueWorkOrder } from '../api/workshop-queue-api';
-import { IconActionButton } from '../../shared/ui/icon-action-button';
 import { useWorkOrderItems } from '../model/use-work-order-items';
 import {
   canAdjustItems,
@@ -16,7 +12,10 @@ import {
   formatQuantity,
 } from '../model/work-order-lines-model';
 import { AdjustItemsDialog } from './adjust-items-dialog';
+import { ITEM_DETAIL, ITEM_META, ITEM_NAME, ITEM_VALUE } from './item-anatomy';
+import { ItemTypeMarker } from './item-type-marker';
 import { InitialItemsDialog } from './initial-items-dialog';
+import { CountPill, SectionHeader, SectionMark, SURFACE_RAISED } from './section-identity';
 import { WorkOrderItemHistory } from './work-order-item-history';
 
 /** One accepted item, rendered strictly from the snapshot Runtime returned. */
@@ -28,33 +27,34 @@ function AcceptedLine({ line }: { line: WorkshopWorkOrderLine }) {
   );
 
   return (
-    <li className="px-3.5 py-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-(--color-text)">
-            {line.itemName}
-            {line.variantName ? (
-              <span className="font-normal text-(--color-text-muted)"> - {line.variantName}</span>
-            ) : null}
+    <li className="px-4 py-4">
+      <div className="flex items-start gap-3">
+        <ItemTypeMarker type={line.itemType} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-3">
+            <p className={ITEM_NAME}>
+              {line.itemName}
+              {line.variantName ? (
+                <span className="font-normal text-(--color-text-muted)"> - {line.variantName}</span>
+              ) : null}
+            </p>
+            <p className={`shrink-0 text-[15px] ${ITEM_VALUE}`}>{money(line.lineAmount)}</p>
+          </div>
+          <p className={`mt-0.5 ${ITEM_META}`}>
+            {line.itemType === 'SERVICE' ? copy('Service') : copy('Spare part')}
           </p>
-          <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-(--color-text-muted)">
-            <DBadge variant="outline">
-              {line.itemType === 'SERVICE' ? copy('Service') : copy('Spare part')}
-            </DBadge>
-            <span className="tabular-nums">
-              {formatQuantity(line.quantity)} x {money(line.unitPrice)}
-            </span>
+          <p className={`${ITEM_META} tabular-nums`}>
+            {formatQuantity(line.quantity)} × {money(line.unitPrice)}
           </p>
+          {includes.length ? (
+            <p
+              className={`mt-2 line-clamp-3 break-words rounded-lg bg-(--color-surface-muted)/70 px-2.5 py-1.5 ${ITEM_DETAIL}`}
+            >
+              {copy('Includes')}: {includes.join(', ')}
+            </p>
+          ) : null}
         </div>
-        <p className="shrink-0 text-sm font-semibold tabular-nums text-(--color-text)">
-          {money(line.lineAmount)}
-        </p>
       </div>
-      {includes.length ? (
-        <p className="mt-1.5 text-[13px] leading-snug text-(--color-text-muted)">
-          {copy('Includes')}: {includes.join(', ')}
-        </p>
-      ) : null}
     </li>
   );
 }
@@ -86,85 +86,121 @@ export function WorkOrderItemsSection({
   const canAdjust = lines !== undefined && canAdjustItems(workOrder.workStatus, permissions);
 
   return (
-    <section aria-label={copy('Work Order items')} className="space-y-2">
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="text-[11px] font-semibold text-(--color-text-muted)">
-          {copy('Work Order items')}
-        </h3>
-        {canAdjust && lines.length > 0 ? (
-          <div className="flex items-center gap-1">
-            <IconActionButton
-              icon={Plus}
-              touch
-              label={copy('Add item')}
-              onClick={() => items.openAdjust({ addFirst: true })}
-            />
-            <IconActionButton
-              icon={Pencil}
-              touch
-              label={copy('Change items')}
-              onClick={() => items.openAdjust()}
-            />
-          </div>
-        ) : null}
-      </div>
+    <>
+      <section
+        aria-label={copy('Work Order items')}
+        className={`overflow-hidden rounded-2xl ${SURFACE_RAISED} lg:flex lg:min-h-0 lg:flex-1 lg:flex-col`}
+      >
+        <SectionHeader
+          icon={Wrench}
+          tone="work"
+          title={copy('Work Order items')}
+          className="border-b border-(--color-border) bg-(--color-brand)/[0.05]"
+          meta={
+            lines && lines.length > 0 ? (
+              <CountPill>
+                {lines.length} {copy('items')}
+              </CountPill>
+            ) : null
+          }
+          actions={
+            canAdjust && lines.length > 0 ? (
+              <>
+                <DButton
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => items.openAdjust({ addFirst: true })}
+                >
+                  <span className="inline-flex items-center gap-1.5">
+                    <Plus className="size-4" aria-hidden="true" />
+                    <span className="max-sm:sr-only">{copy('Add item')}</span>
+                  </span>
+                </DButton>
+                <DButton variant="secondary" size="sm" onClick={() => items.openAdjust()}>
+                  <span className="inline-flex items-center gap-1.5">
+                    <Pencil className="size-4" aria-hidden="true" />
+                    <span className="max-sm:sr-only">{copy('Change items')}</span>
+                  </span>
+                </DButton>
+              </>
+            ) : null
+          }
+        />
 
-      {items.detail.isError && !lines ? (
-        <div>
-          <DAlert variant="danger" title={copy('Could not load Work Order items.')} />
-          <DButton
-            variant="secondary"
-            size="sm"
-            className="mt-3"
-            onClick={() => void items.detail.refetch()}
-          >
-            {copy('Retry')}
-          </DButton>
-        </div>
-      ) : !lines ? (
-        <div aria-busy="true" className="space-y-2">
-          <DSkeleton className="h-14 w-full" />
-        </div>
-      ) : lines.length > 0 ? (
-        <>
-          <ul className="divide-y divide-(--color-border) rounded-lg border border-(--color-border)">
+        {items.detail.isError && !lines ? (
+          <div className="px-4 py-4">
+            <DAlert variant="danger" title={copy('Could not load Work Order items.')} />
+            <DButton
+              variant="secondary"
+              size="sm"
+              className="mt-3"
+              onClick={() => void items.detail.refetch()}
+            >
+              {copy('Retry')}
+            </DButton>
+          </div>
+        ) : !lines ? (
+          <div aria-busy="true" className="space-y-3 px-4 py-4">
+            <DSkeleton className="h-12 w-full" />
+            <DSkeleton className="h-12 w-full" />
+          </div>
+        ) : lines.length > 0 ? (
+          <ul className="divide-y divide-(--color-border) lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
             {lines.map((line) => (
               <AcceptedLine key={line.id} line={line} />
             ))}
           </ul>
-          <p className="text-[12px] text-(--color-text-muted)">
-            {copy('Prices are recorded when items are saved.')}
-          </p>
-          <WorkOrderItemHistory entries={adjustments} />
-        </>
-      ) : (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed border-(--color-border) px-3.5 py-3">
-          <p className="text-sm text-(--color-text-muted)">{copy('No items selected yet.')}</p>
-          {canSelect ? (
-            <DButton variant="secondary" size="sm" onClick={items.openPicker}>
-              <span className="inline-flex items-center gap-1.5">
-                <ListPlus className="size-4" aria-hidden="true" />
-                {copy('Select items')}
+        ) : (
+          <div className="flex flex-col items-center justify-center gap-1 px-6 py-12 text-center lg:min-h-0 lg:flex-1">
+            <span className="relative mb-3">
+              <SectionMark icon={Wrench} tone="work" size="lg" />
+              <span className="absolute -bottom-1 -right-1 grid size-6 place-items-center rounded-full bg-(--color-surface) text-(--color-brand) shadow-sm ring-1 ring-black/[0.08]">
+                <Plus className="size-3.5" aria-hidden="true" />
               </span>
-            </DButton>
-          ) : canAdjust ? (
-            <DButton
-              variant="secondary"
-              size="sm"
-              onClick={() => items.openAdjust({ addFirst: true })}
-            >
-              <span className="inline-flex items-center gap-1.5">
-                <Plus className="size-4" aria-hidden="true" />
-                {copy('Add item')}
-              </span>
-            </DButton>
-          ) : null}
-        </div>
-      )}
+            </span>
+            <p className="text-base font-semibold text-(--color-text)">
+              {copy('No work items yet')}
+            </p>
+            <p className="max-w-xs text-sm leading-relaxed text-(--color-text-muted)">
+              {canSelect || canAdjust
+                ? copy('Add the services and spare parts worked on for this Work Order.')
+                : copy('No items selected yet.')}
+            </p>
+            {canSelect ? (
+              <DButton className="mt-4" variant="primary" onClick={items.openPicker}>
+                <span className="inline-flex items-center gap-1.5">
+                  <ListPlus className="size-4" aria-hidden="true" />
+                  {copy('Select items')}
+                </span>
+              </DButton>
+            ) : canAdjust ? (
+              <DButton
+                className="mt-4"
+                variant="primary"
+                onClick={() => items.openAdjust({ addFirst: true })}
+              >
+                <span className="inline-flex items-center gap-1.5">
+                  <Plus className="size-4" aria-hidden="true" />
+                  {copy('Add item')}
+                </span>
+              </DButton>
+            ) : null}
+          </div>
+        )}
 
-      {lines !== undefined && adjustments.length > 0 && lines.length === 0 ? (
-        <WorkOrderItemHistory entries={adjustments} />
-      ) : null}
+        {lines !== undefined && (lines.length > 0 || adjustments.length > 0) ? (
+          <footer className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-(--color-border) bg-(--color-surface-muted)/40 px-4 py-2">
+            {lines.length > 0 ? (
+              <p className="text-[12px] text-(--color-text-muted)">
+                {copy('Prices are recorded when items are saved.')}
+              </p>
+            ) : (
+              <span />
+            )}
+            <WorkOrderItemHistory entries={adjustments} />
+          </footer>
+        ) : null}
+      </section>
 
       {canAdjust ? (
         <AdjustItemsDialog
@@ -198,6 +234,6 @@ export function WorkOrderItemsSection({
           }
         />
       ) : null}
-    </section>
+    </>
   );
 }

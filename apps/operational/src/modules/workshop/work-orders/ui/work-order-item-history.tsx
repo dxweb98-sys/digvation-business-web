@@ -1,86 +1,136 @@
-import { ChevronDown } from 'lucide-react';
-import { useId, useState } from 'react';
+import { cn, DBadge, DDialog } from '@digvation/ui';
+import { History, Minus, Pencil, Plus } from 'lucide-react';
+import { useState } from 'react';
 
 import { useOperationalLocalization } from '../../../../app/localization/operational-localization';
-import type { WorkshopLineAdjustmentEntry } from '../api/workshop-lines-api';
+import type {
+  WorkshopLineAdjustmentEntry,
+  WorkshopLineAdjustmentType,
+} from '../api/workshop-lines-api';
 import { historyNewestFirst } from '../model/work-order-line-adjustment-model';
 import { formatQuantity } from '../model/work-order-lines-model';
+import { DEPTH_OBJECT } from './item-anatomy';
+import { SectionMark } from './section-identity';
 
-function EntryText({ entry }: { entry: WorkshopLineAdjustmentEntry }) {
-  const { copy } = useOperationalLocalization();
+const NODE_ICON = { ADD: Plus, QUANTITY_CHANGE: Pencil, REMOVE: Minus } as const;
+const NODE_TONE: Record<WorkshopLineAdjustmentType, string> = {
+  ADD: 'bg-(--color-success) text-white',
+  QUANTITY_CHANGE: 'bg-(--color-brand) text-(--color-brand-foreground)',
+  REMOVE: 'bg-(--color-danger) text-white',
+};
+const LABEL_TONE: Record<WorkshopLineAdjustmentType, string> = {
+  ADD: 'text-(--color-success)',
+  QUANTITY_CHANGE: 'text-(--color-brand)',
+  REMOVE: 'text-(--color-danger)',
+};
+
+/**
+ * One event on the rail: a semantic node, then a lightly lifted content block.
+ * The rail segment below the node reaches the next node, so the line reads as
+ * one continuous timeline.
+ */
+function TimelineEntry({ entry, last }: { entry: WorkshopLineAdjustmentEntry; last: boolean }) {
+  const { copy, formatDate } = useOperationalLocalization();
+  const Icon = NODE_ICON[entry.type];
   const name = entry.variantName ? `${entry.itemName} - ${entry.variantName}` : entry.itemName;
-  if (entry.type === 'ADD')
-    return (
-      <>
-        <span aria-label={copy('Added')}>+</span> {name} x{formatQuantity(entry.quantity)}
-      </>
-    );
-  if (entry.type === 'REMOVE')
-    return (
-      <>
-        <span aria-label={copy('Removed')}>−</span> {name}
-      </>
-    );
+  const typeLabel =
+    entry.type === 'ADD'
+      ? copy('Added')
+      : entry.type === 'REMOVE'
+        ? copy('Removed')
+        : copy('Quantity changed');
+  const change =
+    entry.type === 'ADD'
+      ? `+ ${formatQuantity(entry.quantity)}`
+      : entry.type === 'REMOVE'
+        ? `− ${formatQuantity(entry.previousQuantity ?? '0')}`
+        : `${formatQuantity(entry.previousQuantity ?? '0')} → ${formatQuantity(entry.quantity)}`;
+
   return (
-    <>
-      <span className="sr-only">{copy('Quantity changed')}: </span>
-      {name} {formatQuantity(entry.previousQuantity ?? '0')} → {formatQuantity(entry.quantity)}
-    </>
+    <li className={cn('relative pl-12', !last && 'pb-5')}>
+      {last ? null : (
+        <span
+          aria-hidden="true"
+          className="absolute bottom-0 left-4 top-9 w-0.5 -translate-x-1/2 rounded-full bg-(--color-border)"
+        />
+      )}
+      <span
+        aria-hidden="true"
+        className={cn(
+          'absolute left-0 top-0 grid size-8 place-items-center rounded-full ring-4 ring-(--color-surface)',
+          NODE_TONE[entry.type],
+        )}
+      >
+        <Icon className="size-4" />
+      </span>
+      <div className={cn('rounded-xl px-3.5 py-3', DEPTH_OBJECT)}>
+        <p className={cn('text-[12px] font-semibold', LABEL_TONE[entry.type])}>{typeLabel}</p>
+        <div className="mt-0.5 flex items-start justify-between gap-3">
+          <p className="text-sm font-semibold leading-snug text-(--color-text)">{name}</p>
+          <p className="shrink-0 text-sm font-semibold tabular-nums text-(--color-text)">
+            {change}
+          </p>
+        </div>
+        <p className="mt-1 text-[12px] text-(--color-text-muted)">
+          <time dateTime={entry.adjustedAt}>
+            {formatDate(new Date(entry.adjustedAt), { dateStyle: 'medium', timeStyle: 'short' })}
+          </time>
+        </p>
+      </div>
+    </li>
   );
 }
 
 /**
- * Secondary, collapsed trace of item changes after the first selection. It
- * only presents what Runtime recorded; it is not the Work Order timeline.
+ * Change history of the item list: a compact action that opens a focused
+ * dialog with a vertical timeline (newest first). It only presents what
+ * Runtime already recorded; it is not the Work Order timeline and adds no
+ * request of its own.
  */
 export function WorkOrderItemHistory({
   entries,
 }: {
   entries: readonly WorkshopLineAdjustmentEntry[];
 }) {
-  const { copy, locale } = useOperationalLocalization();
+  const { copy } = useOperationalLocalization();
   const [open, setOpen] = useState(false);
-  const panelId = useId();
   if (entries.length === 0) return null;
-  const time = (value: string) =>
-    new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'short' }).format(
-      new Date(value),
-    );
+  const title = copy('Item change history');
+  const ordered = historyNewestFirst(entries);
 
   return (
-    <div>
+    <>
       <button
         type="button"
-        aria-expanded={open}
-        aria-controls={panelId}
-        onClick={() => setOpen((current) => !current)}
-        className="inline-flex min-h-8 items-center gap-1 rounded-md text-[13px] font-medium text-(--color-text-muted) outline-none transition-colors hover:text-(--color-text) focus-visible:ring-2 focus-visible:ring-(--color-brand)/25"
+        onClick={() => setOpen(true)}
+        className="inline-flex min-h-9 items-center gap-1.5 rounded-md text-[13px] font-medium text-(--color-text-muted) outline-none transition-colors hover:text-(--color-text) focus-visible:ring-2 focus-visible:ring-(--color-brand)/25"
       >
-        <ChevronDown
-          className={`size-4 transition-transform ${open ? 'rotate-180' : ''}`}
-          aria-hidden="true"
-        />
+        <History className="size-4" aria-hidden="true" />
         <span className="text-[13px]">
-          {copy('Item change history')} ({entries.length})
+          {copy('View change history')} ({entries.length})
         </span>
       </button>
-      {open ? (
-        <ul id={panelId} className="mt-1.5 space-y-1.5 border-l border-(--color-border) pl-3">
-          {historyNewestFirst(entries).map((entry) => (
-            <li
-              key={entry.id}
-              className="flex flex-wrap items-baseline justify-between gap-x-3 text-[13px] text-(--color-text-muted)"
-            >
-              <span className="min-w-0 break-words">
-                <EntryText entry={entry} />
-              </span>
-              <time className="tabular-nums" dateTime={entry.adjustedAt}>
-                {time(entry.adjustedAt)}
-              </time>
-            </li>
+      <DDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        size="md"
+        className="[&>div:nth-child(2)]:shrink-0"
+        ariaLabel={title}
+        title={
+          <span className="flex items-center gap-3">
+            <SectionMark icon={History} tone="history" />
+            <span className="text-lg font-bold tracking-tight">{title}</span>
+            <DBadge variant="outline">{entries.length}</DBadge>
+          </span>
+        }
+        description={copy('Item changes saved on this Work Order.')}
+      >
+        <ol className="py-1">
+          {ordered.map((entry, index) => (
+            <TimelineEntry key={entry.id} entry={entry} last={index === ordered.length - 1} />
           ))}
-        </ul>
-      ) : null}
-    </div>
+        </ol>
+      </DDialog>
+    </>
   );
 }

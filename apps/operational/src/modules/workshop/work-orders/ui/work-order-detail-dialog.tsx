@@ -1,16 +1,9 @@
-import { DBadge, DButton, DDialog, DTextarea } from '@digvation/ui';
-import { UserRoundPlus, UserRoundCog } from 'lucide-react';
+import { DBadge, DButton, DDialog } from '@digvation/ui';
 import { useRef, type ReactNode } from 'react';
 
 import { useOperationalLocalization } from '../../../../app/localization/operational-localization';
-import {
-  CustomerIdentity,
-  CustomerMarker,
-  IdentityBlock,
-  VehicleIdentity,
-  VehicleMarker,
-} from '../../shared/ui/identity-blocks';
-import { IconActionButton } from '../../shared/ui/icon-action-button';
+import { CancelWorkOrderDialog } from './cancel-work-order-dialog';
+import { WorkOrderNotesPanel, WorkOrderPeoplePanel } from './work-order-context-panels';
 import {
   availableWorkshopQueueActions,
   mechanicAssignmentMode,
@@ -18,15 +11,6 @@ import {
 } from '../model/workshop-queue-actions';
 import type { WorkshopQueueWorkOrder } from '../api/workshop-queue-api';
 import { STATUS_BADGE_VARIANT } from '../model/workshop-status-presentation';
-
-function DetailField({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div>
-      <p className="text-[11px] font-semibold text-(--color-text-muted)">{label}</p>
-      <div className="mt-1 text-sm text-(--color-text)">{children}</div>
-    </div>
-  );
-}
 
 /**
  * Work Order detail for the Queue. `workOrder` is null while the dialog is
@@ -66,7 +50,7 @@ export function WorkOrderDetailDialog({
   onCancelBack: () => void;
   onCancelConfirm: () => void;
 }) {
-  const { copy, label, formatDate } = useOperationalLocalization();
+  const { copy, label } = useOperationalLocalization();
   const lastWorkOrder = useRef(workOrder);
   if (workOrder) lastWorkOrder.current = workOrder;
   const shown = workOrder ?? lastWorkOrder.current;
@@ -92,21 +76,7 @@ export function WorkOrderDetailDialog({
     cancel: copy('Cancel work order'),
   };
 
-  const footer = !shown ? null : isCancelling ? (
-    <div className="flex justify-end gap-2">
-      <DButton variant="outline" onClick={onCancelBack}>
-        {copy('Back')}
-      </DButton>
-      <DButton
-        variant="danger"
-        loading={cancelPending}
-        disabled={!cancelReason.trim()}
-        onClick={onCancelConfirm}
-      >
-        {copy('Yes, cancel')}
-      </DButton>
-    </div>
-  ) : actions.length ? (
+  const footer = !shown ? null : actions.length ? (
     <div className="flex items-center justify-between gap-2">
       <div>
         {cancelAction ? (
@@ -141,111 +111,69 @@ export function WorkOrderDetailDialog({
   );
 
   return (
-    <DDialog
-      open={Boolean(workOrder)}
-      onClose={onClose}
-      size="md"
-      ariaLabel={shown?.workOrderNumber ?? copy('Queue')}
-      title={
-        shown ? (
-          <span className="flex flex-wrap items-center gap-2.5">
-            <span className="text-lg font-bold tracking-tight">{shown.workOrderNumber}</span>
-            <DBadge variant={STATUS_BADGE_VARIANT[shown.workStatus]}>
-              {label(shown.workStatus)}
-            </DBadge>
-          </span>
-        ) : (
-          ''
-        )
-      }
-      footer={footer}
-    >
-      {shown ? (
-        <div className="space-y-3">
-          <IdentityBlock
-            leading={<CustomerMarker name={shown.customerNameSnapshot} />}
-            label={copy('Customer')}
-          >
-            <CustomerIdentity name={shown.customerNameSnapshot} phone={shown.customerPhoneSnapshot} />
-          </IdentityBlock>
-
-          <IdentityBlock leading={<VehicleMarker />} label={copy('Vehicle')}>
-            <VehicleIdentity
-              plate={shown.vehiclePlateSnapshot}
-              chassis={shown.vehicleChassisNumberSnapshot}
-              copy={copy}
-            />
-          </IdentityBlock>
-
-          <IdentityBlock
-            leading={
-              shown.mechanic ? (
-                <CustomerMarker name={shown.mechanic.displayName} />
-              ) : (
-                <span className="grid size-10 shrink-0 place-items-center rounded-full bg-(--color-surface-muted) text-(--color-text-muted)">
-                  <UserRoundPlus className="size-5" aria-hidden="true" />
-                </span>
-              )
-            }
-            label={copy('Mechanic')}
-            {...(shown.mechanic && assignmentMode === 'replace'
-              ? { replaceLabel: copy('Replace mechanic'), onReplace: onOpenMechanicPicker }
-              : {})}
-          >
-            {shown.mechanic ? (
-              <p className="truncate text-sm font-semibold text-(--color-text)">
-                {shown.mechanic.displayName}
-              </p>
-            ) : (
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm text-(--color-text-muted)">{copy('Not assigned yet')}</p>
-                {assignmentMode ? (
-                  <DButton variant="secondary" size="sm" onClick={onOpenMechanicPicker}>
-                    <span className="inline-flex items-center gap-1.5">
-                      <UserRoundCog className="size-4" aria-hidden="true" />
-                      {copy('Assign mechanic')}
-                    </span>
-                  </DButton>
-                ) : null}
-              </div>
-            )}
-          </IdentityBlock>
-
-          {shownItemsSection ? (
-            <div className="border-t border-(--color-border) pt-4">{shownItemsSection}</div>
-          ) : null}
-
-          {shownBillingSection ? (
-            <div className="border-t border-(--color-border) pt-4">{shownBillingSection}</div>
-          ) : null}
-
-          <div className="space-y-4 border-t border-(--color-border) pt-4">
-            <DetailField label={copy('Keluhan')}>
-              <p className="whitespace-pre-wrap">{shown.customerRequest}</p>
-            </DetailField>
-            <DetailField label={copy('Created')}>
-              {formatDate(new Date(shown.createdAt), { dateStyle: 'medium', timeStyle: 'short' })}
-            </DetailField>
-            {shown.workStatus === 'CANCELLED' && shown.cancellationReason ? (
-              <DetailField label={copy('Reason')}>
-                <p className="whitespace-pre-wrap">{shown.cancellationReason}</p>
-              </DetailField>
-            ) : null}
-          </div>
-
-          {isCancelling ? (
-            <div className="border-t border-(--color-border) pt-4">
-              <DTextarea
-                label={copy('Reason')}
-                value={cancelReason}
-                onChange={onCancelReasonChange}
-                placeholder={copy('For example, the customer changed their mind.')}
-                clearable={false}
+    <>
+      <DDialog
+        open={Boolean(workOrder)}
+        onClose={onClose}
+        size="xl"
+        noPadding
+        className="lg:h-[min(46rem,85vh)]"
+        ariaLabel={shown?.workOrderNumber ?? copy('Queue')}
+        title={
+          shown ? (
+            <span className="flex flex-wrap items-center gap-2.5">
+              <span className="text-lg font-bold tracking-tight">{shown.workOrderNumber}</span>
+              <DBadge variant={STATUS_BADGE_VARIANT[shown.workStatus]}>
+                {label(shown.workStatus)}
+              </DBadge>
+            </span>
+          ) : (
+            ''
+          )
+        }
+        footer={footer}
+      >
+        {shown ? (
+          /* Desktop is a fixed-height workspace: the left column (context above,
+           billing pinned at its bottom) never moves, and only the item list scrolls.
+           Below lg everything reads in one natural column: people, items, billing,
+           then the complaint; `contents` + `max-lg:order-*` re-orders without a
+           second copy of any section. */
+          <div className="grid gap-4 bg-(--color-surface-muted)/45 px-5 py-4 lg:h-full lg:grid-cols-[minmax(0,36fr)_minmax(0,64fr)] lg:grid-rows-[minmax(0,1fr)] lg:gap-6">
+            {/* LEFT: Work Order context only. */}
+            <div
+              data-region="context"
+              className="max-lg:contents lg:min-h-0 lg:space-y-4 lg:overflow-y-auto lg:px-1 lg:py-1"
+            >
+              <WorkOrderPeoplePanel
+                workOrder={shown}
+                assignmentMode={assignmentMode}
+                onOpenMechanicPicker={onOpenMechanicPicker}
               />
+              <WorkOrderNotesPanel workOrder={shown} />
             </div>
-          ) : null}
-        </div>
-      ) : null}
-    </DDialog>
+
+            {/* RIGHT: the operational workspace. The item list is the only region that
+              scrolls on desktop; the billing derived from it stays anchored below. */}
+            <div
+              data-region="work"
+              className="flex min-w-0 flex-col gap-4 max-lg:order-2 lg:min-h-0"
+            >
+              {shownItemsSection}
+              {shownBillingSection ? <div className="shrink-0">{shownBillingSection}</div> : null}
+            </div>
+          </div>
+        ) : null}
+      </DDialog>
+      <CancelWorkOrderDialog
+        open={isCancelling && Boolean(workOrder)}
+        workOrderNumber={shown?.workOrderNumber ?? ''}
+        reason={cancelReason}
+        pending={cancelPending}
+        onReasonChange={onCancelReasonChange}
+        onBack={onCancelBack}
+        onConfirm={onCancelConfirm}
+      />
+    </>
   );
 }
