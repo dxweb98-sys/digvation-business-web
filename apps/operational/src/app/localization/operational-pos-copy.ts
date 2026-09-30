@@ -316,7 +316,6 @@ const posCopy: Record<string, LocalizedCopy> = {
   'Point balance': { 'id-ID': 'Saldo poin', 'en-US': 'Point balance' },
   'Current points': { 'id-ID': 'Poin saat ini', 'en-US': 'Current points' },
   Earned: { 'id-ID': 'Didapat', 'en-US': 'Earned' },
-  Used: { 'id-ID': 'Digunakan', 'en-US': 'Used' },
   'Loyalty redemption': { 'id-ID': 'Penggunaan poin', 'en-US': 'Loyalty redemption' },
   'points used': { 'id-ID': 'poin digunakan', 'en-US': 'points used' },
   'Use loyalty points': { 'id-ID': 'Gunakan poin', 'en-US': 'Use loyalty points' },

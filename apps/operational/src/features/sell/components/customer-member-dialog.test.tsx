@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { ApiError } from '@digvation/pos-api';
 import type { CustomerMemberApi } from '../customer-member-api';
 import { CustomerMemberDialog } from './customer-member-dialog';
 
@@ -188,6 +189,22 @@ describe('Same-transaction continuity', () => {
     update({ open: false, resetKey: 3 });
     update({ open: true, resetKey: 3 });
     expect(screen.getByText('Saldo Poin')).toBeTruthy();
+  });
+
+  it('explains a phone already used by another active member without naming that member', async () => {
+    const { api } = renderDialog({ resetKey: 3 });
+    api.enrollNew.mockRejectedValueOnce(
+      new ApiError(409, 'MEMBERSHIP_PHONE_ALREADY_IN_USE', 'in use'),
+    );
+    type(name(), 'Andir');
+    type(phone(), '08192381923');
+    openEnroll();
+    type(nik(), '1234567890123456');
+    fireEvent.click(enrollButton());
+    expect(
+      await screen.findByText('Nomor telepon ini sudah digunakan oleh member aktif lain.'),
+    ).toBeTruthy();
+    expect(phone().value).toBe('08192381923');
   });
 
   it('keeps the draft after a failed save so it can be retried', async () => {

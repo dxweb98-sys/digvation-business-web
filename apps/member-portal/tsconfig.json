@@ -13,8 +13,8 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "jsx": "react-jsx"
-    ,"types": ["vite/client"]
+    "jsx": "react-jsx",
+    "types": ["vite/client"]
   },
-  "include": ["src.tsx"]
+  "include": ["src.tsx", "member-portal-app.tsx", "member-portal-api.ts"]
 }

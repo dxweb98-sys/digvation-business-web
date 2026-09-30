@@ -11,6 +11,7 @@ const safeMessages = {
     NOT_FOUND: 'Data yang diminta tidak ditemukan.',
     VERSION_CONFLICT: 'Data telah berubah. Muat ulang lalu coba lagi.',
     DUPLICATE_RESOURCE: 'Data dengan nilai tersebut sudah digunakan.',
+    MEMBERSHIP_PHONE_ALREADY_IN_USE: 'Nomor telepon ini sudah digunakan oleh member aktif lain.',
     INACTIVE_REFERENCE: 'Data referensi yang dipilih sudah tidak aktif.',
     DOMAIN_VALIDATION_ERROR: 'Data yang dimasukkan tidak valid.',
     BUSINESS_TIMEZONE_INVALID:
@@ -32,6 +33,7 @@ const safeMessages = {
     NOT_FOUND: 'The requested data was not found.',
     VERSION_CONFLICT: 'The data has changed. Reload and try again.',
     DUPLICATE_RESOURCE: 'A record already uses that value.',
+    MEMBERSHIP_PHONE_ALREADY_IN_USE: 'This phone number is already used by another active member.',
     INACTIVE_REFERENCE: 'The selected reference is no longer active.',
     DOMAIN_VALIDATION_ERROR: 'The submitted data is invalid.',
     BUSINESS_TIMEZONE_INVALID: 'Invalid timezone. Use an IANA timezone such as Asia/Jakarta.',
