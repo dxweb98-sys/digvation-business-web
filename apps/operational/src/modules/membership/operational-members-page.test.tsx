@@ -2,6 +2,7 @@ import {
   DeploymentBootstrapProvider,
   type DeploymentBootstrapConfig,
 } from '@digvation/business-runtime';
+import { ApiError } from '@digvation/pos-api';
 import { DToastProvider } from '@digvation/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -366,6 +367,27 @@ describe('Operational Member profile editing', () => {
 
     expect(await dialog.findByText(/Data member tidak dapat diperbarui/)).toBeTruthy();
     expect(dialog.getByRole('button', { name: 'Simpan' })).toBeTruthy();
+  });
+
+  it('explains a phone already registered as a member without naming that member', async () => {
+    const api = fakeApi({
+      updateProfile: vi
+        .fn()
+        .mockRejectedValue(new ApiError(409, 'MEMBERSHIP_PHONE_ALREADY_IN_USE', 'in use')),
+    });
+    renderView(api, true);
+    const dialog = within(await openRina());
+
+    fireEvent.click(await dialog.findByRole('button', { name: 'Ubah data' }));
+    fireEvent.change(dialog.getByLabelText('Nomor telepon'), {
+      target: { value: '+628111222333' },
+    });
+    fireEvent.click(dialog.getByRole('button', { name: 'Simpan' }));
+
+    expect(
+      await dialog.findByText('Nomor telepon ini sudah terdaftar sebagai member.'),
+    ).toBeTruthy();
+    expect(dialog.queryByText(/Data member tidak dapat diperbarui/)).toBeNull();
   });
 
   it('does not offer to edit points, ledger, member number or NIK', async () => {
