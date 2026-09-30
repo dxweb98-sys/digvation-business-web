@@ -14,7 +14,7 @@ export class MembersApi {
   constructor(private readonly client: ApiClient) {}
   list(input:{q?:string;status?:Status;limit:number;offset:number}) { return this.client.get<MemberPage>(`/api/v1/memberships?${qs(input)}`); }
   get(id:string) { return this.client.get<Member>(`/api/v1/memberships/${id}`); }
-  enroll(input:{name:string;phone:string;nik:string}) { return this.client.post<Member>('/api/v1/memberships',input); }
+  enroll(input:{name:string;phone:string}) { return this.client.post<Member>('/api/v1/memberships',input); }
   updateCustomer(member:Member,input:{name:string;phone:string}) { return this.client.patch<Customer>(`/api/v1/customers/${member.customerId}`,{...input,expectedVersion:member.customer.version}); }
   updateStatus(member:Member,status:Status) { return this.client.patch<Member>(`/api/v1/memberships/${member.id}/status`,{status,expectedVersion:member.version}); }
   balance(id:string) { return this.client.get<Balance>(`/api/v1/loyalty/memberships/${id}/balance`); }

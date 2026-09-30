@@ -28,14 +28,10 @@ export interface MemberPointBalance {
 export interface EnrollNewMemberInput {
   name: string;
   phone: string;
-  /** Input-only: callers must not persist or display this after submission. */
-  nik: string;
 }
 
 export interface EnrollExistingCustomerInput {
   customerId: string;
-  /** Input-only: callers must not persist or display this after submission. */
-  nik: string;
 }
 
 export function canQuickEnrollMember(permissions: readonly string[]): boolean {

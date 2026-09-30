@@ -13,9 +13,6 @@ import {
 import { isApiErrorCode } from '../cashier-transaction-errors';
 import type { SaleCustomer, SaleCustomerSelection } from '../cashier-transaction.types';
 import {
-  isCompleteNik,
-  NIK_LENGTH,
-  sanitizeNikInput,
   sanitizePhoneInput,
   toCanonicalPhone,
 } from '../customer-input';
@@ -44,7 +41,6 @@ const localCopy: Record<string, { 'id-ID': string; 'en-US': string }> = {
   'Customer name': { 'id-ID': 'Nama Pelanggan', 'en-US': 'Customer Name' },
   'Name placeholder': { 'id-ID': 'Contoh: Andir Saputra', 'en-US': 'Example: Andir Saputra' },
   'Phone placeholder': { 'id-ID': 'Contoh: 0812 3456 7890', 'en-US': 'Example: 0812 3456 7890' },
-  'NIK placeholder': { 'id-ID': '16 digit NIK', 'en-US': '16-digit NIK' },
   'WhatsApp / phone': { 'id-ID': 'Nomor WhatsApp / Telepon', 'en-US': 'WhatsApp / Phone' },
   'Required': { 'id-ID': 'Wajib diisi', 'en-US': 'Required' },
   'Want to earn points and rewards?': { 'id-ID': 'Ingin catat poin belanja & reward loyalty pelanggan?', 'en-US': 'Want to earn points and rewards?' },
@@ -84,10 +80,12 @@ const localCopy: Record<string, { 'id-ID': string; 'en-US': string }> = {
   'Registration status': { 'id-ID': 'Status Pendaftaran', 'en-US': 'Registration Status' },
   'Active immediately': { 'id-ID': 'Aktif Langsung', 'en-US': 'Active Immediately' },
   'Full name': { 'id-ID': 'Nama Lengkap', 'en-US': 'Full Name' },
-  'NIK': { 'id-ID': 'NIK (Nomor Induk Kependudukan)', 'en-US': 'NIK (National ID Number)' },
-  'NIK hint': { 'id-ID': '16 digit NIK digunakan hanya untuk verifikasi dan tidak ditampilkan setelah pendaftaran.', 'en-US': 'The 16-digit NIK is used only for verification and is never displayed after enrollment.' },
   'Enroll and select member': { 'id-ID': 'Daftar & Pilih Member', 'en-US': 'Enroll & Select Member' },
-  'This phone number is already used by another active member.': { 'id-ID': 'Nomor telepon ini sudah digunakan oleh member aktif lain.', 'en-US': 'This phone number is already used by another active member.' },
+  'This phone number is already registered as a member.': { 'id-ID': 'Nomor telepon ini sudah terdaftar sebagai member.', 'en-US': 'This phone number is already registered as a member.' },
+  'This phone number is already registered as a customer. Add it as a member from that customer.': {
+    'id-ID': 'Nomor telepon ini sudah terdaftar sebagai pelanggan. Tambahkan sebagai member dari pelanggan tersebut.',
+    'en-US': 'This phone number is already registered as a customer. Add it as a member from that customer.',
+  },
   'Member enrollment could not be completed.': { 'id-ID': 'Pendaftaran member tidak dapat diselesaikan.', 'en-US': 'Member enrollment could not be completed.' },
   'Cancel': { 'id-ID': 'Batal', 'en-US': 'Cancel' },
   'No member search permission.': { 'id-ID': 'Akun ini tidak memiliki akses pencarian member.', 'en-US': 'This account cannot search members.' },
@@ -142,7 +140,6 @@ export function CustomerMemberDialog({
   const [query, setQuery] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [nik, setNik] = useState('');
   const [selectedMember, setSelectedMember] = useState<MemberLookupResult | null>(null);
   const [enrollError, setEnrollError] = useState<string | null>(null);
   const [isEnrolling, setEnrolling] = useState(false);
@@ -155,7 +152,6 @@ export function CustomerMemberDialog({
     setQuery('');
     setName('');
     setPhone('');
-    setNik('');
     setSelectedMember(null);
     setEnrollError(null);
   }
@@ -187,23 +183,24 @@ export function CustomerMemberDialog({
   };
 
   const enroll = async () => {
-    if (!name.trim() || !canonicalPhone || !isCompleteNik(nik) || isEnrolling) return;
-    const submittedNik = nik;
-    setNik('');
+    if (!name.trim() || !canonicalPhone || isEnrolling) return;
     setEnrollError(null);
     setEnrolling(true);
     try {
       const member = await api.enrollNew({
         name: name.trim(),
         phone: canonicalPhone,
-        nik: submittedNik,
       });
       onChoose(memberSaleSelection(member), member);
     } catch (error) {
       setEnrollError(
-        isApiErrorCode(error, 'MEMBERSHIP_PHONE_ALREADY_IN_USE')
-          ? text('This phone number is already used by another active member.')
-          : text('Member enrollment could not be completed.'),
+        isApiErrorCode(error, 'CUSTOMER_PHONE_ALREADY_EXISTS')
+          ? text(
+              'This phone number is already registered as a customer. Add it as a member from that customer.',
+            )
+          : isApiErrorCode(error, 'MEMBERSHIP_PHONE_ALREADY_IN_USE')
+            ? text('This phone number is already registered as a member.')
+            : text('Member enrollment could not be completed.'),
       );
     } finally {
       setEnrolling(false);
@@ -212,8 +209,7 @@ export function CustomerMemberDialog({
 
   const memberItems = memberQuery.data?.items ?? [];
   const customerReady = Boolean(name.trim() && canonicalPhone) && !isSaving;
-  const enrollmentReady =
-    Boolean(name.trim() && canonicalPhone && isCompleteNik(nik)) && !isEnrolling && !isSaving;
+  const enrollmentReady = Boolean(name.trim() && canonicalPhone) && !isEnrolling && !isSaving;
 
   const footer =
     mode === 'CUSTOMER' ? (
@@ -565,16 +561,6 @@ export function CustomerMemberDialog({
                     onChange={(value) => setPhone(sanitizePhoneInput(value))}
                     inputMode="tel"
                     disabled={isEnrolling}
-                  />
-                  <DInput
-                    label={text('NIK')}
-                    placeholder={text('NIK placeholder')}
-                    value={nik}
-                    onChange={(value) => setNik(sanitizeNikInput(value))}
-                    inputMode="numeric"
-                    maxLength={NIK_LENGTH}
-                    disabled={isEnrolling}
-                    hint={text('NIK hint')}
                   />
                 </div>
               </div>

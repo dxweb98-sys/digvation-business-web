@@ -78,6 +78,10 @@ const memberCopy: Record<string, LocalizedCopy> = {
     'id-ID': 'Data member diperbarui.',
     'en-US': 'Member profile updated.',
   },
+  'This phone number is already registered as a member.': {
+    'id-ID': 'Nomor telepon ini sudah terdaftar sebagai member.',
+    'en-US': 'This phone number is already registered as a member.',
+  },
   'Could not update the member profile. Check the name and phone number and try again.': {
     'id-ID': 'Data member tidak dapat diperbarui. Periksa nama dan nomor telepon, lalu coba lagi.',
     'en-US': 'Could not update the member profile. Check the name and phone number and try again.',

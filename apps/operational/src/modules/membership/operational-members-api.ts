@@ -11,7 +11,7 @@ export interface MemberCustomer {
   version: number;
 }
 
-/** Canonical Membership as Runtime returns it; the NIK never appears. */
+/** Canonical Membership as Runtime returns it. */
 export interface Member {
   id: string;
   customerId: string;

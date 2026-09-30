@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  isCompleteNik,
-  sanitizeNikInput,
-  sanitizePhoneInput,
-  toCanonicalPhone,
-} from './customer-input';
+import { sanitizePhoneInput, toCanonicalPhone } from './customer-input';
 
 describe('toCanonicalPhone', () => {
   it.each([
@@ -36,23 +31,5 @@ describe('sanitizePhoneInput', () => {
 
   it('drops characters a phone number cannot contain', () => {
     expect(sanitizePhoneInput('08ab12#3')).toBe('08123');
-  });
-});
-
-describe('NIK input', () => {
-  it('removes letters and punctuation', () => {
-    expect(sanitizeNikInput('12ab34-56')).toBe('123456');
-  });
-
-  it('caps a longer paste at 16 digits', () => {
-    expect(sanitizeNikInput('12345678901234567')).toBe('1234567890123456');
-    expect(sanitizeNikInput('1234 5678 9012 3456 78')).toBe('1234567890123456');
-  });
-
-  it('requires exactly 16 digits', () => {
-    expect(isCompleteNik('123456789012345')).toBe(false);
-    expect(isCompleteNik('1234567890123456')).toBe(true);
-    expect(isCompleteNik('12345678901234567')).toBe(false);
-    expect(isCompleteNik('123456789012345a')).toBe(false);
   });
 });
