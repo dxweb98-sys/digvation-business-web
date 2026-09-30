@@ -90,7 +90,7 @@ describe('LocalCashierTransactionAdapter', () => {
     expect(sale.lines.find((line) => line.id === productLine.id)?.removedAt).not.toBeNull();
 
     const serviceLine = sale.lines.find((line) => line.catalogItemId === hairStyling.id)!;
-    const employees = (await adapter.listEmployees()).items;
+    const employees = (await adapter.listServicePerformers()).items;
     sale = await adapter.setSaleLineAssignments(sale.id, serviceLine.id, {
       expectedVersion: sale.version,
       employeeIds: employees.slice(0, 2).map((employee) => employee.id),

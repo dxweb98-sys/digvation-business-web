@@ -186,10 +186,35 @@ const workforceCopy: Record<string, { id: string; en: string }> = {
     id: 'Riwayat absensi tidak dapat dimuat.',
     en: 'Could not load attendance history.',
   },
-  'Service assignment eligibility is controlled by the employee position.': {
-    id: 'Penugasan layanan mengikuti jabatan karyawan.',
-    en: 'Service assignment follows the employee position.',
+  'Identity & employment': { id: 'Identitas & kepegawaian', en: 'Identity & employment' },
+  'Service work and Product sales attribution are set separately.': {
+    id: 'Pekerjaan layanan dan atribusi penjualan produk diatur terpisah.',
+    en: 'Service work and Product sales attribution are set separately.',
   },
+  'Shown in Operational Service performer selection.': {
+    id: 'Muncul di pilihan pelaksana layanan Operational.',
+    en: 'Shown in Operational Service performer selection.',
+  },
+  'Not shown in Operational Service performer selection.': {
+    id: 'Tidak muncul di pilihan pelaksana layanan Operational.',
+    en: 'Not shown in Operational Service performer selection.',
+  },
+  'Employee is inactive.': { id: 'Karyawan nonaktif.', en: 'Employee is inactive.' },
+  'Not enabled as a Service performer.': {
+    id: 'Belum diaktifkan sebagai pelaksana layanan.',
+    en: 'Not enabled as a Service performer.',
+  },
+  'No position assigned.': { id: 'Jabatan belum diatur.', en: 'No position assigned.' },
+  'Position is inactive.': { id: 'Jabatan nonaktif.', en: 'Position is inactive.' },
+  'Position does not allow Service assignment.': {
+    id: 'Jabatan tidak mengizinkan penugasan layanan.',
+    en: 'Position does not allow Service assignment.',
+  },
+  'Service work needs an active employee enabled as a Service performer, with an active position that allows Service assignment.':
+    {
+      id: 'Pekerjaan layanan memerlukan karyawan aktif yang diaktifkan sebagai pelaksana layanan, dengan jabatan aktif yang mengizinkan penugasan layanan.',
+      en: 'Service work needs an active employee enabled as a Service performer, with an active position that allows Service assignment.',
+    },
 };
 
 export function useWorkforceLocalization() {

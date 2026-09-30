@@ -210,7 +210,8 @@ export interface SellingCatalogQuery {
 }
 
 export interface EmployeeQuery {
-  listEmployees(signal?: AbortSignal): Promise<ApiPage<Employee>>;
+  /** Runtime-filtered effective Service performers (canPerformServices); never a client-side filter. */
+  listServicePerformers(signal?: AbortSignal): Promise<ApiPage<Employee>>;
   /** Runtime-filtered ACTIVE, Product-sales-eligible employees; never a client-side filter. */
   listProductSalespeople(signal?: AbortSignal): Promise<ApiPage<Employee>>;
 }
@@ -427,8 +428,11 @@ export class HttpCashierTransactionAdapter
     });
   }
 
-  public listEmployees(signal?: AbortSignal): Promise<ApiPage<Employee>> {
-    return this.client.get<ApiPage<Employee>>(pagePath(`${API_PREFIX}/employees`), { signal });
+  public listServicePerformers(signal?: AbortSignal): Promise<ApiPage<Employee>> {
+    return this.client.get<ApiPage<Employee>>(
+      `${pagePath(`${API_PREFIX}/employees`)}&canPerformServices=true`,
+      { signal },
+    );
   }
 
   public listProductSalespeople(signal?: AbortSignal): Promise<ApiPage<Employee>> {

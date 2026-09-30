@@ -120,7 +120,7 @@ export function attachOperationalProjection(
     );
   };
 
-  operational.listEmployees = (signal) =>
+  operational.listServicePerformers = (signal) =>
     client.get<ApiPage<Employee>>(`${OPERATIONAL_PREFIX}/employees`, { signal });
 
   operational.listProductSalespeople = (signal) =>
