@@ -59,6 +59,10 @@ export interface Employee {
   positionId?: string | null;
   position?: EmployeePosition | null;
   status: RecordStatus;
+  /** Employee-level Service performer opt-in; only one of the gates Runtime combines. */
+  servicePerformerEligible?: boolean;
+  /** Runtime's effective Service performer decision (employee and Position gates). */
+  canPerformServices?: boolean;
   /** Product salesperson eligibility; distinct from Service performer eligibility. */
   productSalesEligible?: boolean;
   canSellProducts?: boolean;

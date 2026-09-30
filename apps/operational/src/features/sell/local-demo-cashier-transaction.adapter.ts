@@ -181,6 +181,8 @@ function employee(id: string, code: string, displayName: string): Employee {
     code,
     displayName,
     status: 'ACTIVE',
+    servicePerformerEligible: true,
+    canPerformServices: true,
     version: 1,
     createdAt: DEMO_CREATED_AT,
     updatedAt: DEMO_CREATED_AT,
@@ -419,8 +421,9 @@ export class LocalDemoCashierTransactionAdapter
     );
   }
 
-  public async listEmployees(): Promise<ApiPage<Employee>> {
-    return page(employees);
+  /** Stands in for Runtime's canPerformServices filter. */
+  public async listServicePerformers(): Promise<ApiPage<Employee>> {
+    return page(employees.filter((employee) => employee.canPerformServices === true));
   }
 
   public async listProductSalespeople(): Promise<ApiPage<Employee>> {

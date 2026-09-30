@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createEmployeePayload,
   employeeEditorForm,
+  serviceEligibilityBlocker,
   updateEmployeePayload,
 } from './employee-editor-model';
 import type { Employee } from './employees-api';
@@ -66,5 +67,37 @@ describe('employee eligibility editor model', () => {
     const payload = updateEmployeePayload(employee, employeeEditorForm(employee));
     expect(payload).not.toHaveProperty('servicePerformerEligible');
     expect(payload).not.toHaveProperty('productSalesEligible');
+  });
+});
+
+describe('service eligibility explanation', () => {
+  const position = { status: 'ACTIVE' as const, serviceAssignmentEnabled: true };
+  const eligible = {
+    status: 'ACTIVE' as const,
+    servicePerformerEligible: true,
+    position,
+    canPerformServices: true,
+  };
+
+  it('trusts Runtime when it says the employee can perform services', () => {
+    expect(serviceEligibilityBlocker(eligible)).toBeNull();
+  });
+
+  it('names the gate that keeps an employee out of Service selection', () => {
+    const blocked = { ...eligible, canPerformServices: false };
+    expect(serviceEligibilityBlocker({ ...blocked, status: 'INACTIVE' })).toBe('EMPLOYEE_INACTIVE');
+    expect(serviceEligibilityBlocker({ ...blocked, servicePerformerEligible: false })).toBe(
+      'OPTED_OUT',
+    );
+    expect(serviceEligibilityBlocker({ ...blocked, position: null })).toBe('NO_POSITION');
+    expect(
+      serviceEligibilityBlocker({ ...blocked, position: { ...position, status: 'INACTIVE' } }),
+    ).toBe('POSITION_INACTIVE');
+    expect(
+      serviceEligibilityBlocker({
+        ...blocked,
+        position: { ...position, serviceAssignmentEnabled: false },
+      }),
+    ).toBe('POSITION_NOT_SERVICE');
   });
 });

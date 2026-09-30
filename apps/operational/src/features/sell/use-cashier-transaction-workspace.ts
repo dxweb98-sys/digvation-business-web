@@ -644,6 +644,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
 
   const openLineTask = (line: SaleLine) => {
     setEmployeeOptionsEnabled(true);
+    employeeOptions.refresh();
     setLineTaskId(line.id);
   };
 
@@ -1099,7 +1100,10 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     selectVariant,
     cachedCardDisplayPrice,
     cachedCardPrice,
-    requestEmployeeOptions: () => setEmployeeOptionsEnabled(true),
+    requestEmployeeOptions: () => {
+      setEmployeeOptionsEnabled(true);
+      employeeOptions.refresh();
+    },
     closeVariantPicker: () => setVariantPicker(null),
     closeItemConfigurator: () => setItemConfigurator(null),
     confirmItemConfiguration,
