@@ -58,3 +58,15 @@ jobs:
           tags: |
             ${{ env.IMAGE_BASE }}:staging-operational
             ${{ env.IMAGE_BASE }}:staging-operational-${{ github.sha }}
+
+      - name: Publish Member Portal image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: member-portal
+          push: true
+          build-args: |
+            BUILD_REVISION=${{ github.sha }}
+          tags: |
+            ${{ env.IMAGE_BASE }}:staging-member-portal
+            ${{ env.IMAGE_BASE }}:staging-member-portal-${{ github.sha }}
