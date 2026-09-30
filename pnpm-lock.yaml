@@ -108,6 +108,33 @@ importers:
         specifier: 4.3.3
         version: 4.3.3
 
+  apps/member-portal:
+    dependencies:
+      '@digvation/business-runtime':
+        specifier: workspace:*
+        version: link:../../packages/runtime
+      '@digvation/ui':
+        specifier: 1.1.0
+        version: 1.1.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@vitejs/plugin-react':
+        specifier: 6.1.1
+        version: 6.1.1(vite@8.2.2(@types/node@24.5.0)(jiti@2.7.0))
+      lucide-react:
+        specifier: 1.37.0
+        version: 1.37.0(react@19.2.8)
+      react:
+        specifier: 19.2.8
+        version: 19.2.8
+      react-dom:
+        specifier: 19.2.8
+        version: 19.2.8(react@19.2.8)
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vite:
+        specifier: 8.2.2
+        version: 8.2.2(@types/node@24.5.0)(jiti@2.7.0)
+
   apps/operational:
     dependencies:
       '@digvation/business-api':

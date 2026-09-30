@@ -10,6 +10,7 @@ import {
   type CustomerMemberApi,
   type MemberLookupResult,
 } from '../customer-member-api';
+import { isApiErrorCode } from '../cashier-transaction-errors';
 import type { SaleCustomer, SaleCustomerSelection } from '../cashier-transaction.types';
 import {
   isCompleteNik,
@@ -86,6 +87,7 @@ const localCopy: Record<string, { 'id-ID': string; 'en-US': string }> = {
   'NIK': { 'id-ID': 'NIK (Nomor Induk Kependudukan)', 'en-US': 'NIK (National ID Number)' },
   'NIK hint': { 'id-ID': '16 digit NIK digunakan hanya untuk verifikasi dan tidak ditampilkan setelah pendaftaran.', 'en-US': 'The 16-digit NIK is used only for verification and is never displayed after enrollment.' },
   'Enroll and select member': { 'id-ID': 'Daftar & Pilih Member', 'en-US': 'Enroll & Select Member' },
+  'This phone number is already used by another active member.': { 'id-ID': 'Nomor telepon ini sudah digunakan oleh member aktif lain.', 'en-US': 'This phone number is already used by another active member.' },
   'Member enrollment could not be completed.': { 'id-ID': 'Pendaftaran member tidak dapat diselesaikan.', 'en-US': 'Member enrollment could not be completed.' },
   'Cancel': { 'id-ID': 'Batal', 'en-US': 'Cancel' },
   'No member search permission.': { 'id-ID': 'Akun ini tidak memiliki akses pencarian member.', 'en-US': 'This account cannot search members.' },
@@ -197,8 +199,12 @@ export function CustomerMemberDialog({
         nik: submittedNik,
       });
       onChoose(memberSaleSelection(member), member);
-    } catch {
-      setEnrollError(text('Member enrollment could not be completed.'));
+    } catch (error) {
+      setEnrollError(
+        isApiErrorCode(error, 'MEMBERSHIP_PHONE_ALREADY_IN_USE')
+          ? text('This phone number is already used by another active member.')
+          : text('Member enrollment could not be completed.'),
+      );
     } finally {
       setEnrolling(false);
     }
