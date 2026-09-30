@@ -180,6 +180,7 @@ function renderDialog(mocks: ReturnType<typeof fakeApi>, item: Item | null) {
               canViewPricing
               canCreatePricing
               canCreateVariants
+              canUpdateVariants
               canManageImage={false}
               canEditComposition
               onClose={vi.fn()}

@@ -4,11 +4,8 @@ import { useCallback } from 'react';
 
 import { normalizeBackofficeApiError } from '../../../../app/api/backoffice-api-error';
 import { isSessionExpiredError } from '../../../../auth/backoffice-auth-context';
-import type {
-  LoyaltyApi,
-  LoyaltyEarningRule,
-} from '../../../../modules/loyalty/loyalty-api';
-import type { CatalogApi, Item } from '../../api/catalog-api';
+import type { LoyaltyApi, LoyaltyEarningRule } from '../../../../modules/loyalty/loyalty-api';
+import type { CatalogApi, Item, Variant } from '../../api/catalog-api';
 import { sellsItemItself, type SellingModel } from '../../model/catalog-selling';
 import {
   buildCatalogItemBaseInput,
@@ -17,6 +14,7 @@ import {
 import { compositionSubmission } from '../model/service-composition-draft';
 import {
   sameAmount,
+  variantIdentityChange,
   variantPriceSubmissions,
 } from '../model/variant-price-draft';
 import type { useCatalogItemEditor } from '../model/use-catalog-item-editor';
@@ -33,6 +31,7 @@ export function useCatalogItemEditorSave({
   model,
   parsedDefaultDuration,
   canCreateVariants,
+  canUpdateVariants,
   canCreatePricing,
   canEditPrice,
   canManageImage,
@@ -55,6 +54,7 @@ export function useCatalogItemEditorSave({
   model: SellingModel;
   parsedDefaultDuration: number | null;
   canCreateVariants: boolean;
+  canUpdateVariants: boolean;
   canCreatePricing: boolean;
   canEditPrice: boolean;
   canManageImage: boolean;
@@ -89,6 +89,7 @@ export function useCatalogItemEditorSave({
 
     let persistedItem: Item | null = null;
     let createdItem = false;
+    const renamedVariants = new Map<string, Variant>();
 
     try {
       const baseInput = buildCatalogItemBaseInput({
@@ -107,11 +108,7 @@ export function useCatalogItemEditorSave({
         });
         createdItem = true;
 
-        if (
-          canCreatePricing &&
-          sellsItemItself(model) &&
-          editor.form.defaultPrice.trim()
-        ) {
+        if (canCreatePricing && sellsItemItself(model) && editor.form.defaultPrice.trim()) {
           await api.createPrice({
             catalogItemId: persistedItem.id,
             catalogVariantId: null,
@@ -122,6 +119,16 @@ export function useCatalogItemEditorSave({
           });
         }
       } else if (item) {
+        // Name/code corrections go first: a rejected code (duplicate or reserved) then leaves the
+        // item untouched and the editor open with Runtime's reason.
+        if (canUpdateVariants) {
+          for (const draft of editor.form.variants) {
+            const change = variantIdentityChange(draft);
+            if (!draft.record || !change) continue;
+            renamedVariants.set(draft.key, await api.updateVariant(item.id, draft.record, change));
+          }
+        }
+
         const nextPrice = editor.form.defaultPrice.trim();
         const initialItemPrice = editor.actions.getInitialPrice();
 
@@ -261,11 +268,24 @@ export function useCatalogItemEditorSave({
         });
 
         onClose();
-      } else if (!isSessionExpiredError(error)) {
-        showToast({
-          variant: 'danger',
-          title: normalizeBackofficeApiError(error, 'Item tidak dapat disimpan.').safeMessage,
-        });
+      } else {
+        if (renamedVariants.size) {
+          // Keep variants that were already corrected on their new version for the retry.
+          refreshPricingViews();
+          editor.actions.setFormField(
+            'variants',
+            editor.form.variants.map((draft) => {
+              const record = renamedVariants.get(draft.key);
+              return record ? { ...draft, record } : draft;
+            }),
+          );
+        }
+        if (!isSessionExpiredError(error)) {
+          showToast({
+            variant: 'danger',
+            title: normalizeBackofficeApiError(error, 'Item tidak dapat disimpan.').safeMessage,
+          });
+        }
       }
     } finally {
       editor.actions.setSaving(false);
@@ -276,6 +296,7 @@ export function useCatalogItemEditorSave({
     canCreateVariants,
     canEditPrice,
     canManageImage,
+    canUpdateVariants,
     client,
     currency,
     disabled,

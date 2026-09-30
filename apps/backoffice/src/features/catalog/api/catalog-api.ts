@@ -230,7 +230,7 @@ export class CatalogApi {
   createCategory(input: { code?: string; name: string; status?: Category['status'] }) {
     return this.client.post<Category>('/api/v1/catalog/categories', input);
   }
-  updateCategory(item: Category, input: Partial<Pick<Category, 'name' | 'status'>>) {
+  updateCategory(item: Category, input: Partial<Pick<Category, 'code' | 'name' | 'status'>>) {
     return this.client.patch<Category>(`/api/v1/catalog/categories/${item.id}`, {
       expectedVersion: item.version,
       ...input,
@@ -245,7 +245,11 @@ export class CatalogApi {
   ) {
     return this.client.post<Variant>(`/api/v1/catalog/items/${itemId}/variants`, input);
   }
-  updateVariant(itemId: string, item: Variant, input: Partial<Pick<Variant, 'name' | 'status'>>) {
+  updateVariant(
+    itemId: string,
+    item: Variant,
+    input: Partial<Pick<Variant, 'code' | 'name' | 'status'>>,
+  ) {
     return this.client.patch<Variant>(`/api/v1/catalog/items/${itemId}/variants/${item.id}`, {
       expectedVersion: item.version,
       ...input,
