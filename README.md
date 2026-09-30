@@ -93,6 +93,8 @@ Operational http://localhost:5173
 Backoffice  http://localhost:5174
 ```
 
+The Member Portal is a separate app started with `pnpm dev:member`; its generic Business entry is `/member` (local review: `http://127.0.0.1:5175/member`, Runtime CORS must allow that origin).
+
 Run only one app when needed:
 
 ```bash

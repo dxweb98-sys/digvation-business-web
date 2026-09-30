@@ -5051,6 +5051,8 @@ export function ReceiptContent({
   const redeemedAmount =
     sale.loyaltyRedemption?.amount ?? legacyLoyaltyRedemption?.redemptionAmount ?? null;
   const hasLoyaltyRedemption = Boolean(redeemedPoints && redeemedAmount);
+  const receiptLoyaltySummary =
+    customer?.type === 'MEMBER' ? (sale.loyaltySummary ?? null) : null;
   return (
     <>
       <header className="text-center">
@@ -5067,11 +5069,39 @@ export function ReceiptContent({
         </p>
       </header>
 
-      <section className="mt-4 text-xs">
-        <p className="font-semibold">{copy('Customer')}</p>
-        <p className="mt-1">{customerDisplayName(customer, locale)}</p>
-        {customerDisplayDetail(customer) ? (
-          <p className="text-slate-500">{customerDisplayDetail(customer)}</p>
+      <section className="mt-4 flex items-start justify-between gap-4 text-xs">
+        <div className="min-w-0">
+          <p className="font-semibold">{copy('Customer')}</p>
+          <p className="mt-1 break-words">{customerDisplayName(customer, locale)}</p>
+          {customerDisplayDetail(customer) ? (
+            <p className="break-words text-slate-500">{customerDisplayDetail(customer)}</p>
+          ) : null}
+        </div>
+        {receiptLoyaltySummary ? (
+          <dl className="shrink-0 space-y-0.5 text-right tabular-nums">
+            <div className="flex items-baseline justify-end gap-2">
+              <dt className="text-slate-500">{copy('Current points')}</dt>
+              <dd className="font-bold">
+                {pointQuantity(receiptLoyaltySummary.balanceAfter, locale)}
+              </dd>
+            </div>
+            {isPositiveDecimal(receiptLoyaltySummary.earnedPoints) ? (
+              <div className="flex items-baseline justify-end gap-2">
+                <dt className="text-slate-500">{copy('Earned')}</dt>
+                <dd className="font-semibold">
+                  +{pointQuantity(receiptLoyaltySummary.earnedPoints, locale)}
+                </dd>
+              </div>
+            ) : null}
+            {isPositiveDecimal(receiptLoyaltySummary.redeemedPoints) ? (
+              <div className="flex items-baseline justify-end gap-2">
+                <dt className="text-slate-500">{copy('Used')}</dt>
+                <dd className="font-semibold">
+                  −{pointQuantity(receiptLoyaltySummary.redeemedPoints, locale)}
+                </dd>
+              </div>
+            ) : null}
+          </dl>
         ) : null}
         {saleEarnedPoints(sale) ? (
           <div
