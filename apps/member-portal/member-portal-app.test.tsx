@@ -623,10 +623,10 @@ describe('canonical /member access route', () => {
     expect(read('Dockerfile')).toContain('/usr/share/nginx/html/member/');
   });
 
-  it('starts only the Member Portal from the root dev:member script', () => {
+  it('starts the Member Portal alone from dev:member and with the other apps from root dev', () => {
     const scripts = JSON.parse(read('package.json')).scripts as Record<string, string>;
     expect(scripts['dev:member']).toBe('pnpm --filter @digvation/member-portal dev');
-    expect(scripts['dev']).not.toContain('member');
+    expect(scripts['dev']).toContain('--filter @digvation/member-portal');
     expect(scripts['dev:operational']).not.toContain('member');
     expect(JSON.parse(read('apps', 'member-portal', 'package.json')).scripts.dev).toBe('vite');
   });

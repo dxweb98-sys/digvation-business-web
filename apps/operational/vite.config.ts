@@ -18,8 +18,14 @@ export default defineConfig({
   },
   plugins: [react(), tailwindcss()],
   server: {
+    // 127.0.0.1 keeps Operational same-site with the local Runtime and the /member proxy below.
+    host: '127.0.0.1',
     port: 5173,
     strictPort: true,
+    // Local review only: the Member Portal stays its own Vite app (5175); production routing is nginx's job.
+    proxy: {
+      '^/member(/|$)': { target: 'http://127.0.0.1:5175', ws: true },
+    },
     allowedHosts: ['precious-powerpoint-transmitted-flashing.trycloudflare.com']
   },
   preview: {
