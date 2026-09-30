@@ -15,6 +15,8 @@ export class MembersApi {
   list(input:{q?:string;status?:Status;limit:number;offset:number}) { return this.client.get<MemberPage>(`/api/v1/memberships?${qs(input)}`); }
   get(id:string) { return this.client.get<Member>(`/api/v1/memberships/${id}`); }
   enroll(input:{name:string;phone:string}) { return this.client.post<Member>('/api/v1/memberships',input); }
+  enrollExisting(input:{customerId:string}) { return this.client.post<Member>('/api/v1/memberships/enroll-existing-customer',input); }
+  searchCustomers(q:string) { return this.client.get<{items:Customer[];total:number}>(`/api/v1/customers?${qs({q,limit:20,offset:0})}`); }
   updateCustomer(member:Member,input:{name:string;phone:string}) { return this.client.patch<Customer>(`/api/v1/customers/${member.customerId}`,{...input,expectedVersion:member.customer.version}); }
   updateStatus(member:Member,status:Status) { return this.client.patch<Member>(`/api/v1/memberships/${member.id}/status`,{status,expectedVersion:member.version}); }
   balance(id:string) { return this.client.get<Balance>(`/api/v1/loyalty/memberships/${id}/balance`); }
