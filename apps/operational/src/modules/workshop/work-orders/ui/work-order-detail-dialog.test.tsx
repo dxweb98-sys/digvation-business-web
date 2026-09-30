@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../../app/localization/operational-localization', () => ({
@@ -23,7 +23,11 @@ const workOrder: WorkshopQueueWorkOrder = {
   vehicleChassisNumberSnapshot: 'MH1JFZ1',
   customerRequest: 'Rem berbunyi',
   cancellationReason: null,
-  mechanic: { employeeId: 'emp-1', displayName: 'Andi Mekanik', assignedAt: '2026-09-28T20:00:00.000Z' },
+  mechanic: {
+    employeeId: 'emp-1',
+    displayName: 'Andi Mekanik',
+    assignedAt: '2026-09-28T20:00:00.000Z',
+  },
   version: 3,
   createdAt: '2026-09-28T19:23:00.000Z',
   updatedAt: '2026-09-28T19:23:00.000Z',
@@ -65,6 +69,29 @@ describe('WorkOrderDetailDialog', () => {
     expect(screen.queryByText('Engine number')).toBeNull();
   });
 
+  it('keeps Work Order context on one side and the items with the billing derived from them on the other', () => {
+    render(
+      <WorkOrderDetailDialog
+        {...props({
+          itemsSection: <p>items-section</p>,
+          billingSection: <p>billing-section</p>,
+        })}
+      />,
+    );
+    const context = document.querySelector('[data-region="context"]') as HTMLElement;
+    const work = document.querySelector('[data-region="work"]') as HTMLElement;
+    for (const text of ['Budi Santoso', 'B 1234 CDV', 'Andi Mekanik', 'Rem berbunyi'])
+      expect(context.textContent).toContain(text);
+    expect(context.textContent).not.toContain('billing-section');
+    expect(context.textContent).not.toContain('items-section');
+    // Items first, the billing they produce directly after them.
+    expect(work.textContent).toContain('items-section');
+    expect(work.textContent).toContain('billing-section');
+    expect(work.textContent?.indexOf('items-section')).toBeLessThan(
+      work.textContent?.indexOf('billing-section') ?? 0,
+    );
+  });
+
   it('keeps the last Work Order rendered after a close is requested', () => {
     const { rerender } = render(<WorkOrderDetailDialog {...props()} />);
     rerender(<WorkOrderDetailDialog {...props({ workOrder: null })} />);
@@ -83,18 +110,6 @@ describe('WorkOrderDetailDialog', () => {
     expect(screen.getByText('items-section')).toBeTruthy();
   });
 
-  it('keeps the cancellation form while closing instead of collapsing it', () => {
-    const { rerender } = render(
-      <WorkOrderDetailDialog {...props({ isCancelling: true, cancelReason: 'Berubah pikiran' })} />,
-    );
-    rerender(
-      <WorkOrderDetailDialog
-        {...props({ workOrder: null, isCancelling: true, cancelReason: 'Berubah pikiran' })}
-      />,
-    );
-    expect(screen.getByDisplayValue('Berubah pikiran')).toBeTruthy();
-  });
-
   it('puts the destructive cancel action in the footer and runs lifecycle actions', () => {
     const onAction = vi.fn();
     render(<WorkOrderDetailDialog {...props({ onAction })} />);
@@ -105,9 +120,114 @@ describe('WorkOrderDetailDialog', () => {
     expect(onAction).toHaveBeenCalledWith(workOrder, 'cancel');
   });
 
-  it('requires a reason before confirming the cancellation', () => {
-    render(<WorkOrderDetailDialog {...props({ isCancelling: true })} />);
-    expect((screen.getByRole('button', { name: 'Yes, cancel' }) as HTMLButtonElement).disabled).toBe(true);
+  describe('cancellation', () => {
+    it('opens a dedicated dialog and leaves the Work Order detail unchanged behind it', () => {
+      const onAction = vi.fn();
+      const { rerender } = render(<WorkOrderDetailDialog {...props({ onAction })} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel work order' }));
+      expect(onAction).toHaveBeenCalledWith(workOrder, 'cancel');
+
+      rerender(<WorkOrderDetailDialog {...props({ isCancelling: true })} />);
+      const dialogs = screen.getAllByRole('dialog');
+      expect(dialogs).toHaveLength(2);
+      const cancellation = dialogs[dialogs.length - 1] as HTMLElement;
+      expect(within(cancellation).getByText('WO-20260928-000001')).toBeTruthy();
+      expect(within(cancellation).getByLabelText('Cancellation reason')).toBeTruthy();
+      // The Work Order detail is still fully there and did not swap in a form.
+      const detail = dialogs[0] as HTMLElement;
+      expect(within(detail).getByText('Budi Santoso')).toBeTruthy();
+      expect(within(detail).queryByLabelText('Cancellation reason')).toBeNull();
+      expect(within(detail).queryByRole('button', { name: 'Yes, cancel' })).toBeNull();
+      // Lifecycle actions did not turn into Back / Yes, cancel.
+      expect(within(detail).getByRole('button', { name: 'Pause' })).toBeTruthy();
+    });
+
+    it('renders no cancellation dialog or field until cancellation starts', () => {
+      render(<WorkOrderDetailDialog {...props()} />);
+      expect(screen.getAllByRole('dialog')).toHaveLength(1);
+      expect(screen.queryByLabelText('Cancellation reason')).toBeNull();
+    });
+
+    it.each(['', '   '])(
+      'keeps the destructive confirmation disabled for a blank reason (%j)',
+      (blank) => {
+        render(<WorkOrderDetailDialog {...props({ isCancelling: true, cancelReason: blank })} />);
+        expect(
+          (screen.getByRole('button', { name: 'Yes, cancel' }) as HTMLButtonElement).disabled,
+        ).toBe(true);
+      },
+    );
+
+    it('sends the entered reason through the existing handlers', () => {
+      const onCancelReasonChange = vi.fn();
+      const onCancelConfirm = vi.fn();
+      render(
+        <WorkOrderDetailDialog
+          {...props({
+            isCancelling: true,
+            cancelReason: 'Berubah pikiran',
+            onCancelReasonChange,
+            onCancelConfirm,
+          })}
+        />,
+      );
+      fireEvent.change(screen.getByLabelText('Cancellation reason'), {
+        target: { value: 'Pelanggan batal' },
+      });
+      // DTextarea reports (value, event); the workspace handler takes the value.
+      expect(onCancelReasonChange.mock.calls[0]?.[0]).toBe('Pelanggan batal');
+      const confirm = screen.getByRole('button', { name: 'Yes, cancel' }) as HTMLButtonElement;
+      expect(confirm.disabled).toBe(false);
+      fireEvent.click(confirm);
+      expect(onCancelConfirm).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the confirmation busy while the cancellation is pending', () => {
+      render(
+        <WorkOrderDetailDialog
+          {...props({ isCancelling: true, cancelReason: 'x', cancelPending: true })}
+        />,
+      );
+      expect((screen.getByRole('button', { name: 'Back' }) as HTMLButtonElement).disabled).toBe(
+        true,
+      );
+    });
+
+    it('backing out cancels nothing and never closes the Work Order detail', () => {
+      const onCancelBack = vi.fn();
+      const onCancelConfirm = vi.fn();
+      const onClose = vi.fn();
+      render(
+        <WorkOrderDetailDialog
+          {...props({
+            isCancelling: true,
+            cancelReason: 'x',
+            onCancelBack,
+            onCancelConfirm,
+            onClose,
+          })}
+        />,
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+      expect(onCancelBack).toHaveBeenCalledTimes(1);
+      expect(onCancelConfirm).not.toHaveBeenCalled();
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByText('Budi Santoso')).toBeTruthy();
+    });
+
+    it('keeps the cancellation dialog through the close transition', () => {
+      const { rerender } = render(
+        <WorkOrderDetailDialog
+          {...props({ isCancelling: true, cancelReason: 'Berubah pikiran' })}
+        />,
+      );
+      rerender(
+        <WorkOrderDetailDialog
+          {...props({ workOrder: null, isCancelling: false, cancelReason: '' })}
+        />,
+      );
+      expect(screen.getAllByText('WO-20260928-000001').length).toBeGreaterThan(0);
+    });
   });
 
   describe('mechanic assignment', () => {
@@ -134,7 +254,9 @@ describe('WorkOrderDetailDialog', () => {
 
     it('hides the assign action without workshop-assignments:update but still shows the state', () => {
       render(
-        <WorkOrderDetailDialog {...props({ workOrder: waiting, permissions: ['work-orders:cancel'] })} />,
+        <WorkOrderDetailDialog
+          {...props({ workOrder: waiting, permissions: ['work-orders:cancel'] })}
+        />,
       );
       expect(screen.getByText('Not assigned yet')).toBeTruthy();
       expect(screen.queryByRole('button', { name: 'Assign mechanic' })).toBeNull();
@@ -188,9 +310,7 @@ describe('WorkOrderDetailDialog', () => {
 
   it('offers no actions for a finished Work Order', () => {
     render(
-      <WorkOrderDetailDialog
-        {...props({ workOrder: { ...workOrder, workStatus: 'DONE' } })}
-      />,
+      <WorkOrderDetailDialog {...props({ workOrder: { ...workOrder, workStatus: 'DONE' } })} />,
     );
     expect(screen.getByText('No more actions for this Work Order.')).toBeTruthy();
   });

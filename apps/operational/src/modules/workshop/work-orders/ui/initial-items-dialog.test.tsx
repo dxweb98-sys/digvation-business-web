@@ -33,7 +33,12 @@ const CATALOG: PickerItem[] = [
     resolvedPrice: price('120000'),
     variants: [],
     fixedComponents: [
-      { componentItemId: 'p-filter', itemName: 'Filter Oli', variantName: null, quantity: '2.0000' },
+      {
+        componentItemId: 'p-filter',
+        itemName: 'Filter Oli',
+        variantName: null,
+        quantity: '2.0000',
+      },
       { componentItemId: 'p-baut', itemName: 'Baut Kuras', variantName: null, quantity: '1.0000' },
     ],
   },
@@ -46,9 +51,27 @@ const CATALOG: PickerItem[] = [
     variantSelectionMode: 'REQUIRED',
     resolvedPrice: null,
     variants: [
-      { id: 'v-80', code: 'B80', name: 'Ukuran 80', status: 'ACTIVE', resolvedPrice: price('200000') },
-      { id: 'v-90', code: 'B90', name: 'Ukuran 90', status: 'ACTIVE', resolvedPrice: price('250000') },
-      { id: 'v-old', code: 'BOLD', name: 'Ukuran lama', status: 'INACTIVE', resolvedPrice: price('1') },
+      {
+        id: 'v-80',
+        code: 'B80',
+        name: 'Ukuran 80',
+        status: 'ACTIVE',
+        resolvedPrice: price('200000'),
+      },
+      {
+        id: 'v-90',
+        code: 'B90',
+        name: 'Ukuran 90',
+        status: 'ACTIVE',
+        resolvedPrice: price('250000'),
+      },
+      {
+        id: 'v-old',
+        code: 'BOLD',
+        name: 'Ukuran lama',
+        status: 'INACTIVE',
+        resolvedPrice: price('1'),
+      },
     ],
   },
   {
@@ -114,7 +137,7 @@ describe('InitialItemsDialog', () => {
   it('separates browsing from the local draft and hides component-only Products', () => {
     renderDialog();
     expect(screen.getByRole('region', { name: 'Search and add items' })).toBeTruthy();
-    expect(within(selected()).getByText('No items selected.')).toBeTruthy();
+    expect(within(selected()).getByText('No items selected')).toBeTruthy();
     expect(screen.queryByText('Sekrup Komponen')).toBeNull();
     expect(saveButton().disabled).toBe(true);
   });
@@ -171,9 +194,8 @@ describe('InitialItemsDialog', () => {
 
     expect(within(selected()).getByText('Spare part · Ukuran 90')).toBeTruthy();
     fireEvent.click(saveButton());
-    expect(onConfirm).toHaveBeenCalledWith([
-      { catalogItemId: 'prt-tire', catalogVariantId: 'v-90', quantity: '1' },
-    ],
+    expect(onConfirm).toHaveBeenCalledWith(
+      [{ catalogItemId: 'prt-tire', catalogVariantId: 'v-90', quantity: '1' }],
       expect.any(Array),
     );
   });
@@ -188,9 +210,8 @@ describe('InitialItemsDialog', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Increase quantity Ban Luar' }));
     fireEvent.click(saveButton());
-    expect(onConfirm).toHaveBeenCalledWith([
-      { catalogItemId: 'prt-tire', catalogVariantId: 'v-80', quantity: '3' },
-    ],
+    expect(onConfirm).toHaveBeenCalledWith(
+      [{ catalogItemId: 'prt-tire', catalogVariantId: 'v-80', quantity: '3' }],
       expect.any(Array),
     );
   });
@@ -211,7 +232,7 @@ describe('InitialItemsDialog', () => {
     renderDialog();
     add('Ganti Oli');
     fireEvent.click(screen.getByRole('button', { name: 'Remove Ganti Oli' }));
-    expect(within(selected()).getByText('No items selected.')).toBeTruthy();
+    expect(within(selected()).getByText('No items selected')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Add Ganti Oli' })).toBeTruthy();
   });
 
@@ -231,7 +252,7 @@ describe('InitialItemsDialog', () => {
     expect((screen.getByRole('button', { name: /Add item/ }) as HTMLButtonElement).disabled).toBe(
       true,
     );
-    expect(within(selected()).getByText('No items selected.')).toBeTruthy();
+    expect(within(selected()).getByText('No items selected')).toBeTruthy();
   });
 
   it('shows a retry when the catalog cannot load and a pending save', () => {

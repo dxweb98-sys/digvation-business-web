@@ -23,6 +23,7 @@ vi.mock('../../../../app/localization/operational-localization', () => ({
     locale: 'id-ID',
     copy: (value: string) => value,
     label: (value: string) => value,
+    formatDate: (value: Date) => value.toISOString(),
   }),
 }));
 vi.mock('../api/workshop-lines-api', () => ({
@@ -167,7 +168,7 @@ describe('WorkOrderItemsSection', () => {
   it('offers the initial selection when there are no items and the user may update them', async () => {
     mocks.getDetail.mockResolvedValue(detail([]));
     renderSection();
-    expect(await screen.findByText('No items selected yet.')).toBeTruthy();
+    expect(await screen.findByText('No work items yet')).toBeTruthy();
     expect(screen.getByRole('button', { name: /Select items/ })).toBeTruthy();
     // The catalog is not read until the picker is opened.
     expect(mocks.getCatalog).not.toHaveBeenCalled();
@@ -182,7 +183,7 @@ describe('WorkOrderItemsSection', () => {
   ])('does not offer a selection action $name', async ({ props }) => {
     mocks.getDetail.mockResolvedValue(detail([]));
     renderSection(props);
-    await screen.findByText('No items selected yet.');
+    await screen.findByText('No work items yet');
     expect(screen.queryByRole('button', { name: /Select items/ })).toBeNull();
   });
 
@@ -193,7 +194,7 @@ describe('WorkOrderItemsSection', () => {
     expect(await screen.findByText(/Servis Besar \(nama lama\)/)).toBeTruthy();
     expect(screen.getByText('Ban Luar')).toBeTruthy();
     expect(screen.getByText(/Ukuran 90/)).toBeTruthy();
-    expect(screen.getByText(/2 x/)).toBeTruthy();
+    expect(screen.getByText(/2 ×/)).toBeTruthy();
     expect(screen.getByText(/500\.000/)).toBeTruthy();
     expect(screen.getByText('Includes: Filter')).toBeTruthy();
     expect(screen.getByText('Service')).toBeTruthy();
@@ -217,7 +218,9 @@ describe('WorkOrderItemsSection', () => {
         { catalogItemId: 'prt-oil', quantity: '2' },
       ]),
     );
-    await waitFor(() => expect(onAccepted).toHaveBeenCalledWith(expect.objectContaining({ version: 5 })));
+    await waitFor(() =>
+      expect(onAccepted).toHaveBeenCalledWith(expect.objectContaining({ version: 5 })),
+    );
     expect(await screen.findByText('Ban Luar')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Select items/ })).toBeNull();
   });
@@ -233,7 +236,9 @@ describe('WorkOrderItemsSection', () => {
 
     await waitFor(() => expect(onStale).toHaveBeenCalled());
     expect(onAccepted).not.toHaveBeenCalled();
-    expect(await screen.findByText('This Work Order was just changed. Open it again.')).toBeTruthy();
+    expect(
+      await screen.findByText('This Work Order was just changed. Open it again.'),
+    ).toBeTruthy();
   });
 
   it('keeps the picker open and explains a rejected item without exposing the raw code', async () => {
@@ -250,7 +255,9 @@ describe('WorkOrderItemsSection', () => {
     ).toBeTruthy();
     expect(screen.queryByText('PRICE_NOT_FOUND')).toBeNull();
     expect(onStale).not.toHaveBeenCalled();
-    expect(within(screen.getByRole('dialog')).getByRole('button', { name: 'Save items' })).toBeTruthy();
+    expect(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Save items' }),
+    ).toBeTruthy();
   });
 
   it('offers a retry when the accepted items cannot be loaded', async () => {
@@ -278,7 +285,10 @@ describe('WorkOrderItemsSection', () => {
     it.each([
       { name: 'DONE', props: { workOrder: queueOrder({ workStatus: 'DONE' }) } },
       { name: 'CANCELLED', props: { workOrder: queueOrder({ workStatus: 'CANCELLED' }) } },
-      { name: 'a user without work-order-items:update', props: { permissions: ['work-orders:read'] } },
+      {
+        name: 'a user without work-order-items:update',
+        props: { permissions: ['work-orders:read'] },
+      },
     ])('offers no item action for $name', async ({ props }) => {
       mocks.getDetail.mockResolvedValue(detail(ACCEPTED));
       renderSection(props);
@@ -294,7 +304,9 @@ describe('WorkOrderItemsSection', () => {
       const { onAccepted } = renderSection({ workOrder: openOrder() });
 
       fireEvent.click(await screen.findByRole('button', { name: 'Change items' }));
-      expect(screen.getByRole('button', { name: 'Save changes' }).hasAttribute('disabled')).toBe(true);
+      expect(screen.getByRole('button', { name: 'Save changes' }).hasAttribute('disabled')).toBe(
+        true,
+      );
       fireEvent.change(screen.getByLabelText('Quantity Ban Luar - Ukuran 90'), {
         target: { value: '3' },
       });
@@ -305,7 +317,9 @@ describe('WorkOrderItemsSection', () => {
           { type: 'QUANTITY_CHANGE', lineId: 'l2', quantity: '3' },
         ]),
       );
-      await waitFor(() => expect(onAccepted).toHaveBeenCalledWith(expect.objectContaining({ version: 5 })));
+      await waitFor(() =>
+        expect(onAccepted).toHaveBeenCalledWith(expect.objectContaining({ version: 5 })),
+      );
       expect(await screen.findByText('Items updated.')).toBeTruthy();
     });
 
@@ -318,12 +332,16 @@ describe('WorkOrderItemsSection', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Remove item Ban Luar - Ukuran 90' }));
       expect(screen.getByText('Will be removed')).toBeTruthy();
       fireEvent.click(screen.getByRole('button', { name: 'Restore item Ban Luar - Ukuran 90' }));
-      expect(screen.getByRole('button', { name: 'Save changes' }).hasAttribute('disabled')).toBe(true);
+      expect(screen.getByRole('button', { name: 'Save changes' }).hasAttribute('disabled')).toBe(
+        true,
+      );
 
       fireEvent.click(screen.getByRole('button', { name: 'Remove item Ban Luar - Ukuran 90' }));
       fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
       await waitFor(() =>
-        expect(mocks.adjustLines).toHaveBeenCalledWith('wo-1', 4, [{ type: 'REMOVE', lineId: 'l2' }]),
+        expect(mocks.adjustLines).toHaveBeenCalledWith('wo-1', 4, [
+          { type: 'REMOVE', lineId: 'l2' },
+        ]),
       );
     });
 
@@ -371,7 +389,9 @@ describe('WorkOrderItemsSection', () => {
         target: { value: '0' },
       });
       expect(screen.getByRole('alert').textContent).toContain('Enter a quantity above zero.');
-      expect(screen.getByRole('button', { name: 'Save changes' }).hasAttribute('disabled')).toBe(true);
+      expect(screen.getByRole('button', { name: 'Save changes' }).hasAttribute('disabled')).toBe(
+        true,
+      );
     });
 
     it('reloads the Work Order when the adjustment hits a version conflict', async () => {
@@ -383,13 +403,15 @@ describe('WorkOrderItemsSection', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
       await waitFor(() => expect(onStale).toHaveBeenCalled());
       expect(onAccepted).not.toHaveBeenCalled();
-      expect(await screen.findByText('This Work Order was just changed. Open it again.')).toBeTruthy();
+      expect(
+        await screen.findByText('This Work Order was just changed. Open it again.'),
+      ).toBeTruthy();
     });
 
     it('lets an open Work Order without items receive its first item', async () => {
       mocks.getDetail.mockResolvedValue(detail([]));
       renderSection({ workOrder: openOrder('IN_PROGRESS') });
-      await screen.findByText('No items selected yet.');
+      await screen.findByText('No work items yet');
       expect(screen.queryByRole('button', { name: /Select items/ })).toBeNull();
       expect(screen.getByRole('button', { name: /Add item/ })).toBeTruthy();
     });
@@ -413,12 +435,12 @@ describe('WorkOrderItemsSection', () => {
       ];
       mocks.getDetail.mockResolvedValue(detail([], 5, history));
       renderSection({ workOrder: queueOrder({ workStatus: 'WAITING', version: 5 }) });
-      await screen.findByText('No items selected yet.');
+      await screen.findByText('No work items yet');
       expect(screen.queryByRole('button', { name: /Select items/ })).toBeNull();
       expect(screen.getByRole('button', { name: /Add item/ })).toBeTruthy();
     });
 
-    it('presents the change history as secondary, newest first', async () => {
+    it('opens the change history in a focused popup, newest first, with no inline accordion', async () => {
       const history: WorkshopWorkOrderDetail['adjustments'] = [
         {
           id: 'a1',
@@ -466,14 +488,30 @@ describe('WorkOrderItemsSection', () => {
       mocks.getDetail.mockResolvedValue(detail(ACCEPTED, 6, history));
       renderSection({ workOrder: queueOrder({ workStatus: 'DONE', version: 6 }) });
 
-      const toggle = await screen.findByRole('button', { name: /Item change history \(3\)/ });
+      const action = await screen.findByRole('button', { name: /View change history \(3\)/ });
+      // No inline accordion: nothing of the history is on the page until it is opened.
       expect(screen.queryByText(/Baut Kuras/)).toBeNull();
-      fireEvent.click(toggle);
-      const entries = screen.getAllByRole('listitem').map((item) => item.textContent ?? '');
-      const trace = entries.filter((text) => /Filter Oli|Ban Luar 1 → 2|Baut Kuras/.test(text));
-      expect(trace[0]).toContain('Baut Kuras');
-      expect(trace[1]).toContain('Ban Luar 1 → 2');
-      expect(trace[2]).toContain('Filter Oli x1');
+      expect(screen.queryByRole('dialog')).toBeNull();
+
+      fireEvent.click(action);
+      const dialog = await screen.findByRole('dialog');
+      expect(within(dialog).getByText('Item change history')).toBeTruthy();
+      const entries = within(dialog)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent ?? '');
+      // Newest first, with the change type and the quantity meaning.
+      expect(entries[0]).toContain('Removed');
+      expect(entries[0]).toContain('Baut Kuras');
+      expect(entries[0]).toContain('− 1');
+      expect(entries[1]).toContain('Quantity changed');
+      expect(entries[1]).toContain('Ban Luar');
+      expect(entries[1]).toContain('1 → 2');
+      expect(entries[2]).toContain('Added');
+      expect(entries[2]).toContain('Filter Oli');
+      expect(entries[2]).toContain('+ 1');
+
+      fireEvent.click(within(dialog).getByRole('button', { name: /close|tutup/i }));
+      await waitFor(() => expect(screen.queryByText(/Baut Kuras/)).toBeNull());
       // A terminal Work Order keeps its history but offers no edit action.
       expect(screen.queryByRole('button', { name: /Add item|Change items/ })).toBeNull();
     });
