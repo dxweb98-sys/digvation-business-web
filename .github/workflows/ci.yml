@@ -52,8 +52,8 @@ jobs:
 
       - name: Verify web image identity
         run: |
-          test "$(docker inspect --format '{{ index .Config.Labels \"org.opencontainers.image.revision\" }}' business-backoffice-ci:${{ github.sha }})" = "${{ github.sha }}"
-          test "$(docker inspect --format '{{ index .Config.Labels \"org.opencontainers.image.revision\" }}' business-operational-ci:${{ github.sha }})" = "${{ github.sha }}"
+          test "$(docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' business-backoffice-ci:${{ github.sha }})" = "${{ github.sha }}"
+          test "$(docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' business-operational-ci:${{ github.sha }})" = "${{ github.sha }}"
 
       - name: Web container routing and runtime-config smoke
         run: |
@@ -108,7 +108,7 @@ jobs:
         run: |
           SHA=${{ github.sha }}
           for image in web-backoffice-release web-operational-release web-member-release; do
-            test "$(docker inspect --format '{{ index .Config.Labels \"org.opencontainers.image.revision\" }}' ${image}:$SHA)" = "$SHA"
+            test "$(docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' ${image}:$SHA)" = "$SHA"
           done
 
       - name: Smoke production web containers
