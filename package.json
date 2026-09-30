@@ -8,7 +8,7 @@
     "pnpm": ">=11.0.0 <12"
   },
   "scripts": {
-    "dev": "pnpm --parallel --filter @digvation/business-operational-pos --filter @digvation/business-backoffice dev",
+    "dev": "pnpm --parallel --filter @digvation/business-operational-pos --filter @digvation/business-backoffice --filter @digvation/member-portal dev",
     "dev:operational": "pnpm --filter @digvation/business-operational-pos dev",
     "dev:backoffice": "pnpm --filter @digvation/business-backoffice dev",
     "dev:member": "pnpm --filter @digvation/member-portal dev",
