@@ -2,6 +2,7 @@ import { DRadio } from '@digvation/ui';
 import { Phone, UserCheck } from 'lucide-react';
 
 import type { Customer } from './members-api';
+import { toNationalMemberPhone } from './member-phone';
 
 export interface ExistingCustomerChoiceCopy {
   title: string;
@@ -64,7 +65,7 @@ export function ExistingCustomerChoice({
               <span className="block truncate text-sm font-semibold">{customer.name}</span>
               <span className="mt-0.5 flex items-center gap-1 text-xs text-[var(--color-text-muted)]">
                 <Phone className="size-3" />
-                {customer.phoneE164}
+                {toNationalMemberPhone(customer.phoneE164)}
               </span>
             </span>
           </label>

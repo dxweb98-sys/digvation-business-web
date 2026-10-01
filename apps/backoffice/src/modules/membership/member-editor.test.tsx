@@ -35,15 +35,15 @@ function renderEditor(member: Member | null = null) {
 const field = (label: string) => screen.getByLabelText(label) as HTMLInputElement;
 const type = (label: string, value: string) =>
   fireEvent.change(field(label), { target: { value } });
-const save = () => screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement;
+const save = () => screen.getByRole('button', { name: 'Simpan' }) as HTMLButtonElement;
 
 afterEach(cleanup);
 
 describe('MemberEditor enrollment', () => {
   it('asks only for name and phone: no NIK field or hint', () => {
     renderEditor();
-    expect(field('Name')).toBeTruthy();
-    expect(field('Phone')).toBeTruthy();
+    expect(field('Nama')).toBeTruthy();
+    expect(field('No. HP')).toBeTruthy();
     expect(screen.queryByLabelText(/NIK/i)).toBeNull();
     expect(screen.queryByText(/NIK/i)).toBeNull();
   });
@@ -51,11 +51,11 @@ describe('MemberEditor enrollment', () => {
   it('stays disabled until both name and a valid phone are present', () => {
     renderEditor();
     expect(save().disabled).toBe(true);
-    type('Name', 'Budi');
+    type('Nama', 'Budi');
     expect(save().disabled).toBe(true);
-    type('Phone', '08');
+    type('No. HP', '08');
     expect(save().disabled).toBe(true);
-    type('Phone', '0811 1111 111');
+    type('No. HP', '0811 1111 111');
     expect(save().disabled).toBe(false);
   });
 
@@ -63,8 +63,8 @@ describe('MemberEditor enrollment', () => {
     'submits only name and the canonical phone for %s',
     async (typed) => {
       const { api, done, close } = renderEditor();
-      type('Name', 'Budi');
-      type('Phone', typed);
+      type('Nama', 'Budi');
+      type('No. HP', typed);
       fireEvent.click(save());
       await waitFor(() => expect(api.enroll).toHaveBeenCalled());
       expect(api.enroll).toHaveBeenCalledWith({ name: 'Budi', phone: '+6281111111111' });
@@ -76,8 +76,8 @@ describe('MemberEditor enrollment', () => {
 
   it('never blocks a name that already exists: only the phone decides', async () => {
     const { api } = renderEditor();
-    type('Name', existing.customer.name);
-    type('Phone', '0822 2222 222');
+    type('Nama', existing.customer.name);
+    type('No. HP', '0822 2222 222');
     expect(save().disabled).toBe(false);
     fireEvent.click(save());
     await waitFor(() => expect(api.enroll).toHaveBeenCalled());
@@ -92,8 +92,8 @@ describe('MemberEditor enrollment', () => {
   ])('shows the specific %s message and keeps the dialog open', async (code, message) => {
     const { api, done, close } = renderEditor();
     api.enroll.mockRejectedValueOnce({ status: 409, code });
-    type('Name', 'Budi');
-    type('Phone', '081111111111');
+    type('Nama', 'Budi');
+    type('No. HP', '081111111111');
     fireEvent.click(save());
     expect(await screen.findByText(message)).toBeTruthy();
     expect(done).not.toHaveBeenCalled();
@@ -101,11 +101,46 @@ describe('MemberEditor enrollment', () => {
   });
 });
 
+describe('MemberEditor phone UX', () => {
+  it('uses a national 08… example instead of making +62 look mandatory', () => {
+    renderEditor();
+    expect(screen.getByText('Contoh: 081234567890')).toBeTruthy();
+    expect(screen.queryByText(/\+62/)).toBeNull();
+  });
+
+  it('marks an invalid phone and keeps saving disabled', () => {
+    renderEditor();
+    type('Nama', 'Budi');
+    type('No. HP', '08');
+    expect(screen.getByText('Masukkan nomor HP yang valid, contoh 081234567890.')).toBeTruthy();
+    expect(save().disabled).toBe(true);
+  });
+});
+
 describe('MemberEditor editing an existing Member', () => {
-  it('re-saves the same canonical phone and never sends a NIK', async () => {
+  it('shows the Catalog-family identity: title, Member number and status', () => {
+    renderEditor(existing);
+    expect(screen.getByText('Edit Pelanggan')).toBeTruthy();
+    expect(screen.getAllByText('MBR-1').length).toBeGreaterThan(0);
+    expect(screen.getByText('Aktif')).toBeTruthy();
+    expect(screen.getByText('Identitas Member')).toBeTruthy();
+    expect(screen.getByText('Data Pelanggan')).toBeTruthy();
+  });
+
+  it('saving an untouched phone sends exactly the stored canonical phone', async () => {
     const { api } = renderEditor(existing);
-    expect(field('Phone').value).toBe('+628111111111');
-    type('Name', 'Budi Santoso');
+    fireEvent.click(save());
+    await waitFor(() => expect(api.updateCustomer).toHaveBeenCalled());
+    expect(api.updateCustomer).toHaveBeenCalledWith(existing, {
+      name: 'Budi',
+      phone: existing.customer.phoneE164,
+    });
+  });
+
+  it('shows the stored phone nationally and re-saves the same canonical phone without a NIK', async () => {
+    const { api } = renderEditor(existing);
+    expect(field('No. HP').value).toBe('08111111111');
+    type('Nama', 'Budi Santoso');
     fireEvent.click(save());
     await waitFor(() => expect(api.updateCustomer).toHaveBeenCalled());
     expect(api.updateCustomer).toHaveBeenCalledWith(existing, {
@@ -151,8 +186,8 @@ describe('MemberEditor existing Customer continuation', () => {
         />
       </DToastProvider>,
     );
-    type('Name', 'Nama Yang Diketik');
-    type('Phone', typed);
+    type('Nama', 'Nama Yang Diketik');
+    type('No. HP', typed);
     fireEvent.click(save());
     return { api, done, close };
   }
@@ -161,7 +196,8 @@ describe('MemberEditor existing Customer continuation', () => {
     const { api, done, close } = startConflict([lama]);
     expect(await screen.findByText('Pelanggan sudah terdaftar')).toBeTruthy();
     expect(screen.getByText('Pelanggan Lama')).toBeTruthy();
-    expect(screen.getByText(PHONE)).toBeTruthy();
+    // Presented nationally; the canonical phone itself is untouched.
+    expect(screen.getByText('08111111111')).toBeTruthy();
     expect(screen.queryByText(CONFLICT_COPY)).toBeNull();
     // A single unambiguous match is preselected; the typed name is neither shown nor sent.
     expect(screen.queryByText('Nama Yang Diketik')).toBeNull();
@@ -210,9 +246,10 @@ describe('MemberEditor existing Customer continuation', () => {
   it('leaves everything unchanged on Cancel and returns to the simple form', async () => {
     const { api, done, close } = startConflict([lama]);
     await screen.findByText('Pelanggan sudah terdaftar');
-    fireEvent.click(screen.getByRole('button', { name: 'Batal' }));
+    const cancel = screen.getAllByRole('button', { name: 'Batal' });
+    fireEvent.click(cancel[cancel.length - 1]!);
     expect(screen.queryByText('Pelanggan sudah terdaftar')).toBeNull();
-    expect(field('Name').value).toBe('Nama Yang Diketik');
+    expect(field('Nama').value).toBe('Nama Yang Diketik');
     expect(api.enrollExisting).not.toHaveBeenCalled();
     expect(api.enroll).toHaveBeenCalledTimes(1);
     expect(done).not.toHaveBeenCalled();
@@ -244,8 +281,8 @@ describe('MemberEditor existing Customer continuation', () => {
         <MemberEditor member={null} api={api} canLookupCustomers done={done} close={vi.fn()} />
       </DToastProvider>,
     );
-    type('Name', 'Budi');
-    type('Phone', '0811 1111 111');
+    type('Nama', 'Budi');
+    type('No. HP', '0811 1111 111');
     fireEvent.click(save());
     expect(
       await screen.findByText('Nomor telepon ini sudah terdaftar sebagai member.'),

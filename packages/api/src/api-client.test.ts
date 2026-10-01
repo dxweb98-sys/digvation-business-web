@@ -87,6 +87,57 @@ describe('ApiClient', () => {
     expect(headers.get('x-digvation-session-channel')).toBe('backoffice');
   });
 
+  it('downloads authenticated binary content as a Blob', async () => {
+    const bytes = new Uint8Array([0x50, 0x4b, 0x03, 0x04]);
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(bytes, {
+        status: 200,
+        headers: {
+          'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = new ApiClient({
+      baseUrl: 'https://pos.example.test',
+      applicationSurface: 'backoffice',
+      getAccessToken: async () => 'session-token',
+    });
+    const file = await client.getBinary('/api/v1/memberships/import-template.xlsx');
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://pos.example.test/api/v1/memberships/import-template.xlsx');
+    expect(init.method).toBe('GET');
+    expect(new Headers(init.headers).get('authorization')).toBe('Bearer session-token');
+    expect(file.size).toBe(bytes.length);
+  });
+
+  it('refreshes a binary download after a 401 and surfaces JSON API errors', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(failureResponse(401, 'UNAUTHORIZED'))
+      .mockResolvedValueOnce(new Response(new Uint8Array([1, 2]), { status: 200 }))
+      .mockResolvedValueOnce(failureResponse(403, 'FORBIDDEN'));
+    vi.stubGlobal('fetch', fetchMock);
+    const refreshAccessToken = vi.fn().mockResolvedValue({
+      kind: 'refreshed',
+      accessToken: 'fresh-access',
+    });
+    const client = new ApiClient({
+      baseUrl: 'https://pos.example.test',
+      getAccessToken: async () => 'expired-access',
+      refreshAccessToken,
+    });
+
+    const file = await client.getBinary('/api/v1/memberships/import-template.xlsx');
+    expect(refreshAccessToken).toHaveBeenCalledOnce();
+    expect(file.size).toBe(2);
+    await expect(
+      client.getBinary('/api/v1/memberships/import-template.xlsx'),
+    ).rejects.toMatchObject({ status: 403, code: 'FORBIDDEN' });
+  });
+
   it('refreshes once and retries the original request after a 401', async () => {
     const fetchMock = vi
       .fn()
