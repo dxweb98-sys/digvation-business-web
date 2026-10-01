@@ -4,7 +4,7 @@ import type {
   Page,
   PaymentMethod,
   SellingLocation,
-} from './financial-accounts-api';
+} from '../../features/financial-accounts';
 interface FinancialOperationsPage<T> extends Page<T> {
   total: number;
 }

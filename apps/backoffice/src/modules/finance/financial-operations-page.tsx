@@ -23,7 +23,7 @@ import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffic
 import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
 import { canPerformBackofficeAction } from '../../auth/backoffice-access';
 import { useBackofficeAuth } from '../../auth/backoffice-auth-context';
-import type { PaymentMethod } from './financial-accounts-api';
+import type { PaymentMethod } from '../../features/financial-accounts';
 import {
   FinancialOperationsApi,
   type CashMovement,
