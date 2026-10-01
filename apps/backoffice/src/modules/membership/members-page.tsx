@@ -210,7 +210,15 @@ export function MembersPage() {
       ) : null}
 
       {importing ? (
-        <MemberImportDialog api={api} onImported={refresh} onClose={() => setImporting(false)} />
+        <MemberImportDialog
+          api={api}
+          openingPointsAvailable={
+            session.access.capabilities.includes('LOYALTY_POINTS') &&
+            session.access.permissions.includes('loyalty:configure')
+          }
+          onImported={refresh}
+          onClose={() => setImporting(false)}
+        />
       ) : null}
 
       <DConfirmDialog

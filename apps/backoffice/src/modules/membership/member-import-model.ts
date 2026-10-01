@@ -35,3 +35,24 @@ export function formatFileSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
+
+/**
+ * Displays a NUMERIC points string (e.g. "18750.0000") with locale grouping and without trailing
+ * zeros, by string manipulation only: points are never converted to a JavaScript number. A value
+ * that is not a plain decimal (an invalid typed cell) is shown as typed.
+ */
+export function formatImportPoints(value: string, locale: 'id' | 'en'): string {
+  const match = /^(-?)(\d+)(?:\.(\d+))?$/.exec(value);
+  if (!match) return value;
+  const [, sign, whole = '0', fraction = ''] = match;
+  const grouped = whole
+    .replace(/^0+(?=\d)/, '')
+    .replace(/\B(?=(\d{3})+(?!\d))/g, locale === 'id' ? '.' : ',');
+  const decimals = fraction.replace(/0+$/, '');
+  return `${sign}${grouped}${decimals ? `${locale === 'id' ? ',' : '.'}${decimals}` : ''}`;
+}
+
+/** True for a positive opening balance ("0.0000" and blank open none). */
+export function hasImportOpeningPoints(value: string | null): boolean {
+  return value !== null && /^\d+(\.\d+)?$/.test(value) && /[1-9]/.test(value);
+}

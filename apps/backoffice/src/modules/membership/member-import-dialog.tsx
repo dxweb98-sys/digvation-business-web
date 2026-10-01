@@ -10,6 +10,7 @@ import {
 import { useRef, useState, type ReactNode } from 'react';
 
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
+import { readStoredBackofficeLocale } from '../../app/localization/backoffice-localization';
 import { isSessionExpiredError } from '../../auth/backoffice-auth-context';
 import type {
   MemberImportPreview,
@@ -21,6 +22,8 @@ import { memberImportIssueText, membershipCopy } from './membership-copy';
 import {
   MEMBER_IMPORT_TEMPLATE_FILE_NAME,
   formatFileSize,
+  formatImportPoints,
+  hasImportOpeningPoints,
   memberImportFileProblem,
   memberImportPreviewRows,
 } from './member-import-model';
@@ -47,10 +50,16 @@ function saveBlob(blob: Blob, fileName: string) {
  */
 export function MemberImportDialog({
   api,
+  openingPointsAvailable,
   onImported,
   onClose,
 }: {
   api: Pick<MembersApi, 'importTemplate' | 'previewImport' | 'importMembers'>;
+  /**
+   * Presentation hint only: whether Loyalty Points and `loyalty:configure` are present. Runtime
+   * rejects positive Poin Awal rows on its own; import itself stays governed by enrollment.
+   */
+  openingPointsAvailable: boolean;
   onImported: () => void;
   onClose: () => void;
 }) {
@@ -191,6 +200,11 @@ export function MemberImportDialog({
                 {copy.downloadTemplate}
               </DButton>
             </div>
+            {openingPointsAvailable ? null : (
+              <p className="mt-3 text-xs leading-5 text-[var(--color-text-muted)]">
+                {copy.openingPointsUnavailable}
+              </p>
+            )}
           </MemberPanel>
 
           <MemberPanel className="p-5">
@@ -258,7 +272,7 @@ function SummaryTile({
   tone = 'neutral',
 }: {
   label: string;
-  value: number;
+  value: number | string;
   tone?: 'neutral' | 'success' | 'danger' | 'warning';
 }) {
   const color = {
@@ -330,7 +344,7 @@ function ImportPreview({
           </p>
         ) : null}
         <div className="max-h-[26rem] overflow-auto">
-          <table className="w-full min-w-[46rem] text-left text-sm">
+          <table className="w-full min-w-[52rem] text-left text-sm">
             <thead className="sticky top-0 z-10 bg-[var(--color-surface-muted)] text-[11px] uppercase tracking-[0.04em] text-[var(--color-text-muted)]">
               <tr>
                 {[
@@ -340,9 +354,14 @@ function ImportPreview({
                   copy.memberNumber,
                   copy.status,
                   copy.joinedAt,
+                  copy.openingPoints,
                   copy.result,
                 ].map((label) => (
-                  <th key={label} scope="col" className="px-3 py-2 font-semibold">
+                  <th
+                    key={label}
+                    scope="col"
+                    className={`px-3 py-2 font-semibold ${label === copy.openingPoints ? 'text-right' : ''}`}
+                  >
                     {label}
                   </th>
                 ))}
@@ -386,6 +405,19 @@ function PreviewRow({ row }: { row: MemberImportRow }) {
       </td>
       <td className="px-3 py-2.5 align-top tabular-nums">
         {row.joinedDate ?? muted(copy.importTime)}
+      </td>
+      <td className="whitespace-nowrap px-3 py-2.5 text-right align-top tabular-nums">
+        {row.openingPoints === null ? (
+          muted('—')
+        ) : row.errors.some((issue) => issue.field === 'openingPoints') ? (
+          <span className="text-[var(--color-danger)]">{row.openingPoints}</span>
+        ) : hasImportOpeningPoints(row.openingPoints) ? (
+          <span className="font-semibold text-[var(--color-text)]">
+            {formatImportPoints(row.openingPoints, readStoredBackofficeLocale())}
+          </span>
+        ) : (
+          muted('0')
+        )}
       </td>
       <td className="min-w-[14rem] px-3 py-2.5 align-top">
         {row.errors.length ? (
@@ -442,6 +474,21 @@ function ImportResult({ summary }: { summary: MemberImportSummary }) {
         <SummaryTile label={copy.summaryEnrolled} value={summary.enrolledExistingCustomerCount} />
         <SummaryTile label={copy.summaryGenerated} value={summary.generatedMemberNumberCount} />
         <SummaryTile label={copy.summaryPreserved} value={summary.preservedMemberNumberCount} />
+        {summary.openingBalanceMemberCount ? (
+          <>
+            <SummaryTile
+              label={copy.summaryOpeningMembers}
+              value={summary.openingBalanceMemberCount}
+            />
+            <SummaryTile
+              label={copy.summaryOpeningPoints}
+              value={formatImportPoints(
+                summary.openingBalancePointsTotal,
+                readStoredBackofficeLocale(),
+              )}
+            />
+          </>
+        ) : null}
       </div>
     </MemberPanel>
   );

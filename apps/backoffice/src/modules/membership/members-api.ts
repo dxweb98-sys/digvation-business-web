@@ -27,22 +27,28 @@ export interface Balance {
   membershipId: string;
   pointsBalance: string;
 }
-type LedgerType = 'EARN' | 'REDEEM' | 'EARN_REVERSAL' | 'REDEEM_REVERSAL';
+type LedgerType = 'EARN' | 'REDEEM' | 'EARN_REVERSAL' | 'REDEEM_REVERSAL' | 'OPENING_BALANCE';
 type LedgerResponse = {
   id: string;
   type: LedgerType;
   pointsDelta: string;
   balanceAfter: string;
-  sourceSaleId: string;
+  /** The source Sale; null for an OPENING_BALANCE migrated with an imported Member. */
+  sourceSaleId: string | null;
   reversesLedgerEntryId: string | null;
   createdAt: string;
 };
 export interface Ledger {
   id: string;
-  type: 'Points earned' | 'Points redeemed' | 'Earned points reversed' | 'Redeemed points restored';
+  type:
+    | 'Points earned'
+    | 'Points redeemed'
+    | 'Earned points reversed'
+    | 'Redeemed points restored'
+    | 'Opening balance';
   pointsDelta: string;
   balanceAfter: string;
-  sourceSaleId: string;
+  sourceSaleId: string | null;
   reversesLedgerEntryId: string | null;
   createdAt: string;
 }
@@ -51,9 +57,11 @@ const ledgerTypeLabel: Record<LedgerType, Ledger['type']> = {
   REDEEM: 'Points redeemed',
   EARN_REVERSAL: 'Earned points reversed',
   REDEEM_REVERSAL: 'Redeemed points restored',
+  OPENING_BALANCE: 'Opening balance',
 };
 export type MemberImportAction = 'CREATE_CUSTOMER_AND_MEMBERSHIP' | 'ENROLL_EXISTING_CUSTOMER';
-export type MemberImportField = 'name' | 'phone' | 'memberNumber' | 'status' | 'joinedAt' | 'row';
+export type MemberImportField =
+  'name' | 'phone' | 'memberNumber' | 'status' | 'joinedAt' | 'openingPoints' | 'row';
 export interface MemberImportIssue {
   field: MemberImportField;
   code: string;
@@ -67,6 +75,8 @@ export interface MemberImportRow {
   memberNumber: string | null;
   status: Status;
   joinedDate: string | null;
+  /** Opening Loyalty points as a NUMERIC(19,4) string; "0.0000" opens no balance. Typed value when invalid. */
+  openingPoints: string | null;
   action: MemberImportAction | null;
   errors: MemberImportIssue[];
   warnings: MemberImportIssue[];
@@ -85,6 +95,9 @@ export interface MemberImportSummary {
   enrolledExistingCustomerCount: number;
   generatedMemberNumberCount: number;
   preservedMemberNumberCount: number;
+  openingBalanceMemberCount: number;
+  /** NUMERIC(19,4) string. */
+  openingBalancePointsTotal: string;
 }
 export interface MemberImportResult {
   outcome: 'IMPORTED' | 'REJECTED';
