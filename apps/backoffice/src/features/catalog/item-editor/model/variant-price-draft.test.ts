@@ -5,6 +5,7 @@ import {
   editableAmount,
   isValidSellingPrice,
   variantDraftIssue,
+  variantIdentityChange,
   variantPriceSubmissions,
   type VariantPriceDraft,
 } from './variant-price-draft';
@@ -46,10 +47,54 @@ describe('variantDraftIssue', () => {
   });
 
   it('lets an existing variant without a price stay unchanged', () => {
-    expect(variantDraftIssue(draft('a', { id: 'v-a' }), true)).toBeNull();
-    expect(variantDraftIssue(draft('a', { id: 'v-a', persistedPrice: '25000.0000' }), true)).toBe(
-      'PRICE_REQUIRED',
+    expect(variantDraftIssue(draft('a', { id: 'v-a', code: 'VAR-A' }), true)).toBeNull();
+    expect(
+      variantDraftIssue(
+        draft('a', { id: 'v-a', code: 'VAR-A', persistedPrice: '25000.0000' }),
+        true,
+      ),
+    ).toBe('PRICE_REQUIRED');
+  });
+
+  it('validates the name and code of an existing variant', () => {
+    const existing = draft('a', { id: 'v-a', code: 'VAR-A', price: '1' });
+    expect(variantDraftIssue({ ...existing, name: ' ' }, true)).toBe('NAME_REQUIRED');
+    expect(variantDraftIssue({ ...existing, code: ' ' }, true)).toBe('CODE_REQUIRED');
+    expect(variantDraftIssue({ ...existing, code: 'var a' }, true)).toBe('CODE_INVALID');
+    expect(variantDraftIssue({ ...existing, code: ' var-b ' }, true)).toBeNull();
+  });
+
+  it('lets a new variant leave its code blank for Runtime to generate', () => {
+    expect(variantDraftIssue(draft('a', { price: '1' }), true)).toBeNull();
+    expect(variantDraftIssue(draft('a', { code: 'bad code', price: '1' }), true)).toBe(
+      'CODE_INVALID',
     );
+  });
+});
+
+describe('variantIdentityChange', () => {
+  const record = {
+    id: 'v-a',
+    catalogItemId: 'item-1',
+    code: 'VAR-000001',
+    name: 'Besar',
+    status: 'ACTIVE' as const,
+    version: 3,
+  };
+
+  it('is null for new variants and unchanged existing ones', () => {
+    expect(variantIdentityChange(draft('a', { name: 'Besar' }))).toBeNull();
+    expect(
+      variantIdentityChange(draft('a', { id: 'v-a', record, code: 'VAR-000001', name: ' Besar ' })),
+    ).toBeNull();
+  });
+
+  it('returns the normalized name and code when either changed', () => {
+    expect(
+      variantIdentityChange(
+        draft('a', { id: 'v-a', record, code: ' bsr-01 ', name: 'Besar 500ml' }),
+      ),
+    ).toEqual({ code: 'BSR-01', name: 'Besar 500ml' });
   });
 });
 

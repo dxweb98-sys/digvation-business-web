@@ -55,11 +55,32 @@ body {
   --color-text: var(--portal-ink);
   --color-text-muted: var(--portal-muted);
   --color-border: var(--portal-border);
+  /* Interactive family derived from the one configured brand; the bootstrap theme only carries `brand`. */
+  --color-brand-hover: color-mix(in srgb, var(--color-brand) 86%, black);
+  --color-brand-active: color-mix(in srgb, var(--color-brand) 72%, black);
+  --color-focus: var(--color-brand);
+  --color-brand-foreground: white;
   min-height: 100dvh;
   display: flex;
   justify-content: center;
   align-items: flex-start;
 }
+/* Readable text on the brand: white on dark brands, near-black on light ones. */
+@supports (color: oklch(from red l c h)) {
+  .portal-shell {
+    --color-brand-foreground: oklch(from var(--color-brand) clamp(0, (0.62 - l) * 1000, 1) 0 0);
+  }
+}
+/* Keep browser autofill on the warm input surface instead of the default pale blue. */
+.portal-shell input:-webkit-autofill,
+.portal-shell input:-webkit-autofill:hover,
+.portal-shell input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--color-text);
+  caret-color: var(--color-text);
+  box-shadow: 0 0 0 1000px var(--color-surface) inset;
+  transition: background-color 9999s ease-out 0s;
+}
+
 .portal-surface {
   position: relative;
   width: 100%;

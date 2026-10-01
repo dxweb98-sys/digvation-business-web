@@ -1,13 +1,246 @@
 import { useRuntime } from '@digvation/business-runtime';
-import { DBadge,DButton,DDataTable,DDialog,DInput,DStatusFilter,useToast,type TableColumn } from '@digvation/ui';
-import { useQuery,useQueryClient } from '@tanstack/react-query';
-import { Eye,Plus,Pencil,CircleCheck,CircleOff } from 'lucide-react';
-import { useMemo,useState } from 'react';
-import { BackofficePage,BackofficePageHeader } from '../../app/layout/backoffice-page';
+import {
+  DButton,
+  DConfirmDialog,
+  DDataTable,
+  DStatusFilter,
+  useToast,
+  type TableColumn,
+} from '@digvation/ui';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { CircleCheck, CircleOff, Eye, FileSpreadsheet, Pencil, Plus } from 'lucide-react';
+import { useMemo, useState } from 'react';
+
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
+import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
+import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
 import { canPerformBackofficeAction } from '../../auth/backoffice-access';
-import { useBackofficeAuth } from '../../auth/backoffice-auth-context';
-import { MembersApi,type Member,type Status } from './members-api';
-const key=['memberships'] as const;
-export function MembersPage(){const{session,createApiClient}=useBackofficeAuth();const{apiBaseUrl}=useRuntime();const{showToast}=useToast();const qc=useQueryClient();const api=useMemo(()=>new MembersApi(createApiClient(apiBaseUrl)),[apiBaseUrl,createApiClient]);const[q,setQ]=useState('');const[status,setStatus]=useState<''|Status>('');const[offset,setOffset]=useState(0);const[edit,setEdit]=useState<Member|null|undefined>();const[detailId,setDetailId]=useState<string|null>(null);const[statusTarget,setStatusTarget]=useState<Member|null>(null);const canEnroll=!!session&&canPerformBackofficeAction(session,'enrollMember');const canManage=!!session&&canPerformBackofficeAction(session,'manageMember');const list=useQuery({queryKey:[...key,q,status,offset],queryFn:()=>api.list({...(q?{q}:{}),...(status?{status}:{}),limit:20,offset}),enabled:!!session});const detail=useQuery({queryKey:[...key,'detail',detailId],queryFn:()=>api.get(detailId!),enabled:!!detailId});const balance=useQuery({queryKey:[...key,'balance',detailId],queryFn:()=>api.balance(detailId!),enabled:Boolean(detailId&&session?.access.permissions.includes('loyalty:read'))});const history=useQuery({queryKey:[...key,'history',detailId],queryFn:()=>api.history(detailId!),enabled:Boolean(detailId&&session?.access.permissions.includes('loyalty:read'))});if(!session)return null;const refresh=()=>void qc.invalidateQueries({queryKey:key});const columns:TableColumn<Member>[]=[{key:'number',label:'Member number',render:m=>m.memberNumber},{key:'customer',label:'Customer',render:m=>m.customer.name},{key:'phone',label:'Phone',render:m=>m.customer.phoneE164},{key:'status',label:'Status',render:m=><DBadge variant={m.status==='ACTIVE'?'success':'secondary'}>{m.status}</DBadge>}];return <BackofficePage><BackofficePageHeader eyebrow="Customer management" title="Members" description="Manage member enrollment, status, and loyalty history."/><div className="mt-6"><DDataTable columns={columns} data={list.data?.items??[]} loading={list.isLoading} rowKey="id" searchable searchPlaceholder="Search member number, name, or phone..." searchValue={q} onSearchChange={v=>{setQ(v);setOffset(0)}} filters={<DStatusFilter label="Status" value={status} onChange={v=>{setStatus(v as ''|Status);setOffset(0)}} allLabel="All" options={[{label:'Active',value:'ACTIVE'},{label:'Inactive',value:'INACTIVE'}]}/>} headerActions={canEnroll?<DButton leftIcon={<Plus className="size-4"/>} onClick={()=>setEdit(null)}>Enroll member</DButton>:null} emptyMessage="No matching members found." pagination={{page:Math.floor(offset/20)+1,pageSize:20,total:list.data?.total??0}} onPageChange={p=>setOffset((p-1)*20)} actions={[{label:'View details',icon:<Eye className="size-4"/>,onClick:m=>setDetailId(m.id)},{label:'Edit customer',icon:<Pencil className="size-4"/>,show:()=>canManage,onClick:m=>setEdit(m)},{label:'Deactivate member',icon:<CircleOff className="size-4"/>,show:m=>canManage&&m.status==='ACTIVE',onClick:m=>setStatusTarget(m)},{label:'Activate member',icon:<CircleCheck className="size-4"/>,show:m=>canManage&&m.status==='INACTIVE',onClick:m=>setStatusTarget(m)}]}/></div>{edit!==undefined?<Editor member={edit} api={api} done={refresh} close={()=>setEdit(undefined)}/>:null}<DDialog open={!!detailId} onClose={()=>setDetailId(null)} title="Member detail"><div className="space-y-4">{detail.data?<><p><b>{detail.data.memberNumber}</b> · {detail.data.customer.name} · {detail.data.customer.phoneE164}</p><p>Status: {detail.data.status}</p>{balance.data?<p className="text-lg font-semibold">Point balance: {balance.data.pointsBalance}</p>:null}<div><b>Point history</b>{history.data?.length?history.data.map(x=><p key={x.id}>{x.type} · +{x.pointsDelta} · balance {x.balanceAfter}</p>):<p className="text-sm text-(--color-text-muted)">No point history yet.</p>}</div></>:<p>Loading member details…</p>}</div></DDialog><DDialog open={!!statusTarget} onClose={()=>setStatusTarget(null)} title={statusTarget?.status==='ACTIVE'?'Deactivate member?':'Activate member?'} description="This changes membership availability only; loyalty history remains unchanged." footer={<DButton onClick={()=>void(async()=>{if(!statusTarget)return;try{await api.updateStatus(statusTarget,statusTarget.status==='ACTIVE'?'INACTIVE':'ACTIVE');refresh();setStatusTarget(null);showToast({variant:'success',title:'Membership status updated.'})}catch(e){showToast({variant:'danger',title:normalizeBackofficeApiError(e).safeMessage})}})()}>{statusTarget?.status==='ACTIVE'?'Deactivate':'Activate'}</DButton>}><p className="text-sm text-(--color-text-muted)">{statusTarget?.customer.name}</p></DDialog></BackofficePage>}
-function Editor({member,api,done,close}:{member:Member|null;api:MembersApi;done:()=>void;close:()=>void}){const[n,setN]=useState(member?.customer.name??'');const[p,setP]=useState(member?.customer.phoneE164??'');const[nik,setNik]=useState('');const{showToast}=useToast();const save=async()=>{try{if(member)await api.updateCustomer(member,{name:n,phone:p});else await api.enroll({name:n,phone:p,nik});done();close()}catch(e){showToast({variant:'danger',title:normalizeBackofficeApiError(e).safeMessage})}};return <DDialog open onClose={close} title={member?'Edit customer':'Enroll member'} description={member?'Update canonical Customer fields.':'NIK is required for enrollment and never displayed afterwards.'} footer={<DButton disabled={!n||!p||(!member&&!nik)} onClick={()=>void save()}>Save</DButton>}><div className="space-y-4"><DInput label="Name" value={n} onChange={setN}/><DInput label="Phone" value={p} onChange={setP}/>{!member?<DInput label="NIK" value={nik} onChange={setNik} inputMode="numeric" hint="Required only for identity verification during enrollment."/>:null}</div></DDialog>}
+import { isSessionExpiredError, useBackofficeAuth } from '../../auth/backoffice-auth-context';
+import { MemberDetailDialog, memberQueryKeys } from './member-detail-dialog';
+import { MemberEditor } from './member-editor';
+import { MemberImportDialog } from './member-import-dialog';
+import { toNationalMemberPhone } from './member-phone';
+import { MembersApi, type Member, type Status } from './members-api';
+import { membershipCopy } from './membership-copy';
+import { MemberStatusBadge } from './membership-surfaces';
+
+const PAGE_SIZE = 20;
+
+/** Coordinates the Member list and its dialogs; each dialog owns its own behavior. */
+export function MembersPage() {
+  const { session, createApiClient } = useBackofficeAuth();
+  const { apiBaseUrl } = useRuntime();
+  const { formatDate } = useBackofficeLocalization();
+  const { showToast } = useToast();
+  const queryClient = useQueryClient();
+  const api = useMemo(
+    () => new MembersApi(createApiClient(apiBaseUrl)),
+    [apiBaseUrl, createApiClient],
+  );
+  const [q, setQ] = useState('');
+  const [status, setStatus] = useState<'' | Status>('');
+  const [offset, setOffset] = useState(0);
+  const [editing, setEditing] = useState<Member | null | undefined>();
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [statusTarget, setStatusTarget] = useState<Member | null>(null);
+  const [changingStatus, setChangingStatus] = useState(false);
+
+  const list = useQuery({
+    queryKey: [...memberQueryKeys.all, q, status, offset],
+    queryFn: () =>
+      api.list({ ...(q ? { q } : {}), ...(status ? { status } : {}), limit: PAGE_SIZE, offset }),
+    enabled: !!session,
+  });
+  if (!session) return null;
+
+  const copy = membershipCopy();
+  const canEnroll = canPerformBackofficeAction(session, 'enrollMember');
+  const canManage = canPerformBackofficeAction(session, 'manageMember');
+  const canViewLoyalty = session.access.permissions.includes('loyalty:read');
+  const refresh = () => void queryClient.invalidateQueries({ queryKey: memberQueryKeys.all });
+
+  const confirmStatus = async () => {
+    if (!statusTarget || changingStatus) return;
+    setChangingStatus(true);
+    try {
+      await api.updateStatus(
+        statusTarget,
+        statusTarget.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE',
+      );
+      refresh();
+      setStatusTarget(null);
+      showToast({ variant: 'success', title: copy.statusUpdated });
+    } catch (error) {
+      if (!isSessionExpiredError(error))
+        showToast({ variant: 'danger', title: normalizeBackofficeApiError(error).safeMessage });
+    } finally {
+      setChangingStatus(false);
+    }
+  };
+
+  const columns: TableColumn<Member>[] = [
+    {
+      key: 'number',
+      label: copy.memberNumber,
+      render: (member) => <span className="font-mono text-xs">{member.memberNumber}</span>,
+    },
+    { key: 'customer', label: copy.customer, render: (member) => member.customer.name },
+    {
+      key: 'phone',
+      label: copy.phone,
+      render: (member) => toNationalMemberPhone(member.customer.phoneE164),
+    },
+    {
+      key: 'status',
+      label: copy.status,
+      render: (member) => <MemberStatusBadge status={member.status} />,
+    },
+  ];
+
+  return (
+    <BackofficePage>
+      <BackofficePageHeader
+        eyebrow={copy.pageEyebrow}
+        title={copy.pageTitle}
+        description={copy.pageDescription}
+      />
+      <div className="mt-6">
+        <DDataTable
+          columns={columns}
+          data={list.data?.items ?? []}
+          loading={list.isLoading}
+          rowKey="id"
+          searchable
+          searchPlaceholder={copy.searchPlaceholder}
+          searchValue={q}
+          onSearchChange={(value) => {
+            setQ(value);
+            setOffset(0);
+          }}
+          filters={
+            <DStatusFilter
+              label={copy.status}
+              value={status}
+              onChange={(value) => {
+                setStatus(value as '' | Status);
+                setOffset(0);
+              }}
+              allLabel={copy.all}
+              options={[
+                { label: copy.active, value: 'ACTIVE' },
+                { label: copy.inactive, value: 'INACTIVE' },
+              ]}
+            />
+          }
+          headerActions={
+            canEnroll ? (
+              <div className="flex flex-wrap gap-2">
+                <DButton
+                  variant="secondary"
+                  leftIcon={<FileSpreadsheet className="size-4" />}
+                  onClick={() => setImporting(true)}
+                >
+                  {copy.import}
+                </DButton>
+                <DButton leftIcon={<Plus className="size-4" />} onClick={() => setEditing(null)}>
+                  {copy.enroll}
+                </DButton>
+              </div>
+            ) : null
+          }
+          emptyMessage={copy.empty}
+          pagination={{
+            page: Math.floor(offset / PAGE_SIZE) + 1,
+            pageSize: PAGE_SIZE,
+            total: list.data?.total ?? 0,
+          }}
+          onPageChange={(page) => setOffset((page - 1) * PAGE_SIZE)}
+          actions={[
+            {
+              label: copy.viewDetails,
+              icon: <Eye className="size-4" />,
+              onClick: (member) => setDetailId(member.id),
+            },
+            {
+              label: copy.editCustomer,
+              icon: <Pencil className="size-4" />,
+              show: () => canManage,
+              onClick: (member) => setEditing(member),
+            },
+            {
+              label: copy.deactivate,
+              icon: <CircleOff className="size-4" />,
+              show: (member) => canManage && member.status === 'ACTIVE',
+              onClick: (member) => setStatusTarget(member),
+            },
+            {
+              label: copy.activate,
+              icon: <CircleCheck className="size-4" />,
+              show: (member) => canManage && member.status === 'INACTIVE',
+              onClick: (member) => setStatusTarget(member),
+            },
+          ]}
+        />
+      </div>
+
+      {editing !== undefined ? (
+        <MemberEditor
+          member={editing}
+          api={api}
+          canLookupCustomers={session.access.permissions.includes('customers:read')}
+          done={refresh}
+          close={() => setEditing(undefined)}
+        />
+      ) : null}
+
+      {detailId ? (
+        <MemberDetailDialog
+          memberId={detailId}
+          api={api}
+          canViewLoyalty={canViewLoyalty}
+          canEdit={canManage}
+          formatDate={formatDate}
+          onEdit={(member) => {
+            setDetailId(null);
+            setEditing(member);
+          }}
+          onClose={() => setDetailId(null)}
+        />
+      ) : null}
+
+      {importing ? (
+        <MemberImportDialog
+          api={api}
+          openingPointsAvailable={
+            session.access.capabilities.includes('LOYALTY_POINTS') &&
+            session.access.permissions.includes('loyalty:configure')
+          }
+          onImported={refresh}
+          onClose={() => setImporting(false)}
+        />
+      ) : null}
+
+      <DConfirmDialog
+        open={!!statusTarget}
+        onClose={() => setStatusTarget(null)}
+        onConfirm={() => void confirmStatus()}
+        loading={changingStatus}
+        title={statusTarget?.status === 'ACTIVE' ? copy.deactivateTitle : copy.activateTitle}
+        message={
+          <>
+            <span className="block font-medium text-[var(--color-text)]">
+              {statusTarget?.customer.name} · {statusTarget?.memberNumber}
+            </span>
+            <span className="mt-1 block">{copy.statusMessage}</span>
+          </>
+        }
+        confirmLabel={
+          statusTarget?.status === 'ACTIVE' ? copy.deactivateConfirm : copy.activateConfirm
+        }
+        cancelLabel={copy.cancel}
+        variant={statusTarget?.status === 'ACTIVE' ? 'danger' : 'primary'}
+      />
+    </BackofficePage>
+  );
+}

@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  filterPromotionItemTargets,
-  promotionTargetSummary,
-  type PromotionCopy,
-} from './promotions-page';
+import { filterPromotionItemTargets, promotionTargetSummary } from './promotion-presentation';
 import type { Promotion, PromotionReferenceOption } from './promotions-api';
 
 const promotion: Promotion = {
@@ -45,7 +41,6 @@ describe('Promotion variant target presentation', () => {
     expect(promotionTargetSummary(promotion, copy)).toBe('1 Item · 1 Specific variants');
   });
 });
-
 
 describe('Promotion target search', () => {
   const items: PromotionReferenceOption[] = [

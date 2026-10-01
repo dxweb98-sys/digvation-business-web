@@ -473,6 +473,36 @@ describe('authenticated portal', () => {
     expect(document.body.textContent).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-/i);
   });
 
+  it('shows a migrated opening balance as Saldo awal, never as a transaction', async () => {
+    mockApi({
+      '/api/v1/member-portal/points': () =>
+        json({
+          items: [
+            {
+              id: 'o1',
+              type: 'OPENING_BALANCE',
+              pointsDelta: '1250.0000',
+              balanceAfter: '1250.0000',
+              reference: null,
+              createdAt: '2026-09-01T03:00:00.000Z',
+            },
+            pointRows[0],
+          ],
+        }),
+    });
+    renderPortal();
+    await login();
+
+    const label = (await screen.findAllByText('Saldo awal'))[0]!;
+    const row = label.closest('li')!;
+    expect(row.textContent).toContain('Saldo awal migrasi');
+    expect(row.textContent).not.toContain('Transaksi');
+    expect(row.textContent).toMatch(/\+1\.250/);
+    // Sale-backed entries keep their labels and references.
+    expect((await screen.findAllByText('Poin diperoleh')).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/INV-0/).length).toBeGreaterThan(0);
+  });
+
   it('loads more history in bounded pages', async () => {
     const calls = mockApi({
       '/api/v1/member-portal/points': () => json({ items: pointRows }),
@@ -623,10 +653,10 @@ describe('canonical /member access route', () => {
     expect(read('Dockerfile')).toContain('/usr/share/nginx/html/member/');
   });
 
-  it('starts only the Member Portal from the root dev:member script', () => {
+  it('starts the Member Portal alone from dev:member and with the other apps from root dev', () => {
     const scripts = JSON.parse(read('package.json')).scripts as Record<string, string>;
     expect(scripts['dev:member']).toBe('pnpm --filter @digvation/member-portal dev');
-    expect(scripts['dev']).not.toContain('member');
+    expect(scripts['dev']).toContain('--filter @digvation/member-portal');
     expect(scripts['dev:operational']).not.toContain('member');
     expect(JSON.parse(read('apps', 'member-portal', 'package.json')).scripts.dev).toBe('vite');
   });

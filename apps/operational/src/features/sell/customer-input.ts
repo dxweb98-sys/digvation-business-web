@@ -1,7 +1,6 @@
 /** Indonesian calling code: the Operational default for a nationally written number. */
 const DEFAULT_CALLING_CODE = '62';
 const E164 = /^\+[1-9]\d{7,14}$/;
-export const NIK_LENGTH = 16;
 
 /**
  * Keeps what a cashier legitimately types in a phone field (digits, a leading +, spaces and
@@ -29,13 +28,4 @@ export function toCanonicalPhone(raw: string): string | null {
   else candidate = `+${DEFAULT_CALLING_CODE}${compact.replace(/^0+/, '')}`;
 
   return E164.test(candidate) ? candidate : null;
-}
-
-/** NIK is input-only: digits only and never more than 16, whatever was typed or pasted. */
-export function sanitizeNikInput(value: string): string {
-  return value.replace(/\D/g, '').slice(0, NIK_LENGTH);
-}
-
-export function isCompleteNik(value: string): boolean {
-  return /^\d{16}$/.test(value);
 }

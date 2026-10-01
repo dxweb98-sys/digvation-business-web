@@ -12,10 +12,8 @@ import {
   BadgeDollarSign,
   Briefcase,
   Clock,
-  Layers,
   PackagePlus,
   Pencil,
-  Plus,
   Power,
   RotateCcw,
   Tag,
@@ -43,13 +41,7 @@ import { sameAmount } from '../item-editor/model/variant-price-draft';
 import { CatalogItemThumbnail } from './catalog-item-thumbnail';
 import { CatalogItemFixedComponents } from './catalog-item-fixed-components';
 import { CatalogLoyaltyTile } from './catalog-loyalty-section';
-import {
-  ItemPriceHistory,
-  PriceChangeDialog,
-  VariantBulkPriceDialog,
-  VariantPriceLabel,
-} from './catalog-pricing';
-import { CatalogNamedRecordDialog } from './catalog-record-dialog';
+import { ItemPriceHistory, PriceChangeDialog, VariantPriceLabel } from './catalog-pricing';
 import {
   CatalogInfoTile,
   CatalogPanel,
@@ -61,18 +53,13 @@ import {
 const HISTORY_PREVIEW = 5;
 
 type SellingOptionRow =
-  | { kind: 'item'; id: string }
-  | { kind: 'variant'; id: string; variant: Variant };
+  { kind: 'item'; id: string } | { kind: 'variant'; id: string; variant: Variant };
 
 const keys = {
   prices: (itemId: string) => ['catalog', 'prices', itemId] as const,
   variants: (itemId: string) => ['catalog', 'variants', itemId] as const,
-  variantPrice: (
-    itemId: string,
-    variantId: string,
-    currency: string,
-    effectiveAt: string,
-  ) => ['catalog', 'variant-price', itemId, variantId, currency, effectiveAt] as const,
+  variantPrice: (itemId: string, variantId: string, currency: string, effectiveAt: string) =>
+    ['catalog', 'variant-price', itemId, variantId, currency, effectiveAt] as const,
 };
 
 export function CatalogItemDetailDialog({
@@ -85,7 +72,6 @@ export function CatalogItemDetailDialog({
   api,
   loyaltyApi,
   canViewLoyalty,
-  canCreate,
   canUpdate,
   canViewPricing,
   canCreatePricing,
@@ -104,7 +90,6 @@ export function CatalogItemDetailDialog({
   api: CatalogApi;
   loyaltyApi: LoyaltyApi;
   canViewLoyalty: boolean;
-  canCreate: boolean;
   canUpdate: boolean;
   canViewPricing: boolean;
   canCreatePricing: boolean;
@@ -117,9 +102,7 @@ export function CatalogItemDetailDialog({
   const client = useQueryClient();
   const { showToast } = useToast();
   const { formatMoney } = useCatalogLocalization();
-  const [editingVariant, setEditingVariant] = useState<Variant | null | undefined>();
-  const [pricingTarget, setPricingTarget] = useState<'default' | Variant | null>(null);
-  const [bulkPricing, setBulkPricing] = useState(false);
+  const [changingItemPrice, setChangingItemPrice] = useState(false);
   const [showAllHistory, setShowAllHistory] = useState(false);
   const [activeDetailTab, setActiveDetailTab] = useState<'variants' | 'history'>('variants');
   const [statusTarget, setStatusTarget] = useState<Variant | null>(null);
@@ -174,10 +157,8 @@ export function CatalogItemDetailDialog({
     onPricingChanged();
     void client.invalidateQueries({ queryKey: ['catalog', 'variant-price'] });
   };
-  const refreshVariants = () =>
-    void client.invalidateQueries({ queryKey: keys.variants(item.id) });
   const refreshVariantsAndCount = () => {
-    refreshVariants();
+    void client.invalidateQueries({ queryKey: keys.variants(item.id) });
     onVariantsChanged();
   };
 
@@ -324,12 +305,7 @@ export function CatalogItemDetailDialog({
         <CatalogPanel className="p-5">
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-stretch">
             <div className="flex min-w-0 gap-4">
-              <CatalogItemThumbnail
-                api={api}
-                itemId={item.id}
-                itemName={item.name}
-                size="detail"
-              />
+              <CatalogItemThumbnail api={api} itemId={item.id} itemName={item.name} size="detail" />
               <div className="min-w-0 flex-1 self-center">
                 <div className="flex flex-wrap items-center gap-2">
                   <h2 className="break-words text-xl font-semibold tracking-tight text-[var(--color-text)]">
@@ -388,7 +364,7 @@ export function CatalogItemDetailDialog({
                       variant="ghost"
                       size="sm"
                       leftIcon={<BadgeDollarSign className="size-4" />}
-                      onClick={() => setPricingTarget('default')}
+                      onClick={() => setChangingItemPrice(true)}
                     >
                       {defaultPrice ? 'Ubah harga' : 'Atur harga'}
                     </DButton>
@@ -510,37 +486,13 @@ export function CatalogItemDetailDialog({
                       ? 'Kasir wajib memilih salah satu varian sebelum checkout.'
                       : 'Item ini belum menggunakan varian.'
                 }
-                actions={
-                  <>
-                    {canCreatePricing && hasVariants ? (
-                      <DButton
-                        variant="secondary"
-                        size="sm"
-                        leftIcon={<Layers className="size-4" />}
-                        onClick={() => setBulkPricing(true)}
-                      >
-                        Terapkan harga ke semua
-                      </DButton>
-                    ) : null}
-                    {canCreate ? (
-                      <DButton
-                        variant="outline"
-                        size="sm"
-                        leftIcon={<Plus className="size-4" />}
-                        onClick={() => setEditingVariant(null)}
-                      >
-                        Tambah varian
-                      </DButton>
-                    ) : null}
-                  </>
-                }
               />
               {canViewPricing && variantsWithoutPrice > 0 ? (
                 <div className="px-4 pt-4">
                   <DInfoNote variant="warning">
                     {variantsWithoutPrice} varian aktif belum memiliki harga dan tidak bisa dijual.
-                    {canCreatePricing
-                      ? ' Terapkan satu harga ke semua varian atau atur harga tiap varian.'
+                    {canUpdate && canCreatePricing
+                      ? ' Atur harganya melalui Edit Item → Harga & Varian.'
                       : ''}
                   </DInfoNote>
                 </div>
@@ -555,23 +507,8 @@ export function CatalogItemDetailDialog({
                   {
                     label: 'Ubah harga',
                     icon: <BadgeDollarSign className="size-4" />,
-                    onClick: () => setPricingTarget('default'),
+                    onClick: () => setChangingItemPrice(true),
                     show: (row) => canCreatePricing && row.kind === 'item',
-                  },
-                  {
-                    label: 'Ubah harga varian',
-                    icon: <BadgeDollarSign className="size-4" />,
-                    onClick: (row) => row.kind === 'variant' && setPricingTarget(row.variant),
-                    show: (row) =>
-                      canCreatePricing &&
-                      row.kind === 'variant' &&
-                      row.variant.status === 'ACTIVE',
-                  },
-                  {
-                    label: 'Edit varian',
-                    icon: <Pencil className="size-4" />,
-                    onClick: (row) => row.kind === 'variant' && setEditingVariant(row.variant),
-                    show: (row) => canUpdate && row.kind === 'variant',
                   },
                   {
                     label: 'Nonaktifkan varian',
@@ -625,45 +562,15 @@ export function CatalogItemDetailDialog({
         </CatalogPanel>
       </div>
 
-      <CatalogNamedRecordDialog
-        key={`detail-variant-${
-          editingVariant?.id ?? (editingVariant === null ? 'new' : 'closed')
-        }`}
-        entity="Variant"
-        item={editingVariant}
-        onClose={() => setEditingVariant(undefined)}
-        onSave={async (existing, input) =>
-          existing
-            ? api.updateVariant(item.id, existing as Variant, input)
-            : api.createVariant(item.id, input)
-        }
-        onSaved={refreshVariantsAndCount}
-      />
-
       <PriceChangeDialog
-        key={`price-${
-          pricingTarget === 'default' ? 'item' : (pricingTarget?.id ?? 'closed')
-        }`}
-        target={pricingTarget}
+        key={changingItemPrice ? 'item-price-open' : 'item-price-closed'}
+        open={changingItemPrice}
         item={item}
         currency={currency}
         api={api}
-        onClose={() => setPricingTarget(null)}
+        onClose={() => setChangingItemPrice(false)}
         onSaved={refreshPricing}
       />
-
-      {bulkPricing ? (
-        <VariantBulkPriceDialog
-          open
-          item={item}
-          currency={currency}
-          variants={variants.data?.items ?? []}
-          variantStates={variantStates}
-          api={api}
-          onClose={() => setBulkPricing(false)}
-          onSaved={refreshPricing}
-        />
-      ) : null}
 
       <DConfirmDialog
         open={Boolean(statusTarget)}

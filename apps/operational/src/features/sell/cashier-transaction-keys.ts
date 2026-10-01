@@ -22,7 +22,7 @@ export const cashierTransactionKeys = {
       sellingLocationId,
       currency,
     ] as const,
-  employees: () => ['cashier-transaction', 'employees'] as const,
+  servicePerformers: () => ['cashier-transaction', 'service-performers'] as const,
   productSalespeople: () => ['cashier-transaction', 'product-salespeople'] as const,
   paymentRoutes: (sellingLocationId: string, currency: string) =>
     ['cashier-transaction', 'payment-routes', sellingLocationId, currency] as const,

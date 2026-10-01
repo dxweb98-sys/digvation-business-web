@@ -878,6 +878,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   );
   const canReadMembers = session.access.permissions.includes('membership:read');
   const canEnrollMember = session.access.permissions.includes('membership:enroll');
+  const canReadCustomers = session.access.permissions.includes('customers:read');
   const hasLoyaltyCapability = session.access.capabilities.includes('LOYALTY_POINTS');
   const canRedeemLoyalty =
     hasLoyaltyCapability && session.access.permissions.includes('loyalty:redeem');
@@ -1862,6 +1863,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         api={customerMemberApi}
         canReadMembers={canReadMembers}
         canEnrollMember={canEnrollMember}
+        canReadCustomers={canReadCustomers}
         canReadLoyalty={canReadLoyalty}
         resetKey={customerPickerSession.revision}
         onClose={() => setCustomerPickerOpen(false)}

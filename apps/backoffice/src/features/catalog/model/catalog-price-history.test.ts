@@ -1,22 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import type { PriceHistoryEntry, ResolvedPrice, Variant } from '../api/catalog-api';
+import type { PriceHistoryEntry, ResolvedPrice } from '../api/catalog-api';
 import {
-  bulkVariantPricePreview,
   priceChangeActorLabel,
   priceHistoryTarget,
   variantPriceState,
-  type VariantPriceState,
 } from './catalog-price-history';
-
-const variant = (id: string, status: Variant['status'] = 'ACTIVE'): Variant => ({
-  id,
-  code: id.toUpperCase(),
-  name: `Variant ${id}`,
-  status,
-  version: 1,
-  catalogItemId: 'item',
-});
 
 const resolved = (amount: string, sourceVariantId: string | null): ResolvedPrice => ({
   catalogPriceId: 'price',
@@ -82,34 +71,6 @@ describe('variantPriceState', () => {
         'large',
       ),
     ).toEqual({ kind: 'unavailable' });
-  });
-});
-
-describe('bulkVariantPricePreview', () => {
-  const states = new Map<string, VariantPriceState>([
-    ['a', { kind: 'explicit', amount: '25000.0000', currency: 'IDR' }],
-    ['b', { kind: 'explicit', amount: '28000.0000', currency: 'IDR' }],
-    ['c', { kind: 'missing' }],
-  ]);
-
-  it('targets active variants only and flags variants already at the target price', () => {
-    const rows = bulkVariantPricePreview(
-      [variant('a'), variant('b'), variant('c'), variant('d', 'INACTIVE')],
-      states,
-      '28000',
-    );
-    expect(rows.map((row) => [row.variant.id, row.unchanged])).toEqual([
-      ['a', false],
-      ['b', true],
-      // A variant without its own price always receives the applied price.
-      ['c', false],
-    ]);
-  });
-
-  it('does not flag anything as unchanged for an invalid amount', () => {
-    expect(
-      bulkVariantPricePreview([variant('b')], states, '28.00001').every((row) => !row.unchanged),
-    ).toBe(true);
   });
 });
 

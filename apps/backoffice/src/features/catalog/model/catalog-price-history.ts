@@ -1,5 +1,5 @@
-import type { PriceHistoryEntry, ResolvedPrice, Variant } from '../api/catalog-api';
-import { compareAmounts, isValidSellingPrice, sameAmount } from '../item-editor/model/variant-price-draft';
+import type { PriceHistoryEntry, ResolvedPrice } from '../api/catalog-api';
+import { compareAmounts } from '../item-editor/model/variant-price-draft';
 
 /**
  * Presentation of Runtime pricing facts. Runtime stays the price authority: these helpers only
@@ -35,32 +35,6 @@ export function variantPriceState(
   return sourceScope.catalogVariantId === variantId
     ? { kind: 'explicit', amount, currency }
     : { kind: 'missing' };
-}
-
-export interface BulkVariantPricePreviewRow {
-  variant: Variant;
-  state: VariantPriceState;
-  /** Preview only; Runtime reports the authoritative no-op per variant. */
-  unchanged: boolean;
-}
-
-/** Active variants the bulk action targets, with the change each one is expected to receive. */
-export function bulkVariantPricePreview(
-  variants: readonly Variant[],
-  states: ReadonlyMap<string, VariantPriceState>,
-  amount: string,
-): BulkVariantPricePreviewRow[] {
-  const validTarget = isValidSellingPrice(amount);
-  return variants
-    .filter((variant) => variant.status === 'ACTIVE')
-    .map((variant) => {
-      const state = states.get(variant.id) ?? { kind: 'loading' };
-      return {
-        variant,
-        state,
-        unchanged: validTarget && state.kind === 'explicit' && sameAmount(state.amount, amount),
-      };
-    });
 }
 
 /** Lowest and highest explicit variant price, for the item price summary. */

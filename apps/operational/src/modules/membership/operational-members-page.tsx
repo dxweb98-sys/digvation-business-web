@@ -21,6 +21,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
+import { isApiErrorCode } from '../../features/sell/cashier-transaction-errors';
 import { historyQueryPolicy } from '../../app/data/operational-cache-policy';
 import { useOperationalLocalization } from '../../app/localization/operational-localization';
 import { canEditOperationalMemberProfile } from './operational-members-access';
@@ -42,6 +43,7 @@ const ledgerLabel: Record<PointLedgerType, string> = {
   REDEEM: 'Points used',
   EARN_REVERSAL: 'Earned points reversed',
   REDEEM_REVERSAL: 'Used points restored',
+  OPENING_BALANCE: 'Migrated opening balance',
 };
 
 /** Container: wires the authenticated Operational client and the permission-derived edit right. */
@@ -224,9 +226,13 @@ function MemberDetailDialog({
       setFormError(null);
       showToast({ variant: 'success', title: copy('Member profile updated.') });
     },
-    onError: () =>
+    onError: (error) =>
       setFormError(
-        copy('Could not update the member profile. Check the name and phone number and try again.'),
+        isApiErrorCode(error, 'MEMBERSHIP_PHONE_ALREADY_IN_USE')
+          ? copy('This phone number is already registered as a member.')
+          : copy(
+              'Could not update the member profile. Check the name and phone number and try again.',
+            ),
       ),
   });
 

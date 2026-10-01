@@ -79,6 +79,8 @@ export class LocalCashierTransactionAdapter implements SaleTransactionPort {
       code: `EMP-00${index + 1}`,
       displayName,
       status: 'ACTIVE',
+      servicePerformerEligible: true,
+      canPerformServices: true,
       version: 1,
       createdAt: time,
       updatedAt: time,
@@ -155,8 +157,9 @@ export class LocalCashierTransactionAdapter implements SaleTransactionPort {
     });
   }
 
-  public async listEmployees(): Promise<ApiPage<Employee>> {
-    return page(this.employees);
+  /** Stands in for Runtime's canPerformServices filter. */
+  public async listServicePerformers(): Promise<ApiPage<Employee>> {
+    return page(this.employees.filter((employee) => employee.canPerformServices === true));
   }
 
   public async listProductSalespeople(): Promise<ApiPage<Employee>> {

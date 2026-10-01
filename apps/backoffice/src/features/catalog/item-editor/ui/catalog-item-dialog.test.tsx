@@ -59,6 +59,14 @@ function fakeApi(overrides: Record<string, ReturnType<typeof vi.fn>> = {}) {
     createVariant: vi.fn(async (itemId: string, input: { name: string }) =>
       variant(`v-${++created}`, input.name),
     ),
+    updateVariant: vi.fn(
+      async (itemId: string, record: Variant, input: { code?: string; name?: string }) => ({
+        ...record,
+        catalogItemId: itemId,
+        ...input,
+        version: record.version + 1,
+      }),
+    ),
     createPrice: vi.fn(async () => ({})),
     changePrice: vi.fn(async () => ({})),
     changeVariantPrices: vi.fn(async (input: { amount: string; catalogVariantIds?: string[] }) => ({
@@ -116,6 +124,7 @@ function renderDialog(
               canViewPricing
               canCreatePricing
               canCreateVariants
+              canUpdateVariants
               canManageImage={false}
               canEditComposition={false}
               onClose={onClose}
@@ -150,9 +159,7 @@ describe('CatalogItemDialog variant pricing', () => {
     });
 
     const scope = () => within(dialog());
-    expect(
-      await scope().findByText(/Mengikuti default bisnis: 1 poin per unit/),
-    ).toBeTruthy();
+    expect(await scope().findByText(/Mengikuti default bisnis: 1 poin per unit/)).toBeTruthy();
     expect(scope().queryByLabelText('Poin per unit')).toBeNull();
   });
 
@@ -168,9 +175,7 @@ describe('CatalogItemDialog variant pricing', () => {
 
     await type(scope().getByLabelText('Nama Item'), 'Teh Member');
 
-    expect(
-      await scope().findByText(/Mengikuti default bisnis: 1 poin per unit/),
-    ).toBeTruthy();
+    expect(await scope().findByText(/Mengikuti default bisnis: 1 poin per unit/)).toBeTruthy();
 
     await type(scope().getByLabelText('Poin per unit'), '5');
     await act(async () => fireEvent.click(scope().getByRole('button', { name: 'Simpan' })));
@@ -192,9 +197,7 @@ describe('CatalogItemDialog variant pricing', () => {
     await type(scope.getByLabelText('Nama Item'), 'Teh');
     await openPricingTab(scope);
     await type(scope.getByLabelText('Harga tanpa varian (IDR)'), '10000');
-    await act(async () =>
-      fireEvent.click(scope.getByRole('button', { name: 'Simpan' })),
-    );
+    await act(async () => fireEvent.click(scope.getByRole('button', { name: 'Simpan' })));
 
     await waitFor(() => expect(api.createPrice).toHaveBeenCalledTimes(1));
     expect(api.createPrice).toHaveBeenCalledWith(
@@ -481,5 +484,90 @@ describe('CatalogItemDialog variant pricing', () => {
     );
     expect(api.changePrice).not.toHaveBeenCalled();
     expect(api.createVariant).not.toHaveBeenCalled();
+  });
+
+  describe('existing variant identity', () => {
+    const pricedVariantApi = (overrides: Record<string, ReturnType<typeof vi.fn>> = {}) =>
+      fakeApi({
+        listVariants: vi.fn(async () => ({
+          items: [variant('v-a', 'Large'), variant('v-b', 'Small')],
+          limit: 50,
+          offset: 0,
+        })),
+        resolvePrice: vi.fn(async ({ catalogVariantId }: { catalogVariantId: string }) => ({
+          catalogPriceId: `p-${catalogVariantId}`,
+          catalogItemId: 'item-1',
+          catalogVariantId,
+          locationId: null,
+          currency: 'IDR',
+          amount: '28000.0000',
+          effectiveAt: '2026-09-19T00:00:00.000Z',
+          sourceScope: { catalogVariantId, locationId: null },
+        })),
+        ...overrides,
+      });
+    const openLoadedVariants = async () => {
+      const scope = () => within(screen.getByRole('dialog'));
+      await openPricingTab(scope());
+      await waitFor(() =>
+        expect((scope().getByLabelText('Nama varian 1') as HTMLInputElement).value).toBe('Large'),
+      );
+      return scope;
+    };
+
+    it('renames and re-codes an existing variant inline, then saves its price', async () => {
+      const api = pricedVariantApi();
+      const { onClose } = renderDialog(api, existingItem);
+      const scope = await openLoadedVariants();
+
+      await type(scope().getByLabelText('Nama varian 1'), 'Large Cup');
+      await type(scope().getAllByLabelText('SKU')[0]!, ' lrg-01 ');
+      await type(scope().getByLabelText('Harga Large Cup'), '30000');
+      await act(async () => fireEvent.click(scope().getByRole('button', { name: 'Simpan' })));
+
+      await waitFor(() => expect(onClose).toHaveBeenCalled());
+      expect(api.updateVariant).toHaveBeenCalledTimes(1);
+      expect(api.updateVariant).toHaveBeenCalledWith('item-1', variant('v-a', 'Large'), {
+        code: 'LRG-01',
+        name: 'Large Cup',
+      });
+      expect(api.changeVariantPrices).toHaveBeenCalledWith(
+        expect.objectContaining({ amount: '30000', catalogVariantIds: ['v-a'] }),
+      );
+      expect(api.createVariant).not.toHaveBeenCalled();
+    });
+
+    it('keeps the editor open and the item untouched when Runtime rejects the code', async () => {
+      const api = pricedVariantApi({
+        updateVariant: vi.fn(async () => {
+          throw { status: 409, code: 'DUPLICATE_RESOURCE' };
+        }),
+      });
+      const { onClose } = renderDialog(api, existingItem);
+      const scope = await openLoadedVariants();
+
+      await type(scope().getAllByLabelText('SKU')[0]!, 'V-B');
+      await act(async () => fireEvent.click(scope().getByRole('button', { name: 'Simpan' })));
+
+      await waitFor(() => expect(api.updateVariant).toHaveBeenCalledTimes(1));
+      expect(api.updateItem).not.toHaveBeenCalled();
+      expect(api.changeVariantPrices).not.toHaveBeenCalled();
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it('requires a name and SKU on existing variants', async () => {
+      const api = pricedVariantApi();
+      renderDialog(api, existingItem);
+      const scope = await openLoadedVariants();
+
+      await type(scope().getByLabelText('Nama varian 1'), ' ');
+      await type(scope().getAllByLabelText('SKU')[1]!, '');
+      await act(async () => fireEvent.click(scope().getByRole('button', { name: 'Simpan' })));
+
+      expect(scope().getByText('Isi nama varian.')).toBeTruthy();
+      expect(scope().getByText('Isi SKU varian.')).toBeTruthy();
+      expect(api.updateVariant).not.toHaveBeenCalled();
+      expect(api.updateItem).not.toHaveBeenCalled();
+    });
   });
 });

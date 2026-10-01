@@ -70,6 +70,10 @@ const posCopy: Record<string, LocalizedCopy> = {
     'id-ID': 'Kode promo tidak berlaku untuk item pada transaksi ini.',
     'en-US': 'This promo code does not apply to the items in this transaction.',
   },
+  'This promotion is for active members only.': {
+    'id-ID': 'Promo ini khusus untuk member aktif.',
+    'en-US': 'This promotion is for active members only.',
+  },
   'No payment recorded yet.': {
     'id-ID': 'Belum ada pembayaran yang dicatat.',
     'en-US': 'No payment recorded yet.',

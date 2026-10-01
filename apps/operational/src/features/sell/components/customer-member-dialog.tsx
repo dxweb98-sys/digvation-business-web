@@ -7,15 +7,15 @@ import { useState } from 'react';
 import { useOperationalLocalization } from '../../../app/localization/operational-localization';
 import {
   memberSaleSelection,
+  type CustomerLookupResult,
   type CustomerMemberApi,
   type MemberLookupResult,
 } from '../customer-member-api';
+import { findExistingCustomerCandidates } from '../existing-customer-candidates';
 import { isApiErrorCode } from '../cashier-transaction-errors';
+import { ExistingCustomerChoice } from './existing-customer-choice';
 import type { SaleCustomer, SaleCustomerSelection } from '../cashier-transaction.types';
 import {
-  isCompleteNik,
-  NIK_LENGTH,
-  sanitizeNikInput,
   sanitizePhoneInput,
   toCanonicalPhone,
 } from '../customer-input';
@@ -44,7 +44,6 @@ const localCopy: Record<string, { 'id-ID': string; 'en-US': string }> = {
   'Customer name': { 'id-ID': 'Nama Pelanggan', 'en-US': 'Customer Name' },
   'Name placeholder': { 'id-ID': 'Contoh: Andir Saputra', 'en-US': 'Example: Andir Saputra' },
   'Phone placeholder': { 'id-ID': 'Contoh: 0812 3456 7890', 'en-US': 'Example: 0812 3456 7890' },
-  'NIK placeholder': { 'id-ID': '16 digit NIK', 'en-US': '16-digit NIK' },
   'WhatsApp / phone': { 'id-ID': 'Nomor WhatsApp / Telepon', 'en-US': 'WhatsApp / Phone' },
   'Required': { 'id-ID': 'Wajib diisi', 'en-US': 'Required' },
   'Want to earn points and rewards?': { 'id-ID': 'Ingin catat poin belanja & reward loyalty pelanggan?', 'en-US': 'Want to earn points and rewards?' },
@@ -84,10 +83,26 @@ const localCopy: Record<string, { 'id-ID': string; 'en-US': string }> = {
   'Registration status': { 'id-ID': 'Status Pendaftaran', 'en-US': 'Registration Status' },
   'Active immediately': { 'id-ID': 'Aktif Langsung', 'en-US': 'Active Immediately' },
   'Full name': { 'id-ID': 'Nama Lengkap', 'en-US': 'Full Name' },
-  'NIK': { 'id-ID': 'NIK (Nomor Induk Kependudukan)', 'en-US': 'NIK (National ID Number)' },
-  'NIK hint': { 'id-ID': '16 digit NIK digunakan hanya untuk verifikasi dan tidak ditampilkan setelah pendaftaran.', 'en-US': 'The 16-digit NIK is used only for verification and is never displayed after enrollment.' },
   'Enroll and select member': { 'id-ID': 'Daftar & Pilih Member', 'en-US': 'Enroll & Select Member' },
-  'This phone number is already used by another active member.': { 'id-ID': 'Nomor telepon ini sudah digunakan oleh member aktif lain.', 'en-US': 'This phone number is already used by another active member.' },
+  'This phone number is already registered as a member.': { 'id-ID': 'Nomor telepon ini sudah terdaftar sebagai member.', 'en-US': 'This phone number is already registered as a member.' },
+  'This phone number is already registered as a customer. Add it as a member from that customer.': {
+    'id-ID': 'Nomor telepon ini sudah terdaftar sebagai pelanggan. Tambahkan sebagai member dari pelanggan tersebut.',
+    'en-US': 'This phone number is already registered as a customer. Add it as a member from that customer.',
+  },
+  'Customer already registered': { 'id-ID': 'Pelanggan sudah terdaftar', 'en-US': 'Customer already registered' },
+  'This number is already registered as a customer but is not a member yet.': {
+    'id-ID': 'Nomor ini sudah terdaftar sebagai pelanggan, tetapi belum menjadi member.',
+    'en-US': 'This number is already registered as a customer but is not a member yet.',
+  },
+  'Choose the customer to make a member.': {
+    'id-ID': 'Pilih pelanggan yang akan dijadikan member.',
+    'en-US': 'Choose the customer to make a member.',
+  },
+  'The existing customer profile is not changed.': {
+    'id-ID': 'Data pelanggan yang sudah ada tidak diubah.',
+    'en-US': 'The existing customer profile is not changed.',
+  },
+  'Make member': { 'id-ID': 'Jadikan Member', 'en-US': 'Make Member' },
   'Member enrollment could not be completed.': { 'id-ID': 'Pendaftaran member tidak dapat diselesaikan.', 'en-US': 'Member enrollment could not be completed.' },
   'Cancel': { 'id-ID': 'Batal', 'en-US': 'Cancel' },
   'No member search permission.': { 'id-ID': 'Akun ini tidak memiliki akses pencarian member.', 'en-US': 'This account cannot search members.' },
@@ -116,6 +131,7 @@ export function CustomerMemberDialog({
   api,
   canReadMembers,
   canEnrollMember,
+  canReadCustomers,
   canReadLoyalty,
   resetKey = 0,
   onClose,
@@ -127,6 +143,8 @@ export function CustomerMemberDialog({
   api: CustomerMemberApi;
   canReadMembers: boolean;
   canEnrollMember: boolean;
+  /** Needed to resolve a phone conflict to the existing Customer (customers:read). */
+  canReadCustomers: boolean;
   canReadLoyalty: boolean;
   /**
    * Parent-owned transaction boundary. When it changes the temporary draft is discarded; it stays
@@ -142,9 +160,10 @@ export function CustomerMemberDialog({
   const [query, setQuery] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [nik, setNik] = useState('');
   const [selectedMember, setSelectedMember] = useState<MemberLookupResult | null>(null);
   const [enrollError, setEnrollError] = useState<string | null>(null);
+  const [existingCandidates, setExistingCandidates] = useState<CustomerLookupResult[] | null>(null);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [isEnrolling, setEnrolling] = useState(false);
   const [appliedResetKey, setAppliedResetKey] = useState(resetKey);
   // A new transaction starts with a clean picker. An enrollment in flight is never interrupted:
@@ -155,9 +174,10 @@ export function CustomerMemberDialog({
     setQuery('');
     setName('');
     setPhone('');
-    setNik('');
     setSelectedMember(null);
     setEnrollError(null);
+    setExistingCandidates(null);
+    setSelectedCustomerId(null);
   }
 
   const memberSearchReady = query.trim().length >= 2;
@@ -174,6 +194,8 @@ export function CustomerMemberDialog({
 
   const switchMode = (next: CustomerDialogMode) => {
     setEnrollError(null);
+    setExistingCandidates(null);
+    setSelectedCustomerId(null);
     if (next !== 'MEMBER') setSelectedMember(null);
     setMode(next);
   };
@@ -187,33 +209,74 @@ export function CustomerMemberDialog({
   };
 
   const enroll = async () => {
-    if (!name.trim() || !canonicalPhone || !isCompleteNik(nik) || isEnrolling) return;
-    const submittedNik = nik;
-    setNik('');
+    if (!name.trim() || !canonicalPhone || isEnrolling) return;
     setEnrollError(null);
     setEnrolling(true);
     try {
       const member = await api.enrollNew({
         name: name.trim(),
         phone: canonicalPhone,
-        nik: submittedNik,
       });
       onChoose(memberSaleSelection(member), member);
     } catch (error) {
-      setEnrollError(
-        isApiErrorCode(error, 'MEMBERSHIP_PHONE_ALREADY_IN_USE')
-          ? text('This phone number is already used by another active member.')
-          : text('Member enrollment could not be completed.'),
-      );
+      if (isApiErrorCode(error, 'CUSTOMER_PHONE_ALREADY_EXISTS')) {
+        await continueWithExistingCustomer(canonicalPhone);
+      } else {
+        setEnrollError(enrollErrorMessage(error));
+      }
     } finally {
       setEnrolling(false);
     }
   };
 
+  const enrollErrorMessage = (error: unknown) =>
+    isApiErrorCode(error, 'MEMBERSHIP_PHONE_ALREADY_IN_USE')
+      ? text('This phone number is already registered as a member.')
+      : text('Member enrollment could not be completed.');
+
+  // The phone belongs to Customer(s) without a Membership: resolve them explicitly instead of
+  // creating another Customer. Without customers:read, or when nothing matches exactly, the
+  // operator only gets the specific message (no bypass, no guessing).
+  const continueWithExistingCustomer = async (phone: string) => {
+    const conflict = text(
+      'This phone number is already registered as a customer. Add it as a member from that customer.',
+    );
+    if (!canReadCustomers) return setEnrollError(conflict);
+    try {
+      const candidates = await findExistingCustomerCandidates(api, phone);
+      if (!candidates.length) return setEnrollError(conflict);
+      setExistingCandidates(candidates);
+      // Only an unambiguous single match is preselected; several matches need an explicit choice.
+      setSelectedCustomerId(candidates.length === 1 ? candidates[0]!.id : null);
+    } catch {
+      setEnrollError(conflict);
+    }
+  };
+
+  const enrollExistingCustomer = async () => {
+    if (!selectedCustomerId || isEnrolling) return;
+    setEnrollError(null);
+    setEnrolling(true);
+    try {
+      // Enrollment only creates the Membership: the existing Customer's name is never overwritten.
+      const member = await api.enrollExisting({ customerId: selectedCustomerId });
+      onChoose(memberSaleSelection(member), member);
+    } catch (error) {
+      setEnrollError(enrollErrorMessage(error));
+    } finally {
+      setEnrolling(false);
+    }
+  };
+
+  const cancelExistingCustomer = () => {
+    setExistingCandidates(null);
+    setSelectedCustomerId(null);
+    setEnrollError(null);
+  };
+
   const memberItems = memberQuery.data?.items ?? [];
   const customerReady = Boolean(name.trim() && canonicalPhone) && !isSaving;
-  const enrollmentReady =
-    Boolean(name.trim() && canonicalPhone && isCompleteNik(nik)) && !isEnrolling && !isSaving;
+  const enrollmentReady = Boolean(name.trim() && canonicalPhone) && !isEnrolling && !isSaving;
 
   const footer =
     mode === 'CUSTOMER' ? (
@@ -247,6 +310,20 @@ export function CustomerMemberDialog({
             {text('Use this member')}
           </DButton>
         </div>
+      </div>
+    ) : existingCandidates ? (
+      <div className="flex w-full justify-end gap-2">
+        <DButton variant="secondary" onClick={cancelExistingCustomer} disabled={isEnrolling}>
+          {text('Cancel')}
+        </DButton>
+        <DButton
+          disabled={!selectedCustomerId || isEnrolling || isSaving}
+          loading={isEnrolling}
+          leftIcon={<CheckCircle2 className="size-4" />}
+          onClick={() => void enrollExistingCustomer()}
+        >
+          {text('Make member')}
+        </DButton>
       </div>
     ) : (
       <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -526,58 +603,65 @@ export function CustomerMemberDialog({
                 </div>
               </div>
 
-              <div>
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
-                    {text('New member information')}
-                  </p>
-                  <span className="text-[10px] text-[var(--color-text-muted)]">1 / 1</span>
-                </div>
-                <div className="mb-3 grid gap-2 sm:grid-cols-2">
-                  <div className="rounded-xl bg-[var(--color-surface-muted)] px-3 py-2.5">
-                    <p className="text-[10px] font-medium text-[var(--color-text-muted)]">
-                      {text('Member code')}
+              {existingCandidates ? (
+                <ExistingCustomerChoice
+                  candidates={existingCandidates}
+                  selectedId={selectedCustomerId}
+                  onSelect={setSelectedCustomerId}
+                  disabled={isEnrolling}
+                  copy={{
+                    title: text('Customer already registered'),
+                    description: text(
+                      'This number is already registered as a customer but is not a member yet.',
+                    ),
+                    choose: text('Choose the customer to make a member.'),
+                    unchanged: text('The existing customer profile is not changed.'),
+                  }}
+                />
+              ) : (
+                <div>
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+                      {text('New member information')}
                     </p>
-                    <p className="mt-1 text-xs font-semibold">{text('Automatic')}</p>
+                    <span className="text-[10px] text-[var(--color-text-muted)]">1 / 1</span>
                   </div>
-                  <div className="rounded-xl bg-[var(--color-surface-muted)] px-3 py-2.5">
-                    <p className="text-[10px] font-medium text-[var(--color-text-muted)]">
-                      {text('Registration status')}
-                    </p>
-                    <p className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-success)]">
-                      <CheckCircle2 className="size-3.5" aria-hidden="true" />
-                      {text('Active immediately')}
-                    </p>
+                  <div className="mb-3 grid gap-2 sm:grid-cols-2">
+                    <div className="rounded-xl bg-[var(--color-surface-muted)] px-3 py-2.5">
+                      <p className="text-[10px] font-medium text-[var(--color-text-muted)]">
+                        {text('Member code')}
+                      </p>
+                      <p className="mt-1 text-xs font-semibold">{text('Automatic')}</p>
+                    </div>
+                    <div className="rounded-xl bg-[var(--color-surface-muted)] px-3 py-2.5">
+                      <p className="text-[10px] font-medium text-[var(--color-text-muted)]">
+                        {text('Registration status')}
+                      </p>
+                      <p className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-success)]">
+                        <CheckCircle2 className="size-3.5" aria-hidden="true" />
+                        {text('Active immediately')}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <DInput
+                      label={text('Full name')}
+                      placeholder={text('Name placeholder')}
+                      value={name}
+                      onChange={setName}
+                      disabled={isEnrolling}
+                    />
+                    <DInput
+                      label={text('WhatsApp / phone')}
+                      placeholder={text('Phone placeholder')}
+                      value={phone}
+                      onChange={(value) => setPhone(sanitizePhoneInput(value))}
+                      inputMode="tel"
+                      disabled={isEnrolling}
+                    />
                   </div>
                 </div>
-                <div className="space-y-3">
-                  <DInput
-                    label={text('Full name')}
-                    placeholder={text('Name placeholder')}
-                    value={name}
-                    onChange={setName}
-                    disabled={isEnrolling}
-                  />
-                  <DInput
-                    label={text('WhatsApp / phone')}
-                    placeholder={text('Phone placeholder')}
-                    value={phone}
-                    onChange={(value) => setPhone(sanitizePhoneInput(value))}
-                    inputMode="tel"
-                    disabled={isEnrolling}
-                  />
-                  <DInput
-                    label={text('NIK')}
-                    placeholder={text('NIK placeholder')}
-                    value={nik}
-                    onChange={(value) => setNik(sanitizeNikInput(value))}
-                    inputMode="numeric"
-                    maxLength={NIK_LENGTH}
-                    disabled={isEnrolling}
-                    hint={text('NIK hint')}
-                  />
-                </div>
-              </div>
+              )}
 
               {enrollError ? <DAlert variant="danger">{enrollError}</DAlert> : null}
             </DTabsContent>

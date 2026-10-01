@@ -12,6 +12,7 @@ export function CatalogItemVariantsSection({
   canViewPricing,
   canEditPrice,
   canCreateVariants,
+  canUpdateVariants,
   variantPricesLoading,
   inactiveVariantCount,
 }: {
@@ -22,6 +23,7 @@ export function CatalogItemVariantsSection({
   canViewPricing: boolean;
   canEditPrice: boolean;
   canCreateVariants: boolean;
+  canUpdateVariants: boolean;
   variantPricesLoading: boolean;
   inactiveVariantCount: number;
 }) {
@@ -54,6 +56,7 @@ export function CatalogItemVariantsSection({
           currency={currency}
           canPrice={canEditPrice}
           canAddVariants={canCreateVariants}
+          canEditExisting={canUpdateVariants}
           variantRequired={model === 'VARIANT_REQUIRED'}
           seed={
             sellsItemItself(model) && hasVariants

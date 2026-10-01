@@ -15,6 +15,8 @@ import {
 
 const issueMessage: Record<VariantDraftIssue, string> = {
   NAME_REQUIRED: 'Isi nama varian.',
+  CODE_REQUIRED: 'Isi SKU varian.',
+  CODE_INVALID: 'Gunakan huruf, angka, titik, garis bawah, atau tanda hubung.',
   PRICE_REQUIRED: 'Isi harga varian.',
   PRICE_INVALID: 'Harga harus lebih dari nol, maksimal 4 angka desimal.',
 };
@@ -27,6 +29,7 @@ export function VariantPriceEditor({
   currency,
   canPrice,
   canAddVariants,
+  canEditExisting,
   variantRequired = false,
   seed,
   showIssues,
@@ -36,6 +39,8 @@ export function VariantPriceEditor({
   currency: string;
   canPrice: boolean;
   canAddVariants: boolean;
+  /** Existing variants are renamed/re-coded here; Detail only activates or deactivates them. */
+  canEditExisting: boolean;
   variantRequired?: boolean;
   seed?: { label: string; amount: string } | null;
   showIssues: boolean;
@@ -93,9 +98,7 @@ export function VariantPriceEditor({
           <div className="flex min-w-0 items-center gap-2 sm:mr-auto">
             <Layers className="size-4 shrink-0 text-[var(--color-text-muted)]" aria-hidden="true" />
             <div>
-              <p className="text-xs font-medium text-[var(--color-text)]">
-                Ubah Cepat Semua Harga
-              </p>
+              <p className="text-xs font-medium text-[var(--color-text)]">Ubah Cepat Semua Harga</p>
               <p className="text-[11px] text-[var(--color-text-muted)]">
                 Isi sekali lalu tetap bisa diedit per varian.
               </p>
@@ -146,9 +149,7 @@ export function VariantPriceEditor({
 
         <div
           className={`gap-3 border-b border-[var(--color-border)] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.04em] text-[var(--color-text-muted)] max-md:hidden md:grid ${
-            canPrice
-              ? 'md:grid-cols-[1.3fr_1fr_1fr_2.25rem]'
-              : 'md:grid-cols-[1.3fr_1fr_2.25rem]'
+            canPrice ? 'md:grid-cols-[1.3fr_1fr_1fr_2.25rem]' : 'md:grid-cols-[1.3fr_1fr_2.25rem]'
           }`}
         >
           <span>Nama varian</span>
@@ -161,6 +162,7 @@ export function VariantPriceEditor({
           {drafts.map((draft, index) => {
             const issue = showIssues ? variantDraftIssue(draft, canPrice) : null;
             const persisted = Boolean(draft.id);
+            const readOnlyIdentity = persisted && !canEditExisting;
             return (
               <li
                 key={draft.key}
@@ -170,7 +172,7 @@ export function VariantPriceEditor({
                     : 'md:grid-cols-[1.3fr_1fr_2.25rem]'
                 }`}
               >
-                {persisted ? (
+                {readOnlyIdentity ? (
                   <>
                     <div className="min-w-0 md:pt-2">
                       <p className="truncate text-sm font-medium">{draft.name}</p>
@@ -194,14 +196,19 @@ export function VariantPriceEditor({
                       label="SKU"
                       value={draft.code}
                       onChange={(value) => update(draft.key, { code: value })}
-                      placeholder="Otomatis"
+                      placeholder={persisted ? undefined : 'Otomatis'}
+                      error={
+                        issue === 'CODE_REQUIRED' || issue === 'CODE_INVALID'
+                          ? issueMessage[issue]
+                          : undefined
+                      }
                       containerClassName={tabular}
                     />
                   </>
                 )}
 
                 {canPrice ? (
-                  <div className={`min-w-0 ${persisted ? 'col-span-2 md:col-span-1' : ''}`}>
+                  <div className={`min-w-0 ${readOnlyIdentity ? 'col-span-2 md:col-span-1' : ''}`}>
                     <DCurrencyInput
                       label={`Harga ${draft.name.trim() || `varian ${index + 1}`}`}
                       value={draft.price}

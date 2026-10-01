@@ -55,6 +55,10 @@ const memberCopy: Record<string, LocalizedCopy> = {
     'id-ID': 'Poin dikembalikan',
     'en-US': 'Used points restored',
   },
+  'Migrated opening balance': {
+    'id-ID': 'Saldo awal migrasi',
+    'en-US': 'Migrated opening balance',
+  },
   Showing: { 'id-ID': 'Menampilkan', 'en-US': 'Showing' },
   'most recent transactions': { 'id-ID': 'transaksi terbaru', 'en-US': 'most recent transactions' },
   'No completed transaction yet.': {
@@ -77,6 +81,10 @@ const memberCopy: Record<string, LocalizedCopy> = {
   'Member profile updated.': {
     'id-ID': 'Data member diperbarui.',
     'en-US': 'Member profile updated.',
+  },
+  'This phone number is already registered as a member.': {
+    'id-ID': 'Nomor telepon ini sudah terdaftar sebagai member.',
+    'en-US': 'This phone number is already registered as a member.',
   },
   'Could not update the member profile. Check the name and phone number and try again.': {
     'id-ID': 'Data member tidak dapat diperbarui. Periksa nama dan nomor telepon, lalu coba lagi.',

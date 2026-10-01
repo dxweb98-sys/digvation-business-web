@@ -14,21 +14,23 @@ import { Eye, Pencil, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { BackofficePage, BackofficePageHeader } from '../../../app/layout/backoffice-page';
+import { CatalogCategoryDialog } from '../category';
 import { CatalogItemDialog } from '../item-editor';
 import { useFormState } from '../../../shared/forms/use-form-state';
 import { useListQuery } from '../../../shared/query/use-list-query';
 import { usePaginationState } from '../../../shared/query/use-pagination-state';
-import {
-  canPerformBackofficeAction,
-  type BackofficeAction,
-} from '../../../auth/backoffice-access';
+import { canPerformBackofficeAction, type BackofficeAction } from '../../../auth/backoffice-access';
 import { useBackofficeAuth } from '../../../auth/backoffice-auth-context';
-import { CatalogApi, type CatalogManagementItem, type Category, type Item } from '../api/catalog-api';
+import {
+  CatalogApi,
+  type CatalogManagementItem,
+  type Category,
+  type Item,
+} from '../api/catalog-api';
 import { CatalogItemDetailDialog } from './catalog-item-detail-dialog';
 import { LoyaltyApi } from '../../../modules/loyalty/loyalty-api';
 import { CatalogItemThumbnail } from './catalog-item-thumbnail';
 import { useCatalogLocalization } from '../localization/use-catalog-localization';
-import { CatalogNamedRecordDialog } from './catalog-record-dialog';
 import { PriceLabel, Status, humanize } from './catalog-shared';
 
 type ItemFilterState = {
@@ -78,9 +80,7 @@ export function CatalogPage() {
 
   const can = (action: BackofficeAction) =>
     Boolean(session && canPerformBackofficeAction(session, action));
-  const hasLoyaltyCapability = Boolean(
-    session?.access.capabilities.includes('LOYALTY_POINTS'),
-  );
+  const hasLoyaltyCapability = Boolean(session?.access.capabilities.includes('LOYALTY_POINTS'));
   const canViewLoyalty = hasLoyaltyCapability && can('viewLoyalty');
   const canConfigureLoyalty = hasLoyaltyCapability && can('configureLoyalty');
 
@@ -388,6 +388,7 @@ export function CatalogPage() {
         canViewPricing={can('viewPricing')}
         canCreatePricing={can('createPricing')}
         canCreateVariants={can('createCatalog')}
+        canUpdateVariants={can('updateCatalog')}
         canManageImage={can('updateCatalog')}
         canEditComposition={can('updateCatalog')}
         onClose={() => setItem(undefined)}
@@ -404,7 +405,6 @@ export function CatalogPage() {
         api={api}
         loyaltyApi={loyaltyApi}
         canViewLoyalty={canViewLoyalty}
-        canCreate={can('createCatalog')}
         canUpdate={can('updateCatalog')}
         canViewPricing={can('viewPricing')}
         canCreatePricing={can('createPricing')}
@@ -421,14 +421,11 @@ export function CatalogPage() {
           setItem(selected);
         }}
       />
-      <CatalogNamedRecordDialog
+      <CatalogCategoryDialog
         key={`category-${category?.id ?? (category === null ? 'new' : 'closed')}`}
-        entity="Category"
-        item={category}
+        category={category}
+        api={api}
         onClose={() => setCategory(undefined)}
-        onSave={(existing, input) =>
-          existing ? api.updateCategory(existing as Category, input) : api.createCategory(input)
-        }
         onSaved={refreshCategories}
       />
     </BackofficePage>

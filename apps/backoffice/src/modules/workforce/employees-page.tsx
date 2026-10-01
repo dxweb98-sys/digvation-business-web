@@ -1,14 +1,8 @@
 import { useRuntime } from '@digvation/business-runtime';
 import {
-  DBadge,
   DButton,
-  DCheckbox,
   DDataTable,
-  DDatePicker,
   DDialog,
-  DInput,
-  DSelect,
-  DSkeleton,
   DStatusFilter,
   DTabs,
   DTabsContent,
@@ -22,25 +16,16 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CircleCheck, CircleOff, Eye, Pencil, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
 import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
 import { canAccessBackoffice, canPerformBackofficeAction } from '../../auth/backoffice-access';
-import { isSessionExpiredError, useBackofficeAuth } from '../../auth/backoffice-auth-context';
+import { useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import { AttendancePanel } from './attendance-panel';
 import { EmployeeDetailDialog } from './employee-detail-dialog';
-import {
-  createEmployeePayload,
-  employeeEditorForm,
-  updateEmployeePayload,
-} from './employee-editor-model';
-import {
-  EmployeesApi,
-  type Employee,
-  type EmployeeDetail,
-  type EmployeePosition,
-} from './employees-api';
+import { EmployeeEditorDialog, handleEmployeeMutationError } from './employee-editor-dialog';
+import { EmployeesApi, type Employee } from './employees-api';
 import { PositionsPanel } from './positions-panel';
 import { useWorkforceLocalization } from './workforce-localization';
+import { EmployeeStatusBadge, ServiceEligibilityStatus } from './workforce-surfaces';
 
 const defaultPageSize = 20;
 const employeeKey = ['employees'] as const;
@@ -111,7 +96,7 @@ export function EmployeesPage() {
         title: copy(nextStatus === 'ACTIVE' ? 'Employee reactivated.' : 'Employee deactivated.'),
       });
     } catch (error) {
-      handleMutationError(error, refresh, copy, showToast, () => setStatusTarget(null));
+      handleEmployeeMutationError(error, refresh, copy, showToast, () => setStatusTarget(null));
     }
   };
 
@@ -128,24 +113,8 @@ export function EmployeesPage() {
     {
       key: 'serviceAssignment',
       label: copy('Service assignment'),
-      render: (employee) =>
-        employee.position ? (
-          <DBadge
-            variant={
-              employee.position.status === 'ACTIVE' && employee.position.serviceAssignmentEnabled
-                ? 'success'
-                : 'secondary'
-            }
-          >
-            {copy(
-              employee.position.status === 'ACTIVE' && employee.position.serviceAssignmentEnabled
-                ? 'Can perform services'
-                : 'Cannot perform services',
-            )}
-          </DBadge>
-        ) : (
-          copy('Not set')
-        ),
+      // Runtime's effective verdict (employee and Position gates), with the blocking gate if any.
+      render: (employee) => <ServiceEligibilityStatus employee={employee} compact />,
     },
     {
       key: 'joinedOn',
@@ -155,7 +124,7 @@ export function EmployeesPage() {
     {
       key: 'status',
       label: copy('Status'),
-      render: (employee) => <StatusBadge status={employee.status} />,
+      render: (employee) => <EmployeeStatusBadge status={employee.status} />,
     },
   ];
   const nextStatus = statusTarget?.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
@@ -271,7 +240,7 @@ export function EmployeesPage() {
       </DTabs>
 
       {editorId !== null ? (
-        <EmployeeEditor
+        <EmployeeEditorDialog
           key={editorId === 'create' ? 'create' : `${editorId}:${detail.data?.id ?? 'loading'}`}
           employee={editorId === 'create' ? null : detail.data}
           isLoading={editorId !== 'create' && detail.isLoading}
@@ -291,6 +260,14 @@ export function EmployeesPage() {
         api={api}
         attendanceEnabled={attendanceEnabled}
         onClose={() => setDetailId(null)}
+        {...(canUpdate
+          ? {
+              onEdit: (employee: Employee) => {
+                setDetailId(null);
+                setEditorId(employee.id);
+              },
+            }
+          : {})}
       />
 
       <DDialog
@@ -338,197 +315,6 @@ export function EmployeesPage() {
   );
 }
 
-function StatusBadge({ status }: { status: Employee['status'] }) {
-  const { copy } = useWorkforceLocalization();
-  return (
-    <DBadge variant={status === 'ACTIVE' ? 'success' : 'secondary'}>
-      {copy(status === 'ACTIVE' ? 'Active' : 'Inactive')}
-    </DBadge>
-  );
-}
-
-function EmployeeEditor({
-  employee,
-  isLoading,
-  isError,
-  api,
-  onClose,
-  onSaved,
-}: {
-  employee: EmployeeDetail | null | undefined;
-  isLoading: boolean;
-  isError: boolean;
-  api: EmployeesApi;
-  onClose: () => void;
-  onSaved: () => void;
-}) {
-  const { copy } = useWorkforceLocalization();
-  const { showToast } = useToast();
-  const fresh = employee === null;
-  const initial = employeeEditorForm(employee);
-  const [code, setCode] = useState(initial.code);
-  const [displayName, setDisplayName] = useState(initial.displayName);
-  const [positionId, setPositionId] = useState(initial.positionId);
-  const [joinedOn, setJoinedOn] = useState(initial.joinedOn);
-  const [servicePerformerEligible, setServicePerformerEligible] = useState(
-    initial.servicePerformerEligible,
-  );
-  const [productSalesEligible, setProductSalesEligible] = useState(initial.productSalesEligible);
-
-  const positions = useQuery({
-    queryKey: ['employees', 'positions', 'editor'],
-    queryFn: () => api.listPositions({ limit: 100, offset: 0 }),
-    enabled: true,
-  });
-
-  const save = async () => {
-    if (!displayName.trim()) return;
-    try {
-      const form = {
-        code,
-        displayName,
-        positionId,
-        joinedOn,
-        servicePerformerEligible,
-        productSalesEligible,
-      };
-      if (fresh) {
-        await api.create(createEmployeePayload(form));
-      } else if (employee) {
-        await api.update(employee, updateEmployeePayload(employee, form));
-      }
-      onSaved();
-      showToast({
-        variant: 'success',
-        title: fresh ? copy('Employee added.') : copy('Employee updated.'),
-      });
-      onClose();
-    } catch (error) {
-      if (!isSessionExpiredError(error))
-        handleMutationError(error, onSaved, copy, showToast, onClose);
-    }
-  };
-
-  const positionOptions = (positions.data?.items ?? []).map((position: EmployeePosition) => ({
-    value: position.id,
-    label: `${position.name}${position.status === 'INACTIVE' ? ` · ${copy('Inactive')}` : ''}`,
-    disabled: position.status === 'INACTIVE',
-  }));
-
-  return (
-    <DDialog
-      open
-      onClose={onClose}
-      title={fresh ? copy('Add employee') : copy('Edit employee')}
-      description={
-        fresh
-          ? copy('Employees are created Active.')
-          : copy('Employee code cannot be changed after creation.')
-      }
-      footer={
-        <div className="flex justify-end gap-2">
-          <DButton variant="secondary" onClick={onClose}>
-            {copy('Cancel')}
-          </DButton>
-          <DButton
-            disabled={isLoading || isError || !displayName.trim()}
-            onClick={() => void save()}
-          >
-            {copy('Save')}
-          </DButton>
-        </div>
-      }
-    >
-      {isLoading ? (
-        <div className="space-y-4">
-          <DSkeleton className="h-16 w-full" />
-          <DSkeleton className="h-16 w-full" />
-        </div>
-      ) : isError ? (
-        <p className="text-sm text-(--color-text-muted)">
-          {copy('Could not load employee details.')}
-        </p>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
-          <DInput
-            label={copy('Employee code')}
-            value={code}
-            onChange={setCode}
-            disabled={!fresh}
-            placeholder={copy('Leave Employee Code blank to generate it automatically.')}
-            autoFocus
-          />
-          <DInput
-            label={copy('Display name')}
-            value={displayName}
-            onChange={setDisplayName}
-            placeholder={copy('For example, Ari Pratama')}
-          />
-          <DSelect
-            label={copy('Position')}
-            value={positionId || null}
-            onValueChange={(value) => setPositionId(value == null ? '' : String(value))}
-            options={positionOptions}
-            loading={positions.isLoading}
-            searchable
-            clearable
-            placeholder={copy('Select position')}
-            hint={copy(
-              'Service eligibility is controlled by the employee position. Catalog service assignment mode still decides whether assignment is optional or required.',
-            )}
-          />
-          <DDatePicker
-            label={copy('Join date')}
-            value={joinedOn}
-            onChange={setJoinedOn}
-            onClear={() => setJoinedOn('')}
-            clearable
-            variant="date"
-            placeholder={copy('Select join date')}
-          />
-          <fieldset className="grid gap-3 sm:col-span-2">
-            <legend className="mb-1 text-sm font-medium text-[var(--color-text)]">
-              {copy('Work eligibility')}
-            </legend>
-            <label className="flex items-start gap-3">
-              <DCheckbox
-                checked={servicePerformerEligible}
-                onChange={() => setServicePerformerEligible((value) => !value)}
-                className="mt-0.5"
-              />
-              <span className="min-w-0">
-                <span className="block text-sm font-medium text-[var(--color-text)]">
-                  {copy('Eligible as Service performer')}
-                </span>
-                <span className="block text-sm text-[var(--color-text-muted)]">
-                  {copy(
-                    'The employee can be assigned to service work when the position allows it.',
-                  )}
-                </span>
-              </span>
-            </label>
-            <label className="flex items-start gap-3">
-              <DCheckbox
-                checked={productSalesEligible}
-                onChange={() => setProductSalesEligible((value) => !value)}
-                className="mt-0.5"
-              />
-              <span className="min-w-0">
-                <span className="block text-sm font-medium text-[var(--color-text)]">
-                  {copy('Eligible for Product sales attribution')}
-                </span>
-                <span className="block text-sm text-[var(--color-text-muted)]">
-                  {copy('The employee can be chosen as the seller of a Product in a sale.')}
-                </span>
-              </span>
-            </label>
-          </fieldset>
-        </div>
-      )}
-    </DDialog>
-  );
-}
-
 function formatJoinedOn(
   joinedOn: string | null,
   formatDate: (value: Date, options?: Intl.DateTimeFormatOptions) => string,
@@ -539,26 +325,4 @@ function formatJoinedOn(
         dateStyle: 'medium',
       })
     : copy('Not set');
-}
-
-function handleMutationError(
-  error: unknown,
-  refresh: () => void,
-  copy: (value: string) => string,
-  showToast: (input: { variant: 'danger' | 'warning'; title: string }) => void,
-  onConflict?: () => void,
-) {
-  const normalized = normalizeBackofficeApiError(error, copy('Could not save employee.'));
-  if (normalized.code === 'VERSION_CONFLICT') {
-    refresh();
-    onConflict?.();
-    showToast({
-      variant: 'warning',
-      title: copy(
-        'Employee data changed. The latest data has been loaded; review it before trying again.',
-      ),
-    });
-    return;
-  }
-  showToast({ variant: 'danger', title: normalized.safeMessage });
 }
