@@ -8,6 +8,7 @@ import {
   ReceiptText,
   Undo2,
   UserRound,
+  Wallet,
   type LucideIcon,
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
@@ -54,6 +55,7 @@ const POINT_LABEL: Record<string, string> = {
   REDEEM: 'Poin digunakan',
   EARN_REVERSAL: 'Poin dibatalkan',
   REDEEM_REVERSAL: 'Poin dikembalikan',
+  OPENING_BALANCE: 'Saldo awal',
 };
 
 export const formatNumber = (value: string | number) =>
@@ -207,6 +209,7 @@ const POINT_ICON: Record<string, { Icon: LucideIcon; tone: string }> = {
   REDEEM: { Icon: Minus, tone: 'is-redeem' },
   EARN_REVERSAL: { Icon: Undo2, tone: 'is-reversal' },
   REDEEM_REVERSAL: { Icon: Undo2, tone: 'is-reversal' },
+  OPENING_BALANCE: { Icon: Wallet, tone: 'is-earn' },
 };
 
 export function PointRow({ entry }: { entry: PointEntry }) {
@@ -223,7 +226,11 @@ export function PointRow({ entry }: { entry: PointEntry }) {
       <span className="row-copy">
         <b>{POINT_LABEL[entry.type] ?? entry.type}</b>
         <span className="row-sub">
-          {displayReference(entry.reference)} · {formatDate(entry.createdAt)}
+          {/* An opening balance was migrated, not earned in a transaction: no reference. */}
+          {entry.type === 'OPENING_BALANCE'
+            ? 'Saldo awal migrasi'
+            : displayReference(entry.reference)}{' '}
+          · {formatDate(entry.createdAt)}
         </span>
       </span>
       <strong className={delta >= 0 ? 'delta-up' : 'delta-down'}>

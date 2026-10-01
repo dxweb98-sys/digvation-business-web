@@ -1,7 +1,13 @@
 import type { ApiClient } from '@digvation/business-api';
 
 export type MemberStatus = 'ACTIVE' | 'INACTIVE';
-export type PointLedgerType = 'EARN' | 'REDEEM' | 'EARN_REVERSAL' | 'REDEEM_REVERSAL';
+export type PointLedgerType =
+  | 'EARN'
+  | 'REDEEM'
+  | 'EARN_REVERSAL'
+  | 'REDEEM_REVERSAL'
+  /** Points migrated with an imported Member; not tied to any Sale. */
+  | 'OPENING_BALANCE';
 
 export interface MemberCustomer {
   id: string;
@@ -34,7 +40,8 @@ export interface PointLedgerEntry {
   /** Signed: reversals are compensating entries, never edits of the original. */
   pointsDelta: string;
   balanceAfter: string;
-  sourceSaleId: string;
+  /** Null for OPENING_BALANCE. */
+  sourceSaleId: string | null;
   reversesLedgerEntryId: string | null;
   createdAt: string;
 }

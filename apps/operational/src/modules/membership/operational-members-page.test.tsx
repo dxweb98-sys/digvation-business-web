@@ -260,6 +260,41 @@ describe('Operational Member detail', () => {
     expect(rows[3]).toMatch(/\+6/);
   });
 
+  it('shows a migrated opening balance only as point activity, never as a transaction', async () => {
+    const opening: MemberDetail = {
+      membership: rina,
+      loyalty: {
+        pointsBalance: '1250.0000',
+        recentActivity: [
+          {
+            id: 'o1',
+            type: 'OPENING_BALANCE',
+            pointsDelta: '1250.0000',
+            balanceAfter: '1250.0000',
+            sourceSaleId: null,
+            reversesLedgerEntryId: null,
+            createdAt: '2026-10-01T03:00:00.000Z',
+          },
+        ],
+      },
+      recentTransactions: [],
+      transactionTotal: 0,
+    };
+    renderView(fakeApi({ detail: vi.fn().mockResolvedValue(opening) }));
+    const dialog = within(await openRina());
+
+    await dialog.findByRole('tab', { name: 'Aktivitas Poin' });
+    const rows = dialog.getAllByRole('listitem').map((row) => row.textContent ?? '');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toContain('Saldo awal migrasi');
+    expect(rows[0]).not.toContain('Poin diperoleh');
+    expect(rows[0]).toMatch(/\+1[.,]250/);
+    expect(dialog.getAllByText(/^1[.,]250$/).length).toBeGreaterThan(0);
+
+    fireEvent.click(dialog.getByRole('tab', { name: 'Transaksi' }));
+    expect(await dialog.findByText('Belum ada transaksi selesai.')).toBeTruthy();
+  });
+
   it('omits the loyalty section when Loyalty Points is not entitled and handles no transaction', async () => {
     const detail = vi.fn().mockResolvedValue({
       membership: rina,

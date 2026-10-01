@@ -164,7 +164,11 @@ export function MemberDetailDialog({
                         className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 text-sm"
                       >
                         <div className="min-w-0">
-                          <p className="font-medium text-[var(--color-text)]">{entry.type}</p>
+                          <p className="font-medium text-[var(--color-text)]">
+                            {entry.type === 'Opening balance'
+                              ? copy.ledgerOpeningBalance
+                              : entry.type}
+                          </p>
                           <p className="text-xs text-[var(--color-text-muted)]">
                             {formatDate(entry.createdAt)}
                           </p>

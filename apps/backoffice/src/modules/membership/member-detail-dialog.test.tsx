@@ -3,7 +3,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { MemberDetailDialog } from './member-detail-dialog';
-import type { Member } from './members-api';
+import { MembersApi, type Ledger, type Member } from './members-api';
 
 const member: Member = {
   id: 'm1',
@@ -21,21 +21,21 @@ const member: Member = {
   },
 };
 
-function renderDetail(canViewLoyalty: boolean) {
+const earned: Ledger = {
+  id: 'l1',
+  type: 'Points earned',
+  pointsDelta: '20',
+  balanceAfter: '120',
+  sourceSaleId: 's1',
+  reversesLedgerEntryId: null,
+  createdAt: '2026-09-01T00:00:00.000Z',
+};
+
+function renderDetail(canViewLoyalty: boolean, history: Ledger[] = [earned]) {
   const api = {
     get: vi.fn().mockResolvedValue(member),
     balance: vi.fn().mockResolvedValue({ membershipId: 'm1', pointsBalance: '120' }),
-    history: vi.fn().mockResolvedValue([
-      {
-        id: 'l1',
-        type: 'Points earned',
-        pointsDelta: '20',
-        balanceAfter: '120',
-        sourceSaleId: 's1',
-        reversesLedgerEntryId: null,
-        createdAt: '2026-09-01T00:00:00.000Z',
-      },
-    ]),
+    history: vi.fn().mockResolvedValue(history),
   };
   render(
     <QueryClientProvider
@@ -82,5 +82,49 @@ describe('MemberDetailDialog', () => {
     expect(screen.getByText('Poin Loyalty')).toBeTruthy();
     expect(screen.getAllByText('120').length).toBeGreaterThan(0);
     expect(screen.getByText('+20')).toBeTruthy();
+  });
+
+  it('labels a migrated opening balance as such, with no transaction reference', async () => {
+    renderDetail(true, [
+      earned,
+      {
+        id: 'l0',
+        type: 'Opening balance',
+        pointsDelta: '1250',
+        balanceAfter: '1250',
+        sourceSaleId: null,
+        reversesLedgerEntryId: null,
+        createdAt: '2026-08-01T00:00:00.000Z',
+      },
+    ]);
+    expect(await screen.findByText('Saldo awal migrasi')).toBeTruthy();
+    expect(screen.getByText('+1250')).toBeTruthy();
+    expect(screen.getByText('Saldo 1250')).toBeTruthy();
+    // Never presented as earned points.
+    expect(screen.getAllByText('Points earned')).toHaveLength(1);
+  });
+});
+
+describe('MembersApi.history', () => {
+  it('maps OPENING_BALANCE and keeps its null source Sale', async () => {
+    const client = {
+      get: vi.fn().mockResolvedValue([
+        {
+          id: 'l0',
+          type: 'OPENING_BALANCE',
+          pointsDelta: '1250',
+          balanceAfter: '1250',
+          sourceSaleId: null,
+          reversesLedgerEntryId: null,
+          createdAt: '2026-08-01T00:00:00.000Z',
+        },
+        { ...earned, type: 'EARN' },
+      ]),
+    };
+    const rows = await new MembersApi(client as never).history('m1');
+    expect(rows.map((row) => [row.type, row.sourceSaleId])).toEqual([
+      ['Opening balance', null],
+      ['Points earned', 's1'],
+    ]);
   });
 });

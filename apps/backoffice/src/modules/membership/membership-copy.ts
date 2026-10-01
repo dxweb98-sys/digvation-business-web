@@ -55,7 +55,7 @@ const copy = {
     // Import
     importTitle: 'Import Member',
     importIntro:
-      'Pindahkan data member dari sistem sebelumnya menggunakan template Excel. Poin loyalty tidak ikut diimpor.',
+      'Pindahkan data member dari sistem sebelumnya menggunakan template Excel. Saldo poin lama dapat diisi di kolom Poin Awal.',
     downloadTemplate: 'Unduh template',
     templateHint: 'Isi sheet "Members". No. HP cukup ditulis 08…, tanpa +62.',
     chooseFile: 'Pilih file .xlsx',
@@ -85,6 +85,9 @@ const copy = {
     result: 'Hasil',
     autoNumber: 'Otomatis',
     importTime: 'Waktu import',
+    openingPoints: 'Poin Awal',
+    openingPointsUnavailable:
+      'Poin Awal memerlukan fitur Poin Loyalty dan izin mengelola Loyalty. Kosongkan kolom tersebut atau isi 0.',
     actionCreate: 'Member & pelanggan baru',
     actionEnroll: 'Pelanggan lama jadi member',
     successTitle: 'Import berhasil',
@@ -93,6 +96,9 @@ const copy = {
     summaryEnrolled: 'Pelanggan lama didaftarkan',
     summaryGenerated: 'Nomor member otomatis',
     summaryPreserved: 'Nomor member lama dipertahankan',
+    summaryOpeningMembers: 'Member dengan saldo awal',
+    summaryOpeningPoints: 'Total poin awal',
+    ledgerOpeningBalance: 'Saldo awal migrasi',
     templateFailed: 'Template tidak dapat diunduh.',
   },
   en: {
@@ -146,7 +152,7 @@ const copy = {
     balanceAfter: 'Balance',
     importTitle: 'Import members',
     importIntro:
-      'Move members from a previous system with the Excel template. Loyalty points are not imported.',
+      'Move members from a previous system with the Excel template. Previous point balances can be entered in the Poin Awal column.',
     downloadTemplate: 'Download template',
     templateHint: 'Fill the "Members" sheet. Phone numbers can be written as 08…, without +62.',
     chooseFile: 'Choose .xlsx file',
@@ -175,6 +181,9 @@ const copy = {
     result: 'Result',
     autoNumber: 'Automatic',
     importTime: 'Import time',
+    openingPoints: 'Opening points',
+    openingPointsUnavailable:
+      'Opening points need Loyalty Points and permission to manage Loyalty. Leave the Poin Awal column blank or 0.',
     actionCreate: 'New member & customer',
     actionEnroll: 'Existing customer enrolled',
     successTitle: 'Import completed',
@@ -183,6 +192,9 @@ const copy = {
     summaryEnrolled: 'Existing customers enrolled',
     summaryGenerated: 'Generated member numbers',
     summaryPreserved: 'Preserved member numbers',
+    summaryOpeningMembers: 'Members with opening balance',
+    summaryOpeningPoints: 'Total opening points',
+    ledgerOpeningBalance: 'Migrated opening balance',
     templateFailed: 'The template could not be downloaded.',
   },
 } as const;
@@ -213,6 +225,13 @@ const importIssueCopy: Record<string, string> = {
   JOINED_AT_IN_FUTURE: 'Tanggal bergabung tidak boleh di masa depan.',
   FORMULA_NOT_ALLOWED: 'Rumus tidak diimpor; ketik nilainya langsung.',
   VALUE_UNREADABLE: 'Isi sel tidak dapat dibaca.',
+  OPENING_POINTS_INVALID: 'Poin Awal harus berupa angka, contoh 1250 atau 1250.5.',
+  OPENING_POINTS_NEGATIVE: 'Poin Awal tidak boleh negatif.',
+  OPENING_POINTS_TOO_PRECISE: 'Poin Awal maksimal 4 angka desimal.',
+  OPENING_POINTS_TOO_LARGE: 'Poin Awal terlalu besar.',
+  LOYALTY_OPENING_BALANCE_NOT_AVAILABLE:
+    'Fitur Poin Loyalty tidak aktif; kosongkan Poin Awal atau isi 0.',
+  LOYALTY_OPENING_BALANCE_NOT_PERMITTED: 'Import Poin Awal memerlukan izin mengelola Loyalty.',
   EXISTING_CUSTOMER_ENROLLED: 'Pelanggan yang sudah ada dengan No. HP ini akan dijadikan member.',
   EXISTING_CUSTOMER_NAME_KEPT: 'Nama di file berbeda; nama pelanggan yang sudah ada tetap dipakai.',
 };
