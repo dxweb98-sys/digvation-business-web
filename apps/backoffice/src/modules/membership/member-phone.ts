@@ -21,3 +21,13 @@ export function toCanonicalMemberPhone(raw: string): string | null {
 
   return E164.test(candidate) ? candidate : null;
 }
+
+/**
+ * Indonesian national presentation of a canonical Member phone for Backoffice Member screens:
+ * +6281234567890 → 081234567890. Presentation only; any other number is shown as stored.
+ */
+export function toNationalMemberPhone(canonical: string): string {
+  return canonical.startsWith(`+${DEFAULT_CALLING_CODE}`)
+    ? `0${canonical.slice(DEFAULT_CALLING_CODE.length + 1)}`
+    : canonical;
+}
