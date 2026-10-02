@@ -32,6 +32,8 @@ export interface SaleSelectedComponentInput {
   componentItemId: string;
   componentVariantId?: string;
   quantity: string;
+  /** Service only: who performs it; shares are equal unless Runtime is told otherwise. */
+  performers?: Array<{ employeeId: string; shareRate?: string }>;
 }
 
 export interface StartSaleInput extends CreateSaleInput {
@@ -111,6 +113,8 @@ export interface ReplaceLinePreview {
   correctedTotalAmount: string;
   netSuccessfulPaidAmount: string;
   remainingPaymentAmount: string;
+  /** Returned to the customer as a new refund payment fact when the corrected total is lower. */
+  refundAmount?: string;
   replacements: Array<{
     catalogItemId: string;
     itemName: string;

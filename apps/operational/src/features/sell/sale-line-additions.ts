@@ -1,6 +1,6 @@
 import { createDecimal } from '@digvation/pos-money';
 
-import type { SaleLine } from './cashier-transaction.types';
+import type { Employee, SaleLine } from './cashier-transaction.types';
 
 export interface SaleLineAddition {
   id: string;
@@ -11,6 +11,8 @@ export interface SaleLineAddition {
   unitPrice: string;
   /** Billed amount for the whole line; a breakdown of the line amount, never extra revenue. */
   amount: string;
+  /** Who performs it ("Dikerjakan oleh"); empty when nobody is assigned. */
+  performerIds: string[];
 }
 
 /**
@@ -29,6 +31,7 @@ export function saleLineAdditions(
       unitPrice: component.transactionUnitPrice ?? '0.0000',
       // Contributions are stored per line unit; the line quantity is applied exactly once.
       amount: createDecimal(component.extendedContribution).times(line.quantity).toFixed(4),
+      performerIds: (component.performers ?? []).map((performer) => performer.employeeId),
     }));
 }
 
@@ -46,7 +49,11 @@ export function saleLineConfiguration(
     | 'soldByEmployeeId'
     | 'soldByEmployeeNameSnapshot'
   >,
+  /** Names for an addition's performers; Runtime returns only their ids. */
+  employees: readonly Pick<Employee, 'id' | 'displayName'>[] = [],
 ) {
+  const performerName = (employeeId: string) =>
+    employees.find((employee) => employee.id === employeeId)?.displayName ?? '';
   return {
     catalogVariantId: line.catalogVariantId,
     quantity: line.quantity,
@@ -68,6 +75,14 @@ export function saleLineConfiguration(
           .filter(Boolean)
           .join(' / '),
         unitPrice: component.transactionUnitPrice ?? '0.0000',
+        ...(component.performers?.length
+          ? {
+              performers: component.performers.map((performer) => ({
+                employeeId: performer.employeeId,
+                name: performerName(performer.employeeId),
+              })),
+            }
+          : {}),
       })),
   };
 }
@@ -111,4 +126,20 @@ export function saleLineBase(
     amount: amount.toFixed(4),
     unitPrice: amount.dividedBy(line.quantity).toFixed(4),
   };
+}
+
+/**
+ * "Dikerjakan oleh …" for an addition someone performs; null when nobody is assigned. Names come
+ * from the Service performer list, as for any work unit; an unknown employee keeps a neutral label.
+ */
+export function additionPerformedBy(
+  addition: Pick<SaleLineAddition, 'performerIds'>,
+  employees: readonly Pick<Employee, 'id' | 'displayName'>[],
+  copy: (value: string) => string,
+): string | null {
+  if (!addition.performerIds.length) return null;
+  const names = addition.performerIds.map(
+    (id) => employees.find((employee) => employee.id === id)?.displayName ?? copy('Employee'),
+  );
+  return `${copy('Performed by')} ${names.join(', ')}`;
 }

@@ -16,6 +16,7 @@ import { useCashierSession } from '../../app/providers/cashier-session-provider'
 import {
   additionSignature,
   groupUnitAdditions,
+  startAddition,
   type CartDraftAdditionalItem,
   type CartDraftSalesperson,
 } from './cart-draft';
@@ -261,13 +262,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
               ...(selection.soldBy ? { soldByEmployeeId: selection.soldBy.employeeId } : {}),
               ...(group.additions.length
                 ? {
-                    additionalComponents: group.additions.map((entry) => ({
-                      componentItemId: entry.componentItemId,
-                      ...(entry.componentVariantId
-                        ? { componentVariantId: entry.componentVariantId }
-                        : {}),
-                      quantity: entry.quantity,
-                    })),
+                    additionalComponents: group.additions.map(startAddition),
                   }
                 : {}),
             },
@@ -348,10 +343,26 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
               () => [],
             )
         : undefined;
+    // A Service's additional items are performed by Service performers, never sold by anyone.
+    const componentPerformers =
+      item.type === 'SERVICE'
+        ? await queryClient
+            .fetchQuery({
+              queryKey: cashierTransactionKeys.servicePerformers(),
+              queryFn: ({ signal }) => transactionAdapter.listServicePerformers(signal),
+              ...referenceQueryPolicy,
+            })
+            .then(
+              (page) =>
+                page.items.map((employee) => ({ id: employee.id, name: employee.displayName })),
+              () => [],
+            )
+        : undefined;
     return {
       item,
       variants,
       ...(salespeople ? { salespeople } : {}),
+      ...(componentPerformers ? { componentPerformers } : {}),
       itemOption:
         variants.length > 0 && item.variantSelectionMode === 'OPTIONAL' ? { price: ownPrice } : null,
       itemPrice: variants.length === 0 ? ownPrice : null,
@@ -492,6 +503,33 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     } catch (error) {
       command.reportError(error);
     }
+  };
+
+  /**
+   * Adds a new, fully configured item to the transaction being adjusted. The item was chosen and
+   * configured in the shared item configuration; nothing is persisted before that. Errors are
+   * returned to the caller, which keeps its dialog open.
+   */
+  const addItemToTransaction = async (item: CatalogItem, configuration: ItemConfiguration) => {
+    const targetSaleId = queueContextSale?.id;
+    if (!targetSaleId)
+      throw new Error(
+        copy('The transaction being adjusted is no longer active. Reopen the adjustment.'),
+      );
+    const variants = await catalog.loadActiveVariants(item);
+    await addCatalogItem(
+      item,
+      configuration.catalogVariantId ?? undefined,
+      'TRANSACTION_ADJUSTMENT',
+      targetSaleId,
+      variants.find((variant) => variant.id === configuration.catalogVariantId) ?? null,
+      {
+        quantity: configuration.quantity,
+        additionalComponents: configuration.additionalComponents,
+        ...(configuration.unitAdditions ? { unitAdditions: configuration.unitAdditions } : {}),
+        ...(configuration.soldBy ? { soldBy: configuration.soldBy } : {}),
+      },
+    );
   };
 
   /** Reopens a local cart line in the configurator, prefilled with what the operator chose. */
@@ -684,7 +722,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
    */
   const correctLine = async (
     line: SaleLine,
-    input: { lines: ReplaceSaleLineInput['lines']; reason: string },
+    input: { lines: ReplaceSaleLineInput['lines']; reason?: string },
   ) => {
     const sale = queueContextSale?.id === line.saleId ? queueContextSale : saleWorkspace.sale;
     if (!sale || !transactionAdapter.replaceSaleLine)
@@ -693,7 +731,12 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
       transactionAdapter.replaceSaleLine!(
         sale.id,
         line.id,
-        { expectedVersion: sale.version, lines: input.lines, reason: input.reason },
+        {
+          expectedVersion: sale.version,
+          lines: input.lines,
+          // Only an audited correction carries a reason; an ordinary edit has none.
+          ...(input.reason ? { reason: input.reason } : {}),
+        },
         `cashier-correct-line-${crypto.randomUUID()}`,
       ),
     );
@@ -704,14 +747,16 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
   /** Runtime-calculated impact of the correction; nothing is saved. */
   const previewLineCorrection = async (
     line: SaleLine,
-    input: { lines: ReplaceSaleLineInput['lines'] },
+    input: { lines: ReplaceSaleLineInput['lines']; reason?: string },
   ) => {
     const sale = queueContextSale?.id === line.saleId ? queueContextSale : saleWorkspace.sale;
     if (!sale || !transactionAdapter.previewReplaceSaleLine)
       throw new Error(copy('Item correction is not available.'));
+    // The preview is the same command as the correction, so it carries the same reason.
     return transactionAdapter.previewReplaceSaleLine(sale.id, line.id, {
       expectedVersion: sale.version,
       lines: input.lines,
+      ...(input.reason ? { reason: input.reason } : {}),
     });
   };
 
@@ -1064,6 +1109,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     locale: runtime.locale,
     currency: runtime.currency,
     items: catalog.items,
+    activeItems: catalog.activeItems,
     categories: catalog.categories,
     employees: employeeOptions.employees,
     paymentRoutes: (paymentRoutesQuery.data?.items ?? []).filter(
@@ -1114,6 +1160,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     removeLine,
     correctLine,
     previewLineCorrection,
+    addItemToTransaction,
     compensateOpenPayment,
     changeDraftQuantity: saleWorkspace.changeDraftQuantity,
     removeDraftLine: saleWorkspace.removeDraftLine,

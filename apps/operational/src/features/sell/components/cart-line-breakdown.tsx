@@ -13,16 +13,20 @@ interface CartLineBreakdownProps {
   baseLabel: string;
   unitLabel: (index: number) => string;
   heading: string;
+  /** "Dikerjakan oleh"; shown under an addition someone performs. */
+  performedByLabel?: string;
 }
 
 function AdditionRows({
   additions,
   format,
   formatQuantity,
+  performedByLabel,
 }: {
   additions: readonly CartDisplayAddition[];
   format: (amount: string) => string;
   formatQuantity: (quantity: string) => string;
+  performedByLabel?: string | undefined;
 }) {
   return (
     <>
@@ -33,6 +37,15 @@ function AdditionRows({
             <span className="block tabular-nums text-[var(--color-text-muted)]">
               {formatQuantity(addition.quantity)} × {format(addition.unitPrice)}
             </span>
+            {performedByLabel && addition.performers?.some((performer) => performer.name) ? (
+              <span className="block break-words text-[var(--color-text-muted)]">
+                {performedByLabel}{' '}
+                {addition.performers
+                  .map((performer) => performer.name)
+                  .filter(Boolean)
+                  .join(', ')}
+              </span>
+            ) : null}
           </span>
           <span className="shrink-0 tabular-nums">{format(addition.amount)}</span>
         </li>
@@ -54,6 +67,7 @@ export function CartLineBreakdown({
   baseLabel,
   unitLabel,
   heading,
+  performedByLabel,
 }: CartLineBreakdownProps) {
   if (line.units?.length) {
     return (
@@ -84,6 +98,7 @@ export function CartLineBreakdown({
                 additions={unit.additions}
                 format={format}
                 formatQuantity={formatQuantity}
+                performedByLabel={performedByLabel}
               />
             </ul>
           </li>
@@ -111,7 +126,12 @@ export function CartLineBreakdown({
         </span>
         <span className="shrink-0 tabular-nums">{format(baseAmount)}</span>
       </li>
-      <AdditionRows additions={line.additions} format={format} formatQuantity={formatQuantity} />
+      <AdditionRows
+        additions={line.additions}
+        format={format}
+        formatQuantity={formatQuantity}
+        performedByLabel={performedByLabel}
+      />
     </ul>
   );
 }

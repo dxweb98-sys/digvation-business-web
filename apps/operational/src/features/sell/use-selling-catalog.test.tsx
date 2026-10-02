@@ -89,3 +89,60 @@ describe('useSellingCatalog search', () => {
     expect(hook.result.current.items.map((item) => item.id)).toEqual(['paint', 'cut']);
   });
 });
+
+describe('useSellingCatalog page filter vs. every active item', () => {
+  const withComponentOnly: CatalogItem[] = [
+    ...items,
+    {
+      ...base,
+      id: 'resin',
+      code: 'CMP-1',
+      name: 'Resin',
+      type: 'PRODUCT',
+      productUsage: 'COMPONENT_ONLY',
+    } as CatalogItem,
+  ];
+  function setupAll() {
+    const getOperationalCatalog = vi
+      .fn()
+      .mockResolvedValue({ categories: [], items: withComponentOnly });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={new QueryClient()}>{children}</QueryClientProvider>
+    );
+    const hook = renderHook(
+      () =>
+        useSellingCatalog({
+          query: { getOperationalCatalog, listCatalogVariants: vi.fn() } as never,
+          locale: 'id-ID',
+          sellingLocationId: 'location-1',
+          currency: 'IDR',
+        }),
+      { wrapper },
+    );
+    return { hook, getOperationalCatalog };
+  }
+
+  it.each([
+    ['PRODUCT', ['paint'], ['paint', 'cut']],
+    ['SERVICE', ['cut'], ['paint', 'cut']],
+  ] as const)(
+    'with the page on %s, activeItems still holds Products and Services from the one query',
+    async (type, visible, active) => {
+      const { hook, getOperationalCatalog } = setupAll();
+      await waitFor(() => expect(hook.result.current.isLoading).toBe(false));
+      act(() => hook.result.current.setItemType(type));
+      expect(hook.result.current.items.map((item) => item.id)).toEqual(visible);
+      expect(hook.result.current.activeItems.map((item) => item.id)).toEqual(active);
+      expect(getOperationalCatalog).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('keeps the page search out of activeItems and never offers a COMPONENT_ONLY Product', async () => {
+    const { hook } = setupAll();
+    await waitFor(() => expect(hook.result.current.isLoading).toBe(false));
+    act(() => hook.result.current.setSearch('potong'));
+    expect(hook.result.current.activeItems.map((item) => item.id)).toEqual(['paint', 'cut']);
+    expect(hook.result.current.findItem('paint')?.id).toBe('paint');
+    expect(hook.result.current.findItem('resin')).toBeNull();
+  });
+});
