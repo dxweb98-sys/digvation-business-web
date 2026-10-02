@@ -7,7 +7,6 @@ import {
   DBadge as Badge,
   DButton,
   DButton as Button,
-  DCombobox as Combobox,
   DConfirmDialog,
   DDialog,
   DDialog as Dialog,
@@ -77,6 +76,7 @@ import { replacementLinesOf } from '../cart-draft';
 import { visibleCatalogItems } from '../selling-catalog-eligibility';
 import { saleLineConfiguration } from '../sale-line-additions';
 import { ItemConfigurator, type ItemConfiguration, type ItemConfiguratorState } from './item-configurator';
+import { AddTransactionItemDialog, CatalogItemAutocomplete } from './transaction-item-dialog';
 import { CustomerMemberApi, type MemberLookupResult } from '../customer-member-api';
 import type { CartDisplayLine } from '../cart-draft';
 import {
@@ -84,6 +84,7 @@ import {
   isLocalCashierDemoEnabled,
 } from '../cashier-transaction-adapter-factory';
 import { hasStartableQueuedWork, saleLineWorkStatus } from '../queued-sale-work';
+import { correctionSourceOf, saleLineAdjustmentMode } from '../sale-adjustment-access';
 import {
   appliedPaymentComposition,
   employeeDisplayName,
@@ -138,7 +139,7 @@ import {
   SalePaymentList,
   StatusPill,
 } from './sale-detail-presentation';
-import { saleLineAdditions, saleLineBase } from '../sale-line-additions';
+import { additionPerformedBy, saleLineAdditions, saleLineBase } from '../sale-line-additions';
 import { CartLineBreakdown } from './cart-line-breakdown';
 import {
   PaymentIntentHint,
@@ -162,7 +163,6 @@ import {
   type PerformerAllocation,
   type ServiceLineWorkPlan,
 } from '../service-performer-allocation';
-import type { VariantPickerState } from '../variant-selection';
 import {
   isCompletedSaleSummary,
   presentableTransaction,
@@ -362,6 +362,26 @@ function customerStatus(customer: SaleCustomer | null): {
  * the one value shown by Transaction Detail and the receipt; it is never summed from line rows
  * (a TRANSACTION_TOTAL Sale has none) and never shown as +0.
  */
+/**
+ * The member point facts a receipt states once for the whole Sale: the balance right after this
+ * Sale (historical, not today's), what it earned and what it used. Per-line earning stays line detail.
+ */
+export function receiptPointSummary(
+  sale: Pick<Sale, 'status' | 'loyaltyEarning' | 'loyaltySummary' | 'customer'>,
+  customer: Pick<SaleCustomer, 'type'> | null,
+): { balanceAfter: string | null; earnedPoints: string | null; redeemedPoints: string | null } | null {
+  if (customer?.type !== 'MEMBER') return null;
+  const summary = sale.loyaltySummary;
+  if (summary)
+    return {
+      balanceAfter: summary.balanceAfter,
+      earnedPoints: isPositiveDecimal(summary.earnedPoints) ? summary.earnedPoints : null,
+      redeemedPoints: isPositiveDecimal(summary.redeemedPoints) ? summary.redeemedPoints : null,
+    };
+  const earned = saleEarnedPoints(sale);
+  return earned ? { balanceAfter: null, earnedPoints: earned, redeemedPoints: null } : null;
+}
+
 export function saleEarnedPoints(
   sale: Pick<Sale, 'status' | 'loyaltyEarning' | 'customer'>,
 ): string | null {
@@ -2029,23 +2049,19 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       <ReferenceOrderAdjustmentDialog
         key={displayedAdjustmentTarget?.id ?? 'adjustment-closed'}
         sale={displayedAdjustmentTarget}
-        items={workspace.items}
+        // Every active sellable item: the page's Product/Service filter and search never apply.
+        items={workspace.activeItems}
         locale={workspace.locale}
         isMutating={workspace.isCoreMutating}
-        variantPicker={
-          workspace.variantPicker?.context === 'TRANSACTION_ADJUSTMENT'
-            ? workspace.variantPicker
-            : null
-        }
         onClose={() => {
           workspace.closeVariantPicker();
           setAdjustmentTarget(null);
           workspace.closeQueueContext();
         }}
-        onAdd={(item) => void workspace.selectItem(item, 'TRANSACTION_ADJUSTMENT')}
-        onAddVariant={(variantId) => void workspace.selectVariant(variantId)}
+        onAdd={(item, configuration) => workspace.addItemToTransaction(item, configuration)}
         onQuantity={(line, next) => workspace.changeQuantity(line, next)}
         onRemove={workspace.removeLine}
+        onEdit={(line, input) => workspace.correctLine(line, input)}
         onCorrect={(line, input) => workspace.correctLine(line, input)}
         onPreview={(line, input) => workspace.previewLineCorrection(line, input)}
         loadConfiguratorState={workspace.loadConfiguratorState}
@@ -2057,6 +2073,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         }
         canRefundPayment={session.access.permissions.includes('payments:refund')}
         onCompensate={(sale, paymentId, amount) => workspace.compensateOpenPayment(sale, paymentId, amount)}
+        employees={workspace.employees}
       />
 
       <ReferenceBalancePaymentDialog
@@ -3130,6 +3147,7 @@ function ReferenceCartPanel({
                     unitLabel={(index) => `${copy('Unit')} ${index}`}
                     format={(amount) => money(amount, locale)}
                     formatQuantity={quantity}
+                    performedByLabel={copy('Performed by')}
                   />
                   <div className="mt-3 flex items-center justify-between gap-3">
                     <div className="inline-grid grid-cols-[36px_48px_36px] items-center overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] shadow-[inset_0_1px_0_rgb(15_23_42_/_0.02)]">
@@ -3805,6 +3823,7 @@ export function ReferencePaymentDialog({
                         unitLabel={(index) => `${copy('Unit')} ${index}`}
                         format={format}
                         formatQuantity={quantity}
+                        performedByLabel={copy('Performed by')}
                       />
                     </div>
                   );
@@ -4731,6 +4750,7 @@ export function ReferenceTransactionDetail({
                                   name: addition.name,
                                   pricing: `${quantity(addition.quantity)} × ${format(addition.unitPrice)}`,
                                   amount: format(addition.amount),
+                                  performedBy: additionPerformedBy(addition, employees, copy),
                                 }))}
                               />
                             ) : null
@@ -4745,7 +4765,10 @@ export function ReferenceTransactionDetail({
                               : null
                           }
                           context={
-                            showWorkStatus || line.workLineage || durationLabel ? (
+                            showWorkStatus ||
+                            line.workLineage ||
+                            correctionSourceOf(sale, line) ||
+                            durationLabel ? (
                               <>
                                 {showWorkStatus ? (
                                   <StatusPill
@@ -4756,6 +4779,12 @@ export function ReferenceTransactionDetail({
                                 ) : null}
                                 {line.workLineage ? (
                                   <span>Pekerjaan tercatat pada {line.workLineage.sourceItemName}</span>
+                                ) : null}
+                                {correctionSourceOf(sale, line) ? (
+                                  <span>
+                                    Koreksi dari{' '}
+                                    {correctionSourceOf(sale, line)!.itemNameSnapshot}
+                                  </span>
                                 ) : null}
                                 {durationLabel ? <span>{durationLabel}</span> : null}
                               </>
@@ -5053,8 +5082,9 @@ export function ReceiptContent({
   const redeemedAmount =
     sale.loyaltyRedemption?.amount ?? legacyLoyaltyRedemption?.redemptionAmount ?? null;
   const hasLoyaltyRedemption = Boolean(redeemedPoints && redeemedAmount);
-  const receiptLoyaltySummary =
-    customer?.type === 'MEMBER' ? (sale.loyaltySummary ?? null) : null;
+  // The transaction's point summary, stated once. Runtime's finalized loyalty summary is the single
+  // authority; a Sale without one (earlier history) falls back to its finalized earning alone.
+  const receiptPoints = receiptPointSummary(sale, customer);
   return (
     <>
       <header className="text-center">
@@ -5071,47 +5101,42 @@ export function ReceiptContent({
         </p>
       </header>
 
-      <section className="mt-4 flex items-start justify-between gap-4 text-xs">
-        <div className="min-w-0">
+      {/*
+        One stacked hierarchy for 80 mm and 58 mm alike: who the customer is, then (for a member)
+        this Sale's point summary. Customer identity and points never compete side by side.
+      */}
+      <section className="mt-4 space-y-3 text-xs" aria-label={copy('Customer')}>
+        <div>
           <p className="font-semibold">{copy('Customer')}</p>
           <p className="mt-1 break-words">{customerDisplayName(customer, locale)}</p>
           {customerDisplayDetail(customer) ? (
-            <p className="break-words text-slate-500">{customerDisplayDetail(customer)}</p>
+            // A phone or reference is one token: it keeps the full width and never breaks per character.
+            <p className="whitespace-nowrap text-slate-500">{customerDisplayDetail(customer)}</p>
           ) : null}
         </div>
-        {receiptLoyaltySummary ? (
-          <dl className="shrink-0 space-y-0.5 text-right tabular-nums">
-            <div className="flex items-baseline justify-end gap-2">
-              <dt className="text-slate-500">{copy('Current points')}</dt>
-              <dd className="font-bold">
-                {pointQuantity(receiptLoyaltySummary.balanceAfter, locale)}
-              </dd>
-            </div>
-            {isPositiveDecimal(receiptLoyaltySummary.earnedPoints) ? (
-              <div className="flex items-baseline justify-end gap-2">
-                <dt className="text-slate-500">{copy('Earned')}</dt>
-                <dd className="font-semibold">
-                  +{pointQuantity(receiptLoyaltySummary.earnedPoints, locale)}
-                </dd>
-              </div>
-            ) : null}
-            {isPositiveDecimal(receiptLoyaltySummary.redeemedPoints) ? (
-              <div className="flex items-baseline justify-end gap-2">
-                <dt className="text-slate-500">{copy('Used')}</dt>
-                <dd className="font-semibold">
-                  −{pointQuantity(receiptLoyaltySummary.redeemedPoints, locale)}
-                </dd>
-              </div>
-            ) : null}
-          </dl>
-        ) : null}
-        {saleEarnedPoints(sale) ? (
-          <div
-            className="mt-1.5 flex items-start justify-between gap-3 font-semibold"
-            data-testid="receipt-points-earned"
-          >
-            <span>{copy('Points earned')}</span>
-            <span className="shrink-0">+{pointQuantity(saleEarnedPoints(sale)!, locale)}</span>
+        {receiptPoints ? (
+          <div data-testid="receipt-points">
+            <p className="font-semibold">{copy('Points')}</p>
+            <dl className="mt-1 space-y-0.5 tabular-nums">
+              {receiptPoints.balanceAfter !== null ? (
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-slate-500">{copy('Receipt point balance')}</dt>
+                  <dd className="font-bold">{pointQuantity(receiptPoints.balanceAfter, locale)}</dd>
+                </div>
+              ) : null}
+              {receiptPoints.earnedPoints ? (
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-slate-500">{copy('Points gained')}</dt>
+                  <dd className="font-semibold">+{pointQuantity(receiptPoints.earnedPoints, locale)}</dd>
+                </div>
+              ) : null}
+              {receiptPoints.redeemedPoints ? (
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-slate-500">{copy('Used')}</dt>
+                  <dd className="font-semibold">−{pointQuantity(receiptPoints.redeemedPoints, locale)}</dd>
+                </div>
+              ) : null}
+            </dl>
           </div>
         ) : null}
       </section>
@@ -5296,20 +5321,16 @@ export function ReceiptContent({
   );
 }
 
-/** Select value for "the item itself"; it becomes no variant when added. */
-const ADJUSTMENT_ITEM_OPTION = 'item-option';
-
 export function ReferenceOrderAdjustmentDialog({
   sale,
   items,
   locale,
   isMutating: mutating,
-  variantPicker,
   onClose,
   onAdd,
-  onAddVariant,
   onQuantity,
   onRemove,
+  onEdit,
   onCorrect,
   onPreview,
   loadConfiguratorState,
@@ -5317,21 +5338,32 @@ export function ReferenceOrderAdjustmentDialog({
   canAdjust,
   canRefundPayment,
   onCompensate,
+  employees = [],
 }: {
   sale: Sale | null;
+  /** Service performers, to name who performs a Service's additional items. */
+  employees?: readonly Employee[];
+  /**
+   * Every active standalone sellable item. Never the POS page's filtered catalog: adding or
+   * correcting an item has its own Product/Service choice and search.
+   */
   items: readonly CatalogItem[];
   locale: string;
   isMutating: boolean;
-  variantPicker: VariantPickerState | null;
   onClose: () => void;
-  onAdd: (item: CatalogItem) => void;
-  onAddVariant: (catalogVariantId: string | null) => void;
+  /** Adds a new item, chosen and configured in the shared item configuration, as a new line. */
+  onAdd: (item: CatalogItem, configuration: ItemConfiguration) => Promise<unknown>;
   onQuantity: (line: SaleLine, quantity: string) => void;
   onRemove: (line: SaleLine) => void;
+  /** Ordinary edit of a line whose work has not started: same item, new configuration, no reason. */
+  onEdit: (line: SaleLine, input: { lines: ReplaceSaleLineInput['lines'] }) => Promise<unknown>;
   /** One atomic correction with a full item configuration; it may become several Sale lines. */
   onCorrect: (line: SaleLine, input: { lines: ReplaceSaleLineInput['lines']; reason: string }) => Promise<unknown>;
-  /** Runtime-calculated impact of the same correction; nothing is saved. */
-  onPreview: (line: SaleLine, input: { lines: ReplaceSaleLineInput['lines'] }) => Promise<ReplaceLinePreview>;
+  /** Runtime-calculated impact of the same correction (same reason, same rules); nothing is saved. */
+  onPreview: (
+    line: SaleLine,
+    input: { lines: ReplaceSaleLineInput['lines']; reason: string },
+  ) => Promise<ReplaceLinePreview>;
   /** Everything the shared item configuration needs for one item at this location. */
   loadConfiguratorState: (item: CatalogItem) => Promise<ItemConfiguratorState>;
   loadCandidates: (q: string) => Promise<{ items: ComponentCandidate[] }>;
@@ -5343,8 +5375,11 @@ export function ReferenceOrderAdjustmentDialog({
   const { copy } = useOperationalLocalization();
   // Without the adjustment permission every mutating control is off; closing stays available.
   const isMutating = mutating || !canAdjust;
-  const [catalogSearch, setCatalogSearch] = useState('');
-  const [catalogOpen, setCatalogOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  // Ordinary edit of a not-yet-started line, in the shared item configuration.
+  const [editLine, setEditLine] = useState<SaleLine | null>(null);
+  const [editState, setEditState] = useState<ItemConfiguratorState | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
   // Quantities when the dialog opened; only rows that differ show what changed.
   const [baseline] = useState<ReadonlyMap<string, string>>(
     () =>
@@ -5354,10 +5389,6 @@ export function ReferenceOrderAdjustmentDialog({
           .map((line) => [line.id, line.quantity]),
       ),
   );
-  const [variantSelection, setVariantSelection] = useState<{
-    itemId: string;
-    variantId: string;
-  } | null>(null);
   const [correctionLine, setCorrectionLine] = useState<SaleLine | null>(null);
   const [replacementItemId, setReplacementItemId] = useState('');
   // The shared item configuration of the replacement: the same model as adding or editing an item.
@@ -5365,7 +5396,6 @@ export function ReferenceOrderAdjustmentDialog({
   const [configuratorLoading, setConfiguratorLoading] = useState(false);
   const [replacementConfiguration, setReplacementConfiguration] = useState<ItemConfiguration | null>(null);
   const [correctionReason, setCorrectionReason] = useState('');
-  const [replacementSearch, setReplacementSearch] = useState('');
   // The Sale returned by the persisted correction/compensation is the settlement authority.
   const [appliedSale, setAppliedSale] = useState<Sale | null>(null);
   const [correctionSaved, setCorrectionSaved] = useState(false);
@@ -5379,21 +5409,59 @@ export function ReferenceOrderAdjustmentDialog({
     // Keep the authoritative result in view; it renders below the form.
     if (correctionPreview) previewRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
   }, [correctionPreview]);
+  // Only the latest chosen replacement may fill the configuration.
+  const replacementRequest = useRef(0);
   const loadReplacementState = (itemId: string) => {
     const item = items.find((entry) => entry.id === itemId);
+    const ticket = ++replacementRequest.current;
     setConfiguratorState(null);
     setReplacementConfiguration(null);
     if (!item) return;
     setConfiguratorLoading(true);
     void loadConfiguratorState(item)
-      .then((state) => setConfiguratorState((current) => (current === null ? state : current)))
+      .then((state) => {
+        if (ticket === replacementRequest.current) setConfiguratorState(state);
+      })
       .catch(() => undefined)
-      .finally(() => setConfiguratorLoading(false));
+      .finally(() => {
+        if (ticket === replacementRequest.current) setConfiguratorLoading(false);
+      });
   };
-  const selectedVariantId =
-    variantSelection && variantSelection.itemId === variantPicker?.item.id
-      ? variantSelection.variantId
-      : null;
+  const openEdit = (line: SaleLine) => {
+    const item = items.find((entry) => entry.id === line.catalogItemId);
+    if (!item) return;
+    setEditError(null);
+    setEditState(null);
+    setEditLine(line);
+    void loadConfiguratorState(item)
+      .then(setEditState)
+      .catch((error: unknown) => {
+        setEditLine(null);
+        setEditError(cashierTransactionErrorMessage(error));
+      });
+  };
+  const closeEdit = () => {
+    setEditLine(null);
+    setEditState(null);
+  };
+  const confirmEdit = (configuration: ItemConfiguration) => {
+    if (!editLine || !editState) return;
+    const line = editLine;
+    const lines = replacementLinesOf(editState.item.id, configuration.catalogVariantId, {
+      ...configuration,
+      soldByEmployeeId: configuration.soldBy?.employeeId ?? null,
+    });
+    closeEdit();
+    void onEdit(line, { lines }).catch((error: unknown) =>
+      setEditError(
+        correctionErrorMessage(
+          error,
+          copy('The item could not be changed. Reload the transaction and try again.'),
+          locale,
+        ),
+      ),
+    );
+  };
 
   if (!sale) return null;
 
@@ -5424,28 +5492,7 @@ export function ReferenceOrderAdjustmentDialog({
           tone: 'text-[var(--color-brand)]',
         }
       : { label: copy('Total'), amount: sale.totalAmount, tone: 'text-[var(--color-text)]' };
-  const options = items
-    .filter((item) => {
-      const query = catalogSearch.trim().toLocaleLowerCase();
-      return !query || `${item.name} ${item.code}`.toLocaleLowerCase().includes(query);
-    })
-    .slice(0, 12)
-    .map((item) => ({
-      value: item.id,
-      label: `${item.name} (${item.code})`,
-    }));
   const correctionSource = correctionLine;
-  // The selected item stays in the option list so its label remains visible while searching.
-  const replacementOptions = (() => {
-    const query = replacementSearch.trim().toLocaleLowerCase();
-    const matches = items.filter(
-      (item) =>
-        item.id === replacementItemId ||
-        !query ||
-        `${item.name} ${item.code}`.toLocaleLowerCase().includes(query),
-    );
-    return matches.slice(0, 20).map((item) => ({ value: item.id, label: `${item.name} (${item.code})` }));
-  })();
   const replacementLines = () =>
     replacementConfiguration && configuratorState
       ? replacementLinesOf(
@@ -5461,10 +5508,10 @@ export function ReferenceOrderAdjustmentDialog({
   // Ready exactly when the shared configuration is valid: every unit satisfied, price resolved.
   const correctionReady = Boolean(configuratorState && replacementConfiguration);
   const previewCorrection = () => {
-    if (!correctionSource || !correctionReady) return;
+    if (!correctionSource || !correctionReady || !correctionReason.trim()) return;
     setPreviewState('LOADING');
     setPreviewError(null);
-    void onPreview(correctionSource, { lines: replacementLines() })
+    void onPreview(correctionSource, { lines: replacementLines(), reason: correctionReason.trim() })
       .then((value) => {
         setCorrectionPreview(value);
         setPreviewState('IDLE');
@@ -5571,10 +5618,15 @@ export function ReferenceOrderAdjustmentDialog({
         </p>
         <ul className="divide-y divide-[var(--color-border)] rounded-xl border border-[var(--color-border)]">
           {activeLines.map((line) => {
-            const lineMutable = !saleLineWorkStatus(line) || saleLineWorkStatus(line) === 'WAITING';
-            const progressed = !lineMutable;
+            // Runtime stays the authority; this only decides which controls are offered.
+            const mode = saleLineAdjustmentMode(sale, line, {
+              addedInThisAdjustment: !baseline.has(line.id),
+            });
+            const correctedFrom = correctionSourceOf(sale, line);
+            const editable = mode === 'EDIT';
             const canDecrease =
-              lineMutable && createDecimal(line.quantity).greaterThan(createDecimal('1'));
+              editable && createDecimal(line.quantity).greaterThan(createDecimal('1'));
+            const sellable = items.some((item) => item.id === line.catalogItemId);
             const before = baseline.get(line.id);
             const lineChange =
               before === undefined
@@ -5583,8 +5635,12 @@ export function ReferenceOrderAdjustmentDialog({
                   ? null
                   : `${copy('Was')} ${quantity(before)}`;
             return (
-              <li key={line.id} className="flex items-center gap-3 px-3 py-2">
-                <div className="min-w-0 flex-1">
+              <li
+                key={line.id}
+                data-adjustment-mode={mode}
+                className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2"
+              >
+                <div className="min-w-0 flex-1 basis-40">
                   <p
                     className="truncate text-sm"
                     title={`${line.itemNameSnapshot}${line.variantNameSnapshot ? ` · ${line.variantNameSnapshot}` : ''}`}
@@ -5597,7 +5653,7 @@ export function ReferenceOrderAdjustmentDialog({
                       </span>
                     ) : null}
                   </p>
-                  <p className="flex items-center gap-2 text-xs tabular-nums text-[var(--color-text-muted)]">
+                  <p className="flex flex-wrap items-center gap-x-2 text-xs tabular-nums text-[var(--color-text-muted)]">
                     {money(line.effectiveUnitPrice, locale)}
                     {lineChange ? (
                       <span className="rounded-full bg-[var(--color-brand)]/10 px-1.5 text-[10px] font-semibold text-[var(--color-brand)]">
@@ -5605,64 +5661,120 @@ export function ReferenceOrderAdjustmentDialog({
                       </span>
                     ) : null}
                   </p>
+                  {line.soldByEmployeeNameSnapshot ? (
+                    // The Product salesperson; Service performers are a separate concept.
+                    <p className="text-[11px] text-[var(--color-text-muted)]">
+                      {copy('Sold by')} {line.soldByEmployeeNameSnapshot}
+                    </p>
+                  ) : null}
+                  {(line.compositionComponents ?? [])
+                    .filter(
+                      (component) =>
+                        component.componentSource === 'SALE_SELECTED' && component.performers?.length,
+                    )
+                    .map((component) => (
+                      // Part of this Service's work, never a Product sale of its own.
+                      <p key={component.id} className="text-[11px] text-[var(--color-text-muted)]">
+                        + {[component.itemNameSnapshot, component.variantNameSnapshot].filter(Boolean).join(' / ')}{' '}
+                        ·{' '}
+                        {additionPerformedBy(
+                          { performerIds: component.performers!.map((performer) => performer.employeeId) },
+                          employees,
+                          copy,
+                        )}
+                      </p>
+                    ))}
+                  {correctedFrom ? (
+                    <p className="text-[11px] text-[var(--color-text-muted)]">
+                      Koreksi dari {correctedFrom.itemNameSnapshot}
+                      {correctedFrom.fulfillment ? ' · pekerjaan awal tetap tercatat' : ''}
+                    </p>
+                  ) : null}
+                  {mode === 'LOCKED' ? (
+                    <p className="text-[11px] text-[var(--color-text-muted)]">
+                      Item yang sudah selesai dikerjakan tidak dapat dikoreksi.
+                    </p>
+                  ) : null}
                 </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  <button
-                    type="button"
-                    aria-label={`${copy('Decrease quantity')} ${line.itemNameSnapshot}`}
-                    disabled={!canDecrease || isMutating}
-                    onClick={() =>
-                      onQuantity(
-                        line,
-                        createDecimal(line.quantity).minus(createDecimal('1')).toFixed(4),
-                      )
-                    }
-                    className={stepperClass}
-                  >
-                    <Minus className="size-3.5" />
-                  </button>
-                  <span className="w-7 text-center text-xs font-semibold tabular-nums">
-                    {quantity(line.quantity)}
-                  </span>
-                  <button
-                    type="button"
-                    aria-label={`${copy('Increase quantity')} ${line.itemNameSnapshot}`}
-                    disabled={!lineMutable || isMutating}
-                    onClick={() =>
-                      onQuantity(
-                        line,
-                        createDecimal(line.quantity).plus(createDecimal('1')).toFixed(4),
-                      )
-                    }
-                    className={stepperClass}
-                  >
-                    <Plus className="size-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`${copy('Remove')} ${line.itemNameSnapshot}`}
-                    disabled={!lineMutable || isMutating}
-                    onClick={() => onRemove(line)}
-                    className="ml-0.5 flex size-8 items-center justify-center rounded-lg text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <Trash2 className="size-3.5" />
-                  </button>
-                  {sale.status === 'OPEN' ? (
+                <div className="ml-auto flex shrink-0 items-center gap-1">
+                  {editable ? (
+                    <>
+                      <button
+                        type="button"
+                        aria-label={`${copy('Decrease quantity')} ${line.itemNameSnapshot}`}
+                        disabled={!canDecrease || isMutating}
+                        onClick={() =>
+                          onQuantity(
+                            line,
+                            createDecimal(line.quantity).minus(createDecimal('1')).toFixed(4),
+                          )
+                        }
+                        className={stepperClass}
+                      >
+                        <Minus className="size-3.5" />
+                      </button>
+                      <span className="w-7 text-center text-xs font-semibold tabular-nums">
+                        {quantity(line.quantity)}
+                      </span>
+                      <button
+                        type="button"
+                        aria-label={`${copy('Increase quantity')} ${line.itemNameSnapshot}`}
+                        disabled={isMutating}
+                        onClick={() =>
+                          onQuantity(
+                            line,
+                            createDecimal(line.quantity).plus(createDecimal('1')).toFixed(4),
+                          )
+                        }
+                        className={stepperClass}
+                      >
+                        <Plus className="size-3.5" />
+                      </button>
+                      {sale.status === 'OPEN' ? (
+                        <button
+                          type="button"
+                          aria-label={`${copy('Edit item')} ${line.itemNameSnapshot}`}
+                          title={copy('Edit item')}
+                          // Same item, new configuration; an item no longer sold is removed instead.
+                          disabled={isMutating || !sellable}
+                          onClick={() => openEdit(line)}
+                          className={stepperClass}
+                        >
+                          <Pencil className="size-3.5" aria-hidden="true" />
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        aria-label={`${copy('Remove')} ${line.itemNameSnapshot}`}
+                        disabled={isMutating}
+                        onClick={() => onRemove(line)}
+                        className="ml-0.5 flex size-8 items-center justify-center rounded-lg text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </>
+                  ) : (
+                    // Once work is in progress the quantity, removal and configuration of an
+                    // existing line change only through the audited correction, never directly.
+                    <span className="px-1 text-xs font-semibold tabular-nums text-[var(--color-text-muted)]">
+                      × {quantity(line.quantity)}
+                    </span>
+                  )}
+                  {mode === 'CORRECTION' && sale.status === 'OPEN' ? (
                     <button
                       type="button"
-                      // Runtime never replaces a tracked line whose work has started; no permission
-                      // overrides that, so the action is simply unavailable for it.
-                      disabled={isMutating || progressed}
-                      title={
-                        progressed
-                          ? 'Item yang sudah dikerjakan tidak dapat dikoreksi.'
-                          : undefined
-                      }
+                      aria-label={`Koreksi item ${line.itemNameSnapshot}`}
+                      disabled={isMutating}
                       onClick={() => {
                         setCorrectionLine(line);
-                        setReplacementItemId(line.catalogItemId);
-                        loadReplacementState(line.catalogItemId);
-                        setReplacementSearch('');
+                        // The current item starts selected and configured exactly as the line, so a
+                        // variant or quantity correction needs no search. Choosing another item in
+                        // the field changes the Catalog item and starts a fresh configuration.
+                        const current = items.some((item) => item.id === line.catalogItemId)
+                          ? line.catalogItemId
+                          : '';
+                        setReplacementItemId(current);
+                        loadReplacementState(current);
                         setAppliedSale(null);
                         setCorrectionSaved(false);
                         setCorrectionError(null);
@@ -5672,7 +5784,7 @@ export function ReferenceOrderAdjustmentDialog({
                         setCorrectionPreview(null);
                         setPreviewState('IDLE');
                       }}
-                      className="ml-1 rounded-lg px-2 text-xs font-semibold text-[var(--color-brand)] hover:bg-[var(--color-brand)]/10 disabled:opacity-40"
+                      className="ml-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-[var(--color-brand)] hover:bg-[var(--color-brand)]/10 disabled:opacity-40"
                     >
                       Koreksi item
                     </button>
@@ -5687,101 +5799,17 @@ export function ReferenceOrderAdjustmentDialog({
             {removedCount} {copy('items removed')}
           </p>
         ) : null}
+        {editError ? <DAlert variant="danger">{editError}</DAlert> : null}
 
-        {catalogOpen || variantPicker ? (
-          <div className="space-y-2">
-            <Combobox
-              ariaLabel={copy('Add item from catalog')}
-              value={null}
-              placeholder={copy('Search product or service')}
-              options={options}
-              onSearchChange={setCatalogSearch}
-              onChange={(itemId) => {
-                const item = items.find((candidate) => candidate.id === itemId);
-                if (item) onAdd(item);
-              }}
-              disabled={isMutating}
-              idleMessage={copy('Search by item name or code.')}
-            />
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setCatalogOpen(true)}
-            disabled={isMutating}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-semibold text-[var(--color-brand)] hover:bg-[var(--color-brand)]/10 disabled:opacity-50"
-          >
-            <Plus className="size-3.5" aria-hidden="true" />
-            {copy('Add item from catalog')}
-          </button>
-        )}
-
-        {variantPicker ? (
-          <section className="rounded-xl border border-[var(--color-border)] p-3">
-            <div className="space-y-3">
-              <p className="text-sm font-semibold text-[var(--color-text)]">
-                {variantPicker.item.name}
-              </p>
-              <Select
-                label={copy(variantPicker.itemOption ? 'Option' : 'Variant')}
-                value={selectedVariantId}
-                placeholder={copy(variantPicker.itemOption ? 'Select option' : 'Select variant')}
-                options={[
-                  ...(variantPicker.itemOption
-                    ? [
-                        {
-                          value: ADJUSTMENT_ITEM_OPTION,
-                          label:
-                            variantPicker.itemOption.price === null
-                              ? `${copy('Without variant')} (${copy('Price unavailable')})`
-                              : `${copy('Without variant')} (${money(variantPicker.itemOption.price, locale)})`,
-                          disabled: variantPicker.itemOption.price === null,
-                        },
-                      ]
-                    : []),
-                  ...variantPicker.variants.map((variant) => {
-                    const price = variantPicker.pricesByVariantId?.[variant.id];
-                    const isUnavailable =
-                      variantPicker.unavailableVariantIds?.includes(variant.id) ?? false;
-                    return {
-                      value: variant.id,
-                      label: isUnavailable
-                        ? `${variant.name} (${copy('Price unavailable')})`
-                        : price
-                          ? `${variant.name} (${money(price, locale)})`
-                          : variant.name,
-                      disabled: isUnavailable,
-                    };
-                  }),
-                ]}
-                onChange={(value) =>
-                  setVariantSelection(
-                    typeof value === 'string'
-                      ? { itemId: variantPicker.item.id, variantId: value }
-                      : null,
-                  )
-                }
-                disabled={isMutating}
-                className="w-full"
-              />
-              <div className="flex justify-end">
-                <Button
-                  size="sm"
-                  leftIcon={<Plus className="size-3.5" />}
-                  disabled={selectedVariantId === null || isMutating}
-                  onClick={() => {
-                    if (selectedVariantId)
-                      onAddVariant(
-                        selectedVariantId === ADJUSTMENT_ITEM_OPTION ? null : selectedVariantId,
-                      );
-                  }}
-                >
-                  {copy('Add item')}
-                </Button>
-              </div>
-            </div>
-          </section>
-        ) : null}
+        <button
+          type="button"
+          onClick={() => setAddOpen(true)}
+          disabled={isMutating}
+          className="inline-flex h-9 items-center gap-1.5 rounded-lg px-2 text-sm font-semibold text-[var(--color-brand)] hover:bg-[var(--color-brand)]/10 disabled:opacity-50"
+        >
+          <Plus className="size-4" aria-hidden="true" />
+          {copy('Add item')}
+        </button>
       </div>
     </Dialog>
     {correctionLine ? (
@@ -5805,7 +5833,7 @@ export function ReferenceOrderAdjustmentDialog({
               </Button>
               <Button
                 variant="outline"
-                disabled={!correctionReady || isMutating}
+                disabled={!correctionReady || !correctionReason.trim() || isMutating}
                 loading={previewState === 'LOADING'}
                 onClick={previewCorrection}
               >
@@ -5883,24 +5911,28 @@ export function ReferenceOrderAdjustmentDialog({
                 <p className="text-xs tabular-nums text-[var(--color-text-muted)]">
                   {quantity(correctionLine.quantity)} × {money(correctionLine.effectiveUnitPrice, locale)}
                 </p>
+                {correctionLine.fulfillment?.status === 'IN_PROGRESS' ? (
+                  <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                    Pekerjaan yang sudah berjalan tetap tercatat pada item ini.
+                  </p>
+                ) : null}
               </div>
             </div>
             <div className="space-y-3 border-t border-[var(--color-border)] pt-4">
-              <Combobox
-                label="Item pengganti"
-                ariaLabel="Item pengganti"
-                placeholder="Cari produk atau layanan"
-                idleMessage="Cari berdasarkan nama atau kode item."
+              <CatalogItemAutocomplete
+                label="Item koreksi"
+                ariaLabel="Item koreksi"
+                items={items}
                 value={replacementItemId || null}
-                options={replacementOptions}
-                clearable
-                onSearchChange={setReplacementSearch}
-                onChange={(value) => {
-                  const nextId = value === null ? '' : String(value);
-                  setReplacementItemId(nextId);
+                locale={locale}
+                disabled={isMutating}
+                onChange={(item) => {
+                  // The same item keeps its configuration; a different item starts fresh.
+                  if ((item?.id ?? '') === replacementItemId) return;
+                  setReplacementItemId(item?.id ?? '');
                   setCorrectionPreview(null);
                   setPreviewError(null);
-                  loadReplacementState(nextId);
+                  loadReplacementState(item?.id ?? '');
                 }}
               />
               {configuratorState ? (
@@ -5913,7 +5945,7 @@ export function ReferenceOrderAdjustmentDialog({
                   {...(correctionSource && correctionSource.catalogItemId === configuratorState.item.id
                     ? {
                         initial: {
-                          ...saleLineConfiguration(correctionSource),
+                          ...saleLineConfiguration(correctionSource, employees),
                         },
                       }
                     : {})}
@@ -5974,14 +6006,45 @@ export function ReferenceOrderAdjustmentDialog({
                   {figure('Sudah dibayar', correctionPreview.netSuccessfulPaidAmount)}
                 </dl>
                 <div className="mt-2 space-y-1.5 border-t border-[var(--color-border)] pt-2">
-                  {/* A total below the successful payments is refused by Runtime, so a preview never shows one. */}
-                  <dl>{figure('Sisa pembayaran', correctionPreview.remainingPaymentAmount, 'font-semibold text-[var(--color-text)]')}</dl>
+                  {/* Runtime's consequence: what remains to pay, or what is returned as a new refund. */}
+                  {correctionPreview.refundAmount &&
+                  createDecimal(correctionPreview.refundAmount).greaterThan(createDecimal('0')) ? (
+                    <dl>
+                      {figure(
+                        'Dikembalikan ke pelanggan',
+                        correctionPreview.refundAmount,
+                        'font-semibold text-[var(--color-warning)]',
+                      )}
+                    </dl>
+                  ) : (
+                    <dl>{figure('Sisa pembayaran', correctionPreview.remainingPaymentAmount, 'font-semibold text-[var(--color-text)]')}</dl>
+                  )}
                 </div>
               </section>
             ) : null}
           </div>
         )}
       </Dialog>
+    ) : null}
+    {editLine && editState ? (
+      <ItemConfigurator
+        {...editState}
+        initial={saleLineConfiguration(editLine, employees)}
+        confirmLabel={copy('Save changes')}
+        loadCandidates={loadCandidates}
+        onConfirm={confirmEdit}
+        onClose={closeEdit}
+      />
+    ) : null}
+    {addOpen ? (
+      <AddTransactionItemDialog
+        items={items}
+        locale={locale}
+        loadConfiguratorState={loadConfiguratorState}
+        loadCandidates={loadCandidates}
+        onConfirm={onAdd}
+        onClose={() => setAddOpen(false)}
+      />
     ) : null}
     </>
   );

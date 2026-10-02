@@ -309,6 +309,8 @@ const posCopy: Record<string, LocalizedCopy> = {
   Points: { 'id-ID': 'Poin', 'en-US': 'Points' },
   'Point preview': { 'id-ID': 'Perkiraan poin', 'en-US': 'Point preview' },
   'Points earned': { 'id-ID': 'Poin diperoleh', 'en-US': 'Points earned' },
+  'Receipt point balance': { 'id-ID': 'Saldo', 'en-US': 'Balance' },
+  'Points gained': { 'id-ID': 'Diperoleh', 'en-US': 'Earned' },
   'Net total': { 'id-ID': 'Total Bersih', 'en-US': 'Net total' },
   'Ready to pay': { 'id-ID': 'Siap bayar', 'en-US': 'Ready to pay' },
   'Payment total': { 'id-ID': 'Total pembayaran', 'en-US': 'Payment total' },
@@ -428,13 +430,19 @@ const posCopy: Record<string, LocalizedCopy> = {
     'id-ID': 'Pembayaran tersimpan. Coba selesaikan transaksi lagi.',
     'en-US': 'Payment is preserved. Try completing the transaction again.',
   },
-  'Add item from catalog': {
-    'id-ID': 'Tambah item dari katalog',
-    'en-US': 'Add item from catalog',
-  },
   'Search product or service': {
     'id-ID': 'Cari produk atau layanan',
     'en-US': 'Search product or service',
+  },
+  'Add to order': { 'id-ID': 'Tambahkan ke pesanan', 'en-US': 'Add to order' },
+  'Loading item…': { 'id-ID': 'Memuat item…', 'en-US': 'Loading item…' },
+  'The item could not be loaded. Choose it again.': {
+    'id-ID': 'Item belum dapat dimuat. Pilih item lagi.',
+    'en-US': 'The item could not be loaded. Choose it again.',
+  },
+  'The item could not be added. Reload the transaction and try again.': {
+    'id-ID': 'Item belum dapat ditambahkan. Muat ulang transaksi lalu coba lagi.',
+    'en-US': 'The item could not be added. Reload the transaction and try again.',
   },
   'Search by item name or code.': {
     'id-ID': 'Cari berdasarkan nama atau kode item.',
@@ -781,6 +789,12 @@ const posCopy: Record<string, LocalizedCopy> = {
   'Item quantity': { 'id-ID': 'Jumlah', 'en-US': 'Quantity' },
   'Sold by': { 'id-ID': 'Dijual oleh', 'en-US': 'Sold by' },
   'No salesperson': { 'id-ID': 'Tanpa penjual', 'en-US': 'No salesperson' },
+  'Add performer': { 'id-ID': 'Tambah yang mengerjakan', 'en-US': 'Add performer' },
+  'Remove performer': { 'id-ID': 'Hapus yang mengerjakan', 'en-US': 'Remove performer' },
+  'Optional. Part of the service work, not a product sale.': {
+    'id-ID': 'Opsional. Bagian dari pekerjaan layanan, bukan penjualan produk.',
+    'en-US': 'Optional. Part of the service work, not a product sale.',
+  },
   'Optional. The salesperson earns commission when the sale is completed.': {
     'id-ID': 'Opsional. Penjual memperoleh komisi saat transaksi selesai.',
     'en-US': 'Optional. The salesperson earns commission when the sale is completed.',
@@ -821,7 +835,22 @@ const posCopy: Record<string, LocalizedCopy> = {
   'The transaction item was not found.': { 'id-ID': 'Baris transaksi tidak ditemukan.', 'en-US': 'The transaction item was not found.' },
   'The transaction changed. Reload it before correcting.': { 'id-ID': 'Transaksi telah berubah. Muat ulang sebelum melakukan koreksi.', 'en-US': 'The transaction changed. Reload it before correcting.' },
   'The corrected total would be lower than the payments already received.': { 'id-ID': 'Total setelah koreksi lebih kecil dari pembayaran yang sudah diterima.', 'en-US': 'The corrected total would be lower than the payments already received.' },
-  'This item can no longer be changed here: work has started, a performer is assigned, or a manual price or discount is set.': { 'id-ID': 'Item ini tidak dapat diubah lagi di sini: pengerjaan sudah dimulai, karyawan sudah ditugaskan, atau harga/diskon manual sudah dipasang.', 'en-US': 'This item can no longer be changed here: work has started, a performer is assigned, or a manual price or discount is set.' },
+  'This item cannot be corrected: its work is completed, a performer is assigned before work started, or a manual price or discount is set.': {
+    'id-ID': 'Item ini tidak dapat dikoreksi: pekerjaannya sudah selesai, pelaksana sudah ditetapkan sebelum pekerjaan dimulai, atau ada harga manual atau diskon.',
+    'en-US': 'This item cannot be corrected: its work is completed, a performer is assigned before work started, or a manual price or discount is set.',
+  },
+  'Enter the reason for this correction.': {
+    'id-ID': 'Isi alasan koreksi.',
+    'en-US': 'Enter the reason for this correction.',
+  },
+  'Correcting a transaction in progress needs the progressed adjustment permission.': {
+    'id-ID': 'Koreksi transaksi yang sedang dikerjakan memerlukan izin penyesuaian transaksi berjalan.',
+    'en-US': 'Correcting a transaction in progress needs the progressed adjustment permission.',
+  },
+  'The lower total must be returned through the payment provider, which is not available here. Ask a supervisor.': {
+    'id-ID': 'Selisih harus dikembalikan melalui penyedia pembayaran, yang belum tersedia di sini. Hubungi supervisor.',
+    'en-US': 'The lower total must be returned through the payment provider, which is not available here. Ask a supervisor.',
+  },
   'The transaction is already closed and cannot be changed.': { 'id-ID': 'Transaksi sudah selesai dan tidak dapat diubah.', 'en-US': 'The transaction is already closed and cannot be changed.' },
   'A payment is still waiting for confirmation.': { 'id-ID': 'Ada pembayaran yang masih menunggu konfirmasi.', 'en-US': 'A payment is still waiting for confirmation.' },
   'Choose an additional item for every unit that requires one.': { 'id-ID': 'Pilih item tambahan untuk setiap unit yang mewajibkannya.', 'en-US': 'Choose an additional item for every unit that requires one.' },
@@ -839,6 +868,10 @@ const posCopy: Record<string, LocalizedCopy> = {
   'Item price': { 'id-ID': 'Harga item', 'en-US': 'Item price' },
   'Save changes': { 'id-ID': 'Simpan perubahan', 'en-US': 'Save changes' },
   'Edit item': { 'id-ID': 'Ubah item', 'en-US': 'Edit item' },
+  'The item could not be changed. Reload the transaction and try again.': {
+    'id-ID': 'Item belum dapat diubah. Muat ulang transaksi lalu coba lagi.',
+    'en-US': 'The item could not be changed. Reload the transaction and try again.',
+  },
   'Additional items': { 'id-ID': 'Item tambahan', 'en-US': 'Additional items' },
   'Additional items subtotal': { 'id-ID': 'Item tambahan', 'en-US': 'Additional items' },
   'Complete or remove the unfinished additional item.': { 'id-ID': 'Lengkapi atau hapus item tambahan yang belum selesai.', 'en-US': 'Complete or remove the unfinished additional item.' },

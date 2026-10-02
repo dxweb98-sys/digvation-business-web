@@ -286,6 +286,17 @@ export interface SaleLineCompositionComponent {
   catalogPriceId: string | null;
   unitContribution: string;
   extendedContribution: string;
+  /** SALE_SELECTED of a Service only: who performs it ("Dikerjakan oleh"). */
+  performers?: Array<{ employeeId: string; shareRate: string }>;
+  /** Immutable finalized work facts for this component, with their snapshots. */
+  contributions?: Array<{
+    employeeId: string;
+    employeeCodeSnapshot: string;
+    employeeDisplayNameSnapshot: string;
+    shareRate: string;
+    contributionBaseAmount: string;
+    contributionAmount: string;
+  }>;
 }
 
 export interface SaleLine {
@@ -339,6 +350,11 @@ export interface SaleLine {
   taxAmount: string;
   totalAmount: string;
   removedAt: string | null;
+  /**
+   * Runtime correction lineage: the retired historical line of the same Sale this line replaced.
+   * That source keeps its own fulfillment and performer history; this line owns its own work.
+   */
+  correctedFromLineId?: string | null;
   createdAt: string;
   updatedAt: string;
   /** Runtime authority: mutable preview for OPEN Sales, immutable snapshot once finalized. */

@@ -24,6 +24,7 @@ import {
   saleDisplayLines,
   setCartDraftCustomer,
   setCartDraftQuantity,
+  startAddition,
   type CartDraft,
   type CartDraftAdditionalItem,
   type CartDraftSalesperson,
@@ -207,13 +208,7 @@ export function useSaleWorkspaceController({
               ...(intent.soldByEmployeeId ? { soldByEmployeeId: intent.soldByEmployeeId } : {}),
               ...(group.additions.length
                 ? {
-                    additionalComponents: group.additions.map((entry) => ({
-                      componentItemId: entry.componentItemId,
-                      ...(entry.componentVariantId
-                        ? { componentVariantId: entry.componentVariantId }
-                        : {}),
-                      quantity: entry.quantity,
-                    })),
+                    additionalComponents: group.additions.map(startAddition),
                   }
                 : {}),
             },

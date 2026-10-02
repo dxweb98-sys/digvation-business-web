@@ -74,6 +74,7 @@ const row = (overrides: Partial<AdditionalRow> = {}): AdditionalRow => ({
   key: 'r1',
   candidateId: null,
   variantId: null,
+  performers: [],
   quantity: '1',
   ...overrides,
 });

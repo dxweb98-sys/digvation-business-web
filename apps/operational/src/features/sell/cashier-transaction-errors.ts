@@ -62,7 +62,11 @@ const CORRECTION_ERROR_COPY: Record<string, string> = {
   SALE_VERSION_CONFLICT: 'The transaction changed. Reload it before correcting.',
   SALE_PAYMENT_OVERAPPLIED: 'The corrected total would be lower than the payments already received.',
   SALE_LINE_NOT_MUTABLE:
-    'This item can no longer be changed here: work has started, a performer is assigned, or a manual price or discount is set.',
+    'This item cannot be corrected: its work is completed, a performer is assigned before work started, or a manual price or discount is set.',
+  SALE_CORRECTION_REASON_REQUIRED: 'Enter the reason for this correction.',
+  SALE_PROGRESSED_ADJUSTMENT_FORBIDDEN: 'Correcting a transaction in progress needs the progressed adjustment permission.',
+  PAYMENT_REFUND_PROVIDER_CONFIRMATION_REQUIRED:
+    'The lower total must be returned through the payment provider, which is not available here. Ask a supervisor.',
   SALE_NOT_OPEN: 'The transaction is already closed and cannot be changed.',
   SALE_PAYMENT_PENDING: 'A payment is still waiting for confirmation.',
   SERVICE_ADDITIONAL_ITEM_REQUIRED: 'Choose an additional item for every unit that requires one.',

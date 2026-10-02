@@ -24,17 +24,30 @@ export interface CartDraftAdditionalItem {
   label: string;
   /** Display only: the Product/Variant price Runtime offered when it was chosen. */
   unitPrice: string;
+  /**
+   * Service only: who performs this additional item ("Dikerjakan oleh"). Part of the Service's
+   * work, never a Product salesperson; absent or empty means nobody is assigned to it.
+   */
+  performers?: CartDraftSalesperson[];
+}
+
+/** Order-independent identity of who performs an addition. */
+function performerSignature(performers: readonly CartDraftSalesperson[] | undefined): string {
+  return (performers ?? [])
+    .map((performer) => performer.employeeId)
+    .sort()
+    .join(',');
 }
 
 /**
- * Stable identity of one unit's additions: same Products, Variants and quantities means the same
- * configuration and price. Order does not matter.
+ * Stable identity of one unit's additions: same Products, Variants, quantities and performers
+ * means the same configuration and price. Order does not matter.
  */
 export function additionSignature(additions: readonly CartDraftAdditionalItem[]): string {
   return additions
     .map(
       (entry) =>
-        `${entry.componentItemId}:${entry.componentVariantId ?? ''}:${createDecimal(entry.quantity).toFixed(4)}`,
+        `${entry.componentItemId}:${entry.componentVariantId ?? ''}:${createDecimal(entry.quantity).toFixed(4)}:${performerSignature(entry.performers)}`,
     )
     .sort()
     .join('|');
@@ -121,6 +134,8 @@ export interface CartDisplayAddition {
   unitPrice: string;
   /** Billed amount for the whole line. */
   amount: string;
+  /** Service only: who performs this addition, as the operator chose them. */
+  performers?: readonly CartDraftSalesperson[];
 }
 
 export interface CartDisplayUnit {
@@ -416,6 +431,7 @@ function displayAddition(
     quantity: used.toFixed(4),
     unitPrice: entry.unitPrice,
     amount: used.times(entry.unitPrice).toFixed(4),
+    ...(entry.performers?.length ? { performers: entry.performers } : {}),
   };
 }
 
@@ -573,10 +589,14 @@ export function cartDraftStartInput(draft: CartDraft): StartSaleInput {
   };
 }
 
-function startAddition(entry: CartDraftAdditionalItem) {
+/** The Runtime input for one addition, with its performers when anyone performs it. */
+export function startAddition(entry: CartDraftAdditionalItem) {
   return {
     componentItemId: entry.componentItemId,
     ...(entry.componentVariantId ? { componentVariantId: entry.componentVariantId } : {}),
     quantity: entry.quantity,
+    ...(entry.performers?.length
+      ? { performers: entry.performers.map((performer) => ({ employeeId: performer.employeeId })) }
+      : {}),
   };
 }

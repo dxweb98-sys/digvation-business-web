@@ -1,6 +1,6 @@
 import { createDecimal } from '@digvation/pos-money';
 
-import type { CartDraftAdditionalItem } from './cart-draft';
+import type { CartDraftAdditionalItem, CartDraftSalesperson } from './cart-draft';
 import type {
   CatalogItem,
   CatalogVariant,
@@ -30,6 +30,8 @@ export interface AdditionalRow {
   candidateId: string | null;
   variantId: string | null;
   quantity: string;
+  /** Service only: who performs this addition. */
+  performers: CartDraftSalesperson[];
 }
 
 export function newAdditionalRow(): AdditionalRow {
@@ -38,6 +40,7 @@ export function newAdditionalRow(): AdditionalRow {
     candidateId: null,
     variantId: null,
     quantity: '1',
+    performers: [],
   };
 }
 
@@ -162,6 +165,7 @@ export function additionalItemsOf(
         quantity: createDecimal(row.quantity).toFixed(4),
         label: variant ? `${candidate.name} / ${variant.name}` : candidate.name,
         unitPrice,
+        ...(row.performers.length ? { performers: row.performers } : {}),
       },
     ];
   });
@@ -205,6 +209,7 @@ export function rowsFromAdditions(additions: readonly CartDraftAdditionalItem[])
     candidateId: entry.componentItemId,
     variantId: entry.componentVariantId ?? null,
     quantity: entry.quantity.includes('.') ? entry.quantity.replace(/\.?0+$/, '') : entry.quantity,
+    performers: entry.performers ?? [],
   }));
 }
 
