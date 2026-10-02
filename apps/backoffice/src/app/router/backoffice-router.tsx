@@ -16,7 +16,7 @@ import { PromotionsPage } from '../../modules/promotions';
 import { EmployeesPage } from '../../modules/workforce';
 import { MembersPage } from '../../modules/membership';
 import { FinancialAccountsPage } from '../../features/financial-accounts';
-import { ExpensesPage } from '../../modules/finance';
+import { ExpensesPage } from '../../features/expenses';
 import { TransactionHistoryPage } from '../../modules/pos';
 import { ReportsPage } from '../../modules/reporting';
 import { ActivityPage } from '../../modules/activity';

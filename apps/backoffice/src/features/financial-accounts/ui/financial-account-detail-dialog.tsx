@@ -1,6 +1,7 @@
 import { DButton, DDialog } from '@digvation/ui';
 import { Building2, CalendarClock, Coins, Hash, Landmark, Pencil, UserRound } from 'lucide-react';
 
+import { RecordInfoTile, RecordPanel, RecordSectionLabel } from '../../../shared/ui/record-dialog';
 import type { FinancialAccount } from '../api/financial-accounts-api';
 import { useFinancialAccountsLocalization } from '../localization/use-financial-accounts-localization';
 import {
@@ -8,14 +9,7 @@ import {
   accountDestinationSummary,
   destinationFieldCopy,
 } from '../model/financial-account-model';
-import {
-  CodeChip,
-  FinancialDialogTitle,
-  FinancialPanel,
-  InfoTile,
-  RecordStatusBadge,
-  SectionLabel,
-} from './financial-accounts-shared';
+import { CodeChip, FinancialDialogTitle, RecordStatusBadge } from './financial-accounts-shared';
 
 export function FinancialAccountDetailDialog({
   account,
@@ -54,7 +48,7 @@ export function FinancialAccountDetailDialog({
       }
     >
       <div className="space-y-4">
-        <FinancialPanel>
+        <RecordPanel>
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="break-words text-xl font-semibold tracking-tight text-[var(--color-text)]">
               {account.name}
@@ -71,28 +65,28 @@ export function FinancialAccountDetailDialog({
           <p className="mt-3 text-sm text-[var(--color-text-muted)]">
             {accountDestinationSummary(account) ?? copy('On-site cash')}
           </p>
-        </FinancialPanel>
+        </RecordPanel>
 
-        <FinancialPanel>
-          <SectionLabel>{copy('Account information')}</SectionLabel>
+        <RecordPanel>
+          <RecordSectionLabel>{copy('Account information')}</RecordSectionLabel>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <InfoTile
+            <RecordInfoTile
               label={copy('Account code')}
               icon={<Hash className={iconClass} aria-hidden="true" />}
               value={account.code}
               mono
             />
-            <InfoTile
+            <RecordInfoTile
               label={copy('Account type')}
               icon={<Landmark className={iconClass} aria-hidden="true" />}
               value={typeLabel}
             />
-            <InfoTile
+            <RecordInfoTile
               label={copy('Currency')}
               icon={<Coins className={iconClass} aria-hidden="true" />}
               value={account.currency}
             />
-            <InfoTile
+            <RecordInfoTile
               label={copy('Updated')}
               icon={<CalendarClock className={iconClass} aria-hidden="true" />}
               value={formatDate(new Date(account.updatedAt), {
@@ -101,26 +95,26 @@ export function FinancialAccountDetailDialog({
               })}
             />
           </div>
-        </FinancialPanel>
+        </RecordPanel>
 
-        <FinancialPanel>
-          <SectionLabel>
+        <RecordPanel>
+          <RecordSectionLabel>
             {copy(destination ? destination.section : 'Destination details')}
-          </SectionLabel>
+          </RecordSectionLabel>
           {destination ? (
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <InfoTile
+              <RecordInfoTile
                 label={copy(destination.institution)}
                 icon={<Building2 className={iconClass} aria-hidden="true" />}
                 value={account.institutionName}
               />
-              <InfoTile
+              <RecordInfoTile
                 label={copy(destination.reference)}
                 icon={<Hash className={iconClass} aria-hidden="true" />}
                 value={account.accountReference}
                 mono
               />
-              <InfoTile
+              <RecordInfoTile
                 label={copy(destination.holder)}
                 icon={<UserRound className={iconClass} aria-hidden="true" />}
                 value={account.accountHolderName}
@@ -132,7 +126,7 @@ export function FinancialAccountDetailDialog({
               {copy('Cash is held on site. No bank or provider details are needed.')}
             </p>
           )}
-        </FinancialPanel>
+        </RecordPanel>
       </div>
     </DDialog>
   );
