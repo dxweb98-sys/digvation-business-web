@@ -52,19 +52,57 @@ export function RecordPanel({
   children,
   className = '',
   ariaLabel,
+  padded = true,
 }: {
   children: ReactNode;
   className?: string;
   ariaLabel?: string;
+  /** `false` lets a `RecordPanelHeader` + `RecordPanelBody` span the card edge to edge. */
+  padded?: boolean;
 }) {
   return (
     <section
       aria-label={ariaLabel}
-      className={`overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-sm ${className}`}
+      className={`overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm ${padded ? 'p-5' : ''} ${className}`}
     >
       {children}
     </section>
   );
+}
+
+/** Card header strip: quiet label, optional count, and a trailing state on a muted surface. */
+export function RecordPanelHeader({
+  title,
+  count,
+  trailing,
+}: {
+  title: string;
+  count?: number;
+  trailing?: ReactNode;
+}) {
+  return (
+    <div className="flex min-h-12 flex-wrap items-center justify-between gap-2 border-b border-[var(--color-border)] bg-[var(--color-surface-muted)]/60 px-5 py-2.5">
+      <div className="flex min-w-0 items-center gap-2">
+        <RecordSectionLabel>{title}</RecordSectionLabel>
+        {count !== undefined ? (
+          <span className="rounded-full bg-[var(--color-surface)] px-2 py-0.5 text-[11px] font-semibold tabular-nums text-[var(--color-text-muted)] ring-1 ring-[var(--color-border)]">
+            {count}
+          </span>
+        ) : null}
+      </div>
+      {trailing ? <div className="flex flex-wrap items-center gap-2">{trailing}</div> : null}
+    </div>
+  );
+}
+
+export function RecordPanelBody({
+  children,
+  className = '',
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return <div className={`p-5 ${className}`}>{children}</div>;
 }
 
 export function RecordSectionLabel({ children }: { children: ReactNode }) {

@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { TransactionFinancialSummary } from './transaction-financial-summary';
-import type { Sale } from './transaction-history-api';
+import type { Sale } from '../api/transaction-history-api';
 
 const sale = {
   id: 'sale-1',

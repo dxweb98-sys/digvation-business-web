@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import type { PaymentStatus } from './transaction-history-api';
-import { transactionPaymentComposition } from './transaction-payment-composition';
+import type { PaymentStatus } from '../api/transaction-history-api';
+import {
+  transactionPaymentComposition,
+  uncompensatedAmount,
+} from './transaction-payment-composition';
 
 const payment = (id: string, status: PaymentStatus, appliedAmount: string) => ({
   id,
@@ -67,5 +70,21 @@ describe('transactionPaymentComposition', () => {
       totalPaid: '300000.0000',
       balanceDue: '144000.0000',
     });
+  });
+
+  it('keeps refund facts apart from applied payments and from failed attempts', () => {
+    const result = transactionPaymentComposition({
+      totalAmount: '500000.0000',
+      payments: [
+        payment('cash', 'SUCCEEDED', '500000.0000'),
+        { ...payment('refund', 'SUCCEEDED', '-200000.0000'), refundOfPaymentId: 'cash' },
+        payment('qris', 'FAILED', '500000.0000'),
+      ],
+    });
+    expect(result.applied.map((item) => item.id)).toEqual(['cash']);
+    expect(result.refunds.map((item) => item.id)).toEqual(['refund']);
+    expect(result.notApplied.map((item) => item.id)).toEqual(['qris']);
+    expect(result).toMatchObject({ totalPaid: '500000.0000', totalRefunded: '200000.0000' });
+    expect(uncompensatedAmount(result.applied[0]!, result.refunds)).toBe('300000.0000');
   });
 });
