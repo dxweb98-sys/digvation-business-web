@@ -4,6 +4,11 @@ import { useState } from 'react';
 import { normalizeBackofficeApiError } from '../../../app/api/backoffice-api-error';
 import { isSessionExpiredError } from '../../../auth/backoffice-auth-context';
 import { useFormState } from '../../../shared/forms/use-form-state';
+import {
+  RecordDialogFooter,
+  RecordPanel,
+  RecordSectionLabel,
+} from '../../../shared/ui/record-dialog';
 import type {
   FinancialAccount,
   FinancialAccountsApi,
@@ -22,12 +27,7 @@ import {
   FINANCIAL_ACCOUNT_TYPES,
 } from '../model/financial-account-model';
 import { provisionDefaultCheckoutRoute } from '../model/payment-route-model';
-import {
-  FinancialDialogFooter,
-  FinancialDialogTitle,
-  FinancialPanel,
-  SectionLabel,
-} from './financial-accounts-shared';
+import { FinancialDialogTitle } from './financial-accounts-shared';
 
 export function FinancialAccountDialog({
   account,
@@ -123,7 +123,7 @@ export function FinancialAccountDialog({
         />
       }
       footer={
-        <FinancialDialogFooter
+        <RecordDialogFooter
           onClose={onClose}
           onSave={() => void save()}
           disabled={!validation.valid || Boolean(codeRejection) || saving}
@@ -131,8 +131,8 @@ export function FinancialAccountDialog({
       }
     >
       <div className="space-y-4">
-        <FinancialPanel ariaLabel={copy('Account identity')}>
-          <SectionLabel>{copy('Account identity')}</SectionLabel>
+        <RecordPanel ariaLabel={copy('Account identity')}>
+          <RecordSectionLabel>{copy('Account identity')}</RecordSectionLabel>
           <div className="mt-4 space-y-3">
             <DInput
               label={copy('Account name')}
@@ -191,10 +191,10 @@ export function FinancialAccountDialog({
               />
             </div>
           </div>
-        </FinancialPanel>
+        </RecordPanel>
 
-        <FinancialPanel ariaLabel={copy('Destination details')}>
-          <SectionLabel>{copy('Destination details')}</SectionLabel>
+        <RecordPanel ariaLabel={copy('Destination details')}>
+          <RecordSectionLabel>{copy('Destination details')}</RecordSectionLabel>
           {destination ? (
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <DInput
@@ -225,7 +225,7 @@ export function FinancialAccountDialog({
               {copy('Cash is held on site. No bank or provider details are needed.')}
             </p>
           )}
-        </FinancialPanel>
+        </RecordPanel>
       </div>
     </DDialog>
   );

@@ -3,6 +3,11 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { useFormState } from '../../../shared/forms/use-form-state';
+import {
+  RecordDialogFooter,
+  RecordPanel,
+  RecordSectionLabel,
+} from '../../../shared/ui/record-dialog';
 import type {
   FinancialAccountsApi,
   PaymentMethod,
@@ -23,14 +28,7 @@ import {
   isPaymentRouteEditorFormValid,
   savePaymentRoute,
 } from '../model/payment-route-model';
-import {
-  FinancialDialogFooter,
-  FinancialDialogTitle,
-  FinancialPanel,
-  PagedSelect,
-  SectionLabel,
-  useApiErrorToast,
-} from './financial-accounts-shared';
+import { FinancialDialogTitle, PagedSelect, useApiErrorToast } from './financial-accounts-shared';
 
 const OPTION_PAGE_SIZE = 20;
 
@@ -116,7 +114,7 @@ export function PaymentRouteDialog({
         />
       }
       footer={
-        <FinancialDialogFooter
+        <RecordDialogFooter
           onClose={onClose}
           onSave={() => void save()}
           disabled={!valid || saving || locations.isLoading || accounts.isLoading}
@@ -124,8 +122,8 @@ export function PaymentRouteDialog({
       }
     >
       <div className="space-y-4">
-        <FinancialPanel ariaLabel={copy('Route')}>
-          <SectionLabel>{copy('Route')}</SectionLabel>
+        <RecordPanel ariaLabel={copy('Route')}>
+          <RecordSectionLabel>{copy('Route')}</RecordSectionLabel>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             {route ? (
               <DInput
@@ -171,10 +169,10 @@ export function PaymentRouteDialog({
               hint={fresh ? undefined : copy('Locked after creation.')}
             />
           </div>
-        </FinancialPanel>
+        </RecordPanel>
 
-        <FinancialPanel ariaLabel={copy('Settlement destination')}>
-          <SectionLabel>{copy('Settlement destination')}</SectionLabel>
+        <RecordPanel ariaLabel={copy('Settlement destination')}>
+          <RecordSectionLabel>{copy('Settlement destination')}</RecordSectionLabel>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <PagedSelect
               label={copy('Financial account')}
@@ -203,7 +201,7 @@ export function PaymentRouteDialog({
               />
             ) : null}
           </div>
-        </FinancialPanel>
+        </RecordPanel>
       </div>
     </DDialog>
   );
