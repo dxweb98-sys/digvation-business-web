@@ -902,7 +902,9 @@ describe('ItemConfigurator — who performs a Service addition ("Dikerjakan oleh
     await click(within(groups()[0]!).getByRole('button', { name: /Tambah yang mengerjakan/ }));
     expect(offered('Pak Heru')).toBe(false);
     await click(screen.getByRole('option', { name: 'Rindu' }));
-    await click(within(groups()[0]!).getByRole('button', { name: 'Hapus yang mengerjakan Pak Heru' }));
+    await click(
+      within(groups()[0]!).getByRole('button', { name: 'Hapus yang mengerjakan Pak Heru' }),
+    );
     await click(addButton());
     expect(onConfirm.mock.calls[0]![0].additionalComponents[0].performers).toEqual([
       { employeeId: 'emp-rindu', name: 'Rindu' },

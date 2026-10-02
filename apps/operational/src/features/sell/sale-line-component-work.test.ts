@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import { additionSignature, startAddition } from './cart-draft';
 import type { SaleLine } from './cashier-transaction.types';
-import { additionPerformedBy, saleLineAdditions, saleLineConfiguration } from './sale-line-additions';
+import {
+  additionPerformedBy,
+  saleLineAdditions,
+  saleLineConfiguration,
+} from './sale-line-additions';
 
 const copy = (value: string) =>
   ({ 'Performed by': 'Dikerjakan oleh', Employee: 'Karyawan' })[value] ?? value;
@@ -71,15 +75,29 @@ describe('Service additional item work in Web', () => {
   });
 
   it('sends performers with the addition only when someone performs it', () => {
-    const base = { componentItemId: 'red', quantity: '1.0000', label: 'Red', unitPrice: '10000.0000' };
+    const base = {
+      componentItemId: 'red',
+      quantity: '1.0000',
+      label: 'Red',
+      unitPrice: '10000.0000',
+    };
     expect(startAddition(base)).toEqual({ componentItemId: 'red', quantity: '1.0000' });
     expect(
       startAddition({ ...base, performers: [{ employeeId: 'emp-heru', name: 'Pak Heru' }] }),
-    ).toEqual({ componentItemId: 'red', quantity: '1.0000', performers: [{ employeeId: 'emp-heru' }] });
+    ).toEqual({
+      componentItemId: 'red',
+      quantity: '1.0000',
+      performers: [{ employeeId: 'emp-heru' }],
+    });
   });
 
   it('treats different performers as a different unit configuration, in any order', () => {
-    const base = { componentItemId: 'red', quantity: '1.0000', label: 'Red', unitPrice: '10000.0000' };
+    const base = {
+      componentItemId: 'red',
+      quantity: '1.0000',
+      label: 'Red',
+      unitPrice: '10000.0000',
+    };
     const heru = { employeeId: 'emp-heru', name: 'Pak Heru' };
     const rindu = { employeeId: 'emp-rindu', name: 'Rindu' };
     expect(additionSignature([{ ...base, performers: [heru] }])).not.toBe(
