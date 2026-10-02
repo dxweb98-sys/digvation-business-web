@@ -192,6 +192,8 @@ export interface SaleLineAdditionRow {
   /** Quantity x selling unit price, already formatted. */
   pricing: string;
   amount: string;
+  /** Service work on this addition, e.g. "Dikerjakan oleh Heru, Rindu"; never a salesperson. */
+  performedBy?: string | null;
 }
 
 /**
@@ -229,6 +231,11 @@ export function SaleLineAdditions({
               <span className="block tabular-nums text-[var(--color-text-muted)]">
                 {row.pricing}
               </span>
+              {row.performedBy ? (
+                <span className="block break-words text-[var(--color-text-muted)]">
+                  {row.performedBy}
+                </span>
+              ) : null}
             </span>
             <span className="shrink-0 tabular-nums text-[var(--color-text)]">{row.amount}</span>
           </li>

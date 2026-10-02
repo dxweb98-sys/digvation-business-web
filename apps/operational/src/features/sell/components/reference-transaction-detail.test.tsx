@@ -235,7 +235,7 @@ describe('ReferenceTransactionDetail Runtime detail shapes', () => {
     expect(screen.queryByText('Poin diperoleh: +6 poin')).toBeNull();
   });
 
-  it('shows the historical member point summary next to the customer on the receipt', () => {
+  it('stacks the customer, then the historical member point summary, on the receipt', () => {
     const completed = runtimeQueueDetail({
       status: 'FINALIZED',
       finalizedAt: '2026-09-24T02:15:00.000Z',
@@ -277,14 +277,94 @@ describe('ReferenceTransactionDetail Runtime detail shapes', () => {
       </DeploymentBootstrapProvider>,
     );
 
-    const customer = screen.getByText('Nida').closest('section');
-    expect(customer).not.toBeNull();
-    expect(within(customer!).getByText('Poin saat ini')).toBeTruthy();
-    expect(within(customer!).getByText('122')).toBeTruthy();
-    expect(within(customer!).getByText('Didapat')).toBeTruthy();
-    expect(within(customer!).getByText('+5')).toBeTruthy();
-    expect(within(customer!).getByText('Digunakan')).toBeTruthy();
-    expect(within(customer!).getByText('−3')).toBeTruthy();
+    const header = screen.getByText('Nida').closest('section')!;
+    const points = within(header).getByTestId('receipt-points');
+    // Customer identity first, then the point block below it: never side by side.
+    expect(
+      screen.getByText('Nida').compareDocumentPosition(points) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(within(points).getByText('Poin')).toBeTruthy();
+    expect(within(points).getByText('Saldo')).toBeTruthy();
+    expect(within(points).getByText('122')).toBeTruthy();
+    expect(within(points).getByText('Diperoleh')).toBeTruthy();
+    expect(within(points).getByText('+5')).toBeTruthy();
+    expect(within(points).getByText('Digunakan')).toBeTruthy();
+    expect(within(points).getByText('−3')).toBeTruthy();
+    // "Poin saat ini" would read as today's balance; this is the balance right after this Sale.
+    expect(screen.queryByText('Poin saat ini')).toBeNull();
+  });
+
+  it('states the earned points once, from the loyalty summary, without a second total row', () => {
+    const completed = runtimeQueueDetail({
+      status: 'FINALIZED',
+      finalizedAt: '2026-09-24T02:15:00.000Z',
+      loyaltyRedemption: null,
+      loyaltyEarning: { state: 'FINALIZED', pointsEarned: '3.0000' },
+    } as Partial<Sale>);
+    (completed as Sale).loyaltySummary = {
+      earnedPoints: '3.0000',
+      redeemedPoints: '0.0000',
+      balanceAfter: '3.0000',
+    };
+    render(
+      <DeploymentBootstrapProvider config={bootstrap}>
+        <ReceiptContent
+          sale={completed}
+          activeLines={completed.lines}
+          customer={completed.customer!}
+          locale="id-ID"
+          businessName="Digvation"
+          branchName="Main branch"
+          cashierName="Kasir"
+          transactionDate="24 Sep 2026"
+          hasDiscount={false}
+          hasTax={false}
+        />
+      </DeploymentBootstrapProvider>,
+    );
+    const header = screen.getByText('Nida').closest('section')!;
+    expect(within(header).getAllByText('+3')).toHaveLength(1);
+    expect(within(header).queryByText('Poin diperoleh')).toBeNull();
+    expect(within(header).queryByText('Digunakan')).toBeNull();
+    expect(screen.queryByTestId('receipt-points-earned')).toBeNull();
+  });
+
+  it('shows no point summary for a non-member customer', () => {
+    const completed = runtimeQueueDetail({
+      status: 'FINALIZED',
+      finalizedAt: '2026-09-24T02:15:00.000Z',
+      loyaltyRedemption: null,
+    });
+    (completed as Sale).customer = {
+      type: 'NON_MEMBER',
+      referenceId: null,
+      name: 'Alex',
+      phoneE164: '+6285966356803',
+    };
+    (completed as Sale).loyaltySummary = {
+      earnedPoints: '3.0000',
+      redeemedPoints: '0.0000',
+      balanceAfter: '3.0000',
+    };
+    render(
+      <DeploymentBootstrapProvider config={bootstrap}>
+        <ReceiptContent
+          sale={completed}
+          activeLines={completed.lines}
+          customer={completed.customer!}
+          locale="id-ID"
+          businessName="Digvation"
+          branchName="Main branch"
+          cashierName="Kasir"
+          transactionDate="24 Sep 2026"
+          hasDiscount={false}
+          hasTax={false}
+        />
+      </DeploymentBootstrapProvider>,
+    );
+    expect(screen.getByText('Alex')).toBeTruthy();
+    expect(screen.getByText('+6285966356803')).toBeTruthy();
+    expect(screen.queryByTestId('receipt-points')).toBeNull();
   });
 
   it('uses only finalized Runtime snapshot points on the receipt', () => {
@@ -1045,12 +1125,13 @@ describe('ReferenceTransactionDetail Sale-level earned points', () => {
     expect(screen.queryByTestId('transaction-points-earned')).toBeNull();
   });
 
-  it('receipt preview shows +2 for a Sale with no line snapshots', () => {
+  it('receipt preview shows +2 once for a transaction-total earning with no line snapshots', () => {
     renderReceipt(finalized({ loyaltyEarning: { state: 'FINALIZED', pointsEarned: '2.0000' } }));
 
-    const row = screen.getByTestId('receipt-points-earned');
-    expect(within(row).getByText('Poin diperoleh')).toBeTruthy();
-    expect(within(row).getByText('+2')).toBeTruthy();
+    const points = screen.getByTestId('receipt-points');
+    expect(within(points).getByText('Diperoleh')).toBeTruthy();
+    expect(within(points).getByText('+2')).toBeTruthy();
+    expect(screen.getAllByText('+2')).toHaveLength(1);
   });
 
   it('receipt preview omits the row without an EARN fact, whatever the lines say', () => {
@@ -1058,6 +1139,6 @@ describe('ReferenceTransactionDetail Sale-level earned points', () => {
     setLineLoyaltyEarning(sale, { state: 'FINALIZED', pointsEarned: '6.0000' });
     renderReceipt(sale);
 
-    expect(screen.queryByTestId('receipt-points-earned')).toBeNull();
+    expect(screen.queryByTestId('receipt-points')).toBeNull();
   });
 });

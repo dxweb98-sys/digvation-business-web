@@ -72,7 +72,13 @@ export function useSellingCatalog({
   };
 
   return {
+    /** Page-visible items: narrowed by this page's own type filter and search. */
     items,
+    /**
+     * Every active standalone sellable item, untouched by the page's presentation filters. Flows
+     * that pick an item on their own (adjusting or correcting a transaction) search this set.
+     */
+    activeItems,
     categories: (catalogQuery.data?.categories ?? []).filter(
       (category) => category.status === 'ACTIVE',
     ),
