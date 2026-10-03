@@ -63,4 +63,29 @@ describe('groupAccessPermissions', () => {
     expect(groupAccessPermissions([adjust], 'en', 'in-progress')).toHaveLength(1);
     expect(groupAccessPermissions([adjust], 'id', 'sedang dikerjakan')).toHaveLength(1);
   });
+
+  it('presents the Runtime tax:read metadata as Backoffice › Pajak, with no Web permission list', () => {
+    const taxRead: AccessPermission = {
+      key: 'tax:read',
+      label: { id: 'Lihat laporan pajak', en: 'View tax reports' },
+      product: null,
+      capability: 'TAX_FISCAL',
+      foundation: 'CATALOG',
+      section: {
+        key: 'FINANCE_OPERATIONS',
+        label: { id: 'Keuangan', en: 'Finance Operations' },
+        order: 30,
+      },
+      businessArea: { key: 'TAX', label: { id: 'Pajak', en: 'Tax' }, order: 70 },
+      surface: 'BACKOFFICE',
+      configurable: true,
+      order: 10,
+    };
+    const groups = groupAccessPermissions([taxRead], 'id', '');
+    expect(groups).toMatchObject([
+      { key: 'BACKOFFICE', modules: [{ key: 'TAX', label: 'Pajak' }] },
+    ]);
+    expect(groups[0]?.modules[0]?.permissions.map(({ key }) => key)).toEqual(['tax:read']);
+    expect(groupAccessPermissions([taxRead], 'id', 'laporan pajak')).toHaveLength(1);
+  });
 });

@@ -18,7 +18,7 @@ import { MembersPage } from '../../modules/membership';
 import { FinancialAccountsPage } from '../../features/financial-accounts';
 import { ExpensesPage } from '../../features/expenses';
 import { TransactionHistoryPage } from '../../features/transaction-history';
-import { ReportsPage } from '../../modules/reporting';
+import { ReportsPage } from '../../features/reporting';
 import { ActivityPage } from '../../modules/activity';
 import { NotificationsPage } from '../../modules/notifications';
 
