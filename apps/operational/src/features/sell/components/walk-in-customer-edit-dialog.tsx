@@ -4,8 +4,7 @@ import { useRef, useState } from 'react';
 import { useOperationalLocalization } from '../../../app/localization/operational-localization';
 import { cashierTransactionErrorMessage } from '../cashier-transaction-errors';
 import type { SaleCustomer } from '../cashier-transaction.types';
-import { sanitizePhoneInput, toCanonicalPhone } from '../customer-input';
-import { formatWhatsappNumber } from '../receipt-delivery';
+import { sanitizePhoneInput, toCanonicalPhone, toLocalPhoneDisplay } from '../customer-input';
 import { useRetainedValue } from '../use-retained-value';
 
 /** The unfinished transaction whose walk-in customer is being corrected. */
@@ -69,7 +68,7 @@ export function WalkInCustomerEditDialog({
   const saleId = target?.saleId ?? null;
   const [name, setName] = useState(target?.customer.name ?? '');
   const [phone, setPhone] = useState(
-    target ? formatWhatsappNumber(target.customer.phoneE164) : '',
+    target ? toLocalPhoneDisplay(target.customer.phoneE164) : '',
   );
   const [touched, setTouched] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
@@ -80,7 +79,7 @@ export function WalkInCustomerEditDialog({
   if (openedFor !== saleId) {
     setOpenedFor(saleId);
     setName(target?.customer.name ?? '');
-    setPhone(target ? formatWhatsappNumber(target.customer.phoneE164) : '');
+    setPhone(target ? toLocalPhoneDisplay(target.customer.phoneE164) : '');
     setTouched(false);
     setRequestError(null);
   }

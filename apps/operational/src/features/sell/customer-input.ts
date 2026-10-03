@@ -29,3 +29,13 @@ export function toCanonicalPhone(raw: string): string | null {
 
   return E164.test(candidate) ? candidate : null;
 }
+
+/**
+ * Friendly local display for an Indonesian canonical number: +6285155050951 -> 0851 5505 0951.
+ * Other regions keep their international form. It round-trips through toCanonicalPhone.
+ */
+export function toLocalPhoneDisplay(e164: string): string {
+  if (!e164.startsWith(`+${DEFAULT_CALLING_CODE}`)) return e164;
+  const national = `0${e164.slice(DEFAULT_CALLING_CODE.length + 1)}`;
+  return national.replace(/(\d{4})(?=\d)/g, '$1 ');
+}

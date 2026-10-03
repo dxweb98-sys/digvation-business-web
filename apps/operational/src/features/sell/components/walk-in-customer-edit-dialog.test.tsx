@@ -46,7 +46,7 @@ describe('WalkInCustomerEditDialog', () => {
     const { name, phone, save } = setup();
 
     expect(name.value).toBe('wirawan');
-    expect(phone.value).toBe('+62 812 3123 1231');
+    expect(phone.value).toBe('0812 3123 1231');
     expect(save().hasAttribute('disabled')).toBe(true);
   });
 
