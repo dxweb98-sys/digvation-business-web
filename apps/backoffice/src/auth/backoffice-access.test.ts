@@ -44,7 +44,10 @@ function backofficeSessionWith(...permissions: string[]): AuthSession {
 describe('Backoffice effective permission access', () => {
   it('shows a contribution when Runtime projected its read permission', () => {
     expect(
-      canAccessBackoffice(backofficeSessionWith('sales:read', 'sales:read-completed'), 'transactions'),
+      canAccessBackoffice(
+        backofficeSessionWith('sales:read', 'sales:read-completed'),
+        'transactions',
+      ),
     ).toBe(true);
     // Without completed-transaction access the history would only hold summaries.
     expect(canAccessBackoffice(backofficeSessionWith('sales:read'), 'transactions')).toBe(false);
@@ -78,6 +81,8 @@ describe('Backoffice effective permission access', () => {
     expect(canAccessBackoffice(backofficeSessionWith('employees:read'), 'reports')).toBe(true);
     expect(canAccessBackoffice(backofficeSessionWith('attendance:read'), 'reports')).toBe(true);
     expect(canAccessBackoffice(backofficeSessionWith(), 'reports')).toBe(false);
+    // Tax Reporting alone opens Reporting; it never depends on transaction access.
+    expect(canAccessBackoffice(backofficeSessionWith('tax:read'), 'reports')).toBe(true);
   });
 
   it('does not treat an Operational role name or its permissions as Backoffice authority', () => {
@@ -112,5 +117,4 @@ describe('Backoffice effective permission access', () => {
     ];
     expect(canAccessBackoffice(operationalOnly, 'dashboard')).toBe(false);
   });
-
 });

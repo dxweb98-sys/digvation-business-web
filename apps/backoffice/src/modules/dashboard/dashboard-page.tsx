@@ -12,7 +12,7 @@ import {
   canAccessReport,
   canShowDashboardWidget,
   isReportAvailable,
-} from '../reporting/report-availability';
+} from '../../features/reporting';
 import { BusinessInsightWidget } from './components/business-insight-widget';
 import { BusinessPerformanceCard } from './components/business-performance-card';
 import { DashboardKpiCard } from './components/dashboard-kpi-card';

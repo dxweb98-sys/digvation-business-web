@@ -11,17 +11,11 @@ export type ReportType =
   | 'payments'
   | 'expenses'
   | 'cash'
-  | 'settlements'
-  | 'reconciliations'
   | 'tax'
   | 'locations';
 
 export type DashboardWidget =
-  | 'TOP_ITEMS'
-  | 'PAYMENT_MIX'
-  | 'RECENT_TRANSACTIONS'
-  | 'TOP_EMPLOYEES'
-  | 'BUSINESS_INSIGHT';
+  'TOP_ITEMS' | 'PAYMENT_MIX' | 'RECENT_TRANSACTIONS' | 'TOP_EMPLOYEES' | 'BUSINESS_INSIGHT';
 
 const REPORT_PERMISSION: Record<ReportType, string> = {
   'business-performance': 'sales:read',
@@ -36,8 +30,7 @@ const REPORT_PERMISSION: Record<ReportType, string> = {
   payments: 'payments:read',
   expenses: 'expenses:read',
   cash: 'cash:read',
-  settlements: 'settlements:read',
-  reconciliations: 'reconciliations:read',
+  // Captured sale tax is Tax visibility; tax:read is only effective with TAX_FISCAL.
   tax: 'tax:read',
   locations: 'locations:read',
 };
@@ -68,8 +61,10 @@ const DASHBOARD_REPORT: Record<DashboardWidget, ReportType> = {
  * foundation availability before projecting access.permissions.
  */
 export function isReportAvailable(session: AuthSession | null, type: ReportType): boolean {
-  if (!session) return false;
-  if (!session.access.permissions.includes(REPORT_PERMISSION[type])) return false;
+  // Only the current catalog: dormant projections (e.g. settlements) have no entry here.
+  const permission = REPORT_PERMISSION[type] as string | undefined;
+  if (!session || !permission) return false;
+  if (!session.access.permissions.includes(permission)) return false;
   if (POS_REPORTS.has(type) && !session.access.products.includes('POS')) return false;
   return true;
 }

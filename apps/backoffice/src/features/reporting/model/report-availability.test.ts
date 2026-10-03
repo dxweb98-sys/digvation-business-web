@@ -54,9 +54,7 @@ describe('Backoffice report composition', () => {
   });
 
   it('uses effective permissions for capability/foundation reports', () => {
-    expect(
-      canAccessReport(session({ permissions: ['attendance:read'] }), 'attendance'),
-    ).toBe(true);
+    expect(canAccessReport(session({ permissions: ['attendance:read'] }), 'attendance')).toBe(true);
     expect(canAccessReport(session({ permissions: [] }), 'attendance')).toBe(false);
     expect(canAccessReport(session({ permissions: ['expenses:read'] }), 'expenses')).toBe(true);
   });
@@ -81,8 +79,28 @@ describe('Backoffice report composition', () => {
 
   it('keeps tax reports POS-scoped after TAX_FISCAL has made tax:read effective', () => {
     expect(canAccessReport(session({ permissions: ['tax:read'] }), 'tax')).toBe(false);
+    expect(canAccessReport(session({ permissions: ['tax:read'], products: ['POS'] }), 'tax')).toBe(
+      true,
+    );
+  });
+});
+
+describe('Current report catalog availability', () => {
+  it('never offers the dormant settlement or reconciliation projections', () => {
+    const everything = session({
+      permissions: ['settlements:read', 'reconciliations:read'],
+      products: ['POS'],
+    });
+    expect(canAccessReport(everything, 'settlements' as never)).toBe(false);
+    expect(canAccessReport(everything, 'reconciliations' as never)).toBe(false);
+  });
+
+  it('shows the tax report with Tax visibility, not with Sale visibility', () => {
     expect(
-      canAccessReport(session({ permissions: ['tax:read'], products: ['POS'] }), 'tax'),
-    ).toBe(true);
+      canAccessReport(session({ permissions: ['sales:read'], products: ['POS'] }), 'tax'),
+    ).toBe(false);
+    expect(canAccessReport(session({ permissions: ['tax:read'], products: ['POS'] }), 'tax')).toBe(
+      true,
+    );
   });
 });

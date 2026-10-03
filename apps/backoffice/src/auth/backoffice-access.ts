@@ -95,6 +95,8 @@ const capabilityPermissions: Record<BackofficeCapability, PermissionRequirement>
       'settlements:read',
       'reconciliations:read',
       'locations:read',
+      // Tax Reporting is assignable on its own, independently of transaction access.
+      'tax:read',
     ],
   },
   // History shows completed transactions in full, which Runtime grants only with sales:read-completed.
@@ -153,8 +155,7 @@ export function canAccessBackoffice(
   session: AuthSession,
   capability: BackofficeCapability,
 ): boolean {
-  if (!session.access.permissions.includes(BACKOFFICE_ACCESS_PERMISSION))
-    return false;
+  if (!session.access.permissions.includes(BACKOFFICE_ACCESS_PERMISSION)) return false;
   const requirement = capabilityPermissions[capability];
   const permissions = session.access.permissions;
   const hasAll = (requirement.allOf ?? []).every((permission) => permissions.includes(permission));
@@ -167,8 +168,7 @@ export function canPerformBackofficeAction(
   session: AuthSession,
   action: BackofficeAction,
 ): boolean {
-  if (!session.access.permissions.includes(BACKOFFICE_ACCESS_PERMISSION))
-    return false;
+  if (!session.access.permissions.includes(BACKOFFICE_ACCESS_PERMISSION)) return false;
   return actionPermissions[action].every((permission) =>
     session.access.permissions.includes(permission),
   );
