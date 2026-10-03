@@ -4,6 +4,7 @@ import { AlertCircle, CheckCircle2, Clock, Send } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 import { useOperationalLocalization } from '../../../app/localization/operational-localization';
+import { useRetainedValue } from '../use-retained-value';
 import { cashierTransactionErrorMessage, isApiErrorCode } from '../cashier-transaction-errors';
 import { sanitizePhoneInput, toCanonicalPhone } from '../customer-input';
 import type {
@@ -200,7 +201,7 @@ export function ReceiptDeliveryIndicatorLine({
  * transaction customer snapshot or to a Member/Customer record.
  */
 export function ReceiptDeliveryDialog({
-  target,
+  target: requestedTarget,
   commands,
   onClose,
   onDeliveryChanged,
@@ -212,6 +213,8 @@ export function ReceiptDeliveryDialog({
   onDeliveryChanged?: (saleId: string) => void;
 }) {
   const { locale, formatDateTime } = useOperationalLocalization();
+  // Content stays mounted with its last transaction while the dialog plays its close transition.
+  const target = useRetainedValue(requestedTarget);
   const text = (value: string, params: Record<string, string> = {}) =>
     Object.entries(params).reduce(
       (result, [key, param]) => result.replace(`{${key}}`, param),
@@ -221,7 +224,7 @@ export function ReceiptDeliveryDialog({
   const statusQuery = useQuery({
     queryKey: receiptDeliveryStatusKey(saleId),
     queryFn: () => commands.getReceiptDeliveryStatus(saleId!),
-    enabled: Boolean(saleId),
+    enabled: Boolean(requestedTarget),
     staleTime: 1_000,
     refetchInterval: (query) =>
       receiptDeliveryPhase(query.state.data?.delivery?.status) === 'PENDING'
@@ -358,7 +361,7 @@ export function ReceiptDeliveryDialog({
 
   return (
     <DDialog
-      open={Boolean(target)}
+      open={Boolean(requestedTarget)}
       title={text('Send receipt')}
       description={target?.reference ?? ''}
       onClose={onClose}

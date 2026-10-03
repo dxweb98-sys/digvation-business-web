@@ -6,6 +6,7 @@ import { cashierTransactionErrorMessage } from '../cashier-transaction-errors';
 import type { SaleCustomer } from '../cashier-transaction.types';
 import { sanitizePhoneInput, toCanonicalPhone } from '../customer-input';
 import { formatWhatsappNumber } from '../receipt-delivery';
+import { useRetainedValue } from '../use-retained-value';
 
 /** The unfinished transaction whose walk-in customer is being corrected. */
 export interface WalkInCustomerEditTarget {
@@ -52,7 +53,7 @@ const localCopy: Record<string, { 'id-ID': string; 'en-US': string }> = {
  * immutable, so the entry point is simply not offered.
  */
 export function WalkInCustomerEditDialog({
-  target,
+  target: requestedTarget,
   onClose,
   onSave,
 }: {
@@ -62,6 +63,8 @@ export function WalkInCustomerEditDialog({
   onSave: (saleId: string, input: { name: string; phone: string }) => Promise<void>;
 }) {
   const { locale } = useOperationalLocalization();
+  // Fields keep their values while the dialog plays its close transition.
+  const target = useRetainedValue(requestedTarget);
   const text = (value: string) => localCopy[value]?.[locale] ?? value;
   const saleId = target?.saleId ?? null;
   const [name, setName] = useState(target?.customer.name ?? '');
@@ -113,7 +116,7 @@ export function WalkInCustomerEditDialog({
 
   return (
     <DDialog
-      open={Boolean(target)}
+      open={Boolean(requestedTarget)}
       title={text('Edit customer')}
       description={target?.reference ?? ''}
       onClose={onClose}

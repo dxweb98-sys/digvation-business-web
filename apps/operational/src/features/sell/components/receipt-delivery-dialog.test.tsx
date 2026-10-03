@@ -298,4 +298,26 @@ describe('ReceiptDeliveryDialog', () => {
     expect(await screen.findByText(/Percobaan sebelumnya \(1\)/)).toBeTruthy();
     expect(screen.getByText(/Gagal mengirim:/)).toBeTruthy();
   });
+
+  it('keeps its content while closing instead of flashing an empty or loading state', async () => {
+    const commands = {
+      getReceiptDeliveryStatus: vi.fn(async () => status([attempt()])),
+      requestReceiptDelivery: vi.fn(),
+    } satisfies OperationalReceiptDeliveryCommands;
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const tree = (target: ReceiptDeliveryTarget | null) => (
+      <DeploymentBootstrapProvider config={bootstrap}>
+        <QueryClientProvider client={queryClient}>
+          <ReceiptDeliveryDialog target={target} commands={commands} onClose={vi.fn()} />
+        </QueryClientProvider>
+      </DeploymentBootstrapProvider>
+    );
+    const { rerender } = render(tree(TARGET));
+    expect(await screen.findByText('Gagal mengirim')).toBeTruthy();
+
+    rerender(tree(null));
+
+    expect(screen.getByText(TARGET.reference)).toBeTruthy();
+    expect(screen.getByText('Gagal mengirim')).toBeTruthy();
+  });
 });
