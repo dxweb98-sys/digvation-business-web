@@ -122,7 +122,7 @@ export function WalkInCustomerEditDialog({
       ariaLabel={text('Edit customer')}
       closeOnEscape={!isSaving}
       closeOnOverlay={!isSaving}
-      className="pos-reference-dialog w-full max-w-md overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
+      className="pos-reference-dialog transition-[opacity,translate,scale] w-full max-w-md overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
       footer={
         <div className="flex justify-end gap-2">
           <DButton variant="outline" disabled={isSaving} onClick={onClose}>

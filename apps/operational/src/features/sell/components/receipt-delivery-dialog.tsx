@@ -368,7 +368,7 @@ export function ReceiptDeliveryDialog({
       ariaLabel={text('Send receipt')}
       closeOnEscape={!isSubmitting}
       closeOnOverlay={!isSubmitting}
-      className="pos-reference-dialog w-full max-w-md overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
+      className="pos-reference-dialog transition-[opacity,translate,scale] w-full max-w-md overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
       footer={
         <div className="flex justify-end gap-2">
           <DButton variant="outline" disabled={isSubmitting} onClick={onClose}>
