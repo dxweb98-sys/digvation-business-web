@@ -160,7 +160,11 @@ describe('completed queue card', () => {
         <RestrictedCompletedQueueCard
           summary={summary}
           locale="id-ID"
-          isSending={false}
+          receiptDelivery={{
+            status: 'FAILED',
+            destinationMasked: '+62 •••• 7890',
+            requestedAt: '2026-09-19T03:05:00.000Z',
+          }}
           onSendReceipt={onSendReceipt}
         />
       </DeploymentBootstrapProvider>,
@@ -171,8 +175,27 @@ describe('completed queue card', () => {
     expect(card.queryByText('Lihat struk')).toBeNull();
     expect(card.queryByRole('button', { name: /Aksi untuk|Actions for/ })).toBeNull();
     expect(card.getByText('Rina')).not.toBeNull();
+    // The delivery state is answerable from the card, with the number masked.
+    expect(container.textContent).toMatch(/Struk WA · Gagal dikirim · •••• 7890/);
+    expect(container.textContent).not.toMatch(/6281234567890/);
+    // Sending opens the delivery flow only; it grants no receipt view.
     fireEvent.click(card.getByRole('button', { name: /Kirim struk ke customer/ }));
     expect(onSendReceipt).toHaveBeenCalledWith(summary);
+    expect(card.queryByText('Lihat struk')).toBeNull();
+  });
+
+  it('shows a never-sent receipt quietly on a completed card', () => {
+    const { container } = render(
+      <DeploymentBootstrapProvider config={bootstrap}>
+        <RestrictedCompletedQueueCard
+          summary={completedSaleSummary(completedSale())}
+          locale="id-ID"
+          receiptDelivery={null}
+          onSendReceipt={vi.fn()}
+        />
+      </DeploymentBootstrapProvider>,
+    );
+    expect(container.textContent).toMatch(/Struk WA · Belum dikirim/);
   });
 
   it('with the permission keeps the amount, detail, receipt and send actions', () => {
@@ -193,11 +216,19 @@ describe('completed queue card', () => {
           onView={noop}
           onViewReceipt={noop}
           onSendReceipt={onSendReceipt}
+          receiptDelivery={{
+            status: 'SENT',
+            destinationMasked: '+62 •••• 3123',
+            requestedAt: '2026-09-19T03:05:00.000Z',
+          }}
         />
       </DeploymentBootstrapProvider>,
     );
     const card = within(container);
     expect(container.textContent).toMatch(/350\.000/);
+    // Provider acceptance is never presented as delivered.
+    expect(container.textContent).toMatch(/Struk WA · Permintaan berhasil · •••• 3123/);
+    expect(container.textContent).not.toMatch(/Terkirim/);
     fireEvent.click(card.getByRole('button', { name: /TRX-20260919-000042/ }));
     const menu = within(document.body);
     expect(menu.getByRole('menuitem', { name: /Lihat detail/ })).not.toBeNull();

@@ -1,4 +1,5 @@
 import type { ApiClient } from '@digvation/pos-api';
+import type { OperationalQueuePage } from './operational-projection-client';
 
 import type {
   ApiPage,
@@ -227,7 +228,7 @@ export interface PaymentRouteQuery {
 }
 
 export interface OpenSalesQuery {
-  listSales(signal?: AbortSignal): Promise<ApiPage<QueueSale>>;
+  listSales(signal?: AbortSignal): Promise<OperationalQueuePage>;
 }
 
 export interface SaleTransactionClient {

@@ -176,6 +176,18 @@ import {
 } from '../member-cart-presentation';
 import './replatformed-pos-workspace.css';
 import { CustomerMemberDialog } from './customer-member-dialog';
+import {
+  ReceiptDeliveryDialog,
+  ReceiptDeliveryIndicatorLine,
+  receiptDeliveryPreviewLabel,
+  receiptDeliveryStatusKey,
+  type ReceiptDeliveryTarget,
+} from './receipt-delivery-dialog';
+import { receiptDeliveryPhase } from '../receipt-delivery';
+import type {
+  ReceiptDeliveryIndicator,
+  ReceiptDeliveryState,
+} from '../operational-projection-client';
 import { useCustomerPickerSession } from '../customer-picker-session';
 import { canAdjustOrder } from '../sale-adjustment-access';
 import {
@@ -853,8 +865,9 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   } | null>(null);
   const [isSavingPerformers, setSavingPerformers] = useState(false);
   const [receiptSaleId, setReceiptSaleId] = useState<string | null>(null);
-  const [isSendingReceipt, setSendingReceipt] = useState(false);
-  const [sendingReceiptId, setSendingReceiptId] = useState<string | null>(null);
+  const [receiptDeliveryTarget, setReceiptDeliveryTarget] = useState<ReceiptDeliveryTarget | null>(
+    null,
+  );
   // Effective permission, never a role name: without it completed transactions
   // show no amount, detail or receipt, and can only be sent to the customer.
   const canReadCompleted = useCanReadCompletedSaleDetails();
@@ -956,11 +969,13 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         operationalAccessQuery.data?.locations ?? [],
       )
     : null;
+  // Same cache entry as the receipt-delivery dialog: preview and dialog always show one state.
   const receiptDeliveryStatusQuery = useQuery({
-    queryKey: ['operational-receipt-delivery', displayedQueueDetail?.id ?? null],
+    queryKey: receiptDeliveryStatusKey(displayedQueueDetail?.id ?? null),
     queryFn: () => adapter.getReceiptDeliveryStatus(displayedQueueDetail!.id),
     enabled: Boolean(displayedQueueDetail?.status === 'FINALIZED'),
-    refetchInterval: displayedQueueDetail?.status === 'FINALIZED' ? 3_000 : false,
+    refetchInterval: (query) =>
+      receiptDeliveryPhase(query.state.data?.delivery?.status) === 'PENDING' ? 3_000 : false,
     staleTime: 1_000,
   });
   const displayedAdjustmentTarget =
@@ -1093,32 +1108,21 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   };
 
   /**
-   * Requests receipt delivery for a captured transaction. Delivery is separate
-   * from the transaction: a delivery provider that is absent or failing is reported as a
-   * delivery outcome and never touches the Sale, its payment or its queue state.
+   * Opens the one receipt-delivery flow for a completed transaction. Delivery is separate
+   * from the transaction: sending, retrying or redirecting it never touches the Sale, its
+   * customer snapshot, its payment or its queue state. Only the facts sending needs are passed;
+   * the customer number only when this operator may already see it.
    */
-  const sendReceipt = async (target: Pick<QueueSale, 'id' | 'saleNumber'>) => {
-    setSendingReceipt(true);
-    setSendingReceiptId(target.id);
-    try {
-      await adapter.requestReceiptDelivery(target.id, 'WHATSAPP');
-      showToast({
-        title: copy('Receipt is being sent to the customer'),
-        description: transactionNumber(target, workspace.locale),
-        variant: 'success',
-      });
-    } catch (error) {
-      showToast({
-        title: copy('Not available yet'),
-        description: cashierTransactionErrorMessage(error),
-        variant: 'warning',
-      });
-    } finally {
-      setSendingReceipt(false);
-      setSendingReceiptId(null);
-      void receiptDeliveryStatusQuery.refetch();
-    }
+  const openReceiptDelivery = (target: QueueSale) => {
+    const customer = target.customer ?? null;
+    setReceiptDeliveryTarget({
+      saleId: target.id,
+      reference: transactionNumber(target, workspace.locale),
+      customerName: customer ? customerDisplayName(customer, workspace.locale) : null,
+      customerPhone: isCompletedSaleSummary(target) ? null : (target.customer?.phoneE164 ?? null),
+    });
   };
+  const refreshQueue = () => void transactionsQuery.refetch();
 
   const commitCheckoutToQueue = (
     completedSale: Sale,
@@ -1752,8 +1756,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
             setReceiptSaleId(transaction.id);
           }}
           canReadCompleted={canReadCompleted}
-          onSendReceipt={(transaction) => void sendReceipt(transaction)}
-          sendingReceiptId={sendingReceiptId}
+          onSendReceipt={openReceiptDelivery}
+          receiptDeliveries={transactionsQuery.data?.receiptDeliveries ?? {}}
         />
       )}
 
@@ -2025,12 +2029,10 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           setQueueDetail(transaction);
           setReceiptSaleId(transaction.id);
         }}
-        onSendReceipt={(transaction) => void sendReceipt(transaction)}
-        isSendingReceipt={isSendingReceipt}
+        onSendReceipt={openReceiptDelivery}
         {...(displayedQueueDetail?.status === 'FINALIZED' && receiptDeliveryStatusQuery.data
           ? { deliveryStatus: receiptDeliveryStatusQuery.data }
           : {})}
-        onRetryDelivery={(transaction) => void sendReceipt(transaction)}
         onAssign={(line) => {
           if (!displayedQueueDetail) return;
           workspace.requestEmployeeOptions();
@@ -2133,6 +2135,13 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         cancelLabel={copy('Cancel')}
         variant="primary"
         loading={workspace.isCoreMutating}
+      />
+
+      <ReceiptDeliveryDialog
+        target={receiptDeliveryTarget}
+        commands={adapter}
+        onClose={() => setReceiptDeliveryTarget(null)}
+        onDeliveryChanged={refreshQueue}
       />
 
       <ReferenceCancelDialog
@@ -2358,7 +2367,7 @@ function ReferenceQueueBoard({
   onViewReceipt,
   canReadCompleted,
   onSendReceipt,
-  sendingReceiptId,
+  receiptDeliveries,
 }: {
   open: boolean;
   onOpenChange: (value: boolean) => void;
@@ -2375,8 +2384,9 @@ function ReferenceQueueBoard({
   onView: (sale: Sale) => void;
   onViewReceipt: (sale: Sale) => void;
   canReadCompleted: boolean;
-  onSendReceipt: (sale: Pick<QueueSale, 'id' | 'saleNumber'>) => void;
-  sendingReceiptId: string | null;
+  onSendReceipt: (sale: QueueSale) => void;
+  /** Latest receipt delivery per completed transaction, kept beside the queue items. */
+  receiptDeliveries: Readonly<Record<string, ReceiptDeliveryIndicator>>;
 }) {
   const { copy, label } = useOperationalLocalization();
   const statuses = Object.keys(statusMeta) as QueueStatus[];
@@ -2467,7 +2477,7 @@ function ReferenceQueueBoard({
                                     key={sale.id}
                                     summary={summary}
                                     locale={locale}
-                                    isSending={sendingReceiptId === sale.id}
+                                    receiptDelivery={receiptDeliveries[sale.id] ?? null}
                                     onSendReceipt={onSendReceipt}
                                   />
                                 );
@@ -2488,6 +2498,7 @@ function ReferenceQueueBoard({
                                   onView={onView}
                                   onViewReceipt={onViewReceipt}
                                   onSendReceipt={onSendReceipt}
+                                  receiptDelivery={receiptDeliveries[sale.id] ?? null}
                                 />
                               );
                             })}
@@ -2523,13 +2534,13 @@ function ReferenceQueueBoard({
 export function RestrictedCompletedQueueCard({
   summary,
   locale,
-  isSending,
+  receiptDelivery,
   onSendReceipt,
 }: {
   summary: CompletedSaleSummary;
   locale: string;
-  isSending: boolean;
-  onSendReceipt: (sale: Pick<QueueSale, 'id' | 'saleNumber'>) => void;
+  receiptDelivery: ReceiptDeliveryIndicator | null;
+  onSendReceipt: (sale: QueueSale) => void;
 }) {
   const { copy, label } = useOperationalLocalization();
   const meta = statusMeta.COMPLETED;
@@ -2553,19 +2564,21 @@ export function RestrictedCompletedQueueCard({
         </span>
       </div>
       <div className="flex items-center justify-between gap-3">
-        <p className="min-w-0 text-xs text-[var(--color-text-muted)]">
-          {summary.itemCount} {copy('items')},{' '}
-          {new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(
-            new Date(summary.finalizedAt ?? summary.createdAt),
-          )}
-        </p>
+        <div className="min-w-0">
+          <p className="text-xs text-[var(--color-text-muted)]">
+            {summary.itemCount} {copy('items')},{' '}
+            {new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(
+              new Date(summary.finalizedAt ?? summary.createdAt),
+            )}
+          </p>
+          {summary.customer ? <ReceiptDeliveryIndicatorLine indicator={receiptDelivery} /> : null}
+        </div>
         <DButton
           size="sm"
           variant="outline"
           className="h-8 shrink-0 px-3 text-[11px]"
           leftIcon={<Send className="size-3.5" />}
-          loading={isSending}
-          disabled={isSending || !summary.customer}
+          disabled={!summary.customer}
           aria-label={`${copy('Send receipt to customer')} ${number}`}
           {...(summary.customer ? {} : { title: copy('Customer data is not available') })}
           onClick={() => onSendReceipt(summary)}
@@ -2590,6 +2603,7 @@ export function ReferenceQueueCard({
   onView,
   onViewReceipt,
   onSendReceipt,
+  receiptDelivery = null,
 }: {
   sale: Sale;
   status: QueueStatus;
@@ -2604,6 +2618,8 @@ export function ReferenceQueueCard({
   onView: (sale: Sale) => void;
   onViewReceipt: (sale: Sale) => void;
   onSendReceipt: (sale: Sale) => void;
+  /** Latest receipt delivery; shown only on a completed transaction with a customer. */
+  receiptDelivery?: ReceiptDeliveryIndicator | null;
 }) {
   const { copy, label } = useOperationalLocalization();
   const meta = statusMeta[status];
@@ -2741,6 +2757,9 @@ export function ReferenceQueueCard({
           <p className="mt-1 text-sm font-bold text-[var(--color-brand)]">
             {money(sale.totalAmount, locale)}
           </p>
+          {status === 'COMPLETED' && sale.customer ? (
+            <ReceiptDeliveryIndicatorLine indicator={receiptDelivery} />
+          ) : null}
         </div>
         <div className="flex items-center gap-2">
           {canStartWork ? (
@@ -4428,9 +4447,7 @@ export function ReferenceTransactionDetail({
   onClose,
   onViewReceipt,
   onSendReceipt,
-  isSendingReceipt,
   deliveryStatus,
-  onRetryDelivery,
   onAssign,
   onStartLineWork,
   onComplete,
@@ -4448,23 +4465,18 @@ export function ReferenceTransactionDetail({
   onClose: () => void;
   onNewSale: () => void;
   onViewReceipt: (sale: Sale) => void;
+  /** Opens the shared receipt-delivery flow; the preview never sends on its own. */
   onSendReceipt?: (sale: Sale) => void;
-  isSendingReceipt?: boolean;
   deliveryStatus?: {
     available: boolean;
-    delivery: {
-      status: 'QUEUED' | 'SENDING' | 'SENT' | 'FAILED';
-      attemptCount: number;
-      retryAllowed: boolean;
-    } | null;
+    delivery: { status: ReceiptDeliveryState } | null;
   };
-  onRetryDelivery?: (sale: Sale) => void;
   onAssign: (line: SaleLine) => void;
   onStartLineWork: (line: SaleLine) => void;
   onComplete: () => void;
   isMutating: boolean;
 }) {
-  const { copy, label } = useOperationalLocalization();
+  const { copy, label, locale: copyLocale } = useOperationalLocalization();
   const [receiptPaper, setReceiptPaper] = useState<'58' | '80'>('80');
   const sale = useRetainedValue(currentSale);
   if (!sale) return null;
@@ -4519,25 +4531,10 @@ export function ReferenceTransactionDetail({
     sale.loyaltyRedemption?.amount ?? legacyLoyaltyRedemption?.redemptionAmount ?? null;
   const hasLoyaltyRedemption = Boolean(redeemedPoints && redeemedAmount);
   const earnedPoints = saleEarnedPoints(sale);
-  const receiptDelivery = deliveryStatus?.delivery ?? null;
-  const receiptDeliveryBusy =
-    receiptDelivery?.status === 'QUEUED' || receiptDelivery?.status === 'SENDING';
-  const receiptDeliverySent = receiptDelivery?.status === 'SENT';
-  const receiptDeliveryFailed = receiptDelivery?.status === 'FAILED';
-  const receiptDeliveryAction =
-    receiptDeliveryFailed && receiptDelivery.retryAllowed
-      ? (onRetryDelivery ?? onSendReceipt)
-      : onSendReceipt;
-  const receiptDeliveryLabel =
-    receiptDelivery?.status === 'QUEUED'
-      ? 'Mengantre'
-      : receiptDelivery?.status === 'SENDING'
-        ? 'Mengirim'
-        : receiptDelivery?.status === 'SENT'
-          ? 'Terkirim'
-          : receiptDelivery?.status === 'FAILED'
-            ? 'Coba lagi'
-            : copy('Send via WhatsApp');
+  const receiptDeliveryLabel = receiptDeliveryPreviewLabel(
+    receiptDeliveryPhase(deliveryStatus?.delivery?.status),
+    copyLocale,
+  );
 
   return (
     <>
@@ -4589,14 +4586,8 @@ export function ReferenceTransactionDetail({
                 <DButton variant="ghost" onClick={onClose}>
                   {copy('Close')}
                 </DButton>
-                {deliveryStatus?.available && receiptDeliveryAction ? (
-                  <DButton
-                    variant="outline"
-                    loading={Boolean(isSendingReceipt) || receiptDeliveryBusy}
-                    disabled={receiptDeliverySent}
-                    aria-label={receiptDeliveryFailed ? 'Retry sending' : undefined}
-                    onClick={() => receiptDeliveryAction(sale)}
-                  >
+                {deliveryStatus?.available && onSendReceipt ? (
+                  <DButton variant="outline" onClick={() => onSendReceipt(sale)}>
                     {receiptDeliveryLabel}
                   </DButton>
                 ) : null}

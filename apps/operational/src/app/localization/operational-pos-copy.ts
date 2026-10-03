@@ -616,10 +616,6 @@ const posCopy: Record<string, LocalizedCopy> = {
     'id-ID': 'Kirim struk ke customer',
     'en-US': 'Send receipt to customer',
   },
-  'Receipt is being sent to the customer': {
-    'id-ID': 'Struk sedang dikirim ke customer',
-    'en-US': 'Receipt is being sent to the customer',
-  },
   Remaining: { 'id-ID': 'Sisa', 'en-US': 'Remaining' },
   Received: { 'id-ID': 'Diterima', 'en-US': 'Received' },
   'Payment progress': { 'id-ID': 'Progres pembayaran', 'en-US': 'Payment progress' },
