@@ -336,13 +336,17 @@ function CustomerEditDialog({
   onSaved: () => void;
 }) {
   const { text } = useCustomerLocalization();
-  const draft = useFormState({ name: customer.name, phone: toNationalMemberPhone(customer.phoneE164) });
+  const draft = useFormState({
+    name: customer.name,
+    phone: toNationalMemberPhone(customer.phoneE164),
+  });
   const [validation, setValidation] = useState(false);
   const save = useMutation({
-    mutationFn: () => api.update(customer, {
-      name: draft.values.name,
-      phone: toCanonicalMemberPhone(draft.values.phone) ?? draft.values.phone,
-    }),
+    mutationFn: () =>
+      api.update(customer, {
+        name: draft.values.name,
+        phone: toCanonicalMemberPhone(draft.values.phone) ?? draft.values.phone,
+      }),
     onSuccess: onSaved,
   });
   const valid =

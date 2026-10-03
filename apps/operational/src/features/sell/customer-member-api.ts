@@ -11,7 +11,12 @@ export interface CustomerLookupResult {
   phoneE164: string;
   status: 'ACTIVE' | 'INACTIVE';
   /** Omitted unless Membership is entitled and readable by this actor. */
-  membership?: { id: string; memberNumber: string; status: 'ACTIVE' | 'INACTIVE'; joinedAt: string } | null;
+  membership?: {
+    id: string;
+    memberNumber: string;
+    status: 'ACTIVE' | 'INACTIVE';
+    joinedAt: string;
+  } | null;
 }
 
 export interface MemberLookupResult {
@@ -58,7 +63,10 @@ function lookupPath(path: string, query: string): string {
  * authority. It deliberately owns no identity or enrollment state.
  */
 export class CustomerMemberApi {
-  public constructor(private readonly client: ApiClient, public readonly cacheScope = '') {}
+  public constructor(
+    private readonly client: ApiClient,
+    public readonly cacheScope = '',
+  ) {}
 
   searchMembers(query: string, signal?: AbortSignal): Promise<ApiPage<MemberLookupResult>> {
     return this.client.get<ApiPage<MemberLookupResult>>(
@@ -68,9 +76,12 @@ export class CustomerMemberApi {
   }
 
   searchCustomers(query: string, signal?: AbortSignal): Promise<ApiPage<CustomerLookupResult>> {
-    return this.client.get<ApiPage<CustomerLookupResult>>(`${lookupPath('/customers', query)}&status=ACTIVE`, {
-      signal,
-    });
+    return this.client.get<ApiPage<CustomerLookupResult>>(
+      `${lookupPath('/customers', query)}&status=ACTIVE`,
+      {
+        signal,
+      },
+    );
   }
 
   getPointBalance(membershipId: string, signal?: AbortSignal): Promise<MemberPointBalance> {

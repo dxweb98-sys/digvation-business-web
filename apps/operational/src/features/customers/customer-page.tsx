@@ -320,7 +320,12 @@ export function CustomerDetailDialog({
       ) : editing ? (
         <div className="space-y-5">
           <div className="space-y-3">
-            <DInput label={copy('Name')} value={name} onChange={setName} disabled={save.isPending} />
+            <DInput
+              label={copy('Name')}
+              value={name}
+              onChange={setName}
+              disabled={save.isPending}
+            />
             <DInput
               label={copy('Phone number')}
               value={phone}

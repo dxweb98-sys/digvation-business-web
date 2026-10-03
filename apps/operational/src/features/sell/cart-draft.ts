@@ -207,9 +207,9 @@ export function draftCustomerSnapshot(
   if (!selection) return null;
   if (selection.type === 'MEMBER')
     return { type: 'MEMBER', referenceId: selection.referenceId, name: '', phoneE164: '' };
-    return {
-      type: 'NON_MEMBER',
-      referenceId: selection.referenceId ?? null,
+  return {
+    type: 'NON_MEMBER',
+    referenceId: selection.referenceId ?? null,
     name: selection.name,
     phoneE164: selection.phone,
   };

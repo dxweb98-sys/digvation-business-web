@@ -140,7 +140,9 @@ describe('Operational canonical Customers', () => {
     fireEvent.click((await screen.findAllByText('Dicky'))[0]!);
     fireEvent.click(await screen.findByRole('button', { name: 'Ubah data' }));
     expect((screen.getByLabelText('Nomor telepon') as HTMLInputElement).value).toBe('08123456789');
-    fireEvent.change(screen.getByLabelText('Nomor telepon'), { target: { value: '+6281234567890' } });
+    fireEvent.change(screen.getByLabelText('Nomor telepon'), {
+      target: { value: '+6281234567890' },
+    });
     expect((screen.getByLabelText('Nomor telepon') as HTMLInputElement).value).toBe('081234567890');
     fireEvent.change(screen.getByLabelText('Nama'), { target: { value: 'Dicky Darmawan' } });
     fireEvent.click(screen.getByRole('button', { name: 'Simpan' }));

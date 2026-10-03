@@ -397,7 +397,8 @@ export interface SaleCustomer {
 
 /** Customer identity requested from Runtime, which resolves and normalizes it. */
 export type SaleCustomerSelection =
-  { type: 'NON_MEMBER'; name: string; phone: string; referenceId?: string; createNew?: true } | { type: 'MEMBER'; referenceId: string };
+  | { type: 'NON_MEMBER'; name: string; phone: string; referenceId?: string; createNew?: true }
+  | { type: 'MEMBER'; referenceId: string };
 
 export interface SaleLoyaltyRedemption {
   membershipId: string;

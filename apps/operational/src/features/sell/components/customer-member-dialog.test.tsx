@@ -69,12 +69,18 @@ const openEnroll = () => fireEvent.click(screen.getByRole('tab', { name: /Daftar
 
 describe('Customer picker phone', () => {
   it('searches after a pause and captures only the explicitly selected canonical customer', async () => {
-    const { api, onChoose } = renderDialog({ canReadMembers: false, canEnrollMember: false, canReadLoyalty: false });
-    api.searchCustomers.mockResolvedValue({ items: [
-      { id: 'c-a', name: 'Dicky', phoneE164: '+628123456789', status: 'ACTIVE' },
-      { id: 'c-b', name: 'Dicky Darmawan', phoneE164: '+628123456789', status: 'ACTIVE' },
-      { id: 'c-c', name: 'Dicky', phoneE164: '+628999999999', status: 'ACTIVE' },
-    ] });
+    const { api, onChoose } = renderDialog({
+      canReadMembers: false,
+      canEnrollMember: false,
+      canReadLoyalty: false,
+    });
+    api.searchCustomers.mockResolvedValue({
+      items: [
+        { id: 'c-a', name: 'Dicky', phoneE164: '+628123456789', status: 'ACTIVE' },
+        { id: 'c-b', name: 'Dicky Darmawan', phoneE164: '+628123456789', status: 'ACTIVE' },
+        { id: 'c-c', name: 'Dicky', phoneE164: '+628999999999', status: 'ACTIVE' },
+      ],
+    });
     type(name(), 'Dic');
     type(name(), 'Dicky');
     expect(api.searchCustomers).not.toHaveBeenCalled();
@@ -84,33 +90,64 @@ describe('Customer picker phone', () => {
     expect(onChoose).not.toHaveBeenCalled();
     fireEvent.click(choice);
     fireEvent.click(screen.getByRole('button', { name: 'Gunakan Pelanggan' }));
-    expect(onChoose).toHaveBeenCalledWith({ type: 'NON_MEMBER', referenceId: 'c-b', name: 'Dicky Darmawan', phone: '+628123456789' });
+    expect(onChoose).toHaveBeenCalledWith({
+      type: 'NON_MEMBER',
+      referenceId: 'c-b',
+      name: 'Dicky Darmawan',
+      phone: '+628123456789',
+    });
     expect(screen.queryByRole('tab', { name: /Member Terdaftar/ })).toBeNull();
     expect(screen.queryByText('Saldo Poin')).toBeNull();
   });
 
   it('creates a separate customer when explicitly requested despite matching name and phone', async () => {
     const { api, onChoose } = renderDialog();
-    api.searchCustomers.mockResolvedValue({ items: [{ id: 'old', name: 'Dicky', phoneE164: '+628123456789', status: 'ACTIVE' }] });
+    api.searchCustomers.mockResolvedValue({
+      items: [{ id: 'old', name: 'Dicky', phoneE164: '+628123456789', status: 'ACTIVE' }],
+    });
     type(name(), 'Dicky');
     type(phone(), '+628123456789');
     await screen.findByRole('option', { name: 'Dicky +628123456789' });
     fireEvent.click(screen.getAllByRole('button', { name: 'Gunakan sebagai pelanggan baru' })[0]!);
-    expect(onChoose).toHaveBeenCalledWith({ type: 'NON_MEMBER', name: 'Dicky', phone: '+628123456789', createNew: true });
+    expect(onChoose).toHaveBeenCalledWith({
+      type: 'NON_MEMBER',
+      name: 'Dicky',
+      phone: '+628123456789',
+      createNew: true,
+    });
     expect(api.enrollNew).not.toHaveBeenCalled();
   });
 
   it('uses the existing Member selection path for an authorized Member suggestion', async () => {
     const { api, onChoose } = renderDialog();
-    api.searchCustomers.mockResolvedValue({ items: [{ ...enrolled.customer, membership: { id: enrolled.id, memberNumber: enrolled.memberNumber, status: 'ACTIVE', joinedAt: '2026-01-01' } }] });
+    api.searchCustomers.mockResolvedValue({
+      items: [
+        {
+          ...enrolled.customer,
+          membership: {
+            id: enrolled.id,
+            memberNumber: enrolled.memberNumber,
+            status: 'ACTIVE',
+            joinedAt: '2026-01-01',
+          },
+        },
+      ],
+    });
     type(name(), 'Andir');
     fireEvent.click(await screen.findByRole('option', { name: /Andir.*Member/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Gunakan Pelanggan' }));
-    expect(onChoose).toHaveBeenCalledWith({ type: 'MEMBER', referenceId: enrolled.customerId }, expect.objectContaining({ id: enrolled.id, customerId: enrolled.customerId }));
+    expect(onChoose).toHaveBeenCalledWith(
+      { type: 'MEMBER', referenceId: enrolled.customerId },
+      expect.objectContaining({ id: enrolled.id, customerId: enrolled.customerId }),
+    );
   });
 
   it('does not request the directory without customers:read', async () => {
-    const { api } = renderDialog({ canReadCustomers: false, canReadMembers: false, canEnrollMember: false });
+    const { api } = renderDialog({
+      canReadCustomers: false,
+      canReadMembers: false,
+      canEnrollMember: false,
+    });
     type(name(), 'Dicky');
     type(phone(), '+628123456789');
     expect(screen.queryByRole('listbox')).toBeNull();
@@ -123,7 +160,9 @@ describe('Customer picker phone', () => {
     type(phone(), '08192381923');
     expect(phone().value).toBe('08192381923');
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Gunakan sebagai pelanggan baru' }).at(-1)!);
+    fireEvent.click(
+      screen.getAllByRole('button', { name: 'Gunakan sebagai pelanggan baru' }).at(-1)!,
+    );
     expect(onChoose).toHaveBeenCalledWith({
       type: 'NON_MEMBER',
       name: 'Andir',
@@ -146,7 +185,9 @@ describe('Customer picker phone', () => {
     const { onChoose } = renderDialog();
     type(name(), 'Andir');
     type(phone(), '08');
-    const button = screen.getAllByRole('button', { name: 'Gunakan sebagai pelanggan baru' }).at(-1)! as HTMLButtonElement;
+    const button = screen
+      .getAllByRole('button', { name: 'Gunakan sebagai pelanggan baru' })
+      .at(-1)! as HTMLButtonElement;
     expect(button.disabled).toBe(true);
     fireEvent.click(button);
     expect(onChoose).not.toHaveBeenCalled();

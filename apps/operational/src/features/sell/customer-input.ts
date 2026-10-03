@@ -40,7 +40,5 @@ export function toCanonicalPhone(raw: string): string | null {
  * It round-trips through toCanonicalPhone.
  */
 export function toLocalPhoneDisplay(e164: string): string {
-  return e164.startsWith(`+${DEFAULT_CALLING_CODE}`)
-    ? sanitizeNationalPhoneInput(e164)
-    : e164;
+  return e164.startsWith(`+${DEFAULT_CALLING_CODE}`) ? sanitizeNationalPhoneInput(e164) : e164;
 }

@@ -4,7 +4,11 @@ import { useRef, useState } from 'react';
 import { useOperationalLocalization } from '../../../app/localization/operational-localization';
 import { cashierTransactionErrorMessage } from '../cashier-transaction-errors';
 import type { SaleCustomer } from '../cashier-transaction.types';
-import { sanitizeNationalPhoneInput, toCanonicalPhone, toLocalPhoneDisplay } from '../customer-input';
+import {
+  sanitizeNationalPhoneInput,
+  toCanonicalPhone,
+  toLocalPhoneDisplay,
+} from '../customer-input';
 import { useRetainedValue } from '../use-retained-value';
 
 /** The unfinished transaction whose walk-in customer is being corrected. */
@@ -67,9 +71,7 @@ export function WalkInCustomerEditDialog({
   const text = (value: string) => localCopy[value]?.[locale] ?? value;
   const saleId = target?.saleId ?? null;
   const [name, setName] = useState(target?.customer.name ?? '');
-  const [phone, setPhone] = useState(
-    target ? toLocalPhoneDisplay(target.customer.phoneE164) : '',
-  );
+  const [phone, setPhone] = useState(target ? toLocalPhoneDisplay(target.customer.phoneE164) : '');
   const [touched, setTouched] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
   const [isSaving, setSaving] = useState(false);

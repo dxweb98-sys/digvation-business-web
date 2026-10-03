@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { sanitizeNationalPhoneInput, toCanonicalPhone, toLocalPhoneDisplay } from './customer-input';
+import {
+  sanitizeNationalPhoneInput,
+  toCanonicalPhone,
+  toLocalPhoneDisplay,
+} from './customer-input';
 
 describe('toCanonicalPhone', () => {
   it.each([
