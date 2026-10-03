@@ -2,10 +2,15 @@
 const DEFAULT_CALLING_CODE = '62';
 const E164 = /^\+[1-9]\d{7,14}$/;
 
-/**
- * Keeps what a cashier legitimately types in a phone field (digits, a leading +, spaces and
- * common separators) so the visible value stays friendly and local. It never rewrites the number.
- */
+/** National digits for Indonesian Customer and Member editor fields. */
+export function sanitizeNationalPhoneInput(value: string): string {
+  const digits = value.replace(/\D/g, '');
+  if (digits.startsWith(`00${DEFAULT_CALLING_CODE}`)) return `0${digits.slice(4)}`;
+  if (digits.startsWith(DEFAULT_CALLING_CODE)) return `0${digits.slice(2)}`;
+  return digits;
+}
+
+/** Kept for receipt delivery, whose input presentation is outside this feature's scope. */
 export function sanitizePhoneInput(value: string): string {
   return value.replace(/[^\d+\s().-]/g, '');
 }
@@ -31,11 +36,9 @@ export function toCanonicalPhone(raw: string): string | null {
 }
 
 /**
- * Friendly local display for an Indonesian canonical number: +6285155050951 -> 0851 5505 0951.
- * Other regions keep their international form. It round-trips through toCanonicalPhone.
+ * National editable presentation: +6285155050951 -> 085155050951.
+ * It round-trips through toCanonicalPhone.
  */
 export function toLocalPhoneDisplay(e164: string): string {
-  if (!e164.startsWith(`+${DEFAULT_CALLING_CODE}`)) return e164;
-  const national = `0${e164.slice(DEFAULT_CALLING_CODE.length + 1)}`;
-  return national.replace(/(\d{4})(?=\d)/g, '$1 ');
+  return e164.startsWith(`+${DEFAULT_CALLING_CODE}`) ? sanitizeNationalPhoneInput(e164) : e164;
 }

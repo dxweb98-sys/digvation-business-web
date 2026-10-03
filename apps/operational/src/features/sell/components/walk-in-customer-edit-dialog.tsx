@@ -4,7 +4,11 @@ import { useRef, useState } from 'react';
 import { useOperationalLocalization } from '../../../app/localization/operational-localization';
 import { cashierTransactionErrorMessage } from '../cashier-transaction-errors';
 import type { SaleCustomer } from '../cashier-transaction.types';
-import { sanitizePhoneInput, toCanonicalPhone, toLocalPhoneDisplay } from '../customer-input';
+import {
+  sanitizeNationalPhoneInput,
+  toCanonicalPhone,
+  toLocalPhoneDisplay,
+} from '../customer-input';
 import { useRetainedValue } from '../use-retained-value';
 
 /** The unfinished transaction whose walk-in customer is being corrected. */
@@ -31,14 +35,14 @@ const localCopy: Record<string, { 'id-ID': string; 'en-US': string }> = {
   'Customer name': { 'id-ID': 'Nama Pelanggan', 'en-US': 'Customer Name' },
   'Name placeholder': { 'id-ID': 'Contoh: Andir Saputra', 'en-US': 'Example: Andir Saputra' },
   'WhatsApp / phone': { 'id-ID': 'Nomor WhatsApp / Telepon', 'en-US': 'WhatsApp / Phone' },
-  'Phone placeholder': { 'id-ID': 'Contoh: 0812 3456 7890', 'en-US': 'Example: 0812 3456 7890' },
+  'Phone placeholder': { 'id-ID': 'Contoh: 081234567890', 'en-US': 'Example: 081234567890' },
   'Enter the customer name.': {
     'id-ID': 'Masukkan nama pelanggan.',
     'en-US': 'Enter the customer name.',
   },
-  'Enter a valid WhatsApp number, for example 0812 3456 7890.': {
-    'id-ID': 'Masukkan nomor WhatsApp yang valid, contoh 0812 3456 7890.',
-    'en-US': 'Enter a valid WhatsApp number, for example 0812 3456 7890.',
+  'Enter a valid WhatsApp number, for example 081234567890.': {
+    'id-ID': 'Masukkan nomor WhatsApp yang valid, contoh 081234567890.',
+    'en-US': 'Enter a valid WhatsApp number, for example 081234567890.',
   },
   Cancel: { 'id-ID': 'Batal', 'en-US': 'Cancel' },
   Save: { 'id-ID': 'Simpan', 'en-US': 'Save' },
@@ -67,9 +71,7 @@ export function WalkInCustomerEditDialog({
   const text = (value: string) => localCopy[value]?.[locale] ?? value;
   const saleId = target?.saleId ?? null;
   const [name, setName] = useState(target?.customer.name ?? '');
-  const [phone, setPhone] = useState(
-    target ? toLocalPhoneDisplay(target.customer.phoneE164) : '',
-  );
+  const [phone, setPhone] = useState(target ? toLocalPhoneDisplay(target.customer.phoneE164) : '');
   const [touched, setTouched] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
   const [isSaving, setSaving] = useState(false);
@@ -89,7 +91,7 @@ export function WalkInCustomerEditDialog({
   const nameError = touched && !trimmedName ? text('Enter the customer name.') : undefined;
   const phoneError =
     touched && !canonical
-      ? text('Enter a valid WhatsApp number, for example 0812 3456 7890.')
+      ? text('Enter a valid WhatsApp number, for example 081234567890.')
       : undefined;
   const unchanged =
     Boolean(target) &&
@@ -158,7 +160,7 @@ export function WalkInCustomerEditDialog({
             label={text('WhatsApp / phone')}
             placeholder={text('Phone placeholder')}
             value={phone}
-            onChange={(value) => setPhone(sanitizePhoneInput(value))}
+            onChange={(value) => setPhone(sanitizeNationalPhoneInput(value))}
             inputMode="tel"
             autoComplete="off"
             disabled={isSaving}

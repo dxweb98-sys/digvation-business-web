@@ -377,6 +377,11 @@ describe('Operational Member profile editing', () => {
     const dialog = within(await openRina());
 
     fireEvent.click(await dialog.findByRole('button', { name: 'Ubah data' }));
+    const phone = dialog.getByLabelText('Nomor telepon') as HTMLInputElement;
+    expect(phone.value).toBe('081234567890');
+    fireEvent.change(phone, { target: { value: '0812 3456 7890' } });
+    expect(phone.value).toBe('081234567890');
+    expect(dialog.queryByText('081234567890')).toBeNull();
     fireEvent.change(dialog.getByLabelText('Nama'), { target: { value: 'Rina Wijaya Putri' } });
     fireEvent.click(dialog.getByRole('button', { name: 'Simpan' }));
 
@@ -432,7 +437,7 @@ describe('Operational Member profile editing', () => {
 
     expect(
       dialog.getAllByRole('textbox').map((field) => (field as HTMLInputElement).value),
-    ).toEqual(['Rina Wijaya', '+6281234567890']);
+    ).toEqual(['Rina Wijaya', '081234567890']);
     expect(dialog.queryByLabelText(/NIK|poin|member/i)).toBeNull();
   });
 });

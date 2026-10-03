@@ -68,25 +68,126 @@ const enrollButton = () =>
 const openEnroll = () => fireEvent.click(screen.getByRole('tab', { name: /Daftar Member Baru/ }));
 
 describe('Customer picker phone', () => {
+  it('searches after a pause and captures only the explicitly selected canonical customer', async () => {
+    const { api, onChoose } = renderDialog({
+      canReadMembers: false,
+      canEnrollMember: false,
+      canReadLoyalty: false,
+    });
+    api.searchCustomers.mockResolvedValue({
+      items: [
+        { id: 'c-a', name: 'Dicky', phoneE164: '+628123456789', status: 'ACTIVE' },
+        { id: 'c-b', name: 'Dicky Darmawan', phoneE164: '+628123456789', status: 'ACTIVE' },
+        { id: 'c-c', name: 'Dicky', phoneE164: '+628999999999', status: 'ACTIVE' },
+      ],
+    });
+    type(name(), 'Dic');
+    type(name(), 'Dicky');
+    expect(api.searchCustomers).not.toHaveBeenCalled();
+    const choice = await screen.findByRole('option', { name: 'Dicky Darmawan +628123456789' });
+    expect(api.searchCustomers).toHaveBeenCalledTimes(1);
+    expect(api.searchCustomers).toHaveBeenCalledWith('Dicky', expect.any(AbortSignal));
+    expect(onChoose).not.toHaveBeenCalled();
+    fireEvent.click(choice);
+    fireEvent.click(screen.getByRole('button', { name: 'Gunakan Pelanggan' }));
+    expect(onChoose).toHaveBeenCalledWith({
+      type: 'NON_MEMBER',
+      referenceId: 'c-b',
+      name: 'Dicky Darmawan',
+      phone: '+628123456789',
+    });
+    expect(screen.queryByRole('tab', { name: /Member Terdaftar/ })).toBeNull();
+    expect(screen.queryByText('Saldo Poin')).toBeNull();
+  });
+
+  it('creates a separate customer when explicitly requested despite matching name and phone', async () => {
+    const { api, onChoose } = renderDialog();
+    api.searchCustomers.mockResolvedValue({
+      items: [{ id: 'old', name: 'Dicky', phoneE164: '+628123456789', status: 'ACTIVE' }],
+    });
+    type(name(), 'Dicky');
+    type(phone(), '+628123456789');
+    await screen.findByRole('option', { name: 'Dicky +628123456789' });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Gunakan sebagai pelanggan baru' })[0]!);
+    expect(onChoose).toHaveBeenCalledWith({
+      type: 'NON_MEMBER',
+      name: 'Dicky',
+      phone: '+628123456789',
+      createNew: true,
+    });
+    expect(api.enrollNew).not.toHaveBeenCalled();
+  });
+
+  it('uses the existing Member selection path for an authorized Member suggestion', async () => {
+    const { api, onChoose } = renderDialog();
+    api.searchCustomers.mockResolvedValue({
+      items: [
+        {
+          ...enrolled.customer,
+          membership: {
+            id: enrolled.id,
+            memberNumber: enrolled.memberNumber,
+            status: 'ACTIVE',
+            joinedAt: '2026-01-01',
+          },
+        },
+      ],
+    });
+    type(name(), 'Andir');
+    fireEvent.click(await screen.findByRole('option', { name: /Andir.*Member/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Gunakan Pelanggan' }));
+    expect(onChoose).toHaveBeenCalledWith(
+      { type: 'MEMBER', referenceId: enrolled.customerId },
+      expect.objectContaining({ id: enrolled.id, customerId: enrolled.customerId }),
+    );
+  });
+
+  it('does not request the directory without customers:read', async () => {
+    const { api } = renderDialog({
+      canReadCustomers: false,
+      canReadMembers: false,
+      canEnrollMember: false,
+    });
+    type(name(), 'Dicky');
+    type(phone(), '+628123456789');
+    expect(screen.queryByRole('listbox')).toBeNull();
+    expect(api.searchCustomers).not.toHaveBeenCalled();
+  });
+
   it('keeps the local number visible and submits canonical E.164 for a regular customer', () => {
     const { onChoose } = renderDialog();
     type(name(), 'Andir');
     type(phone(), '08192381923');
     expect(phone().value).toBe('08192381923');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Gunakan Pelanggan' }));
+    fireEvent.click(
+      screen.getAllByRole('button', { name: 'Gunakan sebagai pelanggan baru' }).at(-1)!,
+    );
     expect(onChoose).toHaveBeenCalledWith({
       type: 'NON_MEMBER',
       name: 'Andir',
       phone: '+628192381923',
+      createNew: true,
     });
+  });
+
+  it.each([
+    ['0812 3456 7890', '081234567890'],
+    ['+6281234567890', '081234567890'],
+    ['6281234567890', '081234567890'],
+  ])('normalizes POS regular Customer input %s to %s', (entered, expected) => {
+    renderDialog();
+    type(phone(), entered);
+    expect(phone().value).toBe(expected);
   });
 
   it('does not submit a partial or empty phone', () => {
     const { onChoose } = renderDialog();
     type(name(), 'Andir');
     type(phone(), '08');
-    const button = screen.getByRole('button', { name: 'Gunakan Pelanggan' }) as HTMLButtonElement;
+    const button = screen
+      .getAllByRole('button', { name: 'Gunakan sebagai pelanggan baru' })
+      .at(-1)! as HTMLButtonElement;
     expect(button.disabled).toBe(true);
     fireEvent.click(button);
     expect(onChoose).not.toHaveBeenCalled();
@@ -172,14 +273,14 @@ describe('Placeholder hierarchy', () => {
   it('keeps the labels and adds localized example placeholders for a regular customer', () => {
     renderDialog();
     expect(name().placeholder).toBe('Contoh: Andir Saputra');
-    expect(phone().placeholder).toBe('Contoh: 0812 3456 7890');
+    expect(phone().placeholder).toBe('Contoh: 081234567890');
   });
 
   it('adds name and phone guidance to enrollment without any NIK guidance', () => {
     renderDialog();
     openEnroll();
     expect(name().placeholder).toBe('Contoh: Andir Saputra');
-    expect(phone().placeholder).toBe('Contoh: 0812 3456 7890');
+    expect(phone().placeholder).toBe('Contoh: 081234567890');
     expect(screen.queryByText(/NIK/)).toBeNull();
   });
 });

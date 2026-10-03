@@ -14,82 +14,144 @@ import {
 import { findExistingCustomerCandidates } from '../existing-customer-candidates';
 import { isApiErrorCode } from '../cashier-transaction-errors';
 import { ExistingCustomerChoice } from './existing-customer-choice';
+import { RegularCustomerSuggestions } from './regular-customer-suggestions';
 import type { SaleCustomer, SaleCustomerSelection } from '../cashier-transaction.types';
-import {
-  sanitizePhoneInput,
-  toCanonicalPhone,
-} from '../customer-input';
+import { sanitizeNationalPhoneInput, toCanonicalPhone } from '../customer-input';
 
 type CustomerDialogMode = 'CUSTOMER' | 'MEMBER' | 'ENROLL';
 
 const localCopy: Record<string, { 'id-ID': string; 'en-US': string }> = {
+  'Customer suggestions': { 'id-ID': 'Saran pelanggan', 'en-US': 'Customer suggestions' },
+  'Customer search could not be completed.': {
+    'id-ID': 'Pencarian pelanggan tidak dapat dimuat.',
+    'en-US': 'Customer search could not be completed.',
+  },
+  'No customers found.': { 'id-ID': 'Pelanggan tidak ditemukan.', 'en-US': 'No customers found.' },
+  'Use as a new customer': {
+    'id-ID': 'Gunakan sebagai pelanggan baru',
+    'en-US': 'Use as a new customer',
+  },
+  Next: {
+    'id-ID': 'Lanjutkan',
+    'en-US': 'Next',
+  },
+  'Regular Customer': { 'id-ID': 'Pelanggan Umum', 'en-US': 'Regular Customer' },
+  Member: { 'id-ID': 'Member', 'en-US': 'Member' },
+  'Try again': { 'id-ID': 'Coba lagi', 'en-US': 'Try again' },
   'Choose customer': { 'id-ID': 'Pilih Pelanggan', 'en-US': 'Choose Customer' },
   'Find a customer, choose a registered member, or enroll a new member for this transaction.': {
-    'id-ID': 'Cari data pelanggan, pilih member terdaftar, atau daftarkan member baru untuk transaksi ini.',
-    'en-US': 'Find a customer, choose a registered member, or enroll a new member for this transaction.',
+    'id-ID':
+      'Cari data pelanggan, pilih member terdaftar, atau daftarkan member baru untuk transaksi ini.',
+    'en-US':
+      'Find a customer, choose a registered member, or enroll a new member for this transaction.',
   },
   'Regular customer': { 'id-ID': 'Customer Biasa', 'en-US': 'Regular Customer' },
   'Registered member': { 'id-ID': 'Member Terdaftar', 'en-US': 'Registered Member' },
   'Enroll member': { 'id-ID': 'Daftar Member Baru', 'en-US': 'Enroll Member' },
-  'Non-loyalty customer': { 'id-ID': 'Pelanggan Non-Loyalty (Struk Digital)', 'en-US': 'Non-Loyalty Customer (Digital Receipt)' },
-  'Regular digital-receipt customer': { 'id-ID': 'Pelanggan Umum (Struk Digital)', 'en-US': 'Regular Customer (Digital Receipt)' },
+  'Non-loyalty customer': {
+    'id-ID': 'Pelanggan Non-Loyalty (Struk Digital)',
+    'en-US': 'Non-Loyalty Customer (Digital Receipt)',
+  },
+  'Regular digital-receipt customer': {
+    'id-ID': 'Pelanggan Umum (Struk Digital)',
+    'en-US': 'Regular Customer (Digital Receipt)',
+  },
   'A regular customer records name and WhatsApp for the digital receipt for this transaction.': {
     'id-ID': 'Customer biasa mencatat nama & WhatsApp untuk kebutuhan transaksi dan struk digital.',
-    'en-US': 'A regular customer records name and WhatsApp for the digital receipt for this transaction.',
+    'en-US':
+      'A regular customer records name and WhatsApp for the digital receipt for this transaction.',
   },
-  'A regular customer records name and WhatsApp for this transaction without accumulating loyalty points.': {
-    'id-ID': 'Customer biasa mencatat nama & WhatsApp untuk transaksi ini tanpa program akumulasi poin loyalty.',
-    'en-US': 'A regular customer records name and WhatsApp for this transaction without accumulating loyalty points.',
-  },
+  'A regular customer records name and WhatsApp for this transaction without accumulating loyalty points.':
+    {
+      'id-ID':
+        'Customer biasa mencatat nama & WhatsApp untuk transaksi ini tanpa program akumulasi poin loyalty.',
+      'en-US':
+        'A regular customer records name and WhatsApp for this transaction without accumulating loyalty points.',
+    },
   'Customer name': { 'id-ID': 'Nama Pelanggan', 'en-US': 'Customer Name' },
   'Name placeholder': { 'id-ID': 'Contoh: Andir Saputra', 'en-US': 'Example: Andir Saputra' },
-  'Phone placeholder': { 'id-ID': 'Contoh: 0812 3456 7890', 'en-US': 'Example: 0812 3456 7890' },
+  'Phone placeholder': { 'id-ID': 'Contoh: 081234567890', 'en-US': 'Example: 081234567890' },
   'WhatsApp / phone': { 'id-ID': 'Nomor WhatsApp / Telepon', 'en-US': 'WhatsApp / Phone' },
-  'Required': { 'id-ID': 'Wajib diisi', 'en-US': 'Required' },
-  'Want to earn points and rewards?': { 'id-ID': 'Ingin catat poin belanja & reward loyalty pelanggan?', 'en-US': 'Want to earn points and rewards?' },
-  'Want to register this customer as a member?': { 'id-ID': 'Ingin daftarkan pelanggan ini sebagai member?', 'en-US': 'Want to register this customer as a member?' },
+  Required: { 'id-ID': 'Wajib diisi', 'en-US': 'Required' },
+  'Want to earn points and rewards?': {
+    'id-ID': 'Ingin catat poin belanja & reward loyalty pelanggan?',
+    'en-US': 'Want to earn points and rewards?',
+  },
+  'Want to register this customer as a member?': {
+    'id-ID': 'Ingin daftarkan pelanggan ini sebagai member?',
+    'en-US': 'Want to register this customer as a member?',
+  },
   'Enroll as member': { 'id-ID': 'Daftar Member', 'en-US': 'Enroll as Member' },
   'Use customer': { 'id-ID': 'Gunakan Pelanggan', 'en-US': 'Use Customer' },
-  'Regular customer status': { 'id-ID': 'Status: Pelanggan Umum (Walk-In)', 'en-US': 'Status: Regular Customer (Walk-In)' },
+  'Regular customer status': {
+    'id-ID': 'Status: Pelanggan Umum (Walk-In)',
+    'en-US': 'Status: Regular Customer (Walk-In)',
+  },
   'Search member': { 'id-ID': 'Cari Member Terdaftar', 'en-US': 'Search Registered Member' },
-  'Search member placeholder': { 'id-ID': 'Cari nama, nomor telepon, atau kode member', 'en-US': 'Search name, phone, or member number' },
+  'Search member placeholder': {
+    'id-ID': 'Cari nama, nomor telepon, atau kode member',
+    'en-US': 'Search name, phone, or member number',
+  },
   'Type at least 2 characters to search members.': {
     'id-ID': 'Ketik minimal 2 karakter untuk mencari member.',
     'en-US': 'Type at least 2 characters to search members.',
   },
   'Search results': { 'id-ID': 'Hasil Pencarian', 'en-US': 'Search Results' },
   'No members found.': { 'id-ID': 'Member tidak ditemukan.', 'en-US': 'No members found.' },
-  'Member lookup could not be completed.': { 'id-ID': 'Pencarian member tidak dapat dimuat.', 'en-US': 'Member lookup could not be completed.' },
-  'Active': { 'id-ID': 'Aktif', 'en-US': 'Active' },
+  'Member lookup could not be completed.': {
+    'id-ID': 'Pencarian member tidak dapat dimuat.',
+    'en-US': 'Member lookup could not be completed.',
+  },
+  Active: { 'id-ID': 'Aktif', 'en-US': 'Active' },
   'Selected member': { 'id-ID': 'Member Terpilih', 'en-US': 'Selected Member' },
   'Point balance': { 'id-ID': 'Saldo Poin', 'en-US': 'Point Balance' },
   'Loading points...': { 'id-ID': 'Memuat poin...', 'en-US': 'Loading points...' },
   'Use this member': { 'id-ID': 'Gunakan Member Ini', 'en-US': 'Use This Member' },
-  'Customer not found in the list?': { 'id-ID': 'Pelanggan tidak ditemukan dalam daftar?', 'en-US': 'Customer not found in the list?' },
+  'Customer not found in the list?': {
+    'id-ID': 'Pelanggan tidak ditemukan dalam daftar?',
+    'en-US': 'Customer not found in the list?',
+  },
   'Register a new member': { 'id-ID': 'Daftarkan Member Baru', 'en-US': 'Register a New Member' },
-  'Membership activation': { 'id-ID': 'Aktivasi Member & Loyalty Point', 'en-US': 'Membership & Loyalty Activation' },
+  'Membership activation': {
+    'id-ID': 'Aktivasi Member & Loyalty Point',
+    'en-US': 'Membership & Loyalty Activation',
+  },
   'Member activation': { 'id-ID': 'Aktivasi Member', 'en-US': 'Member Activation' },
   'Enrollment creates an active membership for this customer.': {
     'id-ID': 'Pendaftaran membuat keanggotaan aktif untuk pelanggan ini.',
     'en-US': 'Enrollment creates an active membership for this customer.',
   },
-  'Enrollment creates an active membership for this customer. Loyalty points follow the current business configuration.': {
-    'id-ID': 'Pendaftaran member membuat keanggotaan aktif. Poin loyalty mengikuti konfigurasi bisnis yang berlaku.',
-    'en-US': 'Enrollment creates an active membership for this customer. Loyalty points follow the current business configuration.',
-  },
+  'Enrollment creates an active membership for this customer. Loyalty points follow the current business configuration.':
+    {
+      'id-ID':
+        'Pendaftaran member membuat keanggotaan aktif. Poin loyalty mengikuti konfigurasi bisnis yang berlaku.',
+      'en-US':
+        'Enrollment creates an active membership for this customer. Loyalty points follow the current business configuration.',
+    },
   'New member information': { 'id-ID': 'Informasi Member Baru', 'en-US': 'New Member Information' },
   'Member code': { 'id-ID': 'Kode Member', 'en-US': 'Member Code' },
-  'Automatic': { 'id-ID': 'Otomatis', 'en-US': 'Automatic' },
+  Automatic: { 'id-ID': 'Otomatis', 'en-US': 'Automatic' },
   'Registration status': { 'id-ID': 'Status Pendaftaran', 'en-US': 'Registration Status' },
   'Active immediately': { 'id-ID': 'Aktif Langsung', 'en-US': 'Active Immediately' },
   'Full name': { 'id-ID': 'Nama Lengkap', 'en-US': 'Full Name' },
-  'Enroll and select member': { 'id-ID': 'Daftar & Pilih Member', 'en-US': 'Enroll & Select Member' },
-  'This phone number is already registered as a member.': { 'id-ID': 'Nomor telepon ini sudah terdaftar sebagai member.', 'en-US': 'This phone number is already registered as a member.' },
-  'This phone number is already registered as a customer. Add it as a member from that customer.': {
-    'id-ID': 'Nomor telepon ini sudah terdaftar sebagai pelanggan. Tambahkan sebagai member dari pelanggan tersebut.',
-    'en-US': 'This phone number is already registered as a customer. Add it as a member from that customer.',
+  'Enroll and select member': {
+    'id-ID': 'Daftar & Pilih Member',
+    'en-US': 'Enroll & Select Member',
   },
-  'Customer already registered': { 'id-ID': 'Pelanggan sudah terdaftar', 'en-US': 'Customer already registered' },
+  'This phone number is already registered as a member.': {
+    'id-ID': 'Nomor telepon ini sudah terdaftar sebagai member.',
+    'en-US': 'This phone number is already registered as a member.',
+  },
+  'This phone number is already registered as a customer. Add it as a member from that customer.': {
+    'id-ID':
+      'Nomor telepon ini sudah terdaftar sebagai pelanggan. Tambahkan sebagai member dari pelanggan tersebut.',
+    'en-US':
+      'This phone number is already registered as a customer. Add it as a member from that customer.',
+  },
+  'Customer already registered': {
+    'id-ID': 'Pelanggan sudah terdaftar',
+    'en-US': 'Customer already registered',
+  },
   'This number is already registered as a customer but is not a member yet.': {
     'id-ID': 'Nomor ini sudah terdaftar sebagai pelanggan, tetapi belum menjadi member.',
     'en-US': 'This number is already registered as a customer but is not a member yet.',
@@ -103,9 +165,15 @@ const localCopy: Record<string, { 'id-ID': string; 'en-US': string }> = {
     'en-US': 'The existing customer profile is not changed.',
   },
   'Make member': { 'id-ID': 'Jadikan Member', 'en-US': 'Make Member' },
-  'Member enrollment could not be completed.': { 'id-ID': 'Pendaftaran member tidak dapat diselesaikan.', 'en-US': 'Member enrollment could not be completed.' },
-  'Cancel': { 'id-ID': 'Batal', 'en-US': 'Cancel' },
-  'No member search permission.': { 'id-ID': 'Akun ini tidak memiliki akses pencarian member.', 'en-US': 'This account cannot search members.' },
+  'Member enrollment could not be completed.': {
+    'id-ID': 'Pendaftaran member tidak dapat diselesaikan.',
+    'en-US': 'Member enrollment could not be completed.',
+  },
+  Cancel: { 'id-ID': 'Batal', 'en-US': 'Cancel' },
+  'No member search permission.': {
+    'id-ID': 'Akun ini tidak memiliki akses pencarian member.',
+    'en-US': 'This account cannot search members.',
+  },
 };
 
 function initials(name: string): string {
@@ -160,6 +228,8 @@ export function CustomerMemberDialog({
   const [query, setQuery] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [regularQuery, setRegularQuery] = useState('');
+  const [regularCustomer, setRegularCustomer] = useState<CustomerLookupResult | null>(null);
   const [selectedMember, setSelectedMember] = useState<MemberLookupResult | null>(null);
   const [enrollError, setEnrollError] = useState<string | null>(null);
   const [existingCandidates, setExistingCandidates] = useState<CustomerLookupResult[] | null>(null);
@@ -174,6 +244,8 @@ export function CustomerMemberDialog({
     setQuery('');
     setName('');
     setPhone('');
+    setRegularQuery('');
+    setRegularCustomer(null);
     setSelectedMember(null);
     setEnrollError(null);
     setExistingCandidates(null);
@@ -182,12 +254,17 @@ export function CustomerMemberDialog({
 
   const memberSearchReady = query.trim().length >= 2;
   const memberQuery = useQuery({
-    queryKey: ['operational-member-search', query.trim()],
+    queryKey: ['operational-member-search', api.cacheScope, query.trim()],
     queryFn: ({ signal }) => api.searchMembers(query.trim(), signal),
     enabled: open && mode === 'MEMBER' && canReadMembers && memberSearchReady,
   });
   const selectedBalanceQuery = useQuery({
-    queryKey: ['operational-member-picker-balance', selectedMember?.id],
+    queryKey: [
+      'operational-member-picker-balance',
+      api.cacheScope,
+      selectedMember?.id,
+      canReadLoyalty,
+    ],
     queryFn: ({ signal }) => api.getPointBalance(selectedMember!.id, signal),
     enabled: Boolean(open && mode === 'MEMBER' && selectedMember && canReadLoyalty),
   });
@@ -205,7 +282,21 @@ export function CustomerMemberDialog({
 
   const submitCustomer = () => {
     if (!name.trim() || !canonicalPhone || isSaving) return;
-    onChoose({ type: 'NON_MEMBER', name: name.trim(), phone: canonicalPhone });
+    if (regularCustomer?.membership?.status === 'ACTIVE' && canReadMembers) {
+      const member: MemberLookupResult = {
+        ...regularCustomer.membership,
+        customerId: regularCustomer.id,
+        customer: regularCustomer,
+      };
+      onChoose(memberSaleSelection(member), member);
+    } else {
+      onChoose({
+        type: 'NON_MEMBER',
+        name: name.trim(),
+        phone: canonicalPhone,
+        ...(regularCustomer ? { referenceId: regularCustomer.id } : { createNew: true as const }),
+      });
+    }
   };
 
   const enroll = async () => {
@@ -281,19 +372,19 @@ export function CustomerMemberDialog({
   const footer =
     mode === 'CUSTOMER' ? (
       <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-xs text-[var(--color-text-muted)]">{text('Regular customer status')}</p>
+        <p className="text-xs text-(--color-text-muted)">{text('Regular customer status')}</p>
         <div className="flex justify-end gap-2">
           <DButton variant="secondary" onClick={onClose} disabled={isSaving}>
             {text('Cancel')}
           </DButton>
           <DButton onClick={submitCustomer} disabled={!customerReady} loading={isSaving}>
-            {text('Use customer')}
+            {text('Next')}
           </DButton>
         </div>
       </div>
     ) : mode === 'MEMBER' ? (
       <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-xs text-[var(--color-text-muted)]">
+        <p className="text-xs text-(--color-text-muted)">
           {selectedMember ? text('Selected member') : text('Search member')}
         </p>
         <div className="flex justify-end gap-2">
@@ -327,8 +418,8 @@ export function CustomerMemberDialog({
       </div>
     ) : (
       <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-xs text-[var(--color-text-muted)]">
-          <span className="text-[var(--color-danger)]">*</span> {text('Required')}
+        <p className="text-xs text-(--color-text-muted)">
+          <span className="text-(--color-danger)">*</span> {text('Required')}
         </p>
         <div className="flex justify-end gap-2">
           <DButton variant="secondary" onClick={onClose} disabled={isEnrolling}>
@@ -354,11 +445,11 @@ export function CustomerMemberDialog({
       ariaLabel={text('Choose customer')}
       closeOnEscape
       closeOnOverlay
-      className="pos-reference-dialog w-full max-w-xl overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-2xl"
+      className="pos-reference-dialog w-full max-w-xl overflow-hidden rounded-t-2xl bg-(--color-surface) shadow-xl sm:rounded-2xl"
       footer={footer}
     >
       <div className="space-y-4">
-        <p className="text-xs leading-5 text-[var(--color-text-muted)]">
+        <p className="text-xs leading-5 text-(--color-text-muted)">
           {text(
             'Find a customer, choose a registered member, or enroll a new member for this transaction.',
           )}
@@ -371,8 +462,12 @@ export function CustomerMemberDialog({
         >
           <DTabsList
             className={`grid w-full ${
-              canEnrollMember ? 'grid-cols-3' : 'grid-cols-2'
-            } rounded-xl bg-[var(--color-surface-muted)] p-1`}
+              canReadMembers && canEnrollMember
+                ? 'grid-cols-3'
+                : canReadMembers || canEnrollMember
+                  ? 'grid-cols-2'
+                  : 'grid-cols-1'
+            } rounded-xl bg-(--color-surface-muted) p-1`}
           >
             <DTabsTrigger value="CUSTOMER" className="min-w-0 px-2">
               <span className="flex min-w-0 items-center justify-center gap-2">
@@ -380,12 +475,14 @@ export function CustomerMemberDialog({
                 <span className="truncate">{text('Regular customer')}</span>
               </span>
             </DTabsTrigger>
-            <DTabsTrigger value="MEMBER" className="min-w-0 px-2">
-              <span className="flex min-w-0 items-center justify-center gap-2">
-                <Users className="size-3.5 shrink-0" aria-hidden="true" />
-                <span className="truncate">{text('Registered member')}</span>
-              </span>
-            </DTabsTrigger>
+            {canReadMembers ? (
+              <DTabsTrigger value="MEMBER" className="min-w-0 px-2">
+                <span className="flex min-w-0 items-center justify-center gap-2">
+                  <Users className="size-3.5 shrink-0" aria-hidden="true" />
+                  <span className="truncate">{text('Registered member')}</span>
+                </span>
+              </DTabsTrigger>
+            ) : null}
             {canEnrollMember ? (
               <DTabsTrigger value="ENROLL" className="min-w-0 px-2">
                 <span className="flex min-w-0 items-center justify-center gap-2">
@@ -397,11 +494,11 @@ export function CustomerMemberDialog({
           </DTabsList>
 
           <DTabsContent value="CUSTOMER" className="mt-4 space-y-4">
-            <div className="rounded-xl border border-[var(--color-brand)]/15 bg-[var(--color-brand)]/[.06] px-4 py-3">
-              <p className="text-sm font-semibold text-[var(--color-brand)]">
+            <div className="rounded-xl border border-(--color-brand)/15 bg-(--color-brand)/6 px-4 py-3">
+              <p className="text-sm font-semibold text-(--color-brand)">
                 {text(canReadLoyalty ? 'Non-loyalty customer' : 'Regular digital-receipt customer')}
               </p>
-              <p className="mt-1 text-xs leading-5 text-[var(--color-text-muted)]">
+              <p className="mt-1 text-xs leading-5 text-(--color-text-muted)">
                 {text(
                   canReadLoyalty
                     ? 'A regular customer records name and WhatsApp for this transaction without accumulating loyalty points.'
@@ -415,27 +512,61 @@ export function CustomerMemberDialog({
                 label={text('Customer name')}
                 placeholder={text('Name placeholder')}
                 value={name}
-                onChange={setName}
+                onChange={(value) => {
+                  setName(value);
+                  setRegularQuery(value);
+                  setRegularCustomer(null);
+                }}
                 disabled={isSaving}
               />
               <DInput
                 label={text('WhatsApp / phone')}
                 placeholder={text('Phone placeholder')}
                 value={phone}
-                onChange={(value) => setPhone(sanitizePhoneInput(value))}
+                onChange={(value) => {
+                  const national = sanitizeNationalPhoneInput(value);
+                  setPhone(national);
+                  setRegularQuery(toCanonicalPhone(national) ?? national);
+                  setRegularCustomer(null);
+                }}
                 inputMode="tel"
                 disabled={isSaving}
               />
             </div>
 
+            <RegularCustomerSuggestions
+              query={regularQuery}
+              api={api}
+              enabled={open && mode === 'CUSTOMER' && canReadCustomers}
+              selectedId={regularCustomer?.id ?? null}
+              canReadMembers={canReadMembers}
+              disabled={isSaving}
+              text={text}
+              newDisabled={!customerReady}
+              onSelect={(selected) => {
+                setRegularCustomer(selected);
+                setName(selected.name);
+                setPhone(sanitizeNationalPhoneInput(selected.phoneE164));
+              }}
+              onNew={() => {
+                if (customerReady)
+                  onChoose({
+                    type: 'NON_MEMBER',
+                    name: name.trim(),
+                    phone: canonicalPhone!,
+                    createNew: true,
+                  });
+              }}
+            />
+
             {canEnrollMember ? (
               <button
                 type="button"
                 onClick={() => switchMode('ENROLL')}
-                className="flex w-full items-center justify-between gap-3 rounded-xl border border-dashed border-[var(--color-brand)]/35 bg-[var(--color-brand)]/[.04] px-4 py-3 text-left transition-colors hover:bg-[var(--color-brand)]/[.08]"
+                className="flex w-full items-center justify-between gap-3 rounded-xl border border-dashed border-(--color-brand)/35 bg-(--color-brand)/4 px-4 py-3 text-left transition-colors hover:bg-(--color-brand)/8"
               >
-                <span className="flex min-w-0 items-center gap-2 text-xs font-medium text-[var(--color-text)]">
-                  <UserPlus className="size-4 shrink-0 text-[var(--color-brand)]" />
+                <span className="flex min-w-0 items-center gap-2 text-xs font-medium text-(--color-text)">
+                  <UserPlus className="size-4 shrink-0 text-(--color-brand)" />
                   <span>
                     {text(
                       canReadLoyalty
@@ -444,7 +575,7 @@ export function CustomerMemberDialog({
                     )}
                   </span>
                 </span>
-                <span className="shrink-0 text-xs font-semibold text-[var(--color-brand)]">
+                <span className="shrink-0 text-xs font-semibold text-(--color-brand)">
                   {text('Enroll as member')}
                 </span>
               </button>
@@ -467,97 +598,97 @@ export function CustomerMemberDialog({
                 />
 
                 {!memberSearchReady ? (
-                  <p className="text-xs text-[var(--color-text-muted)]">
+                  <p className="text-xs text-(--color-text-muted)">
                     {text('Type at least 2 characters to search members.')}
                   </p>
                 ) : (
-                <div className="overflow-hidden rounded-xl border border-[var(--color-border)]">
-                  <div className="flex items-center justify-between bg-[var(--color-surface-muted)] px-3 py-2">
-                    <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
-                      {text('Search results')} ({memberItems.length})
-                    </span>
-                  </div>
-                  <div className="max-h-64 divide-y divide-[var(--color-border)] overflow-y-auto">
-                    {memberQuery.isLoading ? (
-                      <div className="space-y-2 p-3">
-                        <DSkeleton className="h-14 rounded-xl" />
-                        <DSkeleton className="h-14 rounded-xl" />
-                      </div>
-                    ) : memberQuery.isError ? (
-                      <div className="p-3">
-                        <DAlert variant="danger">
-                          {text('Member lookup could not be completed.')}
-                        </DAlert>
-                      </div>
-                    ) : memberItems.length ? (
-                      memberItems.map((member) => {
-                        const selected = selectedMember?.id === member.id;
-                        return (
-                          <button
-                            key={member.id}
-                            type="button"
-                            onClick={() => setSelectedMember(member)}
-                            className={`flex w-full items-center gap-3 px-3 py-3 text-left transition-colors ${
-                              selected
-                                ? 'bg-[var(--color-brand)]/[.07]'
-                                : 'bg-[var(--color-surface)] hover:bg-[var(--color-surface-muted)]'
-                            }`}
-                          >
-                            <div className="grid size-10 shrink-0 place-items-center rounded-full bg-[var(--color-brand)]/10 text-xs font-semibold text-[var(--color-brand)]">
-                              {initials(member.customer.name)}
-                            </div>
-                            <span className="min-w-0 flex-1">
-                              <span className="flex min-w-0 items-center gap-2">
-                                <span className="truncate text-sm font-semibold">
-                                  {member.customer.name}
-                                </span>
-                                <span className="shrink-0 rounded-md bg-[var(--color-surface-muted)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-text-muted)]">
-                                  {member.memberNumber}
-                                </span>
-                                <span className="shrink-0 rounded-full bg-[var(--color-success)]/10 px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-success)]">
-                                  {text('Active')}
-                                </span>
-                              </span>
-                              <span className="mt-0.5 flex items-center gap-1 text-xs text-[var(--color-text-muted)]">
-                                <Phone className="size-3" />
-                                {member.customer.phoneE164}
-                              </span>
-                            </span>
-                            <span className="shrink-0 text-xs font-semibold text-[var(--color-brand)]">
-                              {selected ? '✓' : '›'}
-                            </span>
-                          </button>
-                        );
-                      })
-                    ) : (
-                      <div className="p-4 text-xs text-[var(--color-text-muted)]">
-                        {text('No members found.')}
-                      </div>
-                    )}
-                  </div>
-
-                  {canEnrollMember ? (
-                    <div className="flex items-center justify-between gap-3 border-t border-[var(--color-border)] bg-[var(--color-surface-muted)]/45 px-3 py-2.5">
-                      <span className="text-xs text-[var(--color-text-muted)]">
-                        {text('Customer not found in the list?')}
+                  <div className="overflow-hidden rounded-xl border border-(--color-border)">
+                    <div className="flex items-center justify-between bg-(--color-surface-muted) px-3 py-2">
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-(--color-text-muted)">
+                        {text('Search results')} ({memberItems.length})
                       </span>
-                      <button
-                        type="button"
-                        className="text-xs font-semibold text-[var(--color-brand)]"
-                        onClick={() => switchMode('ENROLL')}
-                      >
-                        {text('Register a new member')}
-                      </button>
                     </div>
-                  ) : null}
-                </div>
+                    <div className="max-h-64 divide-y divide-(--color-border) overflow-y-auto">
+                      {memberQuery.isLoading ? (
+                        <div className="space-y-2 p-3">
+                          <DSkeleton className="h-14 rounded-xl" />
+                          <DSkeleton className="h-14 rounded-xl" />
+                        </div>
+                      ) : memberQuery.isError ? (
+                        <div className="p-3">
+                          <DAlert variant="danger">
+                            {text('Member lookup could not be completed.')}
+                          </DAlert>
+                        </div>
+                      ) : memberItems.length ? (
+                        memberItems.map((member) => {
+                          const selected = selectedMember?.id === member.id;
+                          return (
+                            <button
+                              key={member.id}
+                              type="button"
+                              onClick={() => setSelectedMember(member)}
+                              className={`flex w-full items-center gap-3 px-3 py-3 text-left transition-colors ${
+                                selected
+                                  ? 'bg-(--color-brand)/[.07]'
+                                  : 'bg-(--color-surface) hover:bg-(--color-surface-muted)'
+                              }`}
+                            >
+                              <div className="grid size-10 shrink-0 place-items-center rounded-full bg-(--color-brand)/10 text-xs font-semibold text-(--color-brand)">
+                                {initials(member.customer.name)}
+                              </div>
+                              <span className="min-w-0 flex-1">
+                                <span className="flex min-w-0 items-center gap-2">
+                                  <span className="truncate text-sm font-semibold">
+                                    {member.customer.name}
+                                  </span>
+                                  <span className="shrink-0 rounded-md bg-(--color-surface-muted) px-1.5 py-0.5 text-[10px] font-medium text-(--color-text-muted)">
+                                    {member.memberNumber}
+                                  </span>
+                                  <span className="shrink-0 rounded-full bg-(--color-success)/10 px-1.5 py-0.5 text-[10px] font-medium text-(--color-success)">
+                                    {text('Active')}
+                                  </span>
+                                </span>
+                                <span className="mt-0.5 flex items-center gap-1 text-xs text-(--color-text-muted)">
+                                  <Phone className="size-3" />
+                                  {member.customer.phoneE164}
+                                </span>
+                              </span>
+                              <span className="shrink-0 text-xs font-semibold text-(--color-brand)">
+                                {selected ? '✓' : '›'}
+                              </span>
+                            </button>
+                          );
+                        })
+                      ) : (
+                        <div className="p-4 text-xs text-(--color-text-muted)">
+                          {text('No members found.')}
+                        </div>
+                      )}
+                    </div>
+
+                    {canEnrollMember ? (
+                      <div className="flex items-center justify-between gap-3 border-t border-(--color-border) bg-(--color-surface-muted)/45 px-3 py-2.5">
+                        <span className="text-xs text-(--color-text-muted)">
+                          {text('Customer not found in the list?')}
+                        </span>
+                        <button
+                          type="button"
+                          className="text-xs font-semibold text-(--color-brand)"
+                          onClick={() => switchMode('ENROLL')}
+                        >
+                          {text('Register a new member')}
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
                 )}
 
                 {selectedMember ? (
-                  <div className="rounded-xl border border-[var(--color-brand)]/20 bg-[var(--color-brand)]/[.04] p-3">
+                  <div className="rounded-xl border border-(--color-brand)/20 bg-(--color-brand)/4 p-3">
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-(--color-text-muted)">
                           {text('Selected member')}
                         </p>
                         <p className="mt-1 truncate text-sm font-semibold">
@@ -566,10 +697,10 @@ export function CustomerMemberDialog({
                       </div>
                       {canReadLoyalty ? (
                         <div className="shrink-0 text-right">
-                          <p className="text-[11px] text-[var(--color-text-muted)]">
+                          <p className="text-[11px] text-(--color-text-muted)">
                             {text('Point balance')}
                           </p>
-                          <p className="mt-1 text-sm font-bold text-[var(--color-brand)]">
+                          <p className="mt-1 text-sm font-bold text-(--color-brand)">
                             {selectedBalanceQuery.isLoading
                               ? text('Loading points...')
                               : formatPoints(selectedBalanceQuery.data?.pointsBalance, locale)}
@@ -585,14 +716,14 @@ export function CustomerMemberDialog({
 
           {canEnrollMember ? (
             <DTabsContent value="ENROLL" className="mt-4 space-y-4">
-              <div className="rounded-xl border border-[var(--color-brand)]/20 bg-[var(--color-brand)]/[.06] px-4 py-3">
+              <div className="rounded-xl border border-(--color-brand)/20 bg-(--color-brand)/6 px-4 py-3">
                 <div className="flex items-start gap-2">
-                  <UserPlus className="mt-0.5 size-4 shrink-0 text-[var(--color-brand)]" />
+                  <UserPlus className="mt-0.5 size-4 shrink-0 text-(--color-brand)" />
                   <div>
-                    <p className="text-sm font-semibold text-[var(--color-brand)]">
+                    <p className="text-sm font-semibold text-(--color-brand)">
                       {text(canReadLoyalty ? 'Membership activation' : 'Member activation')}
                     </p>
-                    <p className="mt-1 text-xs leading-5 text-[var(--color-text-muted)]">
+                    <p className="mt-1 text-xs leading-5 text-(--color-text-muted)">
                       {text(
                         canReadLoyalty
                           ? 'Enrollment creates an active membership for this customer. Loyalty points follow the current business configuration.'
@@ -621,23 +752,23 @@ export function CustomerMemberDialog({
               ) : (
                 <div>
                   <div className="mb-3 flex items-center justify-between gap-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-(--color-text-muted)">
                       {text('New member information')}
                     </p>
-                    <span className="text-[10px] text-[var(--color-text-muted)]">1 / 1</span>
+                    <span className="text-[10px] text-(--color-text-muted)">1 / 1</span>
                   </div>
                   <div className="mb-3 grid gap-2 sm:grid-cols-2">
-                    <div className="rounded-xl bg-[var(--color-surface-muted)] px-3 py-2.5">
-                      <p className="text-[10px] font-medium text-[var(--color-text-muted)]">
+                    <div className="rounded-xl bg-(--color-surface-muted) px-3 py-2.5">
+                      <p className="text-[10px] font-medium text-(--color-text-muted)">
                         {text('Member code')}
                       </p>
                       <p className="mt-1 text-xs font-semibold">{text('Automatic')}</p>
                     </div>
-                    <div className="rounded-xl bg-[var(--color-surface-muted)] px-3 py-2.5">
-                      <p className="text-[10px] font-medium text-[var(--color-text-muted)]">
+                    <div className="rounded-xl bg-(--color-surface-muted) px-3 py-2.5">
+                      <p className="text-[10px] font-medium text-(--color-text-muted)">
                         {text('Registration status')}
                       </p>
-                      <p className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-success)]">
+                      <p className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-(--color-success)">
                         <CheckCircle2 className="size-3.5" aria-hidden="true" />
                         {text('Active immediately')}
                       </p>
@@ -655,7 +786,7 @@ export function CustomerMemberDialog({
                       label={text('WhatsApp / phone')}
                       placeholder={text('Phone placeholder')}
                       value={phone}
-                      onChange={(value) => setPhone(sanitizePhoneInput(value))}
+                      onChange={(value) => setPhone(sanitizeNationalPhoneInput(value))}
                       inputMode="tel"
                       disabled={isEnrolling}
                     />

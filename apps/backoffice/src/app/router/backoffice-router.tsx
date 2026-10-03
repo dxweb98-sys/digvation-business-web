@@ -12,6 +12,7 @@ import { BackofficeShell } from '../shell/backoffice-shell';
 import { AccessControlPage } from '../../modules/identity';
 import { BusinessSettingsPage } from '../../modules/organization';
 import { CatalogPage } from '../../features/catalog';
+import { CustomersPage } from '../../features/customers';
 import { PromotionsPage } from '../../modules/promotions';
 import { EmployeesPage } from '../../modules/workforce';
 import { MembersPage } from '../../modules/membership';
@@ -79,6 +80,10 @@ export const backofficeRouter = createBrowserRouter([
           {
             element: <AuthorizedRoute capability="memberships" />,
             children: [{ path: '/memberships', element: <MembersPage /> }],
+          },
+          {
+            element: <AuthorizedRoute capability="customers" />,
+            children: [{ path: '/customers', element: <CustomersPage /> }],
           },
           {
             element: <AuthorizedRoute capability="financialAccounts" />,
