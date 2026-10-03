@@ -61,29 +61,59 @@ export interface OperationalPromotionCommands {
 
 /**
  * Receipt delivery is requested for a captured transaction and handled outside
- * it. Runtime resolves the destination from the transaction's own customer
- * snapshot, so no destination is ever sent from here.
+ * it. Without a target Runtime uses the transaction's customer snapshot; a
+ * target redirects that one attempt and never changes transaction or Customer data.
  */
 export interface OperationalReceiptDeliveryCommands {
   requestReceiptDelivery(
     saleId: string,
-    channel: 'WHATSAPP',
-  ): Promise<{ deliveryId: string; channel: 'WHATSAPP'; state: string }>;
+    request: ReceiptDeliveryRequest,
+  ): Promise<{ deliveryId: string; channel: 'WHATSAPP'; state: ReceiptDeliveryState }>;
   getReceiptDeliveryStatus(saleId: string): Promise<OperationalReceiptDeliveryStatus>;
+}
+
+export type ReceiptDeliveryState = 'QUEUED' | 'SENDING' | 'SENT' | 'FAILED';
+
+export interface ReceiptDeliveryRequest {
+  readonly channel: 'WHATSAPP';
+  /** One key per send intent: repeating it never delivers twice. */
+  readonly idempotencyKey: string;
+  readonly destination?: string;
+  readonly retryOfDeliveryId?: string;
+}
+
+/** One attempt. The destination arrives masked; delivery history never reveals the number. */
+export interface ReceiptDeliveryAttempt {
+  readonly deliveryId: string;
+  /** SENT: the WhatsApp provider accepted the request. Not a delivery confirmation. */
+  readonly status: ReceiptDeliveryState;
+  readonly destinationMasked: string;
+  readonly customerDestination: boolean;
+  readonly attemptCount: number;
+  readonly failureCategory: string | null;
+  readonly requestedAt: string;
+  readonly sentAt: string | null;
+  readonly failedAt: string | null;
+  readonly requestedByName: string | null;
+  readonly retryAllowed: boolean;
 }
 
 export interface OperationalReceiptDeliveryStatus {
   readonly available: boolean;
-  readonly delivery: {
-    readonly deliveryId: string;
-    readonly status: 'QUEUED' | 'SENDING' | 'SENT' | 'FAILED';
-    readonly attemptCount: number;
-    readonly failureCategory: string | null;
-    readonly requestedAt: string;
-    readonly sentAt: string | null;
-    readonly failedAt: string | null;
-    readonly retryAllowed: boolean;
-  } | null;
+  readonly customerDestinationMasked: string | null;
+  readonly delivery: ReceiptDeliveryAttempt | null;
+  readonly history: readonly ReceiptDeliveryAttempt[];
+}
+
+/** Latest attempt of a completed transaction, as listed beside the queue. */
+export interface ReceiptDeliveryIndicator {
+  readonly status: ReceiptDeliveryState;
+  readonly destinationMasked: string;
+  readonly requestedAt: string;
+}
+
+export interface OperationalQueuePage extends ApiPage<QueueSale> {
+  readonly receiptDeliveries?: Readonly<Record<string, ReceiptDeliveryIndicator>>;
 }
 
 export type OperationalAwareTransactionPort = SaleTransactionPort &
@@ -141,7 +171,7 @@ export function attachOperationalProjection(
     const query = new URLSearchParams();
     if (sellingLocationId) query.set('sellingLocationId', sellingLocationId);
     const suffix = query.size ? `?${query.toString()}` : '';
-    return client.get<ApiPage<QueueSale>>(`${OPERATIONAL_PREFIX}/queue${suffix}`, { signal });
+    return client.get<OperationalQueuePage>(`${OPERATIONAL_PREFIX}/queue${suffix}`, { signal });
   };
 
   operational.createSale = (input: CreateSaleInput, idempotencyKey: string) =>
@@ -163,11 +193,14 @@ export function attachOperationalProjection(
       headers: { 'Idempotency-Key': idempotencyKey },
     });
 
-  operational.requestReceiptDelivery = (saleId: string, channel: 'WHATSAPP') =>
-    client.post<{ deliveryId: string; channel: 'WHATSAPP'; state: string }>(
+  operational.requestReceiptDelivery = (
+    saleId: string,
+    { idempotencyKey, ...body }: ReceiptDeliveryRequest,
+  ) =>
+    client.post<{ deliveryId: string; channel: 'WHATSAPP'; state: ReceiptDeliveryState }>(
       `${OPERATIONAL_PREFIX}/transactions/${saleId}/receipt-deliveries`,
-      { channel },
-      idempotencyHeaders(`receipt-delivery-${saleId}`),
+      body,
+      { headers: { 'Idempotency-Key': idempotencyKey } },
     );
 
   operational.getReceiptDeliveryStatus = (saleId: string) =>

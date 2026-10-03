@@ -279,8 +279,6 @@ const copy: Record<string, LocalizedLabel> = {
       'en-US':
         'Member identity comes from the customer directory, which is not connected to this installation yet.',
     },
-  'Send via WhatsApp': { 'id-ID': 'Kirim via WhatsApp', 'en-US': 'Send via WhatsApp' },
-  'Not available yet': { 'id-ID': 'Belum tersedia', 'en-US': 'Not available yet' },
   'Search name or phone number': {
     'id-ID': 'Cari nama atau nomor telepon',
     'en-US': 'Search name or phone number',
