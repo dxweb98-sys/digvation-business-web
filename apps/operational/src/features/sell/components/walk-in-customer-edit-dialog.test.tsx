@@ -46,7 +46,7 @@ describe('WalkInCustomerEditDialog', () => {
     const { name, phone, save } = setup();
 
     expect(name.value).toBe('wirawan');
-    expect(phone.value).toBe('0812 3123 1231');
+    expect(phone.value).toBe('081231231231');
     expect(save().hasAttribute('disabled')).toBe(true);
   });
 
@@ -54,7 +54,8 @@ describe('WalkInCustomerEditDialog', () => {
     const { onSave, name, phone, save } = setup();
 
     fireEvent.change(name, { target: { value: '  Wirawan   Saputra ' } });
-    fireEvent.change(phone, { target: { value: '0812 9999 8888' } });
+    fireEvent.change(phone, { target: { value: '+62812 9999 8888' } });
+    expect(phone.value).toBe('081299998888');
     fireEvent.click(save());
 
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
@@ -70,7 +71,7 @@ describe('WalkInCustomerEditDialog', () => {
     fireEvent.change(phone, { target: { value: '12' } });
     fireEvent.click(save());
     expect(
-      await screen.findByText('Masukkan nomor WhatsApp yang valid, contoh 0812 3456 7890.'),
+      await screen.findByText('Masukkan nomor WhatsApp yang valid, contoh 081234567890.'),
     ).toBeTruthy();
 
     fireEvent.change(name, { target: { value: '   ' } });

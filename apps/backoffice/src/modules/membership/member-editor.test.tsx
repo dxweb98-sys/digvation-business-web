@@ -148,6 +148,16 @@ describe('MemberEditor editing an existing Member', () => {
       phone: '+628111111111',
     });
   });
+
+  it.each([
+    ['0812 3456 7890', '081234567890'],
+    ['+6281234567890', '081234567890'],
+    ['6281234567890', '081234567890'],
+  ])('keeps Member editor input %s as national digits %s', (entered, expected) => {
+    renderEditor(existing);
+    type('No. HP', entered);
+    expect(field('No. HP').value).toBe(expected);
+  });
 });
 
 describe('MemberEditor existing Customer continuation', () => {

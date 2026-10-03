@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { sanitizePhoneInput, toCanonicalPhone } from './customer-input';
+import { sanitizeNationalPhoneInput, toCanonicalPhone, toLocalPhoneDisplay } from './customer-input';
 
 describe('toCanonicalPhone', () => {
   it.each([
@@ -23,13 +23,17 @@ describe('toCanonicalPhone', () => {
   );
 });
 
-describe('sanitizePhoneInput', () => {
-  it('keeps the friendly local value and never rewrites it to +62', () => {
-    expect(sanitizePhoneInput('081234567890')).toBe('081234567890');
-    expect(sanitizePhoneInput('0812-3456 7890')).toBe('0812-3456 7890');
+describe('national editable phone presentation', () => {
+  it.each([
+    ['0812 3456 7890', '081234567890'],
+    ['+6281234567890', '081234567890'],
+    ['6281234567890', '081234567890'],
+    ['(0812)-3456.7890', '081234567890'],
+  ])('%p becomes national digits %p', (input, expected) => {
+    expect(sanitizeNationalPhoneInput(input)).toBe(expected);
   });
 
-  it('drops characters a phone number cannot contain', () => {
-    expect(sanitizePhoneInput('08ab12#3')).toBe('08123');
+  it('initializes a canonical Indonesian number as national digits', () => {
+    expect(toLocalPhoneDisplay('+6281234567890')).toBe('081234567890');
   });
 });

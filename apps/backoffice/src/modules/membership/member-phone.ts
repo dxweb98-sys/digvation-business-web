@@ -2,6 +2,14 @@
 const DEFAULT_CALLING_CODE = '62';
 const E164 = /^\+[1-9]\d{7,14}$/;
 
+/** National digits for Customer and Member editor fields. */
+export function sanitizeNationalMemberPhone(value: string): string {
+  const digits = value.replace(/\D/g, '');
+  if (digits.startsWith(`00${DEFAULT_CALLING_CODE}`)) return `0${digits.slice(4)}`;
+  if (digits.startsWith(DEFAULT_CALLING_CODE)) return `0${digits.slice(2)}`;
+  return digits;
+}
+
 /**
  * Converts a typed phone number to canonical E.164 for Member management.
  *
@@ -28,6 +36,6 @@ export function toCanonicalMemberPhone(raw: string): string | null {
  */
 export function toNationalMemberPhone(canonical: string): string {
   return canonical.startsWith(`+${DEFAULT_CALLING_CODE}`)
-    ? `0${canonical.slice(DEFAULT_CALLING_CODE.length + 1)}`
+    ? sanitizeNationalMemberPhone(canonical)
     : canonical;
 }

@@ -72,7 +72,14 @@ const navigationSections: ReadonlyArray<{
       { label: 'employees', to: '/employees', icon: UsersRound, capability: 'employees' },
       {
         label: 'catalog',
-        localizedLabel: { id: 'Member', en: 'Members' },
+        localizedLabel: { id: 'Pelanggan', en: 'Customers' },
+        to: '/customers',
+        icon: UserRound,
+        capability: 'customers',
+      },
+      {
+        label: 'catalog',
+        localizedLabel: { id: 'Membership', en: 'Membership' },
         to: '/memberships',
         icon: ContactRound,
         capability: 'memberships',
@@ -136,8 +143,7 @@ export function BackofficeShell() {
 
   if (!session) return null;
 
-  const brandSubtitle =
-    session.business.name || bootstrap.branding.companyName || 'Backoffice';
+  const brandSubtitle = session.business.name || bootstrap.branding.companyName || 'Backoffice';
   const roleContext =
     session.identity.roles.map((role) => role.name).join(', ') || t('authenticatedUser');
   const currentDate = formatDate(new Date(), {

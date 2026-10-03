@@ -57,7 +57,7 @@ export function MembersPage() {
   const copy = membershipCopy();
   const canEnroll = canPerformBackofficeAction(session, 'enrollMember');
   const canManage = canPerformBackofficeAction(session, 'manageMember');
-  const canViewLoyalty = session.access.permissions.includes('loyalty:read');
+  const canViewLoyalty = session.access.capabilities.includes('LOYALTY_POINTS') && session.access.permissions.includes('loyalty:read');
   const refresh = () => void queryClient.invalidateQueries({ queryKey: memberQueryKeys.all });
 
   const confirmStatus = async () => {
@@ -156,6 +156,7 @@ export function MembersPage() {
             total: list.data?.total ?? 0,
           }}
           onPageChange={(page) => setOffset((page - 1) * PAGE_SIZE)}
+          onRowClick={(member) => setDetailId(member.id)}
           actions={[
             {
               label: copy.viewDetails,

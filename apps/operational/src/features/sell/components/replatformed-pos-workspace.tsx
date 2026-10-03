@@ -70,12 +70,19 @@ import {
 import { useOperationalAccessContext } from '../../../modules/operational/operational-access-api';
 import { resolveReceiptLocation } from '../../../modules/operational/operational-location-selection';
 import { cashierTransactionKeys } from '../cashier-transaction-keys';
-import { cashierTransactionErrorMessage, correctionErrorMessage } from '../cashier-transaction-errors';
+import {
+  cashierTransactionErrorMessage,
+  correctionErrorMessage,
+} from '../cashier-transaction-errors';
 import type { ReplaceLinePreview, ReplaceSaleLineInput } from '../cashier-transaction.adapter';
 import { replacementLinesOf } from '../cart-draft';
 import { visibleCatalogItems } from '../selling-catalog-eligibility';
 import { saleLineConfiguration } from '../sale-line-additions';
-import { ItemConfigurator, type ItemConfiguration, type ItemConfiguratorState } from './item-configurator';
+import {
+  ItemConfigurator,
+  type ItemConfiguration,
+  type ItemConfiguratorState,
+} from './item-configurator';
 import { AddTransactionItemDialog, CatalogItemAutocomplete } from './transaction-item-dialog';
 import { CustomerMemberApi, type MemberLookupResult } from '../customer-member-api';
 import type { CartDisplayLine } from '../cart-draft';
@@ -115,7 +122,6 @@ import type {
   QueueSale,
   Sale,
   SaleCustomer,
-  SaleCustomerSelection,
   SaleLine,
 } from '../cashier-transaction.types';
 import type { CatalogItemTypeFilter } from '../use-selling-catalog';
@@ -385,7 +391,11 @@ function customerStatus(customer: SaleCustomer | null): {
 export function receiptPointSummary(
   sale: Pick<Sale, 'status' | 'loyaltyEarning' | 'loyaltySummary' | 'customer'>,
   customer: Pick<SaleCustomer, 'type'> | null,
-): { balanceAfter: string | null; earnedPoints: string | null; redeemedPoints: string | null } | null {
+): {
+  balanceAfter: string | null;
+  earnedPoints: string | null;
+  redeemedPoints: string | null;
+} | null {
   if (customer?.type !== 'MEMBER') return null;
   const summary = sale.loyaltySummary;
   if (summary)
@@ -903,6 +913,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         .replace(/\.?0+$/, '')}%)`
     : copy('Tax');
   const activeCustomer = workspace.customer;
+  const customerCacheScope = `${session.business.tenantId}:${session.identity.userId}:${session.contextVersion}`;
   const customerMemberApi = useMemo(
     () =>
       new CustomerMemberApi(
@@ -913,12 +924,18 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
             ? { getAccessToken: authPort.getAccessToken.bind(authPort) }
             : {}),
         }),
+        customerCacheScope,
       ),
-    [authPort, runtime.apiBaseUrl],
+    [authPort, runtime.apiBaseUrl, customerCacheScope],
   );
-  const canReadMembers = session.access.permissions.includes('membership:read');
-  const canEnrollMember = session.access.permissions.includes('membership:enroll');
-  const canReadCustomers = session.access.permissions.includes('customers:read');
+  const hasMembershipCapability = session.access.capabilities.includes('MEMBERSHIP');
+  const canReadMembers =
+    hasMembershipCapability && session.access.permissions.includes('membership:read');
+  const canEnrollMember =
+    hasMembershipCapability && session.access.permissions.includes('membership:enroll');
+  const canReadCustomers =
+    session.access.foundations.includes('CUSTOMER_IDENTITY') &&
+    session.access.permissions.includes('customers:read');
   const hasLoyaltyCapability = session.access.capabilities.includes('LOYALTY_POINTS');
   const canRedeemLoyalty =
     hasLoyaltyCapability && session.access.permissions.includes('loyalty:redeem');
@@ -1309,11 +1326,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
    */
   const startWaitingServiceLine = async (transaction: Sale, line: SaleLine) => {
     try {
-      const updated = await workspace.transitionQueuedFulfillment(
-        transaction,
-        line,
-        'IN_PROGRESS',
-      );
+      const updated = await workspace.transitionQueuedFulfillment(transaction, line, 'IN_PROGRESS');
       setQueueDetail(updated);
       showToast({
         title: copy('Work started'),
@@ -1528,9 +1541,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       )
         return;
       const tendered =
-        paymentMethod === 'CASH'
-          ? normalizeCurrencyPaymentInput(tender || allocation)
-          : undefined;
+        paymentMethod === 'CASH' ? normalizeCurrencyPaymentInput(tender || allocation) : undefined;
       if (tendered && createDecimal(tendered).lessThan(createDecimal(allocation))) return;
       const selectedRoute =
         workspace.paymentRoutes.find(
@@ -1597,9 +1608,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       )
         return;
       const tendered =
-        paymentMethod === 'CASH'
-          ? normalizeCurrencyPaymentInput(tender || allocation)
-          : undefined;
+        paymentMethod === 'CASH' ? normalizeCurrencyPaymentInput(tender || allocation) : undefined;
       if (tendered && createDecimal(tendered).lessThan(createDecimal(allocation))) return;
       const selectedRoute =
         workspace.paymentRoutes.find(
@@ -1792,11 +1801,13 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
             void adapter
               .getSale(transaction.id)
               .then(setQueueDetail)
-              .catch((error) => showToast({
-                title: copy('Could not load transaction'),
-                description: cashierTransactionErrorMessage(error),
-                variant: 'danger',
-              }));
+              .catch((error) =>
+                showToast({
+                  title: copy('Could not load transaction'),
+                  description: cashierTransactionErrorMessage(error),
+                  variant: 'danger',
+                }),
+              );
           }}
           onViewReceipt={(transaction) => {
             setQueueDetail(transaction);
@@ -1928,6 +1939,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       />
 
       <CustomerMemberDialog
+        key={customerCacheScope}
         open={customerPickerOpen}
         customer={cartCustomer}
         isSaving={workspace.isCustomerPending}
@@ -1963,7 +1975,9 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           setCheckoutOpen(false);
           setCartOpen(true);
         }}
-        {...(sale && sale.status === 'OPEN' && workspace.viewModel.monetaryMutation.state === 'AVAILABLE'
+        {...(sale &&
+        sale.status === 'OPEN' &&
+        workspace.viewModel.monetaryMutation.state === 'AVAILABLE'
           ? {
               onEditOrder: () => {
                 setCheckoutOpen(false);
@@ -2062,7 +2076,9 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           if (workspace.isNewSaleBlocked) {
             showToast({
               title: copy('Transaction not finished'),
-              description: copy('Finish the payment of this transaction before starting a new one.'),
+              description: copy(
+                'Finish the payment of this transaction before starting a new one.',
+              ),
               variant: 'warning',
             });
             return;
@@ -2121,7 +2137,9 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
             : true
         }
         canRefundPayment={session.access.permissions.includes('payments:refund')}
-        onCompensate={(sale, paymentId, amount) => workspace.compensateOpenPayment(sale, paymentId, amount)}
+        onCompensate={(sale, paymentId, amount) =>
+          workspace.compensateOpenPayment(sale, paymentId, amount)
+        }
         employees={workspace.employees}
       />
 
@@ -4085,44 +4103,47 @@ export function ReferencePaymentDialog({
               <section className="pos-pay-section pos-pay-section--primary">
                 <div className="pos-pay-section__head">
                   <p className="pos-pay-section__title">
-                    <Clock className="size-4 shrink-0 text-[var(--color-brand)]" aria-hidden="true" />
+                    <Clock
+                      className="size-4 shrink-0 text-[var(--color-brand)]"
+                      aria-hidden="true"
+                    />
                     {copy(instantOnly ? 'Payment' : 'Payment timing')}
                   </p>
                 </div>
                 <div className="pos-pay-section__body">
                   {instantOnly ? null : (
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {[
-                      {
-                        value: true,
-                        title: copy('Pay now'),
-                        description: copy('Choose a payment method before continuing.'),
-                      },
-                      {
-                        value: false,
-                        title: copy('Pay later'),
-                        description: copy('Payment can be recorded after transaction creation.'),
-                      },
-                    ].map((option) => (
-                      <label
-                        key={String(option.value)}
-                        className={`pos-choice ${payNow === option.value ? 'pos-choice--selected' : ''}`}
-                      >
-                        <DRadio
-                          name="pos-payment-timing"
-                          className="mt-0.5 shrink-0"
-                          checked={payNow === option.value}
-                          onChange={() => onPayNowChange(option.value)}
-                        />
-                        <span className="min-w-0">
-                          <span className="block text-sm font-semibold">{option.title}</span>
-                          <span className="mt-0.5 block text-xs leading-4 text-[var(--color-text-muted)]">
-                            {option.description}
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {[
+                        {
+                          value: true,
+                          title: copy('Pay now'),
+                          description: copy('Choose a payment method before continuing.'),
+                        },
+                        {
+                          value: false,
+                          title: copy('Pay later'),
+                          description: copy('Payment can be recorded after transaction creation.'),
+                        },
+                      ].map((option) => (
+                        <label
+                          key={String(option.value)}
+                          className={`pos-choice ${payNow === option.value ? 'pos-choice--selected' : ''}`}
+                        >
+                          <DRadio
+                            name="pos-payment-timing"
+                            className="mt-0.5 shrink-0"
+                            checked={payNow === option.value}
+                            onChange={() => onPayNowChange(option.value)}
+                          />
+                          <span className="min-w-0">
+                            <span className="block text-sm font-semibold">{option.title}</span>
+                            <span className="mt-0.5 block text-xs leading-4 text-[var(--color-text-muted)]">
+                              {option.description}
+                            </span>
                           </span>
-                        </span>
-                      </label>
-                    ))}
-                  </div>
+                        </label>
+                      ))}
+                    </div>
                   )}
 
                   {collectsPayment ? (
@@ -4134,9 +4155,7 @@ export function ReferencePaymentDialog({
                           const next = value as PaymentAllocationMode;
                           setAllocationMode(next);
                           if (next === 'FULL') {
-                            const remaining = currencyInputFromAmount(
-                              progress.remainingAmount,
-                            );
+                            const remaining = currencyInputFromAmount(progress.remainingAmount);
                             onAppliedAmount(remaining);
                           } else {
                             onAppliedAmount('');
@@ -4325,9 +4344,7 @@ export function ReferencePaymentDialog({
                       </span>
                     </div>
                     {hasRecordedMoney ? (
-                      <p className="pos-pay-eyebrow mb-3">
-                        {copy('Next payment')}
-                      </p>
+                      <p className="pos-pay-eyebrow mb-3">{copy('Next payment')}</p>
                     ) : null}
                     {paymentError ? (
                       <DAlert
@@ -4767,7 +4784,8 @@ export function ReferenceTransactionDetail({
                       // repeats it when it differs (waiting, completed, canceled).
                       const showWorkStatus =
                         saleLineWorkStatus(line) !== null &&
-                        saleLineWorkStatus(line) !== (status ? impliedLineWorkStatus[status] : undefined);
+                        saleLineWorkStatus(line) !==
+                          (status ? impliedLineWorkStatus[status] : undefined);
                       // The transaction is already IN_PROGRESS, but this specific tracked
                       // Service has not been started yet: it needs its own explicit action.
                       const canStartLineWork =
@@ -4802,7 +4820,9 @@ export function ReferenceTransactionDetail({
                             info: (
                               <DiscountInfoTooltip
                                 label={copy('Discount details')}
-                                content={<DiscountDetailsContent details={row.details} locale={locale} />}
+                                content={
+                                  <DiscountDetailsContent details={row.details} locale={locale} />
+                                }
                               />
                             ),
                           }))}
@@ -4848,12 +4868,13 @@ export function ReferenceTransactionDetail({
                                   </StatusPill>
                                 ) : null}
                                 {line.workLineage ? (
-                                  <span>Pekerjaan tercatat pada {line.workLineage.sourceItemName}</span>
+                                  <span>
+                                    Pekerjaan tercatat pada {line.workLineage.sourceItemName}
+                                  </span>
                                 ) : null}
                                 {correctionSourceOf(sale, line) ? (
                                   <span>
-                                    Koreksi dari{' '}
-                                    {correctionSourceOf(sale, line)!.itemNameSnapshot}
+                                    Koreksi dari {correctionSourceOf(sale, line)!.itemNameSnapshot}
                                   </span>
                                 ) : null}
                                 {durationLabel ? <span>{durationLabel}</span> : null}
@@ -5197,13 +5218,17 @@ export function ReceiptContent({
               {receiptPoints.earnedPoints ? (
                 <div className="flex items-baseline justify-between gap-3">
                   <dt className="text-slate-500">{copy('Points gained')}</dt>
-                  <dd className="font-semibold">+{pointQuantity(receiptPoints.earnedPoints, locale)}</dd>
+                  <dd className="font-semibold">
+                    +{pointQuantity(receiptPoints.earnedPoints, locale)}
+                  </dd>
                 </div>
               ) : null}
               {receiptPoints.redeemedPoints ? (
                 <div className="flex items-baseline justify-between gap-3">
                   <dt className="text-slate-500">{copy('Used')}</dt>
-                  <dd className="font-semibold">−{pointQuantity(receiptPoints.redeemedPoints, locale)}</dd>
+                  <dd className="font-semibold">
+                    −{pointQuantity(receiptPoints.redeemedPoints, locale)}
+                  </dd>
                 </div>
               ) : null}
             </dl>
@@ -5255,10 +5280,10 @@ export function ReceiptContent({
                   {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
                 </p>
               )}
-              {isPositiveDecimal(line.itemTaxAmount ?? "0") ? (
+              {isPositiveDecimal(line.itemTaxAmount ?? '0') ? (
                 <div className="mt-1 flex items-start justify-between gap-3 text-slate-500">
                   <span>{lineTaxLabel(line, copy('Tax'))}</span>
-                  <span className="shrink-0">{money(line.itemTaxAmount ?? "0", locale)}</span>
+                  <span className="shrink-0">{money(line.itemTaxAmount ?? '0', locale)}</span>
                 </div>
               ) : null}
               {lineDiscounts.length ? (
@@ -5428,7 +5453,10 @@ export function ReferenceOrderAdjustmentDialog({
   /** Ordinary edit of a line whose work has not started: same item, new configuration, no reason. */
   onEdit: (line: SaleLine, input: { lines: ReplaceSaleLineInput['lines'] }) => Promise<unknown>;
   /** One atomic correction with a full item configuration; it may become several Sale lines. */
-  onCorrect: (line: SaleLine, input: { lines: ReplaceSaleLineInput['lines']; reason: string }) => Promise<unknown>;
+  onCorrect: (
+    line: SaleLine,
+    input: { lines: ReplaceSaleLineInput['lines']; reason: string },
+  ) => Promise<unknown>;
   /** Runtime-calculated impact of the same correction (same reason, same rules); nothing is saved. */
   onPreview: (
     line: SaleLine,
@@ -5464,7 +5492,8 @@ export function ReferenceOrderAdjustmentDialog({
   // The shared item configuration of the replacement: the same model as adding or editing an item.
   const [configuratorState, setConfiguratorState] = useState<ItemConfiguratorState | null>(null);
   const [configuratorLoading, setConfiguratorLoading] = useState(false);
-  const [replacementConfiguration, setReplacementConfiguration] = useState<ItemConfiguration | null>(null);
+  const [replacementConfiguration, setReplacementConfiguration] =
+    useState<ItemConfiguration | null>(null);
   const [correctionReason, setCorrectionReason] = useState('');
   // The Sale returned by the persisted correction/compensation is the settlement authority.
   const [appliedSale, setAppliedSale] = useState<Sale | null>(null);
@@ -5477,7 +5506,8 @@ export function ReferenceOrderAdjustmentDialog({
   const previewRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
     // Keep the authoritative result in view; it renders below the form.
-    if (correctionPreview) previewRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+    if (correctionPreview)
+      previewRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
   }, [correctionPreview]);
   // Only the latest chosen replacement may fill the configuration.
   const replacementRequest = useRef(0);
@@ -5565,15 +5595,11 @@ export function ReferenceOrderAdjustmentDialog({
   const correctionSource = correctionLine;
   const replacementLines = () =>
     replacementConfiguration && configuratorState
-      ? replacementLinesOf(
-          configuratorState.item.id,
-          replacementConfiguration.catalogVariantId,
-          {
-            ...replacementConfiguration,
-            // Carried explicitly so a correction never silently drops the salesperson.
-            soldByEmployeeId: replacementConfiguration.soldBy?.employeeId ?? null,
-          },
-        )
+      ? replacementLinesOf(configuratorState.item.id, replacementConfiguration.catalogVariantId, {
+          ...replacementConfiguration,
+          // Carried explicitly so a correction never silently drops the salesperson.
+          soldByEmployeeId: replacementConfiguration.soldBy?.employeeId ?? null,
+        })
       : [];
   // Ready exactly when the shared configuration is valid: every unit satisfied, price resolved.
   const correctionReady = Boolean(configuratorState && replacementConfiguration);
@@ -5624,10 +5650,24 @@ export function ReferenceOrderAdjustmentDialog({
   const authoritativeSettlement = saleSettlement(authoritativeSale);
   const settledPaid = createDecimal(authoritativeSettlement.totalPaid);
   const settledTotal = createDecimal(authoritativeSale.totalAmount);
-  const settledOverpayment = settledPaid.greaterThan(settledTotal) ? settledPaid.minus(settledTotal) : createDecimal('0');
-  const settledBalance = settledTotal.greaterThan(settledPaid) ? settledTotal.minus(settledPaid) : createDecimal('0');
-  const settlementCashPayment = authoritativeSale.payments.find((item) => item.status === 'SUCCEEDED' && item.method === 'CASH' && createDecimal(item.appliedAmount).greaterThan(0));
-  const settlementProviderPayment = authoritativeSale.payments.find((item) => item.status === 'SUCCEEDED' && item.method !== 'CASH' && createDecimal(item.appliedAmount).greaterThan(0));
+  const settledOverpayment = settledPaid.greaterThan(settledTotal)
+    ? settledPaid.minus(settledTotal)
+    : createDecimal('0');
+  const settledBalance = settledTotal.greaterThan(settledPaid)
+    ? settledTotal.minus(settledPaid)
+    : createDecimal('0');
+  const settlementCashPayment = authoritativeSale.payments.find(
+    (item) =>
+      item.status === 'SUCCEEDED' &&
+      item.method === 'CASH' &&
+      createDecimal(item.appliedAmount).greaterThan(0),
+  );
+  const settlementProviderPayment = authoritativeSale.payments.find(
+    (item) =>
+      item.status === 'SUCCEEDED' &&
+      item.method !== 'CASH' &&
+      createDecimal(item.appliedAmount).greaterThan(0),
+  );
   const compensateOverpayment = (paymentId: string) => {
     setCompensationState('LOADING');
     void onCompensate(authoritativeSale, paymentId, settledOverpayment.toFixed(4))
@@ -5648,474 +5688,535 @@ export function ReferenceOrderAdjustmentDialog({
 
   return (
     <>
-    <Dialog
-      open
-      onClose={onClose}
-      title={copy('Adjust order')}
-      description={transactionNumber(sale, locale)}
-      ariaLabel={copy('Adjust order')}
-      closeOnEscape
-      closeOnOverlay
-      className="pos-reference-dialog w-full max-w-xl overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
-      footer={
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0" aria-live="polite">
-            <p className="text-[11px] text-[var(--color-text-muted)]">{consequence.label}</p>
-            <p className={`text-base font-semibold tabular-nums ${consequence.tone}`}>
-              {money(consequence.amount, locale)}
-            </p>
-          </div>
-          <div className="flex shrink-0 gap-2">
-            {changed ? null : (
-              <Button variant="ghost" onClick={onClose}>
-                {copy('Cancel')}
-              </Button>
-            )}
-            <Button disabled={mutating} onClick={onClose}>
-              {copy('Save adjustment')}
-            </Button>
-          </div>
-        </div>
-      }
-    >
-      <div className="space-y-3">
-        <p className="text-xs text-[var(--color-text-muted)]">
-          {copy(
-            hasSuccessfulPayment(sale)
-              ? 'Each change is recorded right away. Items already paid stay on the payment record.'
-              : 'Each change is recorded right away.',
-          )}
-        </p>
-        <ul className="divide-y divide-[var(--color-border)] rounded-xl border border-[var(--color-border)]">
-          {activeLines.map((line) => {
-            // Runtime stays the authority; this only decides which controls are offered.
-            const mode = saleLineAdjustmentMode(sale, line, {
-              addedInThisAdjustment: !baseline.has(line.id),
-            });
-            const correctedFrom = correctionSourceOf(sale, line);
-            const editable = mode === 'EDIT';
-            const canDecrease =
-              editable && createDecimal(line.quantity).greaterThan(createDecimal('1'));
-            const sellable = items.some((item) => item.id === line.catalogItemId);
-            const before = baseline.get(line.id);
-            const lineChange =
-              before === undefined
-                ? copy('New')
-                : createDecimal(before).equals(createDecimal(line.quantity))
-                  ? null
-                  : `${copy('Was')} ${quantity(before)}`;
-            return (
-              <li
-                key={line.id}
-                data-adjustment-mode={mode}
-                className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2"
-              >
-                <div className="min-w-0 flex-1 basis-40">
-                  <p
-                    className="truncate text-sm"
-                    title={`${line.itemNameSnapshot}${line.variantNameSnapshot ? ` · ${line.variantNameSnapshot}` : ''}`}
-                  >
-                    <span className="font-semibold">{line.itemNameSnapshot}</span>
-                    {line.variantNameSnapshot ? (
-                      <span className="text-[var(--color-text-muted)]">
-                        {' '}
-                        · {line.variantNameSnapshot}
-                      </span>
-                    ) : null}
-                  </p>
-                  <p className="flex flex-wrap items-center gap-x-2 text-xs tabular-nums text-[var(--color-text-muted)]">
-                    {money(line.effectiveUnitPrice, locale)}
-                    {lineChange ? (
-                      <span className="rounded-full bg-[var(--color-brand)]/10 px-1.5 text-[10px] font-semibold text-[var(--color-brand)]">
-                        {lineChange}
-                      </span>
-                    ) : null}
-                  </p>
-                  {line.soldByEmployeeNameSnapshot ? (
-                    // The Product salesperson; Service performers are a separate concept.
-                    <p className="text-[11px] text-[var(--color-text-muted)]">
-                      {copy('Sold by')} {line.soldByEmployeeNameSnapshot}
-                    </p>
-                  ) : null}
-                  {(line.compositionComponents ?? [])
-                    .filter(
-                      (component) =>
-                        component.componentSource === 'SALE_SELECTED' && component.performers?.length,
-                    )
-                    .map((component) => (
-                      // Part of this Service's work, never a Product sale of its own.
-                      <p key={component.id} className="text-[11px] text-[var(--color-text-muted)]">
-                        + {[component.itemNameSnapshot, component.variantNameSnapshot].filter(Boolean).join(' / ')}{' '}
-                        ·{' '}
-                        {additionPerformedBy(
-                          { performerIds: component.performers!.map((performer) => performer.employeeId) },
-                          employees,
-                          copy,
-                        )}
-                      </p>
-                    ))}
-                  {correctedFrom ? (
-                    <p className="text-[11px] text-[var(--color-text-muted)]">
-                      Koreksi dari {correctedFrom.itemNameSnapshot}
-                      {correctedFrom.fulfillment ? ' · pekerjaan awal tetap tercatat' : ''}
-                    </p>
-                  ) : null}
-                  {mode === 'LOCKED' ? (
-                    <p className="text-[11px] text-[var(--color-text-muted)]">
-                      Item yang sudah selesai dikerjakan tidak dapat dikoreksi.
-                    </p>
-                  ) : null}
-                </div>
-                <div className="ml-auto flex shrink-0 items-center gap-1">
-                  {editable ? (
-                    <>
-                      <button
-                        type="button"
-                        aria-label={`${copy('Decrease quantity')} ${line.itemNameSnapshot}`}
-                        disabled={!canDecrease || isMutating}
-                        onClick={() =>
-                          onQuantity(
-                            line,
-                            createDecimal(line.quantity).minus(createDecimal('1')).toFixed(4),
-                          )
-                        }
-                        className={stepperClass}
-                      >
-                        <Minus className="size-3.5" />
-                      </button>
-                      <span className="w-7 text-center text-xs font-semibold tabular-nums">
-                        {quantity(line.quantity)}
-                      </span>
-                      <button
-                        type="button"
-                        aria-label={`${copy('Increase quantity')} ${line.itemNameSnapshot}`}
-                        disabled={isMutating}
-                        onClick={() =>
-                          onQuantity(
-                            line,
-                            createDecimal(line.quantity).plus(createDecimal('1')).toFixed(4),
-                          )
-                        }
-                        className={stepperClass}
-                      >
-                        <Plus className="size-3.5" />
-                      </button>
-                      {sale.status === 'OPEN' ? (
-                        <button
-                          type="button"
-                          aria-label={`${copy('Edit item')} ${line.itemNameSnapshot}`}
-                          title={copy('Edit item')}
-                          // Same item, new configuration; an item no longer sold is removed instead.
-                          disabled={isMutating || !sellable}
-                          onClick={() => openEdit(line)}
-                          className={stepperClass}
-                        >
-                          <Pencil className="size-3.5" aria-hidden="true" />
-                        </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        aria-label={`${copy('Remove')} ${line.itemNameSnapshot}`}
-                        disabled={isMutating}
-                        onClick={() => onRemove(line)}
-                        className="ml-0.5 flex size-8 items-center justify-center rounded-lg text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        <Trash2 className="size-3.5" />
-                      </button>
-                    </>
-                  ) : (
-                    // Once work is in progress the quantity, removal and configuration of an
-                    // existing line change only through the audited correction, never directly.
-                    <span className="px-1 text-xs font-semibold tabular-nums text-[var(--color-text-muted)]">
-                      × {quantity(line.quantity)}
-                    </span>
-                  )}
-                  {mode === 'CORRECTION' && sale.status === 'OPEN' ? (
-                    <button
-                      type="button"
-                      aria-label={`Koreksi item ${line.itemNameSnapshot}`}
-                      disabled={isMutating}
-                      onClick={() => {
-                        setCorrectionLine(line);
-                        // The current item starts selected and configured exactly as the line, so a
-                        // variant or quantity correction needs no search. Choosing another item in
-                        // the field changes the Catalog item and starts a fresh configuration.
-                        const current = items.some((item) => item.id === line.catalogItemId)
-                          ? line.catalogItemId
-                          : '';
-                        setReplacementItemId(current);
-                        loadReplacementState(current);
-                        setAppliedSale(null);
-                        setCorrectionSaved(false);
-                        setCorrectionError(null);
-                        setPreviewError(null);
-                        setCompensationState('IDLE');
-                        setCorrectionReason('');
-                        setCorrectionPreview(null);
-                        setPreviewState('IDLE');
-                      }}
-                      className="ml-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-[var(--color-brand)] hover:bg-[var(--color-brand)]/10 disabled:opacity-40"
-                    >
-                      Koreksi item
-                    </button>
-                  ) : null}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-        {removedCount ? (
-          <p className="text-xs text-[var(--color-text-muted)]">
-            {removedCount} {copy('items removed')}
-          </p>
-        ) : null}
-        {editError ? <DAlert variant="danger">{editError}</DAlert> : null}
-
-        <button
-          type="button"
-          onClick={() => setAddOpen(true)}
-          disabled={isMutating}
-          className="inline-flex h-9 items-center gap-1.5 rounded-lg px-2 text-sm font-semibold text-[var(--color-brand)] hover:bg-[var(--color-brand)]/10 disabled:opacity-50"
-        >
-          <Plus className="size-4" aria-hidden="true" />
-          {copy('Add item')}
-        </button>
-      </div>
-    </Dialog>
-    {correctionLine ? (
       <Dialog
         open
-        onClose={() => setCorrectionLine(null)}
-        title="Koreksi item"
+        onClose={onClose}
+        title={copy('Adjust order')}
         description={transactionNumber(sale, locale)}
-        ariaLabel="Koreksi item"
-        closeOnOverlay={false}
-        className="pos-reference-dialog w-full max-w-lg overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
+        ariaLabel={copy('Adjust order')}
+        closeOnEscape
+        closeOnOverlay
+        className="pos-reference-dialog w-full max-w-xl overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
         footer={
-          correctionSaved ? (
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button onClick={() => setCorrectionLine(null)}>Selesai</Button>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0" aria-live="polite">
+              <p className="text-[11px] text-[var(--color-text-muted)]">{consequence.label}</p>
+              <p className={`text-base font-semibold tabular-nums ${consequence.tone}`}>
+                {money(consequence.amount, locale)}
+              </p>
             </div>
-          ) : (
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
-              <Button variant="ghost" className="sm:mr-auto" onClick={() => setCorrectionLine(null)}>
-                Kembali
-              </Button>
-              <Button
-                variant="outline"
-                disabled={!correctionReady || !correctionReason.trim() || isMutating}
-                loading={previewState === 'LOADING'}
-                onClick={previewCorrection}
-              >
-                Lihat dampak
-              </Button>
-              <Button
-                disabled={!correctionPreview || !correctionReason.trim() || isMutating}
-                loading={isMutating}
-                onClick={confirmCorrection}
-              >
-                Konfirmasi koreksi
+            <div className="flex shrink-0 gap-2">
+              {changed ? null : (
+                <Button variant="ghost" onClick={onClose}>
+                  {copy('Cancel')}
+                </Button>
+              )}
+              <Button disabled={mutating} onClick={onClose}>
+                {copy('Save adjustment')}
               </Button>
             </div>
-          )
+          </div>
         }
       >
-        {correctionSaved ? (
-          <div className="space-y-4" aria-live="polite">
-            <DAlert variant="success">Koreksi tersimpan.</DAlert>
-            <section aria-label="Penyelesaian pembayaran" className="rounded-xl bg-[var(--color-surface-muted)] p-3 text-sm">
-              <dl className="space-y-1.5 text-[var(--color-text-muted)]">
-                {figure('Total transaksi', authoritativeSale.totalAmount, 'font-semibold text-[var(--color-text)]')}
-                {figure('Sudah dibayar', settledPaid.toFixed(4))}
-              </dl>
-              <div className="mt-2 space-y-1.5 border-t border-[var(--color-border)] pt-2">
-                {settledOverpayment.greaterThan(createDecimal('0')) ? (
-                  <>
-                    <dl>{figure('Kelebihan pembayaran', settledOverpayment.toFixed(4), 'font-semibold text-[var(--color-danger)]')}</dl>
-                    <p className="text-xs text-[var(--color-text-muted)]">
-                      Transaksi belum dapat diselesaikan sampai kelebihan pembayaran dikembalikan.
+        <div className="space-y-3">
+          <p className="text-xs text-[var(--color-text-muted)]">
+            {copy(
+              hasSuccessfulPayment(sale)
+                ? 'Each change is recorded right away. Items already paid stay on the payment record.'
+                : 'Each change is recorded right away.',
+            )}
+          </p>
+          <ul className="divide-y divide-[var(--color-border)] rounded-xl border border-[var(--color-border)]">
+            {activeLines.map((line) => {
+              // Runtime stays the authority; this only decides which controls are offered.
+              const mode = saleLineAdjustmentMode(sale, line, {
+                addedInThisAdjustment: !baseline.has(line.id),
+              });
+              const correctedFrom = correctionSourceOf(sale, line);
+              const editable = mode === 'EDIT';
+              const canDecrease =
+                editable && createDecimal(line.quantity).greaterThan(createDecimal('1'));
+              const sellable = items.some((item) => item.id === line.catalogItemId);
+              const before = baseline.get(line.id);
+              const lineChange =
+                before === undefined
+                  ? copy('New')
+                  : createDecimal(before).equals(createDecimal(line.quantity))
+                    ? null
+                    : `${copy('Was')} ${quantity(before)}`;
+              return (
+                <li
+                  key={line.id}
+                  data-adjustment-mode={mode}
+                  className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2"
+                >
+                  <div className="min-w-0 flex-1 basis-40">
+                    <p
+                      className="truncate text-sm"
+                      title={`${line.itemNameSnapshot}${line.variantNameSnapshot ? ` · ${line.variantNameSnapshot}` : ''}`}
+                    >
+                      <span className="font-semibold">{line.itemNameSnapshot}</span>
+                      {line.variantNameSnapshot ? (
+                        <span className="text-[var(--color-text-muted)]">
+                          {' '}
+                          · {line.variantNameSnapshot}
+                        </span>
+                      ) : null}
                     </p>
-                    {settlementCashPayment ? (
-                      canRefundPayment ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          loading={compensationState === 'LOADING'}
-                          disabled={isMutating}
-                          onClick={() => compensateOverpayment(settlementCashPayment.id)}
-                        >
-                          Kembalikan kelebihan pembayaran
-                        </Button>
-                      ) : (
-                        <p className="text-xs text-[var(--color-text-muted)]">
-                          Pengembalian dana memerlukan pengguna dengan izin pengembalian pembayaran.
-                        </p>
-                      )
-                    ) : settlementProviderPayment ? (
-                      <p className="text-xs text-[var(--color-text-muted)]">
-                        Pengembalian pembayaran ini memerlukan konfirmasi dari penyedia pembayaran.
+                    <p className="flex flex-wrap items-center gap-x-2 text-xs tabular-nums text-[var(--color-text-muted)]">
+                      {money(line.effectiveUnitPrice, locale)}
+                      {lineChange ? (
+                        <span className="rounded-full bg-[var(--color-brand)]/10 px-1.5 text-[10px] font-semibold text-[var(--color-brand)]">
+                          {lineChange}
+                        </span>
+                      ) : null}
+                    </p>
+                    {line.soldByEmployeeNameSnapshot ? (
+                      // The Product salesperson; Service performers are a separate concept.
+                      <p className="text-[11px] text-[var(--color-text-muted)]">
+                        {copy('Sold by')} {line.soldByEmployeeNameSnapshot}
                       </p>
                     ) : null}
-                    {compensationState === 'ERROR' ? (
-                      <DAlert variant="danger">
-                        Pengembalian kelebihan pembayaran belum dapat diselesaikan. Muat ulang transaksi lalu coba lagi.
-                      </DAlert>
-                    ) : null}
-                  </>
-                ) : (
-                  settledBalance.greaterThan(createDecimal('0')) ? (
-                    <dl>{figure('Sisa pembayaran', settledBalance.toFixed(4), 'font-semibold text-[var(--color-text)]')}</dl>
-                  ) : (
-                    <p className="font-semibold text-[var(--color-text)]">Pembayaran sudah sesuai</p>
-                  )
-                )}
-              </div>
-            </section>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <div>
-                <p className="text-xs text-[var(--color-text-muted)]">Item saat ini</p>
-                <p className="text-sm font-semibold text-[var(--color-text)]">{correctionLine.itemNameSnapshot}</p>
-                <p className="text-xs tabular-nums text-[var(--color-text-muted)]">
-                  {quantity(correctionLine.quantity)} × {money(correctionLine.effectiveUnitPrice, locale)}
-                </p>
-                {correctionLine.fulfillment?.status === 'IN_PROGRESS' ? (
-                  <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                    Pekerjaan yang sudah berjalan tetap tercatat pada item ini.
-                  </p>
-                ) : null}
-              </div>
-            </div>
-            <div className="space-y-3 border-t border-[var(--color-border)] pt-4">
-              <CatalogItemAutocomplete
-                label="Item koreksi"
-                ariaLabel="Item koreksi"
-                items={items}
-                value={replacementItemId || null}
-                locale={locale}
-                disabled={isMutating}
-                onChange={(item) => {
-                  // The same item keeps its configuration; a different item starts fresh.
-                  if ((item?.id ?? '') === replacementItemId) return;
-                  setReplacementItemId(item?.id ?? '');
-                  setCorrectionPreview(null);
-                  setPreviewError(null);
-                  loadReplacementState(item?.id ?? '');
-                }}
-              />
-              {configuratorState ? (
-                <ItemConfigurator
-                  // A different item starts a fresh configuration; the same item starts from the line.
-                  key={configuratorState.item.id}
-                  presentation="inline"
-                  {...configuratorState}
-                  loadCandidates={loadCandidates}
-                  {...(correctionSource && correctionSource.catalogItemId === configuratorState.item.id
-                    ? {
-                        initial: {
-                          ...saleLineConfiguration(correctionSource, employees),
-                        },
-                      }
-                    : {})}
-                  onConfigurationChange={(configuration) => {
-                    setReplacementConfiguration(configuration);
-                    setCorrectionPreview(null);
-                    setPreviewError(null);
-                  }}
-                />
-              ) : configuratorLoading ? (
-                <p className="text-sm text-[var(--color-text-muted)]">Memuat konfigurasi item…</p>
-              ) : null}
-              <DTextarea
-                label="Alasan koreksi"
-                rows={3}
-                value={correctionReason}
-                placeholder="Contoh: Salah memilih layanan"
-                onChange={setCorrectionReason}
-              />
-            </div>
-            {previewState === 'ERROR' && previewError ? (
-              <DAlert variant="danger">{previewError}</DAlert>
-            ) : null}
-            {correctionError ? <DAlert variant="danger">{correctionError}</DAlert> : null}
-            {correctionPreview ? (
-              <section
-                ref={previewRef}
-                aria-label="Dampak koreksi"
-                aria-live="polite"
-                className="rounded-xl bg-[var(--color-surface-muted)] p-3 text-sm"
-              >
-                <ul aria-label="Hasil koreksi" className="mb-3 space-y-2 border-b border-[var(--color-border)] pb-3">
-                  {correctionPreview.replacements.map((replacement, index) => (
-                    <li key={`${replacement.catalogItemId}-${index}`} className="text-xs">
-                      <div className="flex items-start justify-between gap-3">
-                        <span className="min-w-0 font-semibold text-[var(--color-text)]">
-                          {replacement.itemName}
-                          {replacement.variantName ? ` · ${replacement.variantName}` : ''}
-                          <span className="block font-normal tabular-nums text-[var(--color-text-muted)]">
-                            {quantity(replacement.quantity)} × {money(replacement.unitAmount, locale)}
-                          </span>
-                        </span>
-                        <span className="shrink-0 font-semibold tabular-nums">
-                          {money(replacement.grossAmount, locale)}
-                        </span>
-                      </div>
-                      {replacement.additions.map((addition) => (
-                        <p key={addition.name} className="mt-0.5 pl-3 text-[var(--color-text-muted)]">
-                          + {addition.name} × {quantity(addition.quantity)} · {money(addition.amount, locale)}
+                    {(line.compositionComponents ?? [])
+                      .filter(
+                        (component) =>
+                          component.componentSource === 'SALE_SELECTED' &&
+                          component.performers?.length,
+                      )
+                      .map((component) => (
+                        // Part of this Service's work, never a Product sale of its own.
+                        <p
+                          key={component.id}
+                          className="text-[11px] text-[var(--color-text-muted)]"
+                        >
+                          +{' '}
+                          {[component.itemNameSnapshot, component.variantNameSnapshot]
+                            .filter(Boolean)
+                            .join(' / ')}{' '}
+                          ·{' '}
+                          {additionPerformedBy(
+                            {
+                              performerIds: component.performers!.map(
+                                (performer) => performer.employeeId,
+                              ),
+                            },
+                            employees,
+                            copy,
+                          )}
                         </p>
                       ))}
-                    </li>
-                  ))}
-                </ul>
+                    {correctedFrom ? (
+                      <p className="text-[11px] text-[var(--color-text-muted)]">
+                        Koreksi dari {correctedFrom.itemNameSnapshot}
+                        {correctedFrom.fulfillment ? ' · pekerjaan awal tetap tercatat' : ''}
+                      </p>
+                    ) : null}
+                    {mode === 'LOCKED' ? (
+                      <p className="text-[11px] text-[var(--color-text-muted)]">
+                        Item yang sudah selesai dikerjakan tidak dapat dikoreksi.
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="ml-auto flex shrink-0 items-center gap-1">
+                    {editable ? (
+                      <>
+                        <button
+                          type="button"
+                          aria-label={`${copy('Decrease quantity')} ${line.itemNameSnapshot}`}
+                          disabled={!canDecrease || isMutating}
+                          onClick={() =>
+                            onQuantity(
+                              line,
+                              createDecimal(line.quantity).minus(createDecimal('1')).toFixed(4),
+                            )
+                          }
+                          className={stepperClass}
+                        >
+                          <Minus className="size-3.5" />
+                        </button>
+                        <span className="w-7 text-center text-xs font-semibold tabular-nums">
+                          {quantity(line.quantity)}
+                        </span>
+                        <button
+                          type="button"
+                          aria-label={`${copy('Increase quantity')} ${line.itemNameSnapshot}`}
+                          disabled={isMutating}
+                          onClick={() =>
+                            onQuantity(
+                              line,
+                              createDecimal(line.quantity).plus(createDecimal('1')).toFixed(4),
+                            )
+                          }
+                          className={stepperClass}
+                        >
+                          <Plus className="size-3.5" />
+                        </button>
+                        {sale.status === 'OPEN' ? (
+                          <button
+                            type="button"
+                            aria-label={`${copy('Edit item')} ${line.itemNameSnapshot}`}
+                            title={copy('Edit item')}
+                            // Same item, new configuration; an item no longer sold is removed instead.
+                            disabled={isMutating || !sellable}
+                            onClick={() => openEdit(line)}
+                            className={stepperClass}
+                          >
+                            <Pencil className="size-3.5" aria-hidden="true" />
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          aria-label={`${copy('Remove')} ${line.itemNameSnapshot}`}
+                          disabled={isMutating}
+                          onClick={() => onRemove(line)}
+                          className="ml-0.5 flex size-8 items-center justify-center rounded-lg text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </>
+                    ) : (
+                      // Once work is in progress the quantity, removal and configuration of an
+                      // existing line change only through the audited correction, never directly.
+                      <span className="px-1 text-xs font-semibold tabular-nums text-[var(--color-text-muted)]">
+                        × {quantity(line.quantity)}
+                      </span>
+                    )}
+                    {mode === 'CORRECTION' && sale.status === 'OPEN' ? (
+                      <button
+                        type="button"
+                        aria-label={`Koreksi item ${line.itemNameSnapshot}`}
+                        disabled={isMutating}
+                        onClick={() => {
+                          setCorrectionLine(line);
+                          // The current item starts selected and configured exactly as the line, so a
+                          // variant or quantity correction needs no search. Choosing another item in
+                          // the field changes the Catalog item and starts a fresh configuration.
+                          const current = items.some((item) => item.id === line.catalogItemId)
+                            ? line.catalogItemId
+                            : '';
+                          setReplacementItemId(current);
+                          loadReplacementState(current);
+                          setAppliedSale(null);
+                          setCorrectionSaved(false);
+                          setCorrectionError(null);
+                          setPreviewError(null);
+                          setCompensationState('IDLE');
+                          setCorrectionReason('');
+                          setCorrectionPreview(null);
+                          setPreviewState('IDLE');
+                        }}
+                        className="ml-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-[var(--color-brand)] hover:bg-[var(--color-brand)]/10 disabled:opacity-40"
+                      >
+                        Koreksi item
+                      </button>
+                    ) : null}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          {removedCount ? (
+            <p className="text-xs text-[var(--color-text-muted)]">
+              {removedCount} {copy('items removed')}
+            </p>
+          ) : null}
+          {editError ? <DAlert variant="danger">{editError}</DAlert> : null}
+
+          <button
+            type="button"
+            onClick={() => setAddOpen(true)}
+            disabled={isMutating}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg px-2 text-sm font-semibold text-[var(--color-brand)] hover:bg-[var(--color-brand)]/10 disabled:opacity-50"
+          >
+            <Plus className="size-4" aria-hidden="true" />
+            {copy('Add item')}
+          </button>
+        </div>
+      </Dialog>
+      {correctionLine ? (
+        <Dialog
+          open
+          onClose={() => setCorrectionLine(null)}
+          title="Koreksi item"
+          description={transactionNumber(sale, locale)}
+          ariaLabel="Koreksi item"
+          closeOnOverlay={false}
+          className="pos-reference-dialog w-full max-w-lg overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
+          footer={
+            correctionSaved ? (
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <Button onClick={() => setCorrectionLine(null)}>Selesai</Button>
+              </div>
+            ) : (
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
+                <Button
+                  variant="ghost"
+                  className="sm:mr-auto"
+                  onClick={() => setCorrectionLine(null)}
+                >
+                  Kembali
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={!correctionReady || !correctionReason.trim() || isMutating}
+                  loading={previewState === 'LOADING'}
+                  onClick={previewCorrection}
+                >
+                  Lihat dampak
+                </Button>
+                <Button
+                  disabled={!correctionPreview || !correctionReason.trim() || isMutating}
+                  loading={isMutating}
+                  onClick={confirmCorrection}
+                >
+                  Konfirmasi koreksi
+                </Button>
+              </div>
+            )
+          }
+        >
+          {correctionSaved ? (
+            <div className="space-y-4" aria-live="polite">
+              <DAlert variant="success">Koreksi tersimpan.</DAlert>
+              <section
+                aria-label="Penyelesaian pembayaran"
+                className="rounded-xl bg-[var(--color-surface-muted)] p-3 text-sm"
+              >
                 <dl className="space-y-1.5 text-[var(--color-text-muted)]">
-                  {figure('Total sebelumnya', correctionPreview.currentTotalAmount)}
-                  {figure('Total setelah koreksi', correctionPreview.correctedTotalAmount, 'font-semibold text-[var(--color-text)]')}
-                  {figure('Sudah dibayar', correctionPreview.netSuccessfulPaidAmount)}
+                  {figure(
+                    'Total transaksi',
+                    authoritativeSale.totalAmount,
+                    'font-semibold text-[var(--color-text)]',
+                  )}
+                  {figure('Sudah dibayar', settledPaid.toFixed(4))}
                 </dl>
                 <div className="mt-2 space-y-1.5 border-t border-[var(--color-border)] pt-2">
-                  {/* Runtime's consequence: what remains to pay, or what is returned as a new refund. */}
-                  {correctionPreview.refundAmount &&
-                  createDecimal(correctionPreview.refundAmount).greaterThan(createDecimal('0')) ? (
+                  {settledOverpayment.greaterThan(createDecimal('0')) ? (
+                    <>
+                      <dl>
+                        {figure(
+                          'Kelebihan pembayaran',
+                          settledOverpayment.toFixed(4),
+                          'font-semibold text-[var(--color-danger)]',
+                        )}
+                      </dl>
+                      <p className="text-xs text-[var(--color-text-muted)]">
+                        Transaksi belum dapat diselesaikan sampai kelebihan pembayaran dikembalikan.
+                      </p>
+                      {settlementCashPayment ? (
+                        canRefundPayment ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            loading={compensationState === 'LOADING'}
+                            disabled={isMutating}
+                            onClick={() => compensateOverpayment(settlementCashPayment.id)}
+                          >
+                            Kembalikan kelebihan pembayaran
+                          </Button>
+                        ) : (
+                          <p className="text-xs text-[var(--color-text-muted)]">
+                            Pengembalian dana memerlukan pengguna dengan izin pengembalian
+                            pembayaran.
+                          </p>
+                        )
+                      ) : settlementProviderPayment ? (
+                        <p className="text-xs text-[var(--color-text-muted)]">
+                          Pengembalian pembayaran ini memerlukan konfirmasi dari penyedia
+                          pembayaran.
+                        </p>
+                      ) : null}
+                      {compensationState === 'ERROR' ? (
+                        <DAlert variant="danger">
+                          Pengembalian kelebihan pembayaran belum dapat diselesaikan. Muat ulang
+                          transaksi lalu coba lagi.
+                        </DAlert>
+                      ) : null}
+                    </>
+                  ) : settledBalance.greaterThan(createDecimal('0')) ? (
                     <dl>
                       {figure(
-                        'Dikembalikan ke pelanggan',
-                        correctionPreview.refundAmount,
-                        'font-semibold text-[var(--color-warning)]',
+                        'Sisa pembayaran',
+                        settledBalance.toFixed(4),
+                        'font-semibold text-[var(--color-text)]',
                       )}
                     </dl>
                   ) : (
-                    <dl>{figure('Sisa pembayaran', correctionPreview.remainingPaymentAmount, 'font-semibold text-[var(--color-text)]')}</dl>
+                    <p className="font-semibold text-[var(--color-text)]">
+                      Pembayaran sudah sesuai
+                    </p>
                   )}
                 </div>
               </section>
-            ) : null}
-          </div>
-        )}
-      </Dialog>
-    ) : null}
-    {editLine && editState ? (
-      <ItemConfigurator
-        {...editState}
-        initial={saleLineConfiguration(editLine, employees)}
-        confirmLabel={copy('Save changes')}
-        loadCandidates={loadCandidates}
-        onConfirm={confirmEdit}
-        onClose={closeEdit}
-      />
-    ) : null}
-    {addOpen ? (
-      <AddTransactionItemDialog
-        items={items}
-        locale={locale}
-        loadConfiguratorState={loadConfiguratorState}
-        loadCandidates={loadCandidates}
-        onConfirm={onAdd}
-        onClose={() => setAddOpen(false)}
-      />
-    ) : null}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <div>
+                  <p className="text-xs text-[var(--color-text-muted)]">Item saat ini</p>
+                  <p className="text-sm font-semibold text-[var(--color-text)]">
+                    {correctionLine.itemNameSnapshot}
+                  </p>
+                  <p className="text-xs tabular-nums text-[var(--color-text-muted)]">
+                    {quantity(correctionLine.quantity)} ×{' '}
+                    {money(correctionLine.effectiveUnitPrice, locale)}
+                  </p>
+                  {correctionLine.fulfillment?.status === 'IN_PROGRESS' ? (
+                    <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                      Pekerjaan yang sudah berjalan tetap tercatat pada item ini.
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+              <div className="space-y-3 border-t border-[var(--color-border)] pt-4">
+                <CatalogItemAutocomplete
+                  label="Item koreksi"
+                  ariaLabel="Item koreksi"
+                  items={items}
+                  value={replacementItemId || null}
+                  locale={locale}
+                  disabled={isMutating}
+                  onChange={(item) => {
+                    // The same item keeps its configuration; a different item starts fresh.
+                    if ((item?.id ?? '') === replacementItemId) return;
+                    setReplacementItemId(item?.id ?? '');
+                    setCorrectionPreview(null);
+                    setPreviewError(null);
+                    loadReplacementState(item?.id ?? '');
+                  }}
+                />
+                {configuratorState ? (
+                  <ItemConfigurator
+                    // A different item starts a fresh configuration; the same item starts from the line.
+                    key={configuratorState.item.id}
+                    presentation="inline"
+                    {...configuratorState}
+                    loadCandidates={loadCandidates}
+                    {...(correctionSource &&
+                    correctionSource.catalogItemId === configuratorState.item.id
+                      ? {
+                          initial: {
+                            ...saleLineConfiguration(correctionSource, employees),
+                          },
+                        }
+                      : {})}
+                    onConfigurationChange={(configuration) => {
+                      setReplacementConfiguration(configuration);
+                      setCorrectionPreview(null);
+                      setPreviewError(null);
+                    }}
+                  />
+                ) : configuratorLoading ? (
+                  <p className="text-sm text-[var(--color-text-muted)]">Memuat konfigurasi item…</p>
+                ) : null}
+                <DTextarea
+                  label="Alasan koreksi"
+                  rows={3}
+                  value={correctionReason}
+                  placeholder="Contoh: Salah memilih layanan"
+                  onChange={setCorrectionReason}
+                />
+              </div>
+              {previewState === 'ERROR' && previewError ? (
+                <DAlert variant="danger">{previewError}</DAlert>
+              ) : null}
+              {correctionError ? <DAlert variant="danger">{correctionError}</DAlert> : null}
+              {correctionPreview ? (
+                <section
+                  ref={previewRef}
+                  aria-label="Dampak koreksi"
+                  aria-live="polite"
+                  className="rounded-xl bg-[var(--color-surface-muted)] p-3 text-sm"
+                >
+                  <ul
+                    aria-label="Hasil koreksi"
+                    className="mb-3 space-y-2 border-b border-[var(--color-border)] pb-3"
+                  >
+                    {correctionPreview.replacements.map((replacement, index) => (
+                      <li key={`${replacement.catalogItemId}-${index}`} className="text-xs">
+                        <div className="flex items-start justify-between gap-3">
+                          <span className="min-w-0 font-semibold text-[var(--color-text)]">
+                            {replacement.itemName}
+                            {replacement.variantName ? ` · ${replacement.variantName}` : ''}
+                            <span className="block font-normal tabular-nums text-[var(--color-text-muted)]">
+                              {quantity(replacement.quantity)} ×{' '}
+                              {money(replacement.unitAmount, locale)}
+                            </span>
+                          </span>
+                          <span className="shrink-0 font-semibold tabular-nums">
+                            {money(replacement.grossAmount, locale)}
+                          </span>
+                        </div>
+                        {replacement.additions.map((addition) => (
+                          <p
+                            key={addition.name}
+                            className="mt-0.5 pl-3 text-[var(--color-text-muted)]"
+                          >
+                            + {addition.name} × {quantity(addition.quantity)} ·{' '}
+                            {money(addition.amount, locale)}
+                          </p>
+                        ))}
+                      </li>
+                    ))}
+                  </ul>
+                  <dl className="space-y-1.5 text-[var(--color-text-muted)]">
+                    {figure('Total sebelumnya', correctionPreview.currentTotalAmount)}
+                    {figure(
+                      'Total setelah koreksi',
+                      correctionPreview.correctedTotalAmount,
+                      'font-semibold text-[var(--color-text)]',
+                    )}
+                    {figure('Sudah dibayar', correctionPreview.netSuccessfulPaidAmount)}
+                  </dl>
+                  <div className="mt-2 space-y-1.5 border-t border-[var(--color-border)] pt-2">
+                    {/* Runtime's consequence: what remains to pay, or what is returned as a new refund. */}
+                    {correctionPreview.refundAmount &&
+                    createDecimal(correctionPreview.refundAmount).greaterThan(
+                      createDecimal('0'),
+                    ) ? (
+                      <dl>
+                        {figure(
+                          'Dikembalikan ke pelanggan',
+                          correctionPreview.refundAmount,
+                          'font-semibold text-[var(--color-warning)]',
+                        )}
+                      </dl>
+                    ) : (
+                      <dl>
+                        {figure(
+                          'Sisa pembayaran',
+                          correctionPreview.remainingPaymentAmount,
+                          'font-semibold text-[var(--color-text)]',
+                        )}
+                      </dl>
+                    )}
+                  </div>
+                </section>
+              ) : null}
+            </div>
+          )}
+        </Dialog>
+      ) : null}
+      {editLine && editState ? (
+        <ItemConfigurator
+          {...editState}
+          initial={saleLineConfiguration(editLine, employees)}
+          confirmLabel={copy('Save changes')}
+          loadCandidates={loadCandidates}
+          onConfirm={confirmEdit}
+          onClose={closeEdit}
+        />
+      ) : null}
+      {addOpen ? (
+        <AddTransactionItemDialog
+          items={items}
+          locale={locale}
+          loadConfiguratorState={loadConfiguratorState}
+          loadCandidates={loadCandidates}
+          onConfirm={onAdd}
+          onClose={() => setAddOpen(false)}
+        />
+      ) : null}
     </>
   );
 }

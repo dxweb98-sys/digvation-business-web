@@ -12,6 +12,8 @@ import type { SaleCustomer, SaleCustomerSelection } from './cashier-transaction.
 export function localSaleCustomerSnapshot(selection: SaleCustomerSelection): SaleCustomer {
   if (selection.type === 'MEMBER')
     throw new Error('Member customer lookup is not available in this local build.');
+  if (selection.referenceId)
+    throw new Error('Canonical customer lookup is not available in this local build.');
 
   const name = selection.name.replace(/\s+/g, ' ').trim();
   if (!name) throw new Error('Customer name is required.');
