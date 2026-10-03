@@ -59,17 +59,16 @@ const localCopy: Record<string, { 'id-ID': string; 'en-US': string }> = {
     'en-US': 'Destination WhatsApp number',
   },
   'Customer number': { 'id-ID': 'Nomor pelanggan', 'en-US': 'Customer number' },
+  'Other number': { 'id-ID': 'Nomor lain', 'en-US': 'Other number' },
+  'No receipt has been sent for this transaction.': {
+    'id-ID': 'Belum ada struk yang dikirim untuk transaksi ini.',
+    'en-US': 'No receipt has been sent for this transaction.',
+  },
   'Number used last time': { 'id-ID': 'Nomor pengiriman terakhir', 'en-US': 'Number used last time' },
-  'Change number': { 'id-ID': 'Ubah nomor', 'en-US': 'Change number' },
-  'Use customer number': { 'id-ID': 'Pakai nomor pelanggan', 'en-US': 'Use customer number' },
   'Phone placeholder': { 'id-ID': 'Contoh: 0812 3456 7890', 'en-US': 'Example: 0812 3456 7890' },
   'Enter a valid WhatsApp number, for example 0812 3456 7890.': {
     'id-ID': 'Masukkan nomor WhatsApp yang valid, contoh 0812 3456 7890.',
     'en-US': 'Enter a valid WhatsApp number, for example 0812 3456 7890.',
-  },
-  'The previous receipt was sent to {number}.': {
-    'id-ID': 'Struk sebelumnya dikirim ke {number}.',
-    'en-US': 'The previous receipt was sent to {number}.',
   },
   'This number is used only for this receipt and does not change the customer or transaction data.': {
     'id-ID': 'Nomor ini hanya dipakai untuk pengiriman struk ini dan tidak mengubah data pelanggan atau transaksi.',
@@ -154,6 +153,13 @@ const PHASE_TONE: Record<ReceiptDeliveryPhase, string> = {
   PENDING: 'text-[var(--color-text)]',
   ACCEPTED: 'text-[var(--color-success)]',
   FAILED: 'text-[var(--color-danger)]',
+};
+
+const PHASE_SURFACE: Record<ReceiptDeliveryPhase, string> = {
+  NEVER: 'border-[var(--color-border)] bg-[var(--color-surface-muted)]/30',
+  PENDING: 'border-[var(--color-brand)]/15 bg-[var(--color-brand)]/[.06]',
+  ACCEPTED: 'border-[var(--color-success)]/30 bg-[var(--color-success)]/10',
+  FAILED: 'border-[var(--color-danger)]/30 bg-[var(--color-danger)]/10',
 };
 
 /**
@@ -262,13 +268,6 @@ export function ReceiptDeliveryDialog({
     ? formatWhatsappNumber(target.customerPhone)
     : (status?.customerDestinationMasked ?? null);
 
-  const startNewNumber = () => {
-    setModeChoice('NEW');
-    setPhone(target?.customerPhone ? formatWhatsappNumber(target.customerPhone) : '');
-    setFieldError(null);
-    setRequestError(null);
-  };
-
   const submit = async () => {
     if (!target || inFlight.current) return;
     let request: ReceiptDeliveryRequest = {
@@ -327,6 +326,35 @@ export function ReceiptDeliveryDialog({
       .join(', ');
 
   const PhaseIcon = PHASE_ICON[phase];
+  const lastIsOtherNumber = Boolean(latest && !latest.customerDestination);
+  const choices: Array<{
+    mode: DestinationMode;
+    title: string;
+    detail: string | null;
+    value: string | null;
+  }> = [
+    ...(customerDisplay
+      ? [
+          {
+            mode: 'CUSTOMER' as const,
+            title: text('Customer number'),
+            detail: target?.customerName ?? null,
+            value: customerDisplay,
+          },
+        ]
+      : []),
+    ...(lastIsOtherNumber && latest
+      ? [
+          {
+            mode: 'LAST' as const,
+            title: text('Number used last time'),
+            detail: text(RECEIPT_DELIVERY_PHASE_LABEL[phase]),
+            value: latest.destinationMasked,
+          },
+        ]
+      : []),
+    { mode: 'NEW', title: text('Other number'), detail: null, value: null },
+  ];
 
   return (
     <DDialog
@@ -339,7 +367,7 @@ export function ReceiptDeliveryDialog({
       closeOnOverlay={!isSubmitting}
       className="pos-reference-dialog w-full max-w-md overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
       footer={
-        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <div className="flex justify-end gap-2">
           <DButton variant="outline" disabled={isSubmitting} onClick={onClose}>
             {phase === 'NEVER' ? text('Cancel') : text('Close')}
           </DButton>
@@ -356,26 +384,41 @@ export function ReceiptDeliveryDialog({
         </div>
       }
     >
-      <div className="mt-4 space-y-4">
-        {target?.customerName ? (
-          <p className="truncate text-sm font-semibold">{target.customerName}</p>
-        ) : null}
-
+      <div className="mt-4 space-y-5">
         {statusQuery.isPending ? (
           <DSkeleton className="h-16 w-full rounded-xl" />
         ) : statusQuery.isError ? (
           <DAlert variant="danger">{text('Delivery status could not be loaded.')}</DAlert>
         ) : (
-          <section className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)]/30 px-3 py-3">
-            <p className="text-xs text-[var(--color-text-muted)]">{text('Last status')}</p>
-            <div role="status" aria-atomic="true" className="mt-1">
-              <p className={`flex items-center gap-1.5 text-sm font-semibold ${PHASE_TONE[phase]}`}>
-                <PhaseIcon className="size-4 shrink-0" aria-hidden="true" />
-                {text(RECEIPT_DELIVERY_PHASE_LABEL[phase])}
-              </p>
+          <section className={`rounded-xl border px-3 py-3 ${PHASE_SURFACE[phase]}`}>
+            <div role="status" aria-atomic="true">
+              <div className="flex items-center justify-between gap-3">
+                <p className={`flex items-center gap-1.5 text-sm font-semibold ${PHASE_TONE[phase]}`}>
+                  <PhaseIcon className="size-4 shrink-0" aria-hidden="true" />
+                  {text(RECEIPT_DELIVERY_PHASE_LABEL[phase])}
+                </p>
+                {latest ? (
+                  <span className="shrink-0 text-xs font-medium tabular-nums text-[var(--color-text-muted)]">
+                    {latest.destinationMasked}
+                  </span>
+                ) : null}
+              </div>
               {latest ? (
-                <p className="mt-1 text-xs text-[var(--color-text-muted)]">{attemptLine(latest)}</p>
-              ) : null}
+                <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                  {[
+                    formatDateTime(latest.requestedAt),
+                    latest.requestedByName
+                      ? text('by {name}', { name: latest.requestedByName })
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(', ')}
+                </p>
+              ) : (
+                <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                  {text('No receipt has been sent for this transaction.')}
+                </p>
+              )}
               {phase === 'ACCEPTED' ? (
                 <p className="mt-1 text-xs text-[var(--color-text-muted)]">
                   {text('Accepted by the WhatsApp service. Delivery to the customer is not confirmed.')}
@@ -412,78 +455,77 @@ export function ReceiptDeliveryDialog({
         ) : null}
 
         {available ? (
-          mode === 'NEW' ? (
-            <div className="space-y-2">
-              {latest ? (
-                <p className="text-xs text-[var(--color-text-muted)]">
-                  {text('The previous receipt was sent to {number}.', {
-                    number: latest.destinationMasked,
-                  })}
-                </p>
-              ) : null}
-              <DInput
-                label={text('Destination WhatsApp number')}
-                placeholder={text('Phone placeholder')}
-                value={phone}
-                onChange={(value) => {
-                  setPhone(sanitizePhoneInput(value));
-                  setFieldError(null);
-                }}
-                inputMode="tel"
-                autoComplete="off"
-                autoFocus
-                disabled={isSubmitting}
-                error={fieldError ?? undefined}
-              />
-              {customerDisplay ? (
-                <DButton
-                  variant="ghost"
-                  size="sm"
-                  disabled={isSubmitting}
-                  onClick={() => {
-                    setModeChoice('CUSTOMER');
-                    setFieldError(null);
-                  }}
-                >
-                  {text('Use customer number')}
-                </DButton>
-              ) : null}
-            </div>
-          ) : (
-            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-              <div className="min-w-0 grow basis-40">
-                <p className="text-xs text-[var(--color-text-muted)]">
-                  {text(mode === 'LAST' ? 'Number used last time' : 'Customer number')}
-                </p>
-                <p className="mt-0.5 truncate text-sm font-semibold tabular-nums">
-                  {mode === 'LAST' ? latest?.destinationMasked : (customerDisplay ?? '—')}
-                </p>
-              </div>
-              <div className="flex shrink-0 items-center gap-1">
-                {mode === 'LAST' && customerDisplay ? (
-                  <DButton
-                    variant="ghost"
-                    size="sm"
-                    disabled={busy}
-                    onClick={() => setModeChoice('CUSTOMER')}
+          <div role="radiogroup" aria-label={text('Destination WhatsApp number')}>
+            <p className="text-sm font-medium">{text('Destination WhatsApp number')}</p>
+            <div className="mt-1.5 overflow-hidden rounded-xl border border-[var(--color-border)] divide-y divide-[var(--color-border)]">
+              {choices.map((choice) => {
+                const selected = mode === choice.mode;
+                return (
+                  <div
+                    key={choice.mode}
+                    className={selected ? 'bg-[var(--color-brand)]/[.07]' : 'bg-[var(--color-surface)]'}
                   >
-                    {text('Use customer number')}
-                  </DButton>
-                ) : null}
-                <DButton variant="outline" size="sm" disabled={busy} onClick={startNewNumber}>
-                  {text('Change number')}
-                </DButton>
-              </div>
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      disabled={busy}
+                      onClick={() => {
+                        setModeChoice(choice.mode);
+                        setFieldError(null);
+                      }}
+                      className="flex w-full items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-[var(--color-surface-muted)] disabled:opacity-60"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={`grid size-4 shrink-0 place-items-center rounded-full border ${
+                          selected
+                            ? 'border-[var(--color-brand)] bg-[var(--color-brand)]'
+                            : 'border-[var(--color-border)]'
+                        }`}
+                      >
+                        {selected ? <span className="size-1.5 rounded-full bg-white" /> : null}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-xs text-[var(--color-text-muted)]">
+                          {choice.title}
+                          {choice.detail ? ` · ${choice.detail}` : ''}
+                        </span>
+                        {choice.value ? (
+                          <span className="mt-0.5 block truncate text-sm font-semibold tabular-nums">
+                            {choice.value}
+                          </span>
+                        ) : null}
+                      </span>
+                    </button>
+                    {choice.mode === 'NEW' && selected ? (
+                      <div className="px-3 pb-3">
+                        <DInput
+                          label={text('Destination WhatsApp number')}
+                          placeholder={text('Phone placeholder')}
+                          value={phone}
+                          onChange={(value) => {
+                            setPhone(sanitizePhoneInput(value));
+                            setFieldError(null);
+                          }}
+                          inputMode="tel"
+                          autoComplete="off"
+                          autoFocus
+                          disabled={isSubmitting}
+                          error={fieldError ?? undefined}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
             </div>
-          )
-        ) : null}
-
-        {available ? (
-          <p className="text-xs leading-5 text-[var(--color-text-muted)]">
-            {text(
-              'This number is used only for this receipt and does not change the customer or transaction data.',
-            )}
-          </p>
+            <p className="mt-2 text-xs leading-5 text-[var(--color-text-muted)]">
+              {text(
+                'This number is used only for this receipt and does not change the customer or transaction data.',
+              )}
+            </p>
+          </div>
         ) : null}
 
         {requestError ? <DAlert variant="danger">{requestError}</DAlert> : null}

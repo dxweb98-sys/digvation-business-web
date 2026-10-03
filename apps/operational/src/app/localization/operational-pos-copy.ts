@@ -612,6 +612,8 @@ const posCopy: Record<string, LocalizedCopy> = {
   'work set': { 'id-ID': 'pengerjaan sudah diatur', 'en-US': 'work set' },
   'Paper width': { 'id-ID': 'Lebar kertas', 'en-US': 'Paper width' },
   'Send receipt': { 'id-ID': 'Kirim struk', 'en-US': 'Send receipt' },
+  'Edit customer': { 'id-ID': 'Edit pelanggan', 'en-US': 'Edit customer' },
+  'Customer updated': { 'id-ID': 'Pelanggan diperbarui', 'en-US': 'Customer updated' },
   'Send receipt to customer': {
     'id-ID': 'Kirim struk ke customer',
     'en-US': 'Send receipt to customer',

@@ -177,6 +177,10 @@ import {
 import './replatformed-pos-workspace.css';
 import { CustomerMemberDialog } from './customer-member-dialog';
 import {
+  WalkInCustomerEditDialog,
+  type WalkInCustomerEditTarget,
+} from './walk-in-customer-edit-dialog';
+import {
   ReceiptDeliveryDialog,
   ReceiptDeliveryIndicatorLine,
   receiptDeliveryPreviewLabel,
@@ -828,6 +832,9 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const [queueOpen, setQueueOpen] = useState(false);
   const [queueDetail, setQueueDetail] = useState<Sale | null>(null);
   const [cancelTarget, setCancelTarget] = useState<Sale | null>(null);
+  const [customerEditTarget, setCustomerEditTarget] = useState<WalkInCustomerEditTarget | null>(
+    null,
+  );
   const [cancelReason, setCancelReason] = useState('');
   const [cancellationReasons, setCancellationReasons] = useState<Record<string, string>>(() =>
     isLocalDemo ? readCancellationReasons() : {},
@@ -1123,6 +1130,45 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     });
   };
   const refreshQueue = () => void transactionsQuery.refetch();
+
+  /** Only an unfinished transaction of a walk-in customer: a Member is edited in Member management. */
+  const openCustomerEdit = (target: Sale) => {
+    if (target.status !== 'OPEN' || target.customer?.type !== 'NON_MEMBER') return;
+    setCustomerEditTarget({
+      saleId: target.id,
+      reference: transactionNumber(target, workspace.locale),
+      customer: { name: target.customer.name, phoneE164: target.customer.phoneE164 },
+    });
+  };
+
+  const saveCustomerEdit = async (saleId: string, input: { name: string; phone: string }) => {
+    const current =
+      transactionsQuery.data?.items.find((entry) => entry.id === saleId) ?? queueDetail;
+    // The Sale is re-read first so the correction never rides on a stale version.
+    const fresh = await adapter.getSale(saleId);
+    if (fresh.status !== 'OPEN' || fresh.customer?.type !== 'NON_MEMBER') {
+      setCustomerEditTarget(null);
+      refreshQueue();
+      throw new Error('SALE_NOT_OPEN');
+    }
+    const updated = await adapter.setSaleCustomer(
+      saleId,
+      {
+        expectedVersion: fresh.version,
+        customer: { type: 'NON_MEMBER', name: input.name, phone: input.phone },
+      },
+      `customer-correction-${saleId}-${crypto.randomUUID()}`,
+    );
+    setCustomerEditTarget(null);
+    if (queueDetail?.id === saleId || current?.id === saleId)
+      setQueueDetail((detail) => (detail?.id === saleId ? updated : detail));
+    refreshQueue();
+    showToast({
+      title: copy('Customer updated'),
+      description: transactionNumber(updated, workspace.locale),
+      variant: 'success',
+    });
+  };
 
   const commitCheckoutToQueue = (
     completedSale: Sale,
@@ -1736,6 +1782,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           canAdjust={(transaction) => canAdjustOrder(transaction, session.access.permissions)}
           onPay={(transaction) => void openQueuePayment(transaction)}
           onCancel={requestCancel}
+          onEditCustomer={openCustomerEdit}
           onView={(transaction) => {
             // A queue card is a polling projection. Show it immediately, then
             // replace it with the authoritative transaction response so detail
@@ -2137,6 +2184,12 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         loading={workspace.isCoreMutating}
       />
 
+      <WalkInCustomerEditDialog
+        target={customerEditTarget}
+        onClose={() => setCustomerEditTarget(null)}
+        onSave={saveCustomerEdit}
+      />
+
       <ReceiptDeliveryDialog
         target={receiptDeliveryTarget}
         commands={adapter}
@@ -2368,6 +2421,7 @@ function ReferenceQueueBoard({
   canReadCompleted,
   onSendReceipt,
   receiptDeliveries,
+  onEditCustomer,
 }: {
   open: boolean;
   onOpenChange: (value: boolean) => void;
@@ -2387,6 +2441,8 @@ function ReferenceQueueBoard({
   onSendReceipt: (sale: QueueSale) => void;
   /** Latest receipt delivery per completed transaction, kept beside the queue items. */
   receiptDeliveries: Readonly<Record<string, ReceiptDeliveryIndicator>>;
+  /** Corrects a walk-in customer before the transaction is completed. */
+  onEditCustomer: (sale: Sale) => void;
 }) {
   const { copy, label } = useOperationalLocalization();
   const statuses = Object.keys(statusMeta) as QueueStatus[];
@@ -2498,6 +2554,7 @@ function ReferenceQueueBoard({
                                   onView={onView}
                                   onViewReceipt={onViewReceipt}
                                   onSendReceipt={onSendReceipt}
+                                  onEditCustomer={onEditCustomer}
                                   receiptDelivery={receiptDeliveries[sale.id] ?? null}
                                 />
                               );
@@ -2603,6 +2660,7 @@ export function ReferenceQueueCard({
   onView,
   onViewReceipt,
   onSendReceipt,
+  onEditCustomer,
   receiptDelivery = null,
 }: {
   sale: Sale;
@@ -2618,6 +2676,8 @@ export function ReferenceQueueCard({
   onView: (sale: Sale) => void;
   onViewReceipt: (sale: Sale) => void;
   onSendReceipt: (sale: Sale) => void;
+  /** Offered for an unfinished walk-in transaction only. */
+  onEditCustomer?: (sale: Sale) => void;
   /** Latest receipt delivery; shown only on a completed transaction with a customer. */
   receiptDelivery?: ReceiptDeliveryIndicator | null;
 }) {
@@ -2628,7 +2688,25 @@ export function ReferenceQueueCard({
   const paid = hasSuccessfulCheckout(sale);
   const customer = sale.customer ?? null;
   const canStartWork = hasStartableQueuedWork(sale);
-  const actionItems = [
+  const editCustomerItem =
+    onEditCustomer &&
+    sale.status === 'OPEN' &&
+    customer?.type === 'NON_MEMBER' &&
+    (status === 'QUEUED' || status === 'PROGRESS')
+      ? [
+          {
+            label: copy('Edit customer'),
+            icon: <User className="size-3.5" />,
+            onSelect: () => onEditCustomer(sale),
+          },
+        ]
+      : [];
+  const actionItems: Array<{
+    label: string;
+    icon: ReactNode;
+    destructive?: boolean;
+    onSelect: () => void;
+  }> = [
     {
       label: copy('Preview details'),
       icon: <Eye className="size-3.5" />,
@@ -2643,6 +2721,7 @@ export function ReferenceQueueCard({
           },
         ]
       : []),
+    ...editCustomerItem,
     ...(status === 'COMPLETED' && sale.customer
       ? [
           {

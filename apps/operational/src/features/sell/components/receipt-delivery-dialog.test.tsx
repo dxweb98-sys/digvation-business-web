@@ -198,7 +198,8 @@ describe('ReceiptDeliveryDialog', () => {
       status([attempt({ deliveryId: 'delivery-7', customerDestination: false, destinationMasked: '+62 •••• 8888' })]),
     );
 
-    expect(await screen.findByText('Nomor pengiriman terakhir')).toBeTruthy();
+    expect(await screen.findByText(/Nomor pengiriman terakhir/)).toBeTruthy();
+    expect(screen.getByRole('radio', { name: /Nomor pengiriman terakhir/ }).getAttribute('aria-checked')).toBe('true');
     fireEvent.click(screen.getByRole('button', { name: /Coba lagi/ }));
 
     await waitFor(() => expect(commands.requestReceiptDelivery).toHaveBeenCalledTimes(1));
@@ -209,21 +210,65 @@ describe('ReceiptDeliveryDialog', () => {
   it('sends to a corrected number for this attempt and keeps the earlier attempt represented', async () => {
     const { commands } = setup(status([attempt()]));
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Ubah nomor' }));
-    expect(screen.getByText('Struk sebelumnya dikirim ke +62 •••• 1231.')).toBeTruthy();
-    const input = screen.getByLabelText('Nomor WhatsApp tujuan');
+    fireEvent.click(await screen.findByRole('radio', { name: /Nomor lain/ }));
+    const input = screen.getByLabelText('Nomor WhatsApp tujuan', {
+      selector: 'input',
+    }) as HTMLInputElement;
+    // The old customer number is never pre-filled into the override field.
+    expect(input.value).toBe('');
     fireEvent.change(input, { target: { value: '0812 9999 8888' } });
+    expect(input.value).toBe('0812 9999 8888');
     fireEvent.click(screen.getByRole('button', { name: /Kirim ke nomor baru/ }));
 
     await waitFor(() => expect(commands.requestReceiptDelivery).toHaveBeenCalledTimes(1));
     expect(lastRequest(commands)).toMatchObject({ destination: '+6281299998888' });
+    expect(lastRequest(commands)).not.toHaveProperty('retryOfDeliveryId');
+    // A new attempt is observed beside the failed one, which stays visible.
+    expect(await screen.findByText(/Percobaan sebelumnya \(1\)/)).toBeTruthy();
+  });
+
+  it('keeps the typed number selected while the cashier edits it, and sends exactly that number', async () => {
+    const { commands } = setup(status([attempt()]));
+
+    fireEvent.click(await screen.findByRole('radio', { name: /Nomor lain/ }));
+    const input = screen.getByLabelText('Nomor WhatsApp tujuan', {
+      selector: 'input',
+    }) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: '0812 9999' } });
+    fireEvent.change(input, { target: { value: '0812 9999 7777' } });
+    expect(screen.getByRole('radio', { name: /Nomor lain/ }).getAttribute('aria-checked')).toBe('true');
+    fireEvent.click(screen.getByRole('button', { name: /Kirim ke nomor baru/ }));
+
+    await waitFor(() => expect(commands.requestReceiptDelivery).toHaveBeenCalledTimes(1));
+    expect(lastRequest(commands)).toMatchObject({ destination: '+6281299997777' });
+  });
+
+  it('after a corrected number failed, defaults to retrying it and can return to the customer number', async () => {
+    const { commands } = setup(
+      status([
+        attempt({
+          deliveryId: 'delivery-corrected',
+          customerDestination: false,
+          destinationMasked: '+62 •••• 8888',
+        }),
+        attempt({ deliveryId: 'delivery-1' }),
+      ]),
+    );
+
+    expect(await screen.findByRole('radio', { name: /Nomor pengiriman terakhir/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole('radio', { name: /Nomor pelanggan/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Coba lagi/ }));
+
+    await waitFor(() => expect(commands.requestReceiptDelivery).toHaveBeenCalledTimes(1));
+    expect(lastRequest(commands)).not.toHaveProperty('destination');
+    expect(lastRequest(commands)).not.toHaveProperty('retryOfDeliveryId');
   });
 
   it('rejects an unusable number before sending', async () => {
     const { commands } = setup(status());
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Ubah nomor' }));
-    fireEvent.change(screen.getByLabelText('Nomor WhatsApp tujuan'), {
+    fireEvent.click(await screen.findByRole('radio', { name: /Nomor lain/ }));
+    fireEvent.change(screen.getByLabelText('Nomor WhatsApp tujuan', { selector: 'input' }), {
       target: { value: '12' },
     });
     fireEvent.click(screen.getByRole('button', { name: /Kirim WhatsApp/ }));
@@ -237,7 +282,8 @@ describe('ReceiptDeliveryDialog', () => {
   it('shows only the masked customer number to an operator who cannot read the completed Sale', async () => {
     setup(status(), { ...TARGET, customerPhone: null });
 
-    expect(await screen.findByText('+62 •••• 1231')).toBeTruthy();
+    expect(await screen.findByRole('radio', { name: /Nomor pelanggan/ })).toBeTruthy();
+    expect(screen.getByRole('radio', { name: /Nomor pelanggan/ }).textContent).toContain('+62 •••• 1231');
     expect(document.body.textContent).not.toMatch(/812 3123 1231|6281231231231/);
   });
 
