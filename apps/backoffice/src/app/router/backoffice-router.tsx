@@ -12,13 +12,14 @@ import { BackofficeShell } from '../shell/backoffice-shell';
 import { AccessControlPage } from '../../modules/identity';
 import { BusinessSettingsPage } from '../../modules/organization';
 import { CatalogPage } from '../../features/catalog';
+import { CustomersPage } from '../../features/customers';
 import { PromotionsPage } from '../../modules/promotions';
 import { EmployeesPage } from '../../modules/workforce';
 import { MembersPage } from '../../modules/membership';
 import { FinancialAccountsPage } from '../../features/financial-accounts';
-import { ExpensesPage } from '../../modules/finance';
-import { TransactionHistoryPage } from '../../modules/pos';
-import { ReportsPage } from '../../modules/reporting';
+import { ExpensesPage } from '../../features/expenses';
+import { TransactionHistoryPage } from '../../features/transaction-history';
+import { ReportsPage } from '../../features/reporting';
 import { ActivityPage } from '../../modules/activity';
 import { NotificationsPage } from '../../modules/notifications';
 
@@ -79,6 +80,10 @@ export const backofficeRouter = createBrowserRouter([
           {
             element: <AuthorizedRoute capability="memberships" />,
             children: [{ path: '/memberships', element: <MembersPage /> }],
+          },
+          {
+            element: <AuthorizedRoute capability="customers" />,
+            children: [{ path: '/customers', element: <CustomersPage /> }],
           },
           {
             element: <AuthorizedRoute capability="financialAccounts" />,

@@ -135,7 +135,7 @@ function runtimeQueueDetail(overrides: Partial<Sale> = {}): Sale {
 
 function renderRuntimeDetail(
   sale: Sale,
-  delivery?: { status: 'FAILED'; onRetry: () => void },
+  delivery?: { status: 'SENT' | 'FAILED'; onOpenDelivery: (sale: Sale) => void },
   showPaymentReceipt = false,
   onStartLineWork: (line: SaleLine) => void = vi.fn(),
   branchAddress: string | null = null,
@@ -162,13 +162,9 @@ function renderRuntimeDetail(
           ? {
               deliveryStatus: {
                 available: true,
-                delivery: {
-                  status: delivery.status,
-                  attemptCount: 3,
-                  retryAllowed: true,
-                },
+                delivery: { status: delivery.status },
               },
-              onRetryDelivery: delivery.onRetry,
+              onSendReceipt: delivery.onOpenDelivery,
             }
           : {})}
       />
@@ -433,19 +429,33 @@ describe('ReferenceTransactionDetail Runtime detail shapes', () => {
     expect(screen.getAllByText(/Rp\s*0/).length).toBeGreaterThan(0);
   });
 
-  it('makes a failed receipt delivery visible and retryable without changing the Sale', () => {
-    const onRetry = vi.fn();
+  it('makes a failed receipt delivery visible and opens the shared delivery flow to retry', () => {
+    const onOpenDelivery = vi.fn();
     const sale = runtimeQueueDetail({
       status: 'FINALIZED',
       finalizedAt: '2026-09-24T02:15:00.000Z',
     });
 
-    renderRuntimeDetail(sale, { status: 'FAILED', onRetry }, true);
+    renderRuntimeDetail(sale, { status: 'FAILED', onOpenDelivery }, true);
 
-    const retry = screen.queryByRole('button', { name: /retry sending/i });
-    expect(retry).not.toBeNull();
-    retry?.click();
-    expect(onRetry).toHaveBeenCalledTimes(1);
+    const retry = screen.getByRole('button', { name: 'Gagal · Coba lagi' });
+    retry.click();
+    // The preview never sends by itself: it hands the Sale to the one receipt-delivery flow.
+    expect(onOpenDelivery).toHaveBeenCalledTimes(1);
+    expect(onOpenDelivery).toHaveBeenCalledWith(sale);
+  });
+
+  it('keeps an accepted send resendable and never claims delivery', () => {
+    const sale = runtimeQueueDetail({
+      status: 'FINALIZED',
+      finalizedAt: '2026-09-24T02:15:00.000Z',
+    });
+
+    renderRuntimeDetail(sale, { status: 'SENT', onOpenDelivery: vi.fn() }, true);
+
+    const resend = screen.getByRole('button', { name: 'Kirim ulang WhatsApp' });
+    expect(resend.hasAttribute('disabled')).toBe(false);
+    expect(screen.queryByText('Terkirim')).toBeNull();
   });
 });
 

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { toCanonicalMemberPhone, toNationalMemberPhone } from './member-phone';
+import {
+  sanitizeNationalMemberPhone,
+  toCanonicalMemberPhone,
+  toNationalMemberPhone,
+} from './member-phone';
 
 describe('toCanonicalMemberPhone', () => {
   it.each([
@@ -31,5 +35,15 @@ describe('toNationalMemberPhone', () => {
   it('round-trips: presenting and re-saving never changes the canonical phone', () => {
     const stored = '+6281234567890';
     expect(toCanonicalMemberPhone(toNationalMemberPhone(stored))).toBe(stored);
+  });
+});
+
+describe('national editable phone sanitization', () => {
+  it.each([
+    ['0812 3456 7890', '081234567890'],
+    ['+6281234567890', '081234567890'],
+    ['6281234567890', '081234567890'],
+  ])('shows %s as %s', (raw, expected) => {
+    expect(sanitizeNationalMemberPhone(raw)).toBe(expected);
   });
 });

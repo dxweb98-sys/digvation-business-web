@@ -16,7 +16,11 @@ import {
   MemberSectionLabel,
   MemberStatusBadge,
 } from './membership-surfaces';
-import { toCanonicalMemberPhone, toNationalMemberPhone } from './member-phone';
+import {
+  sanitizeNationalMemberPhone,
+  toCanonicalMemberPhone,
+  toNationalMemberPhone,
+} from './member-phone';
 
 const continuationCopy = {
   id: {
@@ -215,7 +219,7 @@ export function MemberEditor({
               <DInput
                 label={text.phone}
                 value={form.values.phone}
-                onChange={(value) => form.setField('phone', value)}
+                onChange={(value) => form.setField('phone', sanitizeNationalMemberPhone(value))}
                 inputMode="tel"
                 placeholder="081234567890"
                 hint={phoneTyped && !phone ? undefined : text.phoneHint}

@@ -6,6 +6,7 @@ export type BackofficeCapability =
   | 'promotions'
   | 'employees'
   | 'memberships'
+  | 'customers'
   | 'attendance'
   | 'finance'
   | 'expenses'
@@ -44,6 +45,7 @@ export type BackofficeAction =
   | 'manageAttendance'
   | 'enrollMember'
   | 'manageMember'
+  | 'manageCustomer'
   | 'viewLoyalty'
   | 'configureLoyalty'
   | 'viewCommission'
@@ -74,6 +76,7 @@ const capabilityPermissions: Record<BackofficeCapability, PermissionRequirement>
   promotions: { allOf: ['promotions:read'] },
   employees: { allOf: ['employees:read'] },
   memberships: { allOf: ['membership:read'] },
+  customers: { allOf: ['customers:read'] },
   attendance: { allOf: ['attendance:read'] },
   finance: { allOf: ['payments:read'] },
   expenses: { allOf: ['expenses:read'] },
@@ -95,6 +98,8 @@ const capabilityPermissions: Record<BackofficeCapability, PermissionRequirement>
       'settlements:read',
       'reconciliations:read',
       'locations:read',
+      // Tax Reporting is assignable on its own, independently of transaction access.
+      'tax:read',
     ],
   },
   // History shows completed transactions in full, which Runtime grants only with sales:read-completed.
@@ -131,6 +136,7 @@ const actionPermissions: Record<BackofficeAction, readonly string[]> = {
   manageAttendance: ['attendance:manage'],
   enrollMember: ['membership:enroll'],
   manageMember: ['customers:manage', 'membership:update'],
+  manageCustomer: ['customers:manage'],
   viewLoyalty: ['loyalty:read'],
   configureLoyalty: ['loyalty:configure'],
   viewCommission: ['commission:read'],
@@ -153,7 +159,10 @@ export function canAccessBackoffice(
   session: AuthSession,
   capability: BackofficeCapability,
 ): boolean {
-  if (!session.access.permissions.includes(BACKOFFICE_ACCESS_PERMISSION))
+  if (!session.access.permissions.includes(BACKOFFICE_ACCESS_PERMISSION)) return false;
+  if (capability === 'customers' && !session.access.foundations.includes('CUSTOMER_IDENTITY'))
+    return false;
+  if (capability === 'memberships' && !session.access.capabilities.includes('MEMBERSHIP'))
     return false;
   const requirement = capabilityPermissions[capability];
   const permissions = session.access.permissions;
@@ -167,8 +176,7 @@ export function canPerformBackofficeAction(
   session: AuthSession,
   action: BackofficeAction,
 ): boolean {
-  if (!session.access.permissions.includes(BACKOFFICE_ACCESS_PERMISSION))
-    return false;
+  if (!session.access.permissions.includes(BACKOFFICE_ACCESS_PERMISSION)) return false;
   return actionPermissions[action].every((permission) =>
     session.access.permissions.includes(permission),
   );

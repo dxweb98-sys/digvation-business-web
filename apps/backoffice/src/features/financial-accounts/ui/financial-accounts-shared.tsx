@@ -1,10 +1,11 @@
-import { DBadge, DButton, DPagination, DSelect, useToast } from '@digvation/ui';
+import { DBadge, DPagination, DSelect, useToast } from '@digvation/ui';
 import type { ReactNode } from 'react';
 
 import { normalizeBackofficeApiError } from '../../../app/api/backoffice-api-error';
 import { isSessionExpiredError } from '../../../auth/backoffice-auth-context';
+import { RecordDialogTitle } from '../../../shared/ui/record-dialog';
 import type { RecordStatus } from '../api/financial-accounts-api';
-import { displayCode, EMPTY_VALUE } from '../model/financial-account-model';
+import { displayCode } from '../model/financial-account-model';
 import { useFinancialAccountsLocalization } from '../localization/use-financial-accounts-localization';
 
 export function RecordStatusBadge({ status }: { status: RecordStatus }) {
@@ -59,94 +60,10 @@ export function FinancialDialogTitle({
   status?: RecordStatus;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <span className="size-2 rounded-full bg-[var(--color-brand)]" aria-hidden="true" />
-      <span>{title}</span>
+    <RecordDialogTitle title={title}>
       {code !== undefined ? <DBadge variant="info">{displayCode(code)}</DBadge> : null}
       {status ? <RecordStatusBadge status={status} /> : null}
-    </div>
-  );
-}
-
-export function FinancialDialogFooter({
-  onClose,
-  onSave,
-  disabled = false,
-}: {
-  onClose: () => void;
-  onSave: () => void;
-  disabled?: boolean;
-}) {
-  const { copy } = useFinancialAccountsLocalization();
-  return (
-    <div className="flex justify-end gap-2">
-      <DButton variant="secondary" onClick={onClose}>
-        {copy('Cancel')}
-      </DButton>
-      <DButton onClick={onSave} disabled={disabled}>
-        {copy('Save')}
-      </DButton>
-    </div>
-  );
-}
-
-export function FinancialPanel({
-  children,
-  className = '',
-  ariaLabel,
-}: {
-  children: ReactNode;
-  className?: string;
-  ariaLabel?: string;
-}) {
-  return (
-    <section
-      aria-label={ariaLabel}
-      className={`overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-sm ${className}`}
-    >
-      {children}
-    </section>
-  );
-}
-
-export function SectionLabel({ children }: { children: ReactNode }) {
-  return (
-    <p className="text-xs font-semibold uppercase tracking-[0.04em] text-[var(--color-text-muted)]">
-      {children}
-    </p>
-  );
-}
-
-export function InfoTile({
-  label,
-  value,
-  icon,
-  mono = false,
-  className = '',
-}: {
-  label: string;
-  value: ReactNode;
-  icon?: ReactNode;
-  mono?: boolean;
-  className?: string;
-}) {
-  const empty = value === null || value === undefined || value === '';
-  return (
-    <div
-      className={`min-w-0 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)]/50 p-3.5 ${className}`}
-    >
-      <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--color-text-muted)]">
-        {icon ? <span className="text-[var(--color-brand)]">{icon}</span> : null}
-        <span>{label}</span>
-      </div>
-      <div
-        className={`mt-1.5 break-words text-sm font-semibold ${
-          empty ? 'text-[var(--color-text-muted)]' : 'text-[var(--color-text)]'
-        } ${mono && !empty ? 'font-mono' : ''}`}
-      >
-        {empty ? EMPTY_VALUE : value}
-      </div>
-    </div>
+    </RecordDialogTitle>
   );
 }
 

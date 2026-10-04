@@ -22,6 +22,11 @@ import { Pencil } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { isApiErrorCode } from '../../features/sell/cashier-transaction-errors';
+import {
+  sanitizeNationalPhoneInput,
+  toCanonicalPhone,
+  toLocalPhoneDisplay,
+} from '../../features/sell/customer-input';
 import { historyQueryPolicy } from '../../app/data/operational-cache-policy';
 import { useOperationalLocalization } from '../../app/localization/operational-localization';
 import { canEditOperationalMemberProfile } from './operational-members-access';
@@ -67,15 +72,25 @@ export function OperationalMembersPage() {
     session.access.permissions,
     session.access.capabilities,
   );
-  return <OperationalMembersView api={api} canEdit={canEdit} />;
+  const cacheScope = JSON.stringify([
+    session.business.tenantId,
+    session.identity.userId,
+    session.contextVersion,
+    session.access.capabilities,
+  ]);
+  return (
+    <OperationalMembersView key={cacheScope} cacheScope={cacheScope} api={api} canEdit={canEdit} />
+  );
 }
 
 export function OperationalMembersView({
   api,
   canEdit,
+  cacheScope = 'test',
 }: {
   api: OperationalMembersApi;
   canEdit: boolean;
+  cacheScope?: string;
 }) {
   const { copy, label } = useOperationalLocalization();
   const [searchInput, setSearchInput] = useState('');
@@ -93,9 +108,10 @@ export function OperationalMembersView({
   }, [searchInput]);
 
   const list = useQuery({
-    queryKey: [...membersKey, q, offset],
+    queryKey: [...membersKey, cacheScope, q, offset],
     queryFn: ({ signal }) => api.list({ q, offset }, signal),
-    placeholderData: (previous) => previous,
+    placeholderData: (previous, query) =>
+      query?.queryKey[1] === cacheScope ? previous : undefined,
     ...historyQueryPolicy,
   });
 
@@ -172,6 +188,7 @@ export function OperationalMembersView({
           key={selectedId}
           api={api}
           membershipId={selectedId}
+          cacheScope={cacheScope}
           canEdit={canEdit}
           onClose={() => setSelectedId(null)}
         />
@@ -189,16 +206,18 @@ function formatPointValue(value: string, locale: string, signed = false): string
   }).format(number);
 }
 
-function MemberDetailDialog({
+export function MemberDetailDialog({
   api,
   membershipId,
   canEdit,
   onClose,
+  cacheScope = 'test',
 }: {
   api: OperationalMembersApi;
   membershipId: string;
   canEdit: boolean;
   onClose: () => void;
+  cacheScope?: string;
 }) {
   const { copy } = useOperationalLocalization();
   const queryClient = useQueryClient();
@@ -209,18 +228,19 @@ function MemberDetailDialog({
   const [formError, setFormError] = useState<string | null>(null);
 
   const detail = useQuery({
-    queryKey: [...memberKey, membershipId],
+    queryKey: [...memberKey, cacheScope, membershipId],
     queryFn: ({ signal }) => api.detail(membershipId, signal),
     ...historyQueryPolicy,
   });
   const member = detail.data?.membership;
 
   const updateProfile = useMutation({
-    mutationFn: () => api.updateProfile(member!, { name, phone }),
+    mutationFn: () => api.updateProfile(member!, { name, phone: toCanonicalPhone(phone) ?? phone }),
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: membersKey }),
         queryClient.invalidateQueries({ queryKey: memberKey }),
+        queryClient.invalidateQueries({ queryKey: ['operational-customers'] }),
       ]);
       setEditing(false);
       setFormError(null);
@@ -239,7 +259,7 @@ function MemberDetailDialog({
   const startEditing = () => {
     if (!member) return;
     setName(member.customer.name);
-    setPhone(member.customer.phoneE164);
+    setPhone(toLocalPhoneDisplay(member.customer.phoneE164));
     setFormError(null);
     setEditing(true);
   };
@@ -250,9 +270,9 @@ function MemberDetailDialog({
     <DDialog
       open
       onClose={onClose}
-      title={copy('Member detail')}
-      ariaLabel={copy('Member detail')}
-      className="w-full max-w-lg"
+      title={isEditing ? copy('Edit profile') : copy('Member detail')}
+      ariaLabel={isEditing ? copy('Edit profile') : copy('Member detail')}
+      className={isEditing ? 'w-full max-w-md' : 'w-full max-w-lg'}
       footer={
         member ? (
           <div className="flex justify-end gap-2">
@@ -302,24 +322,25 @@ function MemberDetailDialog({
           onRetry={() => void detail.refetch()}
         />
       ) : isEditing ? (
-        <div className="space-y-4">
-          <DInput
-            label={copy('Name')}
-            value={name}
-            onChange={setName}
-            autoComplete="off"
-            disabled={updateProfile.isPending}
-          />
-          <DInput
-            label={copy('Phone number')}
-            value={phone}
-            onChange={setPhone}
-            type="tel"
-            inputMode="tel"
-            autoComplete="off"
-            hint={copy('Use the international format, for example +628123456789.')}
-            disabled={updateProfile.isPending}
-          />
+        <div className="space-y-5">
+          <div className="space-y-3">
+            <DInput
+              label={copy('Name')}
+              value={name}
+              onChange={setName}
+              autoComplete="off"
+              disabled={updateProfile.isPending}
+            />
+            <DInput
+              label={copy('Phone number')}
+              value={phone}
+              onChange={(value) => setPhone(sanitizeNationalPhoneInput(value))}
+              type="tel"
+              inputMode="tel"
+              autoComplete="off"
+              disabled={updateProfile.isPending}
+            />
+          </div>
           {formError ? <DAlert variant="danger">{formError}</DAlert> : null}
         </div>
       ) : (
@@ -446,7 +467,7 @@ function MemberDetailBody({ detail }: { detail: MemberDetail }) {
   );
 }
 
-function MemberTransactionCard({
+export function MemberTransactionCard({
   transaction,
   showPoints,
   locale,

@@ -22,7 +22,7 @@ import { useCallback, useEffect, useRef, useState, type TransitionEvent } from '
 import { operationalQueryClientDefaults } from '../data/operational-cache-policy';
 import { operationalCopy, type OperationalLocale } from '../localization/operational-localization';
 import { OperationalLoginPage } from '../../modules/operational/operational-login-page';
-import { canReadOperationalMembers } from '../../modules/membership/operational-members-access';
+import { canReadOperationalCustomers } from '../../features/customers';
 import { OperationalSessionProvider } from '../../modules/operational/operational-session-provider';
 import { PosOperationalSessionProvider } from '../../modules/pos/pos-operational-session-provider';
 
@@ -38,8 +38,8 @@ function hasImplementedOperationalSurface(session: AuthSession): boolean {
   const hasExpenses =
     session.access.capabilities.includes('FINANCE_OPERATIONS') &&
     permissions.some((permission) => permission.startsWith('expenses:'));
-  const hasMembers = canReadOperationalMembers(permissions, session.access.capabilities);
-  return hasPos || hasExpenses || hasMembers;
+  const hasCustomers = canReadOperationalCustomers(permissions, session.access.foundations);
+  return hasPos || hasExpenses || hasCustomers;
 }
 
 const queryClient = new QueryClient({

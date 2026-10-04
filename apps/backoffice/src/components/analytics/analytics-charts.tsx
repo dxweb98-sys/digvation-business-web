@@ -149,7 +149,7 @@ export function AnalyticsDonutChart({
     <DCard variant="elevated" className={surface}>
       <h2 className="text-sm font-semibold tracking-tight">{title}</h2>
       {total ? (
-        <div className="mt-5 grid grid-cols-[112px_1fr] items-center gap-4">
+        <div className="mt-5 grid grid-cols-[112px_minmax(0,1fr)] items-center gap-4">
           <div className="relative">
             <svg viewBox="0 0 42 42" className="h-28 w-28 -rotate-90" role="img" aria-label={title}>
               <circle

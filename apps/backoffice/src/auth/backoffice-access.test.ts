@@ -42,9 +42,52 @@ function backofficeSessionWith(...permissions: string[]): AuthSession {
 }
 
 describe('Backoffice effective permission access', () => {
+  it('keeps the Customer directory independent of Membership entitlement and grants', () => {
+    const base = backofficeSessionWith('customers:read');
+    const customer = { ...base, access: { ...base.access, foundations: ['CUSTOMER_IDENTITY'] } };
+    expect(canAccessBackoffice(customer, 'customers')).toBe(true);
+    expect(canAccessBackoffice(customer, 'memberships')).toBe(false);
+    expect(canPerformBackofficeAction(customer, 'manageCustomer')).toBe(false);
+    expect(
+      canPerformBackofficeAction(
+        {
+          ...customer,
+          access: {
+            ...customer.access,
+            permissions: [...customer.access.permissions, 'customers:manage'],
+          },
+        },
+        'manageCustomer',
+      ),
+    ).toBe(true);
+    expect(
+      canAccessBackoffice(
+        { ...customer, access: { ...customer.access, foundations: [] } },
+        'customers',
+      ),
+    ).toBe(false);
+  });
+
+  it('requires both Membership entitlement and read permission for Membership navigation', () => {
+    const base = backofficeSessionWith('membership:read');
+    expect(canAccessBackoffice(base, 'memberships')).toBe(false);
+    const member = { ...base, access: { ...base.access, capabilities: ['MEMBERSHIP'] } };
+    expect(canAccessBackoffice(member, 'memberships')).toBe(true);
+    expect(canAccessBackoffice(member, 'customers')).toBe(false);
+    expect(
+      canAccessBackoffice(
+        { ...member, access: { ...member.access, permissions: [BACKOFFICE_ACCESS_PERMISSION] } },
+        'memberships',
+      ),
+    ).toBe(false);
+  });
+
   it('shows a contribution when Runtime projected its read permission', () => {
     expect(
-      canAccessBackoffice(backofficeSessionWith('sales:read', 'sales:read-completed'), 'transactions'),
+      canAccessBackoffice(
+        backofficeSessionWith('sales:read', 'sales:read-completed'),
+        'transactions',
+      ),
     ).toBe(true);
     // Without completed-transaction access the history would only hold summaries.
     expect(canAccessBackoffice(backofficeSessionWith('sales:read'), 'transactions')).toBe(false);
@@ -78,6 +121,8 @@ describe('Backoffice effective permission access', () => {
     expect(canAccessBackoffice(backofficeSessionWith('employees:read'), 'reports')).toBe(true);
     expect(canAccessBackoffice(backofficeSessionWith('attendance:read'), 'reports')).toBe(true);
     expect(canAccessBackoffice(backofficeSessionWith(), 'reports')).toBe(false);
+    // Tax Reporting alone opens Reporting; it never depends on transaction access.
+    expect(canAccessBackoffice(backofficeSessionWith('tax:read'), 'reports')).toBe(true);
   });
 
   it('does not treat an Operational role name or its permissions as Backoffice authority', () => {
@@ -112,5 +157,4 @@ describe('Backoffice effective permission access', () => {
     ];
     expect(canAccessBackoffice(operationalOnly, 'dashboard')).toBe(false);
   });
-
 });
