@@ -17,10 +17,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { historyQueryPolicy } from '../../app/data/operational-cache-policy';
-import {
-  MemberDetailDialog,
-  MemberTransactionCard,
-} from './membership/operational-members-page';
+import { MemberDetailDialog, MemberTransactionCard } from './membership/operational-members-page';
 import { OperationalMembersApi } from './membership/operational-members-api';
 import {
   sanitizeNationalPhoneInput,

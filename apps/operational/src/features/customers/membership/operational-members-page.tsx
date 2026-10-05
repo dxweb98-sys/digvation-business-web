@@ -21,7 +21,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
-import { isApiErrorCode } from '../../sell/api/cashier-transaction-errors';
+import { isApiErrorCode } from '../../sell/transaction/api/cashier-transaction-errors';
 import {
   sanitizeNationalPhoneInput,
   toCanonicalPhone,

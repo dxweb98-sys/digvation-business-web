@@ -24,7 +24,7 @@ import { operationalCopy, type OperationalLocale } from '../localization/operati
 import { OperationalLoginPage } from '../auth/operational-login-page';
 import { canReadOperationalCustomers } from '../../features/customers';
 import { OperationalSessionProvider } from '../../shared/operational-access/operational-session-provider';
-import { PosOperationalSessionProvider } from '../../features/sell/model/pos-operational-session-provider';
+import { PosOperationalSessionProvider } from '../../features/sell/session/pos-operational-session-provider';
 
 function runtimeLocale(locale: string): OperationalLocale {
   return locale === 'en-US' ? 'en-US' : 'id-ID';

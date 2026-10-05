@@ -1,8 +1,8 @@
 import { useParams } from 'react-router';
 
-import { ReplatformedPosWorkspace } from '../../features/sell/ui/replatformed-pos-workspace';
-import { ItemConfigurator } from '../../features/sell/ui/item-configurator';
-import { useCashierTransactionWorkspace } from '../../features/sell/model/use-cashier-transaction-workspace';
+import { ReplatformedPosWorkspace } from '../../features/sell/workspace/ui/replatformed-pos-workspace';
+import { ItemConfigurator } from '../../features/sell/cart/item-configurator';
+import { useCashierTransactionWorkspace } from '../../features/sell/workspace/model/use-cashier-transaction-workspace';
 
 export function SellPage() {
   const { saleId } = useParams<{ saleId: string }>();
