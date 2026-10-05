@@ -6,11 +6,11 @@ import type { ReactNode } from 'react';
 
 import { useOperationalLocalization } from '../localization/operational-localization';
 import { SellPage } from '../../routes/sell/sell-page';
-import { OperationalShell } from '../../modules/operational/operational-shell';
-import type { OperationalNavigationSection } from '../../modules/operational/operational-navigation';
-import { posSellOperationalNavigation } from '../../modules/pos/pos-operational-navigation';
-import { financeOperationalNavigation } from '../../modules/finance/finance-operational-navigation';
-import { OperationalExpensesPage } from '../../modules/finance/operational-expenses-page';
+import { OperationalShell } from '../shell/operational-shell';
+import type { OperationalNavigationSection } from '../../shared/navigation/operational-navigation';
+import { posSellOperationalNavigation } from '../../features/sell/pos-operational-navigation';
+import { financeOperationalNavigation } from '../../features/expenses/finance-operational-navigation';
+import { OperationalExpensesPage } from '../../features/expenses/operational-expenses-page';
 import {
   customerOperationalNavigation,
   canReadOperationalCustomers,

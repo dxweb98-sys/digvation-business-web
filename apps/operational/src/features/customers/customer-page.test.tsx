@@ -6,7 +6,7 @@ import { DToastProvider } from '@digvation/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { OperationalMembersApi } from '../../modules/membership/operational-members-api';
+import type { OperationalMembersApi } from './membership/operational-members-api';
 import { canReadCustomerMembership, canReadOperationalCustomers } from './customer-access';
 import { CustomerDetailDialog, OperationalCustomersView } from './customer-page';
 import type { Customer, OperationalCustomersApi } from './customer-api';

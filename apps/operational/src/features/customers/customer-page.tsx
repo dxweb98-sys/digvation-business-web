@@ -20,13 +20,13 @@ import { historyQueryPolicy } from '../../app/data/operational-cache-policy';
 import {
   MemberDetailDialog,
   MemberTransactionCard,
-} from '../../modules/membership/operational-members-page';
-import { OperationalMembersApi } from '../../modules/membership/operational-members-api';
+} from './membership/operational-members-page';
+import { OperationalMembersApi } from './membership/operational-members-api';
 import {
   sanitizeNationalPhoneInput,
   toCanonicalPhone,
   toLocalPhoneDisplay,
-} from '../sell/customer-input';
+} from '../../shared/phone/customer-input';
 import { canReadCustomerMembership } from './customer-access';
 import { CUSTOMER_PAGE_SIZE, OperationalCustomersApi, type Customer } from './customer-api';
 import { useCustomerLocalization } from './customer-copy';
