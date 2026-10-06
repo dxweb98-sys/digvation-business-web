@@ -41,6 +41,7 @@ export function ReferenceCartPanel({
   onEdit,
   onRemove,
   onCheckout,
+  isCheckoutPreparing = false,
 }: {
   lines: readonly CartDisplayLine[];
   total: string;
@@ -62,6 +63,8 @@ export function ReferenceCartPanel({
   onEdit: (line: CartDisplayLine, options?: { addUnit?: boolean }) => void;
   onRemove: (line: CartDisplayLine) => void;
   onCheckout: () => void;
+  /** The checkout destination is being prepared; the button stays busy until it opens. */
+  isCheckoutPreparing?: boolean;
 }) {
   const { copy } = useOperationalLocalization();
   const status = customerStatus(customer);
@@ -311,6 +314,7 @@ export function ReferenceCartPanel({
           <Button
             fullWidth
             disabled={!lines.length}
+            loading={isCheckoutPreparing}
             onClick={onCheckout}
             leftIcon={<CreditCard className="size-3.5" />}
           >

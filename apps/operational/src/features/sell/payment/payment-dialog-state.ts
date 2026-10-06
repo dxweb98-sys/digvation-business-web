@@ -16,14 +16,17 @@ export function usePaymentAllocationMode(open: boolean) {
 
 /**
  * Keeps the confirmation step inside the payment dialog so Escape, overlay and focus handling stay
- * with one DS dialog. It resets to editing whenever the dialog is reopened.
+ * with one DS dialog. It resets to editing whenever the dialog is reopened. A closing dialog keeps
+ * showing the step it was closed from, so its exit transition never snaps back to the edit layout.
  */
 export function usePaymentDialogStep(open: boolean) {
   const [step, setStep] = useState<PaymentDialogStep>('edit');
   const [wasOpen, setWasOpen] = useState(open);
+  const [shownStep, setShownStep] = useState<PaymentDialogStep>(step);
   if (open !== wasOpen) {
     setWasOpen(open);
     if (open) setStep('edit');
   }
-  return [step, setStep] as const;
+  if (open && step !== shownStep) setShownStep(step);
+  return [open ? step : shownStep, setStep] as const;
 }

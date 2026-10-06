@@ -2,7 +2,7 @@ import {
   DeploymentBootstrapProvider,
   type DeploymentBootstrapConfig,
 } from '@digvation/business-runtime';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { Employee, Sale, SaleLine } from '../../transaction/model/cashier-transaction.types';
@@ -457,6 +457,52 @@ describe('ReferenceTransactionDetail Runtime detail shapes', () => {
     const resend = screen.getByRole('button', { name: 'Kirim ulang WhatsApp' });
     expect(resend.hasAttribute('disabled')).toBe(false);
     expect(screen.queryByText('Terkirim')).toBeNull();
+  });
+});
+
+describe('ReferenceTransactionDetail opening and closing', () => {
+  const detail = (sale: Sale | null) => (
+    <DeploymentBootstrapProvider config={bootstrap}>
+      <ReferenceTransactionDetail
+        sale={sale}
+        locale="id-ID"
+        employees={[]}
+        businessName="Digvation"
+        branchName="Main branch"
+        cashierName="Kasir"
+        showPaymentReceipt={false}
+        onClose={vi.fn()}
+        onNewSale={vi.fn()}
+        onViewReceipt={vi.fn()}
+        onAssign={vi.fn()}
+        onStartLineWork={vi.fn()}
+        onComplete={vi.fn()}
+        isMutating={false}
+      />
+    </DeploymentBootstrapProvider>
+  );
+
+  it('keeps the closing dialog and its Sale, then shows the next Sale in a fresh dialog', () => {
+    vi.useFakeTimers();
+    try {
+      const first = runtimeQueueDetail();
+      const { rerender } = render(detail(first));
+      const opened = screen.getByRole('dialog');
+
+      rerender(detail(null));
+      expect(screen.getByRole('dialog')).toBe(opened);
+      expect(screen.getByRole('dialog').textContent).toContain('TRX-20260924-000197');
+
+      act(() => vi.advanceTimersByTime(300));
+      expect(screen.queryByRole('dialog')).toBeNull();
+
+      rerender(
+        detail(runtimeQueueDetail({ id: 'sale-runtime-2', saleNumber: 'TRX-20260924-000198' })),
+      );
+      expect(screen.getByRole('dialog').textContent).toContain('TRX-20260924-000198');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

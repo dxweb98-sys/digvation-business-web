@@ -251,7 +251,19 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     workspace,
   });
 
+  const [checkoutPreparing, setCheckoutPreparing] = useState(false);
+  /** The checkout button stays busy until payment opens or preparing it fails. */
   const openCheckout = async () => {
+    if (checkoutPreparing) return;
+    setCheckoutPreparing(true);
+    try {
+      await prepareCheckout();
+    } finally {
+      setCheckoutPreparing(false);
+    }
+  };
+
+  const prepareCheckout = async () => {
     // A transaction belongs to a customer. Without one there is nothing to
     // check out, so the selector is opened instead of creating a Sale.
     if (!activeCustomer) {
@@ -903,6 +915,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           }
         }}
         onCheckout={() => void openCheckout()}
+        isCheckoutPreparing={checkoutPreparing}
       />
 
       <CustomerMemberDialog

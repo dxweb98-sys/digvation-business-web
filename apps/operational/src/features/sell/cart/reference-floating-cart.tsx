@@ -29,6 +29,7 @@ export function ReferenceFloatingCart({
   onEdit,
   onRemove,
   onCheckout,
+  isCheckoutPreparing = false,
 }: {
   open: boolean;
   onOpenChange: (value: boolean) => void;
@@ -52,6 +53,8 @@ export function ReferenceFloatingCart({
   onEdit: (line: CartDisplayLine, options?: { addUnit?: boolean }) => void;
   onRemove: (line: CartDisplayLine) => void;
   onCheckout: () => void;
+  /** The checkout destination is being prepared; the button stays busy until it opens. */
+  isCheckoutPreparing?: boolean;
 }) {
   const { copy } = useOperationalLocalization();
   useEffect(() => {
@@ -86,6 +89,7 @@ export function ReferenceFloatingCart({
       onEdit={onEdit}
       onRemove={onRemove}
       onCheckout={onCheckout}
+      isCheckoutPreparing={isCheckoutPreparing}
     />
   );
   const countLabel = lines.length
