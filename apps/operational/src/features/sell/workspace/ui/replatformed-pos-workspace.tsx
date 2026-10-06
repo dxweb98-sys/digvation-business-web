@@ -28,7 +28,7 @@ import {
   saleTaxLabel,
   transactionDiscountLabel,
 } from '../../transaction/model/sale-presentation';
-import type { Payment, Sale, SaleLine } from '../../transaction/model/cashier-transaction.types';
+import type { Payment, Sale } from '../../transaction/model/cashier-transaction.types';
 import type { useCashierTransactionWorkspace } from '../model/use-cashier-transaction-workspace';
 
 import {
@@ -39,16 +39,12 @@ import {
 import { SaleAdjustmentControls } from '../../adjustment/sale-adjustment-controls';
 import { SaleLineTaskDialog } from '../../queue/sale-line-task-dialog';
 import { ServicePerformersDialog } from '../../performer/service-performers-dialog';
-import { type ServiceLineWorkPlan } from '../../performer/service-performer-allocation';
 import {
   presentableTransaction,
   useCanReadCompletedSaleDetails,
 } from '../../transaction/model/completed-sale-visibility';
 import { CustomerMemberDialog } from '../../customer/ui/customer-member-dialog';
-import {
-  WalkInCustomerEditDialog,
-  type WalkInCustomerEditTarget,
-} from '../../customer/ui/walk-in-customer-edit-dialog';
+import { WalkInCustomerEditDialog } from '../../customer/ui/walk-in-customer-edit-dialog';
 import { ReceiptDeliveryDialog } from '../../receipt/receipt-delivery-dialog';
 import { canAdjustOrder } from '../../adjustment/sale-adjustment-access';
 import { completeSettledCheckout, hasTrackedWork } from '../../transaction/model/sale-lifecycle';
@@ -57,8 +53,6 @@ import {
   type QueuedSaleEntry,
   readQueuedSaleEntries,
   writeQueuedSaleEntries,
-  readCancellationReasons,
-  writeCancellationReason,
 } from '../../queue/queued-sale-storage';
 import {
   hasSuccessfulCheckout,
@@ -66,7 +60,7 @@ import {
   type TerminalPaymentStatus,
   hasSuccessfulPayment,
 } from '../../payment/sale-payment-status';
-import { workflowIssues, processIssues } from '../../queue/workflow-issues';
+import { processIssues } from '../../queue/workflow-issues';
 import { money, transactionNumber, isPositiveDecimal } from '../../transaction/model/sale-display';
 import { ReferenceQueueBoard } from '../../queue/reference-queue-board';
 import { ReferenceTypeButton } from '../../catalog/reference-type-button';
@@ -83,6 +77,12 @@ import { useDraftTaxPreview } from '../../cart/use-draft-tax-preview';
 import { useQueueGroups } from '../../queue/use-queue-groups';
 import { useCheckoutPaymentForm } from '../../payment/use-checkout-payment-form';
 import { useReceiptDeliveryPreview } from '../../receipt/use-receipt-delivery-preview';
+import { useServicePerformerAssignment } from '../../performer/use-service-performer-assignment';
+import { useQueuedWorkActions } from '../../queue/use-queued-work-actions';
+import { useOrderAdjustment } from '../../adjustment/use-order-adjustment';
+import { useQueuedSaleCancellation } from '../../queue/use-queued-sale-cancellation';
+import { useQueuedSaleCustomerEdit } from '../../queue/use-queued-sale-customer-edit';
+import { useQueuedSaleCompletion } from '../../queue/use-queued-sale-completion';
 import './replatformed-pos-workspace.css';
 
 type Workspace = ReturnType<typeof useCashierTransactionWorkspace>;
@@ -125,33 +125,51 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const [queueIssues] = useState<Record<string, string[]>>({});
   const [queueOpen, setQueueOpen] = useState(false);
   const [queueDetail, setQueueDetail] = useState<Sale | null>(null);
-  const [cancelTarget, setCancelTarget] = useState<Sale | null>(null);
-  const [customerEditTarget, setCustomerEditTarget] = useState<WalkInCustomerEditTarget | null>(
-    null,
-  );
-  const [cancelReason, setCancelReason] = useState('');
-  const [cancellationReasons, setCancellationReasons] = useState<Record<string, string>>(() =>
-    isLocalDemo ? readCancellationReasons() : {},
-  );
-  const [adjustmentTarget, setAdjustmentTarget] = useState<Sale | null>(null);
+
   const [queuePaymentTarget, setQueuePaymentTarget] = useState<Sale | null>(null);
   const [queuePaymentAmount, setQueuePaymentAmount] = useState<string | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
   const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
 
-  const [completionConfirmationTarget, setCompletionConfirmationTarget] = useState<Sale | null>(
-    null,
-  );
-  const [performerTarget, setPerformerTarget] = useState<{
-    sale: Sale;
-    line: SaleLine;
-  } | null>(null);
-  const [isSavingPerformers, setSavingPerformers] = useState(false);
+  const { performerTarget, setPerformerTarget, isSavingPerformers, savePerformers } =
+    useServicePerformerAssignment({ workspace, setQueueDetail, showToast, copy });
+
   const [receiptSaleId, setReceiptSaleId] = useState<string | null>(null);
+  const {
+    cancelTarget,
+    setCancelTarget,
+    cancelReason,
+    setCancelReason,
+    cancellationReasons,
+    requestCancel,
+    confirmCancel,
+  } = useQueuedSaleCancellation({
+    workspace,
+    isLocalDemo,
+    setQueueDetail,
+    setQueueTab,
+    setReceiptSaleId,
+    showToast,
+    copy,
+  });
 
   // Effective permission, never a role name: without it completed transactions
   // show no amount, detail or receipt, and can only be sent to the customer.
   const canReadCompleted = useCanReadCompletedSaleDetails();
+  const {
+    completionConfirmationTarget,
+    setCompletionConfirmationTarget,
+    completeQueuedTransaction,
+    confirmQueuedCompletion,
+  } = useQueuedSaleCompletion({
+    workspace,
+    canReadCompleted,
+    setQueueTab,
+    setQueueDetail,
+    setReceiptSaleId,
+    showToast,
+    copy,
+  });
 
   const sale = workspace.viewModel.sale;
   const lines = workspace.cart.lines;
@@ -215,10 +233,16 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     openReceiptDelivery,
   } = useReceiptDeliveryPreview({ adapter, displayedQueueDetail, workspace });
 
-  const displayedAdjustmentTarget =
-    adjustmentTarget && sale?.id === adjustmentTarget.id ? sale : adjustmentTarget;
   const displayedQueuePaymentTarget =
     queuePaymentTarget && sale?.id === queuePaymentTarget.id ? sale : queuePaymentTarget;
+  const { setAdjustmentTarget, displayedAdjustmentTarget, openAdjustment } = useOrderAdjustment({
+    workspace,
+    session,
+    sale,
+    setQueueDetail,
+    showToast,
+    copy,
+  });
 
   const { groups } = useQueueGroups({
     transactionsQuery,
@@ -312,45 +336,17 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   };
 
   const refreshQueue = () => void transactionsQuery.refetch();
-
-  /** Only an unfinished transaction of a walk-in customer: a Member is edited in Member management. */
-  const openCustomerEdit = (target: Sale) => {
-    if (target.status !== 'OPEN' || target.customer?.type !== 'NON_MEMBER') return;
-    setCustomerEditTarget({
-      saleId: target.id,
-      reference: transactionNumber(target, workspace.locale),
-      customer: { name: target.customer.name, phoneE164: target.customer.phoneE164 },
+  const { customerEditTarget, setCustomerEditTarget, openCustomerEdit, saveCustomerEdit } =
+    useQueuedSaleCustomerEdit({
+      adapter,
+      workspace,
+      transactionsQuery,
+      queueDetail,
+      setQueueDetail,
+      refreshQueue,
+      showToast,
+      copy,
     });
-  };
-
-  const saveCustomerEdit = async (saleId: string, input: { name: string; phone: string }) => {
-    const current =
-      transactionsQuery.data?.items.find((entry) => entry.id === saleId) ?? queueDetail;
-    // The Sale is re-read first so the correction never rides on a stale version.
-    const fresh = await adapter.getSale(saleId);
-    if (fresh.status !== 'OPEN' || fresh.customer?.type !== 'NON_MEMBER') {
-      setCustomerEditTarget(null);
-      refreshQueue();
-      throw new Error('SALE_NOT_OPEN');
-    }
-    const updated = await adapter.setSaleCustomer(
-      saleId,
-      {
-        expectedVersion: fresh.version,
-        customer: { type: 'NON_MEMBER', name: input.name, phone: input.phone },
-      },
-      `customer-correction-${saleId}-${crypto.randomUUID()}`,
-    );
-    setCustomerEditTarget(null);
-    if (queueDetail?.id === saleId || current?.id === saleId)
-      setQueueDetail((detail) => (detail?.id === saleId ? updated : detail));
-    refreshQueue();
-    showToast({
-      title: copy('Customer updated'),
-      description: transactionNumber(updated, workspace.locale),
-      variant: 'success',
-    });
-  };
 
   const commitCheckoutToQueue = (
     completedSale: Sale,
@@ -446,151 +442,13 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     else if (result.kind === 'QUEUED') commitCheckoutToQueue(result.sale, true, 'QUEUE');
   };
 
-  const startQueuedWork = async (transaction: Sale) => {
-    const line = transaction.lines.find(
-      (candidate) =>
-        candidate.removedAt === null &&
-        candidate.fulfillmentBehaviorSnapshot === 'TRACKED' &&
-        candidate.fulfillment?.status === 'WAITING',
-    );
-    if (!line) {
-      showToast({
-        title: copy('No work can be started'),
-        description: copy('This transaction has no services waiting to be worked on.'),
-        variant: 'warning',
-      });
-      return false;
-    }
-    try {
-      const started =
-        transaction.operationalState === 'IN_PROGRESS'
-          ? transaction
-          : await workspace.startSaleWork(transaction);
-      await workspace.startQueuedFulfillment(started, line);
-      setQueueTab('PROGRESS');
-      showToast({
-        title: copy('Work started'),
-        description: `${transactionNumber(transaction, workspace.locale)} ${copy('is now being worked on.')}`,
-        variant: 'success',
-      });
-      return true;
-    } catch {
-      showToast({
-        title: copy('Could not start work'),
-        description: copy('The transaction remains in the queue.'),
-        variant: 'danger',
-      });
-      return false;
-    }
-  };
-
-  /**
-   * Advances a single tracked Service line from WAITING to IN_PROGRESS while the
-   * transaction is already being worked on. Only this line changes; other WAITING
-   * lines on the same Sale are untouched.
-   */
-  const startWaitingServiceLine = async (transaction: Sale, line: SaleLine) => {
-    try {
-      const updated = await workspace.transitionQueuedFulfillment(transaction, line, 'IN_PROGRESS');
-      setQueueDetail(updated);
-      showToast({
-        title: copy('Work started'),
-        description: `${line.itemNameSnapshot} ${copy('is now being worked on.')}`,
-        variant: 'success',
-      });
-    } catch {
-      showToast({
-        title: copy('Could not start work'),
-        description: copy('The service was not started. Try again.'),
-        variant: 'danger',
-      });
-    }
-  };
-
-  const savePerformers = async (
-    target: { sale: Sale; line: SaleLine },
-    plans: ServiceLineWorkPlan[],
-  ) => {
-    setSavingPerformers(true);
-    try {
-      const updated = await workspace.setQueuedWorkUnits(target.sale, plans);
-      setQueueDetail(updated);
-      setPerformerTarget(null);
-      showToast({
-        title: copy('Employee updated'),
-        description: copy('Service assignment saved for this transaction.'),
-        variant: 'success',
-      });
-    } catch {
-      showToast({
-        title: copy('Could not update employee'),
-        description: copy('Assignment was not changed. Try again.'),
-        variant: 'danger',
-      });
-    } finally {
-      setSavingPerformers(false);
-    }
-  };
-
-  const completeQueuedTransaction = (transaction: Sale) => {
-    const issues = workflowIssues(transaction, workspace.locale);
-    if (issues.length) return;
-    setCompletionConfirmationTarget(transaction);
-  };
-
-  const confirmQueuedCompletion = async () => {
-    if (
-      !completionConfirmationTarget ||
-      workflowIssues(completionConfirmationTarget, workspace.locale).length
-    ) {
-      return;
-    }
-    try {
-      // The finalize response is the immediate completion result, so its receipt
-      // is shown to every operator who completed it. Without sales:read-completed
-      // it opens as the receipt only (no detail) and is gone once closed: later
-      // reads of the completed transaction are history, which Runtime forbids.
-      const finalized = await workspace.finalizeQueuedSale(completionConfirmationTarget);
-      setQueueTab('COMPLETED');
-      const paid = hasSuccessfulPayment(finalized);
-      if (canReadCompleted || paid) {
-        setQueueDetail(finalized);
-        setReceiptSaleId(paid ? finalized.id : null);
-      } else {
-        setQueueDetail(null);
-        setReceiptSaleId(null);
-      }
-      setCompletionConfirmationTarget(null);
-      showToast({
-        title: copy('Transaction completed'),
-        description: `${transactionNumber(finalized, workspace.locale)} ${copy('has been completed.')}`,
-        variant: 'success',
-      });
-    } catch {
-      showToast({
-        title: copy('Could not complete transaction'),
-        description: copy('Check the transaction status and try again.'),
-        variant: 'danger',
-      });
-    }
-  };
-
-  const openAdjustment = async (transaction: Sale) => {
-    if (transaction.status !== 'OPEN') return;
-    // Runtime enforces this too; never open a dialog that can only end in a refusal.
-    if (!canAdjustOrder(transaction, session.access.permissions)) return;
-    setQueueDetail(null);
-    try {
-      const hydrated = await workspace.hydrateQueuedSale(transaction.id);
-      setAdjustmentTarget(hydrated);
-    } catch {
-      showToast({
-        title: copy('Could not load transaction'),
-        description: copy('Reload the transaction before accepting payment.'),
-        variant: 'danger',
-      });
-    }
-  };
+  const { startQueuedWork, startWaitingServiceLine } = useQueuedWorkActions({
+    workspace,
+    setQueueTab,
+    setQueueDetail,
+    showToast,
+    copy,
+  });
 
   const openQueuePayment = async (transaction: Sale) => {
     try {
@@ -614,45 +472,6 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       showToast({
         title: copy('Could not load transaction'),
         description: copy('Reload the transaction before accepting payment.'),
-        variant: 'danger',
-      });
-    }
-  };
-
-  const requestCancel = (transaction: Sale) => {
-    setCancelTarget(transaction);
-    setCancelReason('');
-  };
-
-  const confirmCancel = async () => {
-    if (!cancelTarget || !cancelReason.trim()) return;
-    const refundAmount = financialSummary(cancelTarget).totalPaid;
-    try {
-      const canceledSale = await workspace.voidQueuedSale(cancelTarget);
-      if (isLocalDemo) {
-        writeCancellationReason(canceledSale.id, cancelReason.trim());
-        setCancellationReasons((current) => ({
-          ...current,
-          [canceledSale.id]: cancelReason.trim(),
-        }));
-      }
-      setQueueDetail(canceledSale);
-      setQueueTab('CANCELED');
-      setReceiptSaleId(null);
-      setCancelTarget(null);
-      setCancelReason('');
-      workspace.closeQueueContext();
-      showToast({
-        title: copy('Transaction canceled'),
-        description: isPositiveDecimal(refundAmount)
-          ? `${copy('Refund required')}: ${money(refundAmount, workspace.locale)}. ${copy('Cancellation reason saved.')}`
-          : copy('Cancellation reason saved.'),
-        variant: 'success',
-      });
-    } catch (error) {
-      showToast({
-        title: copy('Cancellation failed'),
-        description: cashierTransactionErrorMessage(error),
         variant: 'danger',
       });
     }
