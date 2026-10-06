@@ -4,6 +4,7 @@ import type {
   SaleLine,
   SaleLineCompositionComponent,
 } from '../api/transaction-history-api';
+import { fromMoneyUnits, toMoneyUnits } from './transaction-payment-composition';
 import { activeSaleLines } from './transaction-summary';
 
 /** A readable employee, or `null` when no readable identity exists (never a raw id). */
@@ -26,6 +27,25 @@ export interface AdditionalComponentPresentation {
   performers: EmployeeName[];
 }
 
+export interface ServicePriceAdditionPresentation extends AdditionalComponentPresentation {
+  /** What this addition contributes to the whole line; `null` when included in the Service price. */
+  lineAmount: string | null;
+}
+
+/**
+ * How a composed Service line's billed amount is built: the Service before its sale-selected
+ * additions plus each priced addition. It only explains the captured gross amount; it never adds.
+ */
+export interface ServicePriceBreakdown {
+  /** Service price per unit before sale-selected additions (fixed composition stays bundled). */
+  serviceUnitPrice: string;
+  /** `serviceUnitPrice` for the whole line quantity. */
+  serviceAmount: string;
+  additions: ServicePriceAdditionPresentation[];
+  /** Equals the line's captured gross amount. */
+  totalAmount: string;
+}
+
 export interface TransactionItemPresentation {
   line: SaleLine;
   isService: boolean;
@@ -36,6 +56,8 @@ export interface TransactionItemPresentation {
   /** Product salesperson; never a Service performer. */
   soldBy: EmployeeName;
   additionalComponents: AdditionalComponentPresentation[];
+  /** Present only when the captured snapshot reconciles exactly; otherwise `null`. */
+  priceBreakdown: ServicePriceBreakdown | null;
 }
 
 /**
@@ -107,6 +129,58 @@ function additionalComponents(line: SaleLine, nameOf: (id: string) => EmployeeNa
     }));
 }
 
+const UNIT_SCALE = 10_000n;
+
+/** `amount × quantity` at four decimals, or `null` when the product needs more precision. */
+function timesQuantity(amount: string, quantity: string): string | null {
+  const product = toMoneyUnits(amount) * toMoneyUnits(quantity);
+  return product % UNIT_SCALE === 0n ? fromMoneyUnits(product / UNIT_SCALE) : null;
+}
+
+/**
+ * Runtime captures a composed Service as resolvedUnitPrice = base + Σ extendedContribution, so the
+ * Service before its sale-selected additions is resolvedUnitPrice minus those priced additions.
+ * Only the immutable Sale snapshot is used, never current Catalog prices. A manual override replaced
+ * the composed price, so no base is derived for it; any snapshot that does not reconcile exactly
+ * to the captured gross amount keeps the plain presentation.
+ */
+function servicePriceBreakdown(
+  line: SaleLine,
+  additional: AdditionalComponentPresentation[],
+): ServicePriceBreakdown | null {
+  const priced = additional.filter(
+    (component) => component.chargedAmount !== null && toMoneyUnits(component.chargedAmount) !== 0n,
+  );
+  if (!priced.length || line.overrideAmount != null) return null;
+  const { resolvedUnitPrice, effectiveUnitPrice, grossAmount, quantity } = line;
+  if (!resolvedUnitPrice || !effectiveUnitPrice || !grossAmount) return null;
+  if (toMoneyUnits(resolvedUnitPrice) !== toMoneyUnits(effectiveUnitPrice)) return null;
+
+  const serviceUnits =
+    toMoneyUnits(resolvedUnitPrice) -
+    priced.reduce((sum, component) => sum + toMoneyUnits(component.chargedAmount ?? '0'), 0n);
+  if (serviceUnits < 0n) return null;
+  const serviceUnitPrice = fromMoneyUnits(serviceUnits);
+  const serviceAmount = timesQuantity(serviceUnitPrice, quantity);
+  const additions = additional.map((component) => ({
+    ...component,
+    lineAmount:
+      component.chargedAmount === null ? null : timesQuantity(component.chargedAmount, quantity),
+  }));
+  if (
+    serviceAmount === null ||
+    additions.some((addition) => addition.chargedAmount !== null && addition.lineAmount === null)
+  )
+    return null;
+
+  const reconciled = additions.reduce(
+    (sum, addition) => sum + (addition.lineAmount ? toMoneyUnits(addition.lineAmount) : 0n),
+    toMoneyUnits(serviceAmount),
+  );
+  if (reconciled !== toMoneyUnits(grossAmount)) return null;
+  return { serviceUnitPrice, serviceAmount, additions, totalAmount: grossAmount };
+}
+
 /** The billed items of a transaction, each with who sold or performed it. */
 export function transactionItems(
   sale: Pick<Sale, 'lines' | 'workEmployees'>,
@@ -116,13 +190,15 @@ export function transactionItems(
     const isService =
       line.itemTypeSnapshot === 'SERVICE' ||
       (line.itemTypeSnapshot === undefined && line.fulfillmentBehaviorSnapshot === 'TRACKED');
+    const additional = isService ? additionalComponents(line, nameOf) : [];
     return {
       line,
       isService,
       performers: isService ? servicePerformers(line, nameOf) : [],
       workUnits: isService ? distinctWorkUnits(line, nameOf) : [],
       soldBy: isService ? null : (line.soldByEmployeeNameSnapshot?.trim() ?? null) || null,
-      additionalComponents: isService ? additionalComponents(line, nameOf) : [],
+      additionalComponents: additional,
+      priceBreakdown: isService ? servicePriceBreakdown(line, additional) : null,
     };
   });
 }

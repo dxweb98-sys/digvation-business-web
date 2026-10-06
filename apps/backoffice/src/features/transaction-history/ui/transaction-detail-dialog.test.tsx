@@ -3,7 +3,13 @@ import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/re
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { Sale } from '../api/transaction-history-api';
-import { SCENARIOS, testLine, testPayment } from '../model/transaction-test-fixtures';
+import {
+  SCENARIOS,
+  testComponent,
+  testLine,
+  testPayment,
+  testSale,
+} from '../model/transaction-test-fixtures';
 import { TransactionHistoryPage } from './transaction-history-page';
 import { renderDetail, renderWithProviders, tableRow } from './transaction-history-test-harness';
 
@@ -257,5 +263,89 @@ describe('Transaction detail stability', () => {
     const second = await screen.findByRole('dialog', { name: 'Detail transaksi' });
     expect(within(second).getAllByText('TRX-20261001-000005').length).toBeGreaterThan(0);
     expect(within(second).queryByText('TRX-20261001-000004')).toBeNull();
+  });
+});
+
+describe('Composed Service price presentation', () => {
+  const composedSale = (line: Parameters<typeof testLine>[0] = {}) =>
+    testSale({
+      lines: [
+        testLine({
+          itemNameSnapshot: 'Hair Color',
+          variantNameSnapshot: 'Red',
+          quantity: '1.0000',
+          resolvedUnitPrice: '210000.0000',
+          overrideAmount: null,
+          effectiveUnitPrice: '210000.0000',
+          grossAmount: '210000.0000',
+          totalAmount: '210000.0000',
+          compositionComponents: [
+            testComponent({
+              itemNameSnapshot: 'Red Coloring BRAND',
+              extendedContribution: '10000.0000',
+            }),
+          ],
+          ...line,
+        }),
+      ],
+    });
+  const itemsOf = async (sale: Sale) => {
+    renderDetail(sale);
+    const dialog = within(await screen.findByRole('dialog'));
+    return within(await dialog.findByRole('region', { name: 'Item transaksi' }));
+  };
+
+  it('reconciles the composed amount instead of adding the addition on top of it', async () => {
+    const items = await itemsOf(composedSale());
+    expect(items.getByText('Rincian harga')).toBeTruthy();
+    expect(items.getByText('Harga layanan')).toBeTruthy();
+    expect(items.getByText(/^Rp\s200\.000$/)).toBeTruthy();
+    expect(items.getByText(/^\+Rp\s10\.000$/)).toBeTruthy();
+    expect(items.getByText('Total item')).toBeTruthy();
+    // The authoritative line amount and the breakdown total are the same Rp 210.000.
+    expect(items.getAllByText(/^Rp\s210\.000$/)).toHaveLength(2);
+    // The composed price is never presented as a per-item base price.
+    expect(items.getByText(/^Jml 1$/)).toBeTruthy();
+    expect(items.queryByText(/per item/)).toBeNull();
+    expect(items.queryByText('Item tambahan')).toBeNull();
+    // Addition performer attribution is unchanged.
+    expect(items.getByText('Citra Ayu')).toBeTruthy();
+  });
+
+  it('shows an included addition as included, never as Rp 0', async () => {
+    const items = await itemsOf(
+      composedSale({
+        compositionComponents: [
+          testComponent({
+            itemNameSnapshot: 'Red Coloring BRAND',
+            extendedContribution: '10000.0000',
+          }),
+          testComponent({
+            id: 'included',
+            position: 1,
+            itemNameSnapshot: 'Hair Mask',
+            pricingMode: 'INCLUDED_IN_SERVICE_PRICE',
+            extendedContribution: '0.0000',
+          }),
+        ],
+      }),
+    );
+    expect(items.getByText('Hair Mask')).toBeTruthy();
+    expect(items.getByText('Termasuk')).toBeTruthy();
+    expect(items.queryByText(/Rp\s0$/)).toBeNull();
+  });
+
+  it('keeps the existing presentation for a manual price override', async () => {
+    const items = await itemsOf(
+      composedSale({
+        overrideAmount: '180000.0000',
+        effectiveUnitPrice: '180000.0000',
+        grossAmount: '180000.0000',
+        totalAmount: '180000.0000',
+      }),
+    );
+    expect(items.queryByText('Rincian harga')).toBeNull();
+    expect(items.getByText(/Jml 1 × Rp\s180\.000 per item/)).toBeTruthy();
+    expect(items.getByText('Item tambahan')).toBeTruthy();
   });
 });
