@@ -9,8 +9,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { saleDisplayLines } from '../../cart/cart-draft';
 import type { PaymentRoute, Sale, SaleLine } from '../../transaction/model/cashier-transaction.types';
-import { amountFractionDigits, currencyInputFromAmount, normalizeCurrencyPaymentInput } from './pos-controls';
-import { ReferencePaymentDialog } from './replatformed-pos-workspace';
+import { amountFractionDigits, currencyInputFromAmount, normalizeCurrencyPaymentInput } from '../../lib/pos-controls';
+import { ReferencePaymentDialog } from '../../payment/reference-payment-dialog';
 
 const bootstrap = {
   apiBaseUrl: '',

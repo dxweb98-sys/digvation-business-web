@@ -13,10 +13,7 @@ import {
   queueEntryFor,
   restrictedQueueSummary,
 } from './completed-sale-visibility';
-import {
-  ReferenceQueueCard,
-  RestrictedCompletedQueueCard,
-} from '../../workspace/ui/replatformed-pos-workspace';
+import { ReferenceQueueCard, RestrictedCompletedQueueCard } from '../../queue/reference-queue-card';
 
 const bootstrap = {
   apiBaseUrl: '',

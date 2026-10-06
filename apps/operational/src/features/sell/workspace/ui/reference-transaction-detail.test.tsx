@@ -7,7 +7,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { Employee, Sale, SaleLine } from '../../transaction/model/cashier-transaction.types';
 import { presentableTransaction } from '../../transaction/model/completed-sale-visibility';
-import { ReceiptContent, ReferenceTransactionDetail } from './replatformed-pos-workspace';
+import { ReceiptContent } from '../../receipt/receipt-content';
+import { ReferenceTransactionDetail } from '../../transaction/ui/reference-transaction-detail';
 
 const bootstrap = {
   apiBaseUrl: '',
