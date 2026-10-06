@@ -5,7 +5,7 @@ import {
 import { cleanup, fireEvent, render, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ReferenceQueueCard } from './replatformed-pos-workspace';
+import { ReferenceQueueCard } from '../../queue/reference-queue-card';
 import type { Sale } from '../../transaction/model/cashier-transaction.types';
 import { canAdjustOrder } from '../../adjustment/sale-adjustment-access';
 

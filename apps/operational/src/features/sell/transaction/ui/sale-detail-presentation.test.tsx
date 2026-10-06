@@ -2,8 +2,8 @@ import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { SaleFinancialSummary } from './sale-detail-presentation';
-import { referenceTransactionDetailLayout } from '../../workspace/ui/replatformed-pos-workspace';
-import { referenceTransactionDetailPresentation } from '../../workspace/ui/replatformed-pos-workspace';
+import { referenceTransactionDetailLayout } from './reference-transaction-detail';
+import { referenceTransactionDetailPresentation } from './reference-transaction-detail';
 
 afterEach(cleanup);
 

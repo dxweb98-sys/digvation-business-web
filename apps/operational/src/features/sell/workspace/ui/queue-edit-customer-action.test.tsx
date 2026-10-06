@@ -6,7 +6,7 @@ import { cleanup, fireEvent, render, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { Sale } from '../../transaction/model/cashier-transaction.types';
-import { ReferenceQueueCard } from './replatformed-pos-workspace';
+import { ReferenceQueueCard } from '../../queue/reference-queue-card';
 
 const bootstrap = {
   apiBaseUrl: '',

@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { ReplaceLinePreview } from '../../transaction/api/cashier-transaction.adapter';
 import type { CatalogItem, ComponentCandidate, Sale, SaleLine } from '../../transaction/model/cashier-transaction.types';
-import { ReferenceOrderAdjustmentDialog } from './replatformed-pos-workspace';
+import { ReferenceOrderAdjustmentDialog } from '../../adjustment/reference-order-adjustment-dialog';
 
 const bootstrap = {
   apiBaseUrl: '',
