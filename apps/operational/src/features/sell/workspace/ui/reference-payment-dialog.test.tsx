@@ -3,7 +3,7 @@ import {
   type DeploymentBootstrapConfig,
 } from '@digvation/business-runtime';
 import { DToastProvider } from '@digvation-labs/ui';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -88,6 +88,8 @@ function PaymentHarness({
   payments = [],
   onQueue = vi.fn(),
   onClose = vi.fn(),
+  open = true,
+  isSubmitting = false,
 }: {
   onConfirm: (amount: string) => Promise<void>;
   amount?: string;
@@ -97,6 +99,8 @@ function PaymentHarness({
   payments?: PaymentFixture[];
   onQueue?: () => void;
   onClose?: () => void;
+  open?: boolean;
+  isSubmitting?: boolean;
 }) {
   const [appliedAmount, setAppliedAmount] = useState(() => currencyInputFromAmount(amount));
   const [tender, setTender] = useState('');
@@ -107,7 +111,7 @@ function PaymentHarness({
     <DeploymentBootstrapProvider config={bootstrap}>
       <DToastProvider>
         <ReferencePaymentDialog
-          open
+          open={open}
           onClose={onClose}
           {...(onEditOrder ? { onEditOrder } : {})}
           sale={sale}
@@ -136,7 +140,7 @@ function PaymentHarness({
           onTender={setTender}
           onTransitionPayment={vi.fn()}
           quickTender={['50000', '100000', '150000', '200000', '500000']}
-          isSubmitting={false}
+          isSubmitting={isSubmitting}
           paymentError={null}
           onConfirmPayment={onConfirm}
           onQueue={onQueue}
@@ -179,6 +183,50 @@ describe('ReferencePaymentDialog currency boundary', () => {
     fireEvent.click(screen.getByRole('button', { name: /Bayar.*105[.,]224/ }));
     fireEvent.click(screen.getByRole('button', { name: /Konfirmasi dan selesaikan/ }));
     expect(onConfirm).toHaveBeenCalledWith('105224');
+  });
+});
+
+describe('ReferencePaymentDialog confirmation in flight', () => {
+  const paid = [{ status: 'SUCCEEDED' as const, appliedAmount: '105224.0000' }];
+
+  function confirmFullAmount(onConfirm: (amount: string) => Promise<void>) {
+    const view = render(<PaymentHarness onConfirm={onConfirm} />);
+    fireEvent.click(screen.getByRole('button', { name: /Bayar.*105[.,]224/ }));
+    const confirmed = screen.getByRole('dialog').textContent;
+    fireEvent.click(screen.getByRole('button', { name: /Konfirmasi dan selesaikan/ }));
+    return { ...view, confirmed };
+  }
+
+  it('keeps showing the confirmed amount while the settled Sale finishes and the dialog closes', async () => {
+    let finish = () => {};
+    const onConfirm = vi.fn(() => new Promise<void>((resolve) => (finish = resolve)));
+    const { rerender, confirmed } = confirmFullAmount(onConfirm);
+    expect(onConfirm).toHaveBeenCalledWith('105224');
+
+    // The payment is recorded (balance now 0) while finalize or queue is still running.
+    rerender(<PaymentHarness onConfirm={onConfirm} payments={paid} isSubmitting />);
+    expect(screen.getByRole('dialog').textContent).toBe(confirmed);
+
+    // The settled checkout closes the dialog; its exit transition keeps the confirmed review.
+    await act(async () => {
+      finish();
+      rerender(<PaymentHarness onConfirm={onConfirm} payments={paid} open={false} />);
+    });
+    expect(screen.getByRole('dialog').textContent).toBe(confirmed);
+  });
+
+  it('returns to live values when a confirmation leaves the dialog open', async () => {
+    const onConfirm = vi.fn(async () => undefined);
+    const { rerender } = confirmFullAmount(onConfirm);
+    await act(async () => {
+      rerender(
+        <PaymentHarness
+          onConfirm={onConfirm}
+          payments={[{ status: 'SUCCEEDED', appliedAmount: '50000.0000' }]}
+        />,
+      );
+    });
+    expect(screen.getByRole('button', { name: /Bayar.*55[.,]224/ })).toBeTruthy();
   });
 });
 

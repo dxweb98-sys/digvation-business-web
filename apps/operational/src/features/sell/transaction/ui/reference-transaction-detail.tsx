@@ -63,6 +63,18 @@ function useRetainedValue<T>(value: T | null): T | null {
   return value ?? retained;
 }
 
+function useOpeningKey(open: boolean): number {
+  // A retained, closed DS dialog needs an extra effect pass to reopen; a fresh one is shown in the
+  // same render as the state that opens it. Only an opening changes the key, never a close.
+  const [openings, setOpenings] = useState(open ? 1 : 0);
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setOpenings(openings + 1);
+  }
+  return openings;
+}
+
 /** The line status a transaction state already implies, so it is not repeated per item. */
 const impliedLineWorkStatus: Partial<Record<QueueStatus, string>> = {
   QUEUED: 'WAITING',
@@ -136,6 +148,7 @@ export function ReferenceTransactionDetail({
   const { copy, label, locale: copyLocale } = useOperationalLocalization();
   const [receiptPaper, setReceiptPaper] = useState<'58' | '80'>('80');
   const sale = useRetainedValue(currentSale);
+  const openingKey = useOpeningKey(currentSale !== null);
   if (!sale) return null;
   const open = currentSale !== null;
   const status = queueStatus(sale);
@@ -196,6 +209,7 @@ export function ReferenceTransactionDetail({
   return (
     <>
       <Dialog
+        key={openingKey}
         open={open}
         onClose={onClose}
         title={copy(showReceipt ? 'Preview receipt' : 'Transaction details')}

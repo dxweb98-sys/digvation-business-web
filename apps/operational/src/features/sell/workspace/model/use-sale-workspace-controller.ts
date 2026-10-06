@@ -153,8 +153,9 @@ export function useSaleWorkspaceController({
   const [retryIntent, setRetryIntent] = useState<AddItemIntent | null>(null);
   const [draft, setDraft] = useState<CartDraft | null>(null);
   const [retryCommitIntent, setRetryCommitIntent] = useState<CommitDraftIntent | null>(null);
-  // The Sale just created from the draft. The draft is cleared before the route delivers the Sale,
-  // so it carries the customer across that gap and the transaction identity never disappears.
+  // The Sale just created from the draft, until the route delivers it. The committed draft stays on
+  // screen across that gap and is cleared in the same render the Sale replaces it, so the cart is
+  // never empty in between.
   const [handoverSale, setHandoverSale] = useState<Sale | null>(null);
   const previousLocationIdRef = useRef(selectedLocationId);
   const draftCommitGateRef = useRef(createDraftCommitGate<Sale>());
@@ -166,7 +167,10 @@ export function useSaleWorkspaceController({
     ...transactionQueryPolicy,
   });
 
-  if (handoverSale && saleQuery.data?.id === handoverSale.id) setHandoverSale(null);
+  if (handoverSale && saleQuery.data?.id === handoverSale.id) {
+    setHandoverSale(null);
+    setDraft(null);
+  }
 
   useEffect(() => {
     const sale = saleQuery.data;
@@ -242,7 +246,6 @@ export function useSaleWorkspaceController({
       command.commitSale(sale);
       selectLocation(sale.sellingLocationId);
       setHandoverSale(sale);
-      setDraft(null);
       setRetryCommitIntent(null);
       navigate(`/sell/${sale.id}`, { replace: true });
     },
@@ -477,6 +480,8 @@ export function useSaleWorkspaceController({
   };
 
   const commitDraft = async () => {
+    // The draft on screen during the handover is already this Sale; never start a second one.
+    if (handoverSale) return handoverSale;
     if (!draft?.lines.length) throw new Error(copy('Add at least one item before payment.'));
     const intent =
       retryCommitIntent?.draft === draft

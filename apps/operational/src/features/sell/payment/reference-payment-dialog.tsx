@@ -22,7 +22,7 @@ import {
   Sparkles,
   Trash2,
 } from 'lucide-react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ComponentProps, type ReactNode } from 'react';
 import { useOperationalLocalization } from '../../../app/localization/operational-localization';
 import { cashierTransactionErrorMessage } from '../transaction/api/cashier-transaction-errors';
 import type { CartDisplayLine } from '../cart/cart-draft';
@@ -306,7 +306,22 @@ export function ReferencePaymentDialog({
     .filter(isPositiveDecimal)
     .filter((amount, index, list) => list.indexOf(amount) === index)
     .slice(0, 6);
-  const completes = intent.outcome !== 'LEAVES_BALANCE';
+  const review: ComponentProps<typeof PaymentReview> = {
+    intent,
+    total: sale?.totalAmount ?? total,
+    methodName: label(method),
+    accountName: activeRoute?.financialAccountName ?? label(method),
+    ...(!isCash && paymentReference.trim() ? { reference: paymentReference.trim() } : {}),
+    ...(isCash ? { tendered: normalizedTender, change: cashChange } : {}),
+    earlierPayments: payments,
+    format,
+    confirmReceived: !isCash,
+  };
+  // Recording the payment settles the live balance before finalize or queue answers. Until that
+  // confirmation finishes, and while the dialog closes after it, the review shows what was confirmed.
+  const [confirmedReview, setConfirmedReview] = useState<typeof review | null>(null);
+  const shownReview = confirmedReview && (isSubmitting || !open) ? confirmedReview : review;
+  const completes = shownReview.intent.outcome !== 'LEAVES_BALANCE';
 
   // Leaving is only guarded once money is recorded and the transaction is not settled yet.
   const requestClose = () => {
@@ -323,6 +338,7 @@ export function ReferencePaymentDialog({
     onClose();
   };
   const confirmPayment = async () => {
+    setConfirmedReview(review);
     await onConfirmPayment(normalizedAllocation);
     setStep('edit');
   };
@@ -411,17 +427,7 @@ export function ReferencePaymentDialog({
       footer={step === 'edit' ? undefined : footer}
     >
       {step === 'review' ? (
-        <PaymentReview
-          intent={intent}
-          total={sale?.totalAmount ?? total}
-          methodName={label(method)}
-          accountName={activeRoute?.financialAccountName ?? label(method)}
-          {...(!isCash && paymentReference.trim() ? { reference: paymentReference.trim() } : {})}
-          {...(isCash ? { tendered: normalizedTender, change: cashChange } : {})}
-          earlierPayments={payments}
-          format={format}
-          confirmReceived={!isCash}
-        />
+        <PaymentReview {...shownReview} />
       ) : step === 'leave' ? (
         <PaymentLeaveNotice progress={progress} format={format} hasPending={hasPending} />
       ) : (
