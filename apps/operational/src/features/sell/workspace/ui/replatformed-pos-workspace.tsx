@@ -1,0 +1,6627 @@
+import { useAuth } from '@digvation/pos-auth';
+import { ApiClient } from '@digvation/business-api';
+import { createDecimal, formatMoney } from '@digvation/pos-money';
+import { useRuntime } from '@digvation/pos-runtime';
+import {
+  DAlert,
+  DBadge as Badge,
+  DButton,
+  DButton as Button,
+  DConfirmDialog,
+  DDialog,
+  DDialog as Dialog,
+  DDropdown as Dropdown,
+  DInput,
+  DRadio,
+  DSearchInput as SearchInput,
+  DSelect as Select,
+  DSkeleton as Skeleton,
+  useToast,
+} from '@digvation-labs/ui';
+import {
+  DAvatar,
+  DDropdown as PortalDropdown,
+  DTabs,
+  DTabsContent,
+  DTabsList,
+  DTabsTrigger,
+  DTextarea,
+} from '@digvation/ui';
+import { useQuery } from '@tanstack/react-query';
+import {
+  AlertCircle,
+  Banknote,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  Clock,
+  CreditCard,
+  Eye,
+  Info,
+  Minus,
+  MoreHorizontal,
+  Pencil,
+  PlayCircle,
+  Plus,
+  Printer,
+  Send,
+  QrCode,
+  RotateCcw,
+  ShoppingBag,
+  Sparkles,
+  Trash2,
+  User,
+  UserPlus,
+  X,
+  XCircle,
+} from 'lucide-react';
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+
+import {
+  QUEUE_REFRESH_INTERVAL_MS,
+  liveQueryPolicy,
+} from '../../../../app/data/operational-cache-policy';
+import {
+  operationalCopy,
+  resolveOperationalLocale,
+  useOperationalLocalization,
+} from '../../../../app/localization/operational-localization';
+import { useOperationalAccessContext } from '../../../../shared/operational-access/operational-access-api';
+import { resolveReceiptLocation } from '../../../../shared/operational-access/operational-location-selection';
+import { cashierTransactionKeys } from '../../transaction/api/cashier-transaction-keys';
+import {
+  cashierTransactionErrorMessage,
+  correctionErrorMessage,
+} from '../../transaction/api/cashier-transaction-errors';
+import type {
+  ReplaceLinePreview,
+  ReplaceSaleLineInput,
+} from '../../transaction/api/cashier-transaction.adapter';
+import { replacementLinesOf } from '../../cart/cart-draft';
+import { visibleCatalogItems } from '../../catalog/selling-catalog-eligibility';
+import { saleLineConfiguration } from '../../transaction/model/sale-line-additions';
+import {
+  ItemConfigurator,
+  type ItemConfiguration,
+  type ItemConfiguratorState,
+} from '../../cart/item-configurator';
+import {
+  AddTransactionItemDialog,
+  CatalogItemAutocomplete,
+} from '../../adjustment/transaction-item-dialog';
+import { CustomerMemberApi, type MemberLookupResult } from '../../customer/api/customer-member-api';
+import type { CartDisplayLine } from '../../cart/cart-draft';
+import {
+  createCashierTransactionAdapter,
+  isLocalCashierDemoEnabled,
+} from '../../transaction/api/cashier-transaction-adapter-factory';
+import { hasStartableQueuedWork, saleLineWorkStatus } from '../../queue/queued-sale-work';
+import {
+  correctionSourceOf,
+  saleLineAdjustmentMode,
+} from '../../adjustment/sale-adjustment-access';
+import {
+  appliedPaymentComposition,
+  employeeDisplayName,
+  formatServiceDuration,
+  lineDiscountPercentage,
+  saleDiscountRows,
+  aggregateDiscountRows,
+  lineTaxLabel,
+  cashTenderNote,
+  type DiscountDetails,
+  discountPresentation,
+  lineDiscountRows,
+  paymentIntent,
+  paymentProgress,
+  saleSettlement,
+  saleTaxLabel,
+  transactionDiscountLabel,
+} from '../../transaction/model/sale-presentation';
+import type {
+  CatalogItem,
+  ComponentCandidate,
+  CompletedSaleSummary,
+  Employee,
+  Payment,
+  PaymentMethod,
+  PaymentRoute,
+  PaymentStatus,
+  QueueSale,
+  Sale,
+  SaleCustomer,
+  SaleLine,
+} from '../../transaction/model/cashier-transaction.types';
+import type { CatalogItemTypeFilter } from '../../catalog/use-selling-catalog';
+import type { useCashierTransactionWorkspace } from '../model/use-cashier-transaction-workspace';
+
+import {
+  amountFractionDigits,
+  currencyInputFromAmount,
+  normalizeCurrencyPaymentInput,
+  PosCurrencyInput,
+  PosNumericInput,
+} from './pos-controls';
+import {
+  SaleCustomerStrip,
+  SaleDetailSection,
+  SaleFinancialSummary,
+  SaleLineAdditions,
+  SaleLineItem,
+  SaleLineItemList,
+  SalePaymentComposition,
+  SalePaymentList,
+  StatusPill,
+} from '../../transaction/ui/sale-detail-presentation';
+import {
+  additionPerformedBy,
+  saleLineAdditions,
+  saleLineBase,
+} from '../../transaction/model/sale-line-additions';
+import { CartLineBreakdown } from '../../cart/cart-line-breakdown';
+import {
+  PaymentIntentHint,
+  PaymentLeaveNotice,
+  PaymentProgressSummary,
+  PaymentReview,
+  RecordedPaymentList,
+} from '../../payment/payment-confirmation';
+import { SaleAdjustmentControls } from '../../adjustment/sale-adjustment-controls';
+import { SaleLineTaskDialog } from '../../queue/sale-line-task-dialog';
+import {
+  ServicePerformersDialog,
+  serviceWorkUnitAllocations,
+  serviceWorkUnitCount,
+} from '../../performer/service-performers-dialog';
+import {
+  formatPercent,
+  formatUnitRanges,
+  groupAllocations,
+  resolveAllocation,
+  type PerformerAllocation,
+  type ServiceLineWorkPlan,
+} from '../../performer/service-performer-allocation';
+import {
+  isCompletedSaleSummary,
+  presentableTransaction,
+  restrictedQueueSummary,
+  useCanReadCompletedSaleDetails,
+} from '../../transaction/model/completed-sale-visibility';
+import {
+  activeMemberOf,
+  needsMemberIdentityLookup,
+  presentedCustomer,
+} from '../../customer/model/member-cart-presentation';
+import './replatformed-pos-workspace.css';
+import { CustomerMemberDialog } from '../../customer/ui/customer-member-dialog';
+import {
+  WalkInCustomerEditDialog,
+  type WalkInCustomerEditTarget,
+} from '../../customer/ui/walk-in-customer-edit-dialog';
+import {
+  ReceiptDeliveryDialog,
+  ReceiptDeliveryIndicatorLine,
+  receiptDeliveryPreviewLabel,
+  receiptDeliveryStatusKey,
+  type ReceiptDeliveryTarget,
+} from '../../receipt/receipt-delivery-dialog';
+import { receiptDeliveryPhase } from '../../receipt/receipt-delivery';
+import type {
+  ReceiptDeliveryIndicator,
+  ReceiptDeliveryState,
+} from '../../transaction/api/operational-projection-client';
+import { useCustomerPickerSession } from '../../customer/model/customer-picker-session';
+import { canAdjustOrder } from '../../adjustment/sale-adjustment-access';
+import {
+  completeSettledCheckout,
+  hasTrackedWork,
+  isFullySettled,
+  isInstantOnly,
+} from '../../transaction/model/sale-lifecycle';
+
+type Workspace = ReturnType<typeof useCashierTransactionWorkspace>;
+type QueueStatus = 'QUEUED' | 'PROGRESS' | 'COMPLETED' | 'CANCELED';
+type FulfillmentDestination = 'QUEUE' | 'START_PROCESS';
+interface QueuedSaleEntry {
+  saleId: string;
+  sellingLocationId: string;
+  saleCreatedAt: string;
+}
+
+const QUEUED_SALE_IDS_KEY = 'digvation-pos-demo-queued-sale-ids';
+const CANCELED_SALE_REASONS_KEY = 'digvation-pos-demo-canceled-sale-reasons';
+
+function copyFor(value: string, locale: string): string {
+  return operationalCopy(value, resolveOperationalLocale(locale));
+}
+
+function readQueuedSaleEntries(): QueuedSaleEntry[] {
+  try {
+    const raw = window.sessionStorage.getItem(QUEUED_SALE_IDS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed)
+      ? parsed.filter(
+          (value): value is QueuedSaleEntry =>
+            typeof value === 'object' &&
+            value !== null &&
+            typeof value.saleId === 'string' &&
+            typeof value.sellingLocationId === 'string' &&
+            typeof value.saleCreatedAt === 'string',
+        )
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeQueuedSaleEntries(entries: readonly QueuedSaleEntry[]): void {
+  try {
+    window.sessionStorage.setItem(QUEUED_SALE_IDS_KEY, JSON.stringify(entries));
+  } catch {
+    // Queue presentation state remains available for the current session when storage is unavailable.
+  }
+}
+
+function readCancellationReasons(): Record<string, string> {
+  try {
+    const raw = window.sessionStorage.getItem(CANCELED_SALE_REASONS_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? Object.fromEntries(
+          Object.entries(parsed).filter(
+            (entry): entry is [string, string] => typeof entry[1] === 'string',
+          ),
+        )
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeCancellationReason(saleId: string, reason: string): void {
+  try {
+    window.sessionStorage.setItem(
+      CANCELED_SALE_REASONS_KEY,
+      JSON.stringify({ ...readCancellationReasons(), [saleId]: reason }),
+    );
+  } catch {
+    // This local/demo presentation metadata is optional when session storage is unavailable.
+  }
+}
+
+const statusMeta: Record<
+  QueueStatus,
+  { value: string; icon: ReactNode; tone: string; soft: string }
+> = {
+  QUEUED: {
+    value: 'QUEUED',
+    icon: <Clock className="size-3.75" />,
+    tone: 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]',
+    soft: 'bg-[var(--color-warning)]/[.045]',
+  },
+  PROGRESS: {
+    value: 'IN_PROGRESS',
+    icon: <PlayCircle className="size-3.75" />,
+    tone: 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]',
+    soft: 'bg-[var(--color-brand)]/[.045]',
+  },
+  COMPLETED: {
+    value: 'COMPLETED',
+    icon: <CheckCircle2 className="size-3.75" />,
+    tone: 'bg-[var(--color-success)]/10 text-[var(--color-success)]',
+    soft: 'bg-[var(--color-success)]/[.045]',
+  },
+  CANCELED: {
+    value: 'CANCELED',
+    icon: <XCircle className="size-3.75" />,
+    tone: 'bg-[var(--color-danger)]/10 text-[var(--color-danger)]',
+    soft: 'bg-[var(--color-danger)]/[.045]',
+  },
+};
+
+function money(amount: string, locale: string) {
+  // Whole IDR stays clean; a genuinely fractional authoritative amount keeps its fraction.
+  return formatMoney(amount, 'IDR', locale, Math.min(4, amountFractionDigits(amount)));
+}
+
+function wholePointValue(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const match = /^(\d+)(?:\.0+)?$/.exec(value.trim());
+  return match?.[1] ?? null;
+}
+
+function pointQuantity(value: string | null | undefined, locale: string): string {
+  const whole = wholePointValue(value);
+  if (whole === null) return '—';
+  return new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(Number(whole));
+}
+
+function formatDurationMinutes(minutes: number | null | undefined, locale: string): string | null {
+  return formatServiceDuration(minutes, {
+    hour: copyFor('hour-short', locale),
+    minute: copyFor('minute-short', locale),
+  });
+}
+
+function quantity(value: string) {
+  const normalized = value.replace(/(\.\d*?[1-9])0+$|\.0+$/, '$1');
+  return normalized === '-0' ? '0' : normalized;
+}
+
+function transactionNumber(sale: Pick<Sale, 'id' | 'saleNumber'>, locale: string) {
+  // Prefer the authoritative sale number; fall back to the short id for sales without one.
+  if (sale.saleNumber) return sale.saleNumber;
+  return sale.id.startsWith('SALE-DEMO-')
+    ? sale.id
+    : `${copyFor('Transaction', locale)} ${sale.id.slice(0, 8)}`;
+}
+
+/**
+ * The Sale owns its customer identity, so presentation reads it straight from
+ * the Sale. A Sale captured before the customer contract carries no identity:
+ * it stays neutral and is never shown as a general or anonymous customer.
+ */
+function customerDisplayName(customer: Pick<SaleCustomer, 'name'> | null, locale: string): string {
+  return customer && customer.name.trim()
+    ? customer.name
+    : copyFor('Customer data is not available', locale);
+}
+
+function customerDisplayDetail(customer: SaleCustomer | null): string | null {
+  return customer && customer.phoneE164.trim() ? customer.phoneE164 : null;
+}
+
+function customerInitials(customer: SaleCustomer | null): string {
+  const name = customer?.name?.trim();
+  if (!name) return '—';
+  return name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('');
+}
+
+function customerStatus(customer: SaleCustomer | null): {
+  label: 'Member' | 'Non-member';
+  variant: 'primary' | 'outline';
+} | null {
+  if (!customer) return null;
+  return customer.type === 'MEMBER'
+    ? { label: 'Member', variant: 'primary' }
+    : { label: 'Non-member', variant: 'outline' };
+}
+
+/**
+ * Total points a FINALIZED Sale earned, exactly as Runtime reports its immutable EARN fact. It is
+ * the one value shown by Transaction Detail and the receipt; it is never summed from line rows
+ * (a TRANSACTION_TOTAL Sale has none) and never shown as +0.
+ */
+/**
+ * The member point facts a receipt states once for the whole Sale: the balance right after this
+ * Sale (historical, not today's), what it earned and what it used. Per-line earning stays line detail.
+ */
+export function receiptPointSummary(
+  sale: Pick<Sale, 'status' | 'loyaltyEarning' | 'loyaltySummary' | 'customer'>,
+  customer: Pick<SaleCustomer, 'type'> | null,
+): {
+  balanceAfter: string | null;
+  earnedPoints: string | null;
+  redeemedPoints: string | null;
+} | null {
+  if (customer?.type !== 'MEMBER') return null;
+  const summary = sale.loyaltySummary;
+  if (summary)
+    return {
+      balanceAfter: summary.balanceAfter,
+      earnedPoints: isPositiveDecimal(summary.earnedPoints) ? summary.earnedPoints : null,
+      redeemedPoints: isPositiveDecimal(summary.redeemedPoints) ? summary.redeemedPoints : null,
+    };
+  const earned = saleEarnedPoints(sale);
+  return earned ? { balanceAfter: null, earnedPoints: earned, redeemedPoints: null } : null;
+}
+
+export function saleEarnedPoints(
+  sale: Pick<Sale, 'status' | 'loyaltyEarning' | 'customer'>,
+): string | null {
+  const earning = sale.loyaltyEarning;
+  if (sale.status !== 'FINALIZED' || earning?.state !== 'FINALIZED') return null;
+  if (sale.customer && sale.customer.type !== 'MEMBER') return null;
+  return isPositiveDecimal(earning.pointsEarned) ? earning.pointsEarned : null;
+}
+
+interface PerformerCredit {
+  employeeId: string;
+  name: string;
+  /** Shown only when the split was set by hand; an even split needs no numbers. */
+  percent: string | null;
+}
+
+interface PerformerGroup {
+  /** Units this setting covers, e.g. "1–2, 4–7"; null when it covers the whole line. */
+  units: string | null;
+  performers: PerformerCredit[];
+}
+
+/**
+ * Who performs a service line. Units with an identical assignment collapse
+ * into one group, so a line reads as one setting unless units really differ.
+ */
+function servicePerformerSummary(
+  line: SaleLine,
+  employees: readonly Employee[],
+  locale: string,
+): { unitCount: number; groups: PerformerGroup[] } {
+  const units = serviceWorkUnitAllocations(line);
+  const credits = (allocation: PerformerAllocation): PerformerCredit[] => {
+    const { shares } = resolveAllocation(allocation);
+    const custom = shares.some((share) => share.manual);
+    return shares.map((share) => ({
+      employeeId: share.employeeId,
+      name: employeeDisplayName(
+        line,
+        share.employeeId,
+        employees,
+        copyFor('Employee unavailable', locale),
+      ),
+      percent: custom ? `${formatPercent(share.basisPoints, locale)}%` : null,
+    }));
+  };
+  const grouped = groupAllocations(units);
+  return {
+    unitCount: units.length,
+    groups: grouped.map((group) => ({
+      units: grouped.length > 1 ? formatUnitRanges(group.unitNumbers) : null,
+      performers: credits(group.allocation),
+    })),
+  };
+}
+
+/** Distinct settings listed before the rest folds away, keeping long lines scannable. */
+const VISIBLE_PERFORMER_GROUPS = 3;
+
+/** Avatars stacked for one shared unit; more people than this collapse into the names. */
+const VISIBLE_AVATARS = 3;
+
+/**
+ * Who works one unit. The avatar carries identity so the name reads as a
+ * person. Several people on ONE unit overlap their avatars and add a
+ * "Shared work" caption; that is what tells it apart from several quantity
+ * units, which are listed as separate rows instead.
+ */
+function PerformerCredits({
+  performers,
+  allWork = false,
+}: {
+  performers: readonly PerformerCredit[];
+  /** The same person performs every unit of a quantity above one. */
+  allWork?: boolean;
+}) {
+  const { copy } = useOperationalLocalization();
+  if (!performers.length)
+    return (
+      <span className="flex min-h-6 items-center">
+        <Badge variant="warning" dot>
+          {copy('No employee yet')}
+        </Badge>
+      </span>
+    );
+  const shared = performers.length > 1;
+  return (
+    <span className="flex min-w-0 items-start gap-2">
+      <span className="mt-0 flex shrink-0 -space-x-1.5" aria-hidden="true">
+        {performers.slice(0, VISIBLE_AVATARS).map((performer) => (
+          <DAvatar
+            key={performer.employeeId}
+            size="xs"
+            name={performer.name}
+            className="rounded-full ring-2 ring-[var(--color-surface)]"
+          />
+        ))}
+      </span>
+      <span className="min-w-0">
+        <span className="block break-words text-xs leading-6">
+          {performers.map((performer, index) => (
+            <span key={performer.employeeId}>
+              {index > 0 ? <span className="text-[var(--color-text-muted)]">, </span> : null}
+              <span className="font-medium text-[var(--color-text)]">{performer.name}</span>
+              {performer.percent ? (
+                <span className="ml-1 whitespace-nowrap text-xs tabular-nums text-[var(--color-text-muted)]">
+                  {performer.percent}
+                </span>
+              ) : null}
+            </span>
+          ))}
+          {allWork ? (
+            <span className="text-xs text-[var(--color-text-muted)]"> · {copy('All work')}</span>
+          ) : null}
+        </span>
+        {shared ? (
+          <span className="block text-[11px] leading-4 text-[var(--color-text-muted)]">
+            {copy('Shared work')}
+          </span>
+        ) : null}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * Who performs one service line, and the action that changes it, as ONE block:
+ * the action sits on the same row as the people it edits. One setting is one
+ * row; a structured "Work 1 / Work 2" list appears only when units really
+ * differ. Quantity is never repeated as names.
+ */
+function ServicePerformers({
+  itemName,
+  summary,
+  needsAttention,
+  editable,
+  disabled,
+  onEdit,
+}: {
+  itemName: string;
+  summary: ReturnType<typeof servicePerformerSummary>;
+  needsAttention: boolean;
+  editable: boolean;
+  disabled: boolean;
+  onEdit: () => void;
+}) {
+  const { copy } = useOperationalLocalization();
+  const [expanded, setExpanded] = useState(false);
+  const { unitCount, groups } = summary;
+  const varied = groups.length > 1;
+  const foldable = groups.length > VISIBLE_PERFORMER_GROUPS;
+  const shown = foldable && !expanded ? groups.slice(0, VISIBLE_PERFORMER_GROUPS - 1) : groups;
+  const hiddenCount = groups.length - shown.length;
+
+  return (
+    <div
+      role="group"
+      aria-label={`${copy('Performed by')}: ${itemName}`}
+      className="mt-2 flex min-w-0 items-start justify-between gap-3"
+    >
+      <div className="min-w-0 flex-1">
+        {varied ? (
+          <>
+            <dl className="m-0 grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1">
+              {shown.map((group) => (
+                <Fragment key={group.units}>
+                  <dt className="whitespace-nowrap text-xs leading-6 tabular-nums text-[var(--color-text-muted)]">
+                    {copy('Work')} {group.units}
+                  </dt>
+                  <dd className="m-0 min-w-0">
+                    <PerformerCredits performers={group.performers} />
+                  </dd>
+                </Fragment>
+              ))}
+            </dl>
+            {foldable ? (
+              <button
+                type="button"
+                aria-expanded={expanded}
+                onClick={() => setExpanded((current) => !current)}
+                className="mt-1 inline-flex min-h-6 items-center gap-1 rounded-md text-xs font-semibold text-[var(--color-brand)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/30"
+              >
+                {expanded ? copy('Show less') : `${copy('Show')} ${hiddenCount} ${copy('more')}`}
+                <ChevronDown
+                  className={`size-3.5 transition-transform motion-reduce:transition-none ${expanded ? 'rotate-180' : ''}`}
+                  aria-hidden="true"
+                />
+              </button>
+            ) : null}
+          </>
+        ) : (
+          <PerformerCredits
+            performers={groups[0]?.performers ?? []}
+            allWork={unitCount > 1 && (groups[0]?.performers.length ?? 0) > 0}
+          />
+        )}
+      </div>
+      {editable ? (
+        needsAttention ? (
+          <DButton
+            size="sm"
+            variant="soft"
+            disabled={disabled}
+            leftIcon={<UserPlus className="size-3.5" aria-hidden="true" />}
+            aria-label={`${copy('Choose employee')}: ${itemName}`}
+            className="-mt-0.5 h-7 shrink-0 px-2"
+            onClick={onEdit}
+          >
+            {copy('Choose employee')}
+          </DButton>
+        ) : (
+          <DButton
+            size="icon"
+            variant="ghost"
+            disabled={disabled}
+            title={copy('Change employee')}
+            aria-label={`${copy('Change employee')}: ${itemName}`}
+            className="-my-1 -mr-1.5 size-8 shrink-0 text-[var(--color-text-muted)]"
+            onClick={onEdit}
+          >
+            <Pencil className="size-3.5" aria-hidden="true" />
+          </DButton>
+        )
+      ) : null}
+    </div>
+  );
+}
+
+function queueStatus(sale: Pick<QueueSale, 'status' | 'operationalState'>): QueueStatus | null {
+  if (sale.status === 'FINALIZED') return 'COMPLETED';
+  if (sale.status === 'VOIDED') return 'CANCELED';
+  if (sale.operationalState === 'IN_PROGRESS') return 'PROGRESS';
+  if (sale.operationalState === 'QUEUED') return 'QUEUED';
+  return null;
+}
+
+function isPositiveDecimal(value: string) {
+  try {
+    return createDecimal(value).greaterThan(createDecimal('0'));
+  } catch {
+    return false;
+  }
+}
+
+function employeeAssignmentIssues(
+  line: SaleLine,
+  locale: string,
+  // A corrected replacement is staffed on its retired historical source line.
+  workLine: SaleLine = line,
+): string[] {
+  const issues: string[] = [];
+  if (
+    line.employeeAssignmentModeSnapshot === 'REQUIRED' &&
+    !workLine.participations.some((participation) => participation.assigned)
+  ) {
+    issues.push(`${line.itemNameSnapshot}: ${copyFor('Select an employee.', locale)}`);
+  }
+  if (line.allowEmployeeContributionSnapshot) {
+    const shares = workLine.participations.filter(
+      (participation) => participation.assigned && participation.shareRate !== null,
+    );
+    const total = shares.reduce(
+      (sum, participation) => sum.plus(createDecimal(participation.shareRate ?? '0')),
+      createDecimal('0'),
+    );
+    if (!shares.length || !total.equals(createDecimal('1'))) {
+      issues.push(
+        `${line.itemNameSnapshot}: ${copyFor('Employee contribution must total 100%.', locale)}`,
+      );
+    }
+  }
+  return issues;
+}
+
+function workflowIssues(sale: Sale, locale: string) {
+  const issues: string[] = [];
+  const active = sale.lines.filter((line) => line.removedAt === null);
+  if (!active.length) issues.push(copyFor('Add at least one item.', locale));
+
+  const succeeded = sale.payments
+    .filter((payment) => payment.status === 'SUCCEEDED')
+    .reduce((sum, payment) => sum.plus(createDecimal(payment.appliedAmount)), createDecimal('0'));
+  if (!succeeded.equals(createDecimal(sale.totalAmount))) {
+    issues.push(copyFor('Payments must match the transaction total.', locale));
+  }
+  if (sale.payments.some((payment) => payment.status === 'PENDING')) {
+    issues.push(copyFor('Resolve pending payments.', locale));
+  }
+
+  for (const line of active) {
+    if (!isPositiveDecimal(line.quantity))
+      issues.push(
+        `${line.itemNameSnapshot}: ${copyFor('Quantity must be greater than zero.', locale)}`,
+      );
+    if (!isPositiveDecimal(line.effectiveUnitPrice))
+      issues.push(`${line.itemNameSnapshot}: ${copyFor('Price is not available.', locale)}`);
+    const requiresTrackedServiceAssignment =
+      line.itemTypeSnapshot === 'SERVICE' && line.fulfillmentBehaviorSnapshot === 'TRACKED';
+    if (!requiresTrackedServiceAssignment) continue;
+
+    const workLine =
+      (line.workLineage
+        ? sale.lines.find((candidate) => candidate.id === line.workLineage!.sourceLineId)
+        : null) ?? line;
+    const plannedUnits = workLine.workUnits?.length ?? 0;
+    if (plannedUnits > 0 && plannedUnits !== serviceWorkUnitCount(workLine)) {
+      issues.push(
+        `${line.itemNameSnapshot}: ${copyFor('Every work unit needs at least one employee.', locale)}`,
+      );
+      continue;
+    }
+
+    issues.push(...employeeAssignmentIssues(line, locale, workLine));
+  }
+  return issues;
+}
+
+interface WorkflowIssueGroup {
+  id: string;
+  label: string;
+  issues: string[];
+}
+
+function groupWorkflowIssues(
+  sale: Sale,
+  issues: readonly string[],
+  locale: string,
+): WorkflowIssueGroup[] {
+  const activeLines = sale.lines.filter((line) => line.removedAt === null);
+  const groups = new Map<string, WorkflowIssueGroup>();
+
+  for (const issue of issues) {
+    const line = activeLines.find((candidate) =>
+      issue.startsWith(`${candidate.itemNameSnapshot}:`),
+    );
+    const id = line?.id ?? 'transaction';
+    const label = line?.itemNameSnapshot ?? copyFor('Transaction', locale);
+    const detail = line ? issue.slice(`${line.itemNameSnapshot}:`.length).trim() : issue;
+    const group = groups.get(id) ?? { id, label, issues: [] };
+    group.issues.push(detail);
+    groups.set(id, group);
+  }
+
+  return [...groups.values()];
+}
+
+function processIssues(
+  sale: Sale | null,
+  lines: readonly CartDisplayLine[],
+  locale: string,
+): string[] {
+  if (!lines.length) return [copyFor('Add at least one item.', locale)];
+  if (sale && sale.status !== 'OPEN')
+    return [copyFor('Only active transactions can be processed.', locale)];
+
+  return lines.flatMap((line) => {
+    if (!isPositiveDecimal(line.quantity))
+      return [
+        `${line.itemNameSnapshot}: ${copyFor('Quantity must be greater than zero.', locale)}`,
+      ];
+    if (!isPositiveDecimal(line.effectiveUnitPrice))
+      return [`${line.itemNameSnapshot}: ${copyFor('Price is not available.', locale)}`];
+    return [];
+  });
+}
+
+function hasSuccessfulCheckout(sale: Sale): boolean {
+  return isFullySettled(sale);
+}
+
+function successfulPayments(sale: Sale) {
+  return sale.payments.filter((payment) => payment.status === 'SUCCEEDED');
+}
+
+function financialSummary(sale: Sale) {
+  const totalPaid = successfulPayments(sale).reduce(
+    (sum, payment) => sum.plus(createDecimal(payment.appliedAmount)),
+    createDecimal('0'),
+  );
+  const balance = createDecimal(sale.totalAmount).minus(totalPaid);
+  return {
+    totalPaid: totalPaid.toFixed(4),
+    balanceDue: balance.greaterThan(createDecimal('0')) ? balance.toFixed(4) : '0.0000',
+  };
+}
+
+function paymentAccountLabel(
+  payment: Payment,
+  fallback: (method: PaymentMethod) => string,
+): string {
+  return payment.financeFinancialAccountNameSnapshot?.trim() || fallback(payment.method);
+}
+
+type TerminalPaymentStatus = Exclude<PaymentStatus, 'PENDING'>;
+
+function hasSuccessfulPayment(sale: Sale): boolean {
+  return successfulPayments(sale).some((payment) =>
+    createDecimal(payment.appliedAmount).greaterThan(createDecimal('0')),
+  );
+}
+
+export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }) {
+  const runtime = useRuntime();
+  const { session, authPort } = useAuth();
+  const { showToast } = useToast();
+  const { copy } = useOperationalLocalization();
+  const isLocalDemo = isLocalCashierDemoEnabled();
+  const adapter = useMemo(
+    () => createCashierTransactionAdapter(runtime, authPort.getAccessToken?.bind(authPort)),
+    [authPort, runtime],
+  );
+  // The queue is shared operational reality, so it polls — but only while this
+  // tab is focused, and it keeps serving the last answer while refetching.
+  const transactionsQuery = useQuery({
+    queryKey: cashierTransactionKeys.sales(),
+    queryFn: ({ signal }) => adapter.listSales(signal),
+    ...liveQueryPolicy,
+    refetchInterval: QUEUE_REFRESH_INTERVAL_MS,
+  });
+  const taxConfigurationQuery = useQuery({
+    queryKey: cashierTransactionKeys.taxConfiguration(),
+    queryFn: ({ signal }) => adapter.getTaxConfiguration(signal),
+    staleTime: 60_000,
+  });
+  const [search, setSearch] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [queueTab, setQueueTab] = useState<QueueStatus>('QUEUED');
+  const [queuedSaleEntries, setQueuedSaleEntries] = useState<QueuedSaleEntry[]>(() =>
+    isLocalDemo ? readQueuedSaleEntries() : [],
+  );
+  const [queueIssues] = useState<Record<string, string[]>>({});
+  const [queueOpen, setQueueOpen] = useState(false);
+  const [queueDetail, setQueueDetail] = useState<Sale | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<Sale | null>(null);
+  const [customerEditTarget, setCustomerEditTarget] = useState<WalkInCustomerEditTarget | null>(
+    null,
+  );
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancellationReasons, setCancellationReasons] = useState<Record<string, string>>(() =>
+    isLocalDemo ? readCancellationReasons() : {},
+  );
+  const [adjustmentTarget, setAdjustmentTarget] = useState<Sale | null>(null);
+  const [queuePaymentTarget, setQueuePaymentTarget] = useState<Sale | null>(null);
+  const [queuePaymentAmount, setQueuePaymentAmount] = useState<string | null>(null);
+  const [cartOpen, setCartOpen] = useState(false);
+  const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<MemberLookupResult | null>(null);
+  const customerPickerSession = useCustomerPickerSession();
+  // A new transaction must never inherit the previous customer's picker draft or selected Member.
+  // Query caches are keyed by identity and stay warm; only this presentation state is cleared.
+  const startNewCustomerTransaction = () => {
+    setSelectedMember(null);
+    customerPickerSession.startNewTransaction();
+  };
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [payNow, setPayNow] = useState(true);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
+  const [paymentRouteId, setPaymentRouteId] = useState('');
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [loyaltyPoints, setLoyaltyPoints] = useState('');
+  const [paymentReference, setPaymentReference] = useState('');
+  const [tender, setTender] = useState('');
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [isRecordingPayment, setRecordingPayment] = useState(false);
+  const paymentInFlight = useRef(false);
+  const [completionConfirmationTarget, setCompletionConfirmationTarget] = useState<Sale | null>(
+    null,
+  );
+  const [performerTarget, setPerformerTarget] = useState<{
+    sale: Sale;
+    line: SaleLine;
+  } | null>(null);
+  const [isSavingPerformers, setSavingPerformers] = useState(false);
+  const [receiptSaleId, setReceiptSaleId] = useState<string | null>(null);
+  const [receiptDeliveryTarget, setReceiptDeliveryTarget] = useState<ReceiptDeliveryTarget | null>(
+    null,
+  );
+  // Effective permission, never a role name: without it completed transactions
+  // show no amount, detail or receipt, and can only be sent to the customer.
+  const canReadCompleted = useCanReadCompletedSaleDetails();
+
+  const sale = workspace.viewModel.sale;
+  const lines = workspace.cart.lines;
+  const total = workspace.cart.totalAmount;
+  const draftTaxAmount =
+    !sale && workspace.cart.isLocalDraft && taxConfigurationQuery.data?.enabled
+      ? createDecimal(workspace.cart.grossAmount)
+          .times(createDecimal(taxConfigurationQuery.data.rate))
+          .toFixed(4)
+      : workspace.cart.taxAmount;
+  const cartPreviewTotal =
+    !sale && workspace.cart.isLocalDraft
+      ? createDecimal(workspace.cart.grossAmount).plus(createDecimal(draftTaxAmount)).toFixed(4)
+      : total;
+  const isTaxPreviewLoading =
+    !sale && workspace.cart.isLocalDraft && taxConfigurationQuery.isLoading;
+  const isTaxPreviewUnavailable =
+    !sale && workspace.cart.isLocalDraft && taxConfigurationQuery.isError;
+  const draftTaxLabel = taxConfigurationQuery.data?.enabled
+    ? `${copy('Tax')} (${createDecimal(taxConfigurationQuery.data.rate)
+        .times(100)
+        .toFixed(2)
+        .replace(/\.?0+$/, '')}%)`
+    : copy('Tax');
+  const activeCustomer = workspace.customer;
+  const customerCacheScope = `${session.business.tenantId}:${session.identity.userId}:${session.contextVersion}`;
+  const customerMemberApi = useMemo(
+    () =>
+      new CustomerMemberApi(
+        new ApiClient({
+          baseUrl: runtime.apiBaseUrl,
+          applicationSurface: 'operational',
+          ...(authPort.getAccessToken
+            ? { getAccessToken: authPort.getAccessToken.bind(authPort) }
+            : {}),
+        }),
+        customerCacheScope,
+      ),
+    [authPort, runtime.apiBaseUrl, customerCacheScope],
+  );
+  const hasMembershipCapability = session.access.capabilities.includes('MEMBERSHIP');
+  const canReadMembers =
+    hasMembershipCapability && session.access.permissions.includes('membership:read');
+  const canEnrollMember =
+    hasMembershipCapability && session.access.permissions.includes('membership:enroll');
+  const canReadCustomers =
+    session.access.foundations.includes('CUSTOMER_IDENTITY') &&
+    session.access.permissions.includes('customers:read');
+  const hasLoyaltyCapability = session.access.capabilities.includes('LOYALTY_POINTS');
+  const canRedeemLoyalty =
+    hasLoyaltyCapability && session.access.permissions.includes('loyalty:redeem');
+  const canReadLoyalty =
+    hasLoyaltyCapability &&
+    (session.access.permissions.includes('loyalty:read') || canRedeemLoyalty);
+  const activeSelectedMember = activeMemberOf(activeCustomer, selectedMember);
+  // Draft customer identity is completed from the picked Member; a Sale's own customer wins once it exists.
+  const cartCustomer = presentedCustomer(activeCustomer, activeSelectedMember, Boolean(sale));
+
+  const memberIdentityQuery = useQuery({
+    queryKey: [
+      'operational-member-by-customer',
+      activeCustomer?.type === 'MEMBER' ? activeCustomer.referenceId : null,
+      activeCustomer?.phoneE164 ?? null,
+    ],
+    queryFn: ({ signal }) => customerMemberApi.searchMembers(activeCustomer!.phoneE164, signal),
+    enabled: needsMemberIdentityLookup({
+      canReadMembers,
+      customer: activeCustomer,
+      activeMember: activeSelectedMember,
+    }),
+    staleTime: 30_000,
+  });
+
+  useEffect(() => {
+    if (activeCustomer?.type !== 'MEMBER') {
+      if (selectedMember) setSelectedMember(null);
+      return;
+    }
+    if (selectedMember?.customerId === activeCustomer.referenceId) return;
+    const matched = memberIdentityQuery.data?.items.find(
+      (member) => member.customerId === activeCustomer.referenceId,
+    );
+    if (matched) setSelectedMember(matched);
+  }, [activeCustomer?.referenceId, activeCustomer?.type, memberIdentityQuery.data, selectedMember]);
+
+  const memberBalanceQuery = useQuery({
+    queryKey: ['operational-member-balance', selectedMember?.id],
+    queryFn: ({ signal }) => customerMemberApi.getPointBalance(selectedMember!.id, signal),
+    enabled: Boolean(selectedMember && canReadLoyalty),
+    staleTime: 15_000,
+  });
+
+  useEffect(() => {
+    setLoyaltyPoints('');
+  }, [activeCustomer?.phoneE164, activeCustomer?.referenceId, activeCustomer?.type]);
+
+  const displayedQueueDetail =
+    receiptSaleId && sale?.id === receiptSaleId && hasSuccessfulPayment(sale) ? sale : queueDetail;
+  const operationalAccessQuery = useOperationalAccessContext();
+  const receiptLocation = displayedQueueDetail
+    ? resolveReceiptLocation(
+        displayedQueueDetail.sellingLocationId,
+        operationalAccessQuery.data?.locations ?? [],
+      )
+    : null;
+  // Same cache entry as the receipt-delivery dialog: preview and dialog always show one state.
+  const receiptDeliveryStatusQuery = useQuery({
+    queryKey: receiptDeliveryStatusKey(displayedQueueDetail?.id ?? null),
+    queryFn: () => adapter.getReceiptDeliveryStatus(displayedQueueDetail!.id),
+    enabled: Boolean(displayedQueueDetail?.status === 'FINALIZED'),
+    refetchInterval: (query) =>
+      receiptDeliveryPhase(query.state.data?.delivery?.status) === 'PENDING' ? 3_000 : false,
+    staleTime: 1_000,
+  });
+  const displayedAdjustmentTarget =
+    adjustmentTarget && sale?.id === adjustmentTarget.id ? sale : adjustmentTarget;
+  const displayedQueuePaymentTarget =
+    queuePaymentTarget && sale?.id === queuePaymentTarget.id ? sale : queuePaymentTarget;
+
+  const categories = useMemo(
+    () =>
+      workspace.categories.filter((category) =>
+        workspace.items.some((item) => item.categoryId === category.id),
+      ),
+    [workspace.categories, workspace.items],
+  );
+  const visibleItems = useMemo(
+    () =>
+      visibleCatalogItems(workspace.items, {
+        search,
+        categoryId: selectedCategory,
+        locale: workspace.locale,
+      }),
+    [search, selectedCategory, workspace.items, workspace.locale],
+  );
+  const groups = useMemo(() => {
+    const locationRecords = (transactionsQuery.data?.items ?? []).filter(
+      (record) => record.sellingLocationId === workspace.selectedLocationId,
+    );
+    const records = isLocalDemo
+      ? locationRecords.filter((record) =>
+          queuedSaleEntries.some(
+            (entry) => entry.saleId === record.id && entry.saleCreatedAt === record.createdAt,
+          ),
+        )
+      : locationRecords;
+    return {
+      QUEUED: records.filter((record) => queueStatus(record) === 'QUEUED'),
+      PROGRESS: records.filter((record) => queueStatus(record) === 'PROGRESS'),
+      COMPLETED: records.filter((record) => queueStatus(record) === 'COMPLETED'),
+      CANCELED: records.filter((record) => queueStatus(record) === 'CANCELED'),
+    };
+  }, [isLocalDemo, queuedSaleEntries, transactionsQuery.data, workspace.selectedLocationId]);
+
+  const selectType = (type: CatalogItemTypeFilter) => {
+    workspace.setItemType(type);
+    setSelectedCategory('');
+  };
+
+  const openCheckout = async () => {
+    // A transaction belongs to a customer. Without one there is nothing to
+    // check out, so the selector is opened instead of creating a Sale.
+    if (!activeCustomer) {
+      showToast({
+        title: copy('Choose the customer first'),
+        description: copy(
+          'A transaction belongs to a customer. Fill in the name and WhatsApp number, or choose a member.',
+        ),
+        variant: 'warning',
+      });
+      setCartOpen(false);
+      setCustomerPickerOpen(true);
+      return;
+    }
+    const issues = processIssues(sale, lines, workspace.locale);
+    if (issues.length) {
+      showToast({
+        title: copy('Cart is not ready for payment'),
+        description: issues[0],
+        variant: 'warning',
+      });
+      return;
+    }
+    if (workspace.viewModel.synchronization !== 'CLEAN') {
+      showToast({
+        title: copy('Wait for changes to finish'),
+        description: copy('The cart is still syncing the latest changes.'),
+        variant: 'warning',
+      });
+      return;
+    }
+
+    let checkoutSale = sale;
+    let checkoutTotal = total;
+    if (workspace.cart.isLocalDraft) {
+      try {
+        const committed = await workspace.commitDraft();
+        checkoutSale = committed;
+        checkoutTotal = committed.totalAmount;
+      } catch (error) {
+        showToast({
+          title: copy('Could not create transaction'),
+          description: `${cashierTransactionErrorMessage(error)} ${copy('The cart is unchanged. Check the configuration or connection and try again.')}`,
+          variant: 'danger',
+        });
+        return;
+      }
+    }
+
+    if (checkoutSale?.status === 'OPEN') {
+      try {
+        checkoutSale = await workspace.refreshPromotionEligibility(checkoutSale);
+        checkoutTotal = checkoutSale.totalAmount;
+      } catch (error) {
+        showToast({
+          title: copy('Could not prepare transaction'),
+          description: cashierTransactionErrorMessage(error),
+          variant: 'danger',
+        });
+        return;
+      }
+    }
+
+    const latestPaymentRoutes = await workspace.refreshPaymentRoutes();
+    // Returning to a checkout that already has payments resumes with what is still open.
+    const openAmount =
+      checkoutSale && checkoutSale.payments.length
+        ? paymentProgress(checkoutSale).remainingAmount
+        : checkoutTotal;
+    const normalizedCheckoutTotal = currencyInputFromAmount(openAmount);
+    setPaymentAmount(normalizedCheckoutTotal);
+    setTender(normalizedCheckoutTotal);
+    setPaymentError(null);
+    setPayNow(true);
+    setPaymentMethod('CASH');
+    setPaymentRouteId(
+      latestPaymentRoutes.find((route) => route.paymentMethod === 'CASH')?.id ?? '',
+    );
+    setPaymentReference('');
+    setCartOpen(false);
+    setCheckoutOpen(true);
+  };
+
+  /**
+   * Opens the one receipt-delivery flow for a completed transaction. Delivery is separate
+   * from the transaction: sending, retrying or redirecting it never touches the Sale, its
+   * customer snapshot, its payment or its queue state. Only the facts sending needs are passed;
+   * the customer number only when this operator may already see it.
+   */
+  const openReceiptDelivery = (target: QueueSale) => {
+    const customer = target.customer ?? null;
+    setReceiptDeliveryTarget({
+      saleId: target.id,
+      reference: transactionNumber(target, workspace.locale),
+      customerName: customer ? customerDisplayName(customer, workspace.locale) : null,
+      customerPhone: isCompletedSaleSummary(target) ? null : (target.customer?.phoneE164 ?? null),
+    });
+  };
+  const refreshQueue = () => void transactionsQuery.refetch();
+
+  /** Only an unfinished transaction of a walk-in customer: a Member is edited in Member management. */
+  const openCustomerEdit = (target: Sale) => {
+    if (target.status !== 'OPEN' || target.customer?.type !== 'NON_MEMBER') return;
+    setCustomerEditTarget({
+      saleId: target.id,
+      reference: transactionNumber(target, workspace.locale),
+      customer: { name: target.customer.name, phoneE164: target.customer.phoneE164 },
+    });
+  };
+
+  const saveCustomerEdit = async (saleId: string, input: { name: string; phone: string }) => {
+    const current =
+      transactionsQuery.data?.items.find((entry) => entry.id === saleId) ?? queueDetail;
+    // The Sale is re-read first so the correction never rides on a stale version.
+    const fresh = await adapter.getSale(saleId);
+    if (fresh.status !== 'OPEN' || fresh.customer?.type !== 'NON_MEMBER') {
+      setCustomerEditTarget(null);
+      refreshQueue();
+      throw new Error('SALE_NOT_OPEN');
+    }
+    const updated = await adapter.setSaleCustomer(
+      saleId,
+      {
+        expectedVersion: fresh.version,
+        customer: { type: 'NON_MEMBER', name: input.name, phone: input.phone },
+      },
+      `customer-correction-${saleId}-${crypto.randomUUID()}`,
+    );
+    setCustomerEditTarget(null);
+    if (queueDetail?.id === saleId || current?.id === saleId)
+      setQueueDetail((detail) => (detail?.id === saleId ? updated : detail));
+    refreshQueue();
+    showToast({
+      title: copy('Customer updated'),
+      description: transactionNumber(updated, workspace.locale),
+      variant: 'success',
+    });
+  };
+
+  const commitCheckoutToQueue = (
+    completedSale: Sale,
+    wasPaid: boolean,
+    destination: FulfillmentDestination,
+  ) => {
+    if (isLocalDemo) {
+      const committedEntry: QueuedSaleEntry = {
+        saleId: completedSale.id,
+        sellingLocationId: completedSale.sellingLocationId,
+        saleCreatedAt: completedSale.createdAt,
+      };
+      const nextQueuedSaleEntries = queuedSaleEntries.some(
+        (entry) =>
+          entry.saleId === committedEntry.saleId &&
+          entry.saleCreatedAt === committedEntry.saleCreatedAt,
+      )
+        ? queuedSaleEntries
+        : [
+            ...queuedSaleEntries.filter((entry) => entry.saleId !== committedEntry.saleId),
+            committedEntry,
+          ];
+      writeQueuedSaleEntries(nextQueuedSaleEntries);
+      setQueuedSaleEntries(nextQueuedSaleEntries);
+    }
+    setQueueTab('QUEUED');
+    setQueueOpen(true);
+    setCartOpen(false);
+    setCheckoutOpen(false);
+
+    workspace.clearProcessedDraft();
+    startNewCustomerTransaction();
+
+    // The receipt belongs to a settled transaction; a partly paid one keeps its balance in the queue.
+    if (wasPaid && destination === 'QUEUE') {
+      setReceiptSaleId(completedSale.id);
+      setQueueDetail(completedSale);
+    } else {
+      setReceiptSaleId(null);
+      setQueueDetail(null);
+    }
+
+    const partlyPaid = !wasPaid && hasSuccessfulPayment(completedSale);
+    showToast({
+      title: wasPaid ? copy('Payment successful') : copy('Transaction created'),
+      description:
+        destination === 'START_PROCESS'
+          ? `${transactionNumber(completedSale, workspace.locale)} ${copy('Added to queue and ready to start.')}`
+          : wasPaid
+            ? `${transactionNumber(completedSale, workspace.locale)} ${copy('Paid and added to queue.')}`
+            : partlyPaid
+              ? `${transactionNumber(completedSale, workspace.locale)} ${copy('Added to queue. Collect the remaining balance from the queue.')} ${copy('Remaining')}: ${money(financialSummary(completedSale).balanceDue, workspace.locale)}`
+              : `${transactionNumber(completedSale, workspace.locale)} ${copy('Added to queue. Payment has not been received.')}`,
+      variant: 'success',
+    });
+  };
+
+  /** An all-INSTANT Sale that finalized at checkout: show its completed receipt, no queue. */
+  const commitInstantCheckout = (finalized: Sale) => {
+    setQueueTab('COMPLETED');
+    setQueueOpen(true);
+    setCartOpen(false);
+    setCheckoutOpen(false);
+
+    workspace.clearProcessedDraft();
+    startNewCustomerTransaction();
+
+    // Same rule as completing queued work: the finalize response is the immediate receipt.
+    if (canReadCompleted || hasSuccessfulPayment(finalized)) {
+      setQueueDetail(finalized);
+      setReceiptSaleId(hasSuccessfulPayment(finalized) ? finalized.id : null);
+    } else {
+      setQueueDetail(null);
+      setReceiptSaleId(null);
+    }
+    showToast({
+      title: copy('Transaction completed'),
+      description: `${transactionNumber(finalized, workspace.locale)} ${copy('has been completed.')}`,
+      variant: 'success',
+    });
+  };
+
+  /**
+   * The one place that decides what an exactly settled checkout becomes: tracked work queues,
+   * an all-INSTANT Sale finalizes immediately. Throws so the caller can keep the payment and retry.
+   */
+  const finishSettledCheckout = async (settled: Sale) => {
+    const result = await completeSettledCheckout(settled, {
+      queue: workspace.queueSale,
+      finalizeInstant: workspace.finalizeInstantSale,
+    });
+    if (result.kind === 'FINALIZED') commitInstantCheckout(result.sale);
+    else if (result.kind === 'QUEUED') commitCheckoutToQueue(result.sale, true, 'QUEUE');
+  };
+
+  const startQueuedWork = async (transaction: Sale) => {
+    const line = transaction.lines.find(
+      (candidate) =>
+        candidate.removedAt === null &&
+        candidate.fulfillmentBehaviorSnapshot === 'TRACKED' &&
+        candidate.fulfillment?.status === 'WAITING',
+    );
+    if (!line) {
+      showToast({
+        title: copy('No work can be started'),
+        description: copy('This transaction has no services waiting to be worked on.'),
+        variant: 'warning',
+      });
+      return false;
+    }
+    try {
+      const started =
+        transaction.operationalState === 'IN_PROGRESS'
+          ? transaction
+          : await workspace.startSaleWork(transaction);
+      await workspace.startQueuedFulfillment(started, line);
+      setQueueTab('PROGRESS');
+      showToast({
+        title: copy('Work started'),
+        description: `${transactionNumber(transaction, workspace.locale)} ${copy('is now being worked on.')}`,
+        variant: 'success',
+      });
+      return true;
+    } catch {
+      showToast({
+        title: copy('Could not start work'),
+        description: copy('The transaction remains in the queue.'),
+        variant: 'danger',
+      });
+      return false;
+    }
+  };
+
+  /**
+   * Advances a single tracked Service line from WAITING to IN_PROGRESS while the
+   * transaction is already being worked on. Only this line changes; other WAITING
+   * lines on the same Sale are untouched.
+   */
+  const startWaitingServiceLine = async (transaction: Sale, line: SaleLine) => {
+    try {
+      const updated = await workspace.transitionQueuedFulfillment(transaction, line, 'IN_PROGRESS');
+      setQueueDetail(updated);
+      showToast({
+        title: copy('Work started'),
+        description: `${line.itemNameSnapshot} ${copy('is now being worked on.')}`,
+        variant: 'success',
+      });
+    } catch {
+      showToast({
+        title: copy('Could not start work'),
+        description: copy('The service was not started. Try again.'),
+        variant: 'danger',
+      });
+    }
+  };
+
+  const savePerformers = async (
+    target: { sale: Sale; line: SaleLine },
+    plans: ServiceLineWorkPlan[],
+  ) => {
+    setSavingPerformers(true);
+    try {
+      const updated = await workspace.setQueuedWorkUnits(target.sale, plans);
+      setQueueDetail(updated);
+      setPerformerTarget(null);
+      showToast({
+        title: copy('Employee updated'),
+        description: copy('Service assignment saved for this transaction.'),
+        variant: 'success',
+      });
+    } catch {
+      showToast({
+        title: copy('Could not update employee'),
+        description: copy('Assignment was not changed. Try again.'),
+        variant: 'danger',
+      });
+    } finally {
+      setSavingPerformers(false);
+    }
+  };
+
+  const completeQueuedTransaction = (transaction: Sale) => {
+    const issues = workflowIssues(transaction, workspace.locale);
+    if (issues.length) return;
+    setCompletionConfirmationTarget(transaction);
+  };
+
+  const confirmQueuedCompletion = async () => {
+    if (
+      !completionConfirmationTarget ||
+      workflowIssues(completionConfirmationTarget, workspace.locale).length
+    ) {
+      return;
+    }
+    try {
+      // The finalize response is the immediate completion result, so its receipt
+      // is shown to every operator who completed it. Without sales:read-completed
+      // it opens as the receipt only (no detail) and is gone once closed: later
+      // reads of the completed transaction are history, which Runtime forbids.
+      const finalized = await workspace.finalizeQueuedSale(completionConfirmationTarget);
+      setQueueTab('COMPLETED');
+      const paid = hasSuccessfulPayment(finalized);
+      if (canReadCompleted || paid) {
+        setQueueDetail(finalized);
+        setReceiptSaleId(paid ? finalized.id : null);
+      } else {
+        setQueueDetail(null);
+        setReceiptSaleId(null);
+      }
+      setCompletionConfirmationTarget(null);
+      showToast({
+        title: copy('Transaction completed'),
+        description: `${transactionNumber(finalized, workspace.locale)} ${copy('has been completed.')}`,
+        variant: 'success',
+      });
+    } catch {
+      showToast({
+        title: copy('Could not complete transaction'),
+        description: copy('Check the transaction status and try again.'),
+        variant: 'danger',
+      });
+    }
+  };
+
+  const openAdjustment = async (transaction: Sale) => {
+    if (transaction.status !== 'OPEN') return;
+    // Runtime enforces this too; never open a dialog that can only end in a refusal.
+    if (!canAdjustOrder(transaction, session.access.permissions)) return;
+    setQueueDetail(null);
+    try {
+      const hydrated = await workspace.hydrateQueuedSale(transaction.id);
+      setAdjustmentTarget(hydrated);
+    } catch {
+      showToast({
+        title: copy('Could not load transaction'),
+        description: copy('Reload the transaction before accepting payment.'),
+        variant: 'danger',
+      });
+    }
+  };
+
+  const openQueuePayment = async (transaction: Sale) => {
+    try {
+      const { sale: hydrated, availableToPay } = await workspace.hydrateQueuedPayment(
+        transaction.id,
+      );
+      setQueueDetail(null);
+      const latestPaymentRoutes = await workspace.refreshPaymentRoutes();
+      const normalizedAvailable = currencyInputFromAmount(availableToPay);
+      setPaymentMethod('CASH');
+      setPaymentRouteId(
+        latestPaymentRoutes.find((route) => route.paymentMethod === 'CASH')?.id ?? '',
+      );
+      setPaymentAmount(normalizedAvailable);
+      setPaymentReference('');
+      setPaymentError(null);
+      setTender(normalizedAvailable);
+      setQueuePaymentTarget(hydrated);
+      setQueuePaymentAmount(availableToPay);
+    } catch {
+      showToast({
+        title: copy('Could not load transaction'),
+        description: copy('Reload the transaction before accepting payment.'),
+        variant: 'danger',
+      });
+    }
+  };
+
+  const requestCancel = (transaction: Sale) => {
+    setCancelTarget(transaction);
+    setCancelReason('');
+  };
+
+  const confirmCancel = async () => {
+    if (!cancelTarget || !cancelReason.trim()) return;
+    const refundAmount = financialSummary(cancelTarget).totalPaid;
+    try {
+      const canceledSale = await workspace.voidQueuedSale(cancelTarget);
+      if (isLocalDemo) {
+        writeCancellationReason(canceledSale.id, cancelReason.trim());
+        setCancellationReasons((current) => ({
+          ...current,
+          [canceledSale.id]: cancelReason.trim(),
+        }));
+      }
+      setQueueDetail(canceledSale);
+      setQueueTab('CANCELED');
+      setReceiptSaleId(null);
+      setCancelTarget(null);
+      setCancelReason('');
+      workspace.closeQueueContext();
+      showToast({
+        title: copy('Transaction canceled'),
+        description: isPositiveDecimal(refundAmount)
+          ? `${copy('Refund required')}: ${money(refundAmount, workspace.locale)}. ${copy('Cancellation reason saved.')}`
+          : copy('Cancellation reason saved.'),
+        variant: 'success',
+      });
+    } catch (error) {
+      showToast({
+        title: copy('Cancellation failed'),
+        description: cashierTransactionErrorMessage(error),
+        variant: 'danger',
+      });
+    }
+  };
+
+  /**
+   * Sends one confirmed payment. A second confirmation while the first is still on its way is
+   * ignored; Runtime's idempotency key and expected version still reject any duplicate.
+   */
+  const sendPaymentOnce = async (send: () => Promise<void>) => {
+    if (paymentInFlight.current) return;
+    paymentInFlight.current = true;
+    setRecordingPayment(true);
+    setPaymentError(null);
+    try {
+      await send();
+    } finally {
+      paymentInFlight.current = false;
+      setRecordingPayment(false);
+    }
+  };
+
+  const queueCheckout = async (destination: FulfillmentDestination) => {
+    if (!sale || !lines.length) return;
+    try {
+      // An all-INSTANT Sale has no queue: it only completes once exactly settled.
+      if (!hasTrackedWork(sale)) {
+        if (hasSuccessfulCheckout(sale)) await finishSettledCheckout(sale);
+        return;
+      }
+      const submitted = await workspace.queueSale(sale);
+      commitCheckoutToQueue(submitted, hasSuccessfulCheckout(sale), destination);
+      if (destination === 'START_PROCESS') await startQueuedWork(submitted);
+    } catch (error) {
+      showToast({
+        title: copy('Checkout failed'),
+        description: cashierTransactionErrorMessage(error),
+        variant: 'danger',
+      });
+    }
+  };
+
+  const recordCheckoutPayment = (allocationOverride?: string) =>
+    sendPaymentOnce(async () => {
+      if (!sale || !lines.length) return;
+      const allocation = normalizeCurrencyPaymentInput(allocationOverride ?? paymentAmount);
+      const progress = paymentProgress(sale);
+      if (
+        !isPositiveDecimal(allocation) ||
+        createDecimal(allocation).greaterThan(createDecimal(progress.remainingAmount))
+      )
+        return;
+      const tendered =
+        paymentMethod === 'CASH' ? normalizeCurrencyPaymentInput(tender || allocation) : undefined;
+      if (tendered && createDecimal(tendered).lessThan(createDecimal(allocation))) return;
+      const selectedRoute =
+        workspace.paymentRoutes.find(
+          (route) => route.id === paymentRouteId && route.paymentMethod === paymentMethod,
+        ) ?? workspace.paymentRoutes.find((route) => route.paymentMethod === paymentMethod);
+      if (!selectedRoute) {
+        setPaymentError(copy('Configure an active settlement account for this payment method.'));
+        return;
+      }
+      let completedSale: Sale;
+      try {
+        completedSale = await workspace.createPayment(
+          paymentMethod,
+          allocation,
+          tendered,
+          paymentReference.trim() || undefined,
+          selectedRoute.id,
+        );
+      } catch (error) {
+        setPaymentError(cashierTransactionErrorMessage(error));
+        return;
+      }
+
+      const next = paymentProgress(completedSale);
+      if (!hasSuccessfulCheckout(completedSale)) {
+        const waiting = completedSale.payments.some((payment) => payment.status === 'PENDING');
+        setPaymentAmount(currencyInputFromAmount(next.remainingAmount));
+        setTender(currencyInputFromAmount(next.remainingAmount));
+        setPaymentReference('');
+        showToast({
+          title: copy(waiting ? 'Payment waiting for confirmation' : 'Payment recorded'),
+          description: waiting
+            ? copy('Confirm the payment once it is received.')
+            : `${copy('Remaining')}: ${money(next.remainingAmount, workspace.locale)}`,
+          variant: 'success',
+        });
+        return;
+      }
+
+      try {
+        await finishSettledCheckout(completedSale);
+      } catch (error) {
+        showToast({
+          title: copy('Payment complete'),
+          description: `${cashierTransactionErrorMessage(error)} ${copy(
+            hasTrackedWork(completedSale)
+              ? 'Payment is preserved. Try adding the transaction to the queue again.'
+              : 'Payment is preserved. Try completing the transaction again.',
+          )}`,
+          variant: 'warning',
+        });
+      }
+    });
+
+  const payQueueBalance = () =>
+    sendPaymentOnce(async () => {
+      const transaction = displayedQueuePaymentTarget;
+      if (!transaction || !queuePaymentAmount) return;
+      const due = currencyInputFromAmount(queuePaymentAmount);
+      const allocation = normalizeCurrencyPaymentInput(paymentAmount);
+      if (
+        !isPositiveDecimal(allocation) ||
+        createDecimal(allocation).greaterThan(createDecimal(due))
+      )
+        return;
+      const tendered =
+        paymentMethod === 'CASH' ? normalizeCurrencyPaymentInput(tender || allocation) : undefined;
+      if (tendered && createDecimal(tendered).lessThan(createDecimal(allocation))) return;
+      const selectedRoute =
+        workspace.paymentRoutes.find(
+          (route) => route.id === paymentRouteId && route.paymentMethod === paymentMethod,
+        ) ?? workspace.paymentRoutes.find((route) => route.paymentMethod === paymentMethod);
+      if (!selectedRoute) {
+        setPaymentError(copy('Configure an active settlement account for this payment method.'));
+        return;
+      }
+      try {
+        const updatedSale = await workspace.createQueuedPayment(
+          transaction,
+          paymentMethod,
+          allocation,
+          tendered,
+          paymentReference.trim() || undefined,
+          selectedRoute.id,
+        );
+        const next = paymentProgress(updatedSale);
+        const settled = hasSuccessfulCheckout(updatedSale);
+        const waiting = updatedSale.payments.some((payment) => payment.status === 'PENDING');
+        setQueuePaymentTarget(updatedSale);
+        setQueuePaymentAmount(next.remainingAmount);
+        setPaymentAmount(currencyInputFromAmount(next.remainingAmount));
+        setTender(currencyInputFromAmount(next.remainingAmount));
+        setPaymentReference('');
+        if (settled) {
+          setQueuePaymentTarget(null);
+          setQueuePaymentAmount(null);
+          setQueueDetail(updatedSale);
+          setReceiptSaleId(updatedSale.id);
+          workspace.closeQueueContext();
+        }
+        showToast({
+          title: settled
+            ? copy('Payment complete')
+            : copy(waiting ? 'Payment waiting for confirmation' : 'Payment recorded'),
+          description: settled
+            ? copy('Transaction payment is complete.')
+            : waiting
+              ? copy('Confirm the payment once it is received.')
+              : `${copy('Remaining')}: ${money(next.remainingAmount, workspace.locale)}`,
+          variant: 'success',
+        });
+      } catch (error) {
+        setPaymentError(cashierTransactionErrorMessage(error));
+      }
+    });
+
+  const transitionCheckoutPayment = async (payment: Payment, status: TerminalPaymentStatus) => {
+    try {
+      const updatedSale = await workspace.transitionPayment(payment, status);
+      const nextAllocation = paymentProgress(updatedSale);
+      setPaymentAmount(currencyInputFromAmount(nextAllocation.remainingAmount));
+      setTender(currencyInputFromAmount(nextAllocation.remainingAmount));
+      setPaymentReference('');
+      if (hasSuccessfulCheckout(updatedSale)) {
+        try {
+          await finishSettledCheckout(updatedSale);
+          return;
+        } catch (error) {
+          showToast({
+            title: copy('Payment complete'),
+            description: `${cashierTransactionErrorMessage(error)} ${copy(
+              hasTrackedWork(updatedSale)
+                ? 'Payment is preserved. Try adding the transaction to the queue again.'
+                : 'Payment is preserved. Try completing the transaction again.',
+            )}`,
+            variant: 'warning',
+          });
+          return;
+        }
+      }
+      showToast({
+        title: copy(status === 'SUCCEEDED' ? 'Payment recorded' : 'Payment updated'),
+        description: isPositiveDecimal(nextAllocation.remainingAmount)
+          ? `${copy('Remaining')}: ${money(nextAllocation.remainingAmount, workspace.locale)}`
+          : copy('Resolve pending payments before continuing.'),
+        variant: status === 'SUCCEEDED' ? 'success' : 'warning',
+      });
+    } catch (error) {
+      showToast({
+        title: copy('Payment failed'),
+        description: cashierTransactionErrorMessage(error),
+        variant: 'danger',
+      });
+    }
+  };
+
+  const transitionQueuePayment = async (payment: Payment, status: TerminalPaymentStatus) => {
+    const transaction = displayedQueuePaymentTarget;
+    if (!transaction) return;
+    try {
+      const updatedSale = await workspace.transitionQueuedPayment(transaction, payment, status);
+      const nextAllocation = paymentProgress(updatedSale);
+      setQueuePaymentTarget(updatedSale);
+      setQueuePaymentAmount(nextAllocation.remainingAmount);
+      setPaymentAmount(currencyInputFromAmount(nextAllocation.remainingAmount));
+      setTender(currencyInputFromAmount(nextAllocation.remainingAmount));
+      setPaymentReference('');
+      if (hasSuccessfulCheckout(updatedSale)) {
+        setQueuePaymentTarget(null);
+        setQueuePaymentAmount(null);
+        setQueueDetail(updatedSale);
+        setReceiptSaleId(updatedSale.id);
+        workspace.closeQueueContext();
+      }
+      showToast({
+        title: copy(status === 'SUCCEEDED' ? 'Payment recorded' : 'Payment updated'),
+        description: hasSuccessfulCheckout(updatedSale)
+          ? copy('Transaction payment is complete.')
+          : `${copy('Remaining')}: ${money(
+              financialSummary(updatedSale).balanceDue,
+              workspace.locale,
+            )}`,
+        variant: status === 'SUCCEEDED' ? 'success' : 'warning',
+      });
+    } catch (error) {
+      showToast({
+        title: copy('Payment failed'),
+        description: cashierTransactionErrorMessage(error),
+        variant: 'danger',
+      });
+    }
+  };
+
+  const quickTender = ['50000', '100000', '150000', '200000', '500000'];
+
+  return (
+    <div className="flex h-full min-h-0 flex-col overflow-hidden px-3 pb-3 pt-3 sm:px-4 sm:pb-4 lg:px-5 lg:pb-5">
+      {workspace.notice ? (
+        <div
+          role="alert"
+          className="mb-3 flex shrink-0 flex-col gap-3 rounded-2xl border border-(--color-warning)/30 bg-(--color-warning)/10 p-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="flex min-w-0 gap-2.5">
+            <AlertCircle className="mt-0.5 size-4 shrink-0 text-(--color-warning)" />
+            <div>
+              <p className="font-semibold">{copy('Transaction needs attention')}</p>
+              <p className="mt-0.5 text-xs text-(--color-text-muted)">{workspace.notice}</p>
+            </div>
+          </div>
+          <div className="flex shrink-0 gap-2">
+            {workspace.canRetryLastCommand ? (
+              <Button size="sm" variant="outline" onClick={workspace.retryLastCommand}>
+                <RotateCcw className="mr-1.5 size-3.5" /> {copy('Try same action')}
+              </Button>
+            ) : null}
+            {workspace.viewModel.primaryMode === 'CONFLICT_REVIEW' ? (
+              <Button size="sm" variant="outline" onClick={workspace.acknowledgeLatestState}>
+                <CheckCircle2 className="mr-1.5 size-3.5" /> {copy('Reviewed')}
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      {transactionsQuery.isLoading ? (
+        <div className="mb-4 shrink-0 rounded-2xl border border-(--color-border) bg-(--color-surface) p-4 shadow-sm">
+          <div className="flex items-center gap-3">
+            <Skeleton className="size-10 shrink-0 rounded-2xl" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <Skeleton className="h-4 w-40 rounded-lg" />
+              <Skeleton className="h-3 w-56 max-w-full rounded-lg" />
+            </div>
+            <Skeleton className="hidden h-8 w-56 rounded-xl md:block" />
+          </div>
+        </div>
+      ) : (
+        <ReferenceQueueBoard
+          open={queueOpen}
+          onOpenChange={setQueueOpen}
+          active={queueTab}
+          onChangeTab={setQueueTab}
+          groups={groups}
+          issues={queueIssues}
+          locale={workspace.locale}
+          onStartWork={(transaction) => void startQueuedWork(transaction)}
+          onAdjust={openAdjustment}
+          canAdjust={(transaction) => canAdjustOrder(transaction, session.access.permissions)}
+          onPay={(transaction) => void openQueuePayment(transaction)}
+          onCancel={requestCancel}
+          onEditCustomer={openCustomerEdit}
+          onView={(transaction) => {
+            // A queue card is a polling projection. Show it immediately, then
+            // replace it with the authoritative transaction response so detail
+            // facts such as an OPEN Sale's loyalty-redemption intent never
+            // depend on which queue projection was cached first.
+            setQueueDetail(transaction);
+            void adapter
+              .getSale(transaction.id)
+              .then(setQueueDetail)
+              .catch((error) =>
+                showToast({
+                  title: copy('Could not load transaction'),
+                  description: cashierTransactionErrorMessage(error),
+                  variant: 'danger',
+                }),
+              );
+          }}
+          onViewReceipt={(transaction) => {
+            setQueueDetail(transaction);
+            setReceiptSaleId(transaction.id);
+          }}
+          canReadCompleted={canReadCompleted}
+          onSendReceipt={openReceiptDelivery}
+          receiptDeliveries={transactionsQuery.data?.receiptDeliveries ?? {}}
+        />
+      )}
+
+      <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="shrink-0 pb-2">
+          <div className="flex flex-wrap items-center gap-2 border-b border-(--color-border) pb-2 lg:flex-nowrap">
+            <div className="grid shrink-0 grid-cols-2 rounded-xl bg-(--color-surface-muted)/75 p-1 sm:inline-flex sm:items-center">
+              <ReferenceTypeButton
+                active={workspace.itemType === 'PRODUCT'}
+                icon={<ShoppingBag className="size-3.5" />}
+                label={copy('Product')}
+                onClick={() => selectType('PRODUCT')}
+              />
+              <ReferenceTypeButton
+                active={workspace.itemType === 'SERVICE'}
+                icon={<Sparkles className="size-3.5" />}
+                label={copy('Service')}
+                onClick={() => selectType('SERVICE')}
+              />
+            </div>
+            <div className="shrink-0">
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder={copy('Search item or variant...')}
+                debounceMs={0}
+                expandedWidth="min(280px, calc(100vw - 140px))"
+              />
+            </div>
+            <div className="hidden h-6 w-px bg-(--color-border) lg:block" aria-hidden="true" />
+            <div className="order-3 min-w-0 flex-1 basis-full lg:order-0 lg:basis-0">
+              <div className="no-scrollbar flex h-9 items-center gap-1.5 overflow-x-auto border-l border-(--color-border)/70 pl-2 lg:border-l-0 lg:pl-0">
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategory('')}
+                  className={`inline-flex h-9 shrink-0 items-center rounded-lg px-2.5 text-xs font-semibold transition-colors ${selectedCategory ? 'bg-(--color-surface-muted) text-(--color-text-muted)' : 'bg-(--color-brand) text-white'}`}
+                >
+                  {copy('All')}
+                </button>
+                {categories.map((category) => (
+                  <button
+                    key={category.id}
+                    type="button"
+                    onClick={() => setSelectedCategory(category.id)}
+                    className={`inline-flex h-9 shrink-0 items-center rounded-lg px-2.5 text-xs font-semibold transition-colors ${selectedCategory === category.id ? 'bg-(--color-brand) text-white' : 'bg-(--color-surface-muted) text-(--color-text-muted)'}`}
+                  >
+                    {category.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-24 pr-1">
+          {workspace.isLoadingCatalog ? (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+              {Array.from({ length: 10 }).map((item, index) => (
+                <Skeleton key={`${String(item)}-${index}`} className="aspect-[3/4] rounded-2xl" />
+              ))}
+            </div>
+          ) : visibleItems.length === 0 ? (
+            <div className="flex min-h-[260px] items-center justify-center rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface)]/50 text-sm text-[var(--color-text-muted)]">
+              {copy('No items found')}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+              {visibleItems.map((item) => (
+                <ReferenceCatalogCard
+                  key={item.id}
+                  item={item}
+                  price={workspace.cachedCardPrice(item.id)}
+                  locale={workspace.locale}
+                  disabled={workspace.viewModel.monetaryMutation.state !== 'AVAILABLE'}
+                  onAdd={() => void workspace.selectItem(item)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <ReferenceFloatingCart
+        open={cartOpen}
+        onOpenChange={setCartOpen}
+        lines={lines}
+        total={cartPreviewTotal}
+        gross={workspace.cart.grossAmount}
+        discountAmount={workspace.cart.discountAmount}
+        discountLabel={
+          sale
+            ? transactionDiscountLabel(sale, copy('Promotions and discounts'))
+            : copy('Promotions and discounts')
+        }
+        taxAmount={draftTaxAmount}
+        taxLabel={sale ? saleTaxLabel(sale, copy('Tax')) : draftTaxLabel}
+        isEstimate={workspace.cart.isLocalDraft}
+        isTaxPreviewLoading={isTaxPreviewLoading}
+        isTaxPreviewUnavailable={isTaxPreviewUnavailable}
+        locale={workspace.locale}
+        customer={cartCustomer}
+        memberNumber={activeSelectedMember?.memberNumber ?? null}
+        pointBalance={memberBalanceQuery.data?.pointsBalance ?? null}
+        isPointBalanceLoading={memberBalanceQuery.isLoading}
+        onChooseCustomer={() => setCustomerPickerOpen(true)}
+        onQuantity={(line, next) => {
+          if (workspace.cart.isLocalDraft) workspace.changeDraftQuantity(line.id, next);
+          else {
+            const serverLine = workspace.viewModel.activeLines.find((item) => item.id === line.id);
+            if (serverLine) workspace.changeQuantity(serverLine, next);
+          }
+        }}
+        onEdit={(line, options) => void workspace.editCartLine(line.id, options)}
+        onRemove={(line) => {
+          if (workspace.cart.isLocalDraft) workspace.removeDraftLine(line.id);
+          else {
+            const serverLine = workspace.viewModel.activeLines.find((item) => item.id === line.id);
+            if (serverLine) workspace.removeLine(serverLine);
+          }
+        }}
+        onCheckout={() => void openCheckout()}
+      />
+
+      <CustomerMemberDialog
+        key={customerCacheScope}
+        open={customerPickerOpen}
+        customer={cartCustomer}
+        isSaving={workspace.isCustomerPending}
+        api={customerMemberApi}
+        canReadMembers={canReadMembers}
+        canEnrollMember={canEnrollMember}
+        canReadCustomers={canReadCustomers}
+        canReadLoyalty={canReadLoyalty}
+        resetKey={customerPickerSession.revision}
+        onClose={() => setCustomerPickerOpen(false)}
+        onChoose={(selection, member) => {
+          const previousMember = selectedMember;
+          setSelectedMember(member ?? null);
+          void workspace
+            .changeCustomer(selection)
+            .then(() => {
+              setCustomerPickerOpen(false);
+            })
+            .catch((error: unknown) => {
+              setSelectedMember(previousMember);
+              showToast({
+                title: copy('Could not save the customer'),
+                description: cashierTransactionErrorMessage(error),
+                variant: 'danger',
+              });
+            });
+        }}
+      />
+
+      <ReferencePaymentDialog
+        open={checkoutOpen}
+        onClose={() => {
+          setCheckoutOpen(false);
+          setCartOpen(true);
+        }}
+        {...(sale &&
+        sale.status === 'OPEN' &&
+        workspace.viewModel.monetaryMutation.state === 'AVAILABLE'
+          ? {
+              onEditOrder: () => {
+                setCheckoutOpen(false);
+                setCartOpen(true);
+              },
+            }
+          : {})}
+        sale={sale}
+        lines={lines}
+        total={total}
+        gross={workspace.cart.grossAmount}
+        discountAmount={workspace.cart.discountAmount}
+        discountLabel={
+          sale
+            ? transactionDiscountLabel(sale, copy('Promotions and discounts'))
+            : copy('Promotions and discounts')
+        }
+        taxAmount={workspace.cart.taxAmount}
+        taxLabel={sale ? saleTaxLabel(sale, copy('Tax')) : copy('Tax')}
+        locale={workspace.locale}
+        customer={cartCustomer}
+        paymentRoutes={workspace.paymentRoutes}
+        isPaymentRoutesLoading={workspace.isLoadingPaymentRoutes}
+        method={paymentMethod}
+        paymentRouteId={paymentRouteId}
+        appliedAmount={paymentAmount}
+        paymentReference={paymentReference}
+        tender={tender}
+        payNow={payNow}
+        onPayNowChange={setPayNow}
+        onMethod={(next) => {
+          setPaymentError(null);
+          setPaymentMethod(next);
+          setPaymentRouteId(
+            workspace.paymentRoutes.find((route) => route.paymentMethod === next)?.id ?? '',
+          );
+          setPaymentReference('');
+          if (next === 'CASH') setTender(paymentAmount);
+        }}
+        onPaymentRoute={(routeId) => {
+          setPaymentError(null);
+          setPaymentRouteId(routeId);
+        }}
+        onAppliedAmount={(amount) => {
+          setPaymentError(null);
+          setPaymentAmount(amount);
+          if (paymentMethod === 'CASH') setTender(amount);
+        }}
+        onPaymentReference={setPaymentReference}
+        onTender={setTender}
+        onTransitionPayment={(payment, status) => void transitionCheckoutPayment(payment, status)}
+        quickTender={quickTender}
+        isSubmitting={workspace.isCoreMutating || isRecordingPayment}
+        paymentError={paymentError}
+        onConfirmPayment={recordCheckoutPayment}
+        onQueue={() => void queueCheckout('QUEUE')}
+        onQueueWithBalance={() => void queueCheckout('QUEUE')}
+        loyaltyRedemption={sale?.loyaltyRedemption ?? null}
+        loyaltyPointBalance={
+          activeSelectedMember ? (memberBalanceQuery.data?.pointsBalance ?? null) : null
+        }
+        isLoyaltyBalanceLoading={
+          Boolean(activeSelectedMember) &&
+          (memberBalanceQuery.isLoading || memberIdentityQuery.isLoading)
+        }
+        canRedeemLoyalty={Boolean(sale) && canRedeemLoyalty && activeCustomer?.type === 'MEMBER'}
+        loyaltyPoints={loyaltyPoints}
+        isLoyaltyMutating={workspace.isLoyaltyRedemptionPending}
+        onLoyaltyPointsChange={setLoyaltyPoints}
+        onApplyLoyalty={(points) => workspace.applyLoyaltyRedemption(points)}
+        onRemoveLoyalty={() => {
+          workspace.removeLoyaltyRedemption();
+          setLoyaltyPoints('');
+        }}
+        adjustmentSlot={<SaleAdjustmentControls workspace={workspace} placement="payment" />}
+      />
+
+      <ReferenceTransactionDetail
+        sale={presentableTransaction(displayedQueueDetail, canReadCompleted, receiptSaleId)}
+        locale={workspace.locale}
+        employees={workspace.employees}
+        businessName={runtime.branding.businessName ?? runtime.branding.productName}
+        branchName={receiptLocation?.name ?? copy('Main branch')}
+        branchAddress={receiptLocation?.address ?? null}
+        cashierName={session.identity.displayName}
+        {...(displayedQueueDetail && cancellationReasons[displayedQueueDetail.id]
+          ? { cancellationReason: cancellationReasons[displayedQueueDetail.id] }
+          : {})}
+        showPaymentReceipt={Boolean(receiptSaleId && displayedQueueDetail?.id === receiptSaleId)}
+        onClose={() => {
+          setQueueDetail(null);
+          setReceiptSaleId(null);
+        }}
+        onNewSale={() => {
+          // A partly paid all-INSTANT Sale has no queue: keep it as the active transaction.
+          if (workspace.isNewSaleBlocked) {
+            showToast({
+              title: copy('Transaction not finished'),
+              description: copy(
+                'Finish the payment of this transaction before starting a new one.',
+              ),
+              variant: 'warning',
+            });
+            return;
+          }
+          setQueueDetail(null);
+          setReceiptSaleId(null);
+          setCartOpen(false);
+          if (workspace.newSale()) startNewCustomerTransaction();
+        }}
+        onViewReceipt={(transaction) => {
+          setQueueDetail(transaction);
+          setReceiptSaleId(transaction.id);
+        }}
+        onSendReceipt={openReceiptDelivery}
+        {...(displayedQueueDetail?.status === 'FINALIZED' && receiptDeliveryStatusQuery.data
+          ? { deliveryStatus: receiptDeliveryStatusQuery.data }
+          : {})}
+        onAssign={(line) => {
+          if (!displayedQueueDetail) return;
+          workspace.requestEmployeeOptions();
+          setPerformerTarget({ sale: displayedQueueDetail, line });
+        }}
+        onStartLineWork={(line) => {
+          if (!displayedQueueDetail) return;
+          void startWaitingServiceLine(displayedQueueDetail, line);
+        }}
+        onComplete={() => {
+          if (displayedQueueDetail) void completeQueuedTransaction(displayedQueueDetail);
+        }}
+        isMutating={workspace.isCoreMutating}
+      />
+
+      <ReferenceOrderAdjustmentDialog
+        key={displayedAdjustmentTarget?.id ?? 'adjustment-closed'}
+        sale={displayedAdjustmentTarget}
+        // Every active sellable item: the page's Product/Service filter and search never apply.
+        items={workspace.activeItems}
+        locale={workspace.locale}
+        isMutating={workspace.isCoreMutating}
+        onClose={() => {
+          workspace.closeVariantPicker();
+          setAdjustmentTarget(null);
+          workspace.closeQueueContext();
+        }}
+        onAdd={(item, configuration) => workspace.addItemToTransaction(item, configuration)}
+        onQuantity={(line, next) => workspace.changeQuantity(line, next)}
+        onRemove={workspace.removeLine}
+        onEdit={(line, input) => workspace.correctLine(line, input)}
+        onCorrect={(line, input) => workspace.correctLine(line, input)}
+        onPreview={(line, input) => workspace.previewLineCorrection(line, input)}
+        loadConfiguratorState={workspace.loadConfiguratorState}
+        loadCandidates={workspace.loadComponentCandidates}
+        canAdjust={
+          displayedAdjustmentTarget
+            ? canAdjustOrder(displayedAdjustmentTarget, session.access.permissions)
+            : true
+        }
+        canRefundPayment={session.access.permissions.includes('payments:refund')}
+        onCompensate={(sale, paymentId, amount) =>
+          workspace.compensateOpenPayment(sale, paymentId, amount)
+        }
+        employees={workspace.employees}
+      />
+
+      <ReferenceBalancePaymentDialog
+        sale={displayedQueuePaymentTarget}
+        availableToPay={queuePaymentAmount}
+        locale={workspace.locale}
+        paymentRoutes={workspace.paymentRoutes}
+        isPaymentRoutesLoading={workspace.isLoadingPaymentRoutes}
+        method={paymentMethod}
+        paymentRouteId={paymentRouteId}
+        appliedAmount={paymentAmount}
+        paymentReference={paymentReference}
+        tender={tender}
+        isMutating={workspace.isCoreMutating || isRecordingPayment}
+        paymentError={paymentError}
+        onClose={() => {
+          setPaymentError(null);
+          setQueuePaymentTarget(null);
+          setQueuePaymentAmount(null);
+          workspace.closeQueueContext();
+        }}
+        onMethod={(next) => {
+          setPaymentError(null);
+          setPaymentMethod(next);
+          setPaymentRouteId(
+            workspace.paymentRoutes.find((route) => route.paymentMethod === next)?.id ?? '',
+          );
+          setPaymentReference('');
+          if (next === 'CASH') setTender(paymentAmount);
+        }}
+        onPaymentRoute={(routeId) => {
+          setPaymentError(null);
+          setPaymentRouteId(routeId);
+        }}
+        onAppliedAmount={(amount) => {
+          setPaymentError(null);
+          setPaymentAmount(amount);
+          if (paymentMethod === 'CASH') setTender(amount);
+        }}
+        onPaymentReference={setPaymentReference}
+        onTender={setTender}
+        onTransitionPayment={(payment, status) => void transitionQueuePayment(payment, status)}
+        onPay={payQueueBalance}
+      />
+
+      <DConfirmDialog
+        open={Boolean(completionConfirmationTarget)}
+        onClose={() => setCompletionConfirmationTarget(null)}
+        onConfirm={() => void confirmQueuedCompletion()}
+        title={copy('Complete transaction')}
+        message={
+          completionConfirmationTarget
+            ? `${copy('Complete transaction')} ${transactionNumber(completionConfirmationTarget, workspace.locale)}? ${copy('Completing this transaction closes finished work.')}`
+            : undefined
+        }
+        confirmLabel={copy('Complete transaction')}
+        cancelLabel={copy('Cancel')}
+        variant="primary"
+        loading={workspace.isCoreMutating}
+      />
+
+      <WalkInCustomerEditDialog
+        target={customerEditTarget}
+        onClose={() => setCustomerEditTarget(null)}
+        onSave={saveCustomerEdit}
+      />
+
+      <ReceiptDeliveryDialog
+        target={receiptDeliveryTarget}
+        commands={adapter}
+        onClose={() => setReceiptDeliveryTarget(null)}
+        onDeliveryChanged={refreshQueue}
+      />
+
+      <ReferenceCancelDialog
+        sale={cancelTarget}
+        reason={cancelReason}
+        isMutating={workspace.isCoreMutating}
+        onReasonChange={setCancelReason}
+        onClose={() => {
+          setCancelTarget(null);
+          workspace.closeQueueContext();
+        }}
+        onConfirm={confirmCancel}
+      />
+
+      {performerTarget ? (
+        <ServicePerformersDialog
+          key={`${performerTarget.sale.id}:${performerTarget.line.id}`}
+          sale={performerTarget.sale}
+          lineId={performerTarget.line.id}
+          employees={workspace.employees}
+          isSaving={isSavingPerformers}
+          onClose={() => setPerformerTarget(null)}
+          onSave={(plans) => void savePerformers(performerTarget, plans)}
+        />
+      ) : null}
+
+      {workspace.lineTask ? (
+        <SaleLineTaskDialog
+          line={workspace.lineTask}
+          employees={workspace.employees}
+          contributionPreview={workspace.contributionPreview}
+          locale={workspace.locale}
+          monetaryAvailability={workspace.viewModel.monetaryMutation}
+          operationalAvailability={workspace.viewModel.operationalMutation}
+          isBusy={workspace.isCoreMutating}
+          onClose={workspace.closeLineTask}
+          onSetPriceOverride={workspace.setPriceOverride}
+          onClearPriceOverride={workspace.clearPriceOverride}
+          onSetLineDiscount={workspace.setLineDiscount}
+          onClearLineDiscount={workspace.clearLineDiscount}
+          onSetAssignments={workspace.setAssignments}
+          onSetContributions={workspace.setContributions}
+          onTransitionFulfillment={workspace.transitionFulfillment}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function ReferenceTypeButton({
+  active,
+  icon,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  icon: ReactNode;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={`inline-flex h-9 items-center justify-center gap-2 rounded-lg px-3 text-xs font-bold transition-all duration-200 active:scale-[.98] sm:px-4 ${active ? 'bg-[var(--color-background)] text-[var(--color-brand)] shadow-sm ring-1 ring-[var(--color-border)]' : 'text-[var(--color-text-muted)] hover:bg-[var(--color-background)]/60 hover:text-[var(--color-text)]'}`}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+/** Initials that stand in for an item photo, e.g. "Hair Spa" -> "HS", "Manicure" -> "Ma". */
+function itemMonogram(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length > 1) return `${words[0]![0]}${words[1]![0]}`.toUpperCase();
+  const word = words[0] ?? '';
+  return `${word.charAt(0).toUpperCase()}${word.charAt(1).toLowerCase()}`;
+}
+
+/**
+ * The card's media band: the item photo edge to edge, or its initials on a
+ * soft tint filling the same band, so every card keeps one height and one
+ * rhythm whether or not a photo exists.
+ */
+function CatalogItemMedia({ item }: { item: CatalogItem }) {
+  const isService = item.type === 'SERVICE';
+  const imageUrl = item.image?.url;
+  return (
+    <span
+      aria-hidden="true"
+      className={`relative block aspect-[4/3] w-full overflow-hidden border-b sm:aspect-[3/2] border-[var(--color-border)] ${
+        imageUrl
+          ? 'bg-[var(--color-surface-muted)]'
+          : isService
+            ? 'bg-[linear-gradient(135deg,color-mix(in_srgb,var(--color-brand)_14%,var(--color-surface))_0%,color-mix(in_srgb,var(--color-brand)_5%,var(--color-surface))_100%)] text-[var(--color-brand)]'
+            : 'bg-[linear-gradient(135deg,color-mix(in_srgb,var(--color-accent-mint)_70%,var(--color-surface))_0%,color-mix(in_srgb,var(--color-accent-mint)_30%,var(--color-surface))_100%)] text-[var(--color-text)]'
+      }`}
+    >
+      {imageUrl ? (
+        <img
+          src={imageUrl}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          className="size-full object-cover transition-transform duration-300 group-hover:scale-[1.04] motion-reduce:transition-none"
+        />
+      ) : (
+        <span className="absolute inset-0 grid place-items-center">
+          <span className="grid size-14 place-items-center rounded-full bg-[var(--color-surface)]/70 text-lg font-semibold tracking-wide shadow-sm ring-1 ring-inset ring-current/10 sm:size-16 sm:text-xl">
+            {itemMonogram(item.name)}
+          </span>
+        </span>
+      )}
+    </span>
+  );
+}
+
+function ReferenceCatalogCard({
+  item,
+  price,
+  locale,
+  disabled,
+  onAdd,
+}: {
+  item: CatalogItem;
+  price: string | null;
+  locale: string;
+  disabled: boolean;
+  onAdd: () => void;
+}) {
+  const { copy } = useOperationalLocalization();
+  const displayPrice = item.displayPrice;
+  const variantCount = item.variants?.length ?? 0;
+  const needsVariantChoice = variantCount > 0;
+  const choiceLabel = item.variantSelectionMode === 'OPTIONAL' ? 'Choose option' : 'Choose variant';
+  const duration = formatDurationMinutes(item.serviceDefinition?.defaultDurationMinutes, locale);
+  return (
+    <button
+      type="button"
+      aria-label={`${copy(needsVariantChoice ? choiceLabel : 'Add')} ${item.name}`}
+      disabled={disabled}
+      onClick={onAdd}
+      className="group flex h-full flex-col overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] text-left transition-all hover:border-[var(--color-brand)]/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/40 active:scale-[.98] disabled:opacity-50"
+    >
+      <CatalogItemMedia item={item} />
+      <span className="flex min-w-0 flex-1 flex-col gap-3 p-3">
+        {/* Identity: a quiet reference line (code, plus duration when the item has one) over the name. */}
+        <span className="block min-w-0">
+          <span className="flex min-w-0 items-center gap-1.5 text-[11px] leading-4 text-[var(--color-text-muted)]">
+            <span className="truncate font-mono tracking-tight">{item.code}</span>
+            {duration ? (
+              <span className="flex shrink-0 items-center gap-1">
+                <span aria-hidden="true">·</span>
+                <Clock className="size-3" aria-hidden="true" />
+                {duration}
+              </span>
+            ) : null}
+          </span>
+          <span className="mt-1 line-clamp-2 text-sm font-semibold leading-snug text-[var(--color-text)]">
+            {item.name}
+          </span>
+        </span>
+        {/* Commerce: price and action stay anchored to the bottom, so they line up across a grid row. */}
+        <span className="mt-auto block border-t border-[var(--color-border)]/70 pt-2.5">
+          {price ? (
+            <span className="flex items-baseline gap-1 tabular-nums">
+              {displayPrice?.kind === 'FROM' ? (
+                <span className="text-[11px] font-medium text-[var(--color-text-muted)]">
+                  {copy('From')}
+                </span>
+              ) : null}
+              <span className="text-sm font-bold text-[var(--color-text)]">
+                {money(price, locale)}
+              </span>
+            </span>
+          ) : (
+            <span className="block text-[11px] leading-5 text-[var(--color-text-muted)]">
+              {copy('Price available when selected')}
+            </span>
+          )}
+          {/* Both outcomes share one treatment; the wording and icon say whether a picker opens first. */}
+          <span className="mt-1 flex items-center gap-1 text-[11px] font-semibold leading-4 text-[var(--color-brand)]">
+            {needsVariantChoice ? (
+              <>
+                {copy(choiceLabel)}
+                <ChevronRight
+                  className="size-3.5 shrink-0 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
+                  aria-hidden="true"
+                />
+              </>
+            ) : (
+              <>
+                <Plus
+                  className="size-3.5 shrink-0 transition-transform group-hover:rotate-90 motion-reduce:transition-none"
+                  aria-hidden="true"
+                />
+                {copy('Add')}
+              </>
+            )}
+          </span>
+        </span>
+      </span>
+    </button>
+  );
+}
+
+function ReferenceQueueBoard({
+  open,
+  onOpenChange,
+  active,
+  onChangeTab,
+  groups,
+  issues,
+  locale,
+  onStartWork,
+  onAdjust,
+  canAdjust,
+  onPay,
+  onCancel,
+  onView,
+  onViewReceipt,
+  canReadCompleted,
+  onSendReceipt,
+  receiptDeliveries,
+  onEditCustomer,
+}: {
+  open: boolean;
+  onOpenChange: (value: boolean) => void;
+  active: QueueStatus;
+  onChangeTab: (status: QueueStatus) => void;
+  groups: Record<QueueStatus, QueueSale[]>;
+  issues: Record<string, string[]>;
+  locale: string;
+  onStartWork: (sale: Sale) => void;
+  onAdjust: (sale: Sale) => void;
+  canAdjust: (sale: Sale) => boolean;
+  onPay: (sale: Sale) => void;
+  onCancel: (sale: Sale) => void;
+  onView: (sale: Sale) => void;
+  onViewReceipt: (sale: Sale) => void;
+  canReadCompleted: boolean;
+  onSendReceipt: (sale: QueueSale) => void;
+  /** Latest receipt delivery per completed transaction, kept beside the queue items. */
+  receiptDeliveries: Readonly<Record<string, ReceiptDeliveryIndicator>>;
+  /** Corrects a walk-in customer before the transaction is completed. */
+  onEditCustomer: (sale: Sale) => void;
+}) {
+  const { copy, label } = useOperationalLocalization();
+  const statuses = Object.keys(statusMeta) as QueueStatus[];
+  const count = groups.QUEUED.length + groups.PROGRESS.length;
+  const statusLabel = (status: QueueStatus) => label(statusMeta[status].value);
+  return (
+    <div className="mb-4 shrink-0">
+      <div className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm">
+        <button
+          type="button"
+          onClick={() => onOpenChange(!open)}
+          className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left transition-colors hover:bg-[var(--color-surface-muted)]/40"
+        >
+          <div className="flex min-w-0 items-center gap-3">
+            <div
+              className={`flex size-10 items-center justify-center rounded-2xl ${count ? 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]'}`}
+            >
+              <Clock className="size-[18px]" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-bold">{copy('Queue transactions')}</p>
+                <span
+                  className={`inline-flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-[11px] font-bold ${count ? 'bg-[var(--color-brand)] text-white' : 'bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]'}`}
+                >
+                  {count}
+                </span>
+              </div>
+              <p className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">
+                {count
+                  ? copy('Click to view active transactions.')
+                  : copy('No queued transactions.')}
+              </p>
+            </div>
+          </div>
+          <div className="pos-queue-status-summary items-center gap-2">
+            {statuses.map((status) => (
+              <span
+                key={status}
+                className={`inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-[11px] font-semibold ${statusMeta[status].tone}`}
+              >
+                {statusMeta[status].icon}
+                {statusLabel(status)}
+                <span>{groups[status].length}</span>
+              </span>
+            ))}
+            <ChevronDown
+              className={`size-[18px] text-[var(--color-text-muted)] transition-transform ${open ? 'rotate-180' : ''}`}
+            />
+          </div>
+          <ChevronDown
+            className={`size-[18px] text-[var(--color-text-muted)] transition-transform md:hidden ${open ? 'rotate-180' : ''}`}
+          />
+        </button>
+        <div className={`pos-collapsible grid ${open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+          <div className="overflow-hidden">
+            <DTabs
+              value={active}
+              defaultValue={active}
+              onValueChange={(value) => onChangeTab(value as QueueStatus)}
+              className="border-t border-[var(--color-border)] p-3"
+            >
+              <DTabsList className="max-w-full overflow-x-auto">
+                {statuses.map((status) => (
+                  <DTabsTrigger key={status} value={status}>
+                    {statusLabel(status)} ({groups[status].length})
+                  </DTabsTrigger>
+                ))}
+              </DTabsList>
+              {statuses.map((status) => {
+                const list = groups[status];
+                const contentKey = `${status}:${list
+                  .map((sale) => `${sale.id}:${sale.updatedAt}`)
+                  .join('|')}`;
+                return (
+                  <DTabsContent key={status} value={status} className="mt-3">
+                    <div key={contentKey} className="pos-queue-content-enter space-y-3">
+                      {list.length ? (
+                        <div className="no-scrollbar cursor-grab overflow-x-auto overflow-y-hidden pb-3 select-none">
+                          <div className="flex w-max gap-4 px-0.5">
+                            {list.map((sale) => {
+                              // A completed transaction without the permission is
+                              // shown from its summary alone, even if a full copy is cached.
+                              const summary = restrictedQueueSummary(sale, canReadCompleted);
+                              if (summary)
+                                return (
+                                  <RestrictedCompletedQueueCard
+                                    key={sale.id}
+                                    summary={summary}
+                                    locale={locale}
+                                    receiptDelivery={receiptDeliveries[sale.id] ?? null}
+                                    onSendReceipt={onSendReceipt}
+                                  />
+                                );
+                              // Every summary entry was presented above; what remains is a full Sale.
+                              if (isCompletedSaleSummary(sale)) return null;
+                              return (
+                                <ReferenceQueueCard
+                                  key={sale.id}
+                                  sale={sale}
+                                  status={status}
+                                  locale={locale}
+                                  issues={issues[sale.id] ?? []}
+                                  onStartWork={onStartWork}
+                                  onAdjust={onAdjust}
+                                  canAdjust={canAdjust(sale)}
+                                  onPay={onPay}
+                                  onCancel={onCancel}
+                                  onView={onView}
+                                  onViewReceipt={onViewReceipt}
+                                  onSendReceipt={onSendReceipt}
+                                  onEditCustomer={onEditCustomer}
+                                  receiptDelivery={receiptDeliveries[sale.id] ?? null}
+                                />
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)]/20 py-7 text-center">
+                          <p className="text-sm font-semibold">
+                            {copy('No transactions in this status.')}
+                          </p>
+                          <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                            {copy('Transactions appear here after they are created.')}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </DTabsContent>
+                );
+              })}
+            </DTabs>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A completed transaction for an operator without `sales:read-completed`: it
+ * stays recognizable for follow-up, carries no amount, detail or receipt, and
+ * offers the one action left, sending the receipt to the customer.
+ */
+export function RestrictedCompletedQueueCard({
+  summary,
+  locale,
+  receiptDelivery,
+  onSendReceipt,
+}: {
+  summary: CompletedSaleSummary;
+  locale: string;
+  receiptDelivery: ReceiptDeliveryIndicator | null;
+  onSendReceipt: (sale: QueueSale) => void;
+}) {
+  const { copy, label } = useOperationalLocalization();
+  const meta = statusMeta.COMPLETED;
+  const number = transactionNumber(summary, locale);
+  return (
+    <article
+      className={`w-[360px] shrink-0 rounded-2xl border border-[var(--color-border)] p-4 transition-shadow hover:shadow-sm ${meta.soft}`}
+    >
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-[11px] text-[var(--color-text-muted)]">{number}</p>
+          <p className="mt-0.5 truncate text-sm font-bold">
+            {customerDisplayName(summary.customer, locale)}
+          </p>
+        </div>
+        <span
+          className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold ${meta.tone}`}
+        >
+          {meta.icon}
+          {label(meta.value)}
+        </span>
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs text-[var(--color-text-muted)]">
+            {summary.itemCount} {copy('items')},{' '}
+            {new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(
+              new Date(summary.finalizedAt ?? summary.createdAt),
+            )}
+          </p>
+          {summary.customer ? <ReceiptDeliveryIndicatorLine indicator={receiptDelivery} /> : null}
+        </div>
+        <DButton
+          size="sm"
+          variant="outline"
+          className="h-8 shrink-0 px-3 text-[11px]"
+          leftIcon={<Send className="size-3.5" />}
+          disabled={!summary.customer}
+          aria-label={`${copy('Send receipt to customer')} ${number}`}
+          {...(summary.customer ? {} : { title: copy('Customer data is not available') })}
+          onClick={() => onSendReceipt(summary)}
+        >
+          {copy('Send receipt')}
+        </DButton>
+      </div>
+    </article>
+  );
+}
+
+export function ReferenceQueueCard({
+  sale,
+  status,
+  locale,
+  issues,
+  onStartWork,
+  onAdjust,
+  canAdjust,
+  onPay,
+  onCancel,
+  onView,
+  onViewReceipt,
+  onSendReceipt,
+  onEditCustomer,
+  receiptDelivery = null,
+}: {
+  sale: Sale;
+  status: QueueStatus;
+  locale: string;
+  issues: string[];
+  onStartWork: (sale: Sale) => void;
+  onAdjust: (sale: Sale) => void;
+  /** False when the session lacks the permission to adjust this Sale in its current state. */
+  canAdjust: boolean;
+  onPay: (sale: Sale) => void;
+  onCancel: (sale: Sale) => void;
+  onView: (sale: Sale) => void;
+  onViewReceipt: (sale: Sale) => void;
+  onSendReceipt: (sale: Sale) => void;
+  /** Offered for an unfinished walk-in transaction only. */
+  onEditCustomer?: (sale: Sale) => void;
+  /** Latest receipt delivery; shown only on a completed transaction with a customer. */
+  receiptDelivery?: ReceiptDeliveryIndicator | null;
+}) {
+  const { copy, label } = useOperationalLocalization();
+  const meta = statusMeta[status];
+  const { balanceDue } = financialSummary(sale);
+  const hasPayment = hasSuccessfulPayment(sale);
+  const paid = hasSuccessfulCheckout(sale);
+  const customer = sale.customer ?? null;
+  const canStartWork = hasStartableQueuedWork(sale);
+  const editCustomerItem =
+    onEditCustomer &&
+    sale.status === 'OPEN' &&
+    customer?.type === 'NON_MEMBER' &&
+    (status === 'QUEUED' || status === 'PROGRESS')
+      ? [
+          {
+            label: copy('Edit customer'),
+            icon: <User className="size-3.5" />,
+            onSelect: () => onEditCustomer(sale),
+          },
+        ]
+      : [];
+  const actionItems: Array<{
+    label: string;
+    icon: ReactNode;
+    destructive?: boolean;
+    onSelect: () => void;
+  }> = [
+    {
+      label: copy('Preview details'),
+      icon: <Eye className="size-3.5" />,
+      onSelect: () => onView(sale),
+    },
+    ...(hasPayment
+      ? [
+          {
+            label: copy('View receipt'),
+            icon: <Printer className="size-3.5" />,
+            onSelect: () => onViewReceipt(sale),
+          },
+        ]
+      : []),
+    ...editCustomerItem,
+    ...(status === 'COMPLETED' && sale.customer
+      ? [
+          {
+            label: copy('Send receipt to customer'),
+            icon: <Send className="size-3.5" />,
+            onSelect: () => onSendReceipt(sale),
+          },
+        ]
+      : []),
+    ...(status === 'QUEUED'
+      ? [
+          ...(canStartWork
+            ? [
+                {
+                  label: copy('Start work'),
+                  icon: <PlayCircle className="size-3.5" />,
+                  onSelect: () => onStartWork(sale),
+                },
+              ]
+            : []),
+          ...(canAdjust
+            ? [
+                {
+                  label: copy('Adjust order'),
+                  icon: <ShoppingBag className="size-3.5" />,
+                  onSelect: () => onAdjust(sale),
+                },
+              ]
+            : []),
+          ...(isPositiveDecimal(balanceDue)
+            ? [
+                {
+                  label: copy(hasPayment ? 'Pay balance' : 'Pay'),
+                  icon: <CreditCard className="size-3.5" />,
+                  onSelect: () => onPay(sale),
+                },
+              ]
+            : []),
+          {
+            label: copy('Cancel'),
+            icon: <XCircle className="size-3.5" />,
+            destructive: true,
+            onSelect: () => onCancel(sale),
+          },
+        ]
+      : []),
+    ...(status === 'PROGRESS'
+      ? [
+          ...(canAdjust
+            ? [
+                {
+                  label: copy('Adjust order'),
+                  icon: <ShoppingBag className="size-3.5" />,
+                  onSelect: () => onAdjust(sale),
+                },
+              ]
+            : []),
+          ...(isPositiveDecimal(balanceDue)
+            ? [
+                {
+                  label: copy(hasPayment ? 'Pay balance' : 'Pay'),
+                  icon: <CreditCard className="size-3.5" />,
+                  onSelect: () => onPay(sale),
+                },
+              ]
+            : []),
+          {
+            label: copy('Cancel'),
+            icon: <XCircle className="size-3.5" />,
+            destructive: true,
+            onSelect: () => onCancel(sale),
+          },
+        ]
+      : []),
+  ];
+
+  return (
+    <article
+      className={`w-[360px] shrink-0 rounded-2xl border border-[var(--color-border)] p-4 transition-shadow hover:shadow-sm ${meta.soft}`}
+    >
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-[11px] text-[var(--color-text-muted)]">
+            {transactionNumber(sale, locale)}
+          </p>
+          <p className="mt-0.5 truncate text-sm font-bold">
+            {customerDisplayName(customer, locale)}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          <span
+            className={`inline-flex items-center rounded-full px-2 py-1 text-[10px] font-bold ${paid ? 'bg-[var(--color-success)]/10 text-[var(--color-success)]' : 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]'}`}
+          >
+            {copy(paid ? 'Paid' : hasPayment ? 'Partially paid' : 'Unpaid')}
+          </span>
+          <span
+            className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold ${meta.tone}`}
+          >
+            {meta.icon}
+            {label(meta.value)}
+          </span>
+        </div>
+      </div>
+      <div className="mb-3 flex items-end justify-between gap-2">
+        <div>
+          <p className="text-xs text-[var(--color-text-muted)]">
+            {sale.lines.filter((line) => !line.removedAt).length} {copy('items')},{' '}
+            {new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(
+              new Date(sale.createdAt),
+            )}
+          </p>
+          <p className="mt-1 text-sm font-bold text-[var(--color-brand)]">
+            {money(sale.totalAmount, locale)}
+          </p>
+          {status === 'COMPLETED' && sale.customer ? (
+            <ReceiptDeliveryIndicatorLine indicator={receiptDelivery} />
+          ) : null}
+        </div>
+        <div className="flex items-center gap-2">
+          {canStartWork ? (
+            <DButton
+              size="sm"
+              className="h-8 px-3 text-[11px]"
+              leftIcon={<PlayCircle className="size-3.5" />}
+              onClick={() => onStartWork(sale)}
+            >
+              {copy('Start work')}
+            </DButton>
+          ) : null}
+          <Dropdown
+            placement="bottom-end"
+            contentRole="menu"
+            closeOnItemClick
+            contentClassName="min-w-[172px] overflow-hidden p-1"
+            trigger={({ open }) => (
+              <button
+                type="button"
+                aria-label={`${copy('Actions for')} ${transactionNumber(sale, locale)}`}
+                aria-expanded={open}
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 text-[11px] font-semibold text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand)]/20"
+              >
+                <MoreHorizontal className="size-4" />
+              </button>
+            )}
+          >
+            {actionItems.map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                role="menuitem"
+                onClick={item.onSelect}
+                className={`flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs font-medium transition-colors ${item.destructive ? 'text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10' : 'text-[var(--color-text)] hover:bg-[var(--color-surface-muted)]'}`}
+              >
+                {item.icon ? <span className="shrink-0">{item.icon}</span> : null}
+                {item.label}
+              </button>
+            ))}
+          </Dropdown>
+        </div>
+      </div>
+      {issues.length ? (
+        <div className="mt-3 rounded-xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 px-3 py-2 text-xs">
+          <p className="font-semibold text-[var(--color-warning)]">
+            {copy('Complete before starting')}
+          </p>
+          <p className="mt-0.5 text-[var(--color-text-muted)]">{issues[0]}</p>
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+function ReferenceFloatingCart({
+  open,
+  onOpenChange,
+  lines,
+  total,
+  gross,
+  discountAmount,
+  discountLabel,
+  taxAmount,
+  taxLabel,
+  isEstimate,
+  isTaxPreviewLoading,
+  isTaxPreviewUnavailable,
+  locale,
+  customer,
+  memberNumber,
+  pointBalance,
+  isPointBalanceLoading,
+  onChooseCustomer,
+  onQuantity,
+  onEdit,
+  onRemove,
+  onCheckout,
+}: {
+  open: boolean;
+  onOpenChange: (value: boolean) => void;
+  lines: readonly CartDisplayLine[];
+  total: string;
+  gross: string;
+  discountAmount: string;
+  discountLabel: string;
+  taxAmount: string;
+  taxLabel: string;
+  isEstimate: boolean;
+  isTaxPreviewLoading: boolean;
+  isTaxPreviewUnavailable: boolean;
+  locale: string;
+  customer: SaleCustomer | null;
+  memberNumber: string | null;
+  pointBalance: string | null;
+  isPointBalanceLoading: boolean;
+  onChooseCustomer: () => void;
+  onQuantity: (line: CartDisplayLine, quantity: string) => void;
+  onEdit: (line: CartDisplayLine, options?: { addUnit?: boolean }) => void;
+  onRemove: (line: CartDisplayLine) => void;
+  onCheckout: () => void;
+}) {
+  const { copy } = useOperationalLocalization();
+  useEffect(() => {
+    if (!open) return undefined;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      if (document.querySelector('[aria-modal="true"]')) return;
+      onOpenChange(false);
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [onOpenChange, open]);
+  const panel = (
+    <ReferenceCartPanel
+      lines={lines}
+      total={total}
+      gross={gross}
+      discountAmount={discountAmount}
+      discountLabel={discountLabel}
+      taxAmount={taxAmount}
+      taxLabel={taxLabel}
+      isEstimate={isEstimate}
+      isTaxPreviewLoading={isTaxPreviewLoading}
+      isTaxPreviewUnavailable={isTaxPreviewUnavailable}
+      locale={locale}
+      customer={customer}
+      memberNumber={memberNumber}
+      pointBalance={pointBalance}
+      isPointBalanceLoading={isPointBalanceLoading}
+      onChooseCustomer={onChooseCustomer}
+      onQuantity={onQuantity}
+      onEdit={onEdit}
+      onRemove={onRemove}
+      onCheckout={onCheckout}
+    />
+  );
+  const countLabel = lines.length
+    ? `${lines.length} ${copy('items selected')}`
+    : copy('No items selected');
+  return (
+    <>
+      <button
+        type="button"
+        aria-label={copy('Close active cart')}
+        onClick={() => onOpenChange(false)}
+        className={`operational-cart-backdrop fixed inset-0 z-40 bg-transparent ${open ? '' : 'pointer-events-none'}`}
+      />
+      <button
+        type="button"
+        aria-label={copy('Cart')}
+        onClick={() => onOpenChange(!open)}
+        className={`fixed bottom-6 right-6 z-50 inline-flex items-center gap-3 rounded-2xl bg-[var(--color-brand)] px-4 py-3 text-white shadow-[0_16px_40px_rgb(37_99_235_/_0.28)] transition-all hover:shadow-[0_18px_48px_rgb(37_99_235_/_0.35)] active:scale-[.97] ${open ? 'md:pointer-events-none md:scale-95 md:opacity-0' : ''}`}
+      >
+        <div className="relative">
+          <ShoppingBag className="size-5" />
+          {lines.length ? (
+            <span className="absolute -right-2 -top-2 flex size-5 items-center justify-center rounded-full bg-white text-[10px] font-bold text-[var(--color-brand)] shadow">
+              {lines.length}
+            </span>
+          ) : null}
+        </div>
+        <div className="operational-cart-button-label text-left">
+          <p className="text-xs font-bold leading-none">{copy('Cart')}</p>
+          <p className="mt-1 text-[11px] opacity-90">{money(total, locale)}</p>
+        </div>
+      </button>
+      <div
+        role="dialog"
+        aria-label={copy('Cart')}
+        className={`operational-cart-panel fixed bottom-6 right-6 z-50 max-h-[calc(100dvh-48px)] w-[420px] max-w-[calc(100vw-48px)] origin-bottom-right flex-col overflow-hidden rounded-[28px] border border-[var(--color-border)] bg-[var(--color-background)] shadow-[0_24px_70px_rgb(15_23_42_/_0.22)] transition-all duration-200 ease-out ${open ? 'pointer-events-auto translate-y-0 scale-100 opacity-100' : 'pointer-events-none translate-y-4 scale-95 opacity-0'}`}
+      >
+        <div className="border-b border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold">{copy('Cart')}</h2>
+              <p className="text-xs text-[var(--color-text-muted)]">{countLabel}</p>
+            </div>
+            <button
+              type="button"
+              aria-label={copy('Close')}
+              onClick={() => onOpenChange(false)}
+              className="rounded-xl p-2 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]"
+            >
+              <X className="size-[18px]" />
+            </button>
+          </div>
+        </div>
+        {panel}
+      </div>
+      <div
+        onClick={() => onOpenChange(false)}
+        className={`fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px] transition-opacity duration-200 md:hidden ${open ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'}`}
+      />
+      <div
+        role="dialog"
+        aria-label={copy('Cart')}
+        className={`fixed inset-x-0 bottom-0 z-50 h-[86dvh] overflow-hidden rounded-t-[28px] border-t border-[var(--color-border)] bg-[var(--color-background)] shadow-[0_-24px_80px_rgb(15_23_42_/_0.25)] transition-transform duration-300 ease-out md:hidden ${open ? 'translate-y-0' : 'translate-y-full'}`}
+      >
+        <div className="flex h-full min-h-0 flex-col">
+          <div className="shrink-0 border-b border-[var(--color-border)] p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-bold">{copy('Cart')}</h2>
+                <p className="text-xs text-[var(--color-text-muted)]">{countLabel}</p>
+              </div>
+              <button
+                type="button"
+                aria-label={copy('Close')}
+                onClick={() => onOpenChange(false)}
+                className="rounded-xl p-2 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]"
+              >
+                <X className="size-[18px]" />
+              </button>
+            </div>
+          </div>
+          {panel}
+        </div>
+      </div>
+    </>
+  );
+}
+
+function ReferenceCartPanel({
+  lines,
+  total,
+  gross,
+  discountAmount,
+  discountLabel,
+  taxAmount,
+  taxLabel,
+  isEstimate,
+  isTaxPreviewLoading,
+  isTaxPreviewUnavailable,
+  locale,
+  customer,
+  memberNumber,
+  pointBalance,
+  isPointBalanceLoading,
+  onChooseCustomer,
+  onQuantity,
+  onEdit,
+  onRemove,
+  onCheckout,
+}: {
+  lines: readonly CartDisplayLine[];
+  total: string;
+  gross: string;
+  discountAmount: string;
+  discountLabel: string;
+  taxAmount: string;
+  taxLabel: string;
+  isEstimate: boolean;
+  isTaxPreviewLoading: boolean;
+  isTaxPreviewUnavailable: boolean;
+  locale: string;
+  customer: SaleCustomer | null;
+  memberNumber: string | null;
+  pointBalance: string | null;
+  isPointBalanceLoading: boolean;
+  onChooseCustomer: () => void;
+  onQuantity: (line: CartDisplayLine, quantity: string) => void;
+  onEdit: (line: CartDisplayLine, options?: { addUnit?: boolean }) => void;
+  onRemove: (line: CartDisplayLine) => void;
+  onCheckout: () => void;
+}) {
+  const { copy } = useOperationalLocalization();
+  const status = customerStatus(customer);
+  const hasDiscount = !createDecimal(discountAmount).equals(createDecimal('0'));
+  const hasTax = !createDecimal(taxAmount).equals(createDecimal('0'));
+  const increment = (line: CartDisplayLine, direction: 'up' | 'down') => {
+    const next =
+      direction === 'up'
+        ? createDecimal(line.quantity).plus(createDecimal('1'))
+        : createDecimal(line.quantity).minus(createDecimal('1'));
+    if (next.lessThan(createDecimal('1'))) return;
+    // A local line that carries additions never gains a unit by copying: the new unit is
+    // configured in the editor, so a required addition cannot be satisfied silently.
+    if (direction === 'up' && line.editable && (line.additions?.length || line.units?.length)) {
+      onEdit(line, { addUnit: true });
+      return;
+    }
+    onQuantity(line, next.toFixed(4));
+  };
+  return (
+    <div className="flex min-h-0 flex-1 flex-col bg-[var(--color-background)]">
+      <div className="shrink-0 space-y-2.5 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3">
+        <button
+          type="button"
+          aria-label={copy('Choose customer')}
+          onClick={onChooseCustomer}
+          className="flex w-full items-center gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-muted)]/45 px-3 py-2.5 text-left transition-colors hover:border-[var(--color-brand)]/35 hover:bg-[var(--color-brand)]/5"
+        >
+          <div className="grid size-8 place-items-center rounded-xl bg-[var(--color-background)] text-[var(--color-text-muted)]">
+            <User className="size-4" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <p className="truncate text-xs font-semibold">
+                {customer ? customer.name : copy('Choose customer')}
+              </p>
+              {status ? (
+                <Badge variant={status.variant} className="shrink-0 px-2 py-0 text-[10px]">
+                  {copy(status.label)}
+                </Badge>
+              ) : null}
+              {customer?.type === 'MEMBER' && memberNumber ? (
+                <Badge variant="outline" className="shrink-0 px-2 py-0 text-[10px]">
+                  {memberNumber}
+                </Badge>
+              ) : null}
+            </div>
+            <p className="mt-0.5 truncate text-[11px] text-[var(--color-text-muted)]">
+              {customer?.type === 'MEMBER' && isPointBalanceLoading
+                ? copy('Loading loyalty points…')
+                : customer?.type === 'MEMBER' && pointBalance !== null
+                  ? `${copy('Loyalty points')}: ${pointQuantity(pointBalance, locale)}`
+                  : (customerDisplayDetail(customer) ??
+                    copy('Name and WhatsApp number are both required.'))}
+            </p>
+          </div>
+          <ChevronDown className="size-4 shrink-0 text-[var(--color-text-muted)]" />
+        </button>
+      </div>
+      <div
+        className={`min-h-0 border-y border-[var(--color-border)] bg-[var(--color-surface-muted)]/20 ${lines.length ? 'flex-1 overflow-y-auto' : 'shrink-0'}`}
+      >
+        {lines.length ? (
+          <div className="space-y-2 overflow-y-auto p-3">
+            {lines.map((line) => {
+              const discountPercentage = lineDiscountPercentage(line);
+              return (
+                <div
+                  key={line.id}
+                  className="pos-cart-line-enter rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 shadow-sm"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold leading-tight">
+                        {line.itemNameSnapshot}
+                      </p>
+                      <div className="mt-1 text-[11px] text-[var(--color-text-muted)]">
+                        {money(line.effectiveUnitPrice, locale)}
+                        {line.variantNameSnapshot ? `, ${line.variantNameSnapshot}` : ''}
+                        {line.promotion ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-label={`${copy('Promotion')}: ${line.promotion.name}`}
+                            title={[
+                              line.promotion.name,
+                              line.promotion.effectiveFrom
+                                ? `${copy('Start')}: ${new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(line.promotion.effectiveFrom))}`
+                                : null,
+                              line.promotion.effectiveUntil
+                                ? `${copy('End')}: ${new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(line.promotion.effectiveUntil))}`
+                                : null,
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')}
+                            className="ml-1 inline-flex size-4 align-text-bottom text-[var(--color-text-muted)]"
+                          >
+                            <Info className="size-3" />
+                          </Button>
+                        ) : null}
+                        {line.itemTypeSnapshot === 'SERVICE' ? (
+                          <span className="ml-1 font-semibold text-cyan-700">
+                            {copy('Service')}
+                          </span>
+                        ) : null}
+                      </div>
+                      {line.soldByName ? (
+                        <p className="mt-0.5 text-[11px] text-[var(--color-text-muted)]">
+                          {copy('Sold by')} {line.soldByName}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="flex shrink-0 items-center gap-0.5">
+                      {line.editable ? (
+                        <button
+                          type="button"
+                          aria-label={`${copy('Edit item')} ${line.itemNameSnapshot}`}
+                          onClick={() => onEdit(line)}
+                          className="rounded-lg p-1.5 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)]"
+                        >
+                          <Pencil className="size-3.5" />
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        aria-label={`${copy('Remove')} ${line.itemNameSnapshot}`}
+                        onClick={() => onRemove(line)}
+                        className="shrink-0 rounded-lg p-1.5 text-[var(--color-text-muted)] hover:bg-[var(--color-danger)]/10 hover:text-[var(--color-danger)]"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                  <CartLineBreakdown
+                    line={line}
+                    heading={copy('Additional items')}
+                    baseLabel={copy('Item price')}
+                    unitLabel={(index) => `${copy('Unit')} ${index}`}
+                    format={(amount) => money(amount, locale)}
+                    formatQuantity={quantity}
+                    performedByLabel={copy('Performed by')}
+                  />
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <div className="inline-grid grid-cols-[36px_48px_36px] items-center overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] shadow-[inset_0_1px_0_rgb(15_23_42_/_0.02)]">
+                      <button
+                        type="button"
+                        aria-label={`${copy('Decrease quantity')} ${line.itemNameSnapshot}`}
+                        onClick={() => increment(line, 'down')}
+                        disabled={createDecimal(line.quantity).lessThanOrEqualTo(
+                          createDecimal('1'),
+                        )}
+                        className="flex h-9 items-center justify-center border-r border-[var(--color-border)] text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)] active:bg-[var(--color-surface-muted)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[var(--color-text-muted)]"
+                      >
+                        <Minus className="size-3.5" />
+                      </button>
+                      <output
+                        aria-label={`${copy('Quantity')} ${line.itemNameSnapshot}`}
+                        className="flex h-9 w-12 items-center justify-center text-xs font-bold tabular-nums text-[var(--color-text)]"
+                      >
+                        {quantity(line.quantity)}
+                      </output>
+                      <button
+                        type="button"
+                        aria-label={`${copy('Increase quantity')} ${line.itemNameSnapshot}`}
+                        onClick={() => increment(line, 'up')}
+                        className="flex h-9 items-center justify-center border-l border-[var(--color-border)] text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)] active:bg-[var(--color-surface-muted)]"
+                      >
+                        <Plus className="size-3.5" />
+                      </button>
+                    </div>
+                    <p className="text-sm font-bold text-[var(--color-brand)]">
+                      {money(line.totalAmount, locale)}
+                    </p>
+                  </div>
+                  {isPositiveDecimal(line.lineDiscountAmount) ? (
+                    <div className="mt-2 flex items-center justify-between gap-3 text-[11px]">
+                      <span className="text-[var(--color-text-muted)]">
+                        {copy('Item discount')}
+                        {discountPercentage ? ` (${discountPercentage}%)` : ''}
+                      </span>
+                      <span className="font-semibold text-[var(--color-danger)]">
+                        −{money(line.lineDiscountAmount, locale)}
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center px-4 py-10 text-center">
+            <div className="mb-3 flex size-12 items-center justify-center rounded-2xl bg-[var(--color-brand)]/10 text-[var(--color-brand)]">
+              <ShoppingBag className="size-[22px]" />
+            </div>
+            <p className="text-sm font-semibold">{copy('Cart is empty')}</p>
+            <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+              {copy('Select products or services from the catalog.')}
+            </p>
+          </div>
+        )}
+      </div>
+      <div className="shrink-0 bg-[var(--color-background)] p-4">
+        <div className="space-y-2 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-[var(--color-text-muted)]">
+              {copy(isEstimate ? 'Estimated subtotal' : 'Subtotal')}
+            </span>
+            <span className="font-medium">{money(gross, locale)}</span>
+          </div>
+          {hasDiscount ? (
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-[var(--color-text-muted)]">{discountLabel}</span>
+              <span className="font-medium text-[var(--color-danger)]">
+                −{money(discountAmount, locale)}
+              </span>
+            </div>
+          ) : null}
+          {hasTax || isTaxPreviewLoading || isTaxPreviewUnavailable ? (
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-[var(--color-text-muted)]">{taxLabel}</span>
+              <span className="font-medium">
+                {isTaxPreviewLoading
+                  ? copy('Calculating…')
+                  : isTaxPreviewUnavailable
+                    ? copy('Not available')
+                    : money(taxAmount, locale)}
+              </span>
+            </div>
+          ) : null}
+          <div className="flex items-center justify-between border-t border-[var(--color-border)] pt-2">
+            <span className="text-sm font-bold">
+              {copy(isEstimate ? 'Estimated total' : 'Total')}
+            </span>
+            <span
+              key={total}
+              className="pos-value-updated text-lg font-bold tabular-nums text-[var(--color-brand)]"
+            >
+              {money(total, locale)}
+            </span>
+          </div>
+          {isEstimate && lines.length ? (
+            <p className="text-[11px] leading-4 text-[var(--color-text-muted)]">
+              {copy('Tax and promotions are finalized when the transaction is created.')}
+            </p>
+          ) : null}
+          <Button
+            fullWidth
+            disabled={!lines.length}
+            onClick={onCheckout}
+            leftIcon={<CreditCard className="size-3.5" />}
+          >
+            {copy('Checkout')}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type PaymentDialogStep = 'edit' | 'review' | 'leave';
+type PaymentAllocationMode = 'FULL' | 'SPLIT';
+
+function usePaymentAllocationMode(open: boolean) {
+  const [mode, setMode] = useState<PaymentAllocationMode>('FULL');
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setMode('FULL');
+  }
+  return [mode, setMode] as const;
+}
+
+/**
+ * Keeps the confirmation step inside the payment dialog so Escape, overlay and focus handling stay
+ * with one DS dialog. It resets to editing whenever the dialog is reopened.
+ */
+function usePaymentDialogStep(open: boolean) {
+  const [step, setStep] = useState<PaymentDialogStep>('edit');
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setStep('edit');
+  }
+  return [step, setStep] as const;
+}
+
+/**
+ * Facts explaining one applied Promotion or discount, read from the Sale's own adjustment
+ * snapshot. Shared by the Payment Dialog and the Transaction Detail so both explain a discount in
+ * the same words; it never looks up the current Promotion.
+ */
+function DiscountDetailsContent({ details, locale }: { details: DiscountDetails; locale: string }) {
+  const { copy } = useOperationalLocalization();
+  const when = (value: string) =>
+    new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(
+      new Date(value),
+    );
+  return (
+    <div className="space-y-1">
+      <p className="font-semibold">
+        {details.name ?? copy(details.source === 'PROMOTION' ? 'Promotion' : 'Manual discount')}
+      </p>
+      {details.percentage ? (
+        <p>
+          {copy('Discount')}: {details.percentage}%
+        </p>
+      ) : null}
+      {details.scope ? (
+        <p>
+          {copy(
+            details.scope === 'TRANSACTION'
+              ? 'Whole transaction'
+              : details.scope === 'ITEM'
+                ? 'Item-level'
+                : 'Category-level',
+          )}
+        </p>
+      ) : null}
+      {details.effectiveFrom ? (
+        <p>
+          {copy('Start')}: {when(details.effectiveFrom)}
+        </p>
+      ) : null}
+      {details.effectiveUntil ? (
+        <p>
+          {copy('End')}: {when(details.effectiveUntil)}
+        </p>
+      ) : null}
+      {details.reason ? <p>{details.reason}</p> : null}
+    </div>
+  );
+}
+
+function DiscountInfoTooltip({ label, content }: { label: string; content: ReactNode }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <PortalDropdown
+      open={open}
+      onOpenChange={setOpen}
+      placement="top-start"
+      offset={6}
+      minWidth={220}
+      contentRole="dialog"
+      contentPadding={false}
+      contentClassName="max-w-72 border-0 bg-[var(--color-tooltip)] px-3 py-2 text-xs leading-relaxed text-white shadow-lg"
+      trigger={() => (
+        <button
+          type="button"
+          aria-label={label}
+          aria-expanded={open}
+          onMouseEnter={() => setOpen(true)}
+          onMouseLeave={() => setOpen(false)}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setOpen(false)}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            setOpen((current) => !current);
+          }}
+          className="grid size-4 shrink-0 place-items-center rounded-full text-[var(--color-danger)] outline-none transition-colors hover:bg-red-50 focus-visible:ring-2 focus-visible:ring-red-200"
+        >
+          <Info className="size-3.5" />
+        </button>
+      )}
+    >
+      {content}
+    </PortalDropdown>
+  );
+}
+
+export function ReferencePaymentDialog({
+  open,
+  onClose,
+  onEditOrder,
+  sale,
+  lines,
+  total,
+  gross,
+  discountAmount,
+  discountLabel,
+  taxAmount,
+  taxLabel,
+  locale,
+  customer,
+  paymentRoutes,
+  isPaymentRoutesLoading,
+  method,
+  paymentRouteId,
+  appliedAmount,
+  paymentReference,
+  tender,
+  payNow,
+  onPayNowChange,
+  onMethod,
+  onPaymentRoute,
+  onAppliedAmount,
+  onPaymentReference,
+  onTender,
+  onTransitionPayment,
+  quickTender,
+  isSubmitting,
+  paymentError,
+  onConfirmPayment,
+  onQueue,
+  onQueueWithBalance,
+  loyaltyRedemption,
+  loyaltyPointBalance,
+  isLoyaltyBalanceLoading,
+  canRedeemLoyalty,
+  loyaltyPoints,
+  isLoyaltyMutating,
+  onLoyaltyPointsChange,
+  onApplyLoyalty,
+  onRemoveLoyalty,
+  adjustmentSlot,
+}: {
+  open: boolean;
+  onClose: () => void;
+  /**
+   * Returns from Payment to editing the order. Offered only while Runtime still allows changing
+   * the Sale (OPEN, nothing pending); Payment never locks the order by itself.
+   */
+  onEditOrder?: () => void;
+  sale: Sale | null;
+  lines: readonly CartDisplayLine[];
+  total: string;
+  gross: string;
+  discountAmount: string;
+  discountLabel: string;
+  taxAmount: string;
+  taxLabel: string;
+  locale: string;
+  customer: SaleCustomer | null;
+  paymentRoutes: readonly PaymentRoute[];
+  isPaymentRoutesLoading: boolean;
+  method: PaymentMethod;
+  paymentRouteId: string;
+  appliedAmount: string;
+  paymentReference: string;
+  tender: string;
+  payNow: boolean;
+  onPayNowChange: (payNow: boolean) => void;
+  onMethod: (method: PaymentMethod) => void;
+  onPaymentRoute: (paymentRouteId: string) => void;
+  onAppliedAmount: (amount: string) => void;
+  onPaymentReference: (reference: string) => void;
+  onTender: (amount: string) => void;
+  onTransitionPayment: (payment: Payment, status: TerminalPaymentStatus) => void;
+  quickTender: readonly string[];
+  isSubmitting: boolean;
+  /** Why the last payment attempt was not recorded; cleared when the payment is edited. */
+  paymentError: string | null;
+  /** Sends the confirmed payment to Runtime. Resolves once Runtime has answered. */
+  onConfirmPayment: (allocation: string) => Promise<void>;
+  onQueue: () => void;
+  /** Queues a partly paid transaction so the rest is collected from the queue. */
+  onQueueWithBalance: () => void;
+  loyaltyRedemption: Sale['loyaltyRedemption'];
+  loyaltyPointBalance: string | null;
+  isLoyaltyBalanceLoading: boolean;
+  canRedeemLoyalty: boolean;
+  loyaltyPoints: string;
+  isLoyaltyMutating: boolean;
+  onLoyaltyPointsChange: (value: string) => void;
+  onApplyLoyalty: (points: string) => Promise<unknown>;
+  onRemoveLoyalty: () => void;
+  /** Applied promotions and discounts for the authoritative Sale being paid. */
+  adjustmentSlot?: ReactNode;
+}) {
+  const { copy, label } = useOperationalLocalization();
+  const { showToast } = useToast();
+  const [step, setStep] = usePaymentDialogStep(open);
+  const [allocationMode, setAllocationMode] = usePaymentAllocationMode(open);
+  const [loyaltyEditorOpen, setLoyaltyEditorOpen] = useState(false);
+  useEffect(() => {
+    if (!open) setLoyaltyEditorOpen(false);
+  }, [open]);
+  const format = (amount: string) => money(amount, locale);
+  const routesForMethod = paymentRoutes.filter((route) => route.paymentMethod === method);
+  const activeRoute =
+    routesForMethod.find((route) => route.id === paymentRouteId) ?? routesForMethod[0] ?? null;
+  const isCash = method === 'CASH';
+  const hasDiscount = !createDecimal(discountAmount).equals(createDecimal('0'));
+  const hasTax = !createDecimal(taxAmount).equals(createDecimal('0'));
+  const canonicalLoyaltyPoints = wholePointValue(loyaltyPoints);
+  const validLoyaltyPointInput =
+    canonicalLoyaltyPoints !== null &&
+    createDecimal(canonicalLoyaltyPoints).greaterThan(createDecimal('0'));
+  const canSubmitLoyalty = canRedeemLoyalty && validLoyaltyPointInput && !isLoyaltyMutating;
+  const legacyLoyaltyRedemption = loyaltyRedemption as
+    | (NonNullable<Sale['loyaltyRedemption']> & {
+        requestedPoints?: string;
+        redemptionAmount?: string;
+      })
+    | null
+    | undefined;
+  const redeemedPoints =
+    loyaltyRedemption?.points ?? legacyLoyaltyRedemption?.requestedPoints ?? null;
+  const redeemedAmount =
+    loyaltyRedemption?.amount ?? legacyLoyaltyRedemption?.redemptionAmount ?? null;
+  const hasLoyaltyRedemption = Boolean(redeemedPoints && redeemedAmount);
+  const wholePointBalance = wholePointValue(loyaltyPointBalance);
+  const hasKnownPointBalance = wholePointBalance !== null;
+  const pointBalancePositive =
+    wholePointBalance !== null && createDecimal(wholePointBalance).greaterThan(createDecimal('0'));
+  const applyLoyalty = async () => {
+    if (!canSubmitLoyalty) return;
+    try {
+      if (
+        hasKnownPointBalance &&
+        createDecimal(canonicalLoyaltyPoints!).greaterThan(createDecimal(wholePointBalance!))
+      ) {
+        showToast({
+          title: copy('Insufficient loyalty points'),
+          description: copy('The requested points exceed the member point balance.'),
+          variant: 'danger',
+        });
+        return;
+      }
+      await onApplyLoyalty(canonicalLoyaltyPoints!);
+      setLoyaltyEditorOpen(false);
+    } catch (error) {
+      showToast({
+        title: copy('Could not apply loyalty points'),
+        description: cashierTransactionErrorMessage(error, locale),
+        variant: 'danger',
+      });
+    }
+  };
+  const editLoyalty = () => {
+    onLoyaltyPointsChange(wholePointValue(redeemedPoints) ?? '');
+    setLoyaltyEditorOpen(true);
+  };
+  const startLoyalty = () => {
+    onLoyaltyPointsChange('');
+    setLoyaltyEditorOpen(true);
+  };
+  const cancelLoyaltyEditor = () => {
+    onLoyaltyPointsChange('');
+    setLoyaltyEditorOpen(false);
+  };
+  const removeLoyalty = () => {
+    setLoyaltyEditorOpen(false);
+    onRemoveLoyalty();
+  };
+  const customerBadge = customerStatus(customer);
+  const payments = sale?.payments ?? [];
+  const progress = sale
+    ? paymentProgress(sale)
+    : { paidAmount: '0.0000', pendingAmount: '0.0000', remainingAmount: total };
+  const amountScale = amountFractionDigits(progress.remainingAmount);
+  const normalizedAllocation =
+    allocationMode === 'FULL'
+      ? currencyInputFromAmount(progress.remainingAmount)
+      : normalizeCurrencyPaymentInput(appliedAmount);
+  const intent = paymentIntent(
+    { totalAmount: sale?.totalAmount ?? total, payments },
+    normalizedAllocation,
+  );
+  const allocationPositive = isPositiveDecimal(normalizedAllocation);
+  const overAllocated =
+    allocationPositive &&
+    createDecimal(normalizedAllocation).greaterThan(createDecimal(progress.remainingAmount));
+  const hasPending = payments.some((payment) => payment.status === 'PENDING');
+  const hasPaymentActivity = payments.length > 0;
+  const hasRecordedMoney = payments.some(
+    (payment) => payment.status === 'SUCCEEDED' || payment.status === 'PENDING',
+  );
+  const normalizedTender = normalizeCurrencyPaymentInput(tender || normalizedAllocation);
+  const cashShort =
+    isCash &&
+    allocationPositive &&
+    createDecimal(normalizedTender).lessThan(createDecimal(normalizedAllocation));
+  const cashChange =
+    isCash && allocationPositive && !cashShort
+      ? createDecimal(normalizedTender).minus(createDecimal(normalizedAllocation)).toFixed(4)
+      : '0';
+  const fullyPaid = sale ? hasSuccessfulCheckout(sale) : false;
+  // An all-INSTANT Sale has no queue to defer to: payment is collected now, in as many parts as needed.
+  const instantOnly = sale ? isInstantOnly(sale) : false;
+  const collectsPayment = (payNow || instantOnly) && !fullyPaid;
+  const canPay =
+    lines.length > 0 &&
+    Boolean(activeRoute) &&
+    allocationPositive &&
+    !overAllocated &&
+    !hasPending &&
+    !cashShort &&
+    !isSubmitting;
+  const canQueue = lines.length > 0 && !isSubmitting;
+  const methods: Array<{ value: PaymentMethod; icon: ReactNode }> = [
+    { value: 'CASH', icon: <Banknote className="size-[15px]" /> },
+    { value: 'BANK_TRANSFER', icon: <CreditCard className="size-[15px]" /> },
+    { value: 'QRIS', icon: <QrCode className="size-[15px]" /> },
+    { value: 'WALLET', icon: <ShoppingBag className="size-[15px]" /> },
+  ];
+  const normalizedQuickTender = [normalizedAllocation, ...quickTender]
+    .map((amount) => normalizeCurrencyPaymentInput(amount))
+    .filter(isPositiveDecimal)
+    .filter((amount, index, list) => list.indexOf(amount) === index)
+    .slice(0, 6);
+  const completes = intent.outcome !== 'LEAVES_BALANCE';
+
+  // Leaving is only guarded once money is recorded and the transaction is not settled yet.
+  const requestClose = () => {
+    if (isSubmitting) return;
+    if (step !== 'edit') {
+      setStep('edit');
+      return;
+    }
+    // Leaving a partly paid all-INSTANT Sale keeps it open; there is no queue to collect from later.
+    if (hasRecordedMoney && !fullyPaid && !instantOnly) {
+      setStep('leave');
+      return;
+    }
+    onClose();
+  };
+  const confirmPayment = async () => {
+    await onConfirmPayment(normalizedAllocation);
+    setStep('edit');
+  };
+
+  const title =
+    step === 'review'
+      ? copy('Confirm payment')
+      : step === 'leave'
+        ? copy('Payment is not finished')
+        : copy('POS payment');
+
+  const editFooter = (
+    <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2">
+      <DButton variant="ghost" className="h-12 px-3 text-sm" onClick={requestClose}>
+        {copy(hasRecordedMoney && !fullyPaid ? 'Leave payment' : 'Cancel')}
+      </DButton>
+      {collectsPayment ? (
+        <DButton
+          size="lg"
+          disabled={!canPay}
+          onClick={() => setStep('review')}
+          rightIcon={<ChevronRight className="size-4" aria-hidden="true" />}
+          className="w-full justify-center whitespace-nowrap"
+        >
+          {copy('Pay')} {format(normalizedAllocation || '0')}
+        </DButton>
+      ) : (
+        <DButton
+          size="lg"
+          disabled={!canQueue}
+          loading={isSubmitting}
+          onClick={onQueue}
+          className="w-full justify-center whitespace-nowrap"
+        >
+          {copy(instantOnly ? 'Complete transaction' : 'Add to queue')}
+        </DButton>
+      )}
+    </div>
+  );
+
+  const footer =
+    step === 'review' ? (
+      <div className="flex flex-col-reverse justify-end gap-2 sm:flex-row">
+        <DButton variant="outline" disabled={isSubmitting} onClick={() => setStep('edit')}>
+          {copy('Back to edit')}
+        </DButton>
+        <DButton
+          disabled={!canPay && !isSubmitting}
+          loading={isSubmitting}
+          onClick={() => void confirmPayment()}
+        >
+          {copy(completes ? 'Confirm and complete' : 'Confirm payment')}
+        </DButton>
+      </div>
+    ) : step === 'leave' ? (
+      <div className="flex flex-col-reverse justify-end gap-2 sm:flex-row">
+        <DButton
+          variant="outline"
+          disabled={hasPending || isSubmitting}
+          loading={isSubmitting}
+          onClick={onQueueWithBalance}
+        >
+          {copy('Add to queue, collect later')}
+        </DButton>
+        <DButton onClick={() => setStep('edit')}>{copy('Continue payment')}</DButton>
+      </div>
+    ) : undefined;
+
+  return (
+    <DDialog
+      title={title}
+      description={
+        sale ? `${copy('Transaction ID')}: ${transactionNumber(sale, locale)}` : undefined
+      }
+      open={open}
+      onClose={requestClose}
+      ariaLabel={title}
+      closeOnEscape
+      closeOnOverlay
+      className={
+        step === 'edit'
+          ? 'pos-reference-dialog max-h-[94dvh] w-[calc(100vw-2rem)] !max-w-[1180px] overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl'
+          : 'pos-reference-dialog max-h-[90dvh] w-[calc(100vw-2rem)] !max-w-[680px] overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl'
+      }
+      noPadding={step === 'edit'}
+      footer={step === 'edit' ? undefined : footer}
+    >
+      {step === 'review' ? (
+        <PaymentReview
+          intent={intent}
+          total={sale?.totalAmount ?? total}
+          methodName={label(method)}
+          accountName={activeRoute?.financialAccountName ?? label(method)}
+          {...(!isCash && paymentReference.trim() ? { reference: paymentReference.trim() } : {})}
+          {...(isCash ? { tendered: normalizedTender, change: cashChange } : {})}
+          earlierPayments={payments}
+          format={format}
+          confirmReceived={!isCash}
+        />
+      ) : step === 'leave' ? (
+        <PaymentLeaveNotice progress={progress} format={format} hasPending={hasPending} />
+      ) : (
+        <div className="grid min-h-0 gap-0 lg:h-[min(720px,calc(85dvh-5.5rem))] lg:grid-cols-[minmax(0,1fr)_440px] lg:overflow-hidden">
+          <div className="min-h-0 space-y-3 overscroll-contain bg-[var(--color-surface)] p-4 lg:overflow-y-auto lg:border-r lg:border-[var(--color-border)] lg:pr-3">
+            <section className="pos-pay-section">
+              <div className="pos-pay-section__head border-b border-[var(--color-border)]">
+                <div className="pos-pay-section__title">
+                  <ShoppingBag
+                    className="size-4 shrink-0 text-[var(--color-text-muted)]"
+                    aria-hidden="true"
+                  />
+                  <span className="truncate">{copy('Order details')}</span>
+                  <span className="shrink-0 rounded-full bg-[var(--color-surface-muted)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-text-muted)]">
+                    {lines.length} {copy('items')}
+                  </span>
+                  {onEditOrder ? (
+                    <button
+                      type="button"
+                      onClick={onEditOrder}
+                      disabled={isSubmitting}
+                      className="ml-1 inline-flex shrink-0 items-center gap-1 rounded-lg border border-[var(--color-border)] px-2 py-1 text-xs font-semibold text-[var(--color-brand)] transition-colors hover:bg-[var(--color-brand)]/8 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <Pencil className="size-3" aria-hidden="true" />
+                      {copy('Return to order')}
+                    </button>
+                  ) : null}
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="pos-pay-eyebrow">{copy('Subtotal')}</p>
+                  <p className="mt-0.5 text-sm font-bold tabular-nums text-[var(--color-text)]">
+                    {format(gross)}
+                  </p>
+                </div>
+              </div>
+              <div className="divide-y divide-[var(--color-border)]/70 bg-[var(--color-surface)]">
+                {lines.map((line) => {
+                  const discountPercentage = lineDiscountPercentage(line);
+                  const discounted = isPositiveDecimal(line.lineDiscountAmount);
+                  const discountedLineAmount = discounted
+                    ? createDecimal(line.totalAmount)
+                        .minus(createDecimal(line.lineDiscountAmount))
+                        .toFixed(4)
+                    : line.totalAmount;
+                  const promotionTooltip = (
+                    <DiscountDetailsContent
+                      locale={locale}
+                      details={{
+                        source: 'PROMOTION',
+                        scope: null,
+                        name: line.promotion?.name ?? null,
+                        percentage: discountPercentage,
+                        effectiveFrom: line.promotion?.effectiveFrom ?? null,
+                        effectiveUntil: line.promotion?.effectiveUntil ?? null,
+                        reason: null,
+                      }}
+                    />
+                  );
+                  return (
+                    <div key={line.id} className="px-4 py-3">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-[var(--color-text)]">
+                            {line.itemNameSnapshot}
+                          </p>
+                          <p className="mt-1 text-[11px] font-medium text-[var(--color-text-muted)]">
+                            {quantity(line.quantity)} × {format(line.effectiveUnitPrice)}
+                          </p>
+                          {discounted ? (
+                            <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-[var(--color-danger)]">
+                              <DiscountInfoTooltip
+                                label={copy('Discount information')}
+                                content={promotionTooltip}
+                              />
+                              <span>
+                                {copy('Discount')} −{format(line.lineDiscountAmount)}
+                              </span>
+                            </div>
+                          ) : null}
+                        </div>
+                        <div className="shrink-0 text-right tabular-nums">
+                          {discounted ? (
+                            <p className="text-[10px] font-medium text-[var(--color-danger)] line-through decoration-[1.5px]">
+                              {format(line.totalAmount)}
+                            </p>
+                          ) : null}
+                          <p className="text-sm font-bold text-[var(--color-text)]">
+                            {format(discountedLineAmount)}
+                          </p>
+                        </div>
+                      </div>
+                      <CartLineBreakdown
+                        line={line}
+                        heading={`${copy('Additional items')}: ${line.itemNameSnapshot}`}
+                        baseLabel={copy('Item price')}
+                        unitLabel={(index) => `${copy('Unit')} ${index}`}
+                        format={format}
+                        formatQuantity={quantity}
+                        performedByLabel={copy('Performed by')}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+
+            {adjustmentSlot}
+
+            {customer?.type === 'MEMBER' && (canRedeemLoyalty || hasLoyaltyRedemption) ? (
+              <section className="pos-pay-section pos-pay-section--secondary">
+                <div className="pos-pay-section__head items-start">
+                  <div className="min-w-0">
+                    <p className="pos-pay-section__title">
+                      <Sparkles
+                        className="size-4 shrink-0 text-[var(--color-warning)]"
+                        aria-hidden="true"
+                      />
+                      {copy('Loyalty points')}
+                    </p>
+                    <p className="mt-1 pl-6 text-xs leading-5 text-[var(--color-text-muted)]">
+                      {copy(
+                        'Use member points for this transaction. Points are consumed only when the sale is finalized.',
+                      )}
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="pos-pay-eyebrow">{copy('Point balance')}</p>
+                    <p className="mt-0.5 text-sm font-bold tabular-nums text-[var(--color-warning)]">
+                      {isLoyaltyBalanceLoading
+                        ? '…'
+                        : `${pointQuantity(loyaltyPointBalance, locale)} PTS`}
+                    </p>
+                  </div>
+                </div>
+                <div className="px-4 pb-4">
+                  {!hasLoyaltyRedemption && canRedeemLoyalty && !loyaltyEditorOpen ? (
+                    <div className="rounded-xl bg-[var(--color-surface)] p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-xs text-[var(--color-text-muted)]">
+                          {copy('Available balance')}: {pointQuantity(loyaltyPointBalance, locale)}{' '}
+                          {copy('points')}
+                        </p>
+                        <DButton
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={!pointBalancePositive || isLoyaltyMutating}
+                          onClick={startLoyalty}
+                        >
+                          {copy('Use loyalty points')}
+                        </DButton>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {loyaltyEditorOpen && canRedeemLoyalty ? (
+                    <div className="rounded-xl bg-[var(--color-surface)] p-3">
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <p className="text-xs font-semibold">{copy('Points to use')}</p>
+                        <p className="text-xs text-[var(--color-text-muted)]">
+                          {copy('Available balance')}: {pointQuantity(loyaltyPointBalance, locale)}{' '}
+                          {copy('points')}
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2">
+                        <DInput
+                          value={loyaltyPoints}
+                          onChange={(value) => onLoyaltyPointsChange(value.replace(/\D/g, ''))}
+                          inputMode="numeric"
+                          disabled={isLoyaltyMutating}
+                          placeholder="0"
+                          autoFocus
+                        />
+                        <DButton
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          disabled={!pointBalancePositive || isLoyaltyMutating}
+                          onClick={() => onLoyaltyPointsChange(wholePointBalance!)}
+                        >
+                          {copy('Fill all')}
+                        </DButton>
+                        <DButton
+                          type="button"
+                          size="sm"
+                          disabled={!canSubmitLoyalty}
+                          loading={isLoyaltyMutating}
+                          onClick={() => void applyLoyalty()}
+                        >
+                          {copy('Apply')}
+                        </DButton>
+                      </div>
+                      <div className="mt-2 flex items-center justify-between gap-3">
+                        <p className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[var(--color-success)]">
+                          <CheckCircle2 className="size-3.5" aria-hidden="true" />
+                          {copy('Points are only consumed after the transaction is finalized.')}
+                        </p>
+                        <DButton
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          disabled={isLoyaltyMutating}
+                          onClick={cancelLoyaltyEditor}
+                        >
+                          {copy('Cancel')}
+                        </DButton>
+                      </div>
+                    </div>
+                  ) : hasLoyaltyRedemption ? (
+                    <div className="flex items-center gap-3 rounded-xl border border-[var(--color-success)]/20 bg-[var(--color-success)]/[.06] px-3 py-2.5">
+                      <CheckCircle2
+                        className="size-4 shrink-0 text-[var(--color-success)]"
+                        aria-hidden="true"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold">{copy('Loyalty redemption')}</p>
+                        <p className="mt-0.5 text-[11px] text-[var(--color-text-muted)]">
+                          {pointQuantity(redeemedPoints, locale)} {copy('points used')}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-xs font-semibold tabular-nums text-[var(--color-danger)]">
+                        −{format(redeemedAmount!)}
+                      </span>
+                      {canRedeemLoyalty ? (
+                        <div className="flex shrink-0 items-center gap-1">
+                          <DButton
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            aria-label={copy('Edit')}
+                            disabled={isLoyaltyMutating}
+                            onClick={editLoyalty}
+                          >
+                            <Pencil className="size-4" aria-hidden="true" />
+                          </DButton>
+                          <DButton
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            aria-label={copy('Remove')}
+                            disabled={isLoyaltyMutating}
+                            loading={isLoyaltyMutating}
+                            onClick={removeLoyalty}
+                          >
+                            <Trash2
+                              className="size-4 text-[var(--color-danger)]"
+                              aria-hidden="true"
+                            />
+                          </DButton>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              </section>
+            ) : null}
+
+            {/* Once money is recorded the transaction is already being paid now. */}
+            {!hasRecordedMoney ? (
+              <section className="pos-pay-section pos-pay-section--primary">
+                <div className="pos-pay-section__head">
+                  <p className="pos-pay-section__title">
+                    <Clock
+                      className="size-4 shrink-0 text-[var(--color-brand)]"
+                      aria-hidden="true"
+                    />
+                    {copy(instantOnly ? 'Payment' : 'Payment timing')}
+                  </p>
+                </div>
+                <div className="pos-pay-section__body">
+                  {instantOnly ? null : (
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {[
+                        {
+                          value: true,
+                          title: copy('Pay now'),
+                          description: copy('Choose a payment method before continuing.'),
+                        },
+                        {
+                          value: false,
+                          title: copy('Pay later'),
+                          description: copy('Payment can be recorded after transaction creation.'),
+                        },
+                      ].map((option) => (
+                        <label
+                          key={String(option.value)}
+                          className={`pos-choice ${payNow === option.value ? 'pos-choice--selected' : ''}`}
+                        >
+                          <DRadio
+                            name="pos-payment-timing"
+                            className="mt-0.5 shrink-0"
+                            checked={payNow === option.value}
+                            onChange={() => onPayNowChange(option.value)}
+                          />
+                          <span className="min-w-0">
+                            <span className="block text-sm font-semibold">{option.title}</span>
+                            <span className="mt-0.5 block text-xs leading-4 text-[var(--color-text-muted)]">
+                              {option.description}
+                            </span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+
+                  {collectsPayment ? (
+                    <div className="mt-3 border-t border-[var(--color-border)] pt-3">
+                      <DTabs
+                        value={allocationMode}
+                        defaultValue="FULL"
+                        onValueChange={(value) => {
+                          const next = value as PaymentAllocationMode;
+                          setAllocationMode(next);
+                          if (next === 'FULL') {
+                            const remaining = currencyInputFromAmount(progress.remainingAmount);
+                            onAppliedAmount(remaining);
+                          } else {
+                            onAppliedAmount('');
+                          }
+                        }}
+                      >
+                        <DTabsList className="grid w-full grid-cols-2 rounded-xl bg-[var(--color-surface-muted)] p-1">
+                          <DTabsTrigger
+                            value="FULL"
+                            className="h-9 min-w-0 px-3 text-sm font-semibold"
+                          >
+                            {copy('Full payment')}
+                          </DTabsTrigger>
+                          <DTabsTrigger
+                            value="SPLIT"
+                            className="h-9 min-w-0 px-3 text-sm font-semibold"
+                          >
+                            {copy('Split payment')}
+                          </DTabsTrigger>
+                        </DTabsList>
+
+                        <DTabsContent value="FULL" className="mt-2">
+                          <div className="flex items-center justify-between gap-3 rounded-lg bg-[var(--color-brand)]/[.045] px-3 py-2.5">
+                            <span className="text-xs text-[var(--color-text)]">
+                              {copy('Pay full remaining balance')}
+                            </span>
+                            <span className="shrink-0 text-base font-bold tabular-nums text-[var(--color-brand)]">
+                              {format(progress.remainingAmount)}
+                            </span>
+                          </div>
+                        </DTabsContent>
+
+                        <DTabsContent value="SPLIT" className="mt-2">
+                          <label className="block text-sm font-medium">
+                            {copy('Payment amount')}
+                            <PosCurrencyInput
+                              aria-label={copy('Payment amount')}
+                              className="mt-1.5 h-11 rounded-lg bg-[var(--color-surface)] text-right text-lg font-bold"
+                              value={appliedAmount}
+                              onChange={onAppliedAmount}
+                              fractionDigits={amountScale}
+                            />
+                          </label>
+                          {overAllocated ? (
+                            <p className="mt-1 text-xs text-[var(--color-danger)]" role="alert">
+                              {copy('Payment allocation cannot exceed the remaining amount.')}{' '}
+                              {copy('Remaining')}: {format(progress.remainingAmount)}
+                            </p>
+                          ) : (
+                            <div className="mt-2">
+                              <PaymentIntentHint
+                                intent={intent}
+                                format={format}
+                                onPayRemaining={() => {
+                                  const remaining = currencyInputFromAmount(
+                                    progress.remainingAmount,
+                                  );
+                                  onAppliedAmount(remaining);
+                                  setAllocationMode('FULL');
+                                }}
+                              />
+                            </div>
+                          )}
+                        </DTabsContent>
+                      </DTabs>
+                    </div>
+                  ) : null}
+                </div>
+              </section>
+            ) : null}
+          </div>
+
+          <div className="max-lg:contents lg:sticky lg:top-0 lg:flex lg:h-full lg:min-h-0 lg:w-[440px] lg:min-w-[440px] lg:flex-col lg:self-stretch lg:overflow-hidden lg:bg-[var(--color-surface-muted)]/60">
+            <div className="shrink-0 space-y-3 bg-[var(--color-surface-muted)]/60 p-4 pb-3 lg:overflow-y-hidden lg:[scrollbar-gutter:stable]">
+              {customer ? (
+                <SaleCustomerStrip
+                  initials={customerInitials(customer)}
+                  name={customerDisplayName(customer, locale)}
+                  detail={customerDisplayDetail(customer)}
+                  badge={
+                    customerBadge ? (
+                      <Badge
+                        variant={customerBadge.variant}
+                        className="shrink-0 px-2 py-0 text-[10px]"
+                      >
+                        {copy(customerBadge.label)}
+                      </Badge>
+                    ) : null
+                  }
+                  aside={
+                    customer.type === 'MEMBER' ? (
+                      <>
+                        <p className="pos-pay-eyebrow">{copy('Points')}</p>
+                        <p className="mt-0.5 text-sm font-bold tabular-nums text-[var(--color-warning)]">
+                          {isLoyaltyBalanceLoading
+                            ? '…'
+                            : `${pointQuantity(loyaltyPointBalance, locale)} PTS`}
+                        </p>
+                      </>
+                    ) : null
+                  }
+                />
+              ) : null}
+
+              <div className="pos-pay-section p-4 shadow-sm">
+                <p className="pos-pay-eyebrow">{copy('Payment total')}</p>
+                <h3 className="mt-0.5 text-3xl font-bold leading-tight tabular-nums text-[var(--color-brand)]">
+                  {format(total)}
+                </h3>
+                <div className="mt-3 space-y-1.5 border-t border-[var(--color-border)] pt-3 text-[13px]">
+                  <div className="flex justify-between gap-3">
+                    <span className="text-[var(--color-text-muted)]">{copy('Subtotal')}</span>
+                    <span className="font-semibold tabular-nums">{format(gross)}</span>
+                  </div>
+                  {hasDiscount ? (
+                    <div className="flex justify-between gap-3">
+                      <span className="text-[var(--color-text-muted)]">{discountLabel}</span>
+                      <span className="font-semibold text-[var(--color-danger)]">
+                        −{format(discountAmount)}
+                      </span>
+                    </div>
+                  ) : null}
+                  {hasLoyaltyRedemption ? (
+                    <div className="flex justify-between gap-3">
+                      <span className="flex items-center gap-2 text-[var(--color-text-muted)]">
+                        <span className="size-2 rounded-full bg-[var(--color-warning)]" />
+                        {copy('Loyalty redemption')}
+                      </span>
+                      <span className="font-semibold text-[var(--color-danger)]">
+                        −{format(redeemedAmount!)}
+                      </span>
+                    </div>
+                  ) : null}
+                  {hasTax ? (
+                    <div className="flex justify-between gap-3">
+                      <span className="text-[var(--color-text-muted)]">{taxLabel}</span>
+                      <span className="font-semibold">{format(taxAmount)}</span>
+                    </div>
+                  ) : null}
+                  <div className="flex justify-between border-t border-[var(--color-border)] pt-2.5 text-sm font-bold">
+                    <span className="font-bold">{copy('Net total')}</span>
+                    <span className="font-bold">{format(total)}</span>
+                  </div>
+                </div>
+                {hasPaymentActivity ? (
+                  <div className="mt-3">
+                    <PaymentProgressSummary
+                      total={sale?.totalAmount ?? total}
+                      progress={progress}
+                      format={format}
+                    />
+                    {hasRecordedMoney && !fullyPaid ? (
+                      <p className="mt-2 text-[11px] font-medium text-[var(--color-text-muted)]">
+                        {copy(
+                          'The transaction is not complete until the remaining amount is paid.',
+                        )}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="min-h-0 flex-1 space-y-3 overscroll-contain bg-[var(--color-surface-muted)]/60 px-4 pb-4 lg:overflow-y-auto lg:[scrollbar-gutter:stable]">
+              {hasPaymentActivity && sale ? (
+                <RecordedPaymentList
+                  payments={payments}
+                  totalAmount={sale.totalAmount}
+                  progress={progress}
+                  format={format}
+                  isMutating={isSubmitting}
+                  onTransition={onTransitionPayment}
+                />
+              ) : null}
+
+              {collectsPayment ? (
+                <>
+                  <div className="pos-pay-section p-4 shadow-sm">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <p className="text-sm font-bold text-[var(--color-text)]">
+                        {copy('Payment method')}
+                      </p>
+                      <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[var(--color-success)]">
+                        <span className="size-1.5 rounded-full bg-[var(--color-success)]" />
+                        {copy('Ready to pay')}
+                      </span>
+                    </div>
+                    {hasRecordedMoney ? (
+                      <p className="pos-pay-eyebrow mb-3">{copy('Next payment')}</p>
+                    ) : null}
+                    {paymentError ? (
+                      <DAlert
+                        variant="danger"
+                        role="alert"
+                        title={copy('Payment was not recorded')}
+                        className="mb-3"
+                      >
+                        {paymentError} {copy('Nothing was added to the paid amount.')}
+                      </DAlert>
+                    ) : null}
+                    <div className="grid grid-cols-2 gap-2">
+                      {methods.map((option) => {
+                        const routeAvailable = paymentRoutes.some(
+                          (route) => route.paymentMethod === option.value,
+                        );
+                        const disabled = isPaymentRoutesLoading || !routeAvailable || hasPending;
+                        const selected = method === option.value;
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            disabled={disabled}
+                            aria-pressed={selected}
+                            onClick={() => onMethod(option.value)}
+                            className={`flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg border px-2 text-[13px] font-semibold sm:gap-2 sm:px-3 sm:text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
+                              selected
+                                ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/[.08] text-[var(--color-brand)] ring-1 ring-[var(--color-brand)]'
+                                : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] hover:border-[var(--color-brand)]/40 hover:bg-[var(--color-brand)]/[.04]'
+                            }`}
+                          >
+                            <span className="shrink-0">{option.icon}</span>
+                            <span className="min-w-0">{label(option.value)}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {hasPending ? (
+                      <p className="mt-2 text-xs text-[var(--color-warning)]">
+                        {copy('Confirm or cancel the waiting payment before adding another one.')}
+                      </p>
+                    ) : null}
+                    {activeRoute ? (
+                      <div className="mt-3">
+                        <Select
+                          label={copy('Settlement account')}
+                          value={activeRoute.id}
+                          options={routesForMethod.map((route) => ({
+                            value: route.id,
+                            label: route.financialAccountCode
+                              ? `${route.financialAccountName} · ${route.financialAccountCode}`
+                              : route.financialAccountName,
+                          }))}
+                          onChange={(value) => {
+                            if (typeof value === 'string') onPaymentRoute(value);
+                          }}
+                          className="w-full"
+                        />
+                      </div>
+                    ) : null}
+                    {!isCash ? (
+                      <div className="mt-3">
+                        <DInput
+                          aria-label={copy('Payment reference')}
+                          label={copy('Payment reference')}
+                          value={paymentReference}
+                          onChange={onPaymentReference}
+                          placeholder={copy('Optional reference')}
+                          className="w-full"
+                        />
+                      </div>
+                    ) : (
+                      <div className="mt-4 border-t border-[var(--color-border)] pt-4">
+                        <div className="mb-2 flex items-center justify-between gap-3">
+                          <span className="text-sm font-bold">{copy('Cash received')}</span>
+                          <button
+                            type="button"
+                            disabled={!allocationPositive}
+                            onClick={() => onTender(normalizedAllocation)}
+                            className="rounded-full bg-[var(--color-brand)]/[.08] px-2.5 py-1 text-xs font-semibold text-[var(--color-brand)] transition-colors hover:bg-[var(--color-brand)]/[.14] disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {copy('Exact amount')} {format(normalizedAllocation || '0')}
+                          </button>
+                        </div>
+
+                        <PosCurrencyInput
+                          aria-label={copy('Cash received')}
+                          className="h-12 rounded-lg bg-[var(--color-surface)] text-right text-lg font-bold"
+                          value={tender}
+                          onChange={onTender}
+                          fractionDigits={amountScale}
+                        />
+
+                        <div className="mt-2 grid grid-cols-3 gap-2">
+                          {normalizedQuickTender
+                            .filter((amount) => amount !== normalizedAllocation)
+                            .slice(0, 5)
+                            .map((amount) => (
+                              <button
+                                key={amount}
+                                type="button"
+                                onClick={() => onTender(amount)}
+                                className={`h-9 rounded-md border px-1 text-xs font-semibold tabular-nums transition-colors ${normalizeCurrencyPaymentInput(tender) === amount ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]' : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-muted)]'}`}
+                              >
+                                {format(amount)}
+                              </button>
+                            ))}
+                        </div>
+
+                        <div
+                          className={`mt-3 flex items-center justify-between rounded-lg px-3 py-2.5 ${cashShort ? 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]' : 'bg-[var(--color-success)]/10 text-[var(--color-success)]'}`}
+                        >
+                          <span className="text-sm font-bold">
+                            {copy(cashShort ? 'Payment short' : 'Change')}
+                          </span>
+                          <span className="text-base font-bold tabular-nums">
+                            {format(
+                              cashShort
+                                ? createDecimal(normalizedAllocation)
+                                    .minus(createDecimal(normalizedTender || '0'))
+                                    .toFixed(4)
+                                : cashChange,
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : null}
+            </div>
+
+            <div className="shrink-0 border-t border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 max-lg:sticky max-lg:bottom-0 max-lg:z-10 shadow-[0_-4px_12px_-8px_rgb(0_0_0/0.18)]">
+              {editFooter}
+            </div>
+          </div>
+        </div>
+      )}
+    </DDialog>
+  );
+}
+
+function useRetainedValue<T>(value: T | null): T | null {
+  // Keep the last value while a DS dialog plays its close transition.
+  const [retained, setRetained] = useState<T | null>(value);
+  if (value !== null && value !== retained) setRetained(value);
+  return value ?? retained;
+}
+
+/** The line status a transaction state already implies, so it is not repeated per item. */
+const impliedLineWorkStatus: Partial<Record<QueueStatus, string>> = {
+  QUEUED: 'WAITING',
+  PROGRESS: 'IN_PROGRESS',
+  COMPLETED: 'COMPLETED',
+  CANCELED: 'CANCELED',
+};
+
+const fulfillmentTone: Record<string, 'neutral' | 'brand' | 'success' | 'warning' | 'danger'> = {
+  WAITING: 'warning',
+  IN_PROGRESS: 'brand',
+  COMPLETED: 'success',
+  CANCELED: 'danger',
+};
+
+export const referenceTransactionDetailLayout = {
+  dialog: 'pos-reference-transaction-dialog lg:!max-w-[1060px]',
+  body: 'pos-transaction-detail-story',
+  orderColumn: 'pos-transaction-detail-order',
+  summaryColumn: 'pos-transaction-detail-summary',
+} as const;
+
+export const referenceTransactionDetailPresentation = {
+  showTopTotal: false,
+  showRightContext: true,
+  emphasizePrimaryStatus: true,
+} as const;
+
+function queueStatusTone(status: QueueStatus | null) {
+  if (status === 'QUEUED') return 'warning' as const;
+  if (status === 'PROGRESS') return 'brand' as const;
+  if (status === 'COMPLETED') return 'success' as const;
+  if (status === 'CANCELED') return 'danger' as const;
+  return 'neutral' as const;
+}
+
+export function ReferenceTransactionDetail({
+  sale: currentSale,
+  locale,
+  employees,
+  businessName,
+  branchName,
+  branchAddress = null,
+  cashierName,
+  cancellationReason,
+  showPaymentReceipt,
+  onClose,
+  onViewReceipt,
+  onSendReceipt,
+  deliveryStatus,
+  onAssign,
+  onStartLineWork,
+  onComplete,
+  isMutating,
+}: {
+  sale: Sale | null;
+  locale: string;
+  employees: readonly Employee[];
+  businessName: string;
+  branchName: string;
+  branchAddress?: string | null;
+  cashierName: string;
+  cancellationReason?: string;
+  showPaymentReceipt: boolean;
+  onClose: () => void;
+  onNewSale: () => void;
+  onViewReceipt: (sale: Sale) => void;
+  /** Opens the shared receipt-delivery flow; the preview never sends on its own. */
+  onSendReceipt?: (sale: Sale) => void;
+  deliveryStatus?: {
+    available: boolean;
+    delivery: { status: ReceiptDeliveryState } | null;
+  };
+  onAssign: (line: SaleLine) => void;
+  onStartLineWork: (line: SaleLine) => void;
+  onComplete: () => void;
+  isMutating: boolean;
+}) {
+  const { copy, label, locale: copyLocale } = useOperationalLocalization();
+  const [receiptPaper, setReceiptPaper] = useState<'58' | '80'>('80');
+  const sale = useRetainedValue(currentSale);
+  if (!sale) return null;
+  const open = currentSale !== null;
+  const status = queueStatus(sale);
+  const customer = sale.customer ?? null;
+  const activeLines = sale.lines.filter((line) => !line.removedAt);
+  const receiptAvailable = appliedPaymentComposition(sale).components.length > 0;
+  const showReceipt = showPaymentReceipt && receiptAvailable;
+  const settlement = saleSettlement(sale);
+  const composition = appliedPaymentComposition(sale);
+  const unappliedPayments = sale.payments
+    .filter((payment) => !composition.components.includes(payment))
+    .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+  const hasDiscount = !createDecimal(sale.discountAmount).equals(createDecimal('0'));
+  const hasTax = !createDecimal(sale.taxAmount).equals(createDecimal('0'));
+  const completionIssues = status === 'PROGRESS' ? workflowIssues(sale, locale) : [];
+  const completionIssueGroups = groupWorkflowIssues(sale, completionIssues, locale);
+  const transactionDate = new Intl.DateTimeFormat(locale, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(sale.finalizedAt ?? sale.updatedAt));
+  const identity = transactionNumber(sale, locale);
+  const format = (amount: string) => money(amount, locale);
+  const discountRows = aggregateDiscountRows(saleDiscountRows(sale));
+  const summaryDiscounts =
+    discountRows.length === 0 && hasDiscount
+      ? [
+          {
+            id: 'sale-discount',
+            source: 'MANUAL_DISCOUNT' as const,
+            scope: 'TRANSACTION' as const,
+            saleLineId: null,
+            label: copy('Promotions and discounts'),
+            amount: sale.discountAmount,
+            percentage: null,
+            reason: null,
+            identity: 'SALE-DISCOUNT',
+          },
+        ]
+      : discountRows;
+  const legacyLoyaltyRedemption = sale.loyaltyRedemption as
+    | (NonNullable<Sale['loyaltyRedemption']> & {
+        requestedPoints?: string;
+        redemptionAmount?: string;
+      })
+    | null
+    | undefined;
+  const redeemedPoints =
+    sale.loyaltyRedemption?.points ?? legacyLoyaltyRedemption?.requestedPoints ?? null;
+  const redeemedAmount =
+    sale.loyaltyRedemption?.amount ?? legacyLoyaltyRedemption?.redemptionAmount ?? null;
+  const hasLoyaltyRedemption = Boolean(redeemedPoints && redeemedAmount);
+  const earnedPoints = saleEarnedPoints(sale);
+  const receiptDeliveryLabel = receiptDeliveryPreviewLabel(
+    receiptDeliveryPhase(deliveryStatus?.delivery?.status),
+    copyLocale,
+  );
+
+  return (
+    <>
+      <Dialog
+        open={open}
+        onClose={onClose}
+        title={copy(showReceipt ? 'Preview receipt' : 'Transaction details')}
+        description={identity}
+        ariaLabel={copy(showReceipt ? 'Preview receipt' : 'Transaction details')}
+        closeOnEscape
+        closeOnOverlay
+        noPadding
+        size="xl"
+        className={`pos-reference-dialog ${referenceTransactionDetailLayout.dialog} w-full overflow-hidden`}
+        footer={
+          showReceipt ? (
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between gap-3">
+                <span
+                  id="pos-receipt-paper-label"
+                  className="text-xs text-[var(--color-text-muted)]"
+                >
+                  {copy('Paper width')}
+                </span>
+                <div
+                  role="radiogroup"
+                  aria-labelledby="pos-receipt-paper-label"
+                  className="grid grid-cols-2 gap-1 rounded-[var(--radius-control)] bg-[var(--color-surface-muted)] p-1"
+                >
+                  {(['58', '80'] as const).map((paper) => (
+                    <button
+                      key={paper}
+                      type="button"
+                      role="radio"
+                      aria-checked={receiptPaper === paper}
+                      onClick={() => setReceiptPaper(paper)}
+                      className={`min-h-8 rounded-[calc(var(--radius-control)-2px)] px-3 text-xs font-semibold tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/30 ${
+                        receiptPaper === paper
+                          ? 'bg-[var(--color-surface)] text-[var(--color-text)] shadow-sm'
+                          : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
+                      }`}
+                    >
+                      {paper} mm
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+                <DButton variant="ghost" onClick={onClose}>
+                  {copy('Close')}
+                </DButton>
+                {deliveryStatus?.available && onSendReceipt ? (
+                  <DButton variant="outline" onClick={() => onSendReceipt(sale)}>
+                    {receiptDeliveryLabel}
+                  </DButton>
+                ) : null}
+                <DButton
+                  variant="primary"
+                  leftIcon={<Printer className="size-3.5" />}
+                  onClick={() => window.print()}
+                >
+                  {copy('Print')}
+                </DButton>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:justify-end">
+              <DButton variant="ghost" className="justify-center" onClick={onClose}>
+                {copy('Close')}
+              </DButton>
+              {receiptAvailable ? (
+                <DButton
+                  rightIcon={<Printer className="size-3.5" />}
+                  variant="outline"
+                  className="justify-center"
+                  onClick={() => onViewReceipt(sale)}
+                >
+                  {copy('View receipt')}
+                </DButton>
+              ) : null}
+              {status === 'PROGRESS' ? (
+                <DButton
+                  variant="primary"
+                  className="order-first col-span-2 justify-center sm:order-none"
+                  disabled={completionIssues.length > 0}
+                  loading={isMutating}
+                  leftIcon={<CheckCircle2 className="size-3.5" />}
+                  onClick={onComplete}
+                >
+                  {copy('Complete transaction')}
+                </DButton>
+              ) : null}
+            </div>
+          )
+        }
+      >
+        {showReceipt ? (
+          // The receipt sits as paper on a muted desk; the dialog body is the only scroll region.
+          <div className="pos-receipt-desk">
+            <div
+              className={`pos-receipt-preview pos-receipt-print--${receiptPaper} bg-white text-slate-950`}
+            >
+              <ReceiptContent
+                sale={sale}
+                activeLines={activeLines}
+                customer={customer}
+                locale={locale}
+                businessName={businessName}
+                branchName={branchName}
+                branchAddress={branchAddress}
+                cashierName={cashierName}
+                transactionDate={transactionDate}
+                hasDiscount={hasDiscount}
+                hasTax={hasTax}
+              />
+            </div>
+          </div>
+        ) : (
+          <div className={referenceTransactionDetailLayout.body}>
+            <div className="pos-detail-columns">
+              <div className={`pos-detail-column ${referenceTransactionDetailLayout.orderColumn}`}>
+                <SaleDetailSection
+                  title={copy('Order')}
+                  icon={<ShoppingBag className="size-4" />}
+                  aside={`${activeLines.length} ${copy('items')}`}
+                >
+                  <SaleLineItemList>
+                    {activeLines.map((line) => {
+                      const isTrackedService =
+                        line.itemTypeSnapshot === 'SERVICE' &&
+                        line.fulfillmentBehaviorSnapshot === 'TRACKED' &&
+                        line.fulfillment !== null;
+                      const requiresEmployeeAttribution =
+                        line.employeeAssignmentModeSnapshot !== 'NONE' ||
+                        line.allowEmployeeContributionSnapshot;
+                      const attributed = isTrackedService && requiresEmployeeAttribution;
+                      const plannedUnits = line.workUnits?.length ?? 0;
+                      const needsAttention =
+                        attributed &&
+                        (employeeAssignmentIssues(line, locale).length > 0 ||
+                          (plannedUnits > 0 && plannedUnits !== serviceWorkUnitCount(line)));
+                      const durationLabel = formatDurationMinutes(
+                        line.defaultDurationMinutesSnapshot,
+                        locale,
+                      );
+                      const workSummary = attributed
+                        ? servicePerformerSummary(line, employees, locale)
+                        : null;
+                      const editable = attributed && status === 'PROGRESS';
+                      // The transaction's own state already says "in progress"; a line only
+                      // repeats it when it differs (waiting, completed, canceled).
+                      const showWorkStatus =
+                        saleLineWorkStatus(line) !== null &&
+                        saleLineWorkStatus(line) !==
+                          (status ? impliedLineWorkStatus[status] : undefined);
+                      // The transaction is already IN_PROGRESS, but this specific tracked
+                      // Service has not been started yet: it needs its own explicit action.
+                      const canStartLineWork =
+                        status === 'PROGRESS' &&
+                        line.itemTypeSnapshot === 'SERVICE' &&
+                        line.fulfillmentBehaviorSnapshot === 'TRACKED' &&
+                        line.fulfillment?.status === 'WAITING';
+                      const additions = saleLineAdditions(line);
+                      const lineBase = saleLineBase(line, additions);
+                      return (
+                        <SaleLineItem
+                          key={line.id}
+                          name={line.itemNameSnapshot}
+                          variant={
+                            [
+                              line.variantNameSnapshot,
+                              line.soldByEmployeeNameSnapshot
+                                ? `${copy('Sold by')} ${line.soldByEmployeeNameSnapshot}`
+                                : null,
+                            ]
+                              .filter(Boolean)
+                              .join(' · ') || null
+                          }
+                          pricing={`${quantity(line.quantity)} × ${format(line.effectiveUnitPrice)}`}
+                          amount={format(line.grossAmount)}
+                          discountsHeading={copy('Discounts and promotions')}
+                          discounts={lineDiscountRows(sale, line, copy('Discount')).map((row) => ({
+                            id: row.id,
+                            title: row.title,
+                            note: row.note,
+                            amount: format(row.amount),
+                            info: (
+                              <DiscountInfoTooltip
+                                label={copy('Discount details')}
+                                content={
+                                  <DiscountDetailsContent details={row.details} locale={locale} />
+                                }
+                              />
+                            ),
+                          }))}
+                          usage={
+                            additions.length ? (
+                              <SaleLineAdditions
+                                heading={copy('Additional items')}
+                                baseLabel={copy('Item price')}
+                                base={{
+                                  pricing: `${quantity(line.quantity)} × ${format(lineBase.unitPrice)}`,
+                                  amount: format(lineBase.amount),
+                                }}
+                                rows={additions.map((addition) => ({
+                                  id: addition.id,
+                                  name: addition.name,
+                                  pricing: `${quantity(addition.quantity)} × ${format(addition.unitPrice)}`,
+                                  amount: format(addition.amount),
+                                  performedBy: additionPerformedBy(addition, employees, copy),
+                                }))}
+                              />
+                            ) : null
+                          }
+                          earning={
+                            line.loyaltyEarning
+                              ? `${
+                                  line.loyaltyEarning.state === 'FINALIZED'
+                                    ? `${copy('Points earned')}: `
+                                    : `${copy('Point preview')}: `
+                                }+${pointQuantity(line.loyaltyEarning.pointsEarned, locale)} ${copy('points')}`
+                              : null
+                          }
+                          context={
+                            showWorkStatus ||
+                            line.workLineage ||
+                            correctionSourceOf(sale, line) ||
+                            durationLabel ? (
+                              <>
+                                {showWorkStatus ? (
+                                  <StatusPill
+                                    tone={fulfillmentTone[saleLineWorkStatus(line)!] ?? 'neutral'}
+                                  >
+                                    {label(saleLineWorkStatus(line)!)}
+                                  </StatusPill>
+                                ) : null}
+                                {line.workLineage ? (
+                                  <span>
+                                    Pekerjaan tercatat pada {line.workLineage.sourceItemName}
+                                  </span>
+                                ) : null}
+                                {correctionSourceOf(sale, line) ? (
+                                  <span>
+                                    Koreksi dari {correctionSourceOf(sale, line)!.itemNameSnapshot}
+                                  </span>
+                                ) : null}
+                                {durationLabel ? <span>{durationLabel}</span> : null}
+                              </>
+                            ) : null
+                          }
+                          detail={
+                            workSummary ? (
+                              <ServicePerformers
+                                itemName={line.itemNameSnapshot}
+                                summary={workSummary}
+                                needsAttention={needsAttention}
+                                editable={editable}
+                                disabled={isMutating}
+                                onEdit={() => onAssign(line)}
+                              />
+                            ) : null
+                          }
+                          action={
+                            canStartLineWork ? (
+                              <DButton
+                                size="sm"
+                                variant="secondary"
+                                className="h-7 px-2.5 text-[11px]"
+                                leftIcon={<PlayCircle className="size-3.5" />}
+                                loading={isMutating}
+                                onClick={() => onStartLineWork(line)}
+                              >
+                                {copy('Start work')}
+                              </DButton>
+                            ) : null
+                          }
+                        />
+                      );
+                    })}
+                  </SaleLineItemList>
+                </SaleDetailSection>
+              </div>
+              <div
+                className={`pos-detail-column ${referenceTransactionDetailLayout.summaryColumn}`}
+              >
+                <SaleFinancialSummary
+                  title={copy('Order summary')}
+                  context={
+                    referenceTransactionDetailPresentation.showRightContext ? (
+                      <div>
+                        <SaleCustomerStrip
+                          initials={customerInitials(customer)}
+                          name={customerDisplayName(customer, locale)}
+                          detail={customerDisplayDetail(customer)}
+                          badge={
+                            customerStatus(customer) ? (
+                              <Badge
+                                variant={customerStatus(customer)!.variant}
+                                className="shrink-0 px-2 py-0 text-[10px]"
+                              >
+                                {copy(customerStatus(customer)!.label)}
+                              </Badge>
+                            ) : null
+                          }
+                          aside={
+                            // Invoice (when it exists) above the transaction date, on the right of the
+                            // customer identity. It is rendered here once and nowhere else.
+                            <div className="flex flex-col items-end gap-0.5">
+                              {sale.invoiceNumber ? (
+                                <span
+                                  className="max-w-[9.5rem] break-all font-mono text-xs font-semibold leading-4 text-[var(--color-text)] sm:max-w-none"
+                                  data-testid="transaction-invoice-number"
+                                >
+                                  {sale.invoiceNumber}
+                                </span>
+                              ) : null}
+                              <span className="text-xs text-[var(--color-text-muted)]">
+                                {transactionDate}
+                              </span>
+                            </div>
+                          }
+                        />
+                        <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1.5 px-1">
+                          <StatusPill
+                            tone={
+                              sale.status === 'VOIDED' || status === 'CANCELED'
+                                ? 'danger'
+                                : queueStatusTone(status)
+                            }
+                            icon={status ? statusMeta[status].icon : null}
+                          >
+                            {status ? label(statusMeta[status].value) : label('OPEN')}
+                          </StatusPill>
+                        </div>
+                        {earnedPoints ? (
+                          <div
+                            className="mt-2.5 flex items-center justify-between gap-3 rounded-lg bg-[var(--color-success)]/10 px-3 py-2 text-xs"
+                            data-testid="transaction-points-earned"
+                          >
+                            <span className="font-semibold text-[var(--color-text)]">
+                              {copy('Points earned')}
+                            </span>
+                            <span className="font-bold text-[var(--color-success)]">
+                              +{pointQuantity(earnedPoints, locale)}
+                            </span>
+                          </div>
+                        ) : null}
+                        {sale.status === 'VOIDED' && cancellationReason ? (
+                          <div className="mt-2 border-l-2 border-[var(--color-danger)] pl-2.5 text-xs">
+                            <p className="font-semibold text-[var(--color-danger)]">
+                              {copy('Cancellation reason')}
+                            </p>
+                            <p className="mt-0.5 text-[var(--color-text-muted)]">
+                              {cancellationReason}
+                            </p>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null
+                  }
+                  labels={{
+                    subtotal: copy('Subtotal'),
+                    total: copy('Total'),
+                    paid: copy('Paid amount'),
+                    balance: copy('Balance due'),
+                    settled: copy('Paid'),
+                    cashReceived: copy('Cash received'),
+                    change: copy('Change'),
+                    discount: copy('Discount'),
+                    discountContext: (row) =>
+                      `${copy(row.source === 'PROMOTION' ? 'Promotion' : 'Manual discount')} · ${copy(
+                        row.scope === 'TRANSACTION'
+                          ? 'Whole transaction'
+                          : row.scope === 'ITEM'
+                            ? 'Item-level'
+                            : 'Category-level',
+                      )}`,
+                  }}
+                  gross={sale.grossAmount}
+                  discounts={summaryDiscounts}
+                  adjustments={
+                    hasLoyaltyRedemption
+                      ? [
+                          {
+                            id: 'loyalty-redemption',
+                            label: copy('Loyalty redemption'),
+                            detail: `${pointQuantity(redeemedPoints, locale)} ${copy('points used')}`,
+                            amount: redeemedAmount!,
+                          },
+                        ]
+                      : []
+                  }
+                  tax={
+                    hasTax
+                      ? { label: saleTaxLabel(sale, copy('Tax')), amount: sale.taxAmount }
+                      : null
+                  }
+                  total={sale.totalAmount}
+                  settlement={settlement}
+                  format={format}
+                  payment={
+                    composition.components.length
+                      ? {
+                          title: copy('Payment'),
+                          aside: composition.isSplit ? (
+                            <StatusPill tone="brand">
+                              {copy('Split Payment')} · {composition.components.length}{' '}
+                              {copy('methods')}
+                            </StatusPill>
+                          ) : undefined,
+                          content: (
+                            <SalePaymentComposition
+                              components={composition.components.map((item) => {
+                                const name = paymentAccountLabel(item, (method) => label(method));
+                                const methodName = label(item.method);
+                                return {
+                                  id: item.id,
+                                  name,
+                                  method: name === methodName ? null : methodName,
+                                  reference: item.providerReference,
+                                  amount: format(item.appliedAmount),
+                                };
+                              })}
+                            />
+                          ),
+                        }
+                      : null
+                  }
+                  paymentAttempts={
+                    unappliedPayments.length ? (
+                      <>
+                        <h4 className="text-sm font-semibold text-[var(--color-text)]">
+                          {copy('Payment attempts')}
+                        </h4>
+                        <SalePaymentList
+                          emptyLabel={copy('No payment recorded yet.')}
+                          payments={unappliedPayments.map((item) => ({
+                            id: item.id,
+                            method: paymentAccountLabel(item, (method) => label(method)),
+                            status: (
+                              <StatusPill tone={item.status === 'PENDING' ? 'warning' : 'neutral'}>
+                                {label(item.status)}
+                              </StatusPill>
+                            ),
+                            detail: new Intl.DateTimeFormat(locale, {
+                              dateStyle: 'medium',
+                              timeStyle: 'short',
+                            }).format(new Date(item.terminalAt ?? item.updatedAt)),
+                            amount: format(item.appliedAmount),
+                          }))}
+                        />
+                      </>
+                    ) : null
+                  }
+                />
+                {completionIssues.length ? (
+                  <DAlert variant="warning" title={copy('Not ready to complete')}>
+                    <div className="space-y-1.5 text-[var(--color-text-muted)]">
+                      {completionIssueGroups.map((group) => (
+                        <div key={group.id}>
+                          <p className="font-medium text-[var(--color-text)]">{group.label}</p>
+                          <ul className="mt-0.5 list-disc space-y-0.5 pl-4">
+                            {group.issues.map((issue) => (
+                              <li key={issue}>{issue}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  </DAlert>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        )}
+      </Dialog>
+
+      {open && showReceipt
+        ? createPortal(
+            <div className={`pos-receipt-print pos-receipt-print--${receiptPaper}`}>
+              <ReceiptContent
+                sale={sale}
+                activeLines={activeLines}
+                customer={customer}
+                locale={locale}
+                businessName={businessName}
+                branchName={branchName}
+                branchAddress={branchAddress}
+                cashierName={cashierName}
+                transactionDate={transactionDate}
+                hasDiscount={hasDiscount}
+                hasTax={hasTax}
+              />
+            </div>,
+            document.body,
+          )
+        : null}
+    </>
+  );
+}
+
+export function ReceiptContent({
+  sale,
+  activeLines,
+  customer,
+  locale,
+  businessName,
+  branchName,
+  branchAddress = null,
+  cashierName,
+  transactionDate,
+  hasDiscount,
+  hasTax,
+}: {
+  sale: Sale;
+  activeLines: readonly SaleLine[];
+  customer: SaleCustomer | null;
+  locale: string;
+  businessName: string;
+  branchName: string;
+  branchAddress?: string | null;
+  cashierName: string;
+  transactionDate: string;
+  hasDiscount: boolean;
+  hasTax: boolean;
+}) {
+  const { copy, label } = useOperationalLocalization();
+  const discountRows = aggregateDiscountRows(saleDiscountRows(sale));
+  const composition = appliedPaymentComposition(sale);
+  const settlement = saleSettlement(sale);
+  const legacyLoyaltyRedemption = sale.loyaltyRedemption as
+    | (NonNullable<Sale['loyaltyRedemption']> & {
+        requestedPoints?: string;
+        redemptionAmount?: string;
+      })
+    | null
+    | undefined;
+  const redeemedPoints =
+    sale.loyaltyRedemption?.points ?? legacyLoyaltyRedemption?.requestedPoints ?? null;
+  const redeemedAmount =
+    sale.loyaltyRedemption?.amount ?? legacyLoyaltyRedemption?.redemptionAmount ?? null;
+  const hasLoyaltyRedemption = Boolean(redeemedPoints && redeemedAmount);
+  // The transaction's point summary, stated once. Runtime's finalized loyalty summary is the single
+  // authority; a Sale without one (earlier history) falls back to its finalized earning alone.
+  const receiptPoints = receiptPointSummary(sale, customer);
+  return (
+    <>
+      <header className="text-center">
+        <h2 className="text-lg font-black tracking-tight">{businessName}</h2>
+        <p className="mt-1 text-xs text-slate-500">{branchName}</p>
+        {branchAddress?.trim() ? (
+          <p className="mt-0.5 text-[11px] text-slate-500">{branchAddress.trim()}</p>
+        ) : null}
+        <div className="my-4 border-t border-dashed border-slate-300" />
+        <p className="font-mono text-xs font-semibold">{transactionNumber(sale, locale)}</p>
+        <p className="mt-1 text-[11px] text-slate-500">{transactionDate}</p>
+        <p className="mt-1 text-[11px] text-slate-500">
+          {copy('Cashier')}: {cashierName}
+        </p>
+      </header>
+
+      {/*
+        One stacked hierarchy for 80 mm and 58 mm alike: who the customer is, then (for a member)
+        this Sale's point summary. Customer identity and points never compete side by side.
+      */}
+      <section className="mt-4 space-y-3 text-xs" aria-label={copy('Customer')}>
+        <div>
+          <p className="font-semibold">{copy('Customer')}</p>
+          <p className="mt-1 break-words">{customerDisplayName(customer, locale)}</p>
+          {customerDisplayDetail(customer) ? (
+            // A phone or reference is one token: it keeps the full width and never breaks per character.
+            <p className="whitespace-nowrap text-slate-500">{customerDisplayDetail(customer)}</p>
+          ) : null}
+        </div>
+        {receiptPoints ? (
+          <div data-testid="receipt-points">
+            <p className="font-semibold">{copy('Points')}</p>
+            <dl className="mt-1 space-y-0.5 tabular-nums">
+              {receiptPoints.balanceAfter !== null ? (
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-slate-500">{copy('Receipt point balance')}</dt>
+                  <dd className="font-bold">{pointQuantity(receiptPoints.balanceAfter, locale)}</dd>
+                </div>
+              ) : null}
+              {receiptPoints.earnedPoints ? (
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-slate-500">{copy('Points gained')}</dt>
+                  <dd className="font-semibold">
+                    +{pointQuantity(receiptPoints.earnedPoints, locale)}
+                  </dd>
+                </div>
+              ) : null}
+              {receiptPoints.redeemedPoints ? (
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-slate-500">{copy('Used')}</dt>
+                  <dd className="font-semibold">
+                    −{pointQuantity(receiptPoints.redeemedPoints, locale)}
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
+          </div>
+        ) : null}
+      </section>
+
+      <div className="my-4 border-t border-dashed border-slate-300" />
+
+      <section className="space-y-2.5">
+        {activeLines.map((line) => {
+          const lineDiscounts = lineDiscountRows(sale, line, copy('Discount'));
+          const additions = saleLineAdditions(line);
+          const receiptBase = saleLineBase(line, additions);
+          return (
+            <div key={line.id} className="text-xs leading-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-bold">{line.itemNameSnapshot}</p>
+                  {line.variantNameSnapshot ? (
+                    <p className="mt-0.5 text-slate-500">{line.variantNameSnapshot}</p>
+                  ) : null}
+                </div>
+                <p className="shrink-0 font-bold">{money(line.grossAmount, locale)}</p>
+              </div>
+              {additions.length ? (
+                <>
+                  <div className="mt-1 flex items-start justify-between gap-3 text-slate-500">
+                    <span>
+                      {quantity(line.quantity)} × {money(receiptBase.unitPrice, locale)}
+                    </span>
+                    <span className="shrink-0">{money(receiptBase.amount, locale)}</span>
+                  </div>
+                  {/* Customer receipt: only additions chosen during the transaction, as a breakdown of the line total. */}
+                  {additions.map((addition) => (
+                    <div key={addition.id} className="mt-1 pl-2">
+                      <p className="break-words">+ {addition.name}</p>
+                      <div className="flex items-start justify-between gap-3 text-slate-500">
+                        <span>
+                          {quantity(addition.quantity)} × {money(addition.unitPrice, locale)}
+                        </span>
+                        <span className="shrink-0">{money(addition.amount, locale)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <p className="mt-1 text-slate-500">
+                  {quantity(line.quantity)} × {money(line.effectiveUnitPrice, locale)}
+                </p>
+              )}
+              {isPositiveDecimal(line.itemTaxAmount ?? '0') ? (
+                <div className="mt-1 flex items-start justify-between gap-3 text-slate-500">
+                  <span>{lineTaxLabel(line, copy('Tax'))}</span>
+                  <span className="shrink-0">{money(line.itemTaxAmount ?? '0', locale)}</span>
+                </div>
+              ) : null}
+              {lineDiscounts.length ? (
+                <div className="mt-1 text-slate-500">
+                  <p className="text-[10px] font-semibold">{copy('Discounts and promotions')}</p>
+                  {lineDiscounts.map((discount) => (
+                    <div key={discount.id} className="pl-2">
+                      <p className="break-words">- {discount.title}</p>
+                      {discount.note ? (
+                        <p className="break-words text-[10px] leading-3">{discount.note}</p>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              {line.loyaltyEarning?.state === 'FINALIZED' ? (
+                <div className="mt-1 flex items-start justify-between gap-3 text-slate-500">
+                  <span>{copy('Points earned')}</span>
+                  <span className="shrink-0 font-medium text-slate-950">
+                    +{pointQuantity(line.loyaltyEarning.pointsEarned, locale)}
+                  </span>
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+      </section>
+
+      <div className="my-4 border-t border-dashed border-slate-300" />
+
+      <dl className="space-y-1.5 text-xs">
+        <div className="flex justify-between gap-3">
+          <dt className="text-slate-500">{copy('Subtotal')}</dt>
+          <dd>{money(sale.grossAmount, locale)}</dd>
+        </div>
+        {hasTax ? (
+          <div className="flex justify-between gap-3">
+            <dt className="text-slate-500">{saleTaxLabel(sale, copy('Tax'))}</dt>
+            <dd>{money(sale.taxAmount, locale)}</dd>
+          </div>
+        ) : null}
+        {discountRows.length ? (
+          <p className="pt-0.5 text-[10px] font-semibold text-slate-500">
+            {copy('Discounts and promotions')}
+          </p>
+        ) : null}
+        {discountRows.map((row) => {
+          const text = discountPresentation(row, copy('Discount'));
+          return (
+            <div key={row.id} className="flex items-start justify-between gap-3 pl-2">
+              <dt className="min-w-0 text-slate-500">
+                {text.title}
+                {text.note ? (
+                  <span className="block break-words text-[10px] leading-3">{text.note}</span>
+                ) : null}
+              </dt>
+              <dd className="shrink-0">−{money(row.amount, locale)}</dd>
+            </div>
+          );
+        })}
+        {hasDiscount && discountRows.length === 0 ? (
+          <div className="flex justify-between gap-3">
+            <dt className="text-slate-500">{copy('Discount')}</dt>
+            <dd>−{money(sale.discountAmount, locale)}</dd>
+          </div>
+        ) : null}
+        {hasLoyaltyRedemption ? (
+          <div className="flex items-start justify-between gap-3">
+            <dt className="min-w-0 text-slate-500">
+              {copy('Loyalty redemption')}
+              <span className="block text-[10px] leading-3">
+                {pointQuantity(redeemedPoints, locale)} {copy('points used')}
+              </span>
+            </dt>
+            <dd className="shrink-0">−{money(redeemedAmount!, locale)}</dd>
+          </div>
+        ) : null}
+        <div className="mt-2 flex justify-between gap-3 border-t border-slate-200 pt-2 text-sm font-black">
+          <dt>{copy('Total').toUpperCase()}</dt>
+          <dd>{money(sale.totalAmount, locale)}</dd>
+        </div>
+      </dl>
+
+      <div className="my-4 border-t border-dashed border-slate-300" />
+
+      <section className="space-y-1.5 text-xs">
+        <p className="flex justify-between gap-3 font-semibold">
+          <span>{copy('Payment')}</span>
+          {composition.isSplit ? <span>{copy('Split Payment')}</span> : null}
+        </p>
+        {composition.components.map((payment) => (
+          <div key={payment.id} className="flex items-start justify-between gap-3">
+            <span className="min-w-0 text-slate-500">
+              {paymentAccountLabel(payment, (method) => label(method))}
+              {payment.providerReference ? (
+                <span className="block break-all font-mono text-[10px]">
+                  {payment.providerReference}
+                </span>
+              ) : null}
+            </span>
+            <span className="shrink-0">{money(payment.appliedAmount, locale)}</span>
+          </div>
+        ))}
+        {composition.isSplit ? (
+          <div className="mt-2 flex justify-between gap-3 border-t border-slate-200 pt-2 font-semibold">
+            <span>{copy('Total paid')}</span>
+            <span>{money(composition.totalPaid, locale)}</span>
+          </div>
+        ) : null}
+        {cashTenderNote(settlement) ? (
+          <div className="flex justify-between gap-3">
+            <span className="text-slate-500">{copy('Cash received')}</span>
+            <span>{money(settlement.cashTendered!, locale)}</span>
+          </div>
+        ) : null}
+        {cashTenderNote(settlement)?.change ? (
+          <div className="flex justify-between gap-3">
+            <span className="text-slate-500">{copy('Change')}</span>
+            <span>{money(settlement.cashChange!, locale)}</span>
+          </div>
+        ) : null}
+      </section>
+
+      <div className="my-4 border-t border-dashed border-slate-300" />
+      <p className="text-center text-[11px] text-slate-500">
+        {copy('Thank you for your purchase.')}
+      </p>
+      <div className="pos-receipt-tear" aria-hidden="true" />
+    </>
+  );
+}
+
+export function ReferenceOrderAdjustmentDialog({
+  sale,
+  items,
+  locale,
+  isMutating: mutating,
+  onClose,
+  onAdd,
+  onQuantity,
+  onRemove,
+  onEdit,
+  onCorrect,
+  onPreview,
+  loadConfiguratorState,
+  loadCandidates,
+  canAdjust,
+  canRefundPayment,
+  onCompensate,
+  employees = [],
+}: {
+  sale: Sale | null;
+  /** Service performers, to name who performs a Service's additional items. */
+  employees?: readonly Employee[];
+  /**
+   * Every active standalone sellable item. Never the POS page's filtered catalog: adding or
+   * correcting an item has its own Product/Service choice and search.
+   */
+  items: readonly CatalogItem[];
+  locale: string;
+  isMutating: boolean;
+  onClose: () => void;
+  /** Adds a new item, chosen and configured in the shared item configuration, as a new line. */
+  onAdd: (item: CatalogItem, configuration: ItemConfiguration) => Promise<unknown>;
+  onQuantity: (line: SaleLine, quantity: string) => void;
+  onRemove: (line: SaleLine) => void;
+  /** Ordinary edit of a line whose work has not started: same item, new configuration, no reason. */
+  onEdit: (line: SaleLine, input: { lines: ReplaceSaleLineInput['lines'] }) => Promise<unknown>;
+  /** One atomic correction with a full item configuration; it may become several Sale lines. */
+  onCorrect: (
+    line: SaleLine,
+    input: { lines: ReplaceSaleLineInput['lines']; reason: string },
+  ) => Promise<unknown>;
+  /** Runtime-calculated impact of the same correction (same reason, same rules); nothing is saved. */
+  onPreview: (
+    line: SaleLine,
+    input: { lines: ReplaceSaleLineInput['lines']; reason: string },
+  ) => Promise<ReplaceLinePreview>;
+  /** Everything the shared item configuration needs for one item at this location. */
+  loadConfiguratorState: (item: CatalogItem) => Promise<ItemConfiguratorState>;
+  loadCandidates: (q: string) => Promise<{ items: ComponentCandidate[] }>;
+  /** Session may adjust this Sale in its current state (see `canAdjustOrder`). */
+  canAdjust: boolean;
+  canRefundPayment: boolean;
+  onCompensate: (sale: Sale, paymentId: string, amount: string) => Promise<unknown>;
+}) {
+  const { copy } = useOperationalLocalization();
+  // Without the adjustment permission every mutating control is off; closing stays available.
+  const isMutating = mutating || !canAdjust;
+  const [addOpen, setAddOpen] = useState(false);
+  // Ordinary edit of a not-yet-started line, in the shared item configuration.
+  const [editLine, setEditLine] = useState<SaleLine | null>(null);
+  const [editState, setEditState] = useState<ItemConfiguratorState | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
+  // Quantities when the dialog opened; only rows that differ show what changed.
+  const [baseline] = useState<ReadonlyMap<string, string>>(
+    () =>
+      new Map(
+        (sale?.lines ?? [])
+          .filter((line) => line.removedAt === null)
+          .map((line) => [line.id, line.quantity]),
+      ),
+  );
+  const [correctionLine, setCorrectionLine] = useState<SaleLine | null>(null);
+  const [replacementItemId, setReplacementItemId] = useState('');
+  // The shared item configuration of the replacement: the same model as adding or editing an item.
+  const [configuratorState, setConfiguratorState] = useState<ItemConfiguratorState | null>(null);
+  const [configuratorLoading, setConfiguratorLoading] = useState(false);
+  const [replacementConfiguration, setReplacementConfiguration] =
+    useState<ItemConfiguration | null>(null);
+  const [correctionReason, setCorrectionReason] = useState('');
+  // The Sale returned by the persisted correction/compensation is the settlement authority.
+  const [appliedSale, setAppliedSale] = useState<Sale | null>(null);
+  const [correctionSaved, setCorrectionSaved] = useState(false);
+  const [correctionError, setCorrectionError] = useState<string | null>(null);
+  const [compensationState, setCompensationState] = useState<'IDLE' | 'LOADING' | 'ERROR'>('IDLE');
+  const [correctionPreview, setCorrectionPreview] = useState<ReplaceLinePreview | null>(null);
+  const [previewState, setPreviewState] = useState<'IDLE' | 'LOADING' | 'ERROR'>('IDLE');
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const previewRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    // Keep the authoritative result in view; it renders below the form.
+    if (correctionPreview)
+      previewRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+  }, [correctionPreview]);
+  // Only the latest chosen replacement may fill the configuration.
+  const replacementRequest = useRef(0);
+  const loadReplacementState = (itemId: string) => {
+    const item = items.find((entry) => entry.id === itemId);
+    const ticket = ++replacementRequest.current;
+    setConfiguratorState(null);
+    setReplacementConfiguration(null);
+    if (!item) return;
+    setConfiguratorLoading(true);
+    void loadConfiguratorState(item)
+      .then((state) => {
+        if (ticket === replacementRequest.current) setConfiguratorState(state);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (ticket === replacementRequest.current) setConfiguratorLoading(false);
+      });
+  };
+  const openEdit = (line: SaleLine) => {
+    const item = items.find((entry) => entry.id === line.catalogItemId);
+    if (!item) return;
+    setEditError(null);
+    setEditState(null);
+    setEditLine(line);
+    void loadConfiguratorState(item)
+      .then(setEditState)
+      .catch((error: unknown) => {
+        setEditLine(null);
+        setEditError(cashierTransactionErrorMessage(error));
+      });
+  };
+  const closeEdit = () => {
+    setEditLine(null);
+    setEditState(null);
+  };
+  const confirmEdit = (configuration: ItemConfiguration) => {
+    if (!editLine || !editState) return;
+    const line = editLine;
+    const lines = replacementLinesOf(editState.item.id, configuration.catalogVariantId, {
+      ...configuration,
+      soldByEmployeeId: configuration.soldBy?.employeeId ?? null,
+    });
+    closeEdit();
+    void onEdit(line, { lines }).catch((error: unknown) =>
+      setEditError(
+        correctionErrorMessage(
+          error,
+          copy('The item could not be changed. Reload the transaction and try again.'),
+          locale,
+        ),
+      ),
+    );
+  };
+
+  if (!sale) return null;
+
+  const activeLines = sale.lines.filter((line) => line.removedAt === null);
+  const removedCount = [...baseline.keys()].filter(
+    (lineId) => !activeLines.some((line) => line.id === lineId),
+  ).length;
+  const changed =
+    removedCount > 0 ||
+    activeLines.some((line) => {
+      const before = baseline.get(line.id);
+      return before === undefined || !createDecimal(before).equals(createDecimal(line.quantity));
+    });
+  // Both figures come from the Runtime-returned Sale after each command.
+  const settlement = saleSettlement(sale);
+  const paidAmount = createDecimal(settlement.totalPaid);
+  const saleTotal = createDecimal(sale.totalAmount);
+  const consequence = paidAmount.greaterThan(saleTotal)
+    ? {
+        label: copy('Refund'),
+        amount: paidAmount.minus(saleTotal).toFixed(4),
+        tone: 'text-[var(--color-warning)]',
+      }
+    : paidAmount.greaterThan(createDecimal('0')) && saleTotal.greaterThan(paidAmount)
+      ? {
+          label: copy('Additional payment'),
+          amount: settlement.balanceDue,
+          tone: 'text-[var(--color-brand)]',
+        }
+      : { label: copy('Total'), amount: sale.totalAmount, tone: 'text-[var(--color-text)]' };
+  const correctionSource = correctionLine;
+  const replacementLines = () =>
+    replacementConfiguration && configuratorState
+      ? replacementLinesOf(configuratorState.item.id, replacementConfiguration.catalogVariantId, {
+          ...replacementConfiguration,
+          // Carried explicitly so a correction never silently drops the salesperson.
+          soldByEmployeeId: replacementConfiguration.soldBy?.employeeId ?? null,
+        })
+      : [];
+  // Ready exactly when the shared configuration is valid: every unit satisfied, price resolved.
+  const correctionReady = Boolean(configuratorState && replacementConfiguration);
+  const previewCorrection = () => {
+    if (!correctionSource || !correctionReady || !correctionReason.trim()) return;
+    setPreviewState('LOADING');
+    setPreviewError(null);
+    void onPreview(correctionSource, { lines: replacementLines(), reason: correctionReason.trim() })
+      .then((value) => {
+        setCorrectionPreview(value);
+        setPreviewState('IDLE');
+      })
+      .catch((error: unknown) => {
+        setPreviewError(
+          correctionErrorMessage(
+            error,
+            'Koreksi tidak dapat dipratinjau. Muat ulang transaksi lalu coba lagi.',
+            locale,
+          ),
+        );
+        setPreviewState('ERROR');
+      });
+  };
+  const asSale = (value: unknown): Sale | null =>
+    typeof value === 'object' && value !== null && 'payments' in value && 'totalAmount' in value
+      ? (value as Sale)
+      : null;
+  const confirmCorrection = () => {
+    if (!correctionSource) return;
+    setCorrectionError(null);
+    // Keep the flow open: whether money must now be returned depends on the persisted Sale.
+    void onCorrect(correctionSource, { lines: replacementLines(), reason: correctionReason.trim() })
+      .then((updated) => {
+        setAppliedSale(asSale(updated));
+        setCorrectionSaved(true);
+      })
+      .catch((error: unknown) =>
+        setCorrectionError(
+          correctionErrorMessage(
+            error,
+            'Koreksi belum dapat disimpan. Muat ulang transaksi lalu coba lagi.',
+            locale,
+          ),
+        ),
+      );
+  };
+  const authoritativeSale = appliedSale ?? sale;
+  const authoritativeSettlement = saleSettlement(authoritativeSale);
+  const settledPaid = createDecimal(authoritativeSettlement.totalPaid);
+  const settledTotal = createDecimal(authoritativeSale.totalAmount);
+  const settledOverpayment = settledPaid.greaterThan(settledTotal)
+    ? settledPaid.minus(settledTotal)
+    : createDecimal('0');
+  const settledBalance = settledTotal.greaterThan(settledPaid)
+    ? settledTotal.minus(settledPaid)
+    : createDecimal('0');
+  const settlementCashPayment = authoritativeSale.payments.find(
+    (item) =>
+      item.status === 'SUCCEEDED' &&
+      item.method === 'CASH' &&
+      createDecimal(item.appliedAmount).greaterThan(0),
+  );
+  const settlementProviderPayment = authoritativeSale.payments.find(
+    (item) =>
+      item.status === 'SUCCEEDED' &&
+      item.method !== 'CASH' &&
+      createDecimal(item.appliedAmount).greaterThan(0),
+  );
+  const compensateOverpayment = (paymentId: string) => {
+    setCompensationState('LOADING');
+    void onCompensate(authoritativeSale, paymentId, settledOverpayment.toFixed(4))
+      .then((updated) => {
+        setAppliedSale(asSale(updated) ?? appliedSale);
+        setCompensationState('IDLE');
+      })
+      .catch(() => setCompensationState('ERROR'));
+  };
+  const figure = (label: string, value: string, className = '') => (
+    <div className={`flex items-baseline justify-between gap-3 ${className}`}>
+      <dt>{label}</dt>
+      <dd className="tabular-nums">{money(value, locale)}</dd>
+    </div>
+  );
+  const stepperClass =
+    'flex size-8 items-center justify-center rounded-lg border border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] disabled:cursor-not-allowed disabled:opacity-40';
+
+  return (
+    <>
+      <Dialog
+        open
+        onClose={onClose}
+        title={copy('Adjust order')}
+        description={transactionNumber(sale, locale)}
+        ariaLabel={copy('Adjust order')}
+        closeOnEscape
+        closeOnOverlay
+        className="pos-reference-dialog w-full max-w-xl overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
+        footer={
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0" aria-live="polite">
+              <p className="text-[11px] text-[var(--color-text-muted)]">{consequence.label}</p>
+              <p className={`text-base font-semibold tabular-nums ${consequence.tone}`}>
+                {money(consequence.amount, locale)}
+              </p>
+            </div>
+            <div className="flex shrink-0 gap-2">
+              {changed ? null : (
+                <Button variant="ghost" onClick={onClose}>
+                  {copy('Cancel')}
+                </Button>
+              )}
+              <Button disabled={mutating} onClick={onClose}>
+                {copy('Save adjustment')}
+              </Button>
+            </div>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-xs text-[var(--color-text-muted)]">
+            {copy(
+              hasSuccessfulPayment(sale)
+                ? 'Each change is recorded right away. Items already paid stay on the payment record.'
+                : 'Each change is recorded right away.',
+            )}
+          </p>
+          <ul className="divide-y divide-[var(--color-border)] rounded-xl border border-[var(--color-border)]">
+            {activeLines.map((line) => {
+              // Runtime stays the authority; this only decides which controls are offered.
+              const mode = saleLineAdjustmentMode(sale, line, {
+                addedInThisAdjustment: !baseline.has(line.id),
+              });
+              const correctedFrom = correctionSourceOf(sale, line);
+              const editable = mode === 'EDIT';
+              const canDecrease =
+                editable && createDecimal(line.quantity).greaterThan(createDecimal('1'));
+              const sellable = items.some((item) => item.id === line.catalogItemId);
+              const before = baseline.get(line.id);
+              const lineChange =
+                before === undefined
+                  ? copy('New')
+                  : createDecimal(before).equals(createDecimal(line.quantity))
+                    ? null
+                    : `${copy('Was')} ${quantity(before)}`;
+              return (
+                <li
+                  key={line.id}
+                  data-adjustment-mode={mode}
+                  className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2"
+                >
+                  <div className="min-w-0 flex-1 basis-40">
+                    <p
+                      className="truncate text-sm"
+                      title={`${line.itemNameSnapshot}${line.variantNameSnapshot ? ` · ${line.variantNameSnapshot}` : ''}`}
+                    >
+                      <span className="font-semibold">{line.itemNameSnapshot}</span>
+                      {line.variantNameSnapshot ? (
+                        <span className="text-[var(--color-text-muted)]">
+                          {' '}
+                          · {line.variantNameSnapshot}
+                        </span>
+                      ) : null}
+                    </p>
+                    <p className="flex flex-wrap items-center gap-x-2 text-xs tabular-nums text-[var(--color-text-muted)]">
+                      {money(line.effectiveUnitPrice, locale)}
+                      {lineChange ? (
+                        <span className="rounded-full bg-[var(--color-brand)]/10 px-1.5 text-[10px] font-semibold text-[var(--color-brand)]">
+                          {lineChange}
+                        </span>
+                      ) : null}
+                    </p>
+                    {line.soldByEmployeeNameSnapshot ? (
+                      // The Product salesperson; Service performers are a separate concept.
+                      <p className="text-[11px] text-[var(--color-text-muted)]">
+                        {copy('Sold by')} {line.soldByEmployeeNameSnapshot}
+                      </p>
+                    ) : null}
+                    {(line.compositionComponents ?? [])
+                      .filter(
+                        (component) =>
+                          component.componentSource === 'SALE_SELECTED' &&
+                          component.performers?.length,
+                      )
+                      .map((component) => (
+                        // Part of this Service's work, never a Product sale of its own.
+                        <p
+                          key={component.id}
+                          className="text-[11px] text-[var(--color-text-muted)]"
+                        >
+                          +{' '}
+                          {[component.itemNameSnapshot, component.variantNameSnapshot]
+                            .filter(Boolean)
+                            .join(' / ')}{' '}
+                          ·{' '}
+                          {additionPerformedBy(
+                            {
+                              performerIds: component.performers!.map(
+                                (performer) => performer.employeeId,
+                              ),
+                            },
+                            employees,
+                            copy,
+                          )}
+                        </p>
+                      ))}
+                    {correctedFrom ? (
+                      <p className="text-[11px] text-[var(--color-text-muted)]">
+                        Koreksi dari {correctedFrom.itemNameSnapshot}
+                        {correctedFrom.fulfillment ? ' · pekerjaan awal tetap tercatat' : ''}
+                      </p>
+                    ) : null}
+                    {mode === 'LOCKED' ? (
+                      <p className="text-[11px] text-[var(--color-text-muted)]">
+                        Item yang sudah selesai dikerjakan tidak dapat dikoreksi.
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="ml-auto flex shrink-0 items-center gap-1">
+                    {editable ? (
+                      <>
+                        <button
+                          type="button"
+                          aria-label={`${copy('Decrease quantity')} ${line.itemNameSnapshot}`}
+                          disabled={!canDecrease || isMutating}
+                          onClick={() =>
+                            onQuantity(
+                              line,
+                              createDecimal(line.quantity).minus(createDecimal('1')).toFixed(4),
+                            )
+                          }
+                          className={stepperClass}
+                        >
+                          <Minus className="size-3.5" />
+                        </button>
+                        <span className="w-7 text-center text-xs font-semibold tabular-nums">
+                          {quantity(line.quantity)}
+                        </span>
+                        <button
+                          type="button"
+                          aria-label={`${copy('Increase quantity')} ${line.itemNameSnapshot}`}
+                          disabled={isMutating}
+                          onClick={() =>
+                            onQuantity(
+                              line,
+                              createDecimal(line.quantity).plus(createDecimal('1')).toFixed(4),
+                            )
+                          }
+                          className={stepperClass}
+                        >
+                          <Plus className="size-3.5" />
+                        </button>
+                        {sale.status === 'OPEN' ? (
+                          <button
+                            type="button"
+                            aria-label={`${copy('Edit item')} ${line.itemNameSnapshot}`}
+                            title={copy('Edit item')}
+                            // Same item, new configuration; an item no longer sold is removed instead.
+                            disabled={isMutating || !sellable}
+                            onClick={() => openEdit(line)}
+                            className={stepperClass}
+                          >
+                            <Pencil className="size-3.5" aria-hidden="true" />
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          aria-label={`${copy('Remove')} ${line.itemNameSnapshot}`}
+                          disabled={isMutating}
+                          onClick={() => onRemove(line)}
+                          className="ml-0.5 flex size-8 items-center justify-center rounded-lg text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </>
+                    ) : (
+                      // Once work is in progress the quantity, removal and configuration of an
+                      // existing line change only through the audited correction, never directly.
+                      <span className="px-1 text-xs font-semibold tabular-nums text-[var(--color-text-muted)]">
+                        × {quantity(line.quantity)}
+                      </span>
+                    )}
+                    {mode === 'CORRECTION' && sale.status === 'OPEN' ? (
+                      <button
+                        type="button"
+                        aria-label={`Koreksi item ${line.itemNameSnapshot}`}
+                        disabled={isMutating}
+                        onClick={() => {
+                          setCorrectionLine(line);
+                          // The current item starts selected and configured exactly as the line, so a
+                          // variant or quantity correction needs no search. Choosing another item in
+                          // the field changes the Catalog item and starts a fresh configuration.
+                          const current = items.some((item) => item.id === line.catalogItemId)
+                            ? line.catalogItemId
+                            : '';
+                          setReplacementItemId(current);
+                          loadReplacementState(current);
+                          setAppliedSale(null);
+                          setCorrectionSaved(false);
+                          setCorrectionError(null);
+                          setPreviewError(null);
+                          setCompensationState('IDLE');
+                          setCorrectionReason('');
+                          setCorrectionPreview(null);
+                          setPreviewState('IDLE');
+                        }}
+                        className="ml-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-[var(--color-brand)] hover:bg-[var(--color-brand)]/10 disabled:opacity-40"
+                      >
+                        Koreksi item
+                      </button>
+                    ) : null}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          {removedCount ? (
+            <p className="text-xs text-[var(--color-text-muted)]">
+              {removedCount} {copy('items removed')}
+            </p>
+          ) : null}
+          {editError ? <DAlert variant="danger">{editError}</DAlert> : null}
+
+          <button
+            type="button"
+            onClick={() => setAddOpen(true)}
+            disabled={isMutating}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg px-2 text-sm font-semibold text-[var(--color-brand)] hover:bg-[var(--color-brand)]/10 disabled:opacity-50"
+          >
+            <Plus className="size-4" aria-hidden="true" />
+            {copy('Add item')}
+          </button>
+        </div>
+      </Dialog>
+      {correctionLine ? (
+        <Dialog
+          open
+          onClose={() => setCorrectionLine(null)}
+          title="Koreksi item"
+          description={transactionNumber(sale, locale)}
+          ariaLabel="Koreksi item"
+          closeOnOverlay={false}
+          className="pos-reference-dialog w-full max-w-lg overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
+          footer={
+            correctionSaved ? (
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <Button onClick={() => setCorrectionLine(null)}>Selesai</Button>
+              </div>
+            ) : (
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
+                <Button
+                  variant="ghost"
+                  className="sm:mr-auto"
+                  onClick={() => setCorrectionLine(null)}
+                >
+                  Kembali
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={!correctionReady || !correctionReason.trim() || isMutating}
+                  loading={previewState === 'LOADING'}
+                  onClick={previewCorrection}
+                >
+                  Lihat dampak
+                </Button>
+                <Button
+                  disabled={!correctionPreview || !correctionReason.trim() || isMutating}
+                  loading={isMutating}
+                  onClick={confirmCorrection}
+                >
+                  Konfirmasi koreksi
+                </Button>
+              </div>
+            )
+          }
+        >
+          {correctionSaved ? (
+            <div className="space-y-4" aria-live="polite">
+              <DAlert variant="success">Koreksi tersimpan.</DAlert>
+              <section
+                aria-label="Penyelesaian pembayaran"
+                className="rounded-xl bg-[var(--color-surface-muted)] p-3 text-sm"
+              >
+                <dl className="space-y-1.5 text-[var(--color-text-muted)]">
+                  {figure(
+                    'Total transaksi',
+                    authoritativeSale.totalAmount,
+                    'font-semibold text-[var(--color-text)]',
+                  )}
+                  {figure('Sudah dibayar', settledPaid.toFixed(4))}
+                </dl>
+                <div className="mt-2 space-y-1.5 border-t border-[var(--color-border)] pt-2">
+                  {settledOverpayment.greaterThan(createDecimal('0')) ? (
+                    <>
+                      <dl>
+                        {figure(
+                          'Kelebihan pembayaran',
+                          settledOverpayment.toFixed(4),
+                          'font-semibold text-[var(--color-danger)]',
+                        )}
+                      </dl>
+                      <p className="text-xs text-[var(--color-text-muted)]">
+                        Transaksi belum dapat diselesaikan sampai kelebihan pembayaran dikembalikan.
+                      </p>
+                      {settlementCashPayment ? (
+                        canRefundPayment ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            loading={compensationState === 'LOADING'}
+                            disabled={isMutating}
+                            onClick={() => compensateOverpayment(settlementCashPayment.id)}
+                          >
+                            Kembalikan kelebihan pembayaran
+                          </Button>
+                        ) : (
+                          <p className="text-xs text-[var(--color-text-muted)]">
+                            Pengembalian dana memerlukan pengguna dengan izin pengembalian
+                            pembayaran.
+                          </p>
+                        )
+                      ) : settlementProviderPayment ? (
+                        <p className="text-xs text-[var(--color-text-muted)]">
+                          Pengembalian pembayaran ini memerlukan konfirmasi dari penyedia
+                          pembayaran.
+                        </p>
+                      ) : null}
+                      {compensationState === 'ERROR' ? (
+                        <DAlert variant="danger">
+                          Pengembalian kelebihan pembayaran belum dapat diselesaikan. Muat ulang
+                          transaksi lalu coba lagi.
+                        </DAlert>
+                      ) : null}
+                    </>
+                  ) : settledBalance.greaterThan(createDecimal('0')) ? (
+                    <dl>
+                      {figure(
+                        'Sisa pembayaran',
+                        settledBalance.toFixed(4),
+                        'font-semibold text-[var(--color-text)]',
+                      )}
+                    </dl>
+                  ) : (
+                    <p className="font-semibold text-[var(--color-text)]">
+                      Pembayaran sudah sesuai
+                    </p>
+                  )}
+                </div>
+              </section>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <div>
+                  <p className="text-xs text-[var(--color-text-muted)]">Item saat ini</p>
+                  <p className="text-sm font-semibold text-[var(--color-text)]">
+                    {correctionLine.itemNameSnapshot}
+                  </p>
+                  <p className="text-xs tabular-nums text-[var(--color-text-muted)]">
+                    {quantity(correctionLine.quantity)} ×{' '}
+                    {money(correctionLine.effectiveUnitPrice, locale)}
+                  </p>
+                  {correctionLine.fulfillment?.status === 'IN_PROGRESS' ? (
+                    <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                      Pekerjaan yang sudah berjalan tetap tercatat pada item ini.
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+              <div className="space-y-3 border-t border-[var(--color-border)] pt-4">
+                <CatalogItemAutocomplete
+                  label="Item koreksi"
+                  ariaLabel="Item koreksi"
+                  items={items}
+                  value={replacementItemId || null}
+                  locale={locale}
+                  disabled={isMutating}
+                  onChange={(item) => {
+                    // The same item keeps its configuration; a different item starts fresh.
+                    if ((item?.id ?? '') === replacementItemId) return;
+                    setReplacementItemId(item?.id ?? '');
+                    setCorrectionPreview(null);
+                    setPreviewError(null);
+                    loadReplacementState(item?.id ?? '');
+                  }}
+                />
+                {configuratorState ? (
+                  <ItemConfigurator
+                    // A different item starts a fresh configuration; the same item starts from the line.
+                    key={configuratorState.item.id}
+                    presentation="inline"
+                    {...configuratorState}
+                    loadCandidates={loadCandidates}
+                    {...(correctionSource &&
+                    correctionSource.catalogItemId === configuratorState.item.id
+                      ? {
+                          initial: {
+                            ...saleLineConfiguration(correctionSource, employees),
+                          },
+                        }
+                      : {})}
+                    onConfigurationChange={(configuration) => {
+                      setReplacementConfiguration(configuration);
+                      setCorrectionPreview(null);
+                      setPreviewError(null);
+                    }}
+                  />
+                ) : configuratorLoading ? (
+                  <p className="text-sm text-[var(--color-text-muted)]">Memuat konfigurasi item…</p>
+                ) : null}
+                <DTextarea
+                  label="Alasan koreksi"
+                  rows={3}
+                  value={correctionReason}
+                  placeholder="Contoh: Salah memilih layanan"
+                  onChange={setCorrectionReason}
+                />
+              </div>
+              {previewState === 'ERROR' && previewError ? (
+                <DAlert variant="danger">{previewError}</DAlert>
+              ) : null}
+              {correctionError ? <DAlert variant="danger">{correctionError}</DAlert> : null}
+              {correctionPreview ? (
+                <section
+                  ref={previewRef}
+                  aria-label="Dampak koreksi"
+                  aria-live="polite"
+                  className="rounded-xl bg-[var(--color-surface-muted)] p-3 text-sm"
+                >
+                  <ul
+                    aria-label="Hasil koreksi"
+                    className="mb-3 space-y-2 border-b border-[var(--color-border)] pb-3"
+                  >
+                    {correctionPreview.replacements.map((replacement, index) => (
+                      <li key={`${replacement.catalogItemId}-${index}`} className="text-xs">
+                        <div className="flex items-start justify-between gap-3">
+                          <span className="min-w-0 font-semibold text-[var(--color-text)]">
+                            {replacement.itemName}
+                            {replacement.variantName ? ` · ${replacement.variantName}` : ''}
+                            <span className="block font-normal tabular-nums text-[var(--color-text-muted)]">
+                              {quantity(replacement.quantity)} ×{' '}
+                              {money(replacement.unitAmount, locale)}
+                            </span>
+                          </span>
+                          <span className="shrink-0 font-semibold tabular-nums">
+                            {money(replacement.grossAmount, locale)}
+                          </span>
+                        </div>
+                        {replacement.additions.map((addition) => (
+                          <p
+                            key={addition.name}
+                            className="mt-0.5 pl-3 text-[var(--color-text-muted)]"
+                          >
+                            + {addition.name} × {quantity(addition.quantity)} ·{' '}
+                            {money(addition.amount, locale)}
+                          </p>
+                        ))}
+                      </li>
+                    ))}
+                  </ul>
+                  <dl className="space-y-1.5 text-[var(--color-text-muted)]">
+                    {figure('Total sebelumnya', correctionPreview.currentTotalAmount)}
+                    {figure(
+                      'Total setelah koreksi',
+                      correctionPreview.correctedTotalAmount,
+                      'font-semibold text-[var(--color-text)]',
+                    )}
+                    {figure('Sudah dibayar', correctionPreview.netSuccessfulPaidAmount)}
+                  </dl>
+                  <div className="mt-2 space-y-1.5 border-t border-[var(--color-border)] pt-2">
+                    {/* Runtime's consequence: what remains to pay, or what is returned as a new refund. */}
+                    {correctionPreview.refundAmount &&
+                    createDecimal(correctionPreview.refundAmount).greaterThan(
+                      createDecimal('0'),
+                    ) ? (
+                      <dl>
+                        {figure(
+                          'Dikembalikan ke pelanggan',
+                          correctionPreview.refundAmount,
+                          'font-semibold text-[var(--color-warning)]',
+                        )}
+                      </dl>
+                    ) : (
+                      <dl>
+                        {figure(
+                          'Sisa pembayaran',
+                          correctionPreview.remainingPaymentAmount,
+                          'font-semibold text-[var(--color-text)]',
+                        )}
+                      </dl>
+                    )}
+                  </div>
+                </section>
+              ) : null}
+            </div>
+          )}
+        </Dialog>
+      ) : null}
+      {editLine && editState ? (
+        <ItemConfigurator
+          {...editState}
+          initial={saleLineConfiguration(editLine, employees)}
+          confirmLabel={copy('Save changes')}
+          loadCandidates={loadCandidates}
+          onConfirm={confirmEdit}
+          onClose={closeEdit}
+        />
+      ) : null}
+      {addOpen ? (
+        <AddTransactionItemDialog
+          items={items}
+          locale={locale}
+          loadConfiguratorState={loadConfiguratorState}
+          loadCandidates={loadCandidates}
+          onConfirm={onAdd}
+          onClose={() => setAddOpen(false)}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function ReferenceBalancePaymentDialog({
+  sale,
+  availableToPay,
+  locale,
+  paymentRoutes,
+  isPaymentRoutesLoading,
+  method,
+  paymentRouteId,
+  appliedAmount,
+  paymentReference,
+  tender,
+  isMutating,
+  paymentError,
+  onClose,
+  onMethod,
+  onPaymentRoute,
+  onAppliedAmount,
+  onPaymentReference,
+  onTender,
+  onTransitionPayment,
+  onPay,
+}: {
+  sale: Sale | null;
+  availableToPay: string | null;
+  locale: string;
+  paymentRoutes: readonly PaymentRoute[];
+  isPaymentRoutesLoading: boolean;
+  method: PaymentMethod;
+  paymentRouteId: string;
+  appliedAmount: string;
+  paymentReference: string;
+  tender: string;
+  isMutating: boolean;
+  paymentError: string | null;
+  onClose: () => void;
+  onMethod: (method: PaymentMethod) => void;
+  onPaymentRoute: (paymentRouteId: string) => void;
+  onAppliedAmount: (amount: string) => void;
+  onPaymentReference: (reference: string) => void;
+  onTender: (amount: string) => void;
+  onTransitionPayment: (payment: Payment, status: TerminalPaymentStatus) => void;
+  /** Sends the confirmed payment to Runtime. Resolves once Runtime has answered. */
+  onPay: () => Promise<void>;
+}) {
+  const { copy, label } = useOperationalLocalization();
+  const [step, setStep] = usePaymentDialogStep(sale !== null);
+  const routesForMethod = paymentRoutes.filter((route) => route.paymentMethod === method);
+  const activeRoute =
+    routesForMethod.find((route) => route.id === paymentRouteId) ?? routesForMethod[0] ?? null;
+  if (!sale) return null;
+
+  const format = (amount: string) => money(amount, locale);
+  const progress = paymentProgress(sale);
+  const remainingToAllocate = availableToPay ?? progress.remainingAmount;
+  const amountScale = amountFractionDigits(remainingToAllocate);
+  const normalizedAllocation = appliedAmount
+    ? normalizeCurrencyPaymentInput(appliedAmount)
+    : currencyInputFromAmount(remainingToAllocate);
+  const intent = paymentIntent(sale, normalizedAllocation);
+  const allocationPositive = isPositiveDecimal(normalizedAllocation);
+  const overAllocated =
+    allocationPositive &&
+    createDecimal(normalizedAllocation).greaterThan(createDecimal(remainingToAllocate));
+  const hasPending = sale.payments.some((payment) => payment.status === 'PENDING');
+  const isCash = method === 'CASH';
+  const normalizedTender = normalizeCurrencyPaymentInput(tender || normalizedAllocation);
+  const cashShort =
+    isCash &&
+    allocationPositive &&
+    createDecimal(normalizedTender).lessThan(createDecimal(normalizedAllocation));
+  const cashChange =
+    isCash && allocationPositive && !cashShort
+      ? createDecimal(normalizedTender).minus(createDecimal(normalizedAllocation)).toFixed(4)
+      : '0';
+  const canPay =
+    allocationPositive &&
+    !overAllocated &&
+    !hasPending &&
+    Boolean(activeRoute) &&
+    !cashShort &&
+    !isMutating;
+  const completes = intent.outcome !== 'LEAVES_BALANCE';
+  const methods: Array<{ value: PaymentMethod; icon: ReactNode }> = [
+    { value: 'CASH', icon: <Banknote className="size-4" /> },
+    { value: 'BANK_TRANSFER', icon: <CreditCard className="size-4" /> },
+    { value: 'QRIS', icon: <QrCode className="size-4" /> },
+    { value: 'WALLET', icon: <ShoppingBag className="size-4" /> },
+  ];
+  // The transaction stays in the queue with its balance, so closing needs no guard.
+  const requestClose = () => {
+    if (isMutating) return;
+    if (step === 'review') {
+      setStep('edit');
+      return;
+    }
+    onClose();
+  };
+  const confirmPayment = async () => {
+    await onPay();
+    setStep('edit');
+  };
+
+  return (
+    <Dialog
+      open
+      onClose={requestClose}
+      title={
+        step === 'review'
+          ? copy('Confirm payment')
+          : copy(hasSuccessfulPayment(sale) ? 'Pay balance' : 'Pay')
+      }
+      description={transactionNumber(sale, locale)}
+      ariaLabel={copy('Payment')}
+      closeOnEscape
+      closeOnOverlay
+      className="pos-reference-dialog w-full max-w-md overflow-hidden rounded-t-2xl bg-[var(--color-surface)] shadow-xl sm:rounded-xl"
+      footer={
+        step === 'review' ? (
+          <div className="flex flex-col-reverse justify-end gap-2 sm:flex-row">
+            <DButton variant="outline" disabled={isMutating} onClick={() => setStep('edit')}>
+              {copy('Back to edit')}
+            </DButton>
+            <DButton
+              disabled={!canPay && !isMutating}
+              loading={isMutating}
+              onClick={() => void confirmPayment()}
+            >
+              {copy(completes ? 'Confirm and complete' : 'Confirm payment')}
+            </DButton>
+          </div>
+        ) : (
+          <div className="flex flex-col-reverse justify-end gap-2 sm:flex-row">
+            <Button variant="ghost" onClick={requestClose}>
+              {copy('Close')}
+            </Button>
+            <Button disabled={!canPay} onClick={() => setStep('review')}>
+              {copy('Pay')} {format(normalizedAllocation || '0')}
+            </Button>
+          </div>
+        )
+      }
+    >
+      {step === 'review' ? (
+        <PaymentReview
+          intent={intent}
+          total={sale.totalAmount}
+          methodName={label(method)}
+          accountName={activeRoute?.financialAccountName ?? label(method)}
+          {...(!isCash && paymentReference.trim() ? { reference: paymentReference.trim() } : {})}
+          {...(isCash ? { tendered: normalizedTender, change: cashChange } : {})}
+          earlierPayments={sale.payments}
+          format={format}
+          confirmReceived={!isCash}
+        />
+      ) : (
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
+          <PaymentProgressSummary total={sale.totalAmount} progress={progress} format={format} />
+
+          <RecordedPaymentList
+            payments={sale.payments}
+            totalAmount={sale.totalAmount}
+            progress={progress}
+            format={format}
+            isMutating={isMutating}
+            onTransition={onTransitionPayment}
+          />
+
+          <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
+            {sale.payments.length ? (
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+                {copy('Next payment')}
+              </p>
+            ) : null}
+            {paymentError ? (
+              <DAlert
+                variant="danger"
+                role="alert"
+                title={copy('Payment was not recorded')}
+                className="mb-3"
+              >
+                {paymentError} {copy('Nothing was added to the paid amount.')}
+              </DAlert>
+            ) : null}
+            <label className="block text-sm font-medium">
+              {copy('Payment amount')}
+              <PosCurrencyInput
+                aria-label={copy('Payment amount')}
+                className="mt-1.5 h-11 rounded-lg text-right text-lg font-bold"
+                value={appliedAmount}
+                onChange={onAppliedAmount}
+                fractionDigits={amountScale}
+              />
+            </label>
+            {overAllocated ? (
+              <p className="mt-1 text-xs text-[var(--color-danger)]" role="alert">
+                {copy('Payment allocation cannot exceed the remaining amount.')} {copy('Remaining')}
+                : {format(remainingToAllocate)}
+              </p>
+            ) : (
+              <div className="mt-2">
+                <PaymentIntentHint
+                  intent={intent}
+                  format={format}
+                  onPayRemaining={() =>
+                    onAppliedAmount(currencyInputFromAmount(remainingToAllocate))
+                  }
+                />
+              </div>
+            )}
+
+            <p className="mt-4 mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+              {copy('Payment method')}
+            </p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {methods.map((option) => {
+                const routeAvailable = paymentRoutes.some(
+                  (route) => route.paymentMethod === option.value,
+                );
+                const disabled = isPaymentRoutesLoading || !routeAvailable || hasPending;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    disabled={disabled}
+                    aria-pressed={method === option.value}
+                    onClick={() => onMethod(option.value)}
+                    className={`flex h-11 items-center justify-center gap-1 rounded-xl border text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${method === option.value ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white' : 'border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)]'}`}
+                  >
+                    {option.icon}
+                    <span className="pos-payment-method-label">{label(option.value)}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {hasPending ? (
+              <p className="mt-2 text-xs text-[var(--color-warning)]">
+                {copy('Confirm or cancel the waiting payment before adding another one.')}
+              </p>
+            ) : null}
+
+            {activeRoute ? (
+              <div className="mt-3">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+                  {copy('Settlement account')}
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {routesForMethod.map((route) => (
+                    <button
+                      key={route.id}
+                      type="button"
+                      aria-pressed={activeRoute.id === route.id}
+                      onClick={() => onPaymentRoute(route.id)}
+                      className={`rounded-xl border px-3 py-2.5 text-left transition-colors ${activeRoute.id === route.id ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/10' : 'border-[var(--color-border)] bg-[var(--color-surface-muted)]/50 hover:bg-[var(--color-surface-muted)]'}`}
+                    >
+                      <span className="block truncate text-sm font-semibold">
+                        {route.financialAccountName}
+                      </span>
+                      {route.financialAccountCode ? (
+                        <span className="mt-0.5 block truncate text-[11px] text-[var(--color-text-muted)]">
+                          {route.financialAccountCode}
+                        </span>
+                      ) : null}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {!isCash ? (
+              <DInput
+                aria-label={copy('Payment reference')}
+                label={copy('Payment reference')}
+                value={paymentReference}
+                onChange={onPaymentReference}
+                placeholder={copy('Optional reference')}
+                className="mt-3"
+              />
+            ) : null}
+          </div>
+
+          {isCash ? (
+            <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background)] p-4">
+              <label className="block text-sm font-medium">
+                {copy('Cash received')}
+                <PosCurrencyInput
+                  aria-label={copy('Cash received')}
+                  className="mt-1.5 h-11 rounded-lg text-right text-lg font-bold"
+                  value={tender}
+                  onChange={onTender}
+                  fractionDigits={amountScale}
+                />
+              </label>
+              <div
+                className={`mt-3 flex items-center justify-between rounded-xl px-3 py-2 ${cashShort ? 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]' : 'bg-[var(--color-success)]/10 text-[var(--color-success)]'}`}
+              >
+                <span className="text-sm font-bold">
+                  {copy(cashShort ? 'Payment short' : 'Change')}
+                </span>
+                <span className="text-sm font-bold tabular-nums">
+                  {format(
+                    cashShort
+                      ? createDecimal(normalizedAllocation)
+                          .minus(createDecimal(normalizedTender || '0'))
+                          .toFixed(4)
+                      : cashChange,
+                  )}
+                </span>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      )}
+    </Dialog>
+  );
+}
+
+function ReferenceCancelDialog({
+  sale,
+  reason,
+  isMutating,
+  onReasonChange,
+  onClose,
+  onConfirm,
+}: {
+  sale: Sale | null;
+  reason: string;
+  isMutating: boolean;
+  onReasonChange: (reason: string) => void;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const { copy, locale } = useOperationalLocalization();
+  const refundAmount = sale ? financialSummary(sale).totalPaid : '0.0000';
+  const hasRefund = isPositiveDecimal(refundAmount);
+  return (
+    <Dialog
+      open={Boolean(sale)}
+      title={copy('Cancel transaction')}
+      description={sale ? transactionNumber(sale, locale) : ''}
+      onClose={onClose}
+      ariaLabel={copy('Cancel transaction')}
+      closeOnEscape={!isMutating}
+      closeOnOverlay={!isMutating}
+      className="pos-reference-dialog w-full max-w-md rounded-t-2xl bg-(--color-surface) shadow-xl sm:rounded-xl"
+      footer={
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" disabled={isMutating} onClick={onClose}>
+            {copy('Back')}
+          </Button>
+          <Button
+            variant="danger"
+            disabled={!reason.trim() || isMutating}
+            loading={isMutating}
+            onClick={onConfirm}
+          >
+            {copy('Confirm cancellation')}
+          </Button>
+        </div>
+      }
+    >
+      <>
+        {hasRefund ? (
+          <div className="mt-4 rounded-xl border border-(--color-warning)/30 bg-(--color-warning)/10 px-3 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm font-semibold text-(--color-warning)">
+                {copy('Refund required')}
+              </span>
+              <span className="text-sm font-bold text-(--color-warning)">
+                {money(refundAmount, locale)}
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-(--color-text-muted)">
+              {copy('Previous payment remains recorded')}
+            </p>
+          </div>
+        ) : null}
+        <label className="mt-5 block text-sm font-medium">
+          {copy('Cancellation reason')}
+          <DTextarea
+            className="mt-1.5 h-10 rounded-lg"
+            autoFocus
+            value={reason}
+            disabled={isMutating}
+            onChange={onReasonChange}
+            placeholder={copy('Example: Customer request')}
+          />
+        </label>
+      </>
+    </Dialog>
+  );
+}
