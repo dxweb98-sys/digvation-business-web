@@ -98,6 +98,10 @@ export const transactionHistoryCopy: Record<string, { id: string; en: string }> 
   'Unknown employee': { id: 'Karyawan tidak dikenal', en: 'Unknown employee' },
   'Additional items': { id: 'Item tambahan', en: 'Additional items' },
   'Included in service price': { id: 'Termasuk harga layanan', en: 'Included in service price' },
+  'Price breakdown': { id: 'Rincian harga', en: 'Price breakdown' },
+  'Service price': { id: 'Harga layanan', en: 'Service price' },
+  Included: { id: 'Termasuk', en: 'Included' },
+  'Item total': { id: 'Total item', en: 'Item total' },
   'Removed or corrected items': {
     id: 'Item yang dihapus atau dikoreksi',
     en: 'Removed or corrected items',

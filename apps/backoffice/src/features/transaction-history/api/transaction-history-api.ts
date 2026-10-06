@@ -110,6 +110,10 @@ export interface SaleLine {
   itemNameSnapshot: string;
   variantNameSnapshot: string | null;
   quantity: string;
+  /** Captured composed unit price (Service base + composition contributions), before any override. */
+  resolvedUnitPrice?: string;
+  /** Manual unit price that replaced the resolved price, when one was applied. */
+  overrideAmount?: string | null;
   effectiveUnitPrice?: string;
   grossAmount?: string;
   lineDiscountAmount?: string;
