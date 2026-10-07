@@ -31,7 +31,11 @@ import {
 import type { Payment, Sale } from '../../transaction/model/cashier-transaction.types';
 import type { useCashierTransactionWorkspace } from '../model/use-cashier-transaction-workspace';
 
-import { currencyInputFromAmount, normalizeCurrencyPaymentInput } from '../../lib/pos-controls';
+import {
+  currencyInputFromAmount,
+  normalizeCurrencyPaymentInput,
+  PosNumericInput,
+} from '../../lib/pos-controls';
 import { SaleAdjustmentControls } from '../../adjustment/sale-adjustment-controls';
 import { SaleLineTaskDialog } from '../../queue/sale-line-task-dialog';
 import { ServicePerformersDialog } from '../../performer/service-performers-dialog';
@@ -856,11 +860,11 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           {workspace.isLoadingCatalog ? (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
               {Array.from({ length: 10 }).map((item, index) => (
-                <Skeleton key={`${String(item)}-${index}`} className="aspect-3/4 rounded-2xl" />
+                <Skeleton key={`${String(item)}-${index}`} className="aspect-[3/4] rounded-2xl" />
               ))}
             </div>
           ) : visibleItems.length === 0 ? (
-            <div className="flex min-h-65 items-center justify-center rounded-2xl border border-dashed border-(--color-border) bg-(--color-surface)/50 text-sm text-(--color-text-muted)">
+            <div className="flex min-h-[260px] items-center justify-center rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface)]/50 text-sm text-[var(--color-text-muted)]">
               {copy('No items found')}
             </div>
           ) : (
