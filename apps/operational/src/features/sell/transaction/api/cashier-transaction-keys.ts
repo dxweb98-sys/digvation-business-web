@@ -27,6 +27,8 @@ export const cashierTransactionKeys = {
   paymentRoutes: (sellingLocationId: string, currency: string) =>
     ['cashier-transaction', 'payment-routes', sellingLocationId, currency] as const,
   taxConfiguration: () => ['cashier-transaction', 'tax-configuration'] as const,
+  /** One entry per exact draft pricing input, so a response can only ever describe its own cart. */
+  pricingPreview: (input: unknown) => ['cashier-transaction', 'pricing-preview', input] as const,
   contributionPreview: (saleId: string, saleLineId: string) =>
     ['cashier-transaction', 'contribution-preview', saleId, saleLineId] as const,
   sales: () => ['cashier-transaction', 'operational-queue'] as const,

@@ -9,6 +9,8 @@ import type {
   SaleTransactionPort,
   SetSaleCustomerInput,
   SetSaleLineQuantityInput,
+  SalePricingPreview,
+  SalePricingPreviewInput,
   SellingCatalogDisplayInput,
   StartSaleInput,
 } from './cashier-transaction.adapter';
@@ -42,6 +44,11 @@ export interface OperationalProjectionQuery {
 }
 
 export interface OperationalPromotionCommands {
+  /** Read-only Runtime pricing of a draft: applicable Promotions, Tax and total. Creates nothing. */
+  previewSalePricing(
+    input: SalePricingPreviewInput,
+    signal?: AbortSignal,
+  ): Promise<SalePricingPreview>;
   setPromotionCode(
     saleId: string,
     input: { expectedVersion: number; code: string },
@@ -177,6 +184,11 @@ export function attachOperationalProjection(
   operational.createSale = (input: CreateSaleInput, idempotencyKey: string) =>
     client.post<Sale>(`${OPERATIONAL_PREFIX}/transactions/empty`, input, {
       headers: { 'Idempotency-Key': idempotencyKey },
+    });
+
+  operational.previewSalePricing = (input, signal) =>
+    client.post<SalePricingPreview>(`${OPERATIONAL_PREFIX}/transactions/pricing-preview`, input, {
+      signal,
     });
 
   operational.startSale = (input: StartSaleInput, idempotencyKey: string) =>

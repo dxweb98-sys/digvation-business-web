@@ -31,6 +31,7 @@ import {
   type CartDraft,
   type CartDraftAdditionalItem,
   type CartDraftSalesperson,
+  cartDraftPricingInput,
 } from '../../cart/cart-draft';
 import { isKnownApiFailure } from '../../transaction/api/cashier-transaction-errors';
 import { cashierTransactionKeys } from '../../transaction/api/cashier-transaction-keys';
@@ -533,6 +534,8 @@ export function useSaleWorkspaceController({
       totalAmount: cartTotal,
       discountAmount: saleQuery.data?.discountAmount ?? '0.0000',
       isLocalDraft: !saleQuery.data && draftLines.length > 0,
+      /** What Runtime prices read-only while the cart is still a local draft. */
+      pricingInput: saleQuery.data ? null : cartDraftPricingInput(draft),
     },
     canRetryLastAdd:
       (Boolean(retryIntent) && !addItemMutation.isPending) ||

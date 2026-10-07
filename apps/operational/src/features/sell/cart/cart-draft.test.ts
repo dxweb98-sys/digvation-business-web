@@ -4,6 +4,7 @@ import {
   addCartDraftSelection,
   cartDraftDisplayLines,
   cartDraftEstimatedTotal,
+  cartDraftPricingInput,
   cartDraftStartInput,
   emptyCartDraft,
   removeCartDraftLine,
@@ -411,6 +412,52 @@ describe('per-unit additions in a cart group', () => {
       quantity: '1.0000',
       additionalComponents: [{ componentItemId: 'b', componentVariantId: 'b-y' }],
     });
+  });
+
+  it('prices exactly the lines checkout would start the Sale with, without who performs or sells', () => {
+    const performed = { ...a, performers: [{ employeeId: 'emp-1', name: 'Andi' }] } as never;
+    const draft = {
+      ...addCartDraftSelection(empty(), service, null, base, {
+        quantity: '3',
+        unitAdditions: [[performed], [b], [performed]],
+      }),
+    };
+    const member = { ...draft, customer: { type: 'MEMBER' as const, referenceId: 'member-1' } };
+    const started = cartDraftStartInput(member).lines;
+    const priced = cartDraftPricingInput(member);
+
+    expect(priced).toEqual({
+      sellingLocationId: 'location-1',
+      currency: 'IDR',
+      customer: { type: 'MEMBER', referenceId: 'member-1' },
+      lines: [
+        {
+          catalogItemId: 'hair-color',
+          quantity: '2.0000',
+          additionalComponents: [{ componentItemId: 'a', quantity: '1.0000' }],
+        },
+        {
+          catalogItemId: 'hair-color',
+          quantity: '1.0000',
+          additionalComponents: [
+            { componentItemId: 'b', componentVariantId: 'b-y', quantity: '1.0000' },
+          ],
+        },
+      ],
+    });
+    // Same lines, same quantities and the same additions as the Sale checkout starts.
+    expect(priced?.lines.map((line) => [line.catalogItemId, line.quantity])).toEqual(
+      started.map((line) => [line.catalogItemId, line.quantity]),
+    );
+    expect(started[0]?.additionalComponents?.[0]).toHaveProperty('performers');
+  });
+
+  it('prices a walk-in or a cart without customer as a non-member, and nothing for an empty cart', () => {
+    const draft = addCartDraftSelection(empty(), service, null, base);
+    expect(cartDraftPricingInput(startable(draft))).not.toHaveProperty('customer');
+    expect(cartDraftPricingInput(draft)).not.toHaveProperty('customer');
+    expect(cartDraftPricingInput(empty())).toBeNull();
+    expect(cartDraftPricingInput(null)).toBeNull();
   });
 
   it('sends a unit without additions as its own plain line', () => {

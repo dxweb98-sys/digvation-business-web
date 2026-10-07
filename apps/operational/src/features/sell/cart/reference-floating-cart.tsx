@@ -30,6 +30,8 @@ export function ReferenceFloatingCart({
   onRemove,
   onCheckout,
   isCheckoutPreparing = false,
+  discountRows,
+  isPricingPreviewed = false,
 }: {
   open: boolean;
   onOpenChange: (value: boolean) => void;
@@ -55,6 +57,10 @@ export function ReferenceFloatingCart({
   onCheckout: () => void;
   /** The checkout destination is being prepared; the button stays busy until it opens. */
   isCheckoutPreparing?: boolean;
+  /** Runtime's applicable Promotions, one row each; without them one combined discount row. */
+  discountRows?: ReadonlyArray<{ key: string; label: string; amount: string }>;
+  /** The summary shows Runtime's preview, so no Tax or Promotion is still left for checkout. */
+  isPricingPreviewed?: boolean;
 }) {
   const { copy } = useOperationalLocalization();
   useEffect(() => {
@@ -90,6 +96,8 @@ export function ReferenceFloatingCart({
       onRemove={onRemove}
       onCheckout={onCheckout}
       isCheckoutPreparing={isCheckoutPreparing}
+      {...(discountRows ? { discountRows } : {})}
+      isPricingPreviewed={isPricingPreviewed}
     />
   );
   const countLabel = lines.length

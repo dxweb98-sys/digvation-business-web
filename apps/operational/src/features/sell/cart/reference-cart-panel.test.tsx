@@ -3,6 +3,7 @@ import {
   type DeploymentBootstrapConfig,
 } from '@digvation/business-runtime';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import type { ComponentProps } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { CatalogItem, ResolvedPrice } from '../transaction/model/cashier-transaction.types';
@@ -49,7 +50,11 @@ const lines = cartDraftDisplayLines(
   addCartDraftSelection(emptyCartDraft('location-1', 'IDR'), item, null, price),
 );
 
-function renderPanel(onCheckout: () => void, isCheckoutPreparing?: boolean) {
+function renderPanel(
+  onCheckout: () => void,
+  isCheckoutPreparing?: boolean,
+  pricing: Partial<ComponentProps<typeof ReferenceCartPanel>> = {},
+) {
   return render(
     <DeploymentBootstrapProvider config={bootstrap}>
       <ReferenceCartPanel
@@ -74,6 +79,7 @@ function renderPanel(onCheckout: () => void, isCheckoutPreparing?: boolean) {
         onRemove={vi.fn()}
         onCheckout={onCheckout}
         {...(isCheckoutPreparing === undefined ? {} : { isCheckoutPreparing })}
+        {...pricing}
       />
     </DeploymentBootstrapProvider>,
   );
@@ -103,5 +109,39 @@ describe('ReferenceCartPanel checkout button', () => {
     expect(checkout.getAttribute('aria-busy')).toBeNull();
     fireEvent.click(checkout);
     expect(onCheckout).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('ReferenceCartPanel pricing preview', () => {
+  const helper = /Pajak dan promo dihitung saat transaksi dibuat/;
+
+  it('shows each applicable Promotion before checkout and drops the pending-pricing note', () => {
+    renderPanel(vi.fn(), false, {
+      gross: '87000.0000',
+      discountAmount: '10000.0000',
+      discountRows: [{ key: 'p-member', label: 'Promo Member', amount: '10000.0000' }],
+      taxLabel: 'Pajak (11%)',
+      taxAmount: '8470.0000',
+      total: '85470.0000',
+      isPricingPreviewed: true,
+    });
+
+    expect(screen.getByText('Promo Member')).toBeTruthy();
+    expect(screen.getByText(/−\s?Rp\s?10[.,]000/)).toBeTruthy();
+    expect(screen.getByText('Pajak (11%)')).toBeTruthy();
+    expect(screen.getByText(/Rp\s?85[.,]470/)).toBeTruthy();
+    expect(screen.getByText('Estimasi total')).toBeTruthy();
+    expect(screen.queryByText(helper)).toBeNull();
+    expect(screen.getByRole('button', { name: /Pembayaran/ }).hasAttribute('disabled')).toBe(false);
+  });
+
+  it('shows no Promotion row when Runtime applies none', () => {
+    renderPanel(vi.fn(), false, { discountRows: [], isPricingPreviewed: true });
+    expect(screen.queryByText(/^−/)).toBeNull();
+  });
+
+  it('keeps the pending-pricing note while only the local estimate is shown', () => {
+    renderPanel(vi.fn());
+    expect(screen.getByText(helper)).toBeTruthy();
   });
 });

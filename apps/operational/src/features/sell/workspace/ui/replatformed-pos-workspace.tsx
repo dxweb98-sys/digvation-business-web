@@ -74,6 +74,7 @@ import { ReferenceCancelDialog } from '../../transaction/ui/reference-cancel-dia
 import { useSaleCustomerContext } from '../../customer/model/use-sale-customer-context';
 import { useSellingCatalogFilter } from '../../catalog/use-selling-catalog-filter';
 import { useDraftTaxPreview } from '../../cart/use-draft-tax-preview';
+import { useCartPricingPreview } from '../../cart/use-cart-pricing-preview';
 import { useQueueGroups } from '../../queue/use-queue-groups';
 import { useCheckoutPaymentForm } from '../../payment/use-checkout-payment-form';
 import { useReceiptDeliveryPreview } from '../../receipt/use-receipt-delivery-preview';
@@ -181,6 +182,13 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     isTaxPreviewUnavailable,
     draftTaxLabel,
   } = useDraftTaxPreview({ adapter, sale, workspace, total, copy });
+  // Runtime prices the draft read-only; until its first answer, or if it fails, the cart keeps the
+  // plain estimate above. A Sale always shows its own amounts.
+  const pricingPreview = useCartPricingPreview({
+    adapter,
+    input: workspace.cart.pricingInput,
+    copy,
+  });
 
   const activeCustomer = workspace.customer;
   const {
@@ -880,19 +888,23 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         open={cartOpen}
         onOpenChange={setCartOpen}
         lines={lines}
-        total={cartPreviewTotal}
-        gross={workspace.cart.grossAmount}
-        discountAmount={workspace.cart.discountAmount}
+        total={pricingPreview?.totalAmount ?? cartPreviewTotal}
+        gross={pricingPreview?.grossAmount ?? workspace.cart.grossAmount}
+        discountAmount={pricingPreview?.discountAmount ?? workspace.cart.discountAmount}
+        {...(pricingPreview ? { discountRows: pricingPreview.discountRows } : {})}
+        isPricingPreviewed={pricingPreview !== null}
         discountLabel={
           sale
             ? transactionDiscountLabel(sale, copy('Promotions and discounts'))
             : copy('Promotions and discounts')
         }
-        taxAmount={draftTaxAmount}
-        taxLabel={sale ? saleTaxLabel(sale, copy('Tax')) : draftTaxLabel}
+        taxAmount={pricingPreview?.taxAmount ?? draftTaxAmount}
+        taxLabel={
+          pricingPreview?.taxLabel ?? (sale ? saleTaxLabel(sale, copy('Tax')) : draftTaxLabel)
+        }
         isEstimate={workspace.cart.isLocalDraft}
-        isTaxPreviewLoading={isTaxPreviewLoading}
-        isTaxPreviewUnavailable={isTaxPreviewUnavailable}
+        isTaxPreviewLoading={!pricingPreview && isTaxPreviewLoading}
+        isTaxPreviewUnavailable={!pricingPreview && isTaxPreviewUnavailable}
         locale={workspace.locale}
         customer={cartCustomer}
         memberNumber={activeSelectedMember?.memberNumber ?? null}
