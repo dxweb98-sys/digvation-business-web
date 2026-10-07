@@ -635,6 +635,7 @@ const posCopy: Record<string, LocalizedCopy> = {
   },
   'Full payment': { 'id-ID': 'Bayar penuh', 'en-US': 'Full payment' },
   'Split payment': { 'id-ID': 'Split pembayaran', 'en-US': 'Split payment' },
+  'Partial payment': { 'id-ID': 'Bayar sebagian', 'en-US': 'Partial payment' },
   'Payment allocation': { 'id-ID': 'Cara pembayaran', 'en-US': 'Payment allocation' },
   'Pay full remaining balance': {
     'id-ID': 'Bayar seluruh sisa tagihan',

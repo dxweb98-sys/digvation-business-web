@@ -63,6 +63,18 @@ function useRetainedValue<T>(value: T | null): T | null {
   return value ?? retained;
 }
 
+function useValueShownWhileOpen<T extends string | boolean | null | undefined>(
+  open: boolean,
+  value: T,
+): T {
+  // The parent clears what it derives from the shown Sale (receipt mode, branch, delivery) in the
+  // same batch that closes the dialog. A closing dialog keeps what it showed while open, so its
+  // exit never swaps the receipt for another view; the next opening shows the live values.
+  const [shown, setShown] = useState<T>(value);
+  if (open && value !== shown) setShown(value);
+  return open ? value : shown;
+}
+
 function useOpeningKey(open: boolean): number {
   // A retained, closed DS dialog needs an extra effect pass to reopen; a fresh one is shown in the
   // same render as the state that opens it. Only an opening changes the key, never a close.
@@ -108,11 +120,11 @@ export function ReferenceTransactionDetail({
   locale,
   employees,
   businessName,
-  branchName,
-  branchAddress = null,
+  branchName: currentBranchName,
+  branchAddress: currentBranchAddress = null,
   cashierName,
-  cancellationReason,
-  showPaymentReceipt,
+  cancellationReason: currentCancellationReason,
+  showPaymentReceipt: currentShowPaymentReceipt,
   onClose,
   onViewReceipt,
   onSendReceipt,
@@ -149,6 +161,24 @@ export function ReferenceTransactionDetail({
   const [receiptPaper, setReceiptPaper] = useState<'58' | '80'>('80');
   const sale = useRetainedValue(currentSale);
   const openingKey = useOpeningKey(currentSale !== null);
+  const showPaymentReceipt = useValueShownWhileOpen(
+    currentSale !== null,
+    currentShowPaymentReceipt,
+  );
+  const branchName = useValueShownWhileOpen(currentSale !== null, currentBranchName);
+  const branchAddress = useValueShownWhileOpen(currentSale !== null, currentBranchAddress);
+  const cancellationReason = useValueShownWhileOpen(
+    currentSale !== null,
+    currentCancellationReason,
+  );
+  const deliveryAvailable = useValueShownWhileOpen(
+    currentSale !== null,
+    deliveryStatus?.available ?? false,
+  );
+  const deliveryState = useValueShownWhileOpen(
+    currentSale !== null,
+    deliveryStatus?.delivery?.status,
+  );
   if (!sale) return null;
   const open = currentSale !== null;
   const status = queueStatus(sale);
@@ -202,7 +232,7 @@ export function ReferenceTransactionDetail({
   const hasLoyaltyRedemption = Boolean(redeemedPoints && redeemedAmount);
   const earnedPoints = saleEarnedPoints(sale);
   const receiptDeliveryLabel = receiptDeliveryPreviewLabel(
-    receiptDeliveryPhase(deliveryStatus?.delivery?.status),
+    receiptDeliveryPhase(deliveryState),
     copyLocale,
   );
 
@@ -257,7 +287,7 @@ export function ReferenceTransactionDetail({
                 <DButton variant="ghost" onClick={onClose}>
                   {copy('Close')}
                 </DButton>
-                {deliveryStatus?.available && onSendReceipt ? (
+                {deliveryAvailable && onSendReceipt ? (
                   <DButton variant="outline" onClick={() => onSendReceipt(sale)}>
                     {receiptDeliveryLabel}
                   </DButton>

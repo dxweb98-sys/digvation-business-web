@@ -1,7 +1,35 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { usePaymentDialogStep } from './payment-dialog-state';
+import { usePaymentAllocationMode, usePaymentDialogStep } from './payment-dialog-state';
+
+describe('usePaymentAllocationMode', () => {
+  it('returns to the full balance when the outstanding amount changes, not on a failed attempt', () => {
+    const { result, rerender } = renderHook(
+      ({ outstanding }) => usePaymentAllocationMode(true, outstanding),
+      { initialProps: { outstanding: '166500.0000' } },
+    );
+    act(() => result.current[1]('SPLIT'));
+    rerender({ outstanding: '166500.0000' });
+    expect(result.current[0]).toBe('SPLIT');
+
+    rerender({ outstanding: '116500.0000' });
+    expect(result.current[0]).toBe('FULL');
+  });
+
+  it('keeps the chosen mode without an outstanding amount, and resets it on reopen', () => {
+    const { result, rerender } = renderHook(({ open }) => usePaymentAllocationMode(open), {
+      initialProps: { open: true },
+    });
+    act(() => result.current[1]('SPLIT'));
+    rerender({ open: true });
+    expect(result.current[0]).toBe('SPLIT');
+
+    rerender({ open: false });
+    rerender({ open: true });
+    expect(result.current[0]).toBe('FULL');
+  });
+});
 
 describe('usePaymentDialogStep', () => {
   it('keeps the step it was closed from while the dialog closes', () => {

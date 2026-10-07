@@ -16,15 +16,15 @@ import {
   normalizeCurrencyPaymentInput,
   PosCurrencyInput,
 } from '../lib/pos-controls';
-import {
-  PaymentIntentHint,
-  PaymentProgressSummary,
-  PaymentReview,
-  RecordedPaymentList,
-} from './payment-confirmation';
+import { PaymentAllocationTabs } from './payment-allocation-tabs';
+import { PaymentProgressSummary, PaymentReview, RecordedPaymentList } from './payment-confirmation';
 import { type TerminalPaymentStatus, hasSuccessfulPayment } from './sale-payment-status';
 import { money, transactionNumber, isPositiveDecimal } from '../transaction/model/sale-display';
-import { usePaymentDialogStep } from './payment-dialog-state';
+import {
+  type PaymentAllocationMode,
+  usePaymentAllocationMode,
+  usePaymentDialogStep,
+} from './payment-dialog-state';
 
 export function ReferenceBalancePaymentDialog({
   sale,
@@ -72,6 +72,13 @@ export function ReferenceBalancePaymentDialog({
 }) {
   const { copy, label } = useOperationalLocalization();
   const [step, setStep] = usePaymentDialogStep(sale !== null);
+  // Paying from the queue: timing is already decided, so the only choice is how much of the
+  // outstanding balance this payment collects.
+  const outstandingAmount = sale ? (availableToPay ?? paymentProgress(sale).remainingAmount) : null;
+  const [allocationMode, setAllocationMode] = usePaymentAllocationMode(
+    sale !== null,
+    outstandingAmount,
+  );
   const routesForMethod = paymentRoutes.filter((route) => route.paymentMethod === method);
   const activeRoute =
     routesForMethod.find((route) => route.id === paymentRouteId) ?? routesForMethod[0] ?? null;
@@ -126,6 +133,16 @@ export function ReferenceBalancePaymentDialog({
   const confirmPayment = async () => {
     await onPay();
     setStep('edit');
+  };
+  // Choosing a partial payment keeps the current amount for the cashier to change; returning to
+  // the full payment restores the current outstanding balance.
+  const changeAllocationMode = (next: PaymentAllocationMode) => {
+    setAllocationMode(next);
+    if (next === 'FULL') onAppliedAmount(currencyInputFromAmount(remainingToAllocate));
+  };
+  const payRemaining = () => {
+    onAppliedAmount(currencyInputFromAmount(remainingToAllocate));
+    setAllocationMode('FULL');
   };
 
   return (
@@ -209,32 +226,19 @@ export function ReferenceBalancePaymentDialog({
                 {paymentError} {copy('Nothing was added to the paid amount.')}
               </DAlert>
             ) : null}
-            <label className="block text-sm font-medium">
-              {copy('Payment amount')}
-              <PosCurrencyInput
-                aria-label={copy('Payment amount')}
-                className="mt-1.5 h-11 rounded-lg text-right text-lg font-bold"
-                value={appliedAmount}
-                onChange={onAppliedAmount}
-                fractionDigits={amountScale}
-              />
-            </label>
-            {overAllocated ? (
-              <p className="mt-1 text-xs text-[var(--color-danger)]" role="alert">
-                {copy('Payment allocation cannot exceed the remaining amount.')} {copy('Remaining')}
-                : {format(remainingToAllocate)}
-              </p>
-            ) : (
-              <div className="mt-2">
-                <PaymentIntentHint
-                  intent={intent}
-                  format={format}
-                  onPayRemaining={() =>
-                    onAppliedAmount(currencyInputFromAmount(remainingToAllocate))
-                  }
-                />
-              </div>
-            )}
+            <PaymentAllocationTabs
+              allocationMode={allocationMode}
+              onAllocationModeChange={changeAllocationMode}
+              remainingAmount={remainingToAllocate}
+              appliedAmount={appliedAmount}
+              onAppliedAmount={onAppliedAmount}
+              amountScale={amountScale}
+              overAllocated={overAllocated}
+              intent={intent}
+              onPayRemaining={payRemaining}
+              partialLabel={copy('Partial payment')}
+              format={format}
+            />
 
             <p className="mt-4 mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
               {copy('Payment method')}
