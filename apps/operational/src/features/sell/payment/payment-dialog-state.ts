@@ -4,12 +4,22 @@ type PaymentDialogStep = 'edit' | 'review' | 'leave';
 
 export type PaymentAllocationMode = 'FULL' | 'SPLIT';
 
-export function usePaymentAllocationMode(open: boolean) {
+/**
+ * Starts at paying the full remaining balance whenever the dialog opens. When an
+ * `outstandingAmount` is given, a recorded payment that changes it also returns to the full
+ * (new) balance, while a failed attempt leaves the balance, and so the chosen mode, as it was.
+ */
+export function usePaymentAllocationMode(open: boolean, outstandingAmount?: string | null) {
   const [mode, setMode] = useState<PaymentAllocationMode>('FULL');
   const [wasOpen, setWasOpen] = useState(open);
+  const [shownOutstanding, setShownOutstanding] = useState(outstandingAmount);
   if (open !== wasOpen) {
     setWasOpen(open);
     if (open) setMode('FULL');
+  }
+  if (outstandingAmount !== shownOutstanding) {
+    setShownOutstanding(outstandingAmount);
+    setMode('FULL');
   }
   return [mode, setMode] as const;
 }

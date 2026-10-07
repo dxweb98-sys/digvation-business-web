@@ -504,6 +504,73 @@ describe('ReferenceTransactionDetail opening and closing', () => {
       vi.useRealTimers();
     }
   });
+
+  /** What the workspace passes: receipt mode, branch and delivery all derive from the shown Sale. */
+  const receipt = (sale: Sale | null, branchName: string) => (
+    <DeploymentBootstrapProvider config={bootstrap}>
+      <ReferenceTransactionDetail
+        sale={sale}
+        locale="id-ID"
+        employees={[]}
+        businessName="Digvation"
+        branchName={branchName}
+        branchAddress={sale ? `Jl. ${branchName}` : null}
+        cashierName="Kasir"
+        showPaymentReceipt={sale !== null}
+        onClose={vi.fn()}
+        onNewSale={vi.fn()}
+        onViewReceipt={vi.fn()}
+        onAssign={vi.fn()}
+        onStartLineWork={vi.fn()}
+        onComplete={vi.fn()}
+        isMutating={false}
+        onSendReceipt={vi.fn()}
+        {...(sale
+          ? { deliveryStatus: { available: true, delivery: { status: 'SENT' as const } } }
+          : {})}
+      />
+    </DeploymentBootstrapProvider>
+  );
+  const finalized = (overrides: Partial<Sale> = {}) =>
+    runtimeQueueDetail({
+      status: 'FINALIZED',
+      finalizedAt: '2026-09-24T02:15:00.000Z',
+      ...overrides,
+    });
+
+  it('keeps the closing receipt exactly as shown until it has left, then opens the next one live', () => {
+    vi.useFakeTimers();
+    try {
+      const { rerender } = render(receipt(finalized(), 'Cabang Utara'));
+      const opened = screen.getByRole('dialog');
+      const shown = opened.textContent;
+      expect(screen.getByRole('heading', { name: 'Pratinjau struk' })).toBeTruthy();
+
+      // Closing clears the Sale and everything derived from it in one batch.
+      rerender(receipt(null, 'Cabang utama'));
+      expect(screen.getByRole('dialog')).toBe(opened);
+      expect(screen.getByRole('dialog').textContent).toBe(shown);
+      expect(screen.getByRole('heading', { name: 'Pratinjau struk' })).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Kirim ulang WhatsApp' })).toBeTruthy();
+
+      act(() => vi.advanceTimersByTime(300));
+      expect(screen.queryByRole('dialog')).toBeNull();
+
+      // The next receipt shows its own values in the opening render, never the retained ones.
+      rerender(
+        receipt(
+          finalized({ id: 'sale-runtime-2', saleNumber: 'TRX-20260924-000198' }),
+          'Cabang Selatan',
+        ),
+      );
+      const next = screen.getByRole('dialog').textContent;
+      expect(next).toContain('TRX-20260924-000198');
+      expect(next).toContain('Cabang Selatan');
+      expect(next).not.toContain('Cabang Utara');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe('ReferenceTransactionDetail receipt location identity', () => {
