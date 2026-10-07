@@ -42,6 +42,8 @@ export function ReferenceCartPanel({
   onRemove,
   onCheckout,
   isCheckoutPreparing = false,
+  discountRows,
+  isPricingPreviewed = false,
 }: {
   lines: readonly CartDisplayLine[];
   total: string;
@@ -65,6 +67,10 @@ export function ReferenceCartPanel({
   onCheckout: () => void;
   /** The checkout destination is being prepared; the button stays busy until it opens. */
   isCheckoutPreparing?: boolean;
+  /** Runtime's applicable Promotions, one row each; without them one combined discount row. */
+  discountRows?: ReadonlyArray<{ key: string; label: string; amount: string }>;
+  /** The summary shows Runtime's preview, so no Tax or Promotion is still left for checkout. */
+  isPricingPreviewed?: boolean;
 }) {
   const { copy } = useOperationalLocalization();
   const status = customerStatus(customer);
@@ -275,14 +281,17 @@ export function ReferenceCartPanel({
             </span>
             <span className="font-medium">{money(gross, locale)}</span>
           </div>
-          {hasDiscount ? (
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-[var(--color-text-muted)]">{discountLabel}</span>
+          {(
+            discountRows ??
+            (hasDiscount ? [{ key: 'discount', label: discountLabel, amount: discountAmount }] : [])
+          ).map((row) => (
+            <div key={row.key} className="flex items-center justify-between text-xs">
+              <span className="text-[var(--color-text-muted)]">{row.label}</span>
               <span className="font-medium text-[var(--color-danger)]">
-                −{money(discountAmount, locale)}
+                −{money(row.amount, locale)}
               </span>
             </div>
-          ) : null}
+          ))}
           {hasTax || isTaxPreviewLoading || isTaxPreviewUnavailable ? (
             <div className="flex items-center justify-between text-xs">
               <span className="text-[var(--color-text-muted)]">{taxLabel}</span>
@@ -306,7 +315,7 @@ export function ReferenceCartPanel({
               {money(total, locale)}
             </span>
           </div>
-          {isEstimate && lines.length ? (
+          {isEstimate && lines.length && !isPricingPreviewed ? (
             <p className="text-[11px] leading-4 text-[var(--color-text-muted)]">
               {copy('Tax and promotions are finalized when the transaction is created.')}
             </p>

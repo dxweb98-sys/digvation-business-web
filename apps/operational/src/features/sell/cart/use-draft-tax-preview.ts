@@ -7,6 +7,10 @@ import type { Sale } from '../transaction/model/cashier-transaction.types';
 /**
  * Tax preview of a local cart draft: before a Sale exists the draft tax is estimated from the tax
  * configuration; once the Sale exists its own amounts are shown.
+ *
+ * The draft estimate is only a fallback: Runtime's read-only pricing preview
+ * (`useCartPricingPreview`) replaces it whenever it has answered for the current draft, and it is
+ * shown only before that first answer or when the preview is unavailable.
  */
 export function useDraftTaxPreview({
   adapter,

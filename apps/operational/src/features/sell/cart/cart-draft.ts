@@ -2,6 +2,7 @@ import { createDecimal } from '@digvation/pos-money';
 
 import type {
   ReplaceSaleLineInput,
+  SalePricingPreviewInput,
   StartSaleInput,
 } from '../transaction/api/cashier-transaction.adapter';
 import {
@@ -556,6 +557,32 @@ export function cartDraftEstimatedTotal(draft: CartDraft | null): string {
     .toFixed(4);
 }
 
+/** The lines a Sale is started with: units with different additions become separate lines. */
+function cartDraftSaleLines(draft: CartDraft): StartSaleInput['lines'] {
+  return draft.lines.flatMap((line) => {
+    const base = {
+      catalogItemId: line.catalogItemId,
+      ...(line.catalogVariantId ? { catalogVariantId: line.catalogVariantId } : {}),
+      ...(line.soldBy ? { soldByEmployeeId: line.soldBy.employeeId } : {}),
+    };
+    // One persisted line is one unambiguous unit price. Units with different additions become
+    // separate lines (identical ones stay grouped), so no average price is ever invented.
+    const groups = line.unitAdditions
+      ? groupUnitAdditions(line.unitAdditions).map((group) => ({
+          quantity: createDecimal(String(group.quantity)).toFixed(4),
+          additions: group.additionalComponents,
+        }))
+      : [{ quantity: line.quantity, additions: line.additionalComponents ?? [] }];
+    return groups.map((group) => ({
+      ...base,
+      quantity: group.quantity,
+      ...(group.additions.length
+        ? { additionalComponents: group.additions.map(startAddition) }
+        : {}),
+    }));
+  });
+}
+
 export function cartDraftStartInput(draft: CartDraft): StartSaleInput {
   if (draft.lines.length === 0) throw new Error('Add at least one item before checkout.');
   const sentLines = draft.lines.reduce(
@@ -571,28 +598,40 @@ export function cartDraftStartInput(draft: CartDraft): StartSaleInput {
     sellingLocationId: draft.sellingLocationId,
     currency: draft.currency,
     customer: draft.customer,
-    lines: draft.lines.flatMap((line) => {
-      const base = {
-        catalogItemId: line.catalogItemId,
-        ...(line.catalogVariantId ? { catalogVariantId: line.catalogVariantId } : {}),
-        ...(line.soldBy ? { soldByEmployeeId: line.soldBy.employeeId } : {}),
-      };
-      // One persisted line is one unambiguous unit price. Units with different additions become
-      // separate lines (identical ones stay grouped), so no average price is ever invented.
-      const groups = line.unitAdditions
-        ? groupUnitAdditions(line.unitAdditions).map((group) => ({
-            quantity: createDecimal(String(group.quantity)).toFixed(4),
-            additions: group.additionalComponents,
-          }))
-        : [{ quantity: line.quantity, additions: line.additionalComponents ?? [] }];
-      return groups.map((group) => ({
-        ...base,
-        quantity: group.quantity,
-        ...(group.additions.length
-          ? { additionalComponents: group.additions.map(startAddition) }
-          : {}),
-      }));
-    }),
+    lines: cartDraftSaleLines(draft),
+  };
+}
+
+/**
+ * What Runtime needs to price this draft read-only: the lines checkout would start the Sale with,
+ * and the member identity if any. Who performs or sells an item, and a walk-in's name and phone,
+ * never change pricing, so they are left out and editing them does not ask for a new preview. Null
+ * when there is nothing a Sale could be started with.
+ */
+export function cartDraftPricingInput(draft: CartDraft | null): SalePricingPreviewInput | null {
+  if (!draft?.lines.length) return null;
+  const lines = cartDraftSaleLines(draft).map((line) => ({
+    catalogItemId: line.catalogItemId,
+    ...(line.catalogVariantId ? { catalogVariantId: line.catalogVariantId } : {}),
+    quantity: line.quantity,
+    ...(line.additionalComponents
+      ? {
+          additionalComponents: line.additionalComponents.map((addition) => ({
+            componentItemId: addition.componentItemId,
+            ...(addition.componentVariantId
+              ? { componentVariantId: addition.componentVariantId }
+              : {}),
+            quantity: addition.quantity,
+          })),
+        }
+      : {}),
+  }));
+  if (lines.length > 100) return null;
+  return {
+    sellingLocationId: draft.sellingLocationId,
+    currency: draft.currency,
+    ...(draft.customer?.type === 'MEMBER' ? { customer: draft.customer } : {}),
+    lines,
   };
 }
 

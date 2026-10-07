@@ -50,6 +50,31 @@ export interface StartSaleInput extends CreateSaleInput {
   }>;
 }
 
+/** A draft priced read-only by Runtime: the same lines its Sale would be started with. */
+export interface SalePricingPreviewInput extends CreateSaleInput {
+  /** Only a member identity can change pricing; without one the draft is priced as a non-member. */
+  customer?: Extract<SaleCustomerSelection, { type: 'MEMBER' }>;
+  lines: StartSaleInput['lines'];
+}
+
+/** Advisory Runtime pricing of a draft. Checkout prices the created Sale again and that Sale wins. */
+export interface SalePricingPreview {
+  currency: string;
+  grossAmount: string;
+  promotions: Array<{
+    promotionId: string;
+    label: string;
+    scope: 'ITEM' | 'CATEGORY' | 'TRANSACTION';
+    amount: string;
+  }>;
+  discountAmount: string;
+  netPreTaxAmount: string;
+  taxRate: string | null;
+  taxPriceTreatment: 'INCLUDED' | 'EXCLUDED' | null;
+  taxAmount: string;
+  totalAmount: string;
+}
+
 export interface SetSaleCustomerInput {
   expectedVersion: number;
   customer: SaleCustomerSelection;
