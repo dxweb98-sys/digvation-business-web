@@ -10,6 +10,15 @@ function copyForLocale(value: string, locale?: string): string {
 }
 
 /** Runtime promotion eligibility codes returned when a promo code is submitted. */
+/** Refund and cancellation refusals, wherever a manual refund or a Void is attempted. */
+const REFUND_ERROR_COPY: Record<string, string> = {
+  REFUND_DISBURSEMENT_REQUIRED: 'Choose how and from which account the refund is returned.',
+  REFUND_DISBURSEMENT_INVALID:
+    'The refund account is not an active refund account of this location.',
+  SALE_VOID_FORBIDDEN: 'Canceling this transaction requires the void permission.',
+  PAYMENT_REFUND_FORBIDDEN: 'Returning money requires the payment refund permission.',
+};
+
 const PROMOTION_ERROR_COPY: Record<string, string> = {
   PROMOTION_NOT_FOUND: 'Promo code was not found.',
   PROMOTION_DISABLED: 'This promotion is currently disabled.',
@@ -46,6 +55,8 @@ export function cashierTransactionErrorMessage(error: unknown, locale?: string):
   }
   const promotionCopy = error instanceof ApiError ? PROMOTION_ERROR_COPY[error.code] : undefined;
   if (promotionCopy) return copyForLocale(promotionCopy, locale);
+  const refundCopy = error instanceof ApiError ? REFUND_ERROR_COPY[error.code] : undefined;
+  if (refundCopy) return copyForLocale(refundCopy, locale);
   return copyForLocale('Transaction could not be processed. Try again.', locale);
 }
 
@@ -69,6 +80,10 @@ const CORRECTION_ERROR_COPY: Record<string, string> = {
     'The lower total must be returned through the payment provider, which is not available here. Ask a supervisor.',
   SALE_NOT_OPEN: 'The transaction is already closed and cannot be changed.',
   SALE_PAYMENT_PENDING: 'A payment is still waiting for confirmation.',
+  ADJUSTMENT_PREVIEW_STALE:
+    'The adjustment total changed since it was reviewed. Review it again before saving.',
+  ...REFUND_ERROR_COPY,
+  ORDER_ADJUSTMENT_INVALID: 'The adjustment is not valid. Reload the transaction and try again.',
   SERVICE_ADDITIONAL_ITEM_REQUIRED: 'Choose an additional item for every unit that requires one.',
   SERVICE_ADDITIONAL_ITEM_NOT_FOUND: 'An additional item is no longer available.',
   SERVICE_ADDITIONAL_ITEM_IN_FIXED_BOM: 'An additional item is already part of this item.',
@@ -84,6 +99,14 @@ const CORRECTION_ERROR_COPY: Record<string, string> = {
 export function correctionErrorMessage(error: unknown, fallback: string, locale?: string): string {
   const known = error instanceof ApiError ? CORRECTION_ERROR_COPY[error.code] : undefined;
   return known ? copyForLocale(known, locale) : fallback;
+}
+
+/** Why Runtime refused one change, or the adjustment as a whole, in an adjustment preview. */
+export function orderAdjustmentIssueMessage(code: string, locale?: string): string {
+  return copyForLocale(
+    CORRECTION_ERROR_COPY[code] ?? 'This change cannot be applied to the transaction.',
+    locale,
+  );
 }
 
 export function isApiErrorCode(error: unknown, code: string): boolean {

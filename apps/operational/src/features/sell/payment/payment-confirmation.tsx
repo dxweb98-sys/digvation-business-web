@@ -349,6 +349,16 @@ export function RecordedPaymentList({
                         {copy(statusCopy[payment.status])}
                       </span>
                     </p>
+                    {payment.refund ? (
+                      // A manually recorded refund: the account above is where the money left.
+                      <p className="mt-0.5 text-[11px] text-[var(--color-text-muted)]">
+                        {copy('Manual refund')}
+                        {payment.refund.externalReference
+                          ? ` · ${payment.refund.externalReference}`
+                          : ''}
+                        {payment.refund.note ? ` · ${payment.refund.note}` : ''}
+                      </p>
+                    ) : null}
                     {payment.providerReference ? (
                       <p className="mt-0.5 break-all font-mono text-[11px] text-[var(--color-text-muted)]">
                         {payment.providerReference}

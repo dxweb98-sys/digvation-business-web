@@ -44,7 +44,11 @@ import type {
   SaleLine,
 } from '../../transaction/model/cashier-transaction.types';
 import { isCompletedSaleSummary } from '../../transaction/model/completed-sale-visibility';
-import type { ReplaceSaleLineInput } from '../../transaction/api/cashier-transaction.adapter';
+import type {
+  OrderAdjustmentCommitInput,
+  RefundDisbursementInput,
+  OrderAdjustmentInput,
+} from '../../transaction/api/cashier-transaction.adapter';
 import { saleLineConfiguration } from '../../transaction/model/sale-line-additions';
 import { fetchResolvedPrice, fetchResolvedVariantPrices } from '../../catalog/resolved-price-query';
 import type { ServiceLineWorkPlan } from '../../performer/service-performer-allocation';
@@ -505,33 +509,6 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     }
   };
 
-  /**
-   * Adds a new, fully configured item to the transaction being adjusted. The item was chosen and
-   * configured in the shared item configuration; nothing is persisted before that. Errors are
-   * returned to the caller, which keeps its dialog open.
-   */
-  const addItemToTransaction = async (item: CatalogItem, configuration: ItemConfiguration) => {
-    const targetSaleId = queueContextSale?.id;
-    if (!targetSaleId)
-      throw new Error(
-        copy('The transaction being adjusted is no longer active. Reopen the adjustment.'),
-      );
-    const variants = await catalog.loadActiveVariants(item);
-    await addCatalogItem(
-      item,
-      configuration.catalogVariantId ?? undefined,
-      'TRANSACTION_ADJUSTMENT',
-      targetSaleId,
-      variants.find((variant) => variant.id === configuration.catalogVariantId) ?? null,
-      {
-        quantity: configuration.quantity,
-        additionalComponents: configuration.additionalComponents,
-        ...(configuration.unitAdditions ? { unitAdditions: configuration.unitAdditions } : {}),
-        ...(configuration.soldBy ? { soldBy: configuration.soldBy } : {}),
-      },
-    );
-  };
-
   /** Reopens a local cart line in the configurator, prefilled with what the operator chose. */
   const editCartLine = async (lineId: string, options: { addUnit?: boolean } = {}) => {
     // What is being edited: a local draft line, or a line of the persisted OPEN Sale.
@@ -715,62 +692,33 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
       .catch((error) => command.reportError(error));
   };
 
+  /** Runtime's read-only impact of an adjustment draft; nothing is saved. */
+  const previewOrderAdjustment = (
+    saleId: string,
+    input: OrderAdjustmentInput,
+    signal?: AbortSignal,
+  ) => {
+    if (!transactionAdapter.previewOrderAdjustment)
+      throw new Error(copy('Item correction is not available.'));
+    return transactionAdapter.previewOrderAdjustment(saleId, input, signal);
+  };
+
   /**
-   * Corrects one line of an OPEN Sale with a full item configuration (variant, quantity, additions,
-   * per-unit additions) through Runtime's atomic replace-line command. One source line may become
-   * several lines; the Sale is never left half-changed.
+   * Saves an adjustment draft atomically. Only Runtime's saved Sale replaces the queued one; while
+   * the draft is edited, and when saving fails, the queue keeps the persisted Sale.
    */
-  const correctLine = async (
-    line: SaleLine,
-    input: { lines: ReplaceSaleLineInput['lines']; reason?: string },
+  const commitOrderAdjustment = async (
+    saleId: string,
+    input: OrderAdjustmentCommitInput,
+    idempotencyKey: string,
   ) => {
-    const sale = queueContextSale?.id === line.saleId ? queueContextSale : saleWorkspace.sale;
-    if (!sale || !transactionAdapter.replaceSaleLine)
+    if (!transactionAdapter.commitOrderAdjustment)
       throw new Error(copy('Item correction is not available.'));
-    const updated = await command.runMutation(() =>
-      transactionAdapter.replaceSaleLine!(
-        sale.id,
-        line.id,
-        {
-          expectedVersion: sale.version,
-          lines: input.lines,
-          // Only an audited correction carries a reason; an ordinary edit has none.
-          ...(input.reason ? { reason: input.reason } : {}),
-        },
-        `cashier-correct-line-${crypto.randomUUID()}`,
-      ),
+    const result = await command.runMutation(() =>
+      transactionAdapter.commitOrderAdjustment!(saleId, input, idempotencyKey),
     );
-    cacheQueueContext(updated);
-    return updated;
-  };
-
-  /** Runtime-calculated impact of the correction; nothing is saved. */
-  const previewLineCorrection = async (
-    line: SaleLine,
-    input: { lines: ReplaceSaleLineInput['lines']; reason?: string },
-  ) => {
-    const sale = queueContextSale?.id === line.saleId ? queueContextSale : saleWorkspace.sale;
-    if (!sale || !transactionAdapter.previewReplaceSaleLine)
-      throw new Error(copy('Item correction is not available.'));
-    // The preview is the same command as the correction, so it carries the same reason.
-    return transactionAdapter.previewReplaceSaleLine(sale.id, line.id, {
-      expectedVersion: sale.version,
-      lines: input.lines,
-      ...(input.reason ? { reason: input.reason } : {}),
-    });
-  };
-
-  const compensateOpenPayment = async (sale: Sale, paymentId: string, amount: string) => {
-    if (!transactionAdapter.compensateOpenSalePayment)
-      throw new Error(copy('Pengembalian pembayaran belum tersedia.'));
-    const updated = await command.runMutation(() =>
-      transactionAdapter.compensateOpenSalePayment!(sale.id, paymentId, {
-        expectedVersion: sale.version,
-        amount,
-      }, `cashier-compensate-${crypto.randomUUID()}`),
-    );
-    cacheQueueContext(updated);
-    return updated;
+    cacheQueueContext(result.sale);
+    return result;
   };
 
   const transitionQueuedFulfillment = async (
@@ -1082,7 +1030,10 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     paymentRouteId?: string,
   ) => core.createPayment(method, appliedAmount, tenderedAmount, providerReference, paymentRouteId);
 
-  const voidQueuedSale = async (targetSale: Sale) => {
+  const voidQueuedSale = async (
+    targetSale: Sale,
+    refundDisbursement?: RefundDisbursementInput,
+  ) => {
     command.clearNotice();
     try {
       const authoritative = await transactionAdapter.getSale(targetSale.id);
@@ -1091,6 +1042,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
           authoritative.id,
           authoritative.version,
           `cashier-void-${crypto.randomUUID()}`,
+          refundDisbursement,
         ),
       );
       cacheQueueContext(updated);
@@ -1100,10 +1052,6 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
       throw error;
     }
   };
-
-  const contextViewModel = queueContextSale
-    ? createSaleWorkspaceViewModel(queueContextSale, effectiveConnectivity, 'CLEAN', runtime.locale)
-    : saleWorkspace.viewModel;
 
   return {
     locale: runtime.locale,
@@ -1133,7 +1081,14 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     contributionPreview: contributionPreviewQuery.data ?? null,
     isContributionPreviewLoading: contributionPreviewQuery.isLoading,
     isCompletionOpen,
-    viewModel: contextViewModel,
+    /**
+     * The workspace's own Sale (cart, checkout and its payment): one authority for every amount
+     * the checkout shows and every payment it records. A queued Sale opened from the queue is
+     * never part of it; that Sale is `queueContextSale`, read only by the queue's own dialogs.
+     */
+    viewModel: saleWorkspace.viewModel,
+    /** The queued Sale a queue dialog (payment, adjustment, detail) is working on, if any. */
+    queueContextSale,
     isLoadingCatalog: catalog.isLoading,
     isLoadingEmployees: employeeOptions.isLoading,
     isLoadingPaymentRoutes: paymentRoutesQuery.isLoading,
@@ -1158,10 +1113,8 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     loadComponentCandidates,
     changeQuantity,
     removeLine,
-    correctLine,
-    previewLineCorrection,
-    addItemToTransaction,
-    compensateOpenPayment,
+    previewOrderAdjustment,
+    commitOrderAdjustment,
     changeDraftQuantity: saleWorkspace.changeDraftQuantity,
     removeDraftLine: saleWorkspace.removeDraftLine,
     commitDraft: saleWorkspace.commitDraft,

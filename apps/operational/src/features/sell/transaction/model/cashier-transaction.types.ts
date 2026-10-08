@@ -205,6 +205,16 @@ export interface EmployeeContribution {
   finalizedAt: string;
 }
 
+export interface PaymentRefundRecord {
+  id: string;
+  kind: 'MANUAL';
+  reason: 'ORDER_ADJUSTMENT' | 'SALE_VOID';
+  externalReference: string | null;
+  note: string | null;
+  adjustmentId: string | null;
+  allocations: Array<{ sourcePaymentId: string; amount: string }>;
+}
+
 export interface Payment {
   id: string;
   saleId: string;
@@ -215,6 +225,11 @@ export interface Payment {
   tenderedAmount: string | null;
   changeAmount: string | null;
   providerReference: string | null;
+  /**
+   * The manual refund this negative payment records. The payment's own method and account are
+   * where the money actually left; the allocations name the original payments it was attributed to.
+   */
+  refund?: PaymentRefundRecord | null;
   financePaymentRouteId?: string | null;
   financeFinancialAccountId?: string | null;
   financeFinancialAccountCodeSnapshot?: string | null;

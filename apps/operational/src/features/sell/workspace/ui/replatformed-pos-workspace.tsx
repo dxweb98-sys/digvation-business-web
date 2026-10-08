@@ -141,6 +141,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     setCancelTarget,
     cancelReason,
     setCancelReason,
+    disbursement: cancelDisbursement,
+    setDisbursement: setCancelDisbursement,
     cancellationReasons,
     requestCancel,
     confirmCancel,
@@ -231,8 +233,11 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     sendPaymentOnce,
   } = useCheckoutPaymentForm({ activeCustomer });
 
-  const displayedQueueDetail =
-    receiptSaleId && sale?.id === receiptSaleId && hasSuccessfulPayment(sale) ? sale : queueDetail;
+  // A receipt follows the Sale that was just paid: the checkout's own Sale or the queued one.
+  const receiptSale = [sale, workspace.queueContextSale].find(
+    (candidate) => candidate && candidate.id === receiptSaleId && hasSuccessfulPayment(candidate),
+  );
+  const displayedQueueDetail = receiptSale ?? queueDetail;
   const {
     receiptDeliveryTarget,
     setReceiptDeliveryTarget,
@@ -241,12 +246,17 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     openReceiptDelivery,
   } = useReceiptDeliveryPreview({ adapter, displayedQueueDetail, workspace });
 
+  // A queue dialog shows only its own queued Sale, kept current by the queue context; never the
+  // checkout's Sale.
+  const queueContextSale = workspace.queueContextSale;
   const displayedQueuePaymentTarget =
-    queuePaymentTarget && sale?.id === queuePaymentTarget.id ? sale : queuePaymentTarget;
+    queuePaymentTarget && queueContextSale?.id === queuePaymentTarget.id
+      ? queueContextSale
+      : queuePaymentTarget;
   const { setAdjustmentTarget, displayedAdjustmentTarget, openAdjustment } = useOrderAdjustment({
     workspace,
     session,
-    sale,
+    sale: queueContextSale,
     setQueueDetail,
     showToast,
     copy,
@@ -1115,22 +1125,26 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           setAdjustmentTarget(null);
           workspace.closeQueueContext();
         }}
-        onAdd={(item, configuration) => workspace.addItemToTransaction(item, configuration)}
-        onQuantity={(line, next) => workspace.changeQuantity(line, next)}
-        onRemove={workspace.removeLine}
-        onEdit={(line, input) => workspace.correctLine(line, input)}
-        onCorrect={(line, input) => workspace.correctLine(line, input)}
-        onPreview={(line, input) => workspace.previewLineCorrection(line, input)}
+        // The draft is only previewed; the queue takes Runtime's Sale once the whole draft is saved.
+        onPreview={workspace.previewOrderAdjustment}
+        onCommit={workspace.commitOrderAdjustment}
+        onCommitted={() => {
+          workspace.closeVariantPicker();
+          setAdjustmentTarget(null);
+          workspace.closeQueueContext();
+        }}
+        onReload={async (saleId) => {
+          const fresh = await workspace.hydrateQueuedSale(saleId);
+          setAdjustmentTarget(fresh);
+          return fresh;
+        }}
         loadConfiguratorState={workspace.loadConfiguratorState}
         loadCandidates={workspace.loadComponentCandidates}
+        paymentRoutes={workspace.paymentRoutes}
         canAdjust={
           displayedAdjustmentTarget
             ? canAdjustOrder(displayedAdjustmentTarget, session.access.permissions)
             : true
-        }
-        canRefundPayment={session.access.permissions.includes('payments:refund')}
-        onCompensate={(sale, paymentId, amount) =>
-          workspace.compensateOpenPayment(sale, paymentId, amount)
         }
         employees={workspace.employees}
       />
@@ -1217,6 +1231,9 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           workspace.closeQueueContext();
         }}
         onConfirm={confirmCancel}
+        paymentRoutes={workspace.paymentRoutes}
+        disbursement={cancelDisbursement}
+        onDisbursementChange={setCancelDisbursement}
       />
 
       {performerTarget ? (

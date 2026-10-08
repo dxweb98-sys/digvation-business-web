@@ -7,6 +7,13 @@ import { money, isPositiveDecimal } from '../transaction/model/sale-display';
 import type { Dispatch, SetStateAction } from 'react';
 import type { useToast } from '@digvation-labs/ui';
 import type { QueueStatus } from './queue-status';
+import type { RefundDisbursementInput } from '../transaction/api/cashier-transaction.adapter';
+import type { PaymentRoute } from '../transaction/model/cashier-transaction.types';
+import {
+  defaultRefundDisbursement,
+  refundDisbursementInput,
+  type RefundDisbursementDraft,
+} from '../adjustment/refund-disbursement-picker';
 
 /** Cancelling (voiding) a queued Sale with a required reason; local demo keeps the reasons. */
 export function useQueuedSaleCancellation({
@@ -20,8 +27,12 @@ export function useQueuedSaleCancellation({
 }: {
   workspace: {
     locale: string;
-    voidQueuedSale: (targetSale: Sale) => Promise<Sale>;
+    voidQueuedSale: (
+      targetSale: Sale,
+      refundDisbursement?: RefundDisbursementInput,
+    ) => Promise<Sale>;
     closeQueueContext: () => void;
+    paymentRoutes: readonly PaymentRoute[];
   };
   isLocalDemo: boolean;
   setQueueDetail: Dispatch<SetStateAction<Sale | null>>;
@@ -32,18 +43,27 @@ export function useQueuedSaleCancellation({
 }) {
   const [cancelTarget, setCancelTarget] = useState<Sale | null>(null);
   const [cancelReason, setCancelReason] = useState('');
+  // How a paid Sale's money is returned; until changed, the first available account.
+  const [disbursementChoice, setDisbursement] = useState<RefundDisbursementDraft | null>(null);
+  const disbursement = disbursementChoice ?? defaultRefundDisbursement(workspace.paymentRoutes);
   const [cancellationReasons, setCancellationReasons] = useState<Record<string, string>>(() =>
     isLocalDemo ? readCancellationReasons() : {},
   );
   const requestCancel = (transaction: Sale) => {
     setCancelTarget(transaction);
     setCancelReason('');
+    setDisbursement(null);
   };
   const confirmCancel = async () => {
     if (!cancelTarget || !cancelReason.trim()) return;
     const refundAmount = financialSummary(cancelTarget).totalPaid;
+    const refunds = isPositiveDecimal(refundAmount);
+    if (refunds && !disbursement) return;
     try {
-      const canceledSale = await workspace.voidQueuedSale(cancelTarget);
+      const canceledSale = await workspace.voidQueuedSale(
+        cancelTarget,
+        refunds && disbursement ? refundDisbursementInput(disbursement) : undefined,
+      );
       if (isLocalDemo) {
         writeCancellationReason(canceledSale.id, cancelReason.trim());
         setCancellationReasons((current) => ({
@@ -59,8 +79,8 @@ export function useQueuedSaleCancellation({
       workspace.closeQueueContext();
       showToast({
         title: copy('Transaction canceled'),
-        description: isPositiveDecimal(refundAmount)
-          ? `${copy('Refund required')}: ${money(refundAmount, workspace.locale)}. ${copy('Cancellation reason saved.')}`
+        description: refunds
+          ? `${copy('Refund recorded')}: ${money(refundAmount, workspace.locale)}. ${copy('Cancellation reason saved.')}`
           : copy('Cancellation reason saved.'),
         variant: 'success',
       });
@@ -77,6 +97,8 @@ export function useQueuedSaleCancellation({
     setCancelTarget,
     cancelReason,
     setCancelReason,
+    disbursement,
+    setDisbursement,
     cancellationReasons,
     requestCancel,
     confirmCancel,
