@@ -575,6 +575,10 @@ const posCopy: Record<string, LocalizedCopy> = {
     'en-US': 'You are not allowed to correct payments.',
   },
   'Add payment method': { 'id-ID': 'Tambah metode pembayaran', 'en-US': 'Add payment method' },
+  'Two route balance hint': {
+    'id-ID': 'Jika salah satu nominal diubah, metode lainnya akan disesuaikan otomatis agar total tetap sama.',
+    'en-US': 'If one amount changes, the other method is adjusted automatically so the total stays the same.',
+  },
   'Remove payment method': { 'id-ID': 'Hapus metode pembayaran', 'en-US': 'Remove payment method' },
   'Left to allocate': { 'id-ID': 'Sisa yang perlu dialokasikan', 'en-US': 'Left to allocate' },
   'Allocated beyond the total paid': {

@@ -1627,6 +1627,22 @@ describe('ReferenceTransactionDetail payment correction', () => {
     expect(onCorrectPayment.mock.calls[0]![0].id).toBe('sale-runtime-1');
   });
 
+  it('places the correction entry in the Payment section header, not as a footer or card-bottom action', () => {
+    renderCorrectable(correctedSale(), vi.fn());
+    const action = within(panel()).getByRole('button', { name: 'Koreksi pembayaran' });
+    const header = within(panel())
+      .getByRole('heading', { name: 'Pembayaran diterima' })
+      .closest('.pos-payment-panel')!
+      .querySelector('h4')!.parentElement as HTMLElement;
+    expect(header.contains(action)).toBe(true);
+    const footer = screen.getByRole('dialog').querySelector('footer');
+    expect(
+      footer
+        ? within(footer as HTMLElement).queryByRole('button', { name: 'Koreksi pembayaran' })
+        : null,
+    ).toBeNull();
+  });
+
   it('does not change what the receipt shows beyond the effective composition', () => {
     render(
       <DeploymentBootstrapProvider config={bootstrap}>

@@ -1,6 +1,6 @@
 import { DButton, DDialog, DSkeleton, useToast } from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeftRight, Info, RotateCcw, Undo2 } from 'lucide-react';
+import { Info, RotateCcw, Undo2 } from 'lucide-react';
 import { useState } from 'react';
 
 import { normalizeBackofficeApiError } from '../../../app/api/backoffice-api-error';
@@ -145,17 +145,8 @@ export function TransactionDetailDialog({
             <DButton variant="secondary" onClick={close}>
               {copy('Close')}
             </DButton>
-            {actions && (actions.canCorrect || actions.canRefund || actions.showReverse) ? (
+            {actions && (actions.canRefund || actions.showReverse) ? (
               <div className="flex flex-wrap justify-end gap-2">
-                {actions.canCorrect && api.correctPayments ? (
-                  <DButton
-                    variant="secondary"
-                    leftIcon={<ArrowLeftRight aria-hidden="true" className="size-4" />}
-                    onClick={() => openAction('correct')}
-                  >
-                    {copy('Payment correction')}
-                  </DButton>
-                ) : null}
                 {actions.canRefund ? (
                   <DButton
                     variant={actions.canReverse ? 'secondary' : 'primary'}
@@ -183,7 +174,12 @@ export function TransactionDetailDialog({
       }
     >
       {sale ? (
-        <TransactionDetailBody sale={sale} />
+        <TransactionDetailBody
+          sale={sale}
+          onCorrectPayment={
+            actions?.canCorrect && api.correctPayments ? () => openAction('correct') : undefined
+          }
+        />
       ) : detail.isError ? (
         <div className="flex min-h-48 flex-col items-center justify-center gap-3 text-center">
           <p className="text-sm text-[var(--color-text-muted)]">
@@ -263,7 +259,14 @@ function TransactionDetailSkeleton({ label }: { label: string }) {
   );
 }
 
-function TransactionDetailBody({ sale }: { sale: Sale }) {
+function TransactionDetailBody({
+  sale,
+  onCorrectPayment,
+}: {
+  sale: Sale;
+  /** Opens the payment correction; omitted unless the viewer may correct this Sale. */
+  onCorrectPayment?: (() => void) | undefined;
+}) {
   const { copy, formatDate, formatMoney, formatQuantity } = useTransactionHistoryLocalization();
   const dateTime = (value: string) =>
     formatDate(new Date(value), { dateStyle: 'medium', timeStyle: 'short' });
@@ -321,7 +324,7 @@ function TransactionDetailBody({ sale }: { sale: Sale }) {
             />
           </RecordPanelBody>
         </RecordPanel>
-        <TransactionPaymentsSection sale={sale} />
+        <TransactionPaymentsSection sale={sale} onCorrectPayment={onCorrectPayment} />
       </div>
 
       {membership ? (

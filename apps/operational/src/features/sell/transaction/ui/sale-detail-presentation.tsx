@@ -499,6 +499,7 @@ export function SaleFinancialSummary({
                   {labels.settled}
                 </DBadge>
               ) : null}
+              {paymentActions}
             </span>
           </div>
           {settlementRows ? (
@@ -552,7 +553,6 @@ export function SaleFinancialSummary({
               <section>{paymentAttempts}</section>
             </>
           ) : null}
-          {paymentActions ? <div className="mt-3 flex justify-end">{paymentActions}</div> : null}
         </DCardContent>
       </DCard>
     </div>

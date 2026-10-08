@@ -201,6 +201,19 @@ describe('payment correction entry point', () => {
     ).toBe(false);
   });
 
+  it('exposes the correction as a contextual action of the Payments section, not the footer', async () => {
+    renderDetail(recorded(), permitted, {
+      correctPayments: vi.fn(async () => corrected()),
+      paymentRoutes: vi.fn(async () => []),
+    });
+    const action = await screen.findByRole('button', { name: 'Koreksi pembayaran' });
+    expect(
+      within(screen.getByRole('region', { name: 'Pembayaran' })).getByRole('button', {
+        name: 'Koreksi pembayaran',
+      }),
+    ).toBe(action);
+  });
+
   it('shows the button only to a permitted session', async () => {
     const correctPayments = vi.fn(async () => corrected());
     renderDetail(recorded(), permitted, { correctPayments, paymentRoutes: vi.fn(async () => []) });
@@ -379,11 +392,12 @@ describe('payment correction composition editor', () => {
 
   it('adds only a route not yet selected, and a three-route mismatch blocks Save', async () => {
     const { dialog } = await open();
-    fireEvent.click(dialog.getByLabelText('Tambah metode pembayaran'));
-    expect(screen.queryByRole('option', { name: /Tunai/ })).toBeNull();
-    expect(screen.queryByRole('option', { name: /QRIS BRI/ })).toBeNull();
-    expect(await screen.findByRole('option', { name: /AKUN1/ })).toBeTruthy();
-    fireEvent.click(await screen.findByRole('option', { name: /BCA/ }));
+    fireEvent.click(dialog.getByRole('button', { name: 'Tambah metode pembayaran' }));
+    const offered = within(dialog.getByRole('list', { name: 'Tambah metode pembayaran' }));
+    expect(offered.queryByRole('button', { name: /Tunai/ })).toBeNull();
+    expect(offered.queryByRole('button', { name: /QRIS BRI/ })).toBeNull();
+    expect(offered.getByRole('button', { name: /AKUN1/ })).toBeTruthy();
+    fireEvent.click(offered.getByRole('button', { name: /BCA/ }));
     type(dialog, 'BCA', '1000');
     // Three routes: nothing is redistributed, the excess is reported.
     expect(amount(dialog, 'Tunai').value).toBe('5.000');
@@ -426,5 +440,81 @@ describe('payment correction composition editor', () => {
       ],
     });
     expect(key).toMatch(/^backoffice-payment-correction-/);
+  });
+
+  describe('visual hierarchy', () => {
+    const region = (dialog: ReturnType<typeof within>, name: string) =>
+      within(dialog.getByRole('region', { name }));
+
+    it('keeps the current recording read-only and apart from the editable target', async () => {
+      const { dialog } = await open();
+      const current = region(dialog, 'Pencatatan saat ini');
+      expect(current.queryByRole('textbox')).toBeNull();
+      expect(current.queryByRole('button')).toBeNull();
+      const target = region(dialog, 'Pencatatan yang benar');
+      expect(target.getAllByRole('textbox')).toHaveLength(2);
+      expect(current.getByText('Total dibayar')).toBeTruthy();
+    });
+
+    it('offers Add payment method inside the editable target, even in Backoffice', async () => {
+      const { dialog } = await open();
+      const target = region(dialog, 'Pencatatan yang benar');
+      expect(target.getByRole('button', { name: 'Tambah metode pembayaran' })).toBeTruthy();
+      expect(
+        region(dialog, 'Pencatatan saat ini').queryByRole('button', {
+          name: 'Tambah metode pembayaran',
+        }),
+      ).toBeNull();
+    });
+
+    it('explains the automatic balance only while exactly two routes are selected', async () => {
+      const { dialog } = await open();
+      const hint = /Jika salah satu nominal diubah, metode lainnya akan disesuaikan otomatis/;
+      expect(region(dialog, 'Pencatatan yang benar').getByText(hint)).toBeTruthy();
+      fireEvent.click(dialog.getByRole('button', { name: 'Tambah metode pembayaran' }));
+      fireEvent.click(
+        within(dialog.getByRole('list', { name: 'Tambah metode pembayaran' })).getByRole('button', {
+          name: /BCA/,
+        }),
+      );
+      expect(dialog.queryByText(hint)).toBeNull();
+    });
+
+    it('shows allocation feedback inside the target composition', async () => {
+      const { dialog } = await open();
+      fireEvent.click(dialog.getByRole('button', { name: 'Tambah metode pembayaran' }));
+      fireEvent.click(
+        within(dialog.getByRole('list', { name: 'Tambah metode pembayaran' })).getByRole('button', {
+          name: /BCA/,
+        }),
+      );
+      type(dialog, 'BCA', '1000');
+      const status = dialog.getByRole('status');
+      expect(region(dialog, 'Pencatatan yang benar').getByRole('status')).toBe(status);
+      expect(status.textContent).toMatch(/Alokasi melebihi total dibayar.*1\.000/);
+    });
+
+    it('keeps the change preview neutral until there are derived changes, then lists only them', async () => {
+      const { dialog } = await open();
+      const changes = region(dialog, 'Perubahan');
+      expect(changes.getByText('Belum ada perubahan.')).toBeTruthy();
+      expect(changes.queryAllByRole('listitem')).toHaveLength(0);
+      expect(dialog.queryByRole('status')).toBeNull();
+      type(dialog, 'Tunai', '10000');
+      const items = changes.getAllByRole('listitem');
+      expect(items.map((item) => item.textContent)).toEqual([
+        expect.stringMatching(/Tunai.*\+\s?Rp\s?5\.000/),
+        expect.stringMatching(/QRIS BRI.*−\s?Rp\s?5\.000/),
+      ]);
+      expect(changes.getByText('Total perubahan').parentElement?.textContent).toMatch(/Rp\s?0/);
+      expect(changes.queryByText('Total dibayar')).toBeNull();
+    });
+
+    it('places the reason after the financial sections', async () => {
+      const { dialog } = await open();
+      const reason = dialog.getByRole('textbox', { name: 'Alasan' });
+      const last = dialog.getByRole('region', { name: 'Perubahan' });
+      expect(last.compareDocumentPosition(reason) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
   });
 });

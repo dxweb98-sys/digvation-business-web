@@ -304,7 +304,7 @@ export function ReferenceTransactionSummary({
       }
       paymentActions={
         onCorrectPayment ? (
-          <DButton variant="outline" size="sm" onClick={onCorrectPayment}>
+          <DButton variant="ghost" size="sm" onClick={onCorrectPayment}>
             {copy('Payment correction')}
           </DButton>
         ) : null

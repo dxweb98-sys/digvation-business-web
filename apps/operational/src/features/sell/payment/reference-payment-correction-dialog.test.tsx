@@ -346,4 +346,63 @@ describe('ReferencePaymentCorrectionDialog', () => {
       /Pengembalian|Bayar sisanya|Tambahan pembayaran|Pindahkan|Transfer dana/,
     );
   });
+
+  describe('visual hierarchy', () => {
+    const current = () => within(screen.getByRole('region', { name: 'Pencatatan saat ini' }));
+    const hint = /Jika salah satu nominal diubah, metode lainnya akan disesuaikan otomatis/;
+
+    it('keeps the current recording read-only and apart from the editable target', () => {
+      renderDialog();
+      expect(current().queryByRole('textbox')).toBeNull();
+      expect(current().queryByRole('button')).toBeNull();
+      expect(current().getByText('Total dibayar')).toBeTruthy();
+      expect(within(correctSection()).getAllByRole('textbox')).toHaveLength(2);
+    });
+
+    it('offers Add payment method inside the editable target only', () => {
+      renderDialog();
+      expect(
+        within(correctSection()).getByRole('button', { name: 'Tambah metode pembayaran' }),
+      ).toBeTruthy();
+      expect(current().queryByRole('button', { name: 'Tambah metode pembayaran' })).toBeNull();
+    });
+
+    it('explains the automatic balance only while exactly two routes are selected', () => {
+      renderDialog();
+      expect(within(correctSection()).getByText(hint)).toBeTruthy();
+      addMethod();
+      chooseMethod(/BCA/);
+      expect(screen.queryByText(hint)).toBeNull();
+    });
+
+    it('shows allocation feedback inside the target composition', () => {
+      renderDialog();
+      addMethod();
+      chooseMethod(/BCA/);
+      type('BCA', '1.000');
+      const status = screen.getByRole('status');
+      expect(within(correctSection()).getByRole('status')).toBe(status);
+      expect(status.textContent).toMatch(/Alokasi melebihi total dibayar.*1\.000/);
+    });
+
+    it('keeps the change preview neutral until there are derived changes, then lists only them', () => {
+      renderDialog();
+      expect(within(changesSection()).getByText('Belum ada perubahan.')).toBeTruthy();
+      expect(within(changesSection()).queryAllByRole('listitem')).toHaveLength(0);
+      expect(screen.queryByRole('status')).toBeNull();
+      type('Tunai', '10.000');
+      const items = within(changesSection()).getAllByRole('listitem');
+      expect(items).toHaveLength(2);
+      expect(items[0]!.textContent).toMatch(/Tunai.*\+\s?Rp\s?5\.000/);
+      expect(items[1]!.textContent).toMatch(/QRIS BRI.*−\s?Rp\s?5\.000/);
+      expect(within(changesSection()).queryByText('Total dibayar')).toBeNull();
+    });
+
+    it('places the reason after the financial sections', () => {
+      renderDialog();
+      expect(
+        changesSection().compareDocumentPosition(reasonField()) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+  });
 });

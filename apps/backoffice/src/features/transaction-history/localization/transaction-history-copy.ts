@@ -152,6 +152,10 @@ export const transactionHistoryCopy: Record<string, { id: string; en: string }> 
   'Total changes': { id: 'Total perubahan', en: 'Total changes' },
   'Nothing to change yet.': { id: 'Belum ada perubahan.', en: 'Nothing to change yet.' },
   'Add payment method': { id: 'Tambah metode pembayaran', en: 'Add payment method' },
+  'Two route balance hint': {
+    id: 'Jika salah satu nominal diubah, metode lainnya akan disesuaikan otomatis agar total tetap sama.',
+    en: 'If one amount changes, the other method is adjusted automatically so the total stays the same.',
+  },
   'Remove payment method': { id: 'Hapus metode pembayaran', en: 'Remove payment method' },
   'Left to allocate': { id: 'Sisa yang perlu dialokasikan', en: 'Left to allocate' },
   'Allocated beyond the total paid': {

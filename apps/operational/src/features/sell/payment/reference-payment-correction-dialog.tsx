@@ -1,21 +1,13 @@
 import { ApiError } from '@digvation/business-api';
 import {
-  addCorrectionRoute,
-  addableRoutes,
-  canRemoveCorrectionRoute,
   correctionDraftState,
-  correctionNet,
-  createDecimal,
-  editCorrectionAmount,
   paymentCorrectionRequest,
-  removeCorrectionRoute,
   startCorrectionDraft,
-  unallocatedAmount,
   type CorrectionDraft,
 } from '@digvation/pos-money';
+import { CorrectionCompositionEditor } from '@digvation/business-payment-correction-ui';
 import { DAlert, DButton as Button, DDialog as Dialog, useToast } from '@digvation-labs/ui';
 import { DTextarea } from '@digvation/ui';
-import { Plus, X } from 'lucide-react';
 import { useState } from 'react';
 
 import { useOperationalLocalization } from '../../../app/localization/operational-localization';
@@ -83,7 +75,6 @@ export function ReferencePaymentCorrectionDialog({
   const { copy, label } = useOperationalLocalization();
   const { showToast } = useToast();
   const [draft, setDraft] = useState<CorrectionDraft | null>(null);
-  const [adding, setAdding] = useState(false);
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -94,14 +85,9 @@ export function ReferencePaymentCorrectionDialog({
 
   if (!sale) return null;
   const format = (amount: string) => money(amount, locale);
-  const signed = (delta: string) =>
-    delta.startsWith('-') ? `−${format(delta.slice(1))}` : `+${format(delta)}`;
   const infos = correctionRouteInfos(sale, paymentRoutes);
-  const info = (routeId: string) => infos.find((candidate) => candidate.routeId === routeId);
   const current = draft ?? startCorrectionDraft(correctionEffectiveEntries(sale));
   const state = correctionDraftState(current);
-  const remaining = unallocatedAmount(current);
-  const mismatch = !createDecimal(remaining).isZero();
   const trimmedReason = reason.trim();
   const ready = state.ok && trimmedReason.length >= 3 && !conflict && !saving;
   const update = (next: CorrectionDraft) => setDraft(next);
@@ -151,7 +137,6 @@ export function ReferencePaymentCorrectionDialog({
       .then(() => {
         // The composition changed under the draft: start again from what Runtime holds.
         setDraft(null);
-        setAdding(false);
         setConflict(false);
         setSaveError(null);
       })
@@ -161,12 +146,6 @@ export function ReferencePaymentCorrectionDialog({
   const close = () => {
     if (!saving) onClose();
   };
-
-  const currentRoutes = Object.entries(baseline.current).filter(
-    ([, amount]) => !createDecimal(amount).isZero(),
-  );
-  const addable = addableRoutes(current, infos);
-  const changes = state.ok ? state.moves : [];
 
   return (
     <Dialog
@@ -194,135 +173,39 @@ export function ReferencePaymentCorrectionDialog({
           {copy('Payment correction explanation')}
         </p>
 
-        <section aria-label={copy('Recorded now')}>
-          <h3 className="text-sm font-semibold">{copy('Recorded now')}</h3>
-          <ul className="mt-1 divide-y divide-[var(--color-border)]">
-            {currentRoutes.map(([routeId, amount]) => (
-              <li key={routeId} className="flex justify-between gap-4 py-1.5 text-sm">
-                <span className="min-w-0 break-words">{info(routeId)?.name ?? routeId}</span>
-                <span className="shrink-0 font-semibold tabular-nums">{format(amount)}</span>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-1 flex justify-between text-xs text-[var(--color-text-muted)]">
-            <span>{copy('Total paid')}</span>
-            <span className="tabular-nums">{format(current.total)}</span>
-          </p>
-        </section>
-
-        <section aria-label={copy('Correct recording')}>
-          <h3 className="text-sm font-semibold">{copy('Correct recording')}</h3>
-          <ul className="mt-1 space-y-2">
-            {current.selected.map((routeId) => {
-              const route = info(routeId);
-              const name = route?.name ?? routeId;
-              return (
-                <li key={routeId} className="flex items-center justify-between gap-2">
-                  <span className="min-w-0 text-sm">
-                    <span className="block break-words font-medium">{name}</span>
-                    <span className="block text-xs text-[var(--color-text-muted)]">
-                      {route ? label(route.method as never) : ''}
-                    </span>
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <PosCurrencyInput
-                      aria-label={name}
-                      className="w-40 text-right"
-                      value={current.amounts[routeId] ?? ''}
-                      disabled={saving}
-                      fractionDigits={0}
-                      onChange={(value) => update(editCorrectionAmount(current, routeId, value))}
-                    />
-                    {canRemoveCorrectionRoute(current) ? (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        aria-label={`${copy('Remove payment method')} ${name}`}
-                        disabled={saving}
-                        onClick={() => update(removeCorrectionRoute(current, routeId))}
-                      >
-                        <X className="size-4" aria-hidden />
-                      </Button>
-                    ) : null}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-          <div className="mt-2">
-            {adding ? (
-              <ul
-                aria-label={copy('Add payment method')}
-                className="divide-y divide-[var(--color-border)] rounded-lg border border-[var(--color-border)]"
-              >
-                {addable.map((route) => (
-                  <li key={route.routeId}>
-                    <button
-                      type="button"
-                      className="flex w-full flex-col px-3 py-2 text-left text-sm hover:bg-[var(--color-surface-muted)]"
-                      onClick={() => {
-                        update(addCorrectionRoute(current, route.routeId));
-                        setAdding(false);
-                      }}
-                    >
-                      <span className="font-medium">{route.name}</span>
-                      <span className="text-xs text-[var(--color-text-muted)]">
-                        {label(route.method as never)}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <Button
-                size="sm"
-                variant="ghost"
-                leftIcon={<Plus className="size-4" aria-hidden />}
-                disabled={saving || addable.length === 0}
-                onClick={() => setAdding(true)}
-              >
-                {copy('Add payment method')}
-              </Button>
-            )}
-          </div>
-          <p className="mt-2 flex justify-between text-xs text-[var(--color-text-muted)]">
-            <span>{copy('Total')}</span>
-            <span className="tabular-nums">{format(current.total)}</span>
-          </p>
-          {mismatch ? (
-            <DAlert variant="warning" role="status" className="mt-2">
-              {createDecimal(remaining).isNegative()
-                ? `${copy('Allocated beyond the total paid')} ${format(remaining.slice(1))}`
-                : `${copy('Left to allocate')} ${format(remaining)}`}
-            </DAlert>
-          ) : null}
-        </section>
-
-        <section aria-label={copy('Correction changes')}>
-          <h3 className="text-sm font-semibold">{copy('Correction changes')}</h3>
-          {changes.length ? (
-            <>
-              <ul className="mt-1 divide-y divide-[var(--color-border)]">
-                {changes.map((move) => (
-                  <li key={move.routeId} className="flex justify-between gap-4 py-1.5 text-sm">
-                    <span className="min-w-0 break-words">{info(move.routeId)?.name}</span>
-                    <span className="shrink-0 font-semibold tabular-nums">
-                      {signed(move.delta)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-1 flex justify-between text-xs text-[var(--color-text-muted)]">
-                <span>{copy('Total changes')}</span>
-                <span className="tabular-nums">{format(correctionNet(changes))}</span>
-              </p>
-            </>
-          ) : (
-            <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-              {copy('Nothing to change yet.')}
-            </p>
+        <CorrectionCompositionEditor
+          baseline={baseline}
+          draft={current}
+          routes={infos}
+          disabled={saving}
+          formatMoney={format}
+          methodLabel={(method) => (method ? label(method as never) : '')}
+          onDraftChange={update}
+          labels={{
+            recordedNow: copy('Recorded now'),
+            totalPaid: copy('Total paid'),
+            correctRecording: copy('Correct recording'),
+            total: copy('Total'),
+            addPaymentMethod: copy('Add payment method'),
+            removePaymentMethod: copy('Remove payment method'),
+            twoRouteHint: copy('Two route balance hint'),
+            leftToAllocate: copy('Left to allocate'),
+            allocatedBeyondTotal: copy('Allocated beyond the total paid'),
+            changes: copy('Correction changes'),
+            totalChanges: copy('Total changes'),
+            nothingToChange: copy('Nothing to change yet.'),
+          }}
+          renderAmountInput={({ name, value, disabled, onChange }) => (
+            <PosCurrencyInput
+              aria-label={name}
+              className="w-40 text-right"
+              value={value}
+              disabled={disabled}
+              fractionDigits={0}
+              onChange={onChange}
+            />
           )}
-        </section>
+        />
 
         <label className="block text-sm font-medium">
           {copy('Reason')}

@@ -1,4 +1,4 @@
-import { DBadge } from '@digvation/ui';
+import { DBadge, DButton } from '@digvation/ui';
 
 import { RecordPanel, RecordPanelBody, RecordPanelHeader } from '../../../shared/ui/record-dialog';
 import type { Payment, Sale } from '../api/transaction-history-api';
@@ -19,7 +19,14 @@ const hasValue = (amount: string | null) => Boolean(amount && /[1-9]/.test(amoun
  * How the transaction was actually paid. Only succeeded payments settle a sale; refunds are their
  * own negative facts linked to the payment they return; other attempts stay quietly apart.
  */
-export function TransactionPaymentsSection({ sale }: { sale: Sale }) {
+export function TransactionPaymentsSection({
+  sale,
+  onCorrectPayment,
+}: {
+  sale: Sale;
+  /** A contextual action of this section; omitted unless the viewer may correct payments. */
+  onCorrectPayment?: (() => void) | undefined;
+}) {
   const { copy, formatMoney, formatDate } = useTransactionHistoryLocalization();
   const dateTime = (value: string) =>
     formatDate(new Date(value), { dateStyle: 'medium', timeStyle: 'short' });
@@ -39,7 +46,16 @@ export function TransactionPaymentsSection({ sale }: { sale: Sale }) {
     <RecordPanel ariaLabel={copy('Payments')} padded={false}>
       <RecordPanelHeader
         title={copy('Payments')}
-        trailing={<SummaryBadge summary={paymentSummary(sale)} />}
+        trailing={
+          <>
+            <SummaryBadge summary={paymentSummary(sale)} />
+            {onCorrectPayment ? (
+              <DButton variant="ghost" size="sm" onClick={onCorrectPayment}>
+                {copy('Payment correction')}
+              </DButton>
+            ) : null}
+          </>
+        }
       />
       <RecordPanelBody>
         {composition.applied.length ? (

@@ -13,6 +13,7 @@
     "@digvation/business-api": "workspace:*",
     "@digvation/business-auth": "workspace:*",
     "@digvation/business-money": "workspace:*",
+    "@digvation/business-payment-correction-ui": "workspace:*",
     "@digvation/business-runtime": "workspace:*",
     "@digvation/business-system-states": "workspace:*",
     "@digvation/ui": "1.1.0",
