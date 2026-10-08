@@ -81,7 +81,8 @@ const PAYMENT_SUMMARY: Record<PaymentSummaryKind, Omit<TransactionSummary<never>
  * cancelled and expired attempts never define the state.
  */
 export function paymentSummary(
-  sale: Pick<Sale, 'status' | 'totalAmount' | 'payments'>,
+  sale: Pick<Sale, 'status' | 'totalAmount' | 'payments'> &
+    Partial<Pick<Sale, 'paymentComposition'>>,
 ): TransactionSummary<PaymentSummaryKind> {
   const composition = transactionPaymentComposition(sale);
   const paid = toMoneyUnits(composition.totalPaid);

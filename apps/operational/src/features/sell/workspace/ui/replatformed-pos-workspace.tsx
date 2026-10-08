@@ -47,6 +47,8 @@ import { CustomerMemberDialog } from '../../customer/ui/customer-member-dialog';
 import { WalkInCustomerEditDialog } from '../../customer/ui/walk-in-customer-edit-dialog';
 import { ReceiptDeliveryDialog } from '../../receipt/receipt-delivery-dialog';
 import { canAdjustOrder } from '../../adjustment/sale-adjustment-access';
+import { ReferencePaymentCorrectionDialog } from '../../payment/reference-payment-correction-dialog';
+import { canCorrectPayments } from '../../payment/payment-correction-draft';
 import { completeSettledCheckout, hasTrackedWork } from '../../transaction/model/sale-lifecycle';
 import { type QueueStatus } from '../../queue/queue-status';
 import {
@@ -126,6 +128,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const [queueIssues] = useState<Record<string, string[]>>({});
   const [queueOpen, setQueueOpen] = useState(false);
   const [queueDetail, setQueueDetail] = useState<Sale | null>(null);
+  // The Sale whose payment recording is being corrected; Runtime's answer replaces the detail.
+  const [paymentCorrectionTarget, setPaymentCorrectionTarget] = useState<Sale | null>(null);
 
   const [queuePaymentTarget, setQueuePaymentTarget] = useState<Sale | null>(null);
   const [queuePaymentAmount, setQueuePaymentAmount] = useState<string | null>(null);
@@ -1111,6 +1115,30 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           if (displayedQueueDetail) void completeQueuedTransaction(displayedQueueDetail);
         }}
         isMutating={workspace.isCoreMutating}
+        {...(displayedQueueDetail &&
+        canCorrectPayments(displayedQueueDetail, session.access.permissions)
+          ? { onCorrectPayment: setPaymentCorrectionTarget }
+          : {})}
+      />
+
+      <ReferencePaymentCorrectionDialog
+        key={paymentCorrectionTarget?.id ?? 'payment-correction-closed'}
+        sale={paymentCorrectionTarget}
+        locale={workspace.locale}
+        paymentRoutes={workspace.paymentRoutes}
+        onClose={() => setPaymentCorrectionTarget(null)}
+        onCorrect={workspace.correctPayments}
+        onCorrected={(updated) => {
+          // Same transaction, same detail: only its payment recording changed.
+          setQueueDetail(updated);
+          setPaymentCorrectionTarget(null);
+        }}
+        onReload={async (saleId) => {
+          const fresh = await workspace.hydrateQueuedSale(saleId);
+          setQueueDetail(fresh);
+          setPaymentCorrectionTarget(fresh);
+          return fresh;
+        }}
       />
 
       <ReferenceOrderAdjustmentDialog

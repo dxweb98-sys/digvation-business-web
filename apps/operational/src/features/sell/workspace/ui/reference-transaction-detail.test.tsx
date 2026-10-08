@@ -1408,3 +1408,495 @@ describe('ReferenceTransactionDetail payments, refunds and payment attempts', ()
     }
   });
 });
+
+describe('ReferenceTransactionDetail payment correction', () => {
+  const payment = (
+    id: string,
+    method: 'CASH' | 'BANK_TRANSFER',
+    account: string,
+    appliedAmount: string,
+    extra: Record<string, unknown> = {},
+  ) =>
+    ({
+      ...runtimeQueueDetail().payments[0]!,
+      id,
+      method,
+      financePaymentRouteId: `route-${account}`,
+      financeFinancialAccountId: `account-${account}`,
+      financeFinancialAccountNameSnapshot: account,
+      appliedAmount,
+      tenderedAmount: method === 'CASH' && !extra.correction ? appliedAmount : null,
+      changeAmount: method === 'CASH' && !extra.correction ? '0.0000' : null,
+      kind: 'PAYMENT',
+      createdAt: `2026-10-08T13:0${id.length}:00.000Z`,
+      ...extra,
+    }) as unknown as Sale['payments'][number];
+
+  /** Total 110.000 recorded as Tunai 5.000 + BCA 105.000, then corrected to 10.000 / 100.000. */
+  const correctedSale = (overrides: Partial<Sale> = {}): Sale =>
+    runtimeQueueDetail({
+      status: 'FINALIZED',
+      finalizedAt: '2026-10-08T13:41:00.000Z',
+      totalAmount: '110000.0000',
+      grossAmount: '110000.0000',
+      discountAmount: '0.0000',
+      taxAmount: '0.0000',
+      loyaltyRedemption: null,
+      version: 5,
+      payments: [
+        payment('p1', 'CASH', 'Tunai', '5000.0000'),
+        payment('p22', 'BANK_TRANSFER', 'BCA', '105000.0000'),
+        payment('c1', 'BANK_TRANSFER', 'BCA', '-5000.0000', {
+          kind: 'CORRECTION_OUT',
+          correction: { id: 'correction-1', leg: 'OUT' },
+        }),
+        payment('c22', 'CASH', 'Tunai', '5000.0000', {
+          kind: 'CORRECTION_IN',
+          correction: { id: 'correction-1', leg: 'IN' },
+        }),
+      ],
+      paymentCorrections: [
+        {
+          id: 'correction-1',
+          reason: 'Salah memasukkan nominal pembayaran',
+          correctsCorrectionId: null,
+          afterSettlement: false,
+          createdByActorId: 'u1',
+          createdByActorKind: 'user',
+          createdBy: 'Andini',
+          createdByPresence: 'USER',
+          createdAt: '2026-10-08T13:50:00.000Z',
+          movements: [
+            {
+              paymentId: 'c1',
+              leg: 'OUT',
+              method: 'BANK_TRANSFER',
+              paymentRouteId: 'route-BCA',
+              financialAccountId: 'account-BCA',
+              financialAccountCode: null,
+              financialAccountName: 'BCA',
+              amount: '-5000.0000',
+            },
+            {
+              paymentId: 'c22',
+              leg: 'IN',
+              method: 'CASH',
+              paymentRouteId: 'route-Tunai',
+              financialAccountId: 'account-Tunai',
+              financialAccountCode: null,
+              financialAccountName: 'Tunai',
+              amount: '5000.0000',
+            },
+          ],
+          allocations: [],
+        },
+      ],
+      paymentComposition: {
+        entries: [
+          entry('BANK_TRANSFER', 'route-BCA', 'BCA', '100000.0000'),
+          entry('CASH', 'route-Tunai', 'Tunai', '10000.0000'),
+        ],
+        totalReceived: '110000.0000',
+        totalRefunded: '0.0000',
+        totalPaid: '110000.0000',
+      },
+      ...overrides,
+    });
+  const entry = (
+    method: 'CASH' | 'BANK_TRANSFER',
+    paymentRouteId: string,
+    name: string,
+    amount: string,
+  ) => ({
+    method,
+    paymentRouteId,
+    financialAccountId: `account-${name}`,
+    financialAccountCode: null,
+    financialAccountName: name,
+    receivedAmount: amount,
+    refundedAmount: '0.0000',
+    effectiveAmount: amount,
+  });
+
+  const renderCorrectable = (sale: Sale, onCorrectPayment?: (sale: Sale) => void) =>
+    render(
+      <DeploymentBootstrapProvider config={bootstrap}>
+        <ReferenceTransactionDetail
+          sale={sale}
+          locale="id-ID"
+          employees={[]}
+          businessName="Digvation"
+          branchName="Main branch"
+          cashierName="Kasir"
+          showPaymentReceipt={false}
+          onClose={vi.fn()}
+          onNewSale={vi.fn()}
+          onViewReceipt={vi.fn()}
+          onAssign={vi.fn()}
+          onStartLineWork={vi.fn()}
+          onComplete={vi.fn()}
+          isMutating={false}
+          {...(onCorrectPayment ? { onCorrectPayment } : {})}
+        />
+      </DeploymentBootstrapProvider>,
+    );
+  const panel = () => screen.getByRole('dialog').querySelector('.pos-payment-panel') as HTMLElement;
+  const section = (name: string) =>
+    within(panel()).getByRole('heading', { name }).parentElement as HTMLElement;
+  /** The correction history is a disclosure: closed until the reader asks for the audit. */
+  const openHistory = () => {
+    fireEvent.click(within(panel()).getByRole('button', { name: /Riwayat koreksi \(1\)/ }));
+    return within(panel()).getByTestId('payment-correction').closest('ul') as HTMLElement;
+  };
+
+  it('summarises the effective composition first, then the correction history apart from it', () => {
+    renderCorrectable(correctedSale());
+    expect(within(panel()).getByRole('heading', { name: 'Pembayaran diterima' })).toBeTruthy();
+    // The first list of the payment card is what each route holds now.
+    const received = panel().querySelector('ul') as HTMLElement;
+    expect(received.textContent).toMatch(/BCA.*100[.,]000/);
+    expect(received.textContent).toMatch(/Tunai.*10[.,]000/);
+    expect(received.textContent).not.toMatch(/105[.,]000/);
+    expect(within(panel()).queryByRole('heading', { name: 'Pembayaran efektif' })).toBeNull();
+
+    const correction = openHistory();
+    expect(correction.textContent).toMatch(/−\s?Rp\s?5[.,]000/);
+    expect(correction.textContent).toMatch(/\+\s?Rp\s?5[.,]000/);
+    expect(correction.textContent).toContain('Alasan: Salah memasukkan nominal pembayaran');
+    expect(correction.textContent).toContain('Dikoreksi oleh: Andini');
+    expect(correction.textContent).toContain('Transfer bank · Dikurangi');
+    expect(correction.textContent).toContain('Tunai · Ditambah');
+    // The history is not the composition.
+    expect(received.contains(correction)).toBe(false);
+  });
+
+  describe('effective payment summary', () => {
+    const withComposition = (
+      entries: ReturnType<typeof entry>[],
+      payments: Sale['payments'],
+      total = '205350.0000',
+    ) =>
+      correctedSale({
+        totalAmount: total,
+        grossAmount: total,
+        payments,
+        paymentCorrections: [],
+        paymentComposition: {
+          entries,
+          totalReceived: total,
+          totalRefunded: '0.0000',
+          totalPaid: total,
+        },
+      });
+    const sameRoutePayments = () => [
+      payment('a1', 'BANK_TRANSFER', 'BCA', '100000.0000'),
+      payment('a2', 'BANK_TRANSFER', 'BCA', '105350.0000'),
+    ];
+
+    it('aggregates payment facts of one route into one row without a split badge', () => {
+      renderCorrectable(
+        withComposition(
+          [entry('BANK_TRANSFER', 'route-BCA', 'BCA', '205350.0000')],
+          sameRoutePayments(),
+        ),
+      );
+      const rows = panel().querySelectorAll('ul')[0]!.querySelectorAll(':scope > li');
+      expect(rows).toHaveLength(1);
+      expect(rows[0]!.textContent).toMatch(/BCA.*Transfer bank.*205[.,]350/);
+      expect(within(panel()).queryByText(/Split Payment/)).toBeNull();
+    });
+
+    it('counts the split badge from the effective routes, not from the payment rows', () => {
+      renderCorrectable(
+        withComposition(
+          [
+            entry('BANK_TRANSFER', 'route-BCA', 'BCA', '100000.0000'),
+            entry('QRIS' as 'CASH', 'route-QRIS', 'QRIS BRI', '105350.0000'),
+          ],
+          sameRoutePayments(),
+        ),
+      );
+      expect(within(panel()).getByText(/Split Payment · 2 metode/)).toBeTruthy();
+    });
+
+    it('keeps two accounts of the same method as two separate routes', () => {
+      renderCorrectable(
+        withComposition(
+          [
+            entry('BANK_TRANSFER', 'route-BCA', 'BCA Operasional', '100000.0000'),
+            entry('BANK_TRANSFER', 'route-BNI', 'BNI Operasional', '105350.0000'),
+          ],
+          sameRoutePayments(),
+        ),
+      );
+      const list = panel().querySelectorAll('ul')[0]!;
+      expect(list.querySelectorAll(':scope > li')).toHaveLength(2);
+      expect(list.textContent).toContain('BCA Operasional');
+      expect(list.textContent).toContain('BNI Operasional');
+      expect(within(panel()).getByText(/Split Payment · 2 metode/)).toBeTruthy();
+    });
+
+    it('keeps the correction action visible for a single effective route', () => {
+      renderCorrectable(
+        withComposition(
+          [entry('BANK_TRANSFER', 'route-BCA', 'BCA', '205350.0000')],
+          sameRoutePayments(),
+        ),
+        vi.fn(),
+      );
+      expect(within(panel()).getByRole('button', { name: 'Koreksi pembayaran' })).toBeTruthy();
+    });
+  });
+
+  it('keeps the total paid and the remaining balance exactly as before the correction', () => {
+    renderCorrectable(correctedSale());
+    const text = panel().textContent ?? '';
+    // Paid in full: no balance due, and no refund or attempt rows invented by the correction.
+    expect(text).not.toContain('Sisa tagihan');
+    expect(within(panel()).getByText('Lunas')).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Percobaan pembayaran' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Pengembalian dana' })).toBeNull();
+    expect(screen.getAllByText(/110[.,]000/).length).toBeGreaterThan(0);
+  });
+
+  it('never presents correction legs as payment attempts or as refunds', () => {
+    renderCorrectable(correctedSale());
+    expect(screen.queryByRole('heading', { name: 'Percobaan pembayaran' })).toBeNull();
+    expect(screen.queryByText('Pengembalian')).toBeNull();
+  });
+
+  it('says when a correction was made after a settlement was closed', () => {
+    const sale = correctedSale();
+    sale.paymentCorrections![0]!.afterSettlement = true;
+    renderCorrectable(sale);
+    expect(openHistory().textContent).toContain('Koreksi setelah rekonsiliasi');
+  });
+
+  it('keeps a refund a Refund, apart from the correction', () => {
+    const sale = correctedSale();
+    sale.payments.push(
+      payment('r1', 'BANK_TRANSFER', 'BCA Operasional', '-1000.0000', {
+        kind: 'REFUND',
+        refund: {
+          id: 'refund-1',
+          kind: 'MANUAL',
+          reason: 'ORDER_ADJUSTMENT',
+          externalReference: null,
+          note: null,
+          adjustmentId: null,
+          allocations: [],
+        },
+      }),
+    );
+    renderCorrectable(sale);
+    const refunds = section('Pengembalian dana');
+    expect(refunds.textContent).toContain('BCA Operasional');
+    expect(refunds.textContent).toContain('Pengembalian');
+    expect(refunds.textContent).not.toContain('Koreksi');
+    expect(openHistory().textContent).not.toContain('BCA Operasional');
+  });
+
+  it('offers the correction entry point only when the session may correct payments', () => {
+    const onCorrectPayment = vi.fn();
+    const { unmount } = renderCorrectable(correctedSale());
+    expect(within(panel()).queryByRole('button', { name: 'Koreksi pembayaran' })).toBeNull();
+    unmount();
+    cleanup();
+    renderCorrectable(correctedSale(), onCorrectPayment);
+    fireEvent.click(within(panel()).getByRole('button', { name: 'Koreksi pembayaran' }));
+    expect(onCorrectPayment).toHaveBeenCalledOnce();
+    expect(onCorrectPayment.mock.calls[0]![0].id).toBe('sale-runtime-1');
+  });
+
+  it('puts the correction action under the composition total, before the history and never in the footer', () => {
+    renderCorrectable(correctedSale(), vi.fn());
+    const action = within(panel()).getByRole('button', { name: 'Koreksi pembayaran' });
+    const total = within(panel()).getByText('Total dibayar');
+    const history = within(panel()).getByRole('button', { name: /Riwayat koreksi/ });
+    const follows = (a: Node, b: Node) =>
+      Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(follows(total, action)).toBe(true);
+    expect(follows(action, history)).toBe(true);
+    // The header carries status only: no action competes with the badges.
+    const header = within(panel()).getByRole('heading', { name: 'Pembayaran diterima' })
+      .parentElement!.parentElement as HTMLElement;
+    expect(header.contains(action)).toBe(false);
+    const footer = screen.getByRole('dialog').querySelector('footer');
+    expect(
+      footer
+        ? within(footer as HTMLElement).queryByRole('button', { name: 'Koreksi pembayaran' })
+        : null,
+    ).toBeNull();
+  });
+
+  it('keeps the correction history closed by default, so the composition stays dominant', () => {
+    renderCorrectable(correctedSale());
+    expect(
+      within(panel())
+        .getByRole('button', { name: /Riwayat koreksi \(1\)/ })
+        .getAttribute('aria-expanded'),
+    ).toBe('false');
+  });
+
+  describe('effective payment summary', () => {
+    const withComposition = (
+      entries: ReturnType<typeof entry>[],
+      payments: Sale['payments'],
+      total = '205350.0000',
+    ) =>
+      correctedSale({
+        totalAmount: total,
+        grossAmount: total,
+        payments,
+        paymentCorrections: [],
+        paymentComposition: {
+          entries,
+          totalReceived: total,
+          totalRefunded: '0.0000',
+          totalPaid: total,
+        },
+      });
+    const sameRoutePayments = () => [
+      payment('a1', 'BANK_TRANSFER', 'BCA', '100000.0000'),
+      payment('a2', 'BANK_TRANSFER', 'BCA', '105350.0000'),
+    ];
+
+    it('aggregates payment facts of one route into one row without a split badge', () => {
+      renderCorrectable(
+        withComposition(
+          [entry('BANK_TRANSFER', 'route-BCA', 'BCA', '205350.0000')],
+          sameRoutePayments(),
+        ),
+      );
+      const rows = panel().querySelectorAll('ul')[0]!.querySelectorAll(':scope > li');
+      expect(rows).toHaveLength(1);
+      expect(rows[0]!.textContent).toMatch(/BCA.*Transfer bank.*205[.,]350/);
+      expect(within(panel()).queryByText(/Split Payment/)).toBeNull();
+    });
+
+    it('counts the split badge from the effective routes, not from the payment rows', () => {
+      renderCorrectable(
+        withComposition(
+          [
+            entry('BANK_TRANSFER', 'route-BCA', 'BCA', '100000.0000'),
+            entry('QRIS' as 'CASH', 'route-QRIS', 'QRIS BRI', '105350.0000'),
+          ],
+          sameRoutePayments(),
+        ),
+      );
+      expect(within(panel()).getByText(/Split Payment · 2 metode/)).toBeTruthy();
+    });
+
+    it('keeps two accounts of the same method as two separate routes', () => {
+      renderCorrectable(
+        withComposition(
+          [
+            entry('BANK_TRANSFER', 'route-BCA', 'BCA Operasional', '100000.0000'),
+            entry('BANK_TRANSFER', 'route-BNI', 'BNI Operasional', '105350.0000'),
+          ],
+          sameRoutePayments(),
+        ),
+      );
+      const list = panel().querySelectorAll('ul')[0]!;
+      expect(list.querySelectorAll(':scope > li')).toHaveLength(2);
+      expect(list.textContent).toContain('BCA Operasional');
+      expect(list.textContent).toContain('BNI Operasional');
+      expect(within(panel()).getByText(/Split Payment · 2 metode/)).toBeTruthy();
+    });
+
+    it('keeps the correction action visible for a single effective route', () => {
+      renderCorrectable(
+        withComposition(
+          [entry('BANK_TRANSFER', 'route-BCA', 'BCA', '205350.0000')],
+          sameRoutePayments(),
+        ),
+        vi.fn(),
+      );
+      expect(within(panel()).getByRole('button', { name: 'Koreksi pembayaran' })).toBeTruthy();
+    });
+  });
+
+  it('keeps the total paid and the remaining balance exactly as before the correction', () => {
+    renderCorrectable(correctedSale());
+    const text = panel().textContent ?? '';
+    // Paid in full: no balance due, and no refund or attempt rows invented by the correction.
+    expect(text).not.toContain('Sisa tagihan');
+    expect(within(panel()).getByText('Lunas')).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Percobaan pembayaran' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Pengembalian dana' })).toBeNull();
+    expect(screen.getAllByText(/110[.,]000/).length).toBeGreaterThan(0);
+  });
+
+  it('never presents correction legs as payment attempts or as refunds', () => {
+    renderCorrectable(correctedSale());
+    expect(screen.queryByRole('heading', { name: 'Percobaan pembayaran' })).toBeNull();
+    expect(screen.queryByText('Pengembalian')).toBeNull();
+  });
+
+  it('says when a correction was made after a settlement was closed', () => {
+    const sale = correctedSale();
+    sale.paymentCorrections![0]!.afterSettlement = true;
+    renderCorrectable(sale);
+    expect(openHistory().textContent).toContain('Koreksi setelah rekonsiliasi');
+  });
+
+  it('keeps a refund a Refund, apart from the correction', () => {
+    const sale = correctedSale();
+    sale.payments.push(
+      payment('r1', 'BANK_TRANSFER', 'BCA Operasional', '-1000.0000', {
+        kind: 'REFUND',
+        refund: {
+          id: 'refund-1',
+          kind: 'MANUAL',
+          reason: 'ORDER_ADJUSTMENT',
+          externalReference: null,
+          note: null,
+          adjustmentId: null,
+          allocations: [],
+        },
+      }),
+    );
+    renderCorrectable(sale);
+    const refunds = section('Pengembalian dana');
+    expect(refunds.textContent).toContain('BCA Operasional');
+    expect(refunds.textContent).toContain('Pengembalian');
+    expect(refunds.textContent).not.toContain('Koreksi');
+    expect(openHistory().textContent).not.toContain('BCA Operasional');
+  });
+
+  it('offers the correction entry point only when the session may correct payments', () => {
+    const onCorrectPayment = vi.fn();
+    const { unmount } = renderCorrectable(correctedSale());
+    expect(within(panel()).queryByRole('button', { name: 'Koreksi pembayaran' })).toBeNull();
+    unmount();
+    cleanup();
+    renderCorrectable(correctedSale(), onCorrectPayment);
+    fireEvent.click(within(panel()).getByRole('button', { name: 'Koreksi pembayaran' }));
+    expect(onCorrectPayment).toHaveBeenCalledOnce();
+    expect(onCorrectPayment.mock.calls[0]![0].id).toBe('sale-runtime-1');
+  });
+
+  it('does not change what the receipt shows beyond the effective composition', () => {
+    render(
+      <DeploymentBootstrapProvider config={bootstrap}>
+        <ReceiptContent
+          sale={correctedSale()}
+          activeLines={correctedSale().lines}
+          customer={null}
+          locale="id-ID"
+          businessName="Digvation"
+          branchName="Main branch"
+          cashierName="Kasir"
+          transactionDate="8 Okt 2026"
+          hasDiscount={false}
+          hasTax={false}
+        />
+      </DeploymentBootstrapProvider>,
+    );
+    const text = document.body.textContent ?? '';
+    expect(text).toMatch(/BCA.*100[.,]000/);
+    expect(text).toMatch(/Tunai.*10[.,]000/);
+    expect(text).not.toMatch(/105[.,]000/);
+    expect(text).not.toContain('Koreksi');
+  });
+});

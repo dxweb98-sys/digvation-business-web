@@ -1,3 +1,4 @@
+import { createDecimal } from '@digvation/pos-money';
 import { useOperationalLocalization } from '../../../app/localization/operational-localization';
 import { saleLineAdditions, saleLineBase } from '../transaction/model/sale-line-additions';
 import {
@@ -13,6 +14,7 @@ import {
 } from '../transaction/model/sale-presentation';
 import type { Sale, SaleCustomer, SaleLine } from '../transaction/model/cashier-transaction.types';
 import { paymentAccountLabel } from '../payment/sale-payment-status';
+import { paymentCompositionOf } from '../payment/payment-correction-draft';
 import {
   money,
   quantity,
@@ -53,6 +55,35 @@ export function ReceiptContent({
   const { copy, label } = useOperationalLocalization();
   const discountRows = aggregateDiscountRows(saleDiscountRows(sale));
   const composition = appliedPaymentComposition(sale);
+  // After a payment correction the customer-facing receipt shows what each route effectively
+  // received, never the original recording; correction audit details stay out of the receipt.
+  const corrected = (sale.paymentCorrections?.length ?? 0) > 0;
+  const paymentLines = corrected
+    ? paymentCompositionOf(sale)
+        .entries.filter((entry) => createDecimal(entry.receivedAmount).greaterThan(0))
+        .map((entry, index) => ({
+          id: entry.paymentRouteId ?? `${entry.method}-${index}`,
+          label: entry.financialAccountName?.trim() || label(entry.method),
+          reference:
+            composition.components
+              .filter((payment) => payment.financePaymentRouteId === entry.paymentRouteId)
+              .map((payment) => payment.providerReference)
+              .filter(Boolean)
+              .at(-1) ?? null,
+          amount: entry.receivedAmount,
+        }))
+    : composition.components.map((payment) => ({
+        id: payment.id,
+        label: paymentAccountLabel(payment, (method) => label(method)),
+        reference: payment.providerReference,
+        amount: payment.appliedAmount,
+      }));
+  const paymentsSplit = corrected ? paymentLines.length > 1 : composition.isSplit;
+  const paymentsTotal = corrected
+    ? paymentLines
+        .reduce((sum, line) => sum.plus(createDecimal(line.amount)), createDecimal('0'))
+        .toFixed(4)
+    : composition.totalPaid;
   const settlement = saleSettlement(sale);
   const legacyLoyaltyRedemption = sale.loyaltyRedemption as
     | (NonNullable<Sale['loyaltyRedemption']> & {
@@ -265,25 +296,23 @@ export function ReceiptContent({
       <section className="space-y-1.5 text-xs">
         <p className="flex justify-between gap-3 font-semibold">
           <span>{copy('Payment')}</span>
-          {composition.isSplit ? <span>{copy('Split Payment')}</span> : null}
+          {paymentsSplit ? <span>{copy('Split Payment')}</span> : null}
         </p>
-        {composition.components.map((payment) => (
-          <div key={payment.id} className="flex items-start justify-between gap-3">
+        {paymentLines.map((line) => (
+          <div key={line.id} className="flex items-start justify-between gap-3">
             <span className="min-w-0 text-slate-500">
-              {paymentAccountLabel(payment, (method) => label(method))}
-              {payment.providerReference ? (
-                <span className="block break-all font-mono text-[10px]">
-                  {payment.providerReference}
-                </span>
+              {line.label}
+              {line.reference ? (
+                <span className="block break-all font-mono text-[10px]">{line.reference}</span>
               ) : null}
             </span>
-            <span className="shrink-0">{money(payment.appliedAmount, locale)}</span>
+            <span className="shrink-0">{money(line.amount, locale)}</span>
           </div>
         ))}
-        {composition.isSplit ? (
+        {paymentsSplit ? (
           <div className="mt-2 flex justify-between gap-3 border-t border-slate-200 pt-2 font-semibold">
             <span>{copy('Total paid')}</span>
-            <span>{money(composition.totalPaid, locale)}</span>
+            <span>{money(paymentsTotal, locale)}</span>
           </div>
         ) : null}
         {cashTenderNote(settlement) ? (

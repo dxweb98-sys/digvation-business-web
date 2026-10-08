@@ -1,4 +1,12 @@
-import { DBadge, DCard, DCardContent, DCardHeader, DSeparator } from '@digvation/ui';
+import {
+  DAccordion,
+  DAccordionItem,
+  DBadge,
+  DCard,
+  DCardContent,
+  DCardHeader,
+  DSeparator,
+} from '@digvation/ui';
 import type { ReactNode } from 'react';
 
 import './sale-detail-presentation.css';
@@ -381,8 +389,10 @@ export function SaleFinancialSummary({
   settlement,
   format,
   payment,
+  corrections,
   refunds,
   paymentAttempts,
+  paymentActions,
 }: {
   title?: string;
   context?: ReactNode;
@@ -390,6 +400,8 @@ export function SaleFinancialSummary({
     subtotal: string;
     total: string;
     paid: string;
+    /** "Total paid", the anchor under an effective payment composition. */
+    totalPaid?: string;
     balance: string;
     settled: string;
     cashReceived: string;
@@ -408,9 +420,14 @@ export function SaleFinancialSummary({
   settlement: SaleSettlement;
   format: (amount: string) => string;
   payment?: { title: string; aside?: ReactNode; content: ReactNode } | null;
+  /** The payment corrections made after the payments were recorded, oldest first. */
+  corrections?: ReactNode;
+  /** What each route effectively holds after corrections; only shown once a correction exists. */
   /** Money returned to the customer, kept apart from payments received and payment attempts. */
   refunds?: ReactNode;
   paymentAttempts?: ReactNode;
+  /** Actions on the payment record, such as correcting how it was recorded. */
+  paymentActions?: ReactNode;
 }) {
   const hasBalance = settlement.balanceDue !== '0.0000';
   // A settled sale whose payments equal its total says so once, as a badge. The
@@ -477,20 +494,18 @@ export function SaleFinancialSummary({
 
       <DCard variant="outlined" className="pos-payment-panel overflow-hidden shadow-sm">
         <DCardContent className="p-4">
-          <div className="flex min-h-6 items-center justify-between gap-3">
-            {payment ? (
-              <h4 className="text-sm font-bold text-[var(--color-text)]">{payment.title}</h4>
-            ) : (
-              <span />
-            )}
-            <span className="flex flex-wrap items-center justify-end gap-1.5">
-              {payment?.aside}
-              {!hasBalance ? (
-                <DBadge variant="success" dot className="font-semibold">
-                  {labels.settled}
-                </DBadge>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              {payment ? (
+                <h4 className="text-sm font-bold text-[var(--color-text)]">{payment.title}</h4>
               ) : null}
-            </span>
+              {payment?.aside ? <div className="mt-1">{payment.aside}</div> : null}
+            </div>
+            {!hasBalance ? (
+              <DBadge variant="success" dot className="shrink-0 font-semibold">
+                {labels.settled}
+              </DBadge>
+            ) : null}
           </div>
           {settlementRows ? (
             <dl className="mt-2 space-y-1.5 text-[13px]">
@@ -509,6 +524,13 @@ export function SaleFinancialSummary({
             </dl>
           ) : null}
           {payment ? <div className="mt-1">{payment.content}</div> : null}
+          {payment && !settlementRows && labels.totalPaid ? (
+            <p className="flex justify-between gap-4 border-t border-[var(--color-border)] pt-2.5 text-sm font-bold">
+              <span>{labels.totalPaid}</span>
+              <span className="tabular-nums">{format(settlement.totalPaid)}</span>
+            </p>
+          ) : null}
+          {paymentActions ? <div className="-ml-2 mt-1">{paymentActions}</div> : null}
           {cashNotes.length ? (
             <dl className="mt-1 space-y-1 text-xs text-[var(--color-text-muted)]">
               {cashNotes.map((note) => (
@@ -518,6 +540,12 @@ export function SaleFinancialSummary({
                 </div>
               ))}
             </dl>
+          ) : null}
+          {corrections ? (
+            <>
+              <DSeparator className="my-3" />
+              <section>{corrections}</section>
+            </>
           ) : null}
           {refunds ? (
             <>
@@ -572,6 +600,83 @@ export function SalePaymentComposition({
         </li>
       ))}
     </ul>
+  );
+}
+
+/**
+ * The payment corrections made on this Sale. The original payments above stay exactly as recorded;
+ * each correction lists the compensating movements per route, why, who and when. A correction made
+ * after a settlement was closed says so: that settlement is untouched.
+ */
+export function SalePaymentCorrectionList({
+  heading,
+  corrections,
+}: {
+  heading: string;
+  corrections: readonly {
+    id: string;
+    movements: readonly {
+      id: string;
+      name: string;
+      /** Method and the word for the direction, so the sign never carries the meaning alone. */
+      detail: string;
+      amount: string;
+    }[];
+    reasonLabel: string;
+    reason: string;
+    byLabel: string;
+    by: string | null;
+    at: string;
+    afterSettlementLabel: string | null;
+  }[];
+}) {
+  return (
+    <DAccordion type="single" variant="default" className="pos-correction-history">
+      <DAccordionItem
+        value="history"
+        title={
+          <span className="text-xs font-semibold text-[var(--color-text-muted)]">
+            {heading} ({corrections.length})
+          </span>
+        }
+      >
+        <ul className="divide-y divide-[var(--color-border)]">
+          {corrections.map((correction) => (
+            <li key={correction.id} className="py-2.5" data-testid="payment-correction">
+              <ul className="space-y-1.5">
+                {correction.movements.map((movement) => (
+                  <li key={movement.id} className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="break-words text-sm font-medium text-[var(--color-text)]">
+                        {movement.name}
+                      </p>
+                      <p className="mt-0.5 break-words text-xs text-[var(--color-text-muted)]">
+                        {movement.detail}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-sm font-semibold tabular-nums">
+                      {movement.amount}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 break-words text-xs text-[var(--color-text-muted)]">
+                {correction.reasonLabel}: {correction.reason}
+              </p>
+              <p className="mt-0.5 break-words text-xs text-[var(--color-text-muted)]">
+                {correction.by ? `${correction.byLabel}: ${correction.by} · ` : ''}
+                {correction.at}
+              </p>
+              {correction.afterSettlementLabel ? (
+                <p className="mt-0.5 text-xs font-medium text-[var(--color-warning)]">
+                  {correction.afterSettlementLabel}
+                </p>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      </DAccordionItem>
+    </DAccordion>
   );
 }
 

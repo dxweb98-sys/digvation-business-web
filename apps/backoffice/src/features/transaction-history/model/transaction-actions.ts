@@ -1,8 +1,9 @@
 import type { Payment, Sale } from '../api/transaction-history-api';
 import {
+  effectivePaymentEntries,
+  remainingCapacity,
   toMoneyUnits,
   transactionPaymentComposition,
-  uncompensatedAmount,
 } from './transaction-payment-composition';
 
 export interface RefundablePayment {
@@ -28,6 +29,12 @@ export interface TransactionActions {
   /** Reverse is actionable now; Runtime still enforces the same rule. */
   canReverse: boolean;
   reverseBlock: ReverseBlock | null;
+  /**
+   * Correcting how received money was recorded is offered: permitted, the Sale is not voided or
+   * reversed, and Runtime's effective composition holds money on a route. Runtime stays the
+   * authority and refuses anything else.
+   */
+  canCorrect: boolean;
 }
 
 /**
@@ -36,15 +43,19 @@ export interface TransactionActions {
  * payment is pending and every succeeded payment is fully compensated — the Runtime reversal rule.
  */
 export function transactionActions(
-  sale: Pick<Sale, 'status' | 'reversal' | 'totalAmount' | 'payments'>,
-  permissions: { refund: boolean; reverse: boolean },
+  sale: Pick<
+    Sale,
+    'status' | 'reversal' | 'totalAmount' | 'payments' | 'paymentCorrections' | 'paymentComposition'
+  >,
+  permissions: { refund: boolean; reverse: boolean; correct?: boolean },
 ): TransactionActions {
   const completed = sale.status === 'FINALIZED' && !sale.reversal;
   const composition = transactionPaymentComposition(sale);
-  const outstanding = composition.applied
+  // Money can be refunded from the payments as recorded and from what a correction moved in.
+  const outstanding = [...composition.applied, ...composition.correctionIn]
     .map((payment) => ({
       payment,
-      maxAmount: uncompensatedAmount(payment, composition.refunds),
+      maxAmount: remainingCapacity(payment, sale),
     }))
     .filter(({ maxAmount }) => toMoneyUnits(maxAmount) > 0n);
   const isCash = ({ payment }: RefundablePayment) =>
@@ -58,7 +69,16 @@ export function transactionActions(
         ? 'REFUND_REQUIRED'
         : null;
   const showReverse = completed && permissions.reverse;
+  const canCorrect =
+    Boolean(permissions.correct) &&
+    sale.status !== 'VOIDED' &&
+    !sale.reversal &&
+    // Never tied to how many rows, routes or refunds there are: only to money held on a route.
+    effectivePaymentEntries(sale).some(
+      (entry) => entry.paymentRouteId !== null && toMoneyUnits(entry.effectiveAmount) > 0n,
+    );
   return {
+    canCorrect,
     refundable: completed && permissions.refund ? refundable : [],
     canRefund: completed && permissions.refund && refundable.length > 0,
     showReverse,
@@ -88,6 +108,12 @@ const ACTION_ERROR_COPY: Record<string, string> = {
   PAYMENT_REFUND_FINALIZED_REQUIRED: 'Only payments of a completed transaction can be refunded.',
   PAYMENT_REFUND_AMOUNT_INVALID: 'Enter a refund amount greater than zero.',
   PAYMENT_REFUND_SOURCE_INVALID: 'This payment can no longer be refunded.',
+  PAYMENT_CORRECTION_NOT_NET_ZERO: 'The total paid must stay the same.',
+  PAYMENT_CORRECTION_EXCEEDS_SOURCE: 'A route cannot give away more than was recorded on it.',
+  PAYMENT_CORRECTION_ROUTE_INVALID:
+    'A payment route is no longer available. Reload and choose again.',
+  PAYMENT_CORRECTION_SALE_VOIDED: 'This transaction can no longer have its payments corrected.',
+  PAYMENT_CORRECTION_FORBIDDEN: 'You are not allowed to correct payments.',
 };
 
 /** The localized message key for a known action error code, else the given fallback key. */

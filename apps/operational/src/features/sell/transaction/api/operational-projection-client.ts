@@ -3,6 +3,7 @@ import type { ApiClient } from '@digvation/business-api';
 import type {
   AddSaleLineInput,
   OrderAdjustmentCommitInput,
+  PaymentCorrectionInput,
   OrderAdjustmentInput,
   OrderAdjustmentPreview,
   OrderAdjustmentResult,
@@ -264,6 +265,15 @@ export function attachOperationalProjection(
       input,
       { headers: { 'Idempotency-Key': idempotencyKey } },
     );
+
+  operational.correctPayments = (
+    saleId: string,
+    input: PaymentCorrectionInput,
+    idempotencyKey: string,
+  ) =>
+    client.post<Sale>(`${OPERATIONAL_PREFIX}/transactions/${saleId}/payment-corrections`, input, {
+      headers: { 'Idempotency-Key': idempotencyKey },
+    });
 
   operational.setSaleLineQuantity = (
     saleId: string,

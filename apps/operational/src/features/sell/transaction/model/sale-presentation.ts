@@ -1,4 +1,5 @@
 import { createDecimal } from '@digvation/pos-money';
+import { isCorrectionLeg, paymentKind } from './payment-kind';
 
 import type {
   Employee,
@@ -388,7 +389,8 @@ export function employeeDisplayName(
 type SettlementPayment = Pick<
   Payment,
   'status' | 'method' | 'appliedAmount' | 'tenderedAmount' | 'changeAmount'
->;
+> &
+  Partial<Pick<Payment, 'kind' | 'correction' | 'refund' | 'providerReference'>>;
 
 export interface SaleSettlement {
   totalPaid: string;
@@ -414,7 +416,10 @@ export function saleSettlement(sale: {
     createDecimal('0'),
   );
   const balance = createDecimal(String(sale.totalAmount)).minus(totalPaid);
-  const cash = succeeded.filter((payment) => payment.method === 'CASH');
+  // A correction leg re-attributes money between routes: it is not cash tendered or cash change.
+  const cash = succeeded.filter(
+    (payment) => payment.method === 'CASH' && !isCorrectionLeg(payment),
+  );
   const cashTendered = cash
     .filter((payment) => payment.tenderedAmount !== null)
     .reduce(
@@ -486,12 +491,18 @@ export interface AppliedPaymentComposition<P> {
  * payments; the number of payment records or methods tried says nothing on its own.
  */
 export function appliedPaymentComposition<
-  P extends ProgressPayment & { createdAt?: string },
+  P extends ProgressPayment & {
+    createdAt?: string;
+    kind?: Payment['kind'];
+    correction?: Payment['correction'];
+  },
 >(sale: { totalAmount: string; payments: readonly P[] }): AppliedPaymentComposition<P> {
   const components = sale.payments
     .filter(
       (payment) =>
         payment.status === 'SUCCEEDED' &&
+        // The payments as originally recorded; a correction leg is not another payment.
+        !isCorrectionLeg(payment) &&
         createDecimal(String(payment.appliedAmount)).greaterThan(0),
     )
     .sort((left, right) => (left.createdAt ?? '').localeCompare(right.createdAt ?? ''));
@@ -511,11 +522,14 @@ export function appliedPaymentComposition<
 }
 
 /**
- * A succeeded manual refund: money that left the business. Runtime's refund record is the
- * authority; the sign of the amount alone never decides how a movement is named.
+ * A succeeded refund: money that left the business. Runtime's payment kind is the authority; the
+ * sign of the amount alone never decides how a movement is named.
  */
-export function isSucceededRefund(payment: Pick<Payment, 'status' | 'refund'>): boolean {
-  return payment.status === 'SUCCEEDED' && Boolean(payment.refund);
+export function isSucceededRefund(
+  payment: Pick<Payment, 'status' | 'appliedAmount'> &
+    Partial<Pick<Payment, 'kind' | 'refund' | 'correction' | 'providerReference'>>,
+): boolean {
+  return payment.status === 'SUCCEEDED' && paymentKind(payment) === 'REFUND';
 }
 
 /** What a refund returned, as a positive amount; the section naming it carries the direction. */

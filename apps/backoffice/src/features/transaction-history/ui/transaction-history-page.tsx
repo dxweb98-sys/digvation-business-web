@@ -166,6 +166,7 @@ export function TransactionHistoryPage() {
         api={api}
         permissions={{
           refund: permissions.includes('payments:refund'),
+          correct: permissions.includes('payments:correct'),
           reverse: permissions.includes('sales:reverse'),
         }}
         onClose={() => setDetailOpen(false)}

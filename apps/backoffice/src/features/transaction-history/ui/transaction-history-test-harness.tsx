@@ -37,8 +37,13 @@ export function renderWithProviders(ui: ReactNode) {
 
 export function renderDetail(
   sale: Sale,
-  permissions = { refund: true, reverse: true },
-  api: Partial<Pick<TransactionHistoryApi, 'refundPayment' | 'reverse'>> = {},
+  permissions: { refund: boolean; reverse: boolean; correct?: boolean } = {
+    refund: true,
+    reverse: true,
+  },
+  api: Partial<
+    Pick<TransactionHistoryApi, 'refundPayment' | 'reverse' | 'correctPayments' | 'paymentRoutes'>
+  > = {},
 ) {
   return renderWithProviders(
     <TransactionDetailDialog
@@ -48,6 +53,8 @@ export function renderDetail(
         get: vi.fn(async () => sale),
         refundPayment: api.refundPayment ?? vi.fn(async () => sale),
         reverse: api.reverse ?? vi.fn(async () => sale),
+        ...(api.correctPayments ? { correctPayments: api.correctPayments } : {}),
+        ...(api.paymentRoutes ? { paymentRoutes: api.paymentRoutes } : {}),
       }}
       permissions={permissions}
       onClose={() => undefined}
