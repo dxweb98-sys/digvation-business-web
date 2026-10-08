@@ -1,3 +1,4 @@
+import { Pencil } from 'lucide-react';
 import { createDecimal } from '@digvation/pos-money';
 import { DAlert, DBadge as Badge, DButton } from '@digvation-labs/ui';
 import { useOperationalLocalization } from '../../../../app/localization/operational-localization';
@@ -207,6 +208,7 @@ export function ReferenceTransactionSummary({
         subtotal: copy('Subtotal'),
         total: copy('Total'),
         paid: copy(refunds.length ? 'Net paid amount' : 'Paid amount'),
+        totalPaid: copy('Total paid'),
         balance: copy('Balance due'),
         settled: copy('Paid'),
         cashReceived: copy('Cash received'),
@@ -302,7 +304,12 @@ export function ReferenceTransactionSummary({
       }
       paymentActions={
         onCorrectPayment ? (
-          <DButton variant="ghost" size="sm" onClick={onCorrectPayment}>
+          <DButton
+            variant="ghost"
+            size="sm"
+            leftIcon={<Pencil className="size-3.5" aria-hidden />}
+            onClick={onCorrectPayment}
+          >
             {copy('Payment correction')}
           </DButton>
         ) : null

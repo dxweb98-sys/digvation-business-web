@@ -6,7 +6,7 @@ import {
   type CorrectionRouteInfo,
 } from '@digvation/business-money';
 import { CorrectionCompositionEditor } from '@digvation/business-payment-correction-ui';
-import { DButton, DCurrencyInput, DDialog, DInfoNote, DTextarea } from '@digvation/ui';
+import { DButton, DCurrencyInput, DDialog, DTextarea } from '@digvation/ui';
 import { useState } from 'react';
 
 import type {
@@ -116,13 +116,16 @@ export function TransactionPaymentCorrectionDialog({
       }
     >
       <div className="space-y-4">
-        <DInfoNote>{copy('Payment correction explanation')}</DInfoNote>
+        <p className="text-sm text-[var(--color-text-muted)]">
+          {copy('Payment correction explanation')}
+        </p>
 
         <CorrectionCompositionEditor
           baseline={baseline}
           draft={draft}
           routes={infos}
           disabled={saving}
+          density="compact"
           formatMoney={money}
           methodLabel={methodLabel}
           onDraftChange={(next) => {
@@ -140,6 +143,7 @@ export function TransactionPaymentCorrectionDialog({
             leftToAllocate: copy('Left to allocate'),
             allocatedBeyondTotal: copy('Allocated beyond the total paid'),
             changes: copy('Correction changes'),
+            changesTitle: copy('Changes to record'),
             totalChanges: copy('Total changes'),
             nothingToChange: copy('Nothing to change yet.'),
           }}

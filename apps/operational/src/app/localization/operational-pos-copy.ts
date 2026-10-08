@@ -518,8 +518,8 @@ const posCopy: Record<string, LocalizedCopy> = {
   'Adjustment saved': { 'id-ID': 'Penyesuaian berhasil disimpan', 'en-US': 'Adjustment saved' },
   'Payment correction': { 'id-ID': 'Koreksi pembayaran', 'en-US': 'Payment correction' },
   'Payment correction explanation': {
-    'id-ID': 'Memperbaiki pencatatan pembayaran. Total yang dibayar pelanggan tidak berubah.',
-    'en-US': 'Fixes how the payment was recorded. The total the customer paid does not change.',
+    'id-ID': 'Perbaiki pencatatan pembayaran tanpa mengubah total yang dibayar pelanggan.',
+    'en-US': 'Correct how the payment was recorded without changing the total the customer paid.',
   },
   'Recorded now': { 'id-ID': 'Pencatatan saat ini', 'en-US': 'Currently recorded' },
   'Correct recording': { 'id-ID': 'Pencatatan yang benar', 'en-US': 'Correct recording' },
@@ -575,6 +575,7 @@ const posCopy: Record<string, LocalizedCopy> = {
     'en-US': 'You are not allowed to correct payments.',
   },
   'Correction history': { 'id-ID': 'Riwayat koreksi', 'en-US': 'Correction history' },
+  'Changes to record': { 'id-ID': 'Perubahan yang akan dicatat', 'en-US': 'Changes to record' },
   'Add payment method': { 'id-ID': 'Tambah metode pembayaran', 'en-US': 'Add payment method' },
   'Two route balance hint': {
     'id-ID': 'Ubah salah satu nominal, metode lainnya akan menyesuaikan otomatis.',

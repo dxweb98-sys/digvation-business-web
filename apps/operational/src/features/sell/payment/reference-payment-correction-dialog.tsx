@@ -169,7 +169,7 @@ export function ReferencePaymentCorrectionDialog({
       }
     >
       <div className="space-y-4">
-        <p className="text-xs text-[var(--color-text-muted)]">
+        <p className="text-sm text-[var(--color-text-muted)]">
           {copy('Payment correction explanation')}
         </p>
 
@@ -178,6 +178,7 @@ export function ReferencePaymentCorrectionDialog({
           draft={current}
           routes={infos}
           disabled={saving}
+          density="comfortable"
           formatMoney={format}
           methodLabel={(method) => (method ? label(method as never) : '')}
           onDraftChange={update}
@@ -192,6 +193,7 @@ export function ReferencePaymentCorrectionDialog({
             leftToAllocate: copy('Left to allocate'),
             allocatedBeyondTotal: copy('Allocated beyond the total paid'),
             changes: copy('Correction changes'),
+            changesTitle: copy('Changes to record'),
             totalChanges: copy('Total changes'),
             nothingToChange: copy('Nothing to change yet.'),
           }}

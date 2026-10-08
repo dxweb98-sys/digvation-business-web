@@ -230,7 +230,10 @@ describe('payment correction audit context', () => {
     renderDetail(corrected(), permitted);
     const panel = await paymentsPanel();
     // Primary: what each route holds now, not the raw payment facts.
-    const heading = panel.getByText('Riwayat koreksi');
+    const toggle = panel.getByRole('button', { name: /Riwayat koreksi \(1\)/ });
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(toggle);
+    const heading = toggle;
     const text = document.body.textContent!;
     const effectiveAt = text.search(/Rp\s100\.000/);
     expect(effectiveAt).toBeGreaterThan(-1);

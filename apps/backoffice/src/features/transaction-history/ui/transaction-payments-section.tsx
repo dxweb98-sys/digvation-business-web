@@ -1,4 +1,5 @@
-import { DBadge, DButton } from '@digvation/ui';
+import { DAccordion, DAccordionItem, DBadge, DButton } from '@digvation/ui';
+import { Pencil } from 'lucide-react';
 
 import { RecordPanel, RecordPanelBody, RecordPanelHeader } from '../../../shared/ui/record-dialog';
 import type { Payment, Sale } from '../api/transaction-history-api';
@@ -46,16 +47,7 @@ export function TransactionPaymentsSection({
     <RecordPanel ariaLabel={copy('Payments')} padded={false}>
       <RecordPanelHeader
         title={copy('Payments')}
-        trailing={
-          <>
-            <SummaryBadge summary={paymentSummary(sale)} />
-            {onCorrectPayment ? (
-              <DButton variant="ghost" size="sm" onClick={onCorrectPayment}>
-                {copy('Payment correction')}
-              </DButton>
-            ) : null}
-          </>
-        }
+        trailing={<SummaryBadge summary={paymentSummary(sale)} />}
       />
       <RecordPanelBody>
         {composition.received.length ? (
@@ -86,7 +78,7 @@ export function TransactionPaymentsSection({
                   className="flex items-start justify-between gap-4 py-2.5"
                 >
                   <dt className="min-w-0">
-                    <span className="block break-words font-medium text-[var(--color-text)]">
+                    <span className="block break-words text-sm font-medium text-[var(--color-text)]">
                       {name}
                     </span>
                     {detail.length ? (
@@ -95,13 +87,13 @@ export function TransactionPaymentsSection({
                       </span>
                     ) : null}
                   </dt>
-                  <dd className="shrink-0 font-semibold tabular-nums text-[var(--color-text)]">
+                  <dd className="shrink-0 text-sm font-semibold tabular-nums text-[var(--color-text)]">
                     {formatMoney(entry.receivedAmount, sale.currency)}
                   </dd>
                 </div>
               );
             })}
-            {composition.isSplit || !composition.settled || composition.refunds.length ? (
+            {composition.received.length ? (
               <div className="flex items-baseline justify-between gap-4 py-2.5 text-sm font-semibold">
                 <dt>{copy('Total paid')}</dt>
                 <dd className="tabular-nums">
@@ -124,71 +116,99 @@ export function TransactionPaymentsSection({
           </p>
         )}
 
+        {onCorrectPayment ? (
+          <DButton
+            variant="ghost"
+            size="sm"
+            className="-ml-2 mt-1"
+            leftIcon={<Pencil aria-hidden="true" className="size-3.5" />}
+            onClick={onCorrectPayment}
+          >
+            {copy('Payment correction')}
+          </DButton>
+        ) : null}
+
         {corrections.length ? (
-          <div className="mt-4 border-t border-[var(--color-border)] pt-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--color-text-muted)]">
-              {copy('Correction history')}
-            </p>
-            <ul className="mt-1.5 divide-y divide-[var(--color-border)]/70">
-              {corrections.map((correction) => (
-                <li key={correction.id} className="py-2.5 text-sm" data-testid="payment-correction">
-                  <ul className="space-y-1.5">
-                    {correction.movements.map((movement) => (
-                      <li
-                        key={movement.paymentId}
-                        className="flex items-start justify-between gap-4"
-                      >
-                        <span className="min-w-0">
-                          <span className="block break-words font-medium text-[var(--color-text)]">
-                            {movement.financialAccountName ??
-                              copy(PAYMENT_METHOD_LABELS[movement.method])}
+          <DAccordion
+            type="single"
+            variant="default"
+            className="mt-3 border-t border-[var(--color-border)]"
+          >
+            <DAccordionItem
+              value="history"
+              title={
+                <span className="text-xs font-semibold text-[var(--color-text-muted)]">
+                  {copy('Correction history')} ({corrections.length})
+                </span>
+              }
+            >
+              <ul className="divide-y divide-[var(--color-border)]">
+                {corrections.map((correction) => (
+                  <li
+                    key={correction.id}
+                    className="py-2.5 text-sm"
+                    data-testid="payment-correction"
+                  >
+                    <ul className="space-y-1.5">
+                      {correction.movements.map((movement) => (
+                        <li
+                          key={movement.paymentId}
+                          className="flex items-start justify-between gap-4"
+                        >
+                          <span className="min-w-0">
+                            <span className="block break-words font-medium text-[var(--color-text)]">
+                              {movement.financialAccountName ??
+                                copy(PAYMENT_METHOD_LABELS[movement.method])}
+                            </span>
+                            <span className="mt-0.5 block break-words text-xs text-[var(--color-text-muted)]">
+                              {copy(PAYMENT_METHOD_LABELS[movement.method])} ·{' '}
+                              {copy(
+                                movement.leg === 'OUT' ? 'Correction reduced' : 'Correction added',
+                              )}
+                            </span>
                           </span>
-                          <span className="mt-0.5 block break-words text-xs text-[var(--color-text-muted)]">
-                            {copy(PAYMENT_METHOD_LABELS[movement.method])} ·{' '}
-                            {copy(
-                              movement.leg === 'OUT' ? 'Correction reduced' : 'Correction added',
-                            )}
+                          <span className="shrink-0 font-semibold tabular-nums text-[var(--color-text)]">
+                            {signed(movement.amount, sale.currency)}
                           </span>
-                        </span>
-                        <span className="shrink-0 font-semibold tabular-nums text-[var(--color-text)]">
-                          {signed(movement.amount, sale.currency)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                  <dl className="mt-2 space-y-0.5 text-xs text-[var(--color-text-muted)]">
-                    <div className="flex gap-1.5">
-                      <dt>{copy('Correction reason')}:</dt>
-                      <dd className="min-w-0 break-words text-[var(--color-text)]">
-                        {correction.reason}
-                      </dd>
-                    </div>
-                    <div className="flex gap-1.5">
-                      <dt>{copy('Corrected by')}:</dt>
-                      <dd className="min-w-0 break-words text-[var(--color-text)]">
-                        {correction.createdBy ?? '—'}
-                      </dd>
-                    </div>
-                    <div className="flex gap-1.5">
-                      <dt>{copy('Corrected on')}:</dt>
-                      <dd className="text-[var(--color-text)]">{dateTime(correction.createdAt)}</dd>
-                    </div>
-                  </dl>
-                  {correction.correctsCorrectionId ? (
-                    <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                      {copy('Corrects an earlier correction')}
-                    </p>
-                  ) : null}
-                  {correction.afterSettlement ? (
-                    <p className="mt-1 text-xs font-medium text-[var(--color-warning)]">
-                      {copy('Correction after reconciliation')} —{' '}
-                      {copy('Correction after reconciliation note')}
-                    </p>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          </div>
+                        </li>
+                      ))}
+                    </ul>
+                    <dl className="mt-2 space-y-0.5 text-xs text-[var(--color-text-muted)]">
+                      <div className="flex gap-1.5">
+                        <dt>{copy('Correction reason')}:</dt>
+                        <dd className="min-w-0 break-words text-[var(--color-text)]">
+                          {correction.reason}
+                        </dd>
+                      </div>
+                      <div className="flex gap-1.5">
+                        <dt>{copy('Corrected by')}:</dt>
+                        <dd className="min-w-0 break-words text-[var(--color-text)]">
+                          {correction.createdBy ?? '—'}
+                        </dd>
+                      </div>
+                      <div className="flex gap-1.5">
+                        <dt>{copy('Corrected on')}:</dt>
+                        <dd className="text-[var(--color-text)]">
+                          {dateTime(correction.createdAt)}
+                        </dd>
+                      </div>
+                    </dl>
+                    {correction.correctsCorrectionId ? (
+                      <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                        {copy('Corrects an earlier correction')}
+                      </p>
+                    ) : null}
+                    {correction.afterSettlement ? (
+                      <p className="mt-1 text-xs font-medium text-[var(--color-warning)]">
+                        {copy('Correction after reconciliation')} —{' '}
+                        {copy('Correction after reconciliation note')}
+                      </p>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </DAccordionItem>
+          </DAccordion>
         ) : null}
 
         {composition.refunds.length ? (

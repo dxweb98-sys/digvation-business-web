@@ -125,8 +125,8 @@ export const transactionHistoryCopy: Record<string, { id: string; en: string }> 
   'Payment correction': { id: 'Koreksi pembayaran', en: 'Payment correction' },
   'Payment corrections': { id: 'Koreksi pembayaran', en: 'Payment corrections' },
   'Payment correction explanation': {
-    id: 'Memperbaiki pencatatan pembayaran. Total yang dibayar pelanggan tidak berubah.',
-    en: 'Fixes how the payment was recorded. The total the customer paid does not change.',
+    id: 'Perbaiki pencatatan pembayaran tanpa mengubah total yang dibayar pelanggan.',
+    en: 'Correct how the payment was recorded without changing the total the customer paid.',
   },
   'Correction history': { id: 'Riwayat koreksi', en: 'Correction history' },
   'Effective payment': { id: 'Pembayaran efektif', en: 'Effective payment' },
@@ -152,6 +152,7 @@ export const transactionHistoryCopy: Record<string, { id: string; en: string }> 
   'Correction changes': { id: 'Perubahan', en: 'Changes' },
   'Total changes': { id: 'Total perubahan', en: 'Total changes' },
   'Nothing to change yet.': { id: 'Belum ada perubahan.', en: 'Nothing to change yet.' },
+  'Changes to record': { id: 'Perubahan yang akan dicatat', en: 'Changes to record' },
   'Add payment method': { id: 'Tambah metode pembayaran', en: 'Add payment method' },
   'Two route balance hint': {
     id: 'Ubah salah satu nominal, metode lainnya akan menyesuaikan otomatis.',
