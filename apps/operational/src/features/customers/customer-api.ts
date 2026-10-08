@@ -1,5 +1,5 @@
 import type { ApiClient } from '@digvation/business-api';
-import type { MemberTransaction } from '../../modules/membership/operational-members-api';
+import type { MemberTransaction } from './membership/operational-members-api';
 
 export interface CustomerMembership {
   id: string;

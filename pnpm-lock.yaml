@@ -76,6 +76,12 @@ importers:
       '@digvation/business-auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@digvation/business-money':
+        specifier: workspace:*
+        version: link:../../packages/money
+      '@digvation/business-payment-correction-ui':
+        specifier: workspace:*
+        version: link:../../packages/payment-correction-ui
       '@digvation/business-runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
@@ -146,6 +152,9 @@ importers:
       '@digvation/business-money':
         specifier: workspace:*
         version: link:../../packages/money
+      '@digvation/business-payment-correction-ui':
+        specifier: workspace:*
+        version: link:../../packages/payment-correction-ui
       '@digvation/business-runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
@@ -191,6 +200,21 @@ importers:
       decimal.js:
         specifier: 10.6.0
         version: 10.6.0
+
+  packages/payment-correction-ui:
+    dependencies:
+      '@digvation/business-money':
+        specifier: workspace:*
+        version: link:../money
+      '@digvation/ui':
+        specifier: 1.1.0
+        version: 1.1.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      lucide-react:
+        specifier: 1.37.0
+        version: 1.37.0(react@19.2.8)
+      react:
+        specifier: ^19.2.0
+        version: 19.2.8
 
   packages/runtime:
     dependencies:

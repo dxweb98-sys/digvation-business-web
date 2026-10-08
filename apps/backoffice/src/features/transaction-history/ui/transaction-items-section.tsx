@@ -7,6 +7,7 @@ import { ADJUSTMENT_SOURCE_LABELS } from '../model/transaction-adjustments';
 import {
   retiredSaleLines,
   transactionItems,
+  type ServicePriceBreakdown,
   type TransactionItemPresentation,
 } from '../model/transaction-lines';
 import { fulfillmentStatusSummary, workSummary } from '../model/transaction-summary';
@@ -80,6 +81,72 @@ function RetiredLine({ line }: { line: Sale['lines'][number] }) {
   );
 }
 
+/** Explains a composed Service amount: the Service before its additions, plus each addition. */
+function ServicePriceBreakdownPanel({
+  breakdown,
+  quantity,
+  currency,
+}: {
+  breakdown: ServicePriceBreakdown;
+  quantity: string;
+  currency: string;
+}) {
+  const { copy, formatMoney, formatQuantity } = useTransactionHistoryLocalization();
+  const multipleUnits = !/^1(\.0+)?$/.test(quantity);
+  return (
+    <div className="mt-2.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)]/50 p-3">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--color-text-muted)]">
+        {copy('Price breakdown')}
+      </p>
+      <ul className="mt-1.5 space-y-2 text-sm">
+        <li className="flex items-start justify-between gap-3">
+          <p className="min-w-0 break-words text-[var(--color-text)]">
+            {copy('Service price')}
+            {multipleUnits ? (
+              <span className="tabular-nums text-[var(--color-text-muted)]">
+                {' '}
+                · {formatQuantity(quantity)} × {formatMoney(breakdown.serviceUnitPrice, currency)}
+              </span>
+            ) : null}
+          </p>
+          <p className="shrink-0 tabular-nums text-[var(--color-text)]">
+            {formatMoney(breakdown.serviceAmount, currency)}
+          </p>
+        </li>
+        {breakdown.additions.map((addition) => (
+          <li key={addition.id}>
+            <div className="flex items-start justify-between gap-3">
+              <p className="min-w-0 break-words text-[var(--color-text)]">
+                <span className="font-medium">{addition.name}</span>
+                {addition.variant ? (
+                  <span className="text-[var(--color-text-muted)]"> · {addition.variant}</span>
+                ) : null}
+                <span className="tabular-nums text-[var(--color-text-muted)]">
+                  {' '}
+                  × {formatQuantity(addition.quantity)}
+                  {multipleUnits ? ` ${copy('per unit')}` : ''}
+                </span>
+              </p>
+              <p className="shrink-0 tabular-nums text-[var(--color-text-muted)]">
+                {addition.lineAmount
+                  ? `+${formatMoney(addition.lineAmount, currency)}`
+                  : copy('Included')}
+              </p>
+            </div>
+            <Attribution label={copy('Worked by')}>
+              <EmployeeNames names={addition.performers} />
+            </Attribution>
+          </li>
+        ))}
+        <li className="flex items-start justify-between gap-3 border-t border-[var(--color-border)] pt-2 font-semibold text-[var(--color-text)]">
+          <p>{copy('Item total')}</p>
+          <p className="shrink-0 tabular-nums">{formatMoney(breakdown.totalAmount, currency)}</p>
+        </li>
+      </ul>
+    </div>
+  );
+}
+
 function TransactionItem({
   item,
   currency,
@@ -125,7 +192,8 @@ function TransactionItem({
           ) : null}
           <p className="mt-1 text-xs tabular-nums text-[var(--color-text-muted)]">
             {copy('Qty')} {formatQuantity(line.quantity)}
-            {line.effectiveUnitPrice
+            {/* A composed price already contains its additions; the breakdown below explains it. */}
+            {line.effectiveUnitPrice && !item.priceBreakdown
               ? ` × ${formatMoney(line.effectiveUnitPrice, currency)} ${copy('each')}`
               : ''}
           </p>
@@ -186,7 +254,13 @@ function TransactionItem({
         <Attribution label={copy('Sold by')}>{item.soldBy}</Attribution>
       ) : null}
 
-      {item.additionalComponents.length ? (
+      {item.priceBreakdown ? (
+        <ServicePriceBreakdownPanel
+          breakdown={item.priceBreakdown}
+          quantity={line.quantity}
+          currency={currency}
+        />
+      ) : item.additionalComponents.length ? (
         <div className="mt-2.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)]/50 p-3">
           <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--color-text-muted)]">
             {copy('Additional items')}

@@ -1,6 +1,7 @@
 @import 'tailwindcss';
 /* Shared runtime presentation (startup splash) is composed by this app. */
 @source '../../../../packages/runtime/src';
+@source '../../../../packages/payment-correction-ui/src';
 
 html,
 body,

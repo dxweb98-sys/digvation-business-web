@@ -126,3 +126,176 @@ describe('transactionItems', () => {
     expect(item).toMatchObject({ isService: false, soldBy: 'Dewi Lestari', performers: [] });
   });
 });
+
+/** A composed Service line as Runtime captures it: resolved = effective, gross = quantity × effective. */
+function composedLine(change: Parameters<typeof testLine>[0] = {}) {
+  return testLine({
+    itemNameSnapshot: 'Hair Color',
+    variantNameSnapshot: 'Red',
+    quantity: '1.0000',
+    resolvedUnitPrice: '210000.0000',
+    overrideAmount: null,
+    effectiveUnitPrice: '210000.0000',
+    grossAmount: '210000.0000',
+    totalAmount: '210000.0000',
+    compositionComponents: [
+      testComponent({ itemNameSnapshot: 'Red Coloring BRAND', extendedContribution: '10000.0000' }),
+    ],
+    ...change,
+  });
+}
+const breakdownOf = (line: ReturnType<typeof testLine>) =>
+  transactionItems(testSale({ lines: [line] }))[0]!.priceBreakdown;
+
+describe('service price breakdown', () => {
+  it('keeps the compact presentation for a Service without additional items', () => {
+    expect(breakdownOf(composedLine({ compositionComponents: [] }))).toBeNull();
+    expect(breakdownOf(testLine())).toBeNull();
+  });
+
+  it('explains a composed price as the Service plus its addition, reconciling to the line', () => {
+    expect(breakdownOf(composedLine())).toEqual({
+      serviceUnitPrice: '200000.0000',
+      serviceAmount: '200000.0000',
+      additions: [
+        expect.objectContaining({
+          name: 'Red Coloring BRAND',
+          quantity: '1.0000',
+          chargedAmount: '10000.0000',
+          lineAmount: '10000.0000',
+          performers: ['Citra Ayu'],
+        }),
+      ],
+      totalAmount: '210000.0000',
+    });
+  });
+
+  it('shows an included addition without an amount, and needs a priced addition to break down', () => {
+    const included = testComponent({
+      id: 'included',
+      position: 1,
+      itemNameSnapshot: 'Hair Mask',
+      pricingMode: 'INCLUDED_IN_SERVICE_PRICE',
+      extendedContribution: '0.0000',
+    });
+    expect(
+      breakdownOf(
+        composedLine({
+          resolvedUnitPrice: '200000.0000',
+          effectiveUnitPrice: '200000.0000',
+          grossAmount: '200000.0000',
+          compositionComponents: [included],
+        }),
+      ),
+    ).toBeNull();
+    const mixed = breakdownOf(
+      composedLine({
+        compositionComponents: [
+          testComponent({
+            itemNameSnapshot: 'Red Coloring BRAND',
+            extendedContribution: '10000.0000',
+          }),
+          included,
+        ],
+      }),
+    );
+    expect(mixed?.serviceAmount).toBe('200000.0000');
+    expect(mixed?.additions.map((addition) => [addition.name, addition.lineAmount])).toEqual([
+      ['Red Coloring BRAND', '10000.0000'],
+      ['Hair Mask', null],
+    ]);
+  });
+
+  it('reconciles several sale-selected additions to the composed amount', () => {
+    const breakdown = breakdownOf(
+      composedLine({
+        resolvedUnitPrice: '225000.0000',
+        effectiveUnitPrice: '225000.0000',
+        grossAmount: '225000.0000',
+        compositionComponents: [
+          testComponent({
+            id: 'red',
+            itemNameSnapshot: 'Red Coloring BRAND',
+            extendedContribution: '10000.0000',
+          }),
+          testComponent({
+            id: 'vitamin',
+            position: 1,
+            itemNameSnapshot: 'Vitamin Serum',
+            quantity: '2.0000',
+            pricingMode: 'FIXED_COMPONENT_PRICE',
+            extendedContribution: '15000.0000',
+          }),
+        ],
+      }),
+    );
+    expect(breakdown?.serviceAmount).toBe('200000.0000');
+    expect(breakdown?.additions.map((addition) => addition.lineAmount)).toEqual([
+      '10000.0000',
+      '15000.0000',
+    ]);
+    expect(breakdown?.totalAmount).toBe('225000.0000');
+  });
+
+  it('keeps quantity and line amounts understandable for more than one unit', () => {
+    expect(breakdownOf(composedLine({ quantity: '2.0000', grossAmount: '420000.0000' }))).toEqual(
+      expect.objectContaining({
+        serviceUnitPrice: '200000.0000',
+        serviceAmount: '400000.0000',
+        additions: [
+          expect.objectContaining({ chargedAmount: '10000.0000', lineAmount: '20000.0000' }),
+        ],
+        totalAmount: '420000.0000',
+      }),
+    );
+  });
+
+  it('keeps fixed composition bundled in the Service price and never lists it', () => {
+    const breakdown = breakdownOf(
+      composedLine({
+        compositionComponents: [
+          testComponent({
+            id: 'fixed',
+            componentSource: 'FIXED_BOM',
+            itemNameSnapshot: 'Developer',
+            pricingMode: 'FIXED_COMPONENT_PRICE',
+            extendedContribution: '5000.0000',
+          }),
+          testComponent({
+            id: 'red',
+            position: 1,
+            itemNameSnapshot: 'Red Coloring BRAND',
+            extendedContribution: '10000.0000',
+          }),
+        ],
+      }),
+    );
+    expect(breakdown?.serviceAmount).toBe('200000.0000');
+    expect(breakdown?.additions.map((addition) => addition.name)).toEqual(['Red Coloring BRAND']);
+  });
+
+  it('never derives a historical base price from a manual price override', () => {
+    expect(
+      breakdownOf(
+        composedLine({
+          overrideAmount: '180000.0000',
+          effectiveUnitPrice: '180000.0000',
+          grossAmount: '180000.0000',
+          totalAmount: '180000.0000',
+        }),
+      ),
+    ).toBeNull();
+  });
+
+  it('keeps the plain presentation when the snapshot does not reconcile or is incomplete', () => {
+    expect(breakdownOf(composedLine({ grossAmount: '220000.0000' }))).toBeNull();
+    const withoutResolvedPrice = composedLine();
+    delete withoutResolvedPrice.resolvedUnitPrice;
+    expect(breakdownOf(withoutResolvedPrice)).toBeNull();
+    expect(
+      breakdownOf(
+        composedLine({ resolvedUnitPrice: '5000.0000', effectiveUnitPrice: '5000.0000' }),
+      ),
+    ).toBeNull();
+  });
+});

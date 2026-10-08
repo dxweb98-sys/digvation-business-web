@@ -8,12 +8,35 @@ export type PaymentStatus = 'PENDING' | 'SUCCEEDED' | 'FAILED' | 'CANCELLED' | '
 export type PaymentMethod = 'CASH' | 'BANK_TRANSFER' | 'WALLET' | 'QRIS';
 export type FulfillmentStatus = 'WAITING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELED';
 
+/**
+ * What a payment fact IS, decided by Runtime: money received, money returned, or one leg of a
+ * payment correction. Never inferred from the sign of the amount.
+ */
+export type PaymentKind = 'PAYMENT' | 'REFUND' | 'CORRECTION_IN' | 'CORRECTION_OUT';
+
+/** The manual refund a negative payment records: its disbursement is the payment's own route. */
+export interface PaymentRefundRecord {
+  id: string;
+  kind: 'MANUAL';
+  reason: 'ORDER_ADJUSTMENT' | 'SALE_VOID';
+  externalReference: string | null;
+  note: string | null;
+  adjustmentId: string | null;
+  allocations: Array<{ sourcePaymentId: string; amount: string }>;
+}
+
 export interface Payment {
   id: string;
+  /** Runtime always sends it; readers go through `paymentKind()` so a gap is handled once. */
+  kind?: PaymentKind;
+  /** The payment correction this fact is a leg of; null for payments and refunds. */
+  correction?: { id: string; leg: 'OUT' | 'IN' } | null;
+  /** Set on a manual refund: why and how it was returned, and which payments it was attributed to. */
+  refund?: PaymentRefundRecord | null;
   method: PaymentMethod;
   status: PaymentStatus;
   currency: string;
-  /** Exact decimal string; negative for a refund fact. */
+  /** Exact decimal string; negative for a refund or a correction-out leg. */
   appliedAmount: string;
   tenderedAmount: string | null;
   changeAmount: string | null;
@@ -26,6 +49,65 @@ export interface Payment {
   financeFinancialAccountNameSnapshot?: string | null;
   terminalAt: string | null;
   createdAt: string;
+}
+
+export interface PaymentCorrectionMovement {
+  paymentId: string;
+  leg: 'OUT' | 'IN';
+  method: PaymentMethod;
+  paymentRouteId: string;
+  financialAccountId: string;
+  financialAccountCode: string | null;
+  financialAccountName: string | null;
+  /** Signed: negative for OUT, positive for IN. */
+  amount: string;
+}
+
+/** One payment correction: the recording was wrong, the money was not. */
+export interface PaymentCorrection {
+  id: string;
+  reason: string;
+  correctsCorrectionId: string | null;
+  /** A source payment was already in a COMPLETED settlement; that settlement is untouched. */
+  afterSettlement: boolean;
+  createdBy: string | null;
+  createdByPresence: 'USER' | 'SYSTEM' | 'UNAVAILABLE' | null;
+  createdAt: string;
+  movements: PaymentCorrectionMovement[];
+  allocations: Array<{ outPaymentId: string; sourcePaymentId: string; amount: string }>;
+}
+
+export interface PaymentCompositionEntry {
+  method: PaymentMethod;
+  paymentRouteId: string | null;
+  financialAccountId: string | null;
+  financialAccountCode: string | null;
+  financialAccountName: string | null;
+  receivedAmount: string;
+  refundedAmount: string;
+  effectiveAmount: string;
+}
+
+/** Runtime's effective payment composition after payments, refunds and corrections. */
+export interface PaymentComposition {
+  entries: PaymentCompositionEntry[];
+  totalReceived: string;
+  totalRefunded: string;
+  totalPaid: string;
+}
+
+/** An active payment route a correction may attribute money to. */
+export interface CorrectionRoute {
+  id: string;
+  paymentMethod: PaymentMethod;
+  currency: string;
+  financialAccountName: string;
+}
+
+export interface PaymentCorrectionRequest {
+  expectedVersion: number;
+  reason: string;
+  moves: Array<{ paymentRouteId: string; delta: string }>;
 }
 
 export interface SaleReversal {
@@ -110,6 +192,10 @@ export interface SaleLine {
   itemNameSnapshot: string;
   variantNameSnapshot: string | null;
   quantity: string;
+  /** Captured composed unit price (Service base + composition contributions), before any override. */
+  resolvedUnitPrice?: string;
+  /** Manual unit price that replaced the resolved price, when one was applied. */
+  overrideAmount?: string | null;
   effectiveUnitPrice?: string;
   grossAmount?: string;
   lineDiscountAmount?: string;
@@ -178,6 +264,8 @@ export interface Sale {
   adjustments?: SaleAdjustment[];
   lines: SaleLine[];
   payments: Payment[];
+  paymentCorrections?: PaymentCorrection[];
+  paymentComposition?: PaymentComposition;
   workEmployees?: SaleWorkEmployee[];
 }
 
@@ -218,6 +306,22 @@ export class TransactionHistoryApi {
       { expectedVersion, amount },
       { headers: { 'idempotency-key': crypto.randomUUID() } },
     );
+  }
+  /** Active payment routes of the Sale's location, so money can be attributed to any of them. */
+  async paymentRoutes(sellingLocationId: string, currency: string) {
+    const page = await this.client.get<{ items: CorrectionRoute[] }>(
+      `/api/v1/sales/payment-routes?${buildQueryString({ sellingLocationId, currency })}`,
+    );
+    return page.items;
+  }
+  /**
+   * The one payment-correction command, shared with Operational. The key stays the same for the
+   * same exact request, so a retry never corrects twice.
+   */
+  correctPayments(saleId: string, input: PaymentCorrectionRequest, idempotencyKey: string) {
+    return this.client.post<Sale>(`/api/v1/sales/${saleId}/payment-corrections`, input, {
+      headers: { 'idempotency-key': idempotencyKey },
+    });
   }
   reverse(saleId: string, expectedVersion: number, reason: string) {
     return this.client.post<Sale>(
