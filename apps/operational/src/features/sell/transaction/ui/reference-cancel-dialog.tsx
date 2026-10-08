@@ -1,9 +1,13 @@
 import { DButton as Button, DDialog as Dialog } from '@digvation-labs/ui';
 import { DTextarea } from '@digvation/ui';
 import { useOperationalLocalization } from '../../../../app/localization/operational-localization';
-import type { Sale } from '../model/cashier-transaction.types';
+import type { PaymentRoute, Sale } from '../model/cashier-transaction.types';
+import {
+  RefundDisbursementPicker,
+  type RefundDisbursementDraft,
+} from '../../adjustment/refund-disbursement-picker';
 import { financialSummary } from '../../payment/sale-payment-status';
-import { money, transactionNumber, isPositiveDecimal } from '../model/sale-display';
+import { transactionNumber, isPositiveDecimal } from '../model/sale-display';
 
 export function ReferenceCancelDialog({
   sale,
@@ -12,6 +16,9 @@ export function ReferenceCancelDialog({
   onReasonChange,
   onClose,
   onConfirm,
+  paymentRoutes,
+  disbursement,
+  onDisbursementChange,
 }: {
   sale: Sale | null;
   reason: string;
@@ -19,6 +26,10 @@ export function ReferenceCancelDialog({
   onReasonChange: (reason: string) => void;
   onClose: () => void;
   onConfirm: () => void;
+  /** The location's routes; a paid Sale returns its money through one of them. */
+  paymentRoutes: readonly PaymentRoute[];
+  disbursement: RefundDisbursementDraft | null;
+  onDisbursementChange: (next: RefundDisbursementDraft) => void;
 }) {
   const { copy, locale } = useOperationalLocalization();
   const refundAmount = sale ? financialSummary(sale).totalPaid : '0.0000';
@@ -40,7 +51,7 @@ export function ReferenceCancelDialog({
           </Button>
           <Button
             variant="danger"
-            disabled={!reason.trim() || isMutating}
+            disabled={!reason.trim() || (hasRefund && !disbursement) || isMutating}
             loading={isMutating}
             onClick={onConfirm}
           >
@@ -51,16 +62,18 @@ export function ReferenceCancelDialog({
     >
       <>
         {hasRefund ? (
+          // Cancelling a paid transaction returns everything paid, manually, through an account the
+          // operator chooses; the earlier payments stay recorded.
           <div className="mt-4 rounded-xl border border-(--color-warning)/30 bg-(--color-warning)/10 px-3 py-3">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-sm font-semibold text-(--color-warning)">
-                {copy('Refund required')}
-              </span>
-              <span className="text-sm font-bold text-(--color-warning)">
-                {money(refundAmount, locale)}
-              </span>
-            </div>
-            <p className="mt-1 text-xs text-(--color-text-muted)">
+            <RefundDisbursementPicker
+              amount={refundAmount}
+              routes={paymentRoutes}
+              value={disbursement}
+              onChange={onDisbursementChange}
+              locale={locale}
+              disabled={isMutating}
+            />
+            <p className="mt-2 text-xs text-(--color-text-muted)">
               {copy('Previous payment remains recorded')}
             </p>
           </div>

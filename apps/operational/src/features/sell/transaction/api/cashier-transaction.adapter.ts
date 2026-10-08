@@ -107,6 +107,129 @@ export interface ReplaceSaleLineInput {
   }>;
 }
 
+/** One change of a normalized adjustment draft; Runtime applies it with the command's own rules. */
+export type OrderAdjustmentOperation =
+  | { kind: 'ADD'; clientKey: string; lines: ReplaceSaleLineInput['lines'] }
+  | { kind: 'QUANTITY'; lineId: string; quantity: string }
+  | { kind: 'REMOVE'; lineId: string }
+  | { kind: 'REPLACE'; lineId: string; lines: ReplaceSaleLineInput['lines']; reason?: string };
+
+export type OrderAdjustmentConsequence =
+  'ADDITIONAL_PAYMENT_REQUIRED' | 'SETTLED' | 'REFUND_REQUIRED' | 'VOID_REQUIRED';
+
+/**
+ * How a refund is returned: a manually recorded disbursement through an active payment route of
+ * the location (the account money actually leaves from). Never a provider reversal.
+ */
+export interface RefundDisbursementInput {
+  method: 'CASH' | 'BANK_TRANSFER';
+  paymentRouteId: string;
+  externalReference?: string;
+  note?: string;
+}
+
+/** A whole adjustment draft against the Sale version it was made from. */
+export interface OrderAdjustmentInput {
+  expectedVersion: number;
+  operations: OrderAdjustmentOperation[];
+}
+
+/** What a save sends: the draft, the reviewed consequence and, when money is returned, how. */
+export type OrderAdjustmentCommitInput = OrderAdjustmentInput & {
+  acknowledgement: OrderAdjustmentAcknowledgement;
+  refundDisbursement?: RefundDisbursementInput;
+};
+
+/** The financial consequence the operator reviewed; Runtime refuses to save a different one. */
+export interface OrderAdjustmentAcknowledgement {
+  previewVersion: number;
+  consequence: OrderAdjustmentConsequence;
+  amount: string;
+  proposedTotalAmount: string;
+}
+
+/** How much of a refund one original payment's capacity covers; attribution, not money flow. */
+export interface RefundSourceAllocation {
+  sourcePaymentId: string;
+  /** How the customer originally paid; informational only. */
+  method: string;
+  amount: string;
+}
+
+/** A recorded manual refund: the outgoing movement and its attribution. */
+export interface RecordedManualRefund {
+  refundId: string;
+  paymentId: string;
+  method: string;
+  paymentRouteId: string;
+  financialAccountId: string;
+  financialAccountName: string;
+  amount: string;
+  externalReference: string | null;
+  note: string | null;
+  allocations: RefundSourceAllocation[];
+}
+
+/** Runtime's settlement of the draft against the net successful payments. */
+export interface OrderAdjustmentSettlement {
+  consequence: OrderAdjustmentConsequence;
+  amount: string;
+  remainingAfter: string;
+  refundAmount: string;
+  /** Saving returns money to the customer. */
+  refundRequired: boolean;
+  /** The successful payments can still return the whole refund. */
+  refundSupported: boolean;
+  refundCapacityAmount: string;
+  /** The planned attribution to the original payments, newest first. */
+  refundSources: RefundSourceAllocation[];
+  /** Saving needs the operator's choice of how and from which account the refund is returned. */
+  refundDisbursementRequired: boolean;
+  refundPermissionRequired: boolean;
+  /** Runtime's own permission check for the acting session; required or not. */
+  refundPermissionGranted: boolean;
+  /** No active line is left: saving voids the transaction instead of adjusting it. */
+  voidRequired: boolean;
+  /** Runtime's own check of the canonical void permission. */
+  voidPermissionGranted: boolean;
+  /** The recorded refund; only after a successful save. */
+  refund: RecordedManualRefund | null;
+}
+
+export interface OrderAdjustmentIssue {
+  /** Position of the operation in the request; null for the adjustment as a whole. */
+  operationIndex: number | null;
+  code: string;
+  message: string;
+}
+
+/** Where a proposed line came from: a draft addition, a replacement, or an unchanged line. */
+export interface OrderAdjustmentLineOrigin {
+  lineId: string;
+  clientKey: string | null;
+  replacesLineId: string | null;
+}
+
+/** What saving the draft would do, calculated by Runtime; nothing has been saved. */
+export interface OrderAdjustmentPreview {
+  saleId: string;
+  saleVersion: number;
+  currency: string;
+  current: { totalAmount: string; paidAmount: string; remainingAmount: string };
+  proposedSale: Sale;
+  lines: OrderAdjustmentLineOrigin[];
+  settlement: OrderAdjustmentSettlement;
+  issues: OrderAdjustmentIssue[];
+  commitAllowed: boolean;
+}
+
+export interface OrderAdjustmentResult {
+  adjustmentId: string;
+  sale: Sale;
+  lines: OrderAdjustmentLineOrigin[];
+  settlement: OrderAdjustmentSettlement;
+}
+
 export interface LoyaltyRedemptionInput {
   expectedVersion: number;
   points: string;
@@ -205,11 +328,6 @@ export interface PaymentTransitionInput {
   status: Exclude<PaymentStatus, 'PENDING'>;
 }
 
-export interface OpenSalePaymentCompensationInput {
-  expectedVersion: number;
-  amount: string;
-}
-
 export interface SellingCatalogDisplayInput {
   sellingLocationId: string;
   currency: string;
@@ -273,11 +391,18 @@ export interface SaleTransactionClient {
     input: ReplaceSaleLineInput,
     idempotencyKey: string,
   ): Promise<Sale>;
-  previewReplaceSaleLine?(
+  /** Runtime's impact of a whole adjustment draft; nothing is saved. */
+  previewOrderAdjustment?(
     saleId: string,
-    saleLineId: string,
-    input: ReplaceSaleLineInput,
-  ): Promise<ReplaceLinePreview>;
+    input: OrderAdjustmentInput,
+    signal?: AbortSignal,
+  ): Promise<OrderAdjustmentPreview>;
+  /** Saves a whole adjustment draft atomically, with any manual refund (or Void) it requires. */
+  commitOrderAdjustment?(
+    saleId: string,
+    input: OrderAdjustmentCommitInput,
+    idempotencyKey: string,
+  ): Promise<OrderAdjustmentResult>;
   applyLoyaltyRedemption(
     saleId: string,
     input: LoyaltyRedemptionInput,
@@ -346,14 +471,14 @@ export interface SaleTransactionClient {
     paymentId: string,
     input: PaymentTransitionInput,
   ): Promise<Sale>;
-  compensateOpenSalePayment?(
-    saleId: string,
-    paymentId: string,
-    input: OpenSalePaymentCompensationInput,
-    idempotencyKey: string,
-  ): Promise<Sale>;
   finalizeSale(saleId: string, expectedVersion: number, idempotencyKey: string): Promise<Sale>;
-  voidSale(saleId: string, expectedVersion: number, idempotencyKey: string): Promise<Sale>;
+  /** The canonical Void; a paid Sale returns everything paid through the chosen disbursement. */
+  voidSale(
+    saleId: string,
+    expectedVersion: number,
+    idempotencyKey: string,
+    refundDisbursement?: RefundDisbursementInput,
+  ): Promise<Sale>;
 }
 
 export interface SaleTransactionPort
@@ -572,14 +697,27 @@ export class HttpCashierTransactionAdapter
     });
   }
 
-  public previewReplaceSaleLine(
+  public previewOrderAdjustment(
     saleId: string,
-    saleLineId: string,
-    input: ReplaceSaleLineInput,
-  ): Promise<ReplaceLinePreview> {
-    return this.client.post<ReplaceLinePreview>(
-      `${API_PREFIX}/sales/${saleId}/lines/${saleLineId}/replace-preview`,
+    input: OrderAdjustmentInput,
+    signal?: AbortSignal,
+  ): Promise<OrderAdjustmentPreview> {
+    return this.client.post<OrderAdjustmentPreview>(
+      `${API_PREFIX}/sales/${saleId}/order-adjustments/preview`,
       input,
+      { signal },
+    );
+  }
+
+  public commitOrderAdjustment(
+    saleId: string,
+    input: OrderAdjustmentCommitInput,
+    idempotencyKey: string,
+  ): Promise<OrderAdjustmentResult> {
+    return this.client.post<OrderAdjustmentResult>(
+      `${API_PREFIX}/sales/${saleId}/order-adjustments`,
+      input,
+      { headers: { 'Idempotency-Key': idempotencyKey } },
     );
   }
 
@@ -744,19 +882,6 @@ export class HttpCashierTransactionAdapter
     );
   }
 
-  public compensateOpenSalePayment(
-    saleId: string,
-    paymentId: string,
-    input: OpenSalePaymentCompensationInput,
-    idempotencyKey: string,
-  ): Promise<Sale> {
-    return this.client.post<Sale>(
-      `${API_PREFIX}/sales/${saleId}/payments/${paymentId}/compensate-open`,
-      input,
-      { headers: { 'Idempotency-Key': idempotencyKey } },
-    );
-  }
-
   public finalizeSale(
     saleId: string,
     expectedVersion: number,
@@ -769,10 +894,15 @@ export class HttpCashierTransactionAdapter
     );
   }
 
-  public voidSale(saleId: string, expectedVersion: number, idempotencyKey: string): Promise<Sale> {
+  public voidSale(
+    saleId: string,
+    expectedVersion: number,
+    idempotencyKey: string,
+    refundDisbursement?: RefundDisbursementInput,
+  ): Promise<Sale> {
     return this.client.post<Sale>(
       `${API_PREFIX}/sales/${saleId}/void`,
-      { expectedVersion },
+      { expectedVersion, ...(refundDisbursement ? { refundDisbursement } : {}) },
       { headers: { 'Idempotency-Key': idempotencyKey } },
     );
   }

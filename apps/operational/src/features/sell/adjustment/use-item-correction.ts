@@ -7,41 +7,33 @@ import type {
   ReplaceLinePreview,
   ReplaceSaleLineInput,
 } from '../transaction/api/cashier-transaction.adapter';
-import type { CatalogItem, Sale, SaleLine } from '../transaction/model/cashier-transaction.types';
-import { correctionSettlement } from './item-correction-settlement';
-
-const asSale = (value: unknown): Sale | null =>
-  typeof value === 'object' && value !== null && 'payments' in value && 'totalAmount' in value
-    ? (value as Sale)
-    : null;
+import type { CatalogItem, SaleLine } from '../transaction/model/cashier-transaction.types';
 
 /**
- * The audited correction of one Sale line whose work has started: choosing and configuring the
- * replacement, its reason, Runtime's impact preview, the persisted correction, and returning any
- * overpayment the persisted Sale shows.
+ * The audited correction of one Sale line whose work has started, as part of the adjustment
+ * draft: choosing and configuring the replacement, its reason, and Runtime's impact of the draft
+ * with it. Confirming only proposes the correction; it is saved with the rest of the adjustment.
  */
 export function useItemCorrection({
-  sale,
   items,
   locale,
   loadConfiguratorState,
   onPreview,
-  onCorrect,
-  onCompensate,
+  onConfirm,
 }: {
-  sale: Sale | null;
   items: readonly CatalogItem[];
   locale: string;
   loadConfiguratorState: (item: CatalogItem) => Promise<ItemConfiguratorState>;
+  /** Runtime's impact of the draft with this correction in it; nothing is saved. */
   onPreview: (
     line: SaleLine,
     input: { lines: ReplaceSaleLineInput['lines']; reason: string },
   ) => Promise<ReplaceLinePreview>;
-  onCorrect: (
+  /** Adds the confirmed correction to the adjustment draft. */
+  onConfirm: (
     line: SaleLine,
     input: { lines: ReplaceSaleLineInput['lines']; reason: string },
-  ) => Promise<unknown>;
-  onCompensate: (sale: Sale, paymentId: string, amount: string) => Promise<unknown>;
+  ) => void;
 }) {
   const [correctionLine, setCorrectionLine] = useState<SaleLine | null>(null);
   const [replacementItemId, setReplacementItemId] = useState('');
@@ -51,11 +43,6 @@ export function useItemCorrection({
   const [replacementConfiguration, setReplacementConfiguration] =
     useState<ItemConfiguration | null>(null);
   const [correctionReason, setCorrectionReason] = useState('');
-  // The Sale returned by the persisted correction/compensation is the settlement authority.
-  const [appliedSale, setAppliedSale] = useState<Sale | null>(null);
-  const [correctionSaved, setCorrectionSaved] = useState(false);
-  const [correctionError, setCorrectionError] = useState<string | null>(null);
-  const [compensationState, setCompensationState] = useState<'IDLE' | 'LOADING' | 'ERROR'>('IDLE');
   const [correctionPreview, setCorrectionPreview] = useState<ReplaceLinePreview | null>(null);
   const [previewState, setPreviewState] = useState<'IDLE' | 'LOADING' | 'ERROR'>('IDLE');
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -91,11 +78,7 @@ export function useItemCorrection({
     const current = items.some((item) => item.id === line.catalogItemId) ? line.catalogItemId : '';
     setReplacementItemId(current);
     loadReplacementState(current);
-    setAppliedSale(null);
-    setCorrectionSaved(false);
-    setCorrectionError(null);
     setPreviewError(null);
-    setCompensationState('IDLE');
     setCorrectionReason('');
     setCorrectionPreview(null);
     setPreviewState('IDLE');
@@ -146,36 +129,9 @@ export function useItemCorrection({
       });
   };
   const confirmCorrection = () => {
-    if (!correctionSource) return;
-    setCorrectionError(null);
-    // Keep the flow open: whether money must now be returned depends on the persisted Sale.
-    void onCorrect(correctionSource, { lines: replacementLines(), reason: correctionReason.trim() })
-      .then((updated) => {
-        setAppliedSale(asSale(updated));
-        setCorrectionSaved(true);
-      })
-      .catch((error: unknown) =>
-        setCorrectionError(
-          correctionErrorMessage(
-            error,
-            'Koreksi belum dapat disimpan. Muat ulang transaksi lalu coba lagi.',
-            locale,
-          ),
-        ),
-      );
-  };
-  const authoritativeSale = appliedSale ?? sale;
-  const compensateOverpayment = (paymentId: string) => {
-    // Offered only from a shown correction, which always has a Sale.
-    if (!authoritativeSale) return;
-    const { settledOverpayment } = correctionSettlement(authoritativeSale);
-    setCompensationState('LOADING');
-    void onCompensate(authoritativeSale, paymentId, settledOverpayment.toFixed(4))
-      .then((updated) => {
-        setAppliedSale(asSale(updated) ?? appliedSale);
-        setCompensationState('IDLE');
-      })
-      .catch(() => setCompensationState('ERROR'));
+    if (!correctionSource || !correctionPreview) return;
+    onConfirm(correctionSource, { lines: replacementLines(), reason: correctionReason.trim() });
+    close();
   };
   return {
     // The preview's element, kept apart from the correction state that renders it.
@@ -196,12 +152,7 @@ export function useItemCorrection({
       previewState,
       previewError,
       runPreview: previewCorrection,
-      error: correctionError,
       confirm: confirmCorrection,
-      saved: correctionSaved,
-      authoritativeSale,
-      compensationState,
-      compensate: compensateOverpayment,
     },
   };
 }

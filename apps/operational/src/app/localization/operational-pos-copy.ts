@@ -515,14 +515,130 @@ const posCopy: Record<string, LocalizedCopy> = {
   Refund: { 'id-ID': 'Pengembalian dana', 'en-US': 'Refund' },
   'Additional payment': { 'id-ID': 'Tambahan pembayaran', 'en-US': 'Additional payment' },
   'Save adjustment': { 'id-ID': 'Simpan penyesuaian', 'en-US': 'Save adjustment' },
-  'Each change is recorded right away.': {
-    'id-ID': 'Setiap perubahan langsung tercatat.',
-    'en-US': 'Each change is recorded right away.',
+  'Adjustment saved': { 'id-ID': 'Penyesuaian berhasil disimpan', 'en-US': 'Adjustment saved' },
+  'Adjustment impact': { 'id-ID': 'Dampak penyesuaian', 'en-US': 'Adjustment impact' },
+  'Changes are saved together when you save the adjustment.': {
+    'id-ID': 'Perubahan disimpan bersamaan saat penyesuaian disimpan.',
+    'en-US': 'Changes are saved together when you save the adjustment.',
   },
-  'Each change is recorded right away. Items already paid stay on the payment record.': {
+  'Changes are saved together when you save the adjustment. Items already paid stay on the payment record.':
+    {
+      'id-ID':
+        'Perubahan disimpan bersamaan saat penyesuaian disimpan. Item yang sudah dibayar tetap tercatat pada pembayaran.',
+      'en-US':
+        'Changes are saved together when you save the adjustment. Items already paid stay on the payment record.',
+    },
+  'Previous total': { 'id-ID': 'Total sebelumnya', 'en-US': 'Previous total' },
+  'Total after adjustment': {
+    'id-ID': 'Total setelah penyesuaian',
+    'en-US': 'Total after adjustment',
+  },
+  'Remaining to pay': { 'id-ID': 'Sisa tagihan', 'en-US': 'Remaining to pay' },
+  'Paid in full': { 'id-ID': 'Lunas', 'en-US': 'Paid in full' },
+  'Refunded to customer': { 'id-ID': 'Dana dikembalikan', 'en-US': 'Refunded to customer' },
+  'A refund of': { 'id-ID': 'Pengembalian dana', 'en-US': 'A refund of' },
+  'All items will be removed': {
+    'id-ID': 'Semua item akan dihapus',
+    'en-US': 'All items will be removed',
+  },
+  'This transaction no longer has any items. Saving will cancel the transaction.': {
     'id-ID':
-      'Setiap perubahan langsung tercatat. Item yang sudah dibayar tetap ada di catatan pembayaran.',
-    'en-US': 'Each change is recorded right away. Items already paid stay on the payment record.',
+      'Transaksi ini tidak lagi memiliki item. Menyimpan perubahan akan membatalkan transaksi.',
+    'en-US': 'This transaction no longer has any items. Saving will cancel the transaction.',
+  },
+  'The transaction will be canceled': {
+    'id-ID': 'Transaksi akan dibatalkan',
+    'en-US': 'The transaction will be canceled',
+  },
+  'Original payment': {
+    'id-ID': 'Pembayaran awal',
+    'en-US': 'Original payment',
+  },
+  'Returned through': {
+    'id-ID': 'Dikembalikan melalui',
+    'en-US': 'Returned through',
+  },
+  'From account': {
+    'id-ID': 'Dari akun',
+    'en-US': 'From account',
+  },
+  'Reference (optional)': {
+    'id-ID': 'Referensi (opsional)',
+    'en-US': 'Reference (optional)',
+  },
+  'Note (optional)': {
+    'id-ID': 'Catatan (opsional)',
+    'en-US': 'Note (optional)',
+  },
+  'The refund is recorded manually: hand the money over yourself from the chosen account.': {
+    'id-ID':
+      'Pengembalian dana dicatat manual: serahkan dana kepada pelanggan dari akun yang dipilih.',
+    'en-US':
+      'The refund is recorded manually: hand the money over yourself from the chosen account.',
+  },
+  'No active cash or bank-transfer account is available for refunds at this location.': {
+    'id-ID':
+      'Belum ada akun tunai atau transfer bank yang aktif untuk pengembalian dana di lokasi ini.',
+    'en-US': 'No active cash or bank-transfer account is available for refunds at this location.',
+  },
+  'Canceling this transaction requires the void permission.': {
+    'id-ID': 'Membatalkan transaksi ini memerlukan izin pembatalan transaksi.',
+    'en-US': 'Canceling this transaction requires the void permission.',
+  },
+  'Manual refund': {
+    'id-ID': 'Pengembalian manual',
+    'en-US': 'Manual refund',
+  },
+  'Refund recorded': {
+    'id-ID': 'Pengembalian dana dicatat',
+    'en-US': 'Refund recorded',
+  },
+  'Choose how and from which account the refund is returned.': {
+    'id-ID': 'Pilih cara dan akun untuk mengembalikan dana.',
+    'en-US': 'Choose how and from which account the refund is returned.',
+  },
+  'The refund account is not an active refund account of this location.': {
+    'id-ID': 'Akun pengembalian dana tidak aktif atau bukan milik lokasi ini.',
+    'en-US': 'The refund account is not an active refund account of this location.',
+  },
+  'is required.': { 'id-ID': 'diperlukan.', 'en-US': 'is required.' },
+  'Your account does not have permission to refund payments.': {
+    'id-ID': 'Akun Anda tidak memiliki izin untuk melakukan pengembalian dana.',
+    'en-US': 'Your account does not have permission to refund payments.',
+  },
+  'Ask a supervisor to complete this adjustment.': {
+    'id-ID': 'Minta supervisor untuk menyelesaikan penyesuaian ini.',
+    'en-US': 'Ask a supervisor to complete this adjustment.',
+  },
+  'Reload transaction': { 'id-ID': 'Muat ulang transaksi', 'en-US': 'Reload transaction' },
+  Recalculate: { 'id-ID': 'Hitung ulang', 'en-US': 'Recalculate' },
+  'Calculating the adjustment…': {
+    'id-ID': 'Menghitung penyesuaian…',
+    'en-US': 'Calculating the adjustment…',
+  },
+  'The adjustment could not be calculated. Try again.': {
+    'id-ID': 'Penyesuaian tidak dapat dihitung. Coba lagi.',
+    'en-US': 'The adjustment could not be calculated. Try again.',
+  },
+  'The adjustment could not be saved. Try again.': {
+    'id-ID': 'Gagal menyimpan penyesuaian. Coba lagi.',
+    'en-US': 'The adjustment could not be saved. Try again.',
+  },
+  'The adjustment total changed since it was reviewed. Review it again before saving.': {
+    'id-ID': 'Total penyesuaian berubah sejak ditinjau. Tinjau kembali sebelum menyimpan.',
+    'en-US': 'The adjustment total changed since it was reviewed. Review it again before saving.',
+  },
+  'Returning money requires the payment refund permission.': {
+    'id-ID': 'Pengembalian dana memerlukan izin pengembalian pembayaran.',
+    'en-US': 'Returning money requires the payment refund permission.',
+  },
+  'The adjustment is not valid. Reload the transaction and try again.': {
+    'id-ID': 'Penyesuaian tidak valid. Muat ulang transaksi lalu coba lagi.',
+    'en-US': 'The adjustment is not valid. Reload the transaction and try again.',
+  },
+  'This change cannot be applied to the transaction.': {
+    'id-ID': 'Perubahan ini tidak dapat diterapkan pada transaksi.',
+    'en-US': 'This change cannot be applied to the transaction.',
   },
   New: { 'id-ID': 'Baru', 'en-US': 'New' },
   Was: { 'id-ID': 'Semula', 'en-US': 'Was' },

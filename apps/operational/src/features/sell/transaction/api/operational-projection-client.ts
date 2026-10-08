@@ -2,7 +2,10 @@ import type { ApiClient } from '@digvation/business-api';
 
 import type {
   AddSaleLineInput,
-  ReplaceLinePreview,
+  OrderAdjustmentCommitInput,
+  OrderAdjustmentInput,
+  OrderAdjustmentPreview,
+  OrderAdjustmentResult,
   ReplaceSaleLineInput,
   CreatePaymentInput,
   CreateSaleInput,
@@ -240,14 +243,26 @@ export function attachOperationalProjection(
       { headers: { 'Idempotency-Key': idempotencyKey } },
     );
 
-  operational.previewReplaceSaleLine = (
+  operational.previewOrderAdjustment = (
     saleId: string,
-    saleLineId: string,
-    input: ReplaceSaleLineInput,
+    input: OrderAdjustmentInput,
+    signal?: AbortSignal,
   ) =>
-    client.post<ReplaceLinePreview>(
-      `${OPERATIONAL_PREFIX}/transactions/${saleId}/lines/${saleLineId}/replace-preview`,
+    client.post<OrderAdjustmentPreview>(
+      `${OPERATIONAL_PREFIX}/transactions/${saleId}/order-adjustments/preview`,
       input,
+      { signal },
+    );
+
+  operational.commitOrderAdjustment = (
+    saleId: string,
+    input: OrderAdjustmentCommitInput,
+    idempotencyKey: string,
+  ) =>
+    client.post<OrderAdjustmentResult>(
+      `${OPERATIONAL_PREFIX}/transactions/${saleId}/order-adjustments`,
+      input,
+      { headers: { 'Idempotency-Key': idempotencyKey } },
     );
 
   operational.setSaleLineQuantity = (
@@ -396,10 +411,10 @@ export function attachOperationalProjection(
       { headers: { 'Idempotency-Key': idempotencyKey } },
     );
 
-  operational.voidSale = (saleId, expectedVersion, idempotencyKey) =>
+  operational.voidSale = (saleId, expectedVersion, idempotencyKey, refundDisbursement) =>
     client.post<Sale>(
       `${OPERATIONAL_PREFIX}/transactions/${saleId}/void`,
-      { expectedVersion },
+      { expectedVersion, ...(refundDisbursement ? { refundDisbursement } : {}) },
       { headers: { 'Idempotency-Key': idempotencyKey } },
     );
 

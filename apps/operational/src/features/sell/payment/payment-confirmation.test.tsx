@@ -162,6 +162,44 @@ describe('RecordedPaymentList', () => {
     expect(paymentProgress(sale).remainingAmount).toBe('200000.0000');
   });
 
+  it('shows a manual refund on the account the money left from, with its reference and note', () => {
+    const sale = {
+      totalAmount: '410700',
+      payments: [
+        payment('qris', 'SUCCEEDED', '616050', {
+          method: 'QRIS',
+          financeFinancialAccountNameSnapshot: 'QRIS BRI',
+        }),
+        payment('refund', 'SUCCEEDED', '-205350', {
+          method: 'BANK_TRANSFER',
+          financeFinancialAccountNameSnapshot: 'BCA Operasional',
+          refund: {
+            id: 'refund-1',
+            kind: 'MANUAL',
+            reason: 'ORDER_ADJUSTMENT',
+            externalReference: 'TRF-0001',
+            note: 'Wrong item',
+            adjustmentId: 'adjustment-1',
+            allocations: [{ sourcePaymentId: 'qris', amount: '205350.0000' }],
+          },
+        }),
+      ],
+    };
+    withLocale(
+      <RecordedPaymentList
+        payments={sale.payments}
+        totalAmount={sale.totalAmount}
+        progress={paymentProgress(sale)}
+        format={format}
+        isMutating={false}
+        onTransition={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('BCA Operasional')).toBeTruthy();
+    expect(screen.getByText('Manual refund · TRF-0001 · Wrong item')).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/provider|automatic/i);
+  });
+
   it('lets a waiting payment be confirmed or cancelled before it counts', () => {
     const onTransition = vi.fn();
     const sale = {

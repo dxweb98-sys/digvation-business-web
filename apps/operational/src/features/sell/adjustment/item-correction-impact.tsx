@@ -1,14 +1,11 @@
 import { createDecimal } from '@digvation/pos-money';
-import { DAlert, DButton as Button } from '@digvation-labs/ui';
 import type { Ref } from 'react';
 
 import type { ReplaceLinePreview } from '../transaction/api/cashier-transaction.adapter';
-import type { Sale } from '../transaction/model/cashier-transaction.types';
 import { money, quantity } from '../transaction/model/sale-display';
-import { correctionSettlement } from './item-correction-settlement';
 
-/** One labelled amount in a correction's impact or settlement. */
-function SettlementFigure({
+/** One labelled amount of an adjustment's or a correction's impact. */
+export function SettlementFigure({
   label,
   value,
   className = '',
@@ -112,107 +109,5 @@ export function CorrectionImpactPreview({
         )}
       </div>
     </section>
-  );
-}
-
-/**
- * Settlement after a correction is saved, from the persisted Sale: what is paid, and any
- * overpayment to return or balance still to pay.
- */
-export function CorrectionSettlementSummary({
-  authoritativeSale,
-  locale,
-  canRefundPayment,
-  compensationState,
-  isMutating,
-  onCompensate,
-}: {
-  authoritativeSale: Sale;
-  locale: string;
-  canRefundPayment: boolean;
-  compensationState: 'IDLE' | 'LOADING' | 'ERROR';
-  isMutating: boolean;
-  onCompensate: (paymentId: string) => void;
-}) {
-  const {
-    settledPaid,
-    settledOverpayment,
-    settledBalance,
-    settlementCashPayment,
-    settlementProviderPayment,
-  } = correctionSettlement(authoritativeSale);
-  return (
-    <div className="space-y-4" aria-live="polite">
-      <DAlert variant="success">Koreksi tersimpan.</DAlert>
-      <section
-        aria-label="Penyelesaian pembayaran"
-        className="rounded-xl bg-[var(--color-surface-muted)] p-3 text-sm"
-      >
-        <dl className="space-y-1.5 text-[var(--color-text-muted)]">
-          <SettlementFigure
-            label="Total transaksi"
-            value={authoritativeSale.totalAmount}
-            className="font-semibold text-[var(--color-text)]"
-            locale={locale}
-          />
-          <SettlementFigure label="Sudah dibayar" value={settledPaid.toFixed(4)} locale={locale} />
-        </dl>
-        <div className="mt-2 space-y-1.5 border-t border-[var(--color-border)] pt-2">
-          {settledOverpayment.greaterThan(createDecimal('0')) ? (
-            <>
-              <dl>
-                <SettlementFigure
-                  label="Kelebihan pembayaran"
-                  value={settledOverpayment.toFixed(4)}
-                  className="font-semibold text-[var(--color-danger)]"
-                  locale={locale}
-                />
-              </dl>
-              <p className="text-xs text-[var(--color-text-muted)]">
-                Transaksi belum dapat diselesaikan sampai kelebihan pembayaran dikembalikan.
-              </p>
-              {settlementCashPayment ? (
-                canRefundPayment ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    loading={compensationState === 'LOADING'}
-                    disabled={isMutating}
-                    onClick={() => onCompensate(settlementCashPayment.id)}
-                  >
-                    Kembalikan kelebihan pembayaran
-                  </Button>
-                ) : (
-                  <p className="text-xs text-[var(--color-text-muted)]">
-                    Pengembalian dana memerlukan pengguna dengan izin pengembalian pembayaran.
-                  </p>
-                )
-              ) : settlementProviderPayment ? (
-                <p className="text-xs text-[var(--color-text-muted)]">
-                  Pengembalian pembayaran ini memerlukan konfirmasi dari penyedia pembayaran.
-                </p>
-              ) : null}
-              {compensationState === 'ERROR' ? (
-                <DAlert variant="danger">
-                  Pengembalian kelebihan pembayaran belum dapat diselesaikan. Muat ulang transaksi
-                  lalu coba lagi.
-                </DAlert>
-              ) : null}
-            </>
-          ) : settledBalance.greaterThan(createDecimal('0')) ? (
-            <dl>
-              <SettlementFigure
-                label="Sisa pembayaran"
-                value={settledBalance.toFixed(4)}
-                className="font-semibold text-[var(--color-text)]"
-                locale={locale}
-              />
-            </dl>
-          ) : (
-            <p className="font-semibold text-[var(--color-text)]">Pembayaran sudah sesuai</p>
-          )}
-        </div>
-      </section>
-    </div>
   );
 }
