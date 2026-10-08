@@ -510,6 +510,19 @@ export function appliedPaymentComposition<
   };
 }
 
+/**
+ * A succeeded manual refund: money that left the business. Runtime's refund record is the
+ * authority; the sign of the amount alone never decides how a movement is named.
+ */
+export function isSucceededRefund(payment: Pick<Payment, 'status' | 'refund'>): boolean {
+  return payment.status === 'SUCCEEDED' && Boolean(payment.refund);
+}
+
+/** What a refund returned, as a positive amount; the section naming it carries the direction. */
+export function refundedAmount(payment: Pick<Payment, 'appliedAmount'>): string {
+  return createDecimal(String(payment.appliedAmount)).abs().toFixed(4);
+}
+
 export interface PaymentProgress {
   /** Payments Runtime reports as succeeded. */
   paidAmount: string;

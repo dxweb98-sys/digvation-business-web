@@ -589,6 +589,9 @@ const posCopy: Record<string, LocalizedCopy> = {
     'id-ID': 'Pengembalian manual',
     'en-US': 'Manual refund',
   },
+  'Refund movement': { 'id-ID': 'Pengembalian', 'en-US': 'Refund' },
+  'Net paid amount': { 'id-ID': 'Dibayar bersih', 'en-US': 'Net paid' },
+  'Net already paid': { 'id-ID': 'Sudah dibayar bersih', 'en-US': 'Net already paid' },
   'Refund recorded': {
     'id-ID': 'Pengembalian dana dicatat',
     'en-US': 'Refund recorded',

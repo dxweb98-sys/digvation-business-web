@@ -381,6 +381,7 @@ export function SaleFinancialSummary({
   settlement,
   format,
   payment,
+  refunds,
   paymentAttempts,
 }: {
   title?: string;
@@ -407,6 +408,8 @@ export function SaleFinancialSummary({
   settlement: SaleSettlement;
   format: (amount: string) => string;
   payment?: { title: string; aside?: ReactNode; content: ReactNode } | null;
+  /** Money returned to the customer, kept apart from payments received and payment attempts. */
+  refunds?: ReactNode;
   paymentAttempts?: ReactNode;
 }) {
   const hasBalance = settlement.balanceDue !== '0.0000';
@@ -516,6 +519,12 @@ export function SaleFinancialSummary({
               ))}
             </dl>
           ) : null}
+          {refunds ? (
+            <>
+              <DSeparator className="my-3" />
+              <section>{refunds}</section>
+            </>
+          ) : null}
           {paymentAttempts ? (
             <>
               <DSeparator className="my-3" />
@@ -563,6 +572,54 @@ export function SalePaymentComposition({
         </li>
       ))}
     </ul>
+  );
+}
+
+/**
+ * Successful manual refunds: money that left the business. Each row names the account and method
+ * the money actually left from, and says "refund" in words so it never reads as a payment, a
+ * discount or a formatting error.
+ */
+export function SaleRefundList({
+  heading,
+  refunds,
+}: {
+  heading: string;
+  refunds: readonly {
+    id: string;
+    /** Disbursement account name, or the method when no account was recorded. */
+    name: string;
+    /** Method of the disbursement and the word for a refund, for example "Transfer bank · Pengembalian". */
+    detail: string;
+    /** Date, external reference and note, when recorded. */
+    note: string | null;
+    amount: string;
+  }[];
+}) {
+  return (
+    <>
+      <h4 className="text-sm font-semibold text-[var(--color-text)]">{heading}</h4>
+      <ul className="divide-y divide-[var(--color-border)]">
+        {refunds.map((refund) => (
+          <li key={refund.id} className="flex items-start justify-between gap-4 py-2.5">
+            <div className="min-w-0">
+              <p className="break-words text-sm font-medium text-[var(--color-text)]">
+                {refund.name}
+              </p>
+              <p className="mt-0.5 break-words text-xs text-[var(--color-text-muted)]">
+                {refund.detail}
+              </p>
+              {refund.note ? (
+                <p className="mt-0.5 break-all text-xs text-[var(--color-text-muted)]">
+                  {refund.note}
+                </p>
+              ) : null}
+            </div>
+            <span className="shrink-0 text-sm font-semibold tabular-nums">{refund.amount}</span>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }
 

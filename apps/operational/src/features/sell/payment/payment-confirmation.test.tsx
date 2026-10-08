@@ -111,7 +111,8 @@ describe('PaymentReview', () => {
         format={format}
       />,
     );
-    expect(screen.getByText('Received · BCA')).toBeTruthy();
+    expect(screen.getByText('Already paid')).toBeTruthy();
+    expect(screen.queryByText(/Received ·/)).toBeNull();
     expect(screen.getByText('Remaining after this payment')).toBeTruthy();
     expect(screen.getByText('This payment completes the transaction.')).toBeTruthy();
   });
@@ -131,6 +132,76 @@ describe('PaymentReview', () => {
     expect(
       screen.getByText('Rp200.000 will remain. You will continue with another payment method.'),
     ).toBeTruthy();
+  });
+});
+
+describe('PaymentReview after refunds', () => {
+  const refundOf = (id: string, method: Payment['method'], account: string, amount: string) =>
+    payment(id, 'SUCCEEDED', `-${amount}`, {
+      method,
+      financeFinancialAccountNameSnapshot: account,
+      refund: {
+        id: `refund-${id}`,
+        kind: 'MANUAL',
+        reason: 'ORDER_ADJUSTMENT',
+        externalReference: null,
+        note: null,
+        adjustmentId: 'adjustment-1',
+        allocations: [{ sourcePaymentId: 'bca-in', amount }],
+      },
+    });
+  // Total 593.850; received 205.350 + 410.700; refunded 38.850 + 38.850 + 166.500 => net 371.850.
+  const payments = [
+    payment('bca-in', 'SUCCEEDED', '205350'),
+    payment('qris-in', 'SUCCEEDED', '410700', {
+      method: 'QRIS',
+      financeFinancialAccountNameSnapshot: 'QRIS BRI',
+    }),
+    refundOf('r1', 'BANK_TRANSFER', 'BCA Operasional', '38850'),
+    refundOf('r22', 'CASH', 'Cash drawer', '38850'),
+    refundOf('r333', 'BANK_TRANSFER', 'BCA Operasional', '166500'),
+  ];
+
+  function review() {
+    return withLocale(
+      <PaymentReview
+        intent={paymentIntent({ totalAmount: '593850', payments }, '222000')}
+        total="593850"
+        methodName="Bank transfer"
+        accountName="BCA"
+        earlierPayments={payments}
+        format={format}
+      />,
+    );
+  }
+
+  it('states total, net already paid, this payment and the remaining balance', () => {
+    review();
+    const value = (label: string) => screen.getByText(label).nextElementSibling!.textContent;
+    expect(value('Transaction total')).toBe('Rp593.850');
+    expect(value('Net already paid')).toBe('Rp371.850');
+    expect(value('This payment')).toBe('Rp222.000');
+    expect(value('Remaining after this payment')).toBe('Rp0');
+  });
+
+  it('never renders a movement as a misleading negative amount', () => {
+    review();
+    expect(document.body.textContent).not.toMatch(/[-−]\s*Rp/);
+    expect(screen.queryByText(/Received ·/)).toBeNull();
+  });
+
+  it('lists payments received and refunds as separate groups', () => {
+    review();
+    const received = screen.getByText('Payment received').parentElement!;
+    expect(received.textContent).toContain('QRIS BRI');
+    expect(received.textContent).toContain('Rp410.700');
+    expect(received.textContent).not.toContain('Refund');
+    const refunds = screen.getByText('Refund', { selector: 'p' }).parentElement!;
+    expect(refunds.textContent).toContain('BCA Operasional');
+    expect(refunds.textContent).toContain('Bank transfer · Refund');
+    expect(refunds.textContent).toContain('Cash · Refund');
+    expect(refunds.textContent).toContain('Rp166.500');
+    expect(refunds.textContent).not.toContain('QRIS');
   });
 });
 
@@ -197,6 +268,12 @@ describe('RecordedPaymentList', () => {
     );
     expect(screen.getByText('BCA Operasional')).toBeTruthy();
     expect(screen.getByText('Manual refund · TRF-0001 · Wrong item')).toBeTruthy();
+    // A refund is a refund, not a payment "Received", and not a negative amount.
+    const refundRow = screen.getByText('BCA Operasional').closest('li')!;
+    expect(refundRow.textContent).not.toContain('Received');
+    expect(refundRow.textContent).toContain('Refund');
+    expect(screen.getAllByText('Received')).toHaveLength(1); // only the incoming QRIS payment
+    expect(screen.getByText('Rp205.350')).toBeTruthy();
     expect(document.body.textContent).not.toMatch(/provider|automatic/i);
   });
 
