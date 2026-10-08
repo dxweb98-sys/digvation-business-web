@@ -9,7 +9,12 @@ import type {
   PaymentMethod,
   PaymentStatus,
 } from '../transaction/model/cashier-transaction.types';
-import type { PaymentIntent, PaymentProgress } from '../transaction/model/sale-presentation';
+import {
+  isSucceededRefund,
+  refundedAmount,
+  type PaymentIntent,
+  type PaymentProgress,
+} from '../transaction/model/sale-presentation';
 
 type Format = (amount: string) => string;
 type TerminalPaymentStatus = Exclude<PaymentStatus, 'PENDING'>;
@@ -117,6 +122,29 @@ export function PaymentIntentHint({
   );
 }
 
+function MovementGroup({ heading, children }: { heading: string; children: ReactNode }) {
+  return (
+    <div className="border-b border-[var(--color-border)] last:border-b-0">
+      <p className="px-4 pt-2.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+        {heading}
+      </p>
+      <ul className="divide-y divide-[var(--color-border)]">{children}</ul>
+    </div>
+  );
+}
+
+function MovementRow({ name, detail, amount }: { name: string; detail: string; amount: string }) {
+  return (
+    <li className="flex items-start justify-between gap-4 px-4 py-2.5">
+      <div className="min-w-0">
+        <p className="break-words text-sm font-medium">{name}</p>
+        <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">{detail}</p>
+      </div>
+      <span className="shrink-0 text-sm font-semibold tabular-nums">{amount}</span>
+    </li>
+  );
+}
+
 /** The confirmation step shown before a payment is sent to Runtime. */
 export function PaymentReview({
   intent,
@@ -145,6 +173,12 @@ export function PaymentReview({
   const { copy, label } = useOperationalLocalization();
   const completes = intent.outcome !== 'LEAVES_BALANCE';
   const recorded = earlierPayments.filter((payment) => payment.status === 'SUCCEEDED');
+  // Money received and money returned are different movements; each is listed on its own.
+  const refunds = recorded.filter(isSucceededRefund);
+  const received = recorded.filter(
+    (payment) => !payment.refund && isPositive(String(payment.appliedAmount)),
+  );
+  const showMovements = refunds.length > 0 || received.length > 1;
   return (
     <div className="space-y-4">
       <section className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]">
@@ -218,21 +252,21 @@ export function PaymentReview({
             <dd className="text-sm font-semibold tabular-nums">{format(total)}</dd>
           </div>
 
-          {recorded.map((payment) => (
-            <div key={payment.id} className="flex items-center justify-between gap-4 px-4 py-3">
-              <dt className="min-w-0 truncate text-sm text-[var(--color-text-muted)]">
-                {copy('Received')} · {paymentAccountName(payment, label)}
+          {recorded.length ? (
+            <div className="flex items-center justify-between gap-4 px-4 py-3">
+              <dt className="text-sm text-[var(--color-text-muted)]">
+                {copy(refunds.length ? 'Net already paid' : 'Already paid')}
               </dt>
               <dd className="shrink-0 text-sm font-semibold tabular-nums text-[var(--color-success)]">
-                −{format(payment.appliedAmount)}
+                {format(intent.paidAmount)}
               </dd>
             </div>
-          ))}
+          ) : null}
 
           <div className="flex items-center justify-between gap-4 px-4 py-3">
             <dt className="text-sm font-medium">{copy('This payment')}</dt>
             <dd className="text-sm font-bold tabular-nums text-[var(--color-brand)]">
-              −{format(intent.amount)}
+              {format(intent.amount)}
             </dd>
           </div>
 
@@ -248,6 +282,33 @@ export function PaymentReview({
           </div>
         </dl>
       </section>
+
+      {showMovements ? (
+        <section className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]">
+          <MovementGroup heading={copy('Payment received')}>
+            {received.map((payment) => (
+              <MovementRow
+                key={payment.id}
+                name={paymentAccountName(payment, label)}
+                detail={label(payment.method)}
+                amount={format(String(payment.appliedAmount))}
+              />
+            ))}
+          </MovementGroup>
+          {refunds.length ? (
+            <MovementGroup heading={copy('Refund')}>
+              {refunds.map((payment) => (
+                <MovementRow
+                  key={payment.id}
+                  name={paymentAccountName(payment, label)}
+                  detail={`${label(payment.method)} · ${copy('Refund movement')}`}
+                  amount={format(refundedAmount(payment))}
+                />
+              ))}
+            </MovementGroup>
+          ) : null}
+        </section>
+      ) : null}
 
       <div
         className={`flex items-start gap-2.5 rounded-xl px-3 py-2.5 text-sm ${
@@ -346,7 +407,11 @@ export function RecordedPaymentList({
                     <p className="mt-0.5 text-[11px] text-[var(--color-text-muted)]">
                       {accountName !== methodName ? `${methodName} · ` : ''}
                       <span className="pos-payment-row__status">
-                        {copy(statusCopy[payment.status])}
+                        {copy(
+                          isSucceededRefund(payment)
+                            ? 'Refund movement'
+                            : statusCopy[payment.status],
+                        )}
                       </span>
                     </p>
                     {payment.refund ? (
@@ -366,7 +431,9 @@ export function RecordedPaymentList({
                     ) : null}
                   </div>
                   <p className="pos-payment-row__amount shrink-0 text-sm font-bold tabular-nums">
-                    {format(payment.appliedAmount)}
+                    {format(
+                      isSucceededRefund(payment) ? refundedAmount(payment) : payment.appliedAmount,
+                    )}
                   </p>
                 </div>
                 {payment.method === 'CASH' && payment.tenderedAmount ? (

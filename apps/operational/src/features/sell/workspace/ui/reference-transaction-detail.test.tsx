@@ -1266,3 +1266,145 @@ describe('ReferenceTransactionDetail Sale-level earned points', () => {
     expect(screen.queryByTestId('receipt-points')).toBeNull();
   });
 });
+
+describe('ReferenceTransactionDetail payments, refunds and payment attempts', () => {
+  const refund = (id: string, method: 'CASH' | 'BANK_TRANSFER', account: string, amount: string) =>
+    ({
+      id,
+      saleId: 'sale-runtime-1',
+      method,
+      status: 'SUCCEEDED',
+      currency: 'IDR',
+      appliedAmount: `-${amount}.0000`,
+      tenderedAmount: null,
+      changeAmount: null,
+      providerReference: null,
+      financeFinancialAccountNameSnapshot: account,
+      idempotencyKey: `key-${id}`,
+      createdByActorId: 'cashier-1',
+      createdByActorKind: 'USER',
+      settledByActorId: 'cashier-1',
+      settledByActorKind: 'USER',
+      terminalAt: '2026-10-08T13:41:00.000Z',
+      createdAt: `2026-10-08T13:4${id.length}:00.000Z`,
+      updatedAt: '2026-10-08T13:41:00.000Z',
+      refund: {
+        id: `refund-${id}`,
+        kind: 'MANUAL',
+        reason: 'ORDER_ADJUSTMENT',
+        externalReference: null,
+        note: null,
+        adjustmentId: 'adjustment-1',
+        allocations: [{ sourcePaymentId: 'bca-in', amount }],
+      },
+    }) as unknown as Sale['payments'][number];
+  const incoming = (
+    id: string,
+    method: 'QRIS' | 'BANK_TRANSFER',
+    account: string,
+    amount: string,
+  ) => ({
+    ...runtimeQueueDetail().payments[0]!,
+    id,
+    method,
+    financeFinancialAccountNameSnapshot: account,
+    appliedAmount: `${amount}.0000`,
+    tenderedAmount: null,
+    changeAmount: null,
+    createdAt: `2026-10-08T13:0${id.length}:00.000Z`,
+  });
+
+  /** Total 593.850; received 205.350 + 410.700; refunded 38.850 + 38.850 + 166.500. */
+  const refundedSale = (extra: Sale['payments'] = []) =>
+    runtimeQueueDetail({
+      status: 'FINALIZED',
+      finalizedAt: '2026-10-08T13:41:00.000Z',
+      totalAmount: '593850.0000',
+      grossAmount: '593850.0000',
+      discountAmount: '0.0000',
+      taxAmount: '0.0000',
+      loyaltyRedemption: null,
+      payments: [
+        incoming('bca-in', 'BANK_TRANSFER', 'BCA', '205350'),
+        incoming('qris-in', 'QRIS', 'QRIS BRI', '410700'),
+        refund('r1', 'BANK_TRANSFER', 'BCA Operasional', '38850'),
+        refund('r22', 'CASH', 'CASH', '38850'),
+        refund('r333', 'BANK_TRANSFER', 'BCA Operasional', '166500'),
+        ...extra,
+      ],
+    });
+  const section = (name: string) =>
+    screen.getByRole('heading', { name }).parentElement as HTMLElement;
+
+  it('lists positive successful payments under "Pembayaran diterima"', () => {
+    renderRuntimeDetail(refundedSale());
+    const received = within(
+      screen.getByRole('heading', { name: 'Pembayaran diterima' }).closest('.pos-payment-panel')!,
+    );
+    expect(received.getByText('QRIS BRI').closest('li')!.textContent).toMatch(/410[.,]700/);
+    expect(received.getByText('BCA').closest('li')!.textContent).toMatch(/205[.,]350/);
+    expect(received.queryByText('Pengembalian')).toBeNull();
+  });
+
+  it('lists each manual refund under "Pengembalian dana" on its actual disbursement account and method', () => {
+    renderRuntimeDetail(refundedSale());
+    const list = section('Pengembalian dana').querySelector('ul')!;
+    const rows = within(list).getAllByRole('listitem');
+    expect(rows).toHaveLength(3);
+    expect(rows[0]!.textContent).toContain('BCA Operasional');
+    expect(rows[0]!.textContent).toContain('Transfer bank · Pengembalian');
+    expect(rows[0]!.textContent).toMatch(/38[.,]850/);
+    expect(rows[1]!.textContent).toContain('Tunai · Pengembalian');
+    expect(rows[2]!.textContent).toMatch(/166[.,]500/);
+    // The original QRIS attribution is never presented as a QRIS refund.
+    expect(list.textContent).not.toContain('QRIS');
+  });
+
+  it('never presents a successful refund as a payment attempt', () => {
+    renderRuntimeDetail(refundedSale());
+    expect(screen.queryByRole('heading', { name: 'Percobaan pembayaran' })).toBeNull();
+  });
+
+  it('still lists pending and failed payments under payment attempts, apart from refunds', () => {
+    const pending = {
+      ...incoming('pending-in', 'BANK_TRANSFER', 'Mandiri', '50000'),
+      status: 'PENDING',
+    } as Sale['payments'][number];
+    const failed = {
+      ...incoming('failed-in', 'QRIS', 'QRIS BCA', '30000'),
+      status: 'FAILED',
+    } as Sale['payments'][number];
+    renderRuntimeDetail(refundedSale([pending, failed]));
+    const attempts = section('Percobaan pembayaran');
+    expect(attempts.textContent).toContain('Mandiri');
+    expect(attempts.textContent).toContain('QRIS BCA');
+    expect(attempts.textContent).not.toContain('Pengembalian');
+    expect(attempts.textContent).not.toContain('BCA Operasional');
+    expect(section('Pengembalian dana').textContent).not.toContain('Mandiri');
+  });
+
+  it('labels the paid amount as net of refunds: 616.050 received − 244.200 refunded = 371.850', () => {
+    renderRuntimeDetail(refundedSale());
+    const net = screen.getByText('Dibayar bersih');
+    expect(net.nextElementSibling!.textContent).toMatch(/371[.,]850/);
+    expect(screen.queryByText('Dibayar')).toBeNull();
+    expect(screen.getByText('Sisa tagihan').nextElementSibling!.textContent).toMatch(/222[.,]000/);
+  });
+
+  it('keeps the plain "Dibayar" label when nothing was refunded', () => {
+    renderRuntimeDetail(runtimeQueueDetail());
+    expect(screen.queryByText('Dibayar bersih')).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Pengembalian dana' })).toBeNull();
+  });
+
+  it('identifies each refund in words, not only by a minus sign, on every viewport', () => {
+    renderRuntimeDetail(refundedSale());
+    const rows = within(section('Pengembalian dana').querySelector('ul')!).getAllByRole('listitem');
+    for (const row of rows) {
+      // The same markup serves compact and wide layouts: the word never depends on a breakpoint.
+      expect(row.textContent).toContain('Pengembalian');
+      expect(row.textContent).not.toMatch(/[-−]\s*Rp/);
+      expect(row.querySelector('[class*="hidden"], [class*="sm:hidden"]')).toBeNull();
+    }
+  });
+});

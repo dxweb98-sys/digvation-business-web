@@ -3,6 +3,8 @@ import { useOperationalLocalization } from '../../../../app/localization/operati
 import {
   type AppliedPaymentComposition,
   type SaleSettlement,
+  isSucceededRefund,
+  refundedAmount,
   aggregateDiscountRows,
   saleDiscountRows,
   saleTaxLabel,
@@ -13,6 +15,7 @@ import {
   SaleFinancialSummary,
   SalePaymentComposition,
   SalePaymentList,
+  SaleRefundList,
   StatusPill,
 } from './sale-detail-presentation';
 import { statusMeta, queueStatus, queueStatusTone } from '../../queue/queue-status';
@@ -165,6 +168,13 @@ export function ReferenceTransactionSummary({
   const redeemedAmount =
     sale.loyaltyRedemption?.amount ?? legacyLoyaltyRedemption?.redemptionAmount ?? null;
   const hasLoyaltyRedemption = Boolean(redeemedPoints && redeemedAmount);
+  // Succeeded manual refunds are money returned, not payment attempts; attempts keep the rest.
+  const refunds = unappliedPayments.filter(isSucceededRefund);
+  const paymentAttempts = unappliedPayments.filter((payment) => !isSucceededRefund(payment));
+  const dateTime = (iso: string) =>
+    new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(
+      new Date(iso),
+    );
   return (
     <SaleFinancialSummary
       title={copy('Order summary')}
@@ -181,7 +191,7 @@ export function ReferenceTransactionSummary({
       labels={{
         subtotal: copy('Subtotal'),
         total: copy('Total'),
-        paid: copy('Paid amount'),
+        paid: copy(refunds.length ? 'Net paid amount' : 'Paid amount'),
         balance: copy('Balance due'),
         settled: copy('Paid'),
         cashReceived: copy('Cash received'),
@@ -217,7 +227,7 @@ export function ReferenceTransactionSummary({
       payment={
         composition.components.length
           ? {
-              title: copy('Payment'),
+              title: copy('Payment received'),
               aside: composition.isSplit ? (
                 <StatusPill tone="brand">
                   {copy('Split Payment')} · {composition.components.length} {copy('methods')}
@@ -241,15 +251,36 @@ export function ReferenceTransactionSummary({
             }
           : null
       }
+      refunds={
+        refunds.length ? (
+          <SaleRefundList
+            heading={copy('Refund')}
+            refunds={refunds.map((item) => ({
+              id: item.id,
+              name: paymentAccountLabel(item, (method) => label(method)),
+              detail: `${label(item.method)} · ${copy('Refund movement')}`,
+              note:
+                [
+                  dateTime(item.terminalAt ?? item.updatedAt),
+                  item.refund?.externalReference,
+                  item.refund?.note,
+                ]
+                  .filter(Boolean)
+                  .join(' · ') || null,
+              amount: format(refundedAmount(item)),
+            }))}
+          />
+        ) : null
+      }
       paymentAttempts={
-        unappliedPayments.length ? (
+        paymentAttempts.length ? (
           <>
             <h4 className="text-sm font-semibold text-[var(--color-text)]">
               {copy('Payment attempts')}
             </h4>
             <SalePaymentList
               emptyLabel={copy('No payment recorded yet.')}
-              payments={unappliedPayments.map((item) => ({
+              payments={paymentAttempts.map((item) => ({
                 id: item.id,
                 method: paymentAccountLabel(item, (method) => label(method)),
                 status: (
@@ -257,10 +288,7 @@ export function ReferenceTransactionSummary({
                     {label(item.status)}
                   </StatusPill>
                 ),
-                detail: new Intl.DateTimeFormat(locale, {
-                  dateStyle: 'medium',
-                  timeStyle: 'short',
-                }).format(new Date(item.terminalAt ?? item.updatedAt)),
+                detail: dateTime(item.terminalAt ?? item.updatedAt),
                 amount: format(item.appliedAmount),
               }))}
             />
