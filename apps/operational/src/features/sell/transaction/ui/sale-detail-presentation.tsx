@@ -381,8 +381,11 @@ export function SaleFinancialSummary({
   settlement,
   format,
   payment,
+  corrections,
+  effectivePayment,
   refunds,
   paymentAttempts,
+  paymentActions,
 }: {
   title?: string;
   context?: ReactNode;
@@ -408,9 +411,15 @@ export function SaleFinancialSummary({
   settlement: SaleSettlement;
   format: (amount: string) => string;
   payment?: { title: string; aside?: ReactNode; content: ReactNode } | null;
+  /** The payment corrections made after the payments were recorded, oldest first. */
+  corrections?: ReactNode;
+  /** What each route effectively holds after corrections; only shown once a correction exists. */
+  effectivePayment?: ReactNode;
   /** Money returned to the customer, kept apart from payments received and payment attempts. */
   refunds?: ReactNode;
   paymentAttempts?: ReactNode;
+  /** Actions on the payment record, such as correcting how it was recorded. */
+  paymentActions?: ReactNode;
 }) {
   const hasBalance = settlement.balanceDue !== '0.0000';
   // A settled sale whose payments equal its total says so once, as a badge. The
@@ -519,6 +528,18 @@ export function SaleFinancialSummary({
               ))}
             </dl>
           ) : null}
+          {corrections ? (
+            <>
+              <DSeparator className="my-3" />
+              <section>{corrections}</section>
+            </>
+          ) : null}
+          {effectivePayment ? (
+            <>
+              <DSeparator className="my-3" />
+              <section>{effectivePayment}</section>
+            </>
+          ) : null}
           {refunds ? (
             <>
               <DSeparator className="my-3" />
@@ -531,6 +552,7 @@ export function SaleFinancialSummary({
               <section>{paymentAttempts}</section>
             </>
           ) : null}
+          {paymentActions ? <div className="mt-3 flex justify-end">{paymentActions}</div> : null}
         </DCardContent>
       </DCard>
     </div>
@@ -572,6 +594,107 @@ export function SalePaymentComposition({
         </li>
       ))}
     </ul>
+  );
+}
+
+/**
+ * The payment corrections made on this Sale. The original payments above stay exactly as recorded;
+ * each correction lists the compensating movements per route, why, who and when. A correction made
+ * after a settlement was closed says so: that settlement is untouched.
+ */
+export function SalePaymentCorrectionList({
+  heading,
+  corrections,
+}: {
+  heading: string;
+  corrections: readonly {
+    id: string;
+    movements: readonly {
+      id: string;
+      name: string;
+      /** Method and the word for the direction, so the sign never carries the meaning alone. */
+      detail: string;
+      amount: string;
+    }[];
+    reasonLabel: string;
+    reason: string;
+    byLabel: string;
+    by: string | null;
+    at: string;
+    afterSettlementLabel: string | null;
+  }[];
+}) {
+  return (
+    <>
+      <h4 className="text-sm font-semibold text-[var(--color-text)]">{heading}</h4>
+      <ul className="divide-y divide-[var(--color-border)]">
+        {corrections.map((correction) => (
+          <li key={correction.id} className="py-2.5" data-testid="payment-correction">
+            <ul className="space-y-1.5">
+              {correction.movements.map((movement) => (
+                <li key={movement.id} className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="break-words text-sm font-medium text-[var(--color-text)]">
+                      {movement.name}
+                    </p>
+                    <p className="mt-0.5 break-words text-xs text-[var(--color-text-muted)]">
+                      {movement.detail}
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-sm font-semibold tabular-nums">
+                    {movement.amount}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 break-words text-xs text-[var(--color-text-muted)]">
+              {correction.reasonLabel}: {correction.reason}
+            </p>
+            <p className="mt-0.5 break-words text-xs text-[var(--color-text-muted)]">
+              {correction.by ? `${correction.byLabel}: ${correction.by} · ` : ''}
+              {correction.at}
+            </p>
+            {correction.afterSettlementLabel ? (
+              <p className="mt-0.5 text-xs font-medium text-[var(--color-warning)]">
+                {correction.afterSettlementLabel}
+              </p>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
+/** What each payment route effectively holds after every correction (and refund attribution). */
+export function SaleEffectivePaymentList({
+  heading,
+  entries,
+}: {
+  heading: string;
+  entries: readonly { id: string; name: string; method: string | null; amount: string }[];
+}) {
+  return (
+    <>
+      <h4 className="text-sm font-semibold text-[var(--color-text)]">{heading}</h4>
+      <ul className="divide-y divide-[var(--color-border)]">
+        {entries.map((entry) => (
+          <li key={entry.id} className="flex items-start justify-between gap-4 py-2.5">
+            <div className="min-w-0">
+              <p className="break-words text-sm font-medium text-[var(--color-text)]">
+                {entry.name}
+              </p>
+              {entry.method ? (
+                <p className="mt-0.5 break-words text-xs text-[var(--color-text-muted)]">
+                  {entry.method}
+                </p>
+              ) : null}
+            </div>
+            <span className="shrink-0 text-sm font-semibold tabular-nums">{entry.amount}</span>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }
 

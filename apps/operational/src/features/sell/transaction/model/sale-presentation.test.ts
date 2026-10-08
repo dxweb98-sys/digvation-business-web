@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { EmployeeContribution, SaleAdjustment } from './cashier-transaction.types';
+import { paymentKind } from './payment-kind';
 import {
   appliedPaymentComposition,
   checkoutAdjustmentRows,
@@ -611,5 +612,68 @@ describe('aggregateDiscountRows (Sale summary by adjustment identity)', () => {
       ['Loyal', '5000.0000'],
       ['Loyal', '5000.0000'],
     ]);
+  });
+});
+
+describe('payment kind and correction legs', () => {
+  const settled = (payments: Array<Record<string, unknown>>) =>
+    saleSettlement({ totalAmount: '110000.0000', payments: payments as never });
+  const cashPayment = (extra: Record<string, unknown>) => ({
+    status: 'SUCCEEDED',
+    method: 'CASH',
+    tenderedAmount: null,
+    changeAmount: null,
+    ...extra,
+  });
+
+  it('classifies from the explicit kind, never the sign, and from facts only when it is absent', () => {
+    expect(paymentKind({ appliedAmount: '5000.0000', kind: 'PAYMENT' })).toBe('PAYMENT');
+    expect(paymentKind({ appliedAmount: '-5000.0000', kind: 'CORRECTION_OUT' })).toBe(
+      'CORRECTION_OUT',
+    );
+    expect(paymentKind({ appliedAmount: '5000.0000', kind: 'CORRECTION_IN' })).toBe(
+      'CORRECTION_IN',
+    );
+    expect(paymentKind({ appliedAmount: '-1000.0000', kind: 'REFUND' })).toBe('REFUND');
+    expect(paymentKind({ appliedAmount: '-1.0000', correction: { leg: 'OUT' } })).toBe(
+      'CORRECTION_OUT',
+    );
+    expect(paymentKind({ appliedAmount: '5000.0000' })).toBe('PAYMENT');
+  });
+
+  it('keeps a cash correction out of the cash tender and change figures', () => {
+    const settlement = settled([
+      cashPayment({
+        appliedAmount: '5000.0000',
+        tenderedAmount: '5000.0000',
+        changeAmount: '0.0000',
+      }),
+      cashPayment({ appliedAmount: '-5000.0000', kind: 'CORRECTION_OUT' }),
+      cashPayment({ appliedAmount: '5000.0000', kind: 'CORRECTION_IN' }),
+    ]);
+    // Net paid is untouched by the net-zero legs, and no phantom change appears.
+    expect(settlement.totalPaid).toBe('5000.0000');
+    expect(settlement.cashChange).toBeNull();
+    expect(settlement.cashApplied).toBe('5000.0000');
+  });
+
+  it('lists only the payments as recorded in the applied composition', () => {
+    const composition = appliedPaymentComposition({
+      totalAmount: '110000.0000',
+      payments: [
+        { status: 'SUCCEEDED', appliedAmount: '105000.0000', createdAt: '1' },
+        { status: 'SUCCEEDED', appliedAmount: '5000.0000', createdAt: '2' },
+        {
+          status: 'SUCCEEDED',
+          appliedAmount: '-5000.0000',
+          kind: 'CORRECTION_OUT',
+          createdAt: '3',
+        },
+        { status: 'SUCCEEDED', appliedAmount: '5000.0000', kind: 'CORRECTION_IN', createdAt: '3' },
+      ],
+    });
+    expect(composition.components).toHaveLength(2);
+    expect(composition.totalPaid).toBe('110000.0000');
+    expect(composition.isSplit).toBe(true);
   });
 });

@@ -215,6 +215,12 @@ export interface PaymentRefundRecord {
   allocations: Array<{ sourcePaymentId: string; amount: string }>;
 }
 
+/**
+ * What a payment fact IS, decided by Runtime. Money received, money returned, or one leg of a
+ * payment correction. Never inferred from the sign of the amount.
+ */
+export type PaymentKind = 'PAYMENT' | 'REFUND' | 'CORRECTION_IN' | 'CORRECTION_OUT';
+
 export interface Payment {
   id: string;
   saleId: string;
@@ -225,6 +231,13 @@ export interface Payment {
   tenderedAmount: string | null;
   changeAmount: string | null;
   providerReference: string | null;
+  /**
+   * Runtime always sends the semantic kind. Only the local demo adapters may omit it; readers go
+   * through `paymentKind()` so a missing kind is handled in exactly one place.
+   */
+  kind?: PaymentKind;
+  /** The payment correction this fact is a leg of; null for payments and refunds. */
+  correction?: { id: string; leg: 'OUT' | 'IN' } | null;
   /**
    * The manual refund this negative payment records. The payment's own method and account are
    * where the money actually left; the allocations name the original payments it was attributed to.
@@ -242,6 +255,54 @@ export interface Payment {
   terminalAt: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface PaymentCorrectionMovement {
+  paymentId: string;
+  leg: 'OUT' | 'IN';
+  method: PaymentMethod;
+  paymentRouteId: string;
+  financialAccountId: string;
+  financialAccountCode: string | null;
+  financialAccountName: string | null;
+  /** Signed: negative for OUT, positive for IN. */
+  amount: string;
+}
+
+/** One payment correction: the recording was wrong, the money was not. */
+export interface PaymentCorrection {
+  id: string;
+  reason: string;
+  correctsCorrectionId: string | null;
+  /** A source payment was already in a COMPLETED settlement; that settlement is untouched. */
+  afterSettlement: boolean;
+  createdByActorId: string;
+  createdByActorKind: string;
+  createdBy: string | null;
+  createdByPresence: 'USER' | 'SYSTEM' | 'UNAVAILABLE' | null;
+  createdAt: string;
+  movements: PaymentCorrectionMovement[];
+  allocations: Array<{ outPaymentId: string; sourcePaymentId: string; amount: string }>;
+}
+
+export interface PaymentCompositionEntry {
+  method: PaymentMethod;
+  paymentRouteId: string | null;
+  financialAccountId: string | null;
+  financialAccountCode: string | null;
+  financialAccountName: string | null;
+  /** Received on this route after corrections, before refunds. */
+  receivedAmount: string;
+  refundedAmount: string;
+  effectiveAmount: string;
+}
+
+export interface PaymentComposition {
+  entries: PaymentCompositionEntry[];
+  totalReceived: string;
+  totalRefunded: string;
+  /** Net paid; a payment correction never changes it. */
+  totalPaid: string;
 }
 
 export interface SaleAdjustment {
@@ -477,6 +538,12 @@ export interface Sale {
   updatedAt: string;
   lines: SaleLine[];
   payments: Payment[];
+  /** Set once Runtime has authoritatively reversed a FINALIZED Sale. */
+  reversal?: { reason: string; reversedAt: string } | null;
+  /** Runtime's payment corrections of this Sale, oldest first; originals stay untouched. */
+  paymentCorrections?: PaymentCorrection[];
+  /** Runtime's effective payment composition after payments, refunds and corrections. */
+  paymentComposition?: PaymentComposition;
 }
 
 export interface OpenSaleSummaryViewModel {

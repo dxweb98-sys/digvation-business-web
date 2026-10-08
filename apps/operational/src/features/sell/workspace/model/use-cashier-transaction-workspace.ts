@@ -46,6 +46,7 @@ import type {
 import { isCompletedSaleSummary } from '../../transaction/model/completed-sale-visibility';
 import type {
   OrderAdjustmentCommitInput,
+  PaymentCorrectionInput,
   RefundDisbursementInput,
   OrderAdjustmentInput,
 } from '../../transaction/api/cashier-transaction.adapter';
@@ -721,6 +722,24 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     return result;
   };
 
+  /**
+   * Corrects how received money was recorded. Only Runtime's updated Sale replaces the displayed
+   * one; when the correction fails, the persisted Sale stays exactly as it was.
+   */
+  const correctPayments = async (
+    saleId: string,
+    input: PaymentCorrectionInput,
+    idempotencyKey: string,
+  ) => {
+    if (!transactionAdapter.correctPayments)
+      throw new Error(copy('Payment correction is not available.'));
+    const sale = await command.runMutation(() =>
+      transactionAdapter.correctPayments!(saleId, input, idempotencyKey),
+    );
+    cacheQueueContext(sale);
+    return sale;
+  };
+
   const transitionQueuedFulfillment = async (
     sale: Sale,
     line: SaleLine,
@@ -1115,6 +1134,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     removeLine,
     previewOrderAdjustment,
     commitOrderAdjustment,
+    correctPayments,
     changeDraftQuantity: saleWorkspace.changeDraftQuantity,
     removeDraftLine: saleWorkspace.removeDraftLine,
     commitDraft: saleWorkspace.commitDraft,

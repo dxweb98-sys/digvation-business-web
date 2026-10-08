@@ -516,6 +516,68 @@ const posCopy: Record<string, LocalizedCopy> = {
   'Additional payment': { 'id-ID': 'Tambahan pembayaran', 'en-US': 'Additional payment' },
   'Save adjustment': { 'id-ID': 'Simpan penyesuaian', 'en-US': 'Save adjustment' },
   'Adjustment saved': { 'id-ID': 'Penyesuaian berhasil disimpan', 'en-US': 'Adjustment saved' },
+  'Payment correction': { 'id-ID': 'Koreksi pembayaran', 'en-US': 'Payment correction' },
+  'Payment correction explanation': {
+    'id-ID': 'Memperbaiki pencatatan pembayaran. Total yang dibayar pelanggan tidak berubah.',
+    'en-US': 'Fixes how the payment was recorded. The total the customer paid does not change.',
+  },
+  'Recorded now': { 'id-ID': 'Pencatatan saat ini', 'en-US': 'Currently recorded' },
+  'Correct recording': { 'id-ID': 'Pencatatan yang benar', 'en-US': 'Correct recording' },
+  'Correction changes': { 'id-ID': 'Perubahan', 'en-US': 'Changes' },
+  'Correction reason placeholder': {
+    'id-ID': 'Contoh: Salah memasukkan nominal pembayaran',
+    'en-US': 'For example: the payment amount was entered wrongly',
+  },
+  'Save correction': { 'id-ID': 'Simpan koreksi', 'en-US': 'Save correction' },
+  'Effective payment': { 'id-ID': 'Pembayaran efektif', 'en-US': 'Effective payment' },
+  'Corrected by': { 'id-ID': 'Dikoreksi oleh', 'en-US': 'Corrected by' },
+  'Correction after reconciliation': {
+    'id-ID': 'Koreksi setelah rekonsiliasi',
+    'en-US': 'Correction after reconciliation',
+  },
+  'Correction reduced': { 'id-ID': 'Dikurangi', 'en-US': 'Reduced' },
+  'Correction added': { 'id-ID': 'Ditambah', 'en-US': 'Added' },
+  'The total paid must stay the same.': {
+    'id-ID': 'Total dibayar harus tetap sama.',
+    'en-US': 'The total paid must stay the same.',
+  },
+  'Correction difference': { 'id-ID': 'Selisih', 'en-US': 'Difference' },
+  'Payment correction saved': {
+    'id-ID': 'Koreksi pembayaran disimpan',
+    'en-US': 'Payment correction saved',
+  },
+  'The payment correction could not be saved. Try again.': {
+    'id-ID': 'Koreksi pembayaran tidak dapat disimpan. Coba lagi.',
+    'en-US': 'The payment correction could not be saved. Try again.',
+  },
+  'Payment correction is not available.': {
+    'id-ID': 'Koreksi pembayaran belum tersedia.',
+    'en-US': 'Payment correction is not available.',
+  },
+  'Reload latest transaction': {
+    'id-ID': 'Muat ulang transaksi',
+    'en-US': 'Reload latest transaction',
+  },
+  'A route cannot give away more than was recorded on it.': {
+    'id-ID': 'Satu jalur pembayaran tidak dapat dikurangi melebihi yang tercatat di jalur itu.',
+    'en-US': 'A route cannot give away more than was recorded on it.',
+  },
+  'A payment route is no longer available. Reload and choose again.': {
+    'id-ID': 'Ada jalur pembayaran yang tidak lagi tersedia. Muat ulang dan pilih lagi.',
+    'en-US': 'A payment route is no longer available. Reload and choose again.',
+  },
+  'This transaction can no longer have its payments corrected.': {
+    'id-ID': 'Pembayaran transaksi ini tidak dapat dikoreksi lagi.',
+    'en-US': 'This transaction can no longer have its payments corrected.',
+  },
+  'You are not allowed to correct payments.': {
+    'id-ID': 'Anda tidak memiliki izin untuk mengoreksi pembayaran.',
+    'en-US': 'You are not allowed to correct payments.',
+  },
+  'Nothing to change yet.': {
+    'id-ID': 'Belum ada perubahan.',
+    'en-US': 'Nothing to change yet.',
+  },
   'Adjustment impact': { 'id-ID': 'Dampak penyesuaian', 'en-US': 'Adjustment impact' },
   'Changes are saved together when you save the adjustment.': {
     'id-ID': 'Perubahan disimpan bersamaan saat penyesuaian disimpan.',

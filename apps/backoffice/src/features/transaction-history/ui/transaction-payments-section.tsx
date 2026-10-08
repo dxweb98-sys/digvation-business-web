@@ -20,7 +20,14 @@ const hasValue = (amount: string | null) => Boolean(amount && /[1-9]/.test(amoun
  * own negative facts linked to the payment they return; other attempts stay quietly apart.
  */
 export function TransactionPaymentsSection({ sale }: { sale: Sale }) {
-  const { copy, formatMoney } = useTransactionHistoryLocalization();
+  const { copy, formatMoney, formatDate } = useTransactionHistoryLocalization();
+  const dateTime = (value: string) =>
+    formatDate(new Date(value), { dateStyle: 'medium', timeStyle: 'short' });
+  const corrections = sale.paymentCorrections ?? [];
+  const signed = (amount: string, currency: string) =>
+    amount.startsWith('-')
+      ? `−${formatMoney(amount.slice(1), currency)}`
+      : `+${formatMoney(amount, currency)}`;
   const composition = transactionPaymentComposition(sale);
   const byId = new Map(sale.payments.map((payment) => [payment.id, payment]));
   const destination = (payment: Payment) => {
@@ -93,6 +100,101 @@ export function TransactionPaymentsSection({ sale }: { sale: Sale }) {
           </p>
         )}
 
+        {corrections.length ? (
+          <div className="mt-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)]/50 p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--color-text-muted)]">
+              {copy('Payment corrections')}
+            </p>
+            <ul className="mt-1.5 divide-y divide-[var(--color-border)]">
+              {corrections.map((correction) => (
+                <li key={correction.id} className="py-2.5 text-sm" data-testid="payment-correction">
+                  <ul className="space-y-1.5">
+                    {correction.movements.map((movement) => (
+                      <li
+                        key={movement.paymentId}
+                        className="flex items-start justify-between gap-4"
+                      >
+                        <span className="min-w-0">
+                          <span className="block break-words font-medium text-[var(--color-text)]">
+                            {movement.financialAccountName ??
+                              copy(PAYMENT_METHOD_LABELS[movement.method])}
+                          </span>
+                          <span className="mt-0.5 block break-words text-xs text-[var(--color-text-muted)]">
+                            {copy(PAYMENT_METHOD_LABELS[movement.method])} ·{' '}
+                            {copy(
+                              movement.leg === 'OUT' ? 'Correction reduced' : 'Correction added',
+                            )}
+                          </span>
+                        </span>
+                        <span className="shrink-0 font-semibold tabular-nums text-[var(--color-text)]">
+                          {signed(movement.amount, sale.currency)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <dl className="mt-2 space-y-0.5 text-xs text-[var(--color-text-muted)]">
+                    <div className="flex gap-1.5">
+                      <dt>{copy('Correction reason')}:</dt>
+                      <dd className="min-w-0 break-words text-[var(--color-text)]">
+                        {correction.reason}
+                      </dd>
+                    </div>
+                    <div className="flex gap-1.5">
+                      <dt>{copy('Corrected by')}:</dt>
+                      <dd className="min-w-0 break-words text-[var(--color-text)]">
+                        {correction.createdBy ?? '—'}
+                      </dd>
+                    </div>
+                    <div className="flex gap-1.5">
+                      <dt>{copy('Corrected on')}:</dt>
+                      <dd className="text-[var(--color-text)]">{dateTime(correction.createdAt)}</dd>
+                    </div>
+                  </dl>
+                  {correction.correctsCorrectionId ? (
+                    <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                      {copy('Corrects an earlier correction')}
+                    </p>
+                  ) : null}
+                  {correction.afterSettlement ? (
+                    <p className="mt-1 text-xs font-medium text-[var(--color-warning)]">
+                      {copy('Correction after reconciliation')} —{' '}
+                      {copy('Correction after reconciliation note')}
+                    </p>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {corrections.length && sale.paymentComposition ? (
+          <div className="mt-3 rounded-xl border border-[var(--color-border)] p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--color-text-muted)]">
+              {copy('Effective payment')}
+            </p>
+            <ul className="mt-1.5 divide-y divide-[var(--color-border)]">
+              {sale.paymentComposition.entries.map((entry, index) => (
+                <li
+                  key={entry.paymentRouteId ?? `${entry.method}-${index}`}
+                  className="flex items-start justify-between gap-4 py-2 text-sm"
+                >
+                  <span className="min-w-0">
+                    <span className="block break-words font-medium text-[var(--color-text)]">
+                      {entry.financialAccountName ?? copy(PAYMENT_METHOD_LABELS[entry.method])}
+                    </span>
+                    <span className="block text-xs text-[var(--color-text-muted)]">
+                      {copy(PAYMENT_METHOD_LABELS[entry.method])}
+                    </span>
+                  </span>
+                  <span className="shrink-0 font-semibold tabular-nums">
+                    {formatMoney(entry.effectiveAmount, sale.currency)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
         {composition.refunds.length ? (
           <div className="mt-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)]/50 p-3">
             <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--color-text-muted)]">
@@ -107,9 +209,26 @@ export function TransactionPaymentsSection({ sale }: { sale: Sale }) {
                     className="flex items-start justify-between gap-4 py-2 text-sm"
                   >
                     <span className="min-w-0 break-words text-[var(--color-text)]">
-                      {source
-                        ? `${copy('Refund of')} ${destination(source)}`
-                        : copy(PAYMENT_METHOD_LABELS[refund.method])}
+                      {refund.refund ? (
+                        <>
+                          {/* A manual refund names where the money actually left, not the payment. */}
+                          <span className="block font-medium">{destination(refund)}</span>
+                          <span className="mt-0.5 block text-xs text-[var(--color-text-muted)]">
+                            {[
+                              copy(PAYMENT_METHOD_LABELS[refund.method]),
+                              copy('Manual refund'),
+                              refund.refund.externalReference,
+                              refund.refund.note,
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </span>
+                        </>
+                      ) : source ? (
+                        `${copy('Refund of')} ${destination(source)}`
+                      ) : (
+                        copy(PAYMENT_METHOD_LABELS[refund.method])
+                      )}
                     </span>
                     <span className="shrink-0 font-semibold tabular-nums text-[var(--color-danger)]">
                       {formatMoney(refund.appliedAmount, refund.currency)}

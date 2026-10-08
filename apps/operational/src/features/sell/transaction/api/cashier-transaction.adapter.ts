@@ -23,6 +23,13 @@ import type {
 const API_PREFIX = '/api/v1';
 const PAGE_SIZE = 100;
 
+/** One route's signed change of what is attributed to it; the deltas of a correction sum to zero. */
+export interface PaymentCorrectionInput {
+  expectedVersion: number;
+  reason: string;
+  moves: Array<{ paymentRouteId: string; delta: string }>;
+}
+
 export interface CreateSaleInput {
   sellingLocationId: string;
   currency: string;
@@ -403,6 +410,15 @@ export interface SaleTransactionClient {
     input: OrderAdjustmentCommitInput,
     idempotencyKey: string,
   ): Promise<OrderAdjustmentResult>;
+  /**
+   * Corrects how received money was recorded: a net-zero re-attribution between routes. Runtime
+   * owns every rule; the total paid, the balance and refunds never change.
+   */
+  correctPayments?(
+    saleId: string,
+    input: PaymentCorrectionInput,
+    idempotencyKey: string,
+  ): Promise<Sale>;
   applyLoyaltyRedemption(
     saleId: string,
     input: LoyaltyRedemptionInput,
@@ -707,6 +723,16 @@ export class HttpCashierTransactionAdapter
       input,
       { signal },
     );
+  }
+
+  public correctPayments(
+    saleId: string,
+    input: PaymentCorrectionInput,
+    idempotencyKey: string,
+  ): Promise<Sale> {
+    return this.client.post<Sale>(`${API_PREFIX}/sales/${saleId}/payment-corrections`, input, {
+      headers: { 'Idempotency-Key': idempotencyKey },
+    });
   }
 
   public commitOrderAdjustment(

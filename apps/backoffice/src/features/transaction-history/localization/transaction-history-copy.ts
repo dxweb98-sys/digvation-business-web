@@ -119,6 +119,75 @@ export const transactionHistoryCopy: Record<string, { id: string; en: string }> 
   'No payments recorded yet.': { id: 'Belum ada pembayaran.', en: 'No payments recorded yet.' },
   'Total paid': { id: 'Total dibayar', en: 'Total paid' },
   'Total refunded': { id: 'Total dikembalikan', en: 'Total refunded' },
+  'Manual refund': { id: 'Pengembalian manual', en: 'Manual refund' },
+
+  // Payment correction: the recording was wrong, the money was not
+  'Payment correction': { id: 'Koreksi pembayaran', en: 'Payment correction' },
+  'Payment corrections': { id: 'Koreksi pembayaran', en: 'Payment corrections' },
+  'Payment correction explanation': {
+    id: 'Memperbaiki pencatatan pembayaran. Total yang dibayar pelanggan tidak berubah.',
+    en: 'Fixes how the payment was recorded. The total the customer paid does not change.',
+  },
+  'Effective payment': { id: 'Pembayaran efektif', en: 'Effective payment' },
+  'Corrected by': { id: 'Dikoreksi oleh', en: 'Corrected by' },
+  'Corrected on': { id: 'Waktu koreksi', en: 'Corrected on' },
+  'Correction reason': { id: 'Alasan', en: 'Reason' },
+  'Correction after reconciliation': {
+    id: 'Koreksi setelah rekonsiliasi',
+    en: 'Correction after reconciliation',
+  },
+  'Correction after reconciliation note': {
+    id: 'Rekonsiliasi yang sudah ditutup tidak diubah. Selisihnya masuk ke penyelesaian berikutnya.',
+    en: 'The closed reconciliation is not changed. The difference goes to the next settlement.',
+  },
+  'Corrects an earlier correction': {
+    id: 'Mengoreksi koreksi sebelumnya',
+    en: 'Corrects an earlier correction',
+  },
+  'Correction reduced': { id: 'Dikurangi', en: 'Reduced' },
+  'Correction added': { id: 'Ditambah', en: 'Added' },
+  'Move from': { id: 'Pindahkan dari', en: 'Move from' },
+  'Move to': { id: 'Ke', en: 'Move to' },
+  'Amount to move': { id: 'Nominal yang dipindahkan', en: 'Amount to move' },
+  'Choose a route': { id: 'Pilih jalur pembayaran', en: 'Choose a route' },
+  'Enter an amount up to what the route holds.': {
+    id: 'Masukkan nominal hingga jumlah yang tercatat di jalur ini.',
+    en: 'Enter an amount up to what the route holds.',
+  },
+  'Recorded on this route': { id: 'Tercatat di jalur ini', en: 'Recorded on this route' },
+  'Save correction': { id: 'Simpan koreksi', en: 'Save correction' },
+  'For example, the payment amount was entered wrongly': {
+    id: 'Contoh: Salah memasukkan nominal pembayaran',
+    en: 'For example, the payment amount was entered wrongly',
+  },
+  'Payment correction saved.': {
+    id: 'Koreksi pembayaran disimpan.',
+    en: 'Payment correction saved.',
+  },
+  'Could not save the payment correction.': {
+    id: 'Koreksi pembayaran tidak dapat disimpan.',
+    en: 'Could not save the payment correction.',
+  },
+  'The total paid must stay the same.': {
+    id: 'Total dibayar harus tetap sama.',
+    en: 'The total paid must stay the same.',
+  },
+  'A route cannot give away more than was recorded on it.': {
+    id: 'Satu jalur pembayaran tidak dapat dikurangi melebihi yang tercatat di jalur itu.',
+    en: 'A route cannot give away more than was recorded on it.',
+  },
+  'A payment route is no longer available. Reload and choose again.': {
+    id: 'Ada jalur pembayaran yang tidak lagi tersedia. Muat ulang dan pilih lagi.',
+    en: 'A payment route is no longer available. Reload and choose again.',
+  },
+  'This transaction can no longer have its payments corrected.': {
+    id: 'Pembayaran transaksi ini tidak dapat dikoreksi lagi.',
+    en: 'This transaction can no longer have its payments corrected.',
+  },
+  'You are not allowed to correct payments.': {
+    id: 'Anda tidak memiliki izin untuk mengoreksi pembayaran.',
+    en: 'You are not allowed to correct payments.',
+  },
   'Balance due': { id: 'Sisa tagihan', en: 'Balance due' },
   'Cash received': { id: 'Uang diterima', en: 'Cash received' },
   Change: { id: 'Kembalian', en: 'Change' },

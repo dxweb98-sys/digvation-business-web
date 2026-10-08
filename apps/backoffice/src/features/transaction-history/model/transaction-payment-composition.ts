@@ -1,13 +1,20 @@
 import type { Payment } from '../api/transaction-history-api';
+import { paymentKind } from './payment-kind';
 
 type CompositionPayment = Pick<Payment, 'id' | 'status' | 'appliedAmount'> &
-  Partial<Pick<Payment, 'refundOfPaymentId'>> & { createdAt?: string };
+  Partial<
+    Pick<Payment, 'refundOfPaymentId' | 'kind' | 'correction' | 'refund' | 'providerReference'>
+  > & { createdAt?: string };
 
 export interface TransactionPaymentComposition<P> {
   /** Payments that actually settle the sale, in the order they were taken. */
   applied: P[];
-  /** Succeeded negative facts that return money against an applied payment. */
+  /** Succeeded refund facts: money returned. Decided by Runtime's kind, never by the sign. */
   refunds: P[];
+  /** Succeeded legs of payment corrections: bookkeeping movements, neither payments nor refunds. */
+  corrections: P[];
+  /** Positive correction legs: they hold re-attributed money and can be refunded like a payment. */
+  correctionIn: P[];
   /** Failed, cancelled, expired or still pending attempts; they never settle the sale. */
   notApplied: P[];
   totalPaid: string;
@@ -51,12 +58,22 @@ export function transactionPaymentComposition<P extends CompositionPayment>(sale
   payments: readonly P[];
 }): TransactionPaymentComposition<P> {
   const succeeded = (payment: P) => payment.status === 'SUCCEEDED';
+  const kindOf = (payment: P) => paymentKind(payment);
+  // The payments as originally recorded; a correction leg is neither a payment nor a refund.
   const applied = sale.payments
-    .filter((payment) => succeeded(payment) && toMoneyUnits(payment.appliedAmount) > 0n)
+    .filter((payment) => succeeded(payment) && kindOf(payment) === 'PAYMENT')
     .sort(byCreation);
   const refunds = sale.payments
-    .filter((payment) => succeeded(payment) && toMoneyUnits(payment.appliedAmount) < 0n)
+    .filter((payment) => succeeded(payment) && kindOf(payment) === 'REFUND')
     .sort(byCreation);
+  const corrections = sale.payments
+    .filter(
+      (payment) =>
+        succeeded(payment) &&
+        (kindOf(payment) === 'CORRECTION_IN' || kindOf(payment) === 'CORRECTION_OUT'),
+    )
+    .sort(byCreation);
+  const correctionIn = corrections.filter((payment) => kindOf(payment) === 'CORRECTION_IN');
   const totalPaid = applied.reduce((sum, payment) => sum + toMoneyUnits(payment.appliedAmount), 0n);
   const totalRefunded = refunds.reduce(
     (sum, payment) => sum - toMoneyUnits(payment.appliedAmount),
@@ -68,6 +85,8 @@ export function transactionPaymentComposition<P extends CompositionPayment>(sale
   return {
     applied,
     refunds,
+    corrections,
+    correctionIn,
     notApplied: sale.payments.filter((payment) => !succeeded(payment)).sort(byCreation),
     totalPaid: fromMoneyUnits(totalPaid),
     totalRefunded: fromMoneyUnits(totalRefunded),
@@ -87,5 +106,35 @@ export function uncompensatedAmount<P extends CompositionPayment>(
     .filter((refund) => refund.refundOfPaymentId === payment.id)
     .reduce((sum, refund) => sum - toMoneyUnits(refund.appliedAmount), 0n);
   const remaining = toMoneyUnits(payment.appliedAmount) - refunded;
+  return fromMoneyUnits(remaining > 0n ? remaining : 0n);
+}
+
+/**
+ * What a succeeded payment (or a correction IN leg) still holds: its amount minus everything that
+ * has consumed it — legacy refunds bound to it, manual refund allocations and correction-out
+ * allocations. Runtime enforces the same capacity; this only mirrors it so the offered maximum is
+ * not stale after a refund or a correction.
+ */
+export function remainingCapacity(
+  payment: CompositionPayment,
+  sale: {
+    payments: readonly CompositionPayment[];
+    paymentCorrections?: readonly {
+      allocations: readonly { sourcePaymentId: string; amount: string }[];
+    }[];
+  },
+): string {
+  let consumed = 0n;
+  for (const other of sale.payments) {
+    if (other.status !== 'SUCCEEDED') continue;
+    if (paymentKind(other) !== 'REFUND') continue;
+    if (other.refundOfPaymentId === payment.id) consumed -= toMoneyUnits(other.appliedAmount);
+    for (const allocation of other.refund?.allocations ?? [])
+      if (allocation.sourcePaymentId === payment.id) consumed += toMoneyUnits(allocation.amount);
+  }
+  for (const correction of sale.paymentCorrections ?? [])
+    for (const allocation of correction.allocations)
+      if (allocation.sourcePaymentId === payment.id) consumed += toMoneyUnits(allocation.amount);
+  const remaining = toMoneyUnits(payment.appliedAmount) - consumed;
   return fromMoneyUnits(remaining > 0n ? remaining : 0n);
 }

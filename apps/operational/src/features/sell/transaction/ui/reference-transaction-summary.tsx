@@ -1,4 +1,4 @@
-import { DAlert, DBadge as Badge } from '@digvation-labs/ui';
+import { DAlert, DBadge as Badge, DButton } from '@digvation-labs/ui';
 import { useOperationalLocalization } from '../../../../app/localization/operational-localization';
 import {
   type AppliedPaymentComposition,
@@ -12,7 +12,9 @@ import {
 import type { Payment, Sale } from '../model/cashier-transaction.types';
 import {
   SaleCustomerStrip,
+  SaleEffectivePaymentList,
   SaleFinancialSummary,
+  SalePaymentCorrectionList,
   SalePaymentComposition,
   SalePaymentList,
   SaleRefundList,
@@ -22,6 +24,7 @@ import { statusMeta, queueStatus, queueStatusTone } from '../../queue/queue-stat
 import { paymentAccountLabel } from '../../payment/sale-payment-status';
 import type { groupWorkflowIssues } from '../../queue/workflow-issues';
 import { money } from '../model/sale-display';
+import { paymentCompositionOf } from '../../payment/payment-correction-draft';
 import {
   customerDisplayName,
   customerDisplayDetail,
@@ -125,6 +128,7 @@ export function ReferenceTransactionSummary({
   transactionDate,
   cancellationReason,
   showRightContext,
+  onCorrectPayment,
 }: {
   sale: Sale;
   locale: string;
@@ -136,6 +140,8 @@ export function ReferenceTransactionSummary({
   transactionDate: string;
   cancellationReason: string | undefined;
   showRightContext: boolean;
+  /** Opens the payment correction; absent when the session or the Sale does not allow it. */
+  onCorrectPayment?: (() => void) | undefined;
 }) {
   const { copy, label } = useOperationalLocalization();
   const format = (amount: string) => money(amount, locale);
@@ -168,6 +174,12 @@ export function ReferenceTransactionSummary({
   const redeemedAmount =
     sale.loyaltyRedemption?.amount ?? legacyLoyaltyRedemption?.redemptionAmount ?? null;
   const hasLoyaltyRedemption = Boolean(redeemedPoints && redeemedAmount);
+  const corrections = sale.paymentCorrections ?? [];
+  const effective = paymentCompositionOf(sale);
+  const signed = (movementAmount: string) =>
+    movementAmount.startsWith('-')
+      ? `−${format(movementAmount.slice(1))}`
+      : `+${format(movementAmount)}`;
   // Succeeded manual refunds are money returned, not payment attempts; attempts keep the rest.
   const refunds = unappliedPayments.filter(isSucceededRefund);
   const paymentAttempts = unappliedPayments.filter((payment) => !isSucceededRefund(payment));
@@ -250,6 +262,52 @@ export function ReferenceTransactionSummary({
               ),
             }
           : null
+      }
+      corrections={
+        corrections.length ? (
+          <SalePaymentCorrectionList
+            heading={copy('Payment correction')}
+            corrections={corrections.map((correction) => ({
+              id: correction.id,
+              movements: correction.movements.map((movement) => ({
+                id: movement.paymentId,
+                name: movement.financialAccountName ?? label(movement.method),
+                detail: `${label(movement.method)} · ${copy(
+                  movement.leg === 'OUT' ? 'Correction reduced' : 'Correction added',
+                )}`,
+                amount: signed(movement.amount),
+              })),
+              reasonLabel: copy('Reason'),
+              reason: correction.reason,
+              byLabel: copy('Corrected by'),
+              by: correction.createdBy,
+              at: dateTime(correction.createdAt),
+              afterSettlementLabel: correction.afterSettlement
+                ? copy('Correction after reconciliation')
+                : null,
+            }))}
+          />
+        ) : null
+      }
+      effectivePayment={
+        corrections.length ? (
+          <SaleEffectivePaymentList
+            heading={copy('Effective payment')}
+            entries={effective.entries.map((entry, index) => ({
+              id: entry.paymentRouteId ?? `${entry.method}-${index}`,
+              name: entry.financialAccountName ?? label(entry.method),
+              method: label(entry.method),
+              amount: format(entry.effectiveAmount),
+            }))}
+          />
+        ) : null
+      }
+      paymentActions={
+        onCorrectPayment ? (
+          <DButton variant="outline" size="sm" onClick={onCorrectPayment}>
+            {copy('Payment correction')}
+          </DButton>
+        ) : null
       }
       refunds={
         refunds.length ? (

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useOperationalLocalization } from '../../../../app/localization/operational-localization';
 import { appliedPaymentComposition, saleSettlement } from '../model/sale-presentation';
+import { isCorrectionLeg } from '../model/payment-kind';
 import type { Employee, Sale, SaleLine } from '../model/cashier-transaction.types';
 import { receiptDeliveryPreviewLabel } from '../../receipt/receipt-delivery-dialog';
 import { receiptDeliveryPhase } from '../../receipt/receipt-delivery';
@@ -81,6 +82,7 @@ export function ReferenceTransactionDetail({
   onStartLineWork,
   onComplete,
   isMutating,
+  onCorrectPayment,
 }: {
   sale: Sale | null;
   locale: string;
@@ -104,6 +106,8 @@ export function ReferenceTransactionDetail({
   onStartLineWork: (line: SaleLine) => void;
   onComplete: () => void;
   isMutating: boolean;
+  /** Opens the payment correction for this Sale; omitted when the session may not correct. */
+  onCorrectPayment?: (sale: Sale) => void;
 }) {
   const { copy, locale: copyLocale } = useOperationalLocalization();
   const [receiptPaper, setReceiptPaper] = useState<'58' | '80'>('80');
@@ -137,7 +141,8 @@ export function ReferenceTransactionDetail({
   const settlement = saleSettlement(sale);
   const composition = appliedPaymentComposition(sale);
   const unappliedPayments = sale.payments
-    .filter((payment) => !composition.components.includes(payment))
+    // A correction leg is neither a payment nor an attempt: it has its own history.
+    .filter((payment) => !composition.components.includes(payment) && !isCorrectionLeg(payment))
     .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
   const hasDiscount = !createDecimal(sale.discountAmount).equals(createDecimal('0'));
   const hasTax = !createDecimal(sale.taxAmount).equals(createDecimal('0'));
@@ -241,6 +246,7 @@ export function ReferenceTransactionDetail({
                   transactionDate={transactionDate}
                   cancellationReason={cancellationReason}
                   showRightContext={referenceTransactionDetailPresentation.showRightContext}
+                  onCorrectPayment={onCorrectPayment ? () => onCorrectPayment(sale) : undefined}
                 />
                 {completionIssues.length ? (
                   <ReferenceCompletionIssues groups={completionIssueGroups} />

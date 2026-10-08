@@ -1,6 +1,6 @@
 import { DButton, DDialog, DSkeleton, useToast } from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
-import { Info, RotateCcw, Undo2 } from 'lucide-react';
+import { ArrowLeftRight, Info, RotateCcw, Undo2 } from 'lucide-react';
 import { useState } from 'react';
 
 import { normalizeBackofficeApiError } from '../../../app/api/backoffice-api-error';
@@ -29,6 +29,7 @@ import { TransactionItemsSection } from './transaction-items-section';
 import { TransactionMembershipSection } from './transaction-membership-section';
 import { TransactionPaymentsSection } from './transaction-payments-section';
 import { SummaryBadge } from './transaction-presentation';
+import { TransactionPaymentCorrectionDialog } from './transaction-payment-correction-dialog';
 import { TransactionRefundDialog } from './transaction-refund-dialog';
 import { TransactionReverseDialog } from './transaction-reverse-dialog';
 
@@ -43,7 +44,7 @@ const REVERSE_BLOCK_COPY: Record<ReverseBlock, string> = {
     'Non-cash payments must be refunded through their provider, so this transaction can’t be reversed here yet.',
 };
 
-type ActionDialog = 'refund' | 'reverse' | null;
+type ActionDialog = 'refund' | 'reverse' | 'correct' | null;
 
 /**
  * Visibility (`open`) is separate from the selected transaction (`saleId`): the last transaction
@@ -62,8 +63,9 @@ export function TransactionDetailDialog({
   saleId: string | null;
   /** The list row of the selected transaction, rendered while its detail refreshes. */
   initialSale?: Sale | undefined;
-  api: Pick<TransactionHistoryApi, 'get' | 'refundPayment' | 'reverse'>;
-  permissions: { refund: boolean; reverse: boolean };
+  api: Pick<TransactionHistoryApi, 'get' | 'refundPayment' | 'reverse'> &
+    Partial<Pick<TransactionHistoryApi, 'correctPayments' | 'paymentRoutes'>>;
+  permissions: { refund: boolean; reverse: boolean; correct?: boolean };
   onClose: () => void;
   onChanged: () => void;
 }) {
@@ -83,6 +85,12 @@ export function TransactionDetailDialog({
   const sale = detail.data && detail.data.id === saleId ? detail.data : undefined;
   const actions = sale ? transactionActions(sale, permissions) : null;
   const reverseHintId = `reverse-hint-${saleId ?? 'none'}`;
+  // Payment routes the correction may attribute money to; only fetched when the dialog is opened.
+  const correctionRoutes = useQuery({
+    queryKey: ['transaction-correction-routes', sale?.sellingLocationId, sale?.currency],
+    queryFn: () => api.paymentRoutes!(sale!.sellingLocationId, sale!.currency),
+    enabled: action === 'correct' && Boolean(sale) && Boolean(api.paymentRoutes),
+  });
 
   const openAction = (next: Exclude<ActionDialog, null>) => {
     setActionSession((session) => session + 1);
@@ -137,8 +145,17 @@ export function TransactionDetailDialog({
             <DButton variant="secondary" onClick={close}>
               {copy('Close')}
             </DButton>
-            {actions && (actions.canRefund || actions.showReverse) ? (
+            {actions && (actions.canCorrect || actions.canRefund || actions.showReverse) ? (
               <div className="flex flex-wrap justify-end gap-2">
+                {actions.canCorrect && api.correctPayments ? (
+                  <DButton
+                    variant="secondary"
+                    leftIcon={<ArrowLeftRight aria-hidden="true" className="size-4" />}
+                    onClick={() => openAction('correct')}
+                  >
+                    {copy('Payment correction')}
+                  </DButton>
+                ) : null}
                 {actions.canRefund ? (
                   <DButton
                     variant={actions.canReverse ? 'secondary' : 'primary'}
@@ -198,6 +215,22 @@ export function TransactionDetailDialog({
               )
             }
           />
+          {api.correctPayments ? (
+            <TransactionPaymentCorrectionDialog
+              key={`correct-${actionSession}`}
+              open={action === 'correct'}
+              sale={sale}
+              routes={correctionRoutes.data ?? []}
+              onClose={() => setAction(null)}
+              onCorrect={(request, key) =>
+                run(
+                  () => api.correctPayments!(sale.id, request, key),
+                  'Payment correction saved.',
+                  'Could not save the payment correction.',
+                )
+              }
+            />
+          ) : null}
           <TransactionReverseDialog
             key={`reverse-${actionSession}`}
             open={action === 'reverse'}
