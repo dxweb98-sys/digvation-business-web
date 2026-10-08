@@ -349,7 +349,7 @@ describe('ReferencePaymentCorrectionDialog', () => {
 
   describe('visual hierarchy', () => {
     const current = () => within(screen.getByRole('region', { name: 'Pencatatan saat ini' }));
-    const hint = /Jika salah satu nominal diubah, metode lainnya akan disesuaikan otomatis/;
+    const hint = /Ubah salah satu nominal, metode lainnya akan menyesuaikan otomatis/;
 
     it('keeps the current recording read-only and apart from the editable target', () => {
       renderDialog();
@@ -403,6 +403,70 @@ describe('ReferencePaymentCorrectionDialog', () => {
       expect(
         changesSection().compareDocumentPosition(reasonField()) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
+    });
+  });
+
+  describe('initial target composition', () => {
+    const bcaAndCash = () =>
+      ({
+        ...sale(),
+        paymentComposition: {
+          entries: [
+            entry('BANK_TRANSFER', 'bca', 'BCA', '105350.0000'),
+            entry('CASH', 'cash', 'Tunai', '100000.0000'),
+          ],
+          totalReceived: '205350.0000',
+          totalRefunded: '0.0000',
+          totalPaid: '205350.0000',
+        },
+      }) as Sale;
+
+    it('opens with an exact copy of every non-zero effective route, as editable rows', () => {
+      renderDialog({ sale: bcaAndCash() });
+      expect(input('BCA').value).toBe('105.350');
+      expect(input('Tunai').value).toBe('100.000');
+      expect(within(correctSection()).getAllByRole('textbox')).toHaveLength(2);
+      expect(
+        within(screen.getByRole('region', { name: 'Pencatatan saat ini' })).getByText(
+          /Transfer bank/,
+        ),
+      ).toBeTruthy();
+    });
+
+    it('derives no movement until something is edited, and Save stays disabled', () => {
+      renderDialog({ sale: bcaAndCash() });
+      expect(within(changesSection()).getByText('Belum ada perubahan.')).toBeTruthy();
+      reasonOk();
+      expect(save().disabled).toBe(true);
+    });
+
+    it('balances the other of two routes only once one amount is edited', () => {
+      renderDialog({ sale: bcaAndCash() });
+      type('Tunai', '105.000');
+      expect(input('BCA').value).toBe('100.350');
+      expect(within(changesSection()).getAllByRole('listitem')).toHaveLength(2);
+      expect(changesSection().textContent).toMatch(/Tunai\+\s?Rp\s?5[.,]000/);
+      expect(changesSection().textContent).toMatch(/BCA−\s?Rp\s?5[.,]000/);
+      expect(changesSection().textContent).toMatch(/Total perubahan.*Rp\s?0/);
+    });
+
+    it('keeps two accounts of one method as two routes and never merges them by method', () => {
+      renderDialog({
+        sale: {
+          ...sale(),
+          paymentComposition: {
+            entries: [
+              entry('BANK_TRANSFER', 'bca', 'BCA', '105350.0000'),
+              entry('BANK_TRANSFER', 'bni', 'Bank BNI', '100000.0000'),
+            ],
+            totalReceived: '205350.0000',
+            totalRefunded: '0.0000',
+            totalPaid: '205350.0000',
+          },
+        } as Sale,
+      });
+      expect(input('BCA').value).toBe('105.350');
+      expect(input('Bank BNI').value).toBe('100.000');
     });
   });
 });

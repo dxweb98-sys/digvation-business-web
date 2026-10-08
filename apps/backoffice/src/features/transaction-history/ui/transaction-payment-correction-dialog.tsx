@@ -15,6 +15,7 @@ import type {
   Sale,
 } from '../api/transaction-history-api';
 import { useTransactionHistoryLocalization } from '../localization/use-transaction-history-localization';
+import { effectivePaymentEntries } from '../model/transaction-payment-composition';
 import { PAYMENT_METHOD_LABELS } from '../model/transaction-summary';
 
 /**
@@ -39,9 +40,7 @@ export function TransactionPaymentCorrectionDialog({
   onCorrect: (request: PaymentCorrectionRequest, idempotencyKey: string) => Promise<string | null>;
 }) {
   const { copy, formatMoney } = useTransactionHistoryLocalization();
-  const entries = (sale.paymentComposition?.entries ?? []).filter(
-    (entry) => entry.paymentRouteId !== null,
-  );
+  const entries = effectivePaymentEntries(sale).filter((entry) => entry.paymentRouteId !== null);
   const baseline = startCorrectionDraft(
     entries.map((entry) => ({ routeId: entry.paymentRouteId!, amount: entry.effectiveAmount })),
   );

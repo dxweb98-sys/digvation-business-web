@@ -226,14 +226,18 @@ describe('payment correction entry point', () => {
 });
 
 describe('payment correction audit context', () => {
-  it('keeps the original payments, then the correction history, then the effective composition', async () => {
+  it('shows the effective composition first, then the correction history apart from it', async () => {
     renderDetail(corrected(), permitted);
     const panel = await paymentsPanel();
-    // Original facts, exactly as recorded.
-    expect(panel.getByText(/^Rp\s105\.000$/)).toBeTruthy();
-    expect(panel.getAllByText(/^Rp\s5\.000$/).length).toBeGreaterThan(0);
+    // Primary: what each route holds now, not the raw payment facts.
+    const heading = panel.getByText('Riwayat koreksi');
+    const text = document.body.textContent!;
+    const effectiveAt = text.search(/Rp\s100\.000/);
+    expect(effectiveAt).toBeGreaterThan(-1);
+    expect(effectiveAt).toBeLessThan(text.indexOf('Riwayat koreksi'));
+    expect(panel.queryByText('Pembayaran efektif')).toBeNull();
 
-    const history = within(panel.getByText('Koreksi pembayaran').parentElement as HTMLElement);
+    const history = within(heading.parentElement as HTMLElement);
     const correction = history.getByTestId('payment-correction');
     expect(correction.textContent).toMatch(/−\s?Rp\s?5\.000/);
     expect(correction.textContent).toMatch(/\+\s?Rp\s?5\.000/);
@@ -241,10 +245,8 @@ describe('payment correction audit context', () => {
     expect(correction.textContent).toContain('Alasan:Salah memasukkan nominal pembayaran');
     expect(correction.textContent).toContain('Dikoreksi oleh:Andini');
     expect(correction.textContent).toContain('Waktu koreksi:');
-
-    const effective = within(panel.getByText('Pembayaran efektif').parentElement as HTMLElement);
-    expect(effective.getByText(/^Rp\s100\.000$/)).toBeTruthy();
-    expect(effective.getByText(/^Rp\s10\.000$/)).toBeTruthy();
+    // The effective rows are not inside the history block.
+    expect(within(heading.parentElement as HTMLElement).queryByText(/^Rp\s100\.000$/)).toBeNull();
     // No refund and no payment attempt was invented.
     expect(panel.queryByText('Pengembalian dana')).toBeNull();
     expect(panel.queryByText('Percobaan pembayaran lain')).toBeNull();
@@ -442,6 +444,60 @@ describe('payment correction composition editor', () => {
     expect(key).toMatch(/^backoffice-payment-correction-/);
   });
 
+  describe('initial target composition', () => {
+    const bcaAndCash = () =>
+      twoRoutes().paymentComposition!.entries && {
+        ...twoRoutes(),
+        paymentComposition: {
+          entries: [
+            entry('BANK_TRANSFER', 'route-bca', 'BCA', '105350.0000'),
+            entry('CASH', 'route-cash', 'Tunai', '100000.0000'),
+          ],
+          totalReceived: '205350.0000',
+          totalRefunded: '0.0000',
+          totalPaid: '205350.0000',
+        },
+      };
+
+    it('opens with every non-zero effective route as an editable row and no changes', async () => {
+      const { dialog } = await open(bcaAndCash());
+      expect(amount(dialog, 'BCA').value).toBe('105.350');
+      expect(amount(dialog, 'Tunai').value).toBe('100.000');
+      expect(
+        within(dialog.getByRole('region', { name: 'Pencatatan yang benar' })).getAllByRole(
+          'textbox',
+        ),
+      ).toHaveLength(2);
+      expect(dialog.getByRole('region', { name: 'Perubahan' }).textContent).toContain(
+        'Belum ada perubahan.',
+      );
+      reasonOk(dialog);
+      expect(save(dialog).disabled).toBe(true);
+    });
+
+    it('balances the other route only after one amount is edited', async () => {
+      const { dialog } = await open(bcaAndCash());
+      type(dialog, 'Tunai', '105000');
+      expect(amount(dialog, 'BCA').value).toBe('100.350');
+    });
+
+    it('aggregates repeated entries of one route instead of showing or collapsing them wrongly', async () => {
+      const { dialog } = await open({
+        ...twoRoutes(),
+        paymentComposition: {
+          entries: [
+            entry('BANK_TRANSFER', 'route-bca', 'BCA', '100000.0000'),
+            entry('BANK_TRANSFER', 'route-bca', 'BCA', '105350.0000'),
+          ],
+          totalReceived: '205350.0000',
+          totalRefunded: '0.0000',
+          totalPaid: '205350.0000',
+        },
+      });
+      expect(amount(dialog, 'BCA').value).toBe('205.350');
+    });
+  });
+
   describe('visual hierarchy', () => {
     const region = (dialog: ReturnType<typeof within>, name: string) =>
       within(dialog.getByRole('region', { name }));
@@ -469,7 +525,7 @@ describe('payment correction composition editor', () => {
 
     it('explains the automatic balance only while exactly two routes are selected', async () => {
       const { dialog } = await open();
-      const hint = /Jika salah satu nominal diubah, metode lainnya akan disesuaikan otomatis/;
+      const hint = /Ubah salah satu nominal, metode lainnya akan menyesuaikan otomatis/;
       expect(region(dialog, 'Pencatatan yang benar').getByText(hint)).toBeTruthy();
       fireEvent.click(dialog.getByRole('button', { name: 'Tambah metode pembayaran' }));
       fireEvent.click(

@@ -52,19 +52,28 @@ export interface CorrectionCompositionEditorProps {
   onDraftChange: (draft: CorrectionDraft) => void;
 }
 
+const SECTION_LABEL =
+  'text-xs font-semibold uppercase tracking-[0.04em] text-[var(--color-text-muted)]';
+
 function Row({
   name,
   detail,
   trailing,
+  muted = false,
 }: {
   name: string;
   detail?: string | undefined;
   trailing: ReactNode;
+  muted?: boolean;
 }) {
   return (
     <li className="flex items-center justify-between gap-3 py-2">
       <span className="min-w-0 text-sm">
-        <span className="block break-words font-medium">{name}</span>
+        <span
+          className={`block break-words ${muted ? 'text-[var(--color-text-muted)]' : 'font-medium'}`}
+        >
+          {name}
+        </span>
         {detail ? (
           <span className="block text-xs text-[var(--color-text-muted)]">{detail}</span>
         ) : null}
@@ -77,7 +86,7 @@ function Row({
 function TotalLine({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
   return (
     <p
-      className={`flex justify-between gap-4 border-t border-[var(--color-border)] pt-2 text-sm ${
+      className={`flex justify-between gap-4 border-t border-[var(--color-border)] py-2 text-sm ${
         strong ? 'font-semibold' : 'text-[var(--color-text-muted)]'
       }`}
     >
@@ -88,8 +97,8 @@ function TotalLine({ label, value, strong }: { label: string; value: string; str
 }
 
 /**
- * The composition editor both Operational and Backoffice use: a read-only "recorded now" card, the
- * primary editable "correct recording" card (rows, add route, total and allocation feedback), and the
+ * The composition editor both Operational and Backoffice use: a quiet read-only "recorded now" block, the
+ * primary editable "correct recording" area (rows, add route, total and allocation feedback), and the
  * derived changes. It only presents and edits the shared draft model; Runtime stays the authority.
  */
 export function CorrectionCompositionEditor({
@@ -121,34 +130,36 @@ export function CorrectionCompositionEditor({
 
   return (
     <>
-      <section aria-label={labels.recordedNow}>
-        <DCard
-          variant="default"
-          className="space-y-1 bg-[var(--color-surface-muted)] p-4 shadow-none"
-        >
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
-            {labels.recordedNow}
-          </h3>
-          <ul className="divide-y divide-[var(--color-border)]">
+      {/* A. What was recorded: quiet, read-only, no controls and no border. */}
+      <section aria-label={labels.recordedNow} className="space-y-1.5">
+        <h3 className={SECTION_LABEL}>{labels.recordedNow}</h3>
+        <div className="rounded-lg bg-[var(--color-surface-muted)]/70 px-3 py-1">
+          <ul className="divide-y divide-[var(--color-border)]/70">
             {recorded.map(([routeId, amount]) => (
               <Row
                 key={routeId}
                 name={nameOf(routeId)}
                 detail={methodLabel(info(routeId)?.method)}
+                muted
                 trailing={
-                  <span className="shrink-0 text-sm tabular-nums">{formatMoney(amount)}</span>
+                  <span className="shrink-0 text-sm tabular-nums text-[var(--color-text-muted)]">
+                    {formatMoney(amount)}
+                  </span>
                 }
               />
             ))}
           </ul>
           <TotalLine label={labels.totalPaid} value={formatMoney(draft.total)} />
-        </DCard>
+        </div>
       </section>
 
-      <section aria-label={labels.correctRecording}>
-        <DCard variant="outlined" className="space-y-1 border-[var(--color-brand)] p-4 shadow-sm">
-          <h3 className="text-sm font-semibold">{labels.correctRecording}</h3>
-          <ul className="divide-y divide-[var(--color-border)]">
+      {/* B. What the operator edits: the one bordered, white surface of the dialog. */}
+      <section aria-label={labels.correctRecording} className="space-y-1.5">
+        <h3 className="text-sm font-semibold text-[var(--color-text)]">
+          {labels.correctRecording}
+        </h3>
+        <DCard variant="outlined" className="px-4 py-2 shadow-none">
+          <ul className="divide-y divide-[var(--color-border)]/70">
             {draft.selected.map((routeId) => {
               const name = nameOf(routeId);
               return (
@@ -183,51 +194,49 @@ export function CorrectionCompositionEditor({
             })}
           </ul>
 
-          {adding && addable.length ? (
-            <ul
-              aria-label={labels.addPaymentMethod}
-              className="divide-y divide-[var(--color-border)] rounded-lg border border-[var(--color-border)]"
-            >
-              {addable.map((route) => (
-                <li key={route.routeId}>
-                  <button
-                    type="button"
-                    className="flex w-full flex-col px-3 py-2 text-left text-sm hover:bg-[var(--color-surface-muted)]"
-                    onClick={() => {
-                      onDraftChange(addCorrectionRoute(draft, route.routeId));
-                      setAdding(false);
-                    }}
-                  >
-                    <span className="font-medium">{route.name}</span>
-                    <span className="text-xs text-[var(--color-text-muted)]">
-                      {methodLabel(route.method)}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <DButton
-              variant="outline"
-              size="sm"
-              fullWidth
-              leftIcon={<Plus className="size-4" aria-hidden />}
-              disabled={disabled || addable.length === 0}
-              onClick={() => setAdding(true)}
-            >
-              {labels.addPaymentMethod}
-            </DButton>
-          )}
-
-          {draft.selected.length === 2 ? (
-            <p className="pt-1 text-xs text-[var(--color-text-muted)]">{labels.twoRouteHint}</p>
-          ) : null}
-
-          <div className="pt-2">
-            <TotalLine strong label={labels.total} value={formatMoney(draft.total)} />
+          <div className="border-t border-[var(--color-border)]/70 py-2">
+            {adding && addable.length ? (
+              <ul
+                aria-label={labels.addPaymentMethod}
+                className="divide-y divide-[var(--color-border)]/70 rounded-lg border border-[var(--color-border)]"
+              >
+                {addable.map((route) => (
+                  <li key={route.routeId}>
+                    <button
+                      type="button"
+                      className="flex w-full flex-col px-3 py-2 text-left text-sm hover:bg-[var(--color-surface-muted)]"
+                      onClick={() => {
+                        onDraftChange(addCorrectionRoute(draft, route.routeId));
+                        setAdding(false);
+                      }}
+                    >
+                      <span className="font-medium">{route.name}</span>
+                      <span className="text-xs text-[var(--color-text-muted)]">
+                        {methodLabel(route.method)}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <DButton
+                variant="ghost"
+                size="sm"
+                leftIcon={<Plus className="size-4" aria-hidden />}
+                disabled={disabled || addable.length === 0}
+                onClick={() => setAdding(true)}
+              >
+                {labels.addPaymentMethod}
+              </DButton>
+            )}
+            {draft.selected.length === 2 ? (
+              <p className="mt-1 text-xs text-[var(--color-text-muted)]">{labels.twoRouteHint}</p>
+            ) : null}
           </div>
+
+          <TotalLine strong label={labels.total} value={formatMoney(draft.total)} />
           {mismatch ? (
-            <DAlert variant="warning" role="status" className="mt-2">
+            <DAlert variant="warning" role="status" className="mb-2 mt-1">
               {createDecimal(remaining).isNegative()
                 ? `${labels.allocatedBeyondTotal} ${formatMoney(remaining.slice(1))}`
                 : `${labels.leftToAllocate} ${formatMoney(remaining)}`}
@@ -236,11 +245,12 @@ export function CorrectionCompositionEditor({
         </DCard>
       </section>
 
-      <section aria-label={labels.changes}>
+      {/* C. What will change: a result, only compact until something actually changes. */}
+      <section aria-label={labels.changes} className="space-y-1.5">
+        <h3 className={SECTION_LABEL}>{labels.changes}</h3>
         {changes.length ? (
-          <DCard variant="default" className="space-y-1 p-4 shadow-none">
-            <h3 className="text-sm font-semibold">{labels.changes}</h3>
-            <ul className="divide-y divide-[var(--color-border)]">
+          <div className="px-1">
+            <ul className="divide-y divide-[var(--color-border)]/70">
               {changes.map((move) => (
                 <Row
                   key={move.routeId}
@@ -254,12 +264,9 @@ export function CorrectionCompositionEditor({
               ))}
             </ul>
             <TotalLine label={labels.totalChanges} value={formatMoney(correctionNet(changes))} />
-          </DCard>
-        ) : (
-          <div className="flex items-baseline justify-between gap-3 px-1">
-            <h3 className="text-sm font-semibold">{labels.changes}</h3>
-            <p className="text-xs text-[var(--color-text-muted)]">{labels.nothingToChange}</p>
           </div>
+        ) : (
+          <p className="px-1 text-sm text-[var(--color-text-muted)]">{labels.nothingToChange}</p>
         )}
       </section>
     </>

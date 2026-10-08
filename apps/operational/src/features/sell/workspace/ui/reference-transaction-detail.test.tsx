@@ -1544,27 +1544,103 @@ describe('ReferenceTransactionDetail payment correction', () => {
   const section = (name: string) =>
     within(panel()).getByRole('heading', { name }).parentElement as HTMLElement;
 
-  it('keeps the original payments, then lists the correction and the effective composition', () => {
+  it('summarises the effective composition first, then the correction history apart from it', () => {
     renderCorrectable(correctedSale());
     expect(within(panel()).getByRole('heading', { name: 'Pembayaran diterima' })).toBeTruthy();
-    // The first list of the payment card is the payments exactly as recorded.
+    // The first list of the payment card is what each route holds now.
     const received = panel().querySelector('ul') as HTMLElement;
-    expect(received.textContent).toMatch(/Tunai.*5[.,]000/);
-    expect(received.textContent).toMatch(/BCA.*105[.,]000/);
-    // The original recording is never rewritten to look right.
-    expect(received.textContent).not.toMatch(/100[.,]000|10[.,]000/);
+    expect(received.textContent).toMatch(/BCA.*100[.,]000/);
+    expect(received.textContent).toMatch(/Tunai.*10[.,]000/);
+    expect(received.textContent).not.toMatch(/105[.,]000/);
+    expect(within(panel()).queryByRole('heading', { name: 'Pembayaran efektif' })).toBeNull();
 
-    const correction = section('Koreksi pembayaran');
+    const correction = section('Riwayat koreksi');
     expect(correction.textContent).toMatch(/−\s?Rp\s?5[.,]000/);
     expect(correction.textContent).toMatch(/\+\s?Rp\s?5[.,]000/);
     expect(correction.textContent).toContain('Alasan: Salah memasukkan nominal pembayaran');
     expect(correction.textContent).toContain('Dikoreksi oleh: Andini');
     expect(correction.textContent).toContain('Transfer bank · Dikurangi');
     expect(correction.textContent).toContain('Tunai · Ditambah');
+    // The history is not the composition.
+    expect(received.contains(correction)).toBe(false);
+  });
 
-    const effective = section('Pembayaran efektif');
-    expect(effective.textContent).toMatch(/BCA.*100[.,]000/);
-    expect(effective.textContent).toMatch(/Tunai.*10[.,]000/);
+  describe('effective payment summary', () => {
+    const withComposition = (
+      entries: ReturnType<typeof entry>[],
+      payments: Sale['payments'],
+      total = '205350.0000',
+    ) =>
+      correctedSale({
+        totalAmount: total,
+        grossAmount: total,
+        payments,
+        paymentCorrections: [],
+        paymentComposition: {
+          entries,
+          totalReceived: total,
+          totalRefunded: '0.0000',
+          totalPaid: total,
+        },
+      });
+    const sameRoutePayments = () => [
+      payment('a1', 'BANK_TRANSFER', 'BCA', '100000.0000'),
+      payment('a2', 'BANK_TRANSFER', 'BCA', '105350.0000'),
+    ];
+
+    it('aggregates payment facts of one route into one row without a split badge', () => {
+      renderCorrectable(
+        withComposition(
+          [entry('BANK_TRANSFER', 'route-BCA', 'BCA', '205350.0000')],
+          sameRoutePayments(),
+        ),
+      );
+      const rows = panel().querySelectorAll('ul')[0]!.querySelectorAll(':scope > li');
+      expect(rows).toHaveLength(1);
+      expect(rows[0]!.textContent).toMatch(/BCA.*Transfer bank.*205[.,]350/);
+      expect(within(panel()).queryByText(/Split Payment/)).toBeNull();
+    });
+
+    it('counts the split badge from the effective routes, not from the payment rows', () => {
+      renderCorrectable(
+        withComposition(
+          [
+            entry('BANK_TRANSFER', 'route-BCA', 'BCA', '100000.0000'),
+            entry('QRIS' as 'CASH', 'route-QRIS', 'QRIS BRI', '105350.0000'),
+          ],
+          sameRoutePayments(),
+        ),
+      );
+      expect(within(panel()).getByText(/Split Payment · 2 metode/)).toBeTruthy();
+    });
+
+    it('keeps two accounts of the same method as two separate routes', () => {
+      renderCorrectable(
+        withComposition(
+          [
+            entry('BANK_TRANSFER', 'route-BCA', 'BCA Operasional', '100000.0000'),
+            entry('BANK_TRANSFER', 'route-BNI', 'BNI Operasional', '105350.0000'),
+          ],
+          sameRoutePayments(),
+        ),
+      );
+      const list = panel().querySelectorAll('ul')[0]!;
+      expect(list.querySelectorAll(':scope > li')).toHaveLength(2);
+      expect(list.textContent).toContain('BCA Operasional');
+      expect(list.textContent).toContain('BNI Operasional');
+      expect(within(panel()).getByText(/Split Payment · 2 metode/)).toBeTruthy();
+    });
+
+    it('keeps the correction action visible for a single effective route', () => {
+      renderCorrectable(
+        withComposition(
+          [entry('BANK_TRANSFER', 'route-BCA', 'BCA', '205350.0000')],
+          sameRoutePayments(),
+        ),
+        vi.fn(),
+      );
+      expect(within(panel()).getByRole('button', { name: 'Koreksi pembayaran' })).toBeTruthy();
+    });
   });
 
   it('keeps the total paid and the remaining balance exactly as before the correction', () => {
@@ -1588,7 +1664,7 @@ describe('ReferenceTransactionDetail payment correction', () => {
     const sale = correctedSale();
     sale.paymentCorrections![0]!.afterSettlement = true;
     renderCorrectable(sale);
-    expect(section('Koreksi pembayaran').textContent).toContain('Koreksi setelah rekonsiliasi');
+    expect(section('Riwayat koreksi').textContent).toContain('Koreksi setelah rekonsiliasi');
   });
 
   it('keeps a refund a Refund, apart from the correction', () => {
@@ -1612,7 +1688,7 @@ describe('ReferenceTransactionDetail payment correction', () => {
     expect(refunds.textContent).toContain('BCA Operasional');
     expect(refunds.textContent).toContain('Pengembalian');
     expect(refunds.textContent).not.toContain('Koreksi');
-    expect(section('Koreksi pembayaran').textContent).not.toContain('BCA Operasional');
+    expect(section('Riwayat koreksi').textContent).not.toContain('BCA Operasional');
   });
 
   it('offers the correction entry point only when the session may correct payments', () => {

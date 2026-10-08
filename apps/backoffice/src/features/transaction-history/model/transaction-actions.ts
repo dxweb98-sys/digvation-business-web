@@ -1,5 +1,6 @@
 import type { Payment, Sale } from '../api/transaction-history-api';
 import {
+  effectivePaymentEntries,
   remainingCapacity,
   toMoneyUnits,
   transactionPaymentComposition,
@@ -72,10 +73,9 @@ export function transactionActions(
     Boolean(permissions.correct) &&
     sale.status !== 'VOIDED' &&
     !sale.reversal &&
-    Boolean(
-      sale.paymentComposition?.entries.some(
-        (entry) => entry.paymentRouteId !== null && toMoneyUnits(entry.effectiveAmount) > 0n,
-      ),
+    // Never tied to how many rows, routes or refunds there are: only to money held on a route.
+    effectivePaymentEntries(sale).some(
+      (entry) => entry.paymentRouteId !== null && toMoneyUnits(entry.effectiveAmount) > 0n,
     );
   return {
     canCorrect,

@@ -58,28 +58,36 @@ export function TransactionPaymentsSection({
         }
       />
       <RecordPanelBody>
-        {composition.applied.length ? (
+        {composition.received.length ? (
           <dl className="-mt-2.5 divide-y divide-[var(--color-border)]">
-            {composition.applied.map((payment) => {
+            {composition.received.map((entry) => {
+              // The payment facts behind one effective route; a single one carries its own detail.
+              const facts = composition.applied.filter(
+                (payment) =>
+                  payment.method === entry.method &&
+                  (payment.financePaymentRouteId ?? null) === entry.paymentRouteId &&
+                  (payment.financeFinancialAccountId ?? null) === entry.financialAccountId,
+              );
+              const only = facts.length === 1 ? facts[0]! : null;
+              const name = entry.financialAccountName ?? copy(PAYMENT_METHOD_LABELS[entry.method]);
               const detail = [
-                paymentDestinationLabel(payment).isMethod
-                  ? null
-                  : copy(PAYMENT_METHOD_LABELS[payment.method]),
-                payment.providerReference
-                  ? `${copy('Reference')} ${payment.providerReference}`
+                entry.financialAccountName ? copy(PAYMENT_METHOD_LABELS[entry.method]) : null,
+                only?.providerReference ? `${copy('Reference')} ${only.providerReference}` : null,
+                only && hasValue(only.tenderedAmount)
+                  ? `${copy('Cash received')} ${formatMoney(only.tenderedAmount!, only.currency)}`
                   : null,
-                hasValue(payment.tenderedAmount)
-                  ? `${copy('Cash received')} ${formatMoney(payment.tenderedAmount!, payment.currency)}`
-                  : null,
-                hasValue(payment.changeAmount)
-                  ? `${copy('Change')} ${formatMoney(payment.changeAmount!, payment.currency)}`
+                only && hasValue(only.changeAmount)
+                  ? `${copy('Change')} ${formatMoney(only.changeAmount!, only.currency)}`
                   : null,
               ].filter(Boolean);
               return (
-                <div key={payment.id} className="flex items-start justify-between gap-4 py-2.5">
+                <div
+                  key={`${entry.method}|${entry.paymentRouteId}|${entry.financialAccountId}`}
+                  className="flex items-start justify-between gap-4 py-2.5"
+                >
                   <dt className="min-w-0">
                     <span className="block break-words font-medium text-[var(--color-text)]">
-                      {destination(payment)}
+                      {name}
                     </span>
                     {detail.length ? (
                       <span className="mt-0.5 block break-words text-xs text-[var(--color-text-muted)]">
@@ -88,7 +96,7 @@ export function TransactionPaymentsSection({
                     ) : null}
                   </dt>
                   <dd className="shrink-0 font-semibold tabular-nums text-[var(--color-text)]">
-                    {formatMoney(payment.appliedAmount, payment.currency)}
+                    {formatMoney(entry.receivedAmount, sale.currency)}
                   </dd>
                 </div>
               );
@@ -117,11 +125,11 @@ export function TransactionPaymentsSection({
         )}
 
         {corrections.length ? (
-          <div className="mt-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)]/50 p-3">
+          <div className="mt-4 border-t border-[var(--color-border)] pt-3">
             <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--color-text-muted)]">
-              {copy('Payment corrections')}
+              {copy('Correction history')}
             </p>
-            <ul className="mt-1.5 divide-y divide-[var(--color-border)]">
+            <ul className="mt-1.5 divide-y divide-[var(--color-border)]/70">
               {corrections.map((correction) => (
                 <li key={correction.id} className="py-2.5 text-sm" data-testid="payment-correction">
                   <ul className="space-y-1.5">
@@ -177,34 +185,6 @@ export function TransactionPaymentsSection({
                       {copy('Correction after reconciliation note')}
                     </p>
                   ) : null}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-
-        {corrections.length && sale.paymentComposition ? (
-          <div className="mt-3 rounded-xl border border-[var(--color-border)] p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--color-text-muted)]">
-              {copy('Effective payment')}
-            </p>
-            <ul className="mt-1.5 divide-y divide-[var(--color-border)]">
-              {sale.paymentComposition.entries.map((entry, index) => (
-                <li
-                  key={entry.paymentRouteId ?? `${entry.method}-${index}`}
-                  className="flex items-start justify-between gap-4 py-2 text-sm"
-                >
-                  <span className="min-w-0">
-                    <span className="block break-words font-medium text-[var(--color-text)]">
-                      {entry.financialAccountName ?? copy(PAYMENT_METHOD_LABELS[entry.method])}
-                    </span>
-                    <span className="block text-xs text-[var(--color-text-muted)]">
-                      {copy(PAYMENT_METHOD_LABELS[entry.method])}
-                    </span>
-                  </span>
-                  <span className="shrink-0 font-semibold tabular-nums">
-                    {formatMoney(entry.effectiveAmount, sale.currency)}
-                  </span>
                 </li>
               ))}
             </ul>

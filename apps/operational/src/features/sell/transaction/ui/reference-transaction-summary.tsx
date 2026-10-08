@@ -1,3 +1,4 @@
+import { createDecimal } from '@digvation/pos-money';
 import { DAlert, DBadge as Badge, DButton } from '@digvation-labs/ui';
 import { useOperationalLocalization } from '../../../../app/localization/operational-localization';
 import {
@@ -12,7 +13,6 @@ import {
 import type { Payment, Sale } from '../model/cashier-transaction.types';
 import {
   SaleCustomerStrip,
-  SaleEffectivePaymentList,
   SaleFinancialSummary,
   SalePaymentCorrectionList,
   SalePaymentComposition,
@@ -175,7 +175,10 @@ export function ReferenceTransactionSummary({
     sale.loyaltyRedemption?.amount ?? legacyLoyaltyRedemption?.redemptionAmount ?? null;
   const hasLoyaltyRedemption = Boolean(redeemedPoints && redeemedAmount);
   const corrections = sale.paymentCorrections ?? [];
-  const effective = paymentCompositionOf(sale);
+  // The effective composition is the one payment summary: routes, not raw payment rows.
+  const received = paymentCompositionOf(sale).entries.filter((entry) =>
+    createDecimal(entry.receivedAmount).greaterThan(0),
+  );
   const signed = (movementAmount: string) =>
     movementAmount.startsWith('-')
       ? `−${format(movementAmount.slice(1))}`
@@ -237,25 +240,33 @@ export function ReferenceTransactionSummary({
       settlement={settlement}
       format={format}
       payment={
-        composition.components.length
+        received.length
           ? {
               title: copy('Payment received'),
-              aside: composition.isSplit ? (
-                <StatusPill tone="brand">
-                  {copy('Split Payment')} · {composition.components.length} {copy('methods')}
-                </StatusPill>
-              ) : undefined,
+              aside:
+                composition.settled && received.length > 1 ? (
+                  <StatusPill tone="brand">
+                    {copy('Split Payment')} · {received.length} {copy('methods')}
+                  </StatusPill>
+                ) : undefined,
               content: (
                 <SalePaymentComposition
-                  components={composition.components.map((item) => {
-                    const name = paymentAccountLabel(item, (method) => label(method));
-                    const methodName = label(item.method);
+                  components={received.map((entry, index) => {
+                    const name = entry.financialAccountName ?? label(entry.method);
+                    const methodName = label(entry.method);
+                    // The facts behind one effective route; a single one carries its own reference.
+                    const facts = composition.components.filter(
+                      (item) =>
+                        item.method === entry.method &&
+                        (item.financePaymentRouteId ?? null) === entry.paymentRouteId &&
+                        (item.financeFinancialAccountId ?? null) === entry.financialAccountId,
+                    );
                     return {
-                      id: item.id,
+                      id: `${entry.method}|${entry.paymentRouteId ?? ''}|${entry.financialAccountId ?? ''}|${index}`,
                       name,
                       method: name === methodName ? null : methodName,
-                      reference: item.providerReference,
-                      amount: format(item.appliedAmount),
+                      reference: facts.length === 1 ? facts[0]!.providerReference : null,
+                      amount: format(entry.receivedAmount),
                     };
                   })}
                 />
@@ -266,7 +277,7 @@ export function ReferenceTransactionSummary({
       corrections={
         corrections.length ? (
           <SalePaymentCorrectionList
-            heading={copy('Payment correction')}
+            heading={copy('Correction history')}
             corrections={corrections.map((correction) => ({
               id: correction.id,
               movements: correction.movements.map((movement) => ({
@@ -285,19 +296,6 @@ export function ReferenceTransactionSummary({
               afterSettlementLabel: correction.afterSettlement
                 ? copy('Correction after reconciliation')
                 : null,
-            }))}
-          />
-        ) : null
-      }
-      effectivePayment={
-        corrections.length ? (
-          <SaleEffectivePaymentList
-            heading={copy('Effective payment')}
-            entries={effective.entries.map((entry, index) => ({
-              id: entry.paymentRouteId ?? `${entry.method}-${index}`,
-              name: entry.financialAccountName ?? label(entry.method),
-              method: label(entry.method),
-              amount: format(entry.effectiveAmount),
             }))}
           />
         ) : null

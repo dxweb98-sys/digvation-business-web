@@ -574,10 +574,11 @@ const posCopy: Record<string, LocalizedCopy> = {
     'id-ID': 'Anda tidak memiliki izin untuk mengoreksi pembayaran.',
     'en-US': 'You are not allowed to correct payments.',
   },
+  'Correction history': { 'id-ID': 'Riwayat koreksi', 'en-US': 'Correction history' },
   'Add payment method': { 'id-ID': 'Tambah metode pembayaran', 'en-US': 'Add payment method' },
   'Two route balance hint': {
-    'id-ID': 'Jika salah satu nominal diubah, metode lainnya akan disesuaikan otomatis agar total tetap sama.',
-    'en-US': 'If one amount changes, the other method is adjusted automatically so the total stays the same.',
+    'id-ID': 'Ubah salah satu nominal, metode lainnya akan menyesuaikan otomatis.',
+    'en-US': 'Change one amount and the other method adjusts automatically.',
   },
   'Remove payment method': { 'id-ID': 'Hapus metode pembayaran', 'en-US': 'Remove payment method' },
   'Left to allocate': { 'id-ID': 'Sisa yang perlu dialokasikan', 'en-US': 'Left to allocate' },

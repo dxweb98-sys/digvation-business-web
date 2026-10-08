@@ -196,4 +196,22 @@ describe('payment correction composition model', () => {
       expect(build()).toEqual(build());
     });
   });
+
+  it('starts as an exact copy of the held routes and sums repeated entries of one route', () => {
+    const draft = startCorrectionDraft([
+      { routeId: 'bca', amount: '105350' },
+      { routeId: 'cash', amount: '100000' },
+      { routeId: 'bca', amount: '0' },
+    ]);
+    expect(draft.selected).toEqual(['bca', 'cash']);
+    expect(draft.amounts).toEqual({ bca: '105350', cash: '100000' });
+    expect(draft.total).toBe('205350');
+    expect(correctionMoves(draft)).toEqual([]);
+    const repeated = startCorrectionDraft([
+      { routeId: 'bca', amount: '100000' },
+      { routeId: 'bca', amount: '105350' },
+    ]);
+    expect(repeated.selected).toEqual(['bca']);
+    expect(repeated.amounts).toEqual({ bca: '205350' });
+  });
 });

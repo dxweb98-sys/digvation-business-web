@@ -54,16 +54,18 @@ const plain = (value: ReturnType<typeof createDecimal>) =>
 export function startCorrectionDraft(
   entries: readonly CorrectionEffectiveEntry[],
 ): CorrectionDraft {
+  // Identity is the payment route, never the method: two entries of one route are one route, two
+  // routes of one method stay two. The target starts as an exact copy of what is held now.
+  const held = new Map<string, ReturnType<typeof createDecimal>>();
+  for (const entry of entries)
+    held.set(entry.routeId, (held.get(entry.routeId) ?? createDecimal(ZERO)).plus(entry.amount));
   const current: Record<string, string> = {};
   let total = createDecimal(ZERO);
-  for (const entry of entries) {
-    const amount = createDecimal(entry.amount);
-    current[entry.routeId] = plain(amount);
+  for (const [routeId, amount] of held) {
+    current[routeId] = plain(amount);
     total = total.plus(amount);
   }
-  const selected = entries
-    .filter((entry) => !createDecimal(entry.amount).isZero())
-    .map((entry) => entry.routeId);
+  const selected = [...held].filter(([, amount]) => !amount.isZero()).map(([routeId]) => routeId);
   return {
     total: plain(total),
     current,
