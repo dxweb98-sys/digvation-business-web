@@ -1,4 +1,20 @@
+import {
+  addCorrectionRoute,
+  addableRoutes,
+  canRemoveCorrectionRoute,
+  correctionDraftState,
+  correctionNet,
+  createDecimal,
+  editCorrectionAmount,
+  paymentCorrectionRequest,
+  removeCorrectionRoute,
+  startCorrectionDraft,
+  unallocatedAmount,
+  type CorrectionDraft,
+  type CorrectionRouteInfo,
+} from '@digvation/business-money';
 import { DButton, DCurrencyInput, DDialog, DInfoNote, DSelect, DTextarea } from '@digvation/ui';
+import { X } from 'lucide-react';
 import { useState } from 'react';
 
 import type {
@@ -7,13 +23,13 @@ import type {
   Sale,
 } from '../api/transaction-history-api';
 import { useTransactionHistoryLocalization } from '../localization/use-transaction-history-localization';
-import { isRefundAmountValid } from '../model/transaction-actions';
 import { PAYMENT_METHOD_LABELS } from '../model/transaction-summary';
 
 /**
- * Moves recorded money from one payment route to another. This is the same Runtime command
- * Operational uses; it only states the two sides of one net-zero move — what leaves a route and
- * what arrives on another — and Runtime validates routes, capacity and the sum again.
+ * Corrects how a payment was recorded, never how much was paid. It is the same composition editor
+ * Operational uses (one shared model): the correct composition of the routes in use is edited, two
+ * routes balance each other, more routes report what is left to allocate, and the net-zero changes
+ * are derived. Runtime validates routes, capacity and the sum again and stays the authority.
  */
 export function TransactionPaymentCorrectionDialog({
   open,
@@ -34,44 +50,63 @@ export function TransactionPaymentCorrectionDialog({
   const entries = (sale.paymentComposition?.entries ?? []).filter(
     (entry) => entry.paymentRouteId !== null,
   );
-  const held = new Map(entries.map((entry) => [entry.paymentRouteId!, entry]));
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
-  const [amount, setAmount] = useState('');
+  const baseline = startCorrectionDraft(
+    entries.map((entry) => ({ routeId: entry.paymentRouteId!, amount: entry.effectiveAmount })),
+  );
+  const infos: CorrectionRouteInfo[] = [
+    ...new Map<string, CorrectionRouteInfo>([
+      ...entries.map(
+        (entry) =>
+          [
+            entry.paymentRouteId!,
+            {
+              routeId: entry.paymentRouteId!,
+              name: entry.financialAccountName ?? entry.method,
+              method: entry.method,
+            },
+          ] as const,
+      ),
+      ...routes.map(
+        (route) =>
+          [
+            route.id,
+            { routeId: route.id, name: route.financialAccountName, method: route.paymentMethod },
+          ] as const,
+      ),
+    ]).values(),
+  ];
+  const info = (routeId: string) => infos.find((candidate) => candidate.routeId === routeId);
+  const methodLabel = (method: string | undefined) =>
+    method ? copy(PAYMENT_METHOD_LABELS[method as keyof typeof PAYMENT_METHOD_LABELS]) : '';
+  const money = (amount: string) => formatMoney(amount, sale.currency);
+  const signed = (delta: string) =>
+    delta.startsWith('-') ? `−${money(delta.slice(1))}` : `+${money(delta)}`;
+
+  const [typed, setTyped] = useState<CorrectionDraft | null>(null);
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // One idempotency key per exact request, so a retry of the same correction never saves twice.
   const [attempt, setAttempt] = useState<{ request: string; key: string } | null>(null);
 
-  const source = from ? held.get(from) : undefined;
-  const sourceAmount = source?.effectiveAmount ?? '0';
-  const valid =
-    Boolean(from && to && from !== to) &&
-    isRefundAmountValid(amount, sourceAmount) &&
-    reason.trim().length >= 3;
-  const routeName = (id: string) => {
-    const entry = held.get(id);
-    const route = routes.find((candidate) => candidate.id === id);
-    return entry?.financialAccountName ?? route?.financialAccountName ?? id;
-  };
-  const targets = [
-    ...new Map([
-      ...entries.map((entry) => [entry.paymentRouteId!, entry.method] as const),
-      ...routes.map((route) => [route.id, route.paymentMethod] as const),
-    ]).entries(),
-  ].filter(([id]) => id !== from);
+  const draft = typed ?? baseline;
+  const state = correctionDraftState(draft);
+  const remaining = unallocatedAmount(draft);
+  const mismatch = !createDecimal(remaining).isZero();
+  const valid = state.ok && reason.trim().length >= 3;
+  const addable = addableRoutes(draft, infos);
+  const changes = state.ok ? state.moves : [];
+  const heldNow = Object.entries(baseline.current).filter(
+    ([, amount]) => !createDecimal(amount).isZero(),
+  );
 
   const submit = async () => {
-    if (!valid || saving) return;
-    const request: PaymentCorrectionRequest = {
+    if (!state.ok || !valid || saving) return;
+    const request = paymentCorrectionRequest({
       expectedVersion: sale.version,
-      reason: reason.trim(),
-      moves: [
-        { paymentRouteId: from, delta: `-${amount.trim()}` },
-        { paymentRouteId: to, delta: amount.trim() },
-      ],
-    };
+      reason,
+      moves: state.moves,
+    });
     const signature = JSON.stringify(request);
     const key =
       attempt?.request === signature
@@ -99,57 +134,123 @@ export function TransactionPaymentCorrectionDialog({
         </div>
       }
     >
-      <div className="space-y-3">
+      <div className="space-y-4">
         <DInfoNote>{copy('Payment correction explanation')}</DInfoNote>
-        <DSelect
-          label={copy('Move from')}
-          value={from}
-          placeholder={copy('Choose a route')}
-          options={entries
-            .filter((entry) => entry.effectiveAmount !== '0.0000')
-            .map((entry) => ({
-              value: entry.paymentRouteId!,
-              label: `${entry.financialAccountName ?? copy(PAYMENT_METHOD_LABELS[entry.method])} · ${formatMoney(entry.effectiveAmount, sale.currency)}`,
-            }))}
-          disabled={saving}
-          onChange={(value) => {
-            const next = String(value ?? '');
-            setFrom(next);
-            if (next === to) setTo('');
-            setAmount('');
-            setError(null);
-          }}
-        />
-        <DSelect
-          label={copy('Move to')}
-          value={to}
-          placeholder={copy('Choose a route')}
-          options={targets.map(([id]) => ({ value: id, label: routeName(id) }))}
-          disabled={saving || !from}
-          onChange={(value) => {
-            setTo(String(value ?? ''));
-            setError(null);
-          }}
-        />
-        <DCurrencyInput
-          label={copy('Amount to move')}
-          value={amount}
-          onValueChange={(value) => {
-            setAmount(value);
-            setError(null);
-          }}
-          disabled={!from || saving}
-          hint={
-            source
-              ? `${copy('Recorded on this route')} ${formatMoney(source.effectiveAmount, sale.currency)}`
-              : undefined
-          }
-          error={
-            from && amount && !isRefundAmountValid(amount, sourceAmount)
-              ? copy('Enter an amount up to what the route holds.')
-              : undefined
-          }
-        />
+
+        <section aria-label={copy('Recorded now')}>
+          <h3 className="text-sm font-semibold">{copy('Recorded now')}</h3>
+          <ul className="mt-1 divide-y divide-[var(--color-border)]">
+            {heldNow.map(([routeId, amount]) => (
+              <li key={routeId} className="flex justify-between gap-4 py-1.5 text-sm">
+                <span className="min-w-0 break-words">{info(routeId)?.name ?? routeId}</span>
+                <span className="shrink-0 font-semibold tabular-nums">{money(amount)}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1 flex justify-between text-xs text-[var(--color-text-muted)]">
+            <span>{copy('Total paid')}</span>
+            <span className="tabular-nums">{money(draft.total)}</span>
+          </p>
+        </section>
+
+        <section aria-label={copy('Correct recording')}>
+          <h3 className="text-sm font-semibold">{copy('Correct recording')}</h3>
+          <ul className="mt-1 space-y-2">
+            {draft.selected.map((routeId) => {
+              const route = info(routeId);
+              const name = route?.name ?? routeId;
+              return (
+                <li key={routeId} className="flex items-center justify-between gap-2">
+                  <span className="min-w-0 text-sm">
+                    <span className="block break-words font-medium">{name}</span>
+                    <span className="block text-xs text-[var(--color-text-muted)]">
+                      {methodLabel(route?.method)}
+                    </span>
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <DCurrencyInput
+                      aria-label={name}
+                      className="w-40"
+                      value={draft.amounts[routeId] ?? ''}
+                      disabled={saving}
+                      onValueChange={(value) => {
+                        setTyped(editCorrectionAmount(draft, routeId, value));
+                        setError(null);
+                      }}
+                    />
+                    {canRemoveCorrectionRoute(draft) ? (
+                      <DButton
+                        size="sm"
+                        variant="ghost"
+                        aria-label={`${copy('Remove payment method')} ${name}`}
+                        disabled={saving}
+                        onClick={() => setTyped(removeCorrectionRoute(draft, routeId))}
+                      >
+                        <X className="size-4" aria-hidden />
+                      </DButton>
+                    ) : null}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+          {addable.length ? (
+            <div className="mt-2">
+              <DSelect
+                value=""
+                placeholder={`+ ${copy('Add payment method')}`}
+                aria-label={copy('Add payment method')}
+                options={addable.map((route) => ({
+                  value: route.routeId,
+                  label: `${route.name} · ${methodLabel(route.method)}`,
+                }))}
+                disabled={saving}
+                onChange={(value) => {
+                  const routeId = String(value ?? '');
+                  if (routeId) setTyped(addCorrectionRoute(draft, routeId));
+                }}
+              />
+            </div>
+          ) : null}
+          <p className="mt-2 flex justify-between text-xs text-[var(--color-text-muted)]">
+            <span>{copy('Total')}</span>
+            <span className="tabular-nums">{money(draft.total)}</span>
+          </p>
+          {mismatch ? (
+            <DInfoNote variant="warning" className="mt-2">
+              {createDecimal(remaining).isNegative()
+                ? `${copy('Allocated beyond the total paid')} ${money(remaining.slice(1))}`
+                : `${copy('Left to allocate')} ${money(remaining)}`}
+            </DInfoNote>
+          ) : null}
+        </section>
+
+        <section aria-label={copy('Correction changes')}>
+          <h3 className="text-sm font-semibold">{copy('Correction changes')}</h3>
+          {changes.length ? (
+            <>
+              <ul className="mt-1 divide-y divide-[var(--color-border)]">
+                {changes.map((move) => (
+                  <li key={move.routeId} className="flex justify-between gap-4 py-1.5 text-sm">
+                    <span className="min-w-0 break-words">{info(move.routeId)?.name}</span>
+                    <span className="shrink-0 font-semibold tabular-nums">
+                      {signed(move.delta)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-1 flex justify-between text-xs text-[var(--color-text-muted)]">
+                <span>{copy('Total changes')}</span>
+                <span className="tabular-nums">{money(correctionNet(changes))}</span>
+              </p>
+            </>
+          ) : (
+            <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+              {copy('Nothing to change yet.')}
+            </p>
+          )}
+        </section>
+
         <DTextarea
           label={copy('Correction reason')}
           value={reason}

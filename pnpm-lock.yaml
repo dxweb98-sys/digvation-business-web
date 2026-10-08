@@ -76,6 +76,9 @@ importers:
       '@digvation/business-auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@digvation/business-money':
+        specifier: workspace:*
+        version: link:../../packages/money
       '@digvation/business-runtime':
         specifier: workspace:*
         version: link:../../packages/runtime

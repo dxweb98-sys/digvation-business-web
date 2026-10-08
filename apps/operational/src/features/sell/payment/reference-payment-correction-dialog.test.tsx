@@ -41,20 +41,42 @@ const sale = (version = 4): Sale =>
     status: 'FINALIZED',
     sellingLocationId: 'location-1',
     currency: 'IDR',
-    totalAmount: '110000.0000',
+    totalAmount: '205350.0000',
     payments: [],
     paymentComposition: {
       entries: [
         entry('CASH', 'cash', 'Tunai', '5000.0000'),
-        entry('BANK_TRANSFER', 'bca', 'BCA', '105000.0000'),
+        entry('QRIS', 'qris', 'QRIS BRI', '200350.0000'),
       ],
-      totalReceived: '110000.0000',
+      totalReceived: '205350.0000',
       totalRefunded: '0.0000',
-      totalPaid: '110000.0000',
+      totalPaid: '205350.0000',
     },
   }) as unknown as Sale;
 
-const routes = [] as readonly PaymentRoute[];
+const route = (id: string, method: PaymentRoute['paymentMethod'], name: string) =>
+  ({
+    id,
+    sellingLocationId: 'location-1',
+    paymentMethod: method,
+    currency: 'IDR',
+    financialAccountId: `account-${id}`,
+    financialAccountCode: null,
+    financialAccountName: name,
+    status: 'ACTIVE',
+    version: 1,
+    createdAt: '',
+    updatedAt: '',
+  }) as PaymentRoute;
+
+/** Every eligible route of the location, most of them holding nothing. */
+const routes = [
+  route('cash', 'CASH', 'Tunai'),
+  route('qris', 'QRIS', 'QRIS BRI'),
+  route('bca', 'BANK_TRANSFER', 'BCA'),
+  route('bni', 'BANK_TRANSFER', 'Bank BNI'),
+  route('akun1', 'BANK_TRANSFER', 'AKUN1'),
+] as readonly PaymentRoute[];
 
 function renderDialog(
   overrides: Partial<Parameters<typeof ReferencePaymentCorrectionDialog>[0]> = {},
@@ -95,54 +117,157 @@ const input = (name: string) => screen.getByLabelText(name) as HTMLInputElement;
 const type = (name: string, value: string) => fireEvent.change(input(name), { target: { value } });
 const reasonField = () => screen.getByPlaceholderText(/Salah memasukkan nominal pembayaran/);
 const save = () => screen.getByRole('button', { name: 'Simpan koreksi' }) as HTMLButtonElement;
+const correctSection = () => screen.getByRole('region', { name: 'Pencatatan yang benar' });
+const changesSection = () => screen.getByRole('region', { name: 'Perubahan' });
+const addMethod = () =>
+  fireEvent.click(screen.getByRole('button', { name: 'Tambah metode pembayaran' }));
+const chooseMethod = (name: RegExp) =>
+  fireEvent.click(
+    within(screen.getByRole('list', { name: 'Tambah metode pembayaran' })).getByRole('button', {
+      name,
+    }),
+  );
+const reasonOk = () =>
+  fireEvent.change(reasonField(), { target: { value: 'Salah memasukkan nominal pembayaran' } });
 
 describe('ReferencePaymentCorrectionDialog', () => {
-  it('shows the current effective composition and the same composition as the starting target', () => {
+  it('shows only routes that currently hold money, never the zero-value eligible ones', () => {
     renderDialog();
     const current = screen.getByRole('region', { name: 'Pencatatan saat ini' });
-    expect(current.textContent).toMatch(/BCA.*105[.,]000/);
     expect(current.textContent).toMatch(/Tunai.*5[.,]000/);
-    expect(input('BCA').value).toBe('105.000');
+    expect(current.textContent).toMatch(/QRIS BRI.*200[.,]350/);
+    expect(current.textContent).not.toMatch(/BCA|BNI|AKUN1/);
+    expect(within(correctSection()).queryByLabelText('BCA')).toBeNull();
+    expect(within(correctSection()).queryByLabelText('Bank BNI')).toBeNull();
+    expect(within(correctSection()).queryByLabelText('AKUN1')).toBeNull();
     expect(input('Tunai').value).toBe('5.000');
-    // Nothing to save yet, and it says so.
+    expect(input('QRIS BRI').value).toBe('200.350');
     expect(screen.getByText('Belum ada perubahan.')).toBeTruthy();
     expect(save().disabled).toBe(true);
   });
 
-  it('derives the signed net-zero change from the correct composition', () => {
+  it('balances the other of two routes automatically, in both directions', () => {
     renderDialog();
     type('Tunai', '10.000');
-    type('BCA', '100.000');
-    const changes = screen.getByRole('region', { name: 'Perubahan' });
+    expect(input('QRIS BRI').value).toBe('195.350');
+    const changes = changesSection();
     expect(changes.textContent).toMatch(/Tunai.*\+\s?Rp\s?5[.,]000/);
-    expect(changes.textContent).toMatch(/BCA.*−\s?Rp\s?5[.,]000/);
+    expect(changes.textContent).toMatch(/QRIS BRI.*−\s?Rp\s?5[.,]000/);
+    type('QRIS BRI', '200.350');
+    expect(input('Tunai').value).toBe('5.000');
+    expect(screen.getByText('Belum ada perubahan.')).toBeTruthy();
   });
 
-  it('warns while the total paid would change and refuses to save', () => {
-    renderDialog();
-    type('Tunai', '11.000');
-    type('BCA', '100.000');
-    fireEvent.change(reasonField(), { target: { value: 'Salah nominal' } });
-    expect(screen.getByRole('alert').textContent).toContain('Total dibayar harus tetap sama.');
-    expect(save().disabled).toBe(true);
-  });
-
-  it('requires a reason', () => {
+  it('shows only non-zero changes whose total is zero', () => {
     renderDialog();
     type('Tunai', '10.000');
-    type('BCA', '100.000');
+    const changes = changesSection();
+    expect(within(changes).getAllByRole('listitem')).toHaveLength(2);
+    expect(changes.textContent).toMatch(/Total perubahan\s*Rp\s?0/);
+  });
+
+  it('adds an eligible route once; an already-selected route is not offered again', () => {
+    renderDialog();
+    addMethod();
+    const offered = within(screen.getByRole('list', { name: 'Tambah metode pembayaran' }));
+    expect(offered.queryByRole('button', { name: /Tunai/ })).toBeNull();
+    expect(offered.queryByRole('button', { name: /QRIS BRI/ })).toBeNull();
+    expect(offered.getByRole('button', { name: /BCA/ })).toBeTruthy();
+    expect(offered.getByRole('button', { name: /Bank BNI/ })).toBeTruthy();
+    chooseMethod(/BCA/);
+    expect(within(correctSection()).getByLabelText('BCA')).toBeTruthy();
+    addMethod();
+    expect(
+      within(screen.getByRole('list', { name: 'Tambah metode pembayaran' })).queryByRole('button', {
+        name: /BCA/,
+      }),
+    ).toBeNull();
+  });
+
+  it('adds Cash to a single BCA and balances BCA once Cash is typed', () => {
+    renderDialog({
+      sale: {
+        ...sale(),
+        paymentComposition: {
+          entries: [entry('BANK_TRANSFER', 'bca', 'BCA', '205350.0000')],
+          totalReceived: '205350.0000',
+          totalRefunded: '0.0000',
+          totalPaid: '205350.0000',
+        },
+      } as Sale,
+    });
+    addMethod();
+    chooseMethod(/Tunai/);
+    type('Tunai', '5.000');
+    expect(input('BCA').value).toBe('200.350');
+    expect(changesSection().textContent).toMatch(/BCA.*−\s?Rp\s?5[.,]000/);
+    expect(changesSection().textContent).toMatch(/Tunai.*\+\s?Rp\s?5[.,]000/);
+  });
+
+  it('removes a route from the target: the survivor receives the balancing amount', () => {
+    renderDialog();
+    fireEvent.click(screen.getByRole('button', { name: 'Hapus metode pembayaran Tunai' }));
+    expect(within(correctSection()).queryByLabelText('Tunai')).toBeNull();
+    expect(input('QRIS BRI').value).toBe('205.350');
+    expect(changesSection().textContent).toMatch(/Tunai.*−\s?Rp\s?5[.,]000/);
+    // The last route cannot be removed.
+    expect(screen.queryByRole('button', { name: /Hapus metode pembayaran/ })).toBeNull();
+  });
+
+  describe('three routes', () => {
+    const threeRoutes = () => {
+      renderDialog();
+      addMethod();
+      chooseMethod(/BCA/);
+    };
+
+    it('does not guess a balancing route: it shows what is left to allocate and blocks Save', () => {
+      threeRoutes();
+      // Adding BCA with nothing allocated keeps the total matched.
+      type('BCA', '1.000');
+      // Two routes before: now three, so nothing else moves.
+      expect(input('Tunai').value).toBe('5.000');
+      expect(input('QRIS BRI').value).toBe('200.350');
+      expect(screen.getByRole('status').textContent).toMatch(
+        /Alokasi melebihi total dibayar.*1[.,]000/,
+      );
+      reasonOk();
+      expect(save().disabled).toBe(true);
+    });
+
+    it('saves once the operator allocates exactly the fixed total', () => {
+      threeRoutes();
+      type('BCA', '1.000');
+      type('QRIS BRI', '199.350');
+      expect(screen.queryByRole('status')).toBeNull();
+      reasonOk();
+      expect(save().disabled).toBe(false);
+    });
+
+    it('reports an amount still to allocate when less is allocated', () => {
+      threeRoutes();
+      type('QRIS BRI', '190.350');
+      expect(screen.getByRole('status').textContent).toMatch(
+        /Sisa yang perlu dialokasikan.*10[.,]000/,
+      );
+      expect(save().disabled).toBe(true);
+    });
+  });
+
+  it('requires a reason before Save is enabled', () => {
+    renderDialog();
+    type('Tunai', '10.000');
     expect(save().disabled).toBe(true);
     fireEvent.change(reasonField(), { target: { value: '  ' } });
     expect(save().disabled).toBe(true);
-    fireEvent.change(reasonField(), { target: { value: 'Salah memasukkan nominal pembayaran' } });
+    reasonOk();
     expect(save().disabled).toBe(false);
   });
 
   it('sends exactly one correction command with the derived moves, and reports success', async () => {
     const props = renderDialog();
     type('Tunai', '10.000');
-    type('BCA', '100.000');
-    fireEvent.change(reasonField(), { target: { value: 'Salah memasukkan nominal pembayaran' } });
+    reasonOk();
     fireEvent.click(save());
     await waitFor(() => expect(props.onCorrected).toHaveBeenCalledOnce());
     expect(props.onCorrect).toHaveBeenCalledOnce();
@@ -152,12 +277,11 @@ describe('ReferencePaymentCorrectionDialog', () => {
       expectedVersion: 4,
       reason: 'Salah memasukkan nominal pembayaran',
       moves: [
-        { paymentRouteId: 'bca', delta: '-5000.0000' },
-        { paymentRouteId: 'cash', delta: '5000.0000' },
+        { paymentRouteId: 'cash', delta: '5000' },
+        { paymentRouteId: 'qris', delta: '-5000' },
       ],
     });
     expect(key).toMatch(/^cashier-payment-correction-/);
-    expect(props.onCorrected.mock.calls[0]![0].version).toBe(5);
   });
 
   it('prevents a duplicate submit while saving', async () => {
@@ -167,8 +291,7 @@ describe('ReferencePaymentCorrectionDialog', () => {
     });
     const props = renderDialog({ onCorrect: vi.fn().mockReturnValue(pending) });
     type('Tunai', '10.000');
-    type('BCA', '100.000');
-    fireEvent.change(reasonField(), { target: { value: 'Salah nominal' } });
+    reasonOk();
     fireEvent.click(save());
     fireEvent.click(save());
     fireEvent.click(save());
@@ -178,23 +301,22 @@ describe('ReferencePaymentCorrectionDialog', () => {
     await waitFor(() => expect(props.onCorrected).toHaveBeenCalledOnce());
   });
 
-  it('keeps every typed value and explains Runtime’s refusal', async () => {
+  it('keeps every typed value and explains Runtime’s refusal; a retry keeps its key', async () => {
     const props = renderDialog({
       onCorrect: vi
         .fn()
         .mockRejectedValue(new ApiError(422, 'PAYMENT_CORRECTION_EXCEEDS_SOURCE', 'x')),
     });
     type('Tunai', '10.000');
-    type('BCA', '100.000');
-    fireEvent.change(reasonField(), { target: { value: 'Salah nominal' } });
+    reasonOk();
     fireEvent.click(save());
-    const alert = await screen.findByText(/tidak dapat dikurangi melebihi yang tercatat/);
-    expect(alert).toBeTruthy();
+    expect(await screen.findByText(/tidak dapat dikurangi melebihi yang tercatat/)).toBeTruthy();
     expect(input('Tunai').value).toBe('10.000');
-    expect(input('BCA').value).toBe('100.000');
-    expect((reasonField() as HTMLTextAreaElement).value).toBe('Salah nominal');
+    expect(input('QRIS BRI').value).toBe('195.350');
+    expect((reasonField() as HTMLTextAreaElement).value).toBe(
+      'Salah memasukkan nominal pembayaran',
+    );
     expect(props.onCorrected).not.toHaveBeenCalled();
-    // The same exact request retried keeps its idempotency key.
     fireEvent.click(save());
     await waitFor(() => expect(props.onCorrect).toHaveBeenCalledTimes(2));
     expect(props.onCorrect.mock.calls[0]![2]).toBe(props.onCorrect.mock.calls[1]![2]);
@@ -205,24 +327,23 @@ describe('ReferencePaymentCorrectionDialog', () => {
       onCorrect: vi.fn().mockRejectedValue(new ApiError(409, 'SALE_VERSION_CONFLICT', 'x')),
     });
     type('Tunai', '10.000');
-    type('BCA', '100.000');
-    fireEvent.change(reasonField(), { target: { value: 'Salah nominal' } });
+    reasonOk();
     fireEvent.click(save());
     const reload = await screen.findByRole('button', { name: 'Muat ulang transaksi' });
-    // Saving stays off until the transaction is reloaded.
     expect(save().disabled).toBe(true);
     fireEvent.click(reload);
     await waitFor(() => expect(props.onReload).toHaveBeenCalledWith('sale-1'));
     await waitFor(() =>
       expect(screen.queryByRole('button', { name: 'Muat ulang transaksi' })).toBeNull(),
     );
-    expect(
-      within(screen.getByRole('region', { name: 'Perubahan' })).getByText('Belum ada perubahan.'),
-    ).toBeTruthy();
+    expect(screen.getByText('Belum ada perubahan.')).toBeTruthy();
+    expect(input('Tunai').value).toBe('5.000');
   });
 
-  it('shows no refund or additional-payment controls', () => {
+  it('shows no refund or additional-payment controls, and no transfer wording', () => {
     renderDialog();
-    expect(document.body.textContent).not.toMatch(/Pengembalian|Bayar sisanya|Tambahan pembayaran/);
+    expect(document.body.textContent).not.toMatch(
+      /Pengembalian|Bayar sisanya|Tambahan pembayaran|Pindahkan|Transfer dana/,
+    );
   });
 });

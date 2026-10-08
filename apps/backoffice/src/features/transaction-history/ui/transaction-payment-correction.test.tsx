@@ -274,39 +274,142 @@ describe('payment correction audit context', () => {
   });
 });
 
-describe('payment correction command', () => {
-  const open = async (correctPayments = vi.fn(async () => corrected())) => {
-    const paymentRoutes = vi.fn(async () => [
-      {
-        id: 'route-mandiri',
-        paymentMethod: 'BANK_TRANSFER' as const,
-        currency: 'IDR',
-        financialAccountName: 'Mandiri',
+describe('payment correction composition editor', () => {
+  /** Tunai 5.000 + QRIS BRI 200.350 recorded; every other eligible route holds nothing. */
+  const twoRoutes = () =>
+    recorded({
+      grossAmount: '205350.0000',
+      totalAmount: '205350.0000',
+      paymentComposition: {
+        entries: [
+          entry('CASH', 'route-cash', 'Tunai', '5000.0000'),
+          { ...entry('CASH', 'route-qris', 'QRIS BRI', '200350.0000'), method: 'QRIS' },
+        ],
+        totalReceived: '205350.0000',
+        totalRefunded: '0.0000',
+        totalPaid: '205350.0000',
       },
-    ]);
-    renderDetail(recorded(), permitted, { correctPayments, paymentRoutes });
+    });
+  const eligible = [
+    {
+      id: 'route-cash',
+      paymentMethod: 'CASH' as const,
+      currency: 'IDR',
+      financialAccountName: 'Tunai',
+    },
+    {
+      id: 'route-qris',
+      paymentMethod: 'QRIS' as const,
+      currency: 'IDR',
+      financialAccountName: 'QRIS BRI',
+    },
+    {
+      id: 'route-bca',
+      paymentMethod: 'BANK_TRANSFER' as const,
+      currency: 'IDR',
+      financialAccountName: 'BCA',
+    },
+    {
+      id: 'route-bni',
+      paymentMethod: 'BANK_TRANSFER' as const,
+      currency: 'IDR',
+      financialAccountName: 'Bank BNI',
+    },
+    {
+      id: 'route-akun1',
+      paymentMethod: 'BANK_TRANSFER' as const,
+      currency: 'IDR',
+      financialAccountName: 'AKUN1',
+    },
+  ];
+
+  const open = async (
+    sale: Sale = twoRoutes(),
+    correctPayments = vi.fn(async () => corrected()),
+  ) => {
+    const paymentRoutes = vi.fn(async () => eligible);
+    renderDetail(sale, permitted, { correctPayments, paymentRoutes });
     fireEvent.click(await screen.findByRole('button', { name: 'Koreksi pembayaran' }));
     const dialog = within(await screen.findByRole('dialog', { name: 'Koreksi pembayaran' }));
-    return { dialog, correctPayments, paymentRoutes };
-  };
-
-  it('sends the same one Runtime command with the two sides of a net-zero move', async () => {
-    const { dialog, correctPayments, paymentRoutes } = await open();
     await waitFor(() => expect(paymentRoutes).toHaveBeenCalledWith('location-1', 'IDR'));
-    expect(
-      (dialog.getByRole('button', { name: 'Simpan koreksi' }) as HTMLButtonElement).disabled,
-    ).toBe(true);
-    fireEvent.click(dialog.getByLabelText('Pindahkan dari'));
-    fireEvent.click(await screen.findByRole('option', { name: /BCA · Rp\s?105\.000/ }));
-    fireEvent.click(dialog.getByLabelText('Ke'));
-    fireEvent.click(await screen.findByRole('option', { name: 'Tunai' }));
-    fireEvent.change(dialog.getByRole('textbox', { name: /Nominal yang dipindahkan/ }), {
-      target: { value: '5000' },
-    });
+    return { dialog, correctPayments };
+  };
+  const amount = (dialog: ReturnType<typeof within>, name: string) =>
+    dialog.getByLabelText(name) as HTMLInputElement;
+  const type = (dialog: ReturnType<typeof within>, name: string, value: string) =>
+    fireEvent.change(amount(dialog, name), { target: { value } });
+  const reasonOk = (dialog: ReturnType<typeof within>) =>
     fireEvent.change(dialog.getByRole('textbox', { name: 'Alasan' }), {
       target: { value: 'Salah memasukkan nominal pembayaran' },
     });
-    fireEvent.click(dialog.getByRole('button', { name: 'Simpan koreksi' }));
+  const save = (dialog: ReturnType<typeof within>) =>
+    dialog.getByRole('button', { name: 'Simpan koreksi' }) as HTMLButtonElement;
+
+  it('uses the composition editor, not a transfer between accounts', async () => {
+    const { dialog } = await open();
+    for (const heading of ['Pencatatan saat ini', 'Pencatatan yang benar', 'Perubahan'])
+      expect(dialog.getByRole('region', { name: heading })).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/Pindahkan dari|Nominal yang dipindahkan/);
+    expect(dialog.queryByLabelText('Ke')).toBeNull();
+  });
+
+  it('shows only routes that hold money now; zero-value eligible routes stay hidden', async () => {
+    const { dialog } = await open();
+    const current = dialog.getByRole('region', { name: 'Pencatatan saat ini' });
+    expect(current.textContent).toMatch(/Tunai.*5\.000/);
+    expect(current.textContent).toMatch(/QRIS BRI.*200\.350/);
+    expect(current.textContent).not.toMatch(/BCA|BNI|AKUN1/);
+    expect(dialog.queryByLabelText('BCA')).toBeNull();
+    expect(amount(dialog, 'Tunai').value).toBe('5.000');
+    expect(amount(dialog, 'QRIS BRI').value).toBe('200.350');
+    expect(save(dialog).disabled).toBe(true);
+  });
+
+  it('balances the other of two routes automatically and derives the changes', async () => {
+    const { dialog } = await open();
+    type(dialog, 'Tunai', '10000');
+    expect(amount(dialog, 'QRIS BRI').value).toBe('195.350');
+    const changes = dialog.getByRole('region', { name: 'Perubahan' });
+    expect(changes.textContent).toMatch(/Tunai.*\+\s?Rp\s?5\.000/);
+    expect(changes.textContent).toMatch(/QRIS BRI.*−\s?Rp\s?5\.000/);
+    expect(within(changes).getAllByRole('listitem')).toHaveLength(2);
+    type(dialog, 'QRIS BRI', '200350');
+    expect(amount(dialog, 'Tunai').value).toBe('5.000');
+  });
+
+  it('adds only a route not yet selected, and a three-route mismatch blocks Save', async () => {
+    const { dialog } = await open();
+    fireEvent.click(dialog.getByLabelText('Tambah metode pembayaran'));
+    expect(screen.queryByRole('option', { name: /Tunai/ })).toBeNull();
+    expect(screen.queryByRole('option', { name: /QRIS BRI/ })).toBeNull();
+    expect(await screen.findByRole('option', { name: /AKUN1/ })).toBeTruthy();
+    fireEvent.click(await screen.findByRole('option', { name: /BCA/ }));
+    type(dialog, 'BCA', '1000');
+    // Three routes: nothing is redistributed, the excess is reported.
+    expect(amount(dialog, 'Tunai').value).toBe('5.000');
+    expect(amount(dialog, 'QRIS BRI').value).toBe('200.350');
+    expect(dialog.getByText(/Alokasi melebihi total dibayar.*1\.000/)).toBeTruthy();
+    reasonOk(dialog);
+    expect(save(dialog).disabled).toBe(true);
+    type(dialog, 'QRIS BRI', '199350');
+    expect(save(dialog).disabled).toBe(false);
+  });
+
+  it('removes a route: the survivor receives the balancing amount', async () => {
+    const { dialog } = await open();
+    fireEvent.click(dialog.getByRole('button', { name: 'Hapus metode pembayaran Tunai' }));
+    expect(dialog.queryByLabelText('Tunai')).toBeNull();
+    expect(amount(dialog, 'QRIS BRI').value).toBe('205.350');
+    expect(dialog.getByRole('region', { name: 'Perubahan' }).textContent).toMatch(
+      /Tunai.*−\s?Rp\s?5\.000/,
+    );
+  });
+
+  it('sends the same Runtime command Operational sends for the same current and target', async () => {
+    const { dialog, correctPayments } = await open();
+    type(dialog, 'Tunai', '10000');
+    reasonOk(dialog);
+    fireEvent.click(save(dialog));
     await waitFor(() => expect(correctPayments).toHaveBeenCalledOnce());
     const [saleId, request, key] = correctPayments.mock.calls[0]! as unknown as [
       string,
@@ -318,8 +421,8 @@ describe('payment correction command', () => {
       expectedVersion: 7,
       reason: 'Salah memasukkan nominal pembayaran',
       moves: [
-        { paymentRouteId: 'route-bca', delta: '-5000' },
         { paymentRouteId: 'route-cash', delta: '5000' },
+        { paymentRouteId: 'route-qris', delta: '-5000' },
       ],
     });
     expect(key).toMatch(/^backoffice-payment-correction-/);

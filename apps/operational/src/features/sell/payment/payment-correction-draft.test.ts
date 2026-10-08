@@ -3,11 +3,9 @@ import { describe, expect, it } from 'vitest';
 import type { PaymentRoute, Sale } from '../transaction/model/cashier-transaction.types';
 import {
   canCorrectPayments,
-  correctionMoves,
-  correctionRows,
-  correctionState,
+  correctionEffectiveEntries,
+  correctionRouteInfos,
   paymentCompositionOf,
-  paymentCorrectionInput,
 } from './payment-correction-draft';
 
 const payment = (id: string, route: string, amount: string, extra: object = {}) => ({
@@ -116,59 +114,41 @@ describe('payment correction draft', () => {
     ).toBe(false);
   });
 
-  it('lists the effective routes first and every other active route of the location', () => {
-    const rows = correctionRows(sale(), [
+  it('starts the shared editor from the route-bound effective composition only', () => {
+    const legacy = sale({
+      paymentComposition: {
+        ...composition('5000.0000', '105000.0000'),
+        entries: [
+          ...composition('5000.0000', '105000.0000').entries,
+          {
+            method: 'CASH',
+            paymentRouteId: null,
+            financialAccountId: null,
+            financialAccountCode: null,
+            financialAccountName: null,
+            receivedAmount: '1.0000',
+            refundedAmount: '0.0000',
+            effectiveAmount: '1.0000',
+          },
+        ],
+      },
+    });
+    expect(correctionEffectiveEntries(legacy)).toEqual([
+      { routeId: 'cash', amount: '5000.0000' },
+      { routeId: 'bca', amount: '105000.0000' },
+    ]);
+  });
+
+  it('knows the effective routes first and every other active route of the location', () => {
+    const infos = correctionRouteInfos(sale(), [
       route('mandiri', 'Mandiri'),
+      route('bni', 'Bank BNI'),
       route('other-place', 'Elsewhere', { sellingLocationId: 'location-2' }),
       route('usd', 'USD', { currency: 'USD' }),
       route('closed', 'Closed', { status: 'INACTIVE' }),
     ]);
-    expect(rows.map((row) => row.name)).toEqual(['BCA', 'Tunai', 'Mandiri']);
-  });
-
-  it('derives the signed deltas from the correct composition the operator typed', () => {
-    const rows = correctionRows(sale(), []);
-    const state = correctionState(rows, { cash: '10000', bca: '100000' });
-    expect(state.ok).toBe(true);
-    if (!state.ok) return;
-    expect(state.moves.map((move) => [move.row.name, move.delta])).toEqual([
-      ['BCA', '-5000.0000'],
-      ['Tunai', '5000.0000'],
-    ]);
-    expect(paymentCorrectionInput(sale(), '  Salah nominal  ', state.moves)).toEqual({
-      expectedVersion: 4,
-      reason: 'Salah nominal',
-      moves: [
-        { paymentRouteId: 'bca', delta: '-5000.0000' },
-        { paymentRouteId: 'cash', delta: '5000.0000' },
-      ],
-    });
-  });
-
-  it('is not valid while the total paid would change', () => {
-    const rows = correctionRows(sale(), []);
-    expect(correctionState(rows, { cash: '11000', bca: '100000' })).toMatchObject({
-      ok: false,
-      reason: 'NOT_NET_ZERO',
-      net: '1000.0000',
-    });
-  });
-
-  it('is not valid without a change or with an unreadable amount', () => {
-    const rows = correctionRows(sale(), []);
-    expect(correctionState(rows, {})).toMatchObject({ ok: false, reason: 'NO_CHANGE' });
-    expect(correctionState(rows, { cash: 'abc' })).toMatchObject({
-      ok: false,
-      reason: 'INVALID_AMOUNT',
-    });
-  });
-
-  it('moves money to a route that held none yet', () => {
-    const rows = correctionRows(sale(), [route('mandiri', 'Mandiri')]);
-    const moves = correctionMoves(rows, { bca: '100000', mandiri: '5000' });
-    expect(moves.map((move) => [move.row.name, move.delta])).toEqual([
-      ['BCA', '-5000.0000'],
-      ['Mandiri', '5000.0000'],
-    ]);
+    expect(infos.map((info) => info.name)).toEqual(['Tunai', 'BCA', 'Mandiri', 'Bank BNI']);
+    // Two bank-transfer routes stay distinct correction targets.
+    expect(infos.filter((info) => info.method === 'BANK_TRANSFER')).toHaveLength(3);
   });
 });

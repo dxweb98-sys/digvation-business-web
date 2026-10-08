@@ -1,9 +1,12 @@
-import { createDecimal } from '@digvation/pos-money';
+import {
+  createDecimal,
+  type CorrectionEffectiveEntry,
+  type CorrectionRouteInfo,
+} from '@digvation/pos-money';
 
 import type {
   PaymentComposition,
   PaymentCompositionEntry,
-  PaymentMethod,
   PaymentRoute,
   Sale,
 } from '../transaction/model/cashier-transaction.types';
@@ -67,115 +70,43 @@ export function canCorrectPayments(sale: Sale, permissions: readonly string[]): 
   );
 }
 
-export interface CorrectionRow {
-  routeId: string;
-  method: PaymentMethod;
-  name: string;
-  /** What Runtime effectively holds on this route now. */
-  current: string;
+/**
+ * What the shared composition model starts from: the route-bound routes of Runtime's effective
+ * composition. Legacy payments without a route cannot be re-attributed and stay out of the editor.
+ */
+export function correctionEffectiveEntries(sale: Sale): CorrectionEffectiveEntry[] {
+  return paymentCompositionOf(sale)
+    .entries.filter((entry) => entry.paymentRouteId !== null)
+    .map((entry) => ({ routeId: entry.paymentRouteId!, amount: entry.effectiveAmount }));
 }
 
 /**
- * The routes the operator can attribute money to: every effective route of the Sale and every
- * active payment route of its location and currency. Legacy payments without a route are fixed
- * and never offered.
+ * Every route money can be attributed to: the routes of the Sale's effective composition and every
+ * active payment route of its location and currency. Two BANK_TRANSFER routes stay distinct.
  */
-export function correctionRows(sale: Sale, routes: readonly PaymentRoute[]): CorrectionRow[] {
-  const rows = new Map<string, CorrectionRow>();
+export function correctionRouteInfos(
+  sale: Sale,
+  routes: readonly PaymentRoute[],
+): CorrectionRouteInfo[] {
+  const infos = new Map<string, CorrectionRouteInfo>();
   for (const entry of paymentCompositionOf(sale).entries)
     if (entry.paymentRouteId)
-      rows.set(entry.paymentRouteId, {
+      infos.set(entry.paymentRouteId, {
         routeId: entry.paymentRouteId,
-        method: entry.method,
         name: entry.financialAccountName ?? entry.method,
-        current: entry.effectiveAmount,
+        method: entry.method,
       });
   for (const route of routes)
     if (
       route.status === 'ACTIVE' &&
       route.sellingLocationId === sale.sellingLocationId &&
       route.currency === sale.currency &&
-      !rows.has(route.id)
+      !infos.has(route.id)
     )
-      rows.set(route.id, {
+      infos.set(route.id, {
         routeId: route.id,
-        method: route.paymentMethod,
         name: route.financialAccountName,
-        current: ZERO,
+        method: route.paymentMethod,
       });
-  return [...rows.values()].sort(
-    (left, right) =>
-      Number(createDecimal(right.current).greaterThan(createDecimal(left.current))) -
-        Number(createDecimal(left.current).greaterThan(createDecimal(right.current))) ||
-      left.name.localeCompare(right.name),
-  );
-}
-
-/** The target the operator types, as a decimal; empty means zero and anything else is invalid. */
-export function targetOf(text: string): string | null {
-  const trimmed = text.trim();
-  if (trimmed === '') return ZERO;
-  return /^\d+(\.\d{1,4})?$/.test(trimmed) ? createDecimal(trimmed).toFixed(4) : null;
-}
-
-export interface CorrectionMove {
-  row: CorrectionRow;
-  /** Signed delta from the current effective amount to the typed target. */
-  delta: string;
-}
-
-/** The derived moves: only the routes whose typed target differs from what they hold now. */
-export function correctionMoves(
-  rows: readonly CorrectionRow[],
-  targets: Readonly<Record<string, string>>,
-): CorrectionMove[] {
-  const moves: CorrectionMove[] = [];
-  for (const row of rows) {
-    const target = targetOf(targets[row.routeId] ?? row.current);
-    if (target === null) continue;
-    const delta = createDecimal(target).minus(createDecimal(row.current));
-    if (!delta.isZero()) moves.push({ row, delta: delta.toFixed(4) });
-  }
-  return moves;
-}
-
-export type CorrectionState =
-  | { ok: true; moves: CorrectionMove[] }
-  | {
-      ok: false;
-      reason: 'INVALID_AMOUNT' | 'NO_CHANGE' | 'NOT_NET_ZERO' | 'NEGATIVE';
-      net: string;
-    };
-
-/** The correction is valid only when it changes something and keeps the total paid unchanged. */
-export function correctionState(
-  rows: readonly CorrectionRow[],
-  targets: Readonly<Record<string, string>>,
-): CorrectionState {
-  for (const row of rows)
-    if (targetOf(targets[row.routeId] ?? row.current) === null)
-      return { ok: false, reason: 'INVALID_AMOUNT', net: ZERO };
-  const moves = correctionMoves(rows, targets);
-  const net = moves.reduce((sum, move) => sum.plus(createDecimal(move.delta)), createDecimal('0'));
-  if (moves.length === 0) return { ok: false, reason: 'NO_CHANGE', net: ZERO };
-  if (!net.isZero()) return { ok: false, reason: 'NOT_NET_ZERO', net: net.toFixed(4) };
-  if (
-    !moves.some((move) => createDecimal(move.delta).isNegative()) ||
-    !moves.some((move) => createDecimal(move.delta).greaterThan(0))
-  )
-    return { ok: false, reason: 'NEGATIVE', net: ZERO };
-  return { ok: true, moves };
-}
-
-/** The request Runtime validates again; the typed targets never leave the screen. */
-export function paymentCorrectionInput(
-  sale: Sale,
-  reason: string,
-  moves: readonly CorrectionMove[],
-) {
-  return {
-    expectedVersion: sale.version,
-    reason: reason.trim(),
-    moves: moves.map((move) => ({ paymentRouteId: move.row.routeId, delta: move.delta })),
-  };
+  return [...infos.values()];
 }

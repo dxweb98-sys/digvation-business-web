@@ -574,6 +574,14 @@ const posCopy: Record<string, LocalizedCopy> = {
     'id-ID': 'Anda tidak memiliki izin untuk mengoreksi pembayaran.',
     'en-US': 'You are not allowed to correct payments.',
   },
+  'Add payment method': { 'id-ID': 'Tambah metode pembayaran', 'en-US': 'Add payment method' },
+  'Remove payment method': { 'id-ID': 'Hapus metode pembayaran', 'en-US': 'Remove payment method' },
+  'Left to allocate': { 'id-ID': 'Sisa yang perlu dialokasikan', 'en-US': 'Left to allocate' },
+  'Allocated beyond the total paid': {
+    'id-ID': 'Alokasi melebihi total dibayar',
+    'en-US': 'Allocated beyond the total paid',
+  },
+  'Total changes': { 'id-ID': 'Total perubahan', 'en-US': 'Total changes' },
   'Nothing to change yet.': {
     'id-ID': 'Belum ada perubahan.',
     'en-US': 'Nothing to change yet.',
