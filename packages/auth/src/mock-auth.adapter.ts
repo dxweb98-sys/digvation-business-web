@@ -23,7 +23,13 @@ const DEVELOPMENT_SESSION: AuthSession = {
   access: {
     products: ['POS'],
     capabilities: [],
-    foundations: ['IDENTITY_ACCESS', 'AUDIT_ACTIVITY', 'ORGANIZATION_LOCATION', 'CATALOG', 'OPERATIONAL_ACCESS'],
+    foundations: [
+      'IDENTITY_ACCESS',
+      'AUDIT_ACTIVITY',
+      'ORGANIZATION_LOCATION',
+      'CATALOG',
+      'OPERATIONAL_ACCESS',
+    ],
     permissions: ['auth:self', 'sales:read', 'sales:create'],
   },
   preferences: {

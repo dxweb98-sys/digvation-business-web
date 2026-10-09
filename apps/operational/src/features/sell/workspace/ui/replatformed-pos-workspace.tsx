@@ -31,10 +31,7 @@ import {
 import type { Payment, Sale } from '../../transaction/model/cashier-transaction.types';
 import type { useCashierTransactionWorkspace } from '../model/use-cashier-transaction-workspace';
 
-import {
-  currencyInputFromAmount,
-  normalizeCurrencyPaymentInput,
-} from '../../lib/pos-controls';
+import { currencyInputFromAmount, normalizeCurrencyPaymentInput } from '../../lib/pos-controls';
 import { SaleAdjustmentControls } from '../../adjustment/sale-adjustment-controls';
 import { SaleLineTaskDialog } from '../../queue/sale-line-task-dialog';
 import { ServicePerformersDialog } from '../../performer/service-performers-dialog';

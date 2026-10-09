@@ -329,10 +329,22 @@ describe('createSaleWorkspaceViewModel', () => {
         employeeAssignmentModeSnapshot: 'REQUIRED',
         allowEmployeeContributionSnapshot: true,
         fulfillment: {
-          saleId: SALE_ID, saleLineId: LINE_ID, status: sourceStatus,
-          startedAt: '2026-09-02T00:02:00.000Z', completedAt: sourceStatus === 'COMPLETED' ? '2026-09-02T00:03:00.000Z' : null, canceledAt: null,
+          saleId: SALE_ID,
+          saleLineId: LINE_ID,
+          status: sourceStatus,
+          startedAt: '2026-09-02T00:02:00.000Z',
+          completedAt: sourceStatus === 'COMPLETED' ? '2026-09-02T00:03:00.000Z' : null,
+          canceledAt: null,
         },
-        participations: [{ saleId: SALE_ID, saleLineId: LINE_ID, employeeId: EMPLOYEE_ID, assigned: true, shareRate: '1.000000000000000000' }],
+        participations: [
+          {
+            saleId: SALE_ID,
+            saleLineId: LINE_ID,
+            employeeId: EMPLOYEE_ID,
+            assigned: true,
+            shareRate: '1.000000000000000000',
+          },
+        ],
       });
       // The replacement owns no fulfillment, assignment or contribution of its own.
       const replacement = createLine({
@@ -356,9 +368,17 @@ describe('createSaleWorkspaceViewModel', () => {
     });
 
     it('stays blocked on incomplete work while the source is IN_PROGRESS', () => {
-      const viewModel = createSaleWorkspaceViewModel(correctedSale('IN_PROGRESS'), 'ONLINE', 'CLEAN');
-      expect(viewModel.domainReadiness.blockers.map((blocker) => blocker.code)).toEqual(['FULFILLMENT_INCOMPLETE']);
-      expect(viewModel.domainReadiness.blockers.map((blocker) => blocker.code)).not.toContain('ASSIGNMENT_REQUIRED');
+      const viewModel = createSaleWorkspaceViewModel(
+        correctedSale('IN_PROGRESS'),
+        'ONLINE',
+        'CLEAN',
+      );
+      expect(viewModel.domainReadiness.blockers.map((blocker) => blocker.code)).toEqual([
+        'FULFILLMENT_INCOMPLETE',
+      ]);
+      expect(viewModel.domainReadiness.blockers.map((blocker) => blocker.code)).not.toContain(
+        'ASSIGNMENT_REQUIRED',
+      );
     });
 
     it('presents the work status of the source lineage instead of a misleading waiting state', () => {

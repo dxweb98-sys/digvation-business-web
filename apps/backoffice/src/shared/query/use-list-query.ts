@@ -1,12 +1,6 @@
-import {
-  useQuery,
-  type QueryKey,
-} from '@tanstack/react-query';
+import { useQuery, type QueryKey } from '@tanstack/react-query';
 
-import type {
-  LimitOffsetPagination,
-  PaginationState,
-} from './use-pagination-state';
+import type { LimitOffsetPagination, PaginationState } from './use-pagination-state';
 import { toLimitOffsetPagination } from './use-pagination-state';
 
 export interface OffsetPageResponse<TItem> {
@@ -38,9 +32,7 @@ export function useListQuery<TData>({
   staleTime,
   pagination,
 }: UseListQueryOptions<TData>) {
-  const requestPagination = pagination
-    ? toLimitOffsetPagination(pagination)
-    : undefined;
+  const requestPagination = pagination ? toLimitOffsetPagination(pagination) : undefined;
 
   const resolvedQueryKey: QueryKey = requestPagination
     ? [...queryKey, requestPagination.limit, requestPagination.offset]
@@ -69,18 +61,10 @@ export function paginationMeta<TItem>(
     page: pagination.page,
     pageSize: pagination.pageSize,
     limit: response?.limit ?? pagination.pageSize,
-    offset:
-      response?.offset ??
-      toLimitOffsetPagination(pagination).offset,
+    offset: response?.offset ?? toLimitOffsetPagination(pagination).offset,
     total,
-    pageCount:
-      total === undefined
-        ? undefined
-        : Math.ceil(total / pagination.pageSize),
+    pageCount: total === undefined ? undefined : Math.ceil(total / pagination.pageSize),
     hasPreviousPage: pagination.page > 1,
-    hasNextPage:
-      total === undefined
-        ? undefined
-        : pagination.page * pagination.pageSize < total,
+    hasNextPage: total === undefined ? undefined : pagination.page * pagination.pageSize < total,
   };
 }

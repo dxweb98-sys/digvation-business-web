@@ -26,7 +26,7 @@ export default defineConfig({
     proxy: {
       '^/member(/|$)': { target: 'http://127.0.0.1:5175', ws: true },
     },
-    allowedHosts: ['precious-powerpoint-transmitted-flashing.trycloudflare.com']
+    allowedHosts: ['precious-powerpoint-transmitted-flashing.trycloudflare.com'],
   },
   preview: {
     port: 4173,

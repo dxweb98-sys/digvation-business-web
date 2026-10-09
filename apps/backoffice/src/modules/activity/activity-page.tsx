@@ -118,17 +118,7 @@ export function ActivityPage() {
   const [detail, setDetail] = useState<ActivityEvent | null>(null);
 
   const list = useQuery({
-    queryKey: [
-      'activity',
-      offset,
-      pageSize,
-      from,
-      to,
-      actorUserId,
-      category,
-      locationId,
-      source,
-    ],
+    queryKey: ['activity', offset, pageSize, from, to, actorUserId, category, locationId, source],
     queryFn: () =>
       api.list({
         offset,
@@ -271,11 +261,13 @@ export function ActivityPage() {
                 placeholder={text.allApplications}
                 value={source || null}
                 clearable
-                options={([
-                  ['BACKOFFICE', 'Backoffice'],
-                  ['OPERATIONAL', 'Operational'],
-                  ['SYSTEM', text.system],
-                ] as const).map(([value, label]) => ({ value, label }))}
+                options={(
+                  [
+                    ['BACKOFFICE', 'Backoffice'],
+                    ['OPERATIONAL', 'Operational'],
+                    ['SYSTEM', text.system],
+                  ] as const
+                ).map(([value, label]) => ({ value, label }))}
                 onChange={(value) => {
                   setSource((value ?? '') as ActivitySource | '');
                   resetPage();
@@ -395,9 +387,7 @@ function ActorIdentity({
   return (
     <div>
       <div className="font-medium text-[var(--color-text)]">{actor.displayName}</div>
-      {context ? (
-        <div className="text-xs text-[var(--color-text-muted)]">{context}</div>
-      ) : null}
+      {context ? <div className="text-xs text-[var(--color-text-muted)]">{context}</div> : null}
     </div>
   );
 }

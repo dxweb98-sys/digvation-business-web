@@ -67,10 +67,30 @@ test('keeps the compact detail composition coherent across representative transa
   await page.goto('http://127.0.0.1:5173/', { waitUntil: 'networkidle' });
 
   const states = [
-    ['waiting', 'Menunggu', 'Menunggu pembayaran', 'border-[var(--color-warning)]/35 bg-[var(--color-warning)]/[.08]'],
-    ['in-progress', 'Dikerjakan', 'Belum dibayar', 'border-[var(--color-brand)]/35 bg-[var(--color-brand)]/[.08]'],
-    ['completed', 'Selesai', 'Lunas', 'border-[var(--color-success)]/35 bg-[var(--color-success)]/[.08]'],
-    ['cancelled', 'Dibatalkan', 'Dibalik', 'border-[var(--color-danger)]/35 bg-[var(--color-danger)]/[.08]'],
+    [
+      'waiting',
+      'Menunggu',
+      'Menunggu pembayaran',
+      'border-[var(--color-warning)]/35 bg-[var(--color-warning)]/[.08]',
+    ],
+    [
+      'in-progress',
+      'Dikerjakan',
+      'Belum dibayar',
+      'border-[var(--color-brand)]/35 bg-[var(--color-brand)]/[.08]',
+    ],
+    [
+      'completed',
+      'Selesai',
+      'Lunas',
+      'border-[var(--color-success)]/35 bg-[var(--color-success)]/[.08]',
+    ],
+    [
+      'cancelled',
+      'Dibatalkan',
+      'Dibalik',
+      'border-[var(--color-danger)]/35 bg-[var(--color-danger)]/[.08]',
+    ],
   ] as const;
 
   for (const [id, transactionStatus, paymentStatus, tone] of states) {
@@ -78,7 +98,8 @@ test('keeps the compact detail composition coherent across representative transa
       ({ transactionStatus, paymentStatus, tone }) => {
         document.querySelector('.visual-detail-fixture')?.remove();
         const dialog = document.createElement('section');
-        dialog.className = 'visual-detail-fixture w-full max-w-[1060px] overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]';
+        dialog.className =
+          'visual-detail-fixture w-full max-w-[1060px] overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]';
         dialog.innerHTML = `
           <header class="flex items-center justify-between border-b border-[var(--color-border)] px-5 py-4"><div><p class="text-base font-semibold">Detail transaksi</p><p class="mt-1 font-mono text-xs text-[var(--color-text-muted)]">TRX-2026-0001</p></div><button class="rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm">Tutup</button></header>
           <div class="pos-detail-columns p-5">

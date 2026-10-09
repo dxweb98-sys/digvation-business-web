@@ -17,11 +17,7 @@ export function CatalogTabs<T extends string>({
 }) {
   return (
     <div className="border-b border-[var(--color-border)] px-4 pt-3">
-      <div
-        role="tablist"
-        aria-label={ariaLabel}
-        className="flex min-w-0 gap-1 overflow-x-auto"
-      >
+      <div role="tablist" aria-label={ariaLabel} className="flex min-w-0 gap-1 overflow-x-auto">
         {tabs.map((tab) => {
           const selected = value === tab.value;
           return (

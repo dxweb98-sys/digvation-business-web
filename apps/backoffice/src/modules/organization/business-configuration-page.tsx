@@ -156,9 +156,7 @@ export function BusinessConfigurationPage() {
             <DTabsTrigger value="numbering">{copy('Numbering')}</DTabsTrigger>
           ) : null}
           {canViewLoyalty ? <DTabsTrigger value="loyalty">Loyalty</DTabsTrigger> : null}
-          {canViewCommission ? (
-            <DTabsTrigger value="commission">Komisi Produk</DTabsTrigger>
-          ) : null}
+          {canViewCommission ? <DTabsTrigger value="commission">Komisi Produk</DTabsTrigger> : null}
         </DTabsList>
 
         <DTabsContent value="profile" className="mt-5">
@@ -214,7 +212,12 @@ export function BusinessConfigurationPage() {
               api={commissionApi}
               canConfigure={canConfigureCommission}
               loadProducts={(q) =>
-                catalogApi.listItems({ type: 'PRODUCT', lifecycle: 'ACTIVE', limit: 20, ...(q ? { q } : {}) })
+                catalogApi.listItems({
+                  type: 'PRODUCT',
+                  lifecycle: 'ACTIVE',
+                  limit: 20,
+                  ...(q ? { q } : {}),
+                })
               }
             />
           </DTabsContent>
@@ -327,7 +330,6 @@ function ProfileSection({
   );
 }
 
-
 function percentageFromTaxRate(rate: string): string {
   const [whole = '0', fraction = ''] = rate.trim().split('.');
   if (whole === '1') return '100';
@@ -381,10 +383,7 @@ function TaxSection({
 
   const percent = Number(draftPercent);
   const validPercent =
-    draftPercent.trim().length > 0 &&
-    Number.isFinite(percent) &&
-    percent >= 0 &&
-    percent <= 100;
+    draftPercent.trim().length > 0 && Number.isFinite(percent) && percent >= 0 && percent <= 100;
 
   const save = async () => {
     if (!tax || saving || !validPercent) return;
@@ -401,10 +400,8 @@ function TaxSection({
       if (!isSessionExpiredError(error))
         showToast({
           variant: 'danger',
-          title: normalizeBackofficeApiError(
-            error,
-            copy('Could not update tax configuration.'),
-          ).safeMessage,
+          title: normalizeBackofficeApiError(error, copy('Could not update tax configuration.'))
+            .safeMessage,
         });
     } finally {
       setSaving(false);

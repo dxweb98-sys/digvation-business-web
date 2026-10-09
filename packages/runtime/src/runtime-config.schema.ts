@@ -1,12 +1,12 @@
 import { z } from 'zod';
 
 const hexColorSchema = z.string().regex(/^#[0-9A-Fa-f]{6}$/);
-const apiBaseUrlSchema = z.string().refine(
-  (value) =>
-    value === '' ||
-    /^https?:\/\/[^\s/$.?#].[^\s]*$/i.test(value),
-  'apiBaseUrl must be empty for same-origin or an absolute HTTP(S) origin',
-);
+const apiBaseUrlSchema = z
+  .string()
+  .refine(
+    (value) => value === '' || /^https?:\/\/[^\s/$.?#].[^\s]*$/i.test(value),
+    'apiBaseUrl must be empty for same-origin or an absolute HTTP(S) origin',
+  );
 
 const workspaceResolutionSchema = z.discriminatedUnion('mode', [
   z.object({

@@ -22,10 +22,7 @@ import {
 } from '../../cart/cart-draft';
 import { MAX_CONFIGURATION_UNITS, opensItemConfigurator } from '../../cart/item-configurator-model';
 import { blocksNewTransaction, hasTrackedWork } from '../../transaction/model/sale-lifecycle';
-import type {
-  ItemConfiguration,
-  ItemConfiguratorState,
-} from '../../cart/item-configurator';
+import type { ItemConfiguration, ItemConfiguratorState } from '../../cart/item-configurator';
 import type { VariantPickerContext, VariantPickerState } from './variant-selection';
 import {
   createCashierTransactionAdapter,
@@ -252,7 +249,12 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
             quantity: String(group.quantity),
             additions: group.additionalComponents,
           }))
-        : [{ quantity: selection.quantity ?? '1', additions: selection.additionalComponents ?? [] }];
+        : [
+            {
+              quantity: selection.quantity ?? '1',
+              additions: selection.additionalComponents ?? [],
+            },
+          ];
       const updated = await command.runMutation(async () => {
         let expectedVersion = target.version;
         let latest: Sale | null = null;
@@ -369,7 +371,9 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
       ...(salespeople ? { salespeople } : {}),
       ...(componentPerformers ? { componentPerformers } : {}),
       itemOption:
-        variants.length > 0 && item.variantSelectionMode === 'OPTIONAL' ? { price: ownPrice } : null,
+        variants.length > 0 && item.variantSelectionMode === 'OPTIONAL'
+          ? { price: ownPrice }
+          : null,
       itemPrice: variants.length === 0 ? ownPrice : null,
       pricesByVariantId: resolvedVariants.pricesByVariantId,
       unavailableVariantIds: resolvedVariants.unavailableVariantIds,
@@ -459,7 +463,9 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     try {
       // A line of the persisted OPEN Sale is edited through Runtime, never with Web-side state.
       const persistedLine = editLineId
-        ? saleWorkspace.sale?.lines.find((line) => line.id === editLineId && line.removedAt === null)
+        ? saleWorkspace.sale?.lines.find(
+            (line) => line.id === editLineId && line.removedAt === null,
+          )
         : undefined;
       if (persistedLine) {
         saleWorkspace.replaceSaleLine(persistedLine, {
@@ -517,7 +523,9 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     const persistedLine = draftLine
       ? undefined
       : saleWorkspace.sale?.lines.find((entry) => entry.id === lineId && entry.removedAt === null);
-    const item = draftLine?.catalogItem ?? (persistedLine ? catalog.findItem(persistedLine.catalogItemId) : null);
+    const item =
+      draftLine?.catalogItem ??
+      (persistedLine ? catalog.findItem(persistedLine.catalogItemId) : null);
     if (!item) {
       if (persistedLine)
         command.reportError(new Error(copy('This item is no longer available for editing.')));
@@ -948,9 +956,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
       if (workLines.some((line) => line.fulfillment?.status === 'WAITING')) {
         throw new Error(copy('Start all work before completing the transaction.'));
       }
-      if (
-        workLines.some((line) => !line.fulfillment || line.fulfillment.status === 'CANCELED')
-      ) {
+      if (workLines.some((line) => !line.fulfillment || line.fulfillment.status === 'CANCELED')) {
         throw new Error(copy('Canceled work cannot be completed as an active transaction.'));
       }
       for (const trackedLine of workLines) {
@@ -1049,10 +1055,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     paymentRouteId?: string,
   ) => core.createPayment(method, appliedAmount, tenderedAmount, providerReference, paymentRouteId);
 
-  const voidQueuedSale = async (
-    targetSale: Sale,
-    refundDisbursement?: RefundDisbursementInput,
-  ) => {
+  const voidQueuedSale = async (targetSale: Sale, refundDisbursement?: RefundDisbursementInput) => {
     command.clearNotice();
     try {
       const authoritative = await transactionAdapter.getSale(targetSale.id);
