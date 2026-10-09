@@ -39,7 +39,8 @@ describe('AuthenticatedRoute', () => {
     );
 
     expect(screen.queryByText('Protected shell content')).toBeNull();
-    expect(screen.queryByText('Backoffice sign in')).not.toBeNull();
+    // The sign-in surface stays painted while the redirect commits; once it has, the user is on /login.
+    expect(screen.queryByText('Login route')).not.toBeNull();
   });
 
   it('allows protected content for an authenticated Backoffice session', () => {

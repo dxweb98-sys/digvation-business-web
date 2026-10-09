@@ -15,7 +15,7 @@ function bootstrap(applications: DeploymentBootstrapConfig['applications']): Dep
       companyName: 'Digvation',
     },
     theme: { preset: 'DIGVATION_LIGHT', radius: 'SOFT' },
-    defaults: { locale: 'en-US', defaultCountry: 'US' },
+    defaults: { locale: 'en-US', country: 'US' },
   };
 }
 

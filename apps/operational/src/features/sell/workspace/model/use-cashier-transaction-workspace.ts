@@ -627,7 +627,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
       return await loadQueueContext(saleId);
     } catch (error) {
       command.reportError(error);
-      throw new Error(copy('The latest transaction could not be loaded.'));
+      throw new Error(copy('The latest transaction could not be loaded.'), { cause: error });
     }
   };
 

@@ -34,7 +34,6 @@ import type { useCashierTransactionWorkspace } from '../model/use-cashier-transa
 import {
   currencyInputFromAmount,
   normalizeCurrencyPaymentInput,
-  PosNumericInput,
 } from '../../lib/pos-controls';
 import { SaleAdjustmentControls } from '../../adjustment/sale-adjustment-controls';
 import { SaleLineTaskDialog } from '../../queue/sale-line-task-dialog';

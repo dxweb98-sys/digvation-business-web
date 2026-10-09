@@ -24,6 +24,7 @@ export function useCheckoutPaymentForm({
   const [isRecordingPayment, setRecordingPayment] = useState(false);
   const paymentInFlight = useRef(false);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- accepted baseline: state is reset when its source changes; moving it to render-time derivation is a behavioural refactor tracked separately
     setLoyaltyPoints('');
   }, [activeCustomer?.phoneE164, activeCustomer?.referenceId, activeCustomer?.type]);
   /**
