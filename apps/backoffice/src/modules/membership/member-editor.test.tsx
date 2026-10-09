@@ -15,7 +15,7 @@ const existing: Member = {
   customer: { id: 'c1', name: 'Budi', phoneE164: '+628111111111', version: 1, status: 'ACTIVE' },
 };
 
-function renderEditor(member: Member | null = null) {
+function renderEditor(member: Member | null = null, openingPointsAvailable = false) {
   const api = {
     enroll: vi.fn().mockResolvedValue(existing),
     updateCustomer: vi.fn().mockResolvedValue(existing.customer),
@@ -26,7 +26,14 @@ function renderEditor(member: Member | null = null) {
   const close = vi.fn();
   render(
     <DToastProvider>
-      <MemberEditor member={member} api={api} canLookupCustomers done={done} close={close} />
+      <MemberEditor
+        member={member}
+        api={api}
+        canLookupCustomers
+        openingPointsAvailable={openingPointsAvailable}
+        done={done}
+        close={close}
+      />
     </DToastProvider>,
   );
   return { api, done, close };
@@ -300,5 +307,47 @@ describe('MemberEditor existing Customer continuation', () => {
     expect(api.searchCustomers).not.toHaveBeenCalled();
     expect(api.enrollExisting).not.toHaveBeenCalled();
     expect(done).not.toHaveBeenCalled();
+  });
+});
+
+describe('MemberEditor opening points (Poin awal)', () => {
+  it('hides the field without Loyalty authority or when editing', () => {
+    renderEditor(null, false);
+    expect(screen.queryByLabelText('Poin awal (opsional)')).toBeNull();
+    cleanup();
+    renderEditor(existing, true);
+    expect(screen.queryByLabelText('Poin awal (opsional)')).toBeNull();
+  });
+
+  it('sends no opening points by default', async () => {
+    const { api } = renderEditor(null, true);
+    type('Nama', 'Budi');
+    type('No. HP', '081111111111');
+    fireEvent.click(save());
+    await waitFor(() => expect(api.enroll).toHaveBeenCalled());
+    expect(api.enroll).toHaveBeenCalledWith({ name: 'Budi', phone: '+6281111111111' });
+  });
+
+  it('sends a positive opening balance as typed', async () => {
+    const { api } = renderEditor(null, true);
+    type('Nama', 'Budi');
+    type('No. HP', '081111111111');
+    type('Poin awal (opsional)', '1250,5');
+    fireEvent.click(save());
+    await waitFor(() => expect(api.enroll).toHaveBeenCalled());
+    expect(api.enroll).toHaveBeenCalledWith({
+      name: 'Budi',
+      phone: '+6281111111111',
+      openingPoints: '1250.5',
+    });
+  });
+
+  it('treats zero as none and blocks an unusable value', () => {
+    renderEditor(null, true);
+    type('Nama', 'Budi');
+    type('No. HP', '081111111111');
+    type('Poin awal (opsional)', '0');
+    expect(save().disabled).toBe(true);
+    expect(screen.getByText('Masukkan angka poin, contoh 1250.')).toBeTruthy();
   });
 });

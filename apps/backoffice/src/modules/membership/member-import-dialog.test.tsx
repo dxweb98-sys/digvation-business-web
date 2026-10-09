@@ -1,3 +1,4 @@
+import { DToastProvider } from '@digvation/ui';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -65,12 +66,14 @@ function renderDialog(
   const onImported = vi.fn();
   const onClose = vi.fn();
   render(
-    <MemberImportDialog
-      api={api}
-      openingPointsAvailable={openingPointsAvailable}
-      onImported={onImported}
-      onClose={onClose}
-    />,
+    <DToastProvider>
+      <MemberImportDialog
+        api={api}
+        openingPointsAvailable={openingPointsAvailable}
+        onImported={onImported}
+        onClose={onClose}
+      />
+    </DToastProvider>,
   );
   return { api, onImported, onClose };
 }
@@ -321,5 +324,218 @@ describe('MemberImportDialog', () => {
       expect(screen.getByText('Member dengan saldo awal').nextSibling?.textContent).toBe('23');
       expect(screen.getByText('Total poin awal').nextSibling?.textContent).toBe('18.750');
     });
+  });
+});
+
+describe('MemberImportDialog existing Members', () => {
+  const existingRow = previewRow({
+    name: 'Ani',
+    phone: '+6281234567890',
+    openingPoints: '150.0000',
+    action: 'ADD_POINTS_TO_EXISTING_MEMBER',
+    existingMember: {
+      membershipId: 'm-1',
+      memberNumber: 'MBR-000007',
+      name: 'Ani Wijaya',
+      phone: '+6281234567890',
+      status: 'ACTIVE',
+      currentPoints: '300.0000',
+      resultingPoints: '450.0000',
+    },
+    warnings: [
+      {
+        field: 'row',
+        code: 'EXISTING_MEMBER_DATA_DIFFERS',
+        message: 'The file data differs from the current member.',
+      },
+    ],
+  });
+
+  beforeEach(() => localStorage.clear());
+
+  it('shows an existing Member as importable with current, imported and resulting points', async () => {
+    const { api } = renderDialog(preview([existingRow, previewRow({ rowNumber: 3 })]));
+    chooseFile(workbook());
+    fireEvent.click(button('Validasi'));
+
+    expect(await screen.findByText('Member sudah ada')).toBeTruthy();
+    // Canonical profile is shown, not the file's name.
+    expect(screen.getByText('Ani Wijaya')).toBeTruthy();
+    expect(screen.queryByText('Ani')).toBeNull();
+    const row = screen.getByText('Ani Wijaya').closest('tr') as HTMLElement;
+    expect(within(row).getByText('Saat ini').nextSibling?.textContent).toBe('300');
+    expect(within(row).getByText('Dari import').nextSibling?.textContent).toBe('+150');
+    expect(within(row).getByText('Hasil').nextSibling?.textContent).toBe('450');
+    // Informational, not a failure.
+    expect(
+      within(row).getByText(
+        'Data pada file berbeda dengan data member saat ini. Data member yang sudah ada akan dipertahankan.',
+      ),
+    ).toBeTruthy();
+    expect(button('Import').disabled).toBe(false);
+    expect(api.importMembers).not.toHaveBeenCalled();
+  });
+
+  it('does not count an existing Member under errors', async () => {
+    renderDialog(preview([existingRow]));
+    chooseFile(workbook());
+    fireEvent.click(button('Validasi'));
+    await screen.findByText('Member sudah ada');
+    expect(
+      screen.queryByText('Semua baris valid. Import akan menyimpan semua baris sekaligus.'),
+    ).not.toBeNull();
+  });
+
+  it('shows an already-imported member as skipped with previous and file points, not as an error', async () => {
+    const skipped = previewRow({
+      name: 'Ani',
+      openingPoints: '150.0000',
+      action: 'SKIP_ALREADY_IMPORTED',
+      existingMember: {
+        membershipId: 'm-1',
+        memberNumber: 'MBR-000007',
+        name: 'Ani Wijaya',
+        phone: '+6281234567890',
+        status: 'ACTIVE',
+        currentPoints: '450.0000',
+        resultingPoints: '450.0000',
+        previousImportPoints: '150.0000',
+      },
+      warnings: [
+        {
+          field: 'openingPoints',
+          code: 'IMPORT_POINTS_ALREADY_APPLIED',
+          message: 'already',
+        },
+      ],
+    });
+    renderDialog(preview([skipped]));
+    chooseFile(workbook());
+    fireEvent.click(button('Validasi'));
+
+    expect(await screen.findByText('Sudah pernah diimport')).toBeTruthy();
+    const row = screen.getByText('Ani Wijaya').closest('tr') as HTMLElement;
+    expect(within(row).getByText('Poin import sebelumnya').nextSibling?.textContent).toBe('150');
+    expect(within(row).getByText('Poin pada file ini').nextSibling?.textContent).toBe('150');
+    expect(within(row).getByText('Poin tidak akan ditambahkan kembali.')).toBeTruthy();
+    expect(within(row).queryByText('Dari import')).toBeNull();
+    expect(button('Import').disabled).toBe(false);
+  });
+});
+
+describe('MemberImportDialog operation feedback', () => {
+  const READY = 'Validasi selesai. Data siap diimpor.';
+  const NEEDS_FIX = 'Validasi selesai. Ada data yang perlu diperbaiki sebelum impor.';
+
+  it('confirms a successful validation with a success toast', async () => {
+    renderDialog(preview([previewRow()]));
+    chooseFile(workbook());
+    fireEvent.click(button('Validasi'));
+    expect(await screen.findByText(READY)).toBeTruthy();
+    expect(screen.queryByText(NEEDS_FIX)).toBeNull();
+  });
+
+  it('warns, keeping the row errors visible, when validation finds problems', async () => {
+    renderDialog(
+      preview([
+        previewRow({
+          action: null,
+          errors: [{ field: 'phone', code: 'PHONE_INVALID', message: 'bad' }],
+        }),
+      ]),
+    );
+    chooseFile(workbook());
+    fireEvent.click(button('Validasi'));
+    expect(await screen.findByText(NEEDS_FIX)).toBeTruthy();
+    expect(screen.queryByText(READY)).toBeNull();
+    expect(screen.getByText('No. HP tidak valid, contoh 081234567890.')).toBeTruthy();
+    expect(button('Import').disabled).toBe(true);
+  });
+
+  it('shows the API failure as an error and no validation success or warning', async () => {
+    const { api } = renderDialog(preview([previewRow()]));
+    api.previewImport.mockRejectedValueOnce(
+      Object.assign(new Error('x'), { status: 503, code: 'SERVICE_UNAVAILABLE' }),
+    );
+    chooseFile(workbook());
+    fireEvent.click(button('Validasi'));
+    expect(
+      await screen.findByText('Layanan sedang tidak tersedia. Coba beberapa saat lagi.'),
+    ).toBeTruthy();
+    expect(screen.queryByText(READY)).toBeNull();
+    expect(screen.queryByText(NEEDS_FIX)).toBeNull();
+  });
+
+  it('confirms a completed import with the processed row count', async () => {
+    renderDialog(preview([previewRow(), previewRow({ rowNumber: 3, name: 'Budi' })]));
+    chooseFile(workbook());
+    fireEvent.click(button('Validasi'));
+    await screen.findByText(READY);
+    fireEvent.click(button('Import'));
+    expect(await screen.findByText('Import member berhasil. 2 data diproses.')).toBeTruthy();
+  });
+
+  it('never reports success when Runtime rejects the import', async () => {
+    const { api } = renderDialog(preview([previewRow()]));
+    api.importMembers.mockResolvedValueOnce({
+      outcome: 'REJECTED',
+      preview: preview([
+        previewRow({
+          action: null,
+          errors: [{ field: 'phone', code: 'CUSTOMER_AMBIGUOUS', message: 'x' }],
+        }),
+      ]),
+      summary: null,
+    });
+    chooseFile(workbook());
+    fireEvent.click(button('Validasi'));
+    await screen.findByText(READY);
+    fireEvent.click(button('Import'));
+    expect(
+      await screen.findByText(
+        'Import tidak dilakukan. Data berubah atau tidak lagi valid; tidak ada data yang disimpan.',
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Import member berhasil/)).toBeNull();
+    expect(screen.queryByText('Import berhasil')).toBeNull();
+  });
+
+  it('ignores repeated clicks while validation and import are in flight', async () => {
+    const { api } = renderDialog(preview([previewRow()]));
+    let finishPreview: (value: MemberImportPreview) => void = () => undefined;
+    api.previewImport.mockReturnValueOnce(
+      new Promise<MemberImportPreview>((resolve) => (finishPreview = resolve)),
+    );
+    chooseFile(workbook());
+    const validate = button('Validasi');
+    fireEvent.click(validate);
+    fireEvent.click(validate);
+    fireEvent.click(validate);
+    expect(button('Memvalidasi…').disabled).toBe(true);
+    expect(api.previewImport).toHaveBeenCalledTimes(1);
+    finishPreview(preview([previewRow()]));
+    await screen.findByText(READY);
+
+    let finishImport: (value: unknown) => void = () => undefined;
+    api.importMembers.mockReturnValueOnce(new Promise((resolve) => (finishImport = resolve)));
+    const run = button('Import');
+    fireEvent.click(run);
+    fireEvent.click(run);
+    expect(button('Mengimpor…').disabled).toBe(true);
+    expect(api.importMembers).toHaveBeenCalledTimes(1);
+    finishImport({
+      outcome: 'IMPORTED',
+      preview: preview([previewRow()]),
+      summary: {
+        importedCount: 1,
+        createdCustomerCount: 1,
+        enrolledExistingCustomerCount: 0,
+        generatedMemberNumberCount: 1,
+        preservedMemberNumberCount: 0,
+        openingBalanceMemberCount: 0,
+        openingBalancePointsTotal: '0.0000',
+      },
+    });
+    expect(await screen.findByText('Import member berhasil. 1 data diproses.')).toBeTruthy();
   });
 });

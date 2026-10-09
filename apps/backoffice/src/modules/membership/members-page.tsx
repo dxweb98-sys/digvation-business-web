@@ -8,7 +8,15 @@ import {
   type TableColumn,
 } from '@digvation/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { CircleCheck, CircleOff, Eye, FileSpreadsheet, Pencil, Plus } from 'lucide-react';
+import {
+  CircleCheck,
+  CircleOff,
+  Eye,
+  FileSpreadsheet,
+  Pencil,
+  Plus,
+  SlidersHorizontal,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
@@ -19,6 +27,7 @@ import { isSessionExpiredError, useBackofficeAuth } from '../../auth/backoffice-
 import { MemberDetailDialog, memberQueryKeys } from './member-detail-dialog';
 import { MemberEditor } from './member-editor';
 import { MemberImportDialog } from './member-import-dialog';
+import { MemberPointsAdjustDialog } from './member-points-adjust-dialog';
 import { toNationalMemberPhone } from './member-phone';
 import { MembersApi, type Member, type Status } from './members-api';
 import { membershipCopy } from './membership-copy';
@@ -43,6 +52,7 @@ export function MembersPage() {
   const [editing, setEditing] = useState<Member | null | undefined>();
   const [detailId, setDetailId] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
+  const [adjusting, setAdjusting] = useState<Member | null>(null);
   const [statusTarget, setStatusTarget] = useState<Member | null>(null);
   const [changingStatus, setChangingStatus] = useState(false);
 
@@ -60,6 +70,10 @@ export function MembersPage() {
   const canViewLoyalty =
     session.access.capabilities.includes('LOYALTY_POINTS') &&
     session.access.permissions.includes('loyalty:read');
+  // Presentation hints only: Runtime enforces the Loyalty capability and loyalty:configure.
+  const canAdjustPoints =
+    session.access.capabilities.includes('LOYALTY_POINTS') &&
+    session.access.permissions.includes('loyalty:configure');
   const refresh = () => void queryClient.invalidateQueries({ queryKey: memberQueryKeys.all });
 
   const confirmStatus = async () => {
@@ -172,6 +186,12 @@ export function MembersPage() {
               onClick: (member) => setEditing(member),
             },
             {
+              label: copy.adjustPoints,
+              icon: <SlidersHorizontal className="size-4" />,
+              show: () => canAdjustPoints,
+              onClick: (member) => setAdjusting(member),
+            },
+            {
               label: copy.deactivate,
               icon: <CircleOff className="size-4" />,
               show: (member) => canManage && member.status === 'ACTIVE',
@@ -192,6 +212,7 @@ export function MembersPage() {
           member={editing}
           api={api}
           canLookupCustomers={session.access.permissions.includes('customers:read')}
+          openingPointsAvailable={canAdjustPoints}
           done={refresh}
           close={() => setEditing(undefined)}
         />
@@ -203,6 +224,8 @@ export function MembersPage() {
           api={api}
           canViewLoyalty={canViewLoyalty}
           canEdit={canManage}
+          canAdjustPoints={canAdjustPoints}
+          onAdjustPoints={(member) => setAdjusting(member)}
           formatDate={formatDate}
           onEdit={(member) => {
             setDetailId(null);
@@ -212,13 +235,19 @@ export function MembersPage() {
         />
       ) : null}
 
+      {adjusting ? (
+        <MemberPointsAdjustDialog
+          member={adjusting}
+          api={api}
+          onAdjusted={refresh}
+          onClose={() => setAdjusting(null)}
+        />
+      ) : null}
+
       {importing ? (
         <MemberImportDialog
           api={api}
-          openingPointsAvailable={
-            session.access.capabilities.includes('LOYALTY_POINTS') &&
-            session.access.permissions.includes('loyalty:configure')
-          }
+          openingPointsAvailable={canAdjustPoints}
           onImported={refresh}
           onClose={() => setImporting(false)}
         />

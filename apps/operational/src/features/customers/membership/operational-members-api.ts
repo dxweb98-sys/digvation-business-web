@@ -7,7 +7,11 @@ export type PointLedgerType =
   | 'EARN_REVERSAL'
   | 'REDEEM_REVERSAL'
   /** Points migrated with an imported Member; not tied to any Sale. */
-  | 'OPENING_BALANCE';
+  | 'OPENING_BALANCE'
+  /** Points from a Member import row for an already-existing Member. */
+  | 'IMPORT_POINTS'
+  /** Operator correction; the sign of `pointsDelta` is the direction. */
+  | 'MANUAL_ADJUSTMENT';
 
 export interface MemberCustomer {
   id: string;
