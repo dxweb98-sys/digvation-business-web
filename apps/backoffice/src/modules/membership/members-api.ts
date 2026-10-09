@@ -74,7 +74,11 @@ const ledgerTypeLabel: Record<LedgerType, Ledger['type']> = {
   MANUAL_ADJUSTMENT: 'Manual adjustment',
 };
 export type MemberImportAction =
-  'CREATE_CUSTOMER_AND_MEMBERSHIP' | 'ENROLL_EXISTING_CUSTOMER' | 'ADD_POINTS_TO_EXISTING_MEMBER';
+  | 'CREATE_CUSTOMER_AND_MEMBERSHIP'
+  | 'ENROLL_EXISTING_CUSTOMER'
+  | 'ADD_POINTS_TO_EXISTING_MEMBER'
+  /** Legacy points were already credited to this Member once; nothing is added. */
+  | 'SKIP_ALREADY_IMPORTED';
 /** The Member a row's phone already belongs to: its profile is kept, the row's points are added. */
 export interface MemberImportExistingMember {
   membershipId: string;
@@ -85,6 +89,8 @@ export interface MemberImportExistingMember {
   /** NUMERIC(19,4) strings. */
   currentPoints: string;
   resultingPoints: string;
+  /** Earlier one-time legacy credit; non-null means this row adds nothing. */
+  previousImportPoints?: string | null;
 }
 export type MemberImportField =
   'name' | 'phone' | 'memberNumber' | 'status' | 'joinedAt' | 'openingPoints' | 'row';
@@ -124,6 +130,8 @@ export interface MemberImportSummary {
   preservedMemberNumberCount: number;
   /** Existing Members that received imported points. */
   existingMemberPointsCount?: number;
+  /** Existing Members skipped because they were already credited. */
+  existingMemberSkippedCount?: number;
   /** NUMERIC(19,4) string. */
   existingMemberPointsTotal?: string;
   openingBalanceMemberCount: number;

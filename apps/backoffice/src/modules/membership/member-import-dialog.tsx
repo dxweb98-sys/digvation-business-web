@@ -417,6 +417,8 @@ function PreviewRow({ row }: { row: MemberImportRow }) {
       <td className="whitespace-nowrap px-3 py-2.5 text-right align-top tabular-nums">
         {row.openingPoints === null ? (
           muted('—')
+        ) : row.existingMember?.previousImportPoints ? (
+          muted(formatImportPoints(row.openingPoints, readStoredBackofficeLocale()))
         ) : row.existingMember && hasImportOpeningPoints(row.openingPoints) ? (
           <span className="font-semibold text-[var(--color-text)]">
             +{formatImportPoints(row.openingPoints, readStoredBackofficeLocale())}
@@ -436,14 +438,34 @@ function PreviewRow({ row }: { row: MemberImportRow }) {
           <DBadge variant="danger">{copy.errorRows}</DBadge>
         ) : (
           <DBadge variant={row.warnings.length ? 'warning' : 'success'}>
-            {existing
-              ? copy.badgeExistingMember
-              : row.action === 'ENROLL_EXISTING_CUSTOMER'
-                ? copy.actionEnroll
-                : copy.actionCreate}
+            {existing?.previousImportPoints
+              ? copy.badgeAlreadyImported
+              : existing
+                ? copy.badgeExistingMember
+                : row.action === 'ENROLL_EXISTING_CUSTOMER'
+                  ? copy.actionEnroll
+                  : copy.actionCreate}
           </DBadge>
         )}
-        {existing ? (
+        {existing?.previousImportPoints ? (
+          <dl className="mt-1.5 max-w-[14rem] space-y-0.5 text-xs tabular-nums">
+            <div className="flex justify-between gap-3">
+              <dt className="text-[var(--color-text-muted)]">{copy.pointsPreviousImport}</dt>
+              <dd>{formatImportPoints(existing.previousImportPoints, locale)}</dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-[var(--color-text-muted)]">{copy.pointsInThisFile}</dt>
+              <dd>{formatImportPoints(row.openingPoints ?? '0', locale)}</dd>
+            </div>
+            <div className="flex justify-between gap-3 border-t border-[var(--color-border)] pt-0.5">
+              <dt className="text-[var(--color-text-muted)]">{copy.pointsCurrent}</dt>
+              <dd>{formatImportPoints(existing.currentPoints, locale)}</dd>
+            </div>
+            <p className="pt-0.5 font-medium text-[var(--color-text-muted)]">
+              {copy.pointsNotAddedAgain}
+            </p>
+          </dl>
+        ) : existing ? (
           <dl className="mt-1.5 max-w-[14rem] space-y-0.5 text-xs tabular-nums">
             <div className="flex justify-between gap-3">
               <dt className="text-[var(--color-text-muted)]">{copy.pointsCurrent}</dt>
@@ -512,6 +534,12 @@ function ImportResult({ summary }: { summary: MemberImportSummary }) {
         <SummaryTile label={copy.summaryEnrolled} value={summary.enrolledExistingCustomerCount} />
         <SummaryTile label={copy.summaryGenerated} value={summary.generatedMemberNumberCount} />
         <SummaryTile label={copy.summaryPreserved} value={summary.preservedMemberNumberCount} />
+        {summary.existingMemberSkippedCount ? (
+          <SummaryTile
+            label={copy.summaryExistingSkipped}
+            value={summary.existingMemberSkippedCount}
+          />
+        ) : null}
         {summary.existingMemberPointsCount ? (
           <>
             <SummaryTile

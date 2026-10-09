@@ -132,6 +132,11 @@ const copy = {
     pointsCurrent: 'Saat ini',
     pointsFromImport: 'Dari import',
     pointsResult: 'Hasil',
+    badgeAlreadyImported: 'Sudah pernah diimport',
+    pointsPreviousImport: 'Poin import sebelumnya',
+    pointsInThisFile: 'Poin pada file ini',
+    pointsNotAddedAgain: 'Poin tidak akan ditambahkan kembali.',
+    summaryExistingSkipped: 'Member lama dilewati (sudah diimport)',
     summaryExistingMembers: 'Member lama ditambah poin',
     summaryExistingPoints: 'Poin ditambahkan ke member lama',
   },
@@ -259,6 +264,11 @@ const copy = {
     pointsCurrent: 'Current',
     pointsFromImport: 'From import',
     pointsResult: 'Result',
+    badgeAlreadyImported: 'Already imported',
+    pointsPreviousImport: 'Previously imported points',
+    pointsInThisFile: 'Points in this file',
+    pointsNotAddedAgain: 'The points will not be added again.',
+    summaryExistingSkipped: 'Existing members skipped (already imported)',
     summaryExistingMembers: 'Existing members given points',
     summaryExistingPoints: 'Points added to existing members',
   },
@@ -281,6 +291,8 @@ const importIssueCopy: Record<string, string> = {
   EXISTING_MEMBER_DATA_DIFFERS:
     'Data pada file berbeda dengan data member saat ini. Data member yang sudah ada akan dipertahankan.',
   EXISTING_MEMBER_INACTIVE: 'Member ini nonaktif; poin tetap ditambahkan.',
+  IMPORT_POINTS_ALREADY_APPLIED:
+    'Member ini sudah pernah menerima poin awal/import. Gunakan Sesuaikan poin untuk koreksi.',
   IMPORT_FILE_ALREADY_APPLIED:
     'File ini sudah pernah diimpor. Mengimpor ulang akan menambahkan poin dua kali.',
   CUSTOMER_AMBIGUOUS:

@@ -382,4 +382,40 @@ describe('MemberImportDialog existing Members', () => {
       screen.queryByText('Semua baris valid. Import akan menyimpan semua baris sekaligus.'),
     ).not.toBeNull();
   });
+
+  it('shows an already-imported member as skipped with previous and file points, not as an error', async () => {
+    const skipped = previewRow({
+      name: 'Ani',
+      openingPoints: '150.0000',
+      action: 'SKIP_ALREADY_IMPORTED',
+      existingMember: {
+        membershipId: 'm-1',
+        memberNumber: 'MBR-000007',
+        name: 'Ani Wijaya',
+        phone: '+6281234567890',
+        status: 'ACTIVE',
+        currentPoints: '450.0000',
+        resultingPoints: '450.0000',
+        previousImportPoints: '150.0000',
+      },
+      warnings: [
+        {
+          field: 'openingPoints',
+          code: 'IMPORT_POINTS_ALREADY_APPLIED',
+          message: 'already',
+        },
+      ],
+    });
+    renderDialog(preview([skipped]));
+    chooseFile(workbook());
+    fireEvent.click(button('Validasi'));
+
+    expect(await screen.findByText('Sudah pernah diimport')).toBeTruthy();
+    const row = screen.getByText('Ani Wijaya').closest('tr') as HTMLElement;
+    expect(within(row).getByText('Poin import sebelumnya').nextSibling?.textContent).toBe('150');
+    expect(within(row).getByText('Poin pada file ini').nextSibling?.textContent).toBe('150');
+    expect(within(row).getByText('Poin tidak akan ditambahkan kembali.')).toBeTruthy();
+    expect(within(row).queryByText('Dari import')).toBeNull();
+    expect(button('Import').disabled).toBe(false);
+  });
 });
