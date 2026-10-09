@@ -119,7 +119,7 @@ const copy = {
     adjustSubmit: 'Simpan penyesuaian',
     adjustSaved: 'Poin member disesuaikan.',
     adjustLoadingBalance: 'Memuat saldo poin…',
-    ledgerImportPoints: 'Poin dari import',
+    ledgerImportPoints: 'Import data member lama',
     ledgerManualAdjustment: 'Penyesuaian manual',
     ledgerReason: 'Alasan',
     // Opening points on enrollment
@@ -253,7 +253,7 @@ const copy = {
     adjustSubmit: 'Save adjustment',
     adjustSaved: 'Member points adjusted.',
     adjustLoadingBalance: 'Loading point balance…',
-    ledgerImportPoints: 'Imported points',
+    ledgerImportPoints: 'Legacy member import',
     ledgerManualAdjustment: 'Manual adjustment',
     ledgerReason: 'Reason',
     openingPointsField: 'Opening points (optional)',

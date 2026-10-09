@@ -145,7 +145,7 @@ describe('MemberDetailDialog point adjustments', () => {
     ]);
     expect(await screen.findByText('Penyesuaian manual')).toBeTruthy();
     expect(screen.getByText('Alasan: Salah input')).toBeTruthy();
-    expect(screen.getByText('Poin dari import')).toBeTruthy();
+    expect(screen.getByText('Import data member lama')).toBeTruthy();
   });
 
   it('offers Sesuaikan poin only when allowed', async () => {
