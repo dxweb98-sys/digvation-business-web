@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
 import { readStoredBackofficeLocale } from '../../app/localization/backoffice-localization';
 import { useFormState } from '../../shared/forms/use-form-state';
+import { adjustmentAmountForRequest, sanitizePointsInput } from './member-points-model';
 import { findExistingCustomerCandidates } from './existing-customer-candidates';
 import { ExistingCustomerChoice } from './existing-customer-choice';
 import type { Customer, Member, MembersApi } from './members-api';
@@ -51,6 +52,7 @@ export function MemberEditor({
   member,
   api,
   canLookupCustomers,
+  openingPointsAvailable = false,
   done,
   close,
 }: {
@@ -58,12 +60,15 @@ export function MemberEditor({
   api: Pick<MembersApi, 'enroll' | 'enrollExisting' | 'searchCustomers' | 'updateCustomer'>;
   /** customers:read: without it a phone conflict only shows the specific message. */
   canLookupCustomers: boolean;
+  /** Loyalty Points capability plus loyalty:configure; Runtime enforces it regardless. */
+  openingPointsAvailable?: boolean;
   done: () => void;
   close: () => void;
 }) {
   const form = useFormState(() => ({
     name: member?.customer.name ?? '',
     phone: member ? toNationalMemberPhone(member.customer.phoneE164) : '',
+    openingPoints: '',
   }));
   const [busy, setBusy] = useState(false);
   const [candidates, setCandidates] = useState<Customer[] | null>(null);
@@ -74,6 +79,12 @@ export function MemberEditor({
   const { name } = form.values;
   const phone = toCanonicalMemberPhone(form.values.phone);
   const phoneTyped = form.values.phone.trim() !== '';
+  // Poin awal belongs to enrollment only; blank means none. A positive value is sent as typed.
+  const openingTyped = form.values.openingPoints.trim() !== '';
+  const openingRequest = adjustmentAmountForRequest(form.values.openingPoints);
+  const openingInvalid = !member && openingPointsAvailable && openingTyped && !openingRequest;
+  const openingPoints =
+    !member && openingPointsAvailable && openingRequest ? { openingPoints: openingRequest } : {};
 
   const fail = (error: unknown) =>
     showToast({ variant: 'danger', title: normalizeBackofficeApiError(error).safeMessage });
@@ -92,11 +103,11 @@ export function MemberEditor({
   };
 
   const save = async () => {
-    if (!name.trim() || !phone || busy) return;
+    if (!name.trim() || !phone || openingInvalid || busy) return;
     setBusy(true);
     try {
       if (member) await api.updateCustomer(member, { name, phone });
-      else await api.enroll({ name, phone });
+      else await api.enroll({ name, phone, ...openingPoints });
       done();
       close();
     } catch (error) {
@@ -113,7 +124,7 @@ export function MemberEditor({
     setBusy(true);
     try {
       // Only the Membership is created: the existing Customer's name is never overwritten.
-      await api.enrollExisting({ customerId: selectedId });
+      await api.enrollExisting({ customerId: selectedId, ...openingPoints });
       done();
       close();
     } catch (error) {
@@ -161,7 +172,10 @@ export function MemberEditor({
             <DButton variant="secondary" disabled={busy} onClick={close}>
               {text.cancel}
             </DButton>
-            <DButton disabled={!name.trim() || !phone || busy} onClick={() => void save()}>
+            <DButton
+              disabled={!name.trim() || !phone || openingInvalid || busy}
+              onClick={() => void save()}
+            >
               {text.save}
             </DButton>
           </div>
@@ -225,6 +239,18 @@ export function MemberEditor({
                 hint={phoneTyped && !phone ? undefined : text.phoneHint}
                 error={phoneTyped && !phone ? text.phoneInvalid : undefined}
               />
+              {!member && openingPointsAvailable ? (
+                <DInput
+                  label={text.openingPointsField}
+                  value={form.values.openingPoints}
+                  onChange={(value) => form.setField('openingPoints', sanitizePointsInput(value))}
+                  inputMode="decimal"
+                  placeholder="0"
+                  hint={openingInvalid ? undefined : text.openingPointsFieldHint}
+                  error={openingInvalid ? text.openingPointsFieldInvalid : undefined}
+                  containerClassName="sm:col-span-2"
+                />
+              ) : null}
             </div>
           </MemberPanel>
         </div>

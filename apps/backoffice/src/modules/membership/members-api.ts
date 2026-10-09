@@ -27,7 +27,14 @@ export interface Balance {
   membershipId: string;
   pointsBalance: string;
 }
-type LedgerType = 'EARN' | 'REDEEM' | 'EARN_REVERSAL' | 'REDEEM_REVERSAL' | 'OPENING_BALANCE';
+type LedgerType =
+  | 'EARN'
+  | 'REDEEM'
+  | 'EARN_REVERSAL'
+  | 'REDEEM_REVERSAL'
+  | 'OPENING_BALANCE'
+  | 'IMPORT_POINTS'
+  | 'MANUAL_ADJUSTMENT';
 type LedgerResponse = {
   id: string;
   type: LedgerType;
@@ -36,6 +43,8 @@ type LedgerResponse = {
   /** The source Sale; null for an OPENING_BALANCE migrated with an imported Member. */
   sourceSaleId: string | null;
   reversesLedgerEntryId: string | null;
+  /** Operator reason; set for MANUAL_ADJUSTMENT only. */
+  reason?: string | null;
   createdAt: string;
 };
 export interface Ledger {
@@ -45,11 +54,14 @@ export interface Ledger {
     | 'Points redeemed'
     | 'Earned points reversed'
     | 'Redeemed points restored'
-    | 'Opening balance';
+    | 'Opening balance'
+    | 'Imported points'
+    | 'Manual adjustment';
   pointsDelta: string;
   balanceAfter: string;
   sourceSaleId: string | null;
   reversesLedgerEntryId: string | null;
+  reason?: string | null;
   createdAt: string;
 }
 const ledgerTypeLabel: Record<LedgerType, Ledger['type']> = {
@@ -58,8 +70,22 @@ const ledgerTypeLabel: Record<LedgerType, Ledger['type']> = {
   EARN_REVERSAL: 'Earned points reversed',
   REDEEM_REVERSAL: 'Redeemed points restored',
   OPENING_BALANCE: 'Opening balance',
+  IMPORT_POINTS: 'Imported points',
+  MANUAL_ADJUSTMENT: 'Manual adjustment',
 };
-export type MemberImportAction = 'CREATE_CUSTOMER_AND_MEMBERSHIP' | 'ENROLL_EXISTING_CUSTOMER';
+export type MemberImportAction =
+  'CREATE_CUSTOMER_AND_MEMBERSHIP' | 'ENROLL_EXISTING_CUSTOMER' | 'ADD_POINTS_TO_EXISTING_MEMBER';
+/** The Member a row's phone already belongs to: its profile is kept, the row's points are added. */
+export interface MemberImportExistingMember {
+  membershipId: string;
+  memberNumber: string;
+  name: string;
+  phone: string;
+  status: Status;
+  /** NUMERIC(19,4) strings. */
+  currentPoints: string;
+  resultingPoints: string;
+}
 export type MemberImportField =
   'name' | 'phone' | 'memberNumber' | 'status' | 'joinedAt' | 'openingPoints' | 'row';
 export interface MemberImportIssue {
@@ -78,6 +104,7 @@ export interface MemberImportRow {
   /** Opening Loyalty points as a NUMERIC(19,4) string; "0.0000" opens no balance. Typed value when invalid. */
   openingPoints: string | null;
   action: MemberImportAction | null;
+  existingMember?: MemberImportExistingMember | null;
   errors: MemberImportIssue[];
   warnings: MemberImportIssue[];
 }
@@ -95,9 +122,18 @@ export interface MemberImportSummary {
   enrolledExistingCustomerCount: number;
   generatedMemberNumberCount: number;
   preservedMemberNumberCount: number;
+  /** Existing Members that received imported points. */
+  existingMemberPointsCount?: number;
+  /** NUMERIC(19,4) string. */
+  existingMemberPointsTotal?: string;
   openingBalanceMemberCount: number;
   /** NUMERIC(19,4) string. */
   openingBalancePointsTotal: string;
+}
+export interface PointAdjustmentResult {
+  membershipId: string;
+  previousBalance: string;
+  pointsBalance: string;
 }
 export interface MemberImportResult {
   outcome: 'IMPORTED' | 'REJECTED';
@@ -121,10 +157,10 @@ export class MembersApi {
   get(id: string) {
     return this.client.get<Member>(`/api/v1/memberships/${id}`);
   }
-  enroll(input: { name: string; phone: string }) {
+  enroll(input: { name: string; phone: string; openingPoints?: string }) {
     return this.client.post<Member>('/api/v1/memberships', input);
   }
-  enrollExisting(input: { customerId: string }) {
+  enrollExisting(input: { customerId: string; openingPoints?: string }) {
     return this.client.post<Member>('/api/v1/memberships/enroll-existing-customer', input);
   }
   searchCustomers(q: string) {
@@ -164,10 +200,24 @@ export class MembersApi {
   balance(id: string) {
     return this.client.get<Balance>(`/api/v1/loyalty/memberships/${id}/balance`);
   }
+  /** Append-only: Runtime records a MANUAL_ADJUSTMENT ledger entry with this reason and actor. */
+  adjustPoints(
+    id: string,
+    input: { direction: 'ADD' | 'SUBTRACT'; points: string; reason: string },
+  ) {
+    return this.client.post<PointAdjustmentResult>(
+      `/api/v1/loyalty/memberships/${id}/adjustments`,
+      input,
+    );
+  }
   async history(id: string) {
     const rows = await this.client.get<LedgerResponse[]>(
       `/api/v1/loyalty/memberships/${id}/history`,
     );
-    return rows.map(({ type, ...row }) => ({ ...row, type: ledgerTypeLabel[type] }));
+    return rows.map(({ type, reason, ...row }) => ({
+      ...row,
+      reason: reason ?? null,
+      type: ledgerTypeLabel[type],
+    }));
   }
 }

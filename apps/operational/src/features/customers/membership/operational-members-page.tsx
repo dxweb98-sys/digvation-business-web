@@ -49,6 +49,8 @@ const ledgerLabel: Record<PointLedgerType, string> = {
   EARN_REVERSAL: 'Earned points reversed',
   REDEEM_REVERSAL: 'Used points restored',
   OPENING_BALANCE: 'Migrated opening balance',
+  IMPORT_POINTS: 'Imported points',
+  MANUAL_ADJUSTMENT: 'Manual points adjustment',
 };
 
 /** Container: wires the authenticated Operational client and the permission-derived edit right. */

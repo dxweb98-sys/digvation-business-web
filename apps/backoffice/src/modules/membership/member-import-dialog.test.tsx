@@ -323,3 +323,63 @@ describe('MemberImportDialog', () => {
     });
   });
 });
+
+describe('MemberImportDialog existing Members', () => {
+  const existingRow = previewRow({
+    name: 'Ani',
+    phone: '+6281234567890',
+    openingPoints: '150.0000',
+    action: 'ADD_POINTS_TO_EXISTING_MEMBER',
+    existingMember: {
+      membershipId: 'm-1',
+      memberNumber: 'MBR-000007',
+      name: 'Ani Wijaya',
+      phone: '+6281234567890',
+      status: 'ACTIVE',
+      currentPoints: '300.0000',
+      resultingPoints: '450.0000',
+    },
+    warnings: [
+      {
+        field: 'row',
+        code: 'EXISTING_MEMBER_DATA_DIFFERS',
+        message: 'The file data differs from the current member.',
+      },
+    ],
+  });
+
+  beforeEach(() => localStorage.clear());
+
+  it('shows an existing Member as importable with current, imported and resulting points', async () => {
+    const { api } = renderDialog(preview([existingRow, previewRow({ rowNumber: 3 })]));
+    chooseFile(workbook());
+    fireEvent.click(button('Validasi'));
+
+    expect(await screen.findByText('Member sudah ada')).toBeTruthy();
+    // Canonical profile is shown, not the file's name.
+    expect(screen.getByText('Ani Wijaya')).toBeTruthy();
+    expect(screen.queryByText('Ani')).toBeNull();
+    const row = screen.getByText('Ani Wijaya').closest('tr') as HTMLElement;
+    expect(within(row).getByText('Saat ini').nextSibling?.textContent).toBe('300');
+    expect(within(row).getByText('Dari import').nextSibling?.textContent).toBe('+150');
+    expect(within(row).getByText('Hasil').nextSibling?.textContent).toBe('450');
+    // Informational, not a failure.
+    expect(
+      within(row).getByText(
+        'Data pada file berbeda dengan data member saat ini. Data member yang sudah ada akan dipertahankan.',
+      ),
+    ).toBeTruthy();
+    expect(button('Import').disabled).toBe(false);
+    expect(api.importMembers).not.toHaveBeenCalled();
+  });
+
+  it('does not count an existing Member under errors', async () => {
+    renderDialog(preview([existingRow]));
+    chooseFile(workbook());
+    fireEvent.click(button('Validasi'));
+    await screen.findByText('Member sudah ada');
+    expect(
+      screen.queryByText('Semua baris valid. Import akan menyimpan semua baris sekaligus.'),
+    ).not.toBeNull();
+  });
+});

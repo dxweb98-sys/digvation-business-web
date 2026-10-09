@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { MemberDetailDialog } from './member-detail-dialog';
@@ -126,5 +126,61 @@ describe('MembersApi.history', () => {
       ['Opening balance', null],
       ['Points earned', 's1'],
     ]);
+  });
+});
+
+describe('MemberDetailDialog point adjustments', () => {
+  it('shows import and manual adjustment entries with their reason', async () => {
+    renderDetail(true, [
+      {
+        ...earned,
+        id: 'l2',
+        type: 'Manual adjustment',
+        pointsDelta: '-50',
+        balanceAfter: '70',
+        sourceSaleId: null,
+        reason: 'Salah input',
+      },
+      { ...earned, id: 'l3', type: 'Imported points', sourceSaleId: null },
+    ]);
+    expect(await screen.findByText('Penyesuaian manual')).toBeTruthy();
+    expect(screen.getByText('Alasan: Salah input')).toBeTruthy();
+    expect(screen.getByText('Poin dari import')).toBeTruthy();
+  });
+
+  it('offers Sesuaikan poin only when allowed', async () => {
+    const onAdjust = vi.fn();
+    const renderWith = (canAdjustPoints: boolean) => {
+      cleanup();
+      const api = {
+        get: vi.fn().mockResolvedValue(member),
+        balance: vi.fn().mockResolvedValue({ membershipId: 'm1', pointsBalance: '120' }),
+        history: vi.fn().mockResolvedValue([]),
+      };
+      render(
+        <QueryClientProvider
+          client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+        >
+          <MemberDetailDialog
+            memberId="m1"
+            api={api}
+            canViewLoyalty
+            canEdit
+            canAdjustPoints={canAdjustPoints}
+            formatDate={(value) => value}
+            onEdit={vi.fn()}
+            onAdjustPoints={onAdjust}
+            onClose={vi.fn()}
+          />
+        </QueryClientProvider>,
+      );
+    };
+    renderWith(false);
+    await screen.findByText('Detail Member');
+    await screen.findByText('Riwayat Poin');
+    expect(screen.queryByRole('button', { name: 'Sesuaikan poin' })).toBeNull();
+    renderWith(true);
+    fireEvent.click(await screen.findByRole('button', { name: 'Sesuaikan poin' }));
+    expect(onAdjust).toHaveBeenCalledWith(member);
   });
 });

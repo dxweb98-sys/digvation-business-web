@@ -55,7 +55,7 @@ const copy = {
     // Import
     importTitle: 'Import Member',
     importIntro:
-      'Pindahkan data member dari sistem sebelumnya menggunakan template Excel. Saldo poin lama dapat diisi di kolom Poin Awal.',
+      'Pindahkan data member dari sistem sebelumnya menggunakan template Excel. Saldo poin lama dapat diisi di kolom Poin Awal. Jika No. HP sudah menjadi member, poin pada file ditambahkan ke saldonya dan data member tidak diubah.',
     downloadTemplate: 'Unduh template',
     templateHint: 'Isi sheet "Members". No. HP cukup ditulis 08…, tanpa +62.',
     chooseFile: 'Pilih file .xlsx',
@@ -100,6 +100,40 @@ const copy = {
     summaryOpeningPoints: 'Total poin awal',
     ledgerOpeningBalance: 'Saldo awal migrasi',
     templateFailed: 'Template tidak dapat diunduh.',
+    // Manual point adjustment
+    adjustPoints: 'Sesuaikan poin',
+    adjustType: 'Jenis penyesuaian',
+    adjustAdd: 'Tambah poin',
+    adjustSubtract: 'Kurangi poin',
+    adjustAmount: 'Jumlah poin',
+    adjustAmountPlaceholder: 'Contoh: 200',
+    adjustAmountInvalid: 'Masukkan jumlah poin lebih dari 0.',
+    adjustReason: 'Alasan',
+    adjustReasonPlaceholder: 'Contoh: Poin dari sistem lama belum tercatat',
+    adjustCurrent: 'Saat ini',
+    adjustAdjustment: 'Penyesuaian',
+    adjustResult: 'Hasil',
+    adjustNegative: 'Pengurangan melebihi saldo poin. Saldo tidak boleh negatif.',
+    adjustAppendOnly:
+      'Penyesuaian dicatat sebagai riwayat baru beserta alasan dan pencatatnya. Riwayat poin yang sudah ada tidak diubah.',
+    adjustSubmit: 'Simpan penyesuaian',
+    adjustSaved: 'Poin member disesuaikan.',
+    adjustLoadingBalance: 'Memuat saldo poin…',
+    ledgerImportPoints: 'Poin dari import',
+    ledgerManualAdjustment: 'Penyesuaian manual',
+    ledgerReason: 'Alasan',
+    // Opening points on enrollment
+    openingPointsField: 'Poin awal (opsional)',
+    openingPointsFieldHint:
+      'Untuk member lama yang belum tercatat. Dicatat sebagai riwayat saldo awal; kosongkan jika tidak ada.',
+    openingPointsFieldInvalid: 'Masukkan angka poin, contoh 1250.',
+    // Import preview
+    badgeExistingMember: 'Member sudah ada',
+    pointsCurrent: 'Saat ini',
+    pointsFromImport: 'Dari import',
+    pointsResult: 'Hasil',
+    summaryExistingMembers: 'Member lama ditambah poin',
+    summaryExistingPoints: 'Poin ditambahkan ke member lama',
   },
   en: {
     pageEyebrow: 'Customer management',
@@ -152,7 +186,7 @@ const copy = {
     balanceAfter: 'Balance',
     importTitle: 'Import members',
     importIntro:
-      'Move members from a previous system with the Excel template. Previous point balances can be entered in the Poin Awal column.',
+      'Move members from a previous system with the Excel template. Previous point balances can be entered in the Poin Awal column. If a phone number already belongs to a member, the points in the file are added to its balance and the member data is not changed.',
     downloadTemplate: 'Download template',
     templateHint: 'Fill the "Members" sheet. Phone numbers can be written as 08…, without +62.',
     chooseFile: 'Choose .xlsx file',
@@ -196,6 +230,37 @@ const copy = {
     summaryOpeningPoints: 'Total opening points',
     ledgerOpeningBalance: 'Migrated opening balance',
     templateFailed: 'The template could not be downloaded.',
+    adjustPoints: 'Adjust points',
+    adjustType: 'Adjustment type',
+    adjustAdd: 'Add points',
+    adjustSubtract: 'Subtract points',
+    adjustAmount: 'Points',
+    adjustAmountPlaceholder: 'For example: 200',
+    adjustAmountInvalid: 'Enter a number of points greater than 0.',
+    adjustReason: 'Reason',
+    adjustReasonPlaceholder: 'For example: Points from the previous system were not recorded',
+    adjustCurrent: 'Current',
+    adjustAdjustment: 'Adjustment',
+    adjustResult: 'Result',
+    adjustNegative: 'The subtraction exceeds the point balance. The balance cannot go negative.',
+    adjustAppendOnly:
+      'The adjustment is recorded as a new history entry with its reason and author. Existing point history is not changed.',
+    adjustSubmit: 'Save adjustment',
+    adjustSaved: 'Member points adjusted.',
+    adjustLoadingBalance: 'Loading point balance…',
+    ledgerImportPoints: 'Imported points',
+    ledgerManualAdjustment: 'Manual adjustment',
+    ledgerReason: 'Reason',
+    openingPointsField: 'Opening points (optional)',
+    openingPointsFieldHint:
+      'For a legacy member not recorded yet. Saved as an opening balance entry; leave blank for none.',
+    openingPointsFieldInvalid: 'Enter a number of points, for example 1250.',
+    badgeExistingMember: 'Existing member',
+    pointsCurrent: 'Current',
+    pointsFromImport: 'From import',
+    pointsResult: 'Result',
+    summaryExistingMembers: 'Existing members given points',
+    summaryExistingPoints: 'Points added to existing members',
   },
 } as const;
 
@@ -213,6 +278,11 @@ const importIssueCopy: Record<string, string> = {
   PHONE_INVALID: 'No. HP tidak valid, contoh 081234567890.',
   PHONE_DUPLICATE_IN_FILE: 'No. HP yang sama juga ada di baris {rows}.',
   PHONE_MEMBER_EXISTS: 'No. HP ini sudah dipakai member lain.',
+  EXISTING_MEMBER_DATA_DIFFERS:
+    'Data pada file berbeda dengan data member saat ini. Data member yang sudah ada akan dipertahankan.',
+  EXISTING_MEMBER_INACTIVE: 'Member ini nonaktif; poin tetap ditambahkan.',
+  IMPORT_FILE_ALREADY_APPLIED:
+    'File ini sudah pernah diimpor. Mengimpor ulang akan menambahkan poin dua kali.',
   CUSTOMER_AMBIGUOUS:
     'Ada lebih dari satu pelanggan dengan No. HP ini. Rapikan data pelanggan terlebih dahulu.',
   MEMBER_NUMBER_TOO_LONG: 'Nomor member maksimal 32 karakter.',
