@@ -1,4 +1,4 @@
-import { DBadge, DButton, DDialog, DInfoNote } from '@digvation/ui';
+import { DBadge, DButton, DDialog, DInfoNote, useToast } from '@digvation/ui';
 import {
   CircleAlert,
   CircleCheck,
@@ -64,6 +64,7 @@ export function MemberImportDialog({
   onClose: () => void;
 }) {
   const copy = membershipCopy();
+  const { showToast } = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
@@ -72,6 +73,11 @@ export function MemberImportDialog({
 
   const failure = (error: unknown) =>
     isSessionExpiredError(error) ? null : normalizeBackofficeApiError(error).safeMessage;
+  // Operation status goes to the shared toast; row and file detail stay in the dialog.
+  const failToast = (error: unknown) => {
+    const message = failure(error);
+    if (message) showToast({ variant: 'danger', title: message });
+  };
 
   const choose = (candidate: File | undefined) => {
     if (!candidate) return;
@@ -107,9 +113,16 @@ export function MemberImportDialog({
     if (!file || busy) return;
     setBusy('preview');
     try {
-      setStep({ kind: 'preview', preview: await api.previewImport(file), rejectedAtImport: false });
+      const preview = await api.previewImport(file);
+      setFileError(null);
+      setStep({ kind: 'preview', preview, rejectedAtImport: false });
+      showToast(
+        preview.canImport
+          ? { variant: 'success', title: copy.feedbackValidated }
+          : { variant: 'warning', title: copy.feedbackNeedsFix },
+      );
     } catch (error) {
-      setFileError(failure(error));
+      failToast(error);
     } finally {
       setBusy(null);
     }
@@ -123,9 +136,16 @@ export function MemberImportDialog({
       if (result.outcome === 'IMPORTED' && result.summary) {
         onImported();
         setStep({ kind: 'result', summary: result.summary });
-      } else setStep({ kind: 'preview', preview: result.preview, rejectedAtImport: true });
+        showToast({
+          variant: 'success',
+          title: copy.feedbackImported(result.preview.totalRows),
+        });
+      } else {
+        setStep({ kind: 'preview', preview: result.preview, rejectedAtImport: true });
+        showToast({ variant: 'warning', title: copy.feedbackRejected });
+      }
     } catch (error) {
-      setFileError(failure(error));
+      failToast(error);
       setStep({ kind: 'file' });
     } finally {
       setBusy(null);

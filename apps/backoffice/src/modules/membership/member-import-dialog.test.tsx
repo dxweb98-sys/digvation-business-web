@@ -1,3 +1,4 @@
+import { DToastProvider } from '@digvation/ui';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -65,12 +66,14 @@ function renderDialog(
   const onImported = vi.fn();
   const onClose = vi.fn();
   render(
-    <MemberImportDialog
-      api={api}
-      openingPointsAvailable={openingPointsAvailable}
-      onImported={onImported}
-      onClose={onClose}
-    />,
+    <DToastProvider>
+      <MemberImportDialog
+        api={api}
+        openingPointsAvailable={openingPointsAvailable}
+        onImported={onImported}
+        onClose={onClose}
+      />
+    </DToastProvider>,
   );
   return { api, onImported, onClose };
 }
@@ -417,5 +420,122 @@ describe('MemberImportDialog existing Members', () => {
     expect(within(row).getByText('Poin tidak akan ditambahkan kembali.')).toBeTruthy();
     expect(within(row).queryByText('Dari import')).toBeNull();
     expect(button('Import').disabled).toBe(false);
+  });
+});
+
+describe('MemberImportDialog operation feedback', () => {
+  const READY = 'Validasi selesai. Data siap diimpor.';
+  const NEEDS_FIX = 'Validasi selesai. Ada data yang perlu diperbaiki sebelum impor.';
+
+  it('confirms a successful validation with a success toast', async () => {
+    renderDialog(preview([previewRow()]));
+    chooseFile(workbook());
+    fireEvent.click(button('Validasi'));
+    expect(await screen.findByText(READY)).toBeTruthy();
+    expect(screen.queryByText(NEEDS_FIX)).toBeNull();
+  });
+
+  it('warns, keeping the row errors visible, when validation finds problems', async () => {
+    renderDialog(
+      preview([
+        previewRow({
+          action: null,
+          errors: [{ field: 'phone', code: 'PHONE_INVALID', message: 'bad' }],
+        }),
+      ]),
+    );
+    chooseFile(workbook());
+    fireEvent.click(button('Validasi'));
+    expect(await screen.findByText(NEEDS_FIX)).toBeTruthy();
+    expect(screen.queryByText(READY)).toBeNull();
+    expect(screen.getByText('No. HP tidak valid, contoh 081234567890.')).toBeTruthy();
+    expect(button('Import').disabled).toBe(true);
+  });
+
+  it('shows the API failure as an error and no validation success or warning', async () => {
+    const { api } = renderDialog(preview([previewRow()]));
+    api.previewImport.mockRejectedValueOnce(
+      Object.assign(new Error('x'), { status: 503, code: 'SERVICE_UNAVAILABLE' }),
+    );
+    chooseFile(workbook());
+    fireEvent.click(button('Validasi'));
+    expect(
+      await screen.findByText('Layanan sedang tidak tersedia. Coba beberapa saat lagi.'),
+    ).toBeTruthy();
+    expect(screen.queryByText(READY)).toBeNull();
+    expect(screen.queryByText(NEEDS_FIX)).toBeNull();
+  });
+
+  it('confirms a completed import with the processed row count', async () => {
+    renderDialog(preview([previewRow(), previewRow({ rowNumber: 3, name: 'Budi' })]));
+    chooseFile(workbook());
+    fireEvent.click(button('Validasi'));
+    await screen.findByText(READY);
+    fireEvent.click(button('Import'));
+    expect(await screen.findByText('Import member berhasil. 2 data diproses.')).toBeTruthy();
+  });
+
+  it('never reports success when Runtime rejects the import', async () => {
+    const { api } = renderDialog(preview([previewRow()]));
+    api.importMembers.mockResolvedValueOnce({
+      outcome: 'REJECTED',
+      preview: preview([
+        previewRow({
+          action: null,
+          errors: [{ field: 'phone', code: 'CUSTOMER_AMBIGUOUS', message: 'x' }],
+        }),
+      ]),
+      summary: null,
+    });
+    chooseFile(workbook());
+    fireEvent.click(button('Validasi'));
+    await screen.findByText(READY);
+    fireEvent.click(button('Import'));
+    expect(
+      await screen.findByText(
+        'Import tidak dilakukan. Data berubah atau tidak lagi valid; tidak ada data yang disimpan.',
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Import member berhasil/)).toBeNull();
+    expect(screen.queryByText('Import berhasil')).toBeNull();
+  });
+
+  it('ignores repeated clicks while validation and import are in flight', async () => {
+    const { api } = renderDialog(preview([previewRow()]));
+    let finishPreview: (value: MemberImportPreview) => void = () => undefined;
+    api.previewImport.mockReturnValueOnce(
+      new Promise<MemberImportPreview>((resolve) => (finishPreview = resolve)),
+    );
+    chooseFile(workbook());
+    const validate = button('Validasi');
+    fireEvent.click(validate);
+    fireEvent.click(validate);
+    fireEvent.click(validate);
+    expect(button('Memvalidasi…').disabled).toBe(true);
+    expect(api.previewImport).toHaveBeenCalledTimes(1);
+    finishPreview(preview([previewRow()]));
+    await screen.findByText(READY);
+
+    let finishImport: (value: unknown) => void = () => undefined;
+    api.importMembers.mockReturnValueOnce(new Promise((resolve) => (finishImport = resolve)));
+    const run = button('Import');
+    fireEvent.click(run);
+    fireEvent.click(run);
+    expect(button('Mengimpor…').disabled).toBe(true);
+    expect(api.importMembers).toHaveBeenCalledTimes(1);
+    finishImport({
+      outcome: 'IMPORTED',
+      preview: preview([previewRow()]),
+      summary: {
+        importedCount: 1,
+        createdCustomerCount: 1,
+        enrolledExistingCustomerCount: 0,
+        generatedMemberNumberCount: 1,
+        preservedMemberNumberCount: 0,
+        openingBalanceMemberCount: 0,
+        openingBalancePointsTotal: '0.0000',
+      },
+    });
+    expect(await screen.findByText('Import member berhasil. 1 data diproses.')).toBeTruthy();
   });
 });

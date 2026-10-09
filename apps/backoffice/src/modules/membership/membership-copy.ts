@@ -100,6 +100,11 @@ const copy = {
     summaryOpeningPoints: 'Total poin awal',
     ledgerOpeningBalance: 'Saldo awal migrasi',
     templateFailed: 'Template tidak dapat diunduh.',
+    feedbackValidated: 'Validasi selesai. Data siap diimpor.',
+    feedbackNeedsFix: 'Validasi selesai. Ada data yang perlu diperbaiki sebelum impor.',
+    feedbackImported: (rows: number) => `Import member berhasil. ${rows} data diproses.`,
+    feedbackRejected:
+      'Import tidak dilakukan. Data berubah atau tidak lagi valid; tidak ada data yang disimpan.',
     // Manual point adjustment
     adjustPoints: 'Sesuaikan poin',
     adjustType: 'Jenis penyesuaian',
@@ -235,6 +240,11 @@ const copy = {
     summaryOpeningPoints: 'Total opening points',
     ledgerOpeningBalance: 'Migrated opening balance',
     templateFailed: 'The template could not be downloaded.',
+    feedbackValidated: 'Validation complete. The data is ready to import.',
+    feedbackNeedsFix: 'Validation complete. Some data needs fixing before import.',
+    feedbackImported: (rows: number) => `Member import completed. ${rows} rows processed.`,
+    feedbackRejected:
+      'Import was not performed. The data changed or is no longer valid; nothing was saved.',
     adjustPoints: 'Adjust points',
     adjustType: 'Adjustment type',
     adjustAdd: 'Add points',
