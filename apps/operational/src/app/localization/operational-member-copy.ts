@@ -59,6 +59,11 @@ const memberCopy: Record<string, LocalizedCopy> = {
     'id-ID': 'Saldo awal migrasi',
     'en-US': 'Migrated opening balance',
   },
+  'Imported points': { 'id-ID': 'Poin dari import', 'en-US': 'Imported points' },
+  'Manual points adjustment': {
+    'id-ID': 'Penyesuaian poin manual',
+    'en-US': 'Manual points adjustment',
+  },
   Showing: { 'id-ID': 'Menampilkan', 'en-US': 'Showing' },
   'most recent transactions': { 'id-ID': 'transaksi terbaru', 'en-US': 'most recent transactions' },
   'No completed transaction yet.': {

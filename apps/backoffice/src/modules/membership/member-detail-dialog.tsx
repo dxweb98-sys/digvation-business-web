@@ -1,6 +1,15 @@
 import { DButton, DDialog, DSkeleton } from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
-import { CalendarDays, CircleDot, Coins, Hash, Pencil, Phone, UserRound } from 'lucide-react';
+import {
+  CalendarDays,
+  CircleDot,
+  Coins,
+  Hash,
+  Pencil,
+  Phone,
+  SlidersHorizontal,
+  UserRound,
+} from 'lucide-react';
 
 import type { Member, MembersApi } from './members-api';
 import { membershipCopy } from './membership-copy';
@@ -30,16 +39,21 @@ export function MemberDetailDialog({
   api,
   canViewLoyalty,
   canEdit,
+  canAdjustPoints = false,
   formatDate,
   onEdit,
+  onAdjustPoints,
   onClose,
 }: {
   memberId: string;
   api: Pick<MembersApi, 'get' | 'balance' | 'history'>;
   canViewLoyalty: boolean;
   canEdit: boolean;
+  /** Loyalty Points capability plus loyalty:configure; Runtime enforces it regardless. */
+  canAdjustPoints?: boolean;
   formatDate: (value: string) => string;
   onEdit: (member: Member) => void;
+  onAdjustPoints?: (member: Member) => void;
   onClose: () => void;
 }) {
   const copy = membershipCopy();
@@ -145,13 +159,25 @@ export function MemberDetailDialog({
                   <Coins className="size-4 text-[var(--color-brand)]" aria-hidden="true" />
                   <h3 className="text-sm font-semibold text-[var(--color-text)]">{copy.loyalty}</h3>
                 </div>
-                <div className="text-right">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--color-text-muted)]">
-                    {copy.pointBalance}
-                  </p>
-                  <p className="text-2xl font-semibold tabular-nums text-[var(--color-text)]">
-                    {balance.data ? balance.data.pointsBalance : '—'}
-                  </p>
+                <div className="flex items-center gap-4">
+                  {canAdjustPoints && onAdjustPoints ? (
+                    <DButton
+                      variant="secondary"
+                      size="sm"
+                      leftIcon={<SlidersHorizontal className="size-4" />}
+                      onClick={() => onAdjustPoints(member)}
+                    >
+                      {copy.adjustPoints}
+                    </DButton>
+                  ) : null}
+                  <div className="text-right">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--color-text-muted)]">
+                      {copy.pointBalance}
+                    </p>
+                    <p className="text-2xl font-semibold tabular-nums text-[var(--color-text)]">
+                      {balance.data ? balance.data.pointsBalance : '—'}
+                    </p>
+                  </div>
                 </div>
               </div>
               <div className="px-5 py-4">
@@ -167,11 +193,20 @@ export function MemberDetailDialog({
                           <p className="font-medium text-[var(--color-text)]">
                             {entry.type === 'Opening balance'
                               ? copy.ledgerOpeningBalance
-                              : entry.type}
+                              : entry.type === 'Imported points'
+                                ? copy.ledgerImportPoints
+                                : entry.type === 'Manual adjustment'
+                                  ? copy.ledgerManualAdjustment
+                                  : entry.type}
                           </p>
                           <p className="text-xs text-[var(--color-text-muted)]">
                             {formatDate(entry.createdAt)}
                           </p>
+                          {entry.reason ? (
+                            <p className="mt-0.5 break-words text-xs text-[var(--color-text-muted)]">
+                              {copy.ledgerReason}: {entry.reason}
+                            </p>
+                          ) : null}
                         </div>
                         <div className="text-right tabular-nums">
                           <p className="font-semibold text-[var(--color-text)]">

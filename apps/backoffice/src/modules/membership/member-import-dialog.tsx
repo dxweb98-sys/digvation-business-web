@@ -1,4 +1,4 @@
-import { DBadge, DButton, DDialog, DInfoNote } from '@digvation/ui';
+import { DBadge, DButton, DDialog, DInfoNote, useToast } from '@digvation/ui';
 import {
   CircleAlert,
   CircleCheck,
@@ -64,6 +64,7 @@ export function MemberImportDialog({
   onClose: () => void;
 }) {
   const copy = membershipCopy();
+  const { showToast } = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
@@ -72,6 +73,11 @@ export function MemberImportDialog({
 
   const failure = (error: unknown) =>
     isSessionExpiredError(error) ? null : normalizeBackofficeApiError(error).safeMessage;
+  // Operation status goes to the shared toast; row and file detail stay in the dialog.
+  const failToast = (error: unknown) => {
+    const message = failure(error);
+    if (message) showToast({ variant: 'danger', title: message });
+  };
 
   const choose = (candidate: File | undefined) => {
     if (!candidate) return;
@@ -107,9 +113,16 @@ export function MemberImportDialog({
     if (!file || busy) return;
     setBusy('preview');
     try {
-      setStep({ kind: 'preview', preview: await api.previewImport(file), rejectedAtImport: false });
+      const preview = await api.previewImport(file);
+      setFileError(null);
+      setStep({ kind: 'preview', preview, rejectedAtImport: false });
+      showToast(
+        preview.canImport
+          ? { variant: 'success', title: copy.feedbackValidated }
+          : { variant: 'warning', title: copy.feedbackNeedsFix },
+      );
     } catch (error) {
-      setFileError(failure(error));
+      failToast(error);
     } finally {
       setBusy(null);
     }
@@ -123,9 +136,16 @@ export function MemberImportDialog({
       if (result.outcome === 'IMPORTED' && result.summary) {
         onImported();
         setStep({ kind: 'result', summary: result.summary });
-      } else setStep({ kind: 'preview', preview: result.preview, rejectedAtImport: true });
+        showToast({
+          variant: 'success',
+          title: copy.feedbackImported(result.preview.totalRows),
+        });
+      } else {
+        setStep({ kind: 'preview', preview: result.preview, rejectedAtImport: true });
+        showToast({ variant: 'warning', title: copy.feedbackRejected });
+      }
     } catch (error) {
-      setFileError(failure(error));
+      failToast(error);
       setStep({ kind: 'file' });
     } finally {
       setBusy(null);
@@ -384,17 +404,25 @@ function PreviewRow({ row }: { row: MemberImportRow }) {
   const muted = (value: ReactNode) => (
     <span className="italic text-[var(--color-text-muted)]">{value}</span>
   );
+  const existing = row.existingMember ?? null;
+  const locale = readStoredBackofficeLocale();
   return (
     <tr className={row.errors.length ? 'bg-[var(--color-danger)]/[0.04]' : undefined}>
       <td className="px-3 py-2.5 align-top tabular-nums text-[var(--color-text-muted)]">
         {row.rowNumber}
       </td>
-      <td className="px-3 py-2.5 align-top font-medium">{row.name ?? muted('—')}</td>
+      <td className="px-3 py-2.5 align-top font-medium">
+        {existing ? existing.name : (row.name ?? muted('—'))}
+      </td>
       <td className="px-3 py-2.5 align-top tabular-nums">
-        {row.phone ? toNationalMemberPhone(row.phone) : muted('—')}
+        {existing
+          ? toNationalMemberPhone(existing.phone)
+          : row.phone
+            ? toNationalMemberPhone(row.phone)
+            : muted('—')}
       </td>
       <td className="px-3 py-2.5 align-top font-mono text-xs">
-        {row.memberNumber ?? muted(copy.autoNumber)}
+        {existing ? existing.memberNumber : (row.memberNumber ?? muted(copy.autoNumber))}
       </td>
       <td className="px-3 py-2.5 align-top">
         {row.errors.some((issue) => issue.field === 'status')
@@ -409,6 +437,12 @@ function PreviewRow({ row }: { row: MemberImportRow }) {
       <td className="whitespace-nowrap px-3 py-2.5 text-right align-top tabular-nums">
         {row.openingPoints === null ? (
           muted('—')
+        ) : row.existingMember?.previousImportPoints ? (
+          muted(formatImportPoints(row.openingPoints, readStoredBackofficeLocale()))
+        ) : row.existingMember && hasImportOpeningPoints(row.openingPoints) ? (
+          <span className="font-semibold text-[var(--color-text)]">
+            +{formatImportPoints(row.openingPoints, readStoredBackofficeLocale())}
+          </span>
         ) : row.errors.some((issue) => issue.field === 'openingPoints') ? (
           <span className="text-[var(--color-danger)]">{row.openingPoints}</span>
         ) : hasImportOpeningPoints(row.openingPoints) ? (
@@ -424,9 +458,55 @@ function PreviewRow({ row }: { row: MemberImportRow }) {
           <DBadge variant="danger">{copy.errorRows}</DBadge>
         ) : (
           <DBadge variant={row.warnings.length ? 'warning' : 'success'}>
-            {row.action === 'ENROLL_EXISTING_CUSTOMER' ? copy.actionEnroll : copy.actionCreate}
+            {existing?.previousImportPoints
+              ? copy.badgeAlreadyImported
+              : existing
+                ? copy.badgeExistingMember
+                : row.action === 'ENROLL_EXISTING_CUSTOMER'
+                  ? copy.actionEnroll
+                  : copy.actionCreate}
           </DBadge>
         )}
+        {existing?.previousImportPoints ? (
+          <dl className="mt-1.5 max-w-[14rem] space-y-0.5 text-xs tabular-nums">
+            <div className="flex justify-between gap-3">
+              <dt className="text-[var(--color-text-muted)]">{copy.pointsPreviousImport}</dt>
+              <dd>{formatImportPoints(existing.previousImportPoints, locale)}</dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-[var(--color-text-muted)]">{copy.pointsInThisFile}</dt>
+              <dd>{formatImportPoints(row.openingPoints ?? '0', locale)}</dd>
+            </div>
+            <div className="flex justify-between gap-3 border-t border-[var(--color-border)] pt-0.5">
+              <dt className="text-[var(--color-text-muted)]">{copy.pointsCurrent}</dt>
+              <dd>{formatImportPoints(existing.currentPoints, locale)}</dd>
+            </div>
+            <p className="pt-0.5 font-medium text-[var(--color-text-muted)]">
+              {copy.pointsNotAddedAgain}
+            </p>
+          </dl>
+        ) : existing ? (
+          <dl className="mt-1.5 max-w-[14rem] space-y-0.5 text-xs tabular-nums">
+            <div className="flex justify-between gap-3">
+              <dt className="text-[var(--color-text-muted)]">{copy.pointsCurrent}</dt>
+              <dd>{formatImportPoints(existing.currentPoints, locale)}</dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-[var(--color-text-muted)]">{copy.pointsFromImport}</dt>
+              <dd>
+                +
+                {formatImportPoints(
+                  hasImportOpeningPoints(row.openingPoints) ? row.openingPoints! : '0',
+                  locale,
+                )}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-3 border-t border-[var(--color-border)] pt-0.5 font-semibold">
+              <dt>{copy.pointsResult}</dt>
+              <dd>{formatImportPoints(existing.resultingPoints, locale)}</dd>
+            </div>
+          </dl>
+        ) : null}
         {[...row.errors, ...row.warnings].length ? (
           <ul className="mt-1.5 space-y-1">
             {row.errors.map((issue) => (
@@ -474,6 +554,27 @@ function ImportResult({ summary }: { summary: MemberImportSummary }) {
         <SummaryTile label={copy.summaryEnrolled} value={summary.enrolledExistingCustomerCount} />
         <SummaryTile label={copy.summaryGenerated} value={summary.generatedMemberNumberCount} />
         <SummaryTile label={copy.summaryPreserved} value={summary.preservedMemberNumberCount} />
+        {summary.existingMemberSkippedCount ? (
+          <SummaryTile
+            label={copy.summaryExistingSkipped}
+            value={summary.existingMemberSkippedCount}
+          />
+        ) : null}
+        {summary.existingMemberPointsCount ? (
+          <>
+            <SummaryTile
+              label={copy.summaryExistingMembers}
+              value={summary.existingMemberPointsCount}
+            />
+            <SummaryTile
+              label={copy.summaryExistingPoints}
+              value={formatImportPoints(
+                summary.existingMemberPointsTotal ?? '0',
+                readStoredBackofficeLocale(),
+              )}
+            />
+          </>
+        ) : null}
         {summary.openingBalanceMemberCount ? (
           <>
             <SummaryTile
