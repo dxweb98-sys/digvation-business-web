@@ -9,6 +9,7 @@ import type {
   DiscountInput,
   EmployeeQuery,
   FulfillmentInput,
+  LoyaltyRedemptionInput,
   OpenSalesQuery,
   PaymentTransitionInput,
   PriceOverrideInput,
@@ -626,16 +627,16 @@ export class LocalDemoCashierTransactionAdapter
 
   public async applyLoyaltyRedemption(
     _saleId: string,
-    _input: import('./cashier-transaction.adapter').LoyaltyRedemptionInput,
+    _input: LoyaltyRedemptionInput,
     _idempotencyKey: string,
-  ): Promise<import('../model/cashier-transaction.types').Sale> {
+  ): Promise<Sale> {
     throw new Error('Loyalty redemption requires the Runtime-backed Operational adapter.');
   }
   public async removeLoyaltyRedemption(
     _saleId: string,
     _expectedVersion: number,
     _idempotencyKey: string,
-  ): Promise<import('../model/cashier-transaction.types').Sale> {
+  ): Promise<Sale> {
     throw new Error('Loyalty redemption requires the Runtime-backed Operational adapter.');
   }
   public async setSaleLineQuantity(

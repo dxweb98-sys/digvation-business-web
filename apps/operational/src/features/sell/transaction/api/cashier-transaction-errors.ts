@@ -48,10 +48,16 @@ export function cashierTransactionErrorMessage(error: unknown, locale?: string):
     return copyForLocale('Refund required', locale);
   }
   if (isApiErrorCode(error, 'SALE_NOT_SETTLED')) {
-    return copyForLocale('Complete the remaining payment before finishing this transaction.', locale);
+    return copyForLocale(
+      'Complete the remaining payment before finishing this transaction.',
+      locale,
+    );
   }
   if (isApiErrorCode(error, 'SALE_LINE_NOT_MUTABLE')) {
-    return copyForLocale('This item can no longer be reduced or removed because work has already started.', locale);
+    return copyForLocale(
+      'This item can no longer be reduced or removed because work has already started.',
+      locale,
+    );
   }
   const promotionCopy = error instanceof ApiError ? PROMOTION_ERROR_COPY[error.code] : undefined;
   if (promotionCopy) return copyForLocale(promotionCopy, locale);
@@ -71,11 +77,13 @@ const CORRECTION_ERROR_COPY: Record<string, string> = {
   CATALOG_PRICE_NOT_FOUND: 'Item price was not found for this location.',
   SALE_LINE_NOT_FOUND: 'The transaction item was not found.',
   SALE_VERSION_CONFLICT: 'The transaction changed. Reload it before correcting.',
-  SALE_PAYMENT_OVERAPPLIED: 'The corrected total would be lower than the payments already received.',
+  SALE_PAYMENT_OVERAPPLIED:
+    'The corrected total would be lower than the payments already received.',
   SALE_LINE_NOT_MUTABLE:
     'This item cannot be corrected: its work is completed, a performer is assigned before work started, or a manual price or discount is set.',
   SALE_CORRECTION_REASON_REQUIRED: 'Enter the reason for this correction.',
-  SALE_PROGRESSED_ADJUSTMENT_FORBIDDEN: 'Correcting a transaction in progress needs the progressed adjustment permission.',
+  SALE_PROGRESSED_ADJUSTMENT_FORBIDDEN:
+    'Correcting a transaction in progress needs the progressed adjustment permission.',
   PAYMENT_REFUND_PROVIDER_CONFIRMATION_REQUIRED:
     'The lower total must be returned through the payment provider, which is not available here. Ask a supervisor.',
   SALE_NOT_OPEN: 'The transaction is already closed and cannot be changed.',

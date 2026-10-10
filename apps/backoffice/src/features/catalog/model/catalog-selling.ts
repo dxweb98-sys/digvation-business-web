@@ -2,10 +2,7 @@ import type { VariantSelectionMode } from '../api/catalog-api';
 
 export type SellingModel = 'DIRECT' | 'VARIANT_REQUIRED' | 'ITEM_AND_VARIANTS';
 
-export function sellingModel(
-  hasActiveVariants: boolean,
-  mode: VariantSelectionMode,
-): SellingModel {
+export function sellingModel(hasActiveVariants: boolean, mode: VariantSelectionMode): SellingModel {
   if (!hasActiveVariants) return 'DIRECT';
   return mode === 'OPTIONAL' ? 'ITEM_AND_VARIANTS' : 'VARIANT_REQUIRED';
 }
@@ -22,10 +19,7 @@ export function sellsItemItself(model: SellingModel) {
   return model !== 'VARIANT_REQUIRED';
 }
 
-export const sellingModelCopy: Record<
-  SellingModel,
-  { label: string; description: string }
-> = {
+export const sellingModelCopy: Record<SellingModel, { label: string; description: string }> = {
   DIRECT: {
     label: 'Dijual langsung',
     description: 'Item utama dijual langsung sebagai opsi default.',

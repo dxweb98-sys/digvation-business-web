@@ -39,9 +39,7 @@ export function CatalogItemLoyaltySection({
     >
       <div className="flex items-center gap-2">
         <Star className="size-4 text-[var(--color-brand)]" aria-hidden="true" />
-        <h3 className="text-sm font-semibold text-[var(--color-text)]">
-          Poin Loyalitas Member
-        </h3>
+        <h3 className="text-sm font-semibold text-[var(--color-text)]">Poin Loyalitas Member</h3>
       </div>
 
       <p className="mt-1 text-xs leading-5 text-[var(--color-text-muted)]">
@@ -78,17 +76,13 @@ export function CatalogItemLoyaltySection({
               value={pointsPerUnit}
               onChange={setLoyaltyPointsPerUnit}
               error={
-                touched && !loyaltyDraftValid
-                  ? 'Gunakan angka bulat nol atau lebih.'
-                  : undefined
+                touched && !loyaltyDraftValid ? 'Gunakan angka bulat nol atau lebih.' : undefined
               }
             />
           ) : null}
         </div>
       ) : !loading ? (
-        <p className="mt-3 text-xs text-[var(--color-text-muted)]">
-          Hanya dapat dilihat.
-        </p>
+        <p className="mt-3 text-xs text-[var(--color-text-muted)]">Hanya dapat dilihat.</p>
       ) : null}
     </section>
   );

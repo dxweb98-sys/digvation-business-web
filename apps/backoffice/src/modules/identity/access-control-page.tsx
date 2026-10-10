@@ -20,7 +20,7 @@ import {
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ban, Pencil, Plus, RefreshCw, UserCog, UserPlus } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
 import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';

@@ -1,11 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  catalogItemEditorReducer,
-} from './catalog-item-editor-reducer';
-import {
-  createCatalogItemEditorState,
-} from './catalog-item-editor-state';
+import { catalogItemEditorReducer } from './catalog-item-editor-reducer';
+import { createCatalogItemEditorState } from './catalog-item-editor-state';
 
 describe('catalogItemEditorReducer', () => {
   it('starts new items with a stable optional-variant selling intent', () => {
@@ -14,7 +10,6 @@ describe('catalogItemEditorReducer', () => {
     expect(initial.form.variantSelectionMode).toBe('OPTIONAL');
     expect(initial.form.variants).toEqual([]);
   });
-
 
   it('keeps related loyalty draft changes together', () => {
     const initial = createCatalogItemEditorState(null);

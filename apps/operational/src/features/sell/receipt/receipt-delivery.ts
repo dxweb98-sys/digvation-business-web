@@ -40,7 +40,9 @@ const FAILURE_REASON: Record<string, string> = {
 };
 
 export function receiptDeliveryFailureReason(category: string | null): string {
-  return (category && FAILURE_REASON[category]) || 'WhatsApp did not accept the message. Try again.';
+  return (
+    (category && FAILURE_REASON[category]) || 'WhatsApp did not accept the message. Try again.'
+  );
 }
 
 /**

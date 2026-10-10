@@ -8,8 +8,16 @@ import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { saleDisplayLines } from '../../cart/cart-draft';
-import type { PaymentRoute, Sale, SaleLine } from '../../transaction/model/cashier-transaction.types';
-import { amountFractionDigits, currencyInputFromAmount, normalizeCurrencyPaymentInput } from '../../lib/pos-controls';
+import type {
+  PaymentRoute,
+  Sale,
+  SaleLine,
+} from '../../transaction/model/cashier-transaction.types';
+import {
+  amountFractionDigits,
+  currencyInputFromAmount,
+  normalizeCurrencyPaymentInput,
+} from '../../lib/pos-controls';
 import { ReferencePaymentDialog } from '../../payment/reference-payment-dialog';
 
 const bootstrap = {
@@ -171,14 +179,20 @@ describe('ReferencePaymentDialog currency boundary', () => {
     expect(screen.getByRole('button', { name: /Bayar.*105[.,]224/ })).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: /Pas.*105[.,]224/ }));
-    expect((screen.getByLabelText('Uang tunai diterima') as HTMLInputElement).value).toBe('105.224');
+    expect((screen.getByLabelText('Uang tunai diterima') as HTMLInputElement).value).toBe(
+      '105.224',
+    );
     expect(screen.getAllByText(/Rp\s?0/).length).toBeGreaterThan(0);
 
-    fireEvent.change(screen.getByLabelText('Uang tunai diterima'), { target: { value: '150.000' } });
+    fireEvent.change(screen.getByLabelText('Uang tunai diterima'), {
+      target: { value: '150.000' },
+    });
     expect(screen.getByText(/Rp\s?44[.,]776/)).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: /Rp\s?150[.,]000/ }));
-    expect((screen.getByLabelText('Uang tunai diterima') as HTMLInputElement).value).toBe('150.000');
+    expect((screen.getByLabelText('Uang tunai diterima') as HTMLInputElement).value).toBe(
+      '150.000',
+    );
 
     fireEvent.click(screen.getByRole('button', { name: /Bayar.*105[.,]224/ }));
     fireEvent.click(screen.getByRole('button', { name: /Konfirmasi dan selesaikan/ }));
@@ -238,9 +252,13 @@ describe('ReferencePaymentDialog fractional Runtime amounts', () => {
 
     expect(screen.getByRole('button', { name: /Bayar.*328[.,]171[.,]5/ })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /Pas.*328[.,]171[.,]5/ }));
-    expect((screen.getByLabelText('Uang tunai diterima') as HTMLInputElement).value).toBe('328.171,5');
+    expect((screen.getByLabelText('Uang tunai diterima') as HTMLInputElement).value).toBe(
+      '328.171,5',
+    );
 
-    fireEvent.change(screen.getByLabelText('Uang tunai diterima'), { target: { value: '400.000' } });
+    fireEvent.change(screen.getByLabelText('Uang tunai diterima'), {
+      target: { value: '400.000' },
+    });
     // Change is exact: 400000 - 328171.5 = 71828.5, never rounded to a whole unit.
     expect(screen.getByText(/Rp\s?71[.,]828[.,]5/)).toBeTruthy();
 
@@ -321,7 +339,13 @@ describe('ReferencePaymentDialog selected-addition breakdown', () => {
 
   it('shows base item + selected addition = the authoritative amount, and never the fixed BOM', () => {
     const lines = saleDisplayLines([saleLine('l1', '211000.0000', [fixed, selected])]) as never[];
-    render(<PaymentHarness onConfirm={vi.fn(async () => undefined)} amount="211000.0000" lines={lines} />);
+    render(
+      <PaymentHarness
+        onConfirm={vi.fn(async () => undefined)}
+        amount="211000.0000"
+        lines={lines}
+      />,
+    );
 
     const breakdown = screen.getByRole('list', { name: /Item tambahan: Smoothing Curly/ });
     const rows = breakdown.querySelectorAll(':scope > li');
@@ -339,10 +363,25 @@ describe('ReferencePaymentDialog selected-addition breakdown', () => {
   it('keeps units with different additions apart: separate lines, exact amounts, no average', () => {
     const lines = saleDisplayLines([
       saleLine('l1', '210000.0000', [selected]),
-      saleLine('l2', '215000.0000', [{ ...selected, id: 'c-blue', itemNameSnapshot: 'Blue Toner', transactionUnitPrice: '31000.0000', unitContribution: '31000.0000', extendedContribution: '31000.0000' }]),
+      saleLine('l2', '215000.0000', [
+        {
+          ...selected,
+          id: 'c-blue',
+          itemNameSnapshot: 'Blue Toner',
+          transactionUnitPrice: '31000.0000',
+          unitContribution: '31000.0000',
+          extendedContribution: '31000.0000',
+        },
+      ]),
     ]) as never[];
     // Base 210.000 - 26.000 = 184.000; 215.000 - 31.000 = 184.000
-    render(<PaymentHarness onConfirm={vi.fn(async () => undefined)} amount="425000.0000" lines={lines} />);
+    render(
+      <PaymentHarness
+        onConfirm={vi.fn(async () => undefined)}
+        amount="425000.0000"
+        lines={lines}
+      />,
+    );
 
     expect(screen.getAllByRole('list', { name: /Item tambahan: Smoothing Curly/ })).toHaveLength(2);
     expect(screen.getByText('+ Red Coloring BRAND')).toBeTruthy();
@@ -370,7 +409,13 @@ describe('ReferencePaymentDialog returning to the order', () => {
 
 describe('ReferencePaymentDialog for an all-INSTANT (Product-only) Sale', () => {
   it('offers no Pay later and no queue wording, only payment', () => {
-    render(<PaymentHarness onConfirm={vi.fn(async () => undefined)} kind="instant" amount="200000.0000" />);
+    render(
+      <PaymentHarness
+        onConfirm={vi.fn(async () => undefined)}
+        kind="instant"
+        amount="200000.0000"
+      />,
+    );
     expect(screen.queryByText('Bayar nanti')).toBeNull();
     expect(screen.queryByText('Bayar sekarang')).toBeNull();
     expect(screen.queryByText(/antrian/i)).toBeNull();
@@ -379,7 +424,13 @@ describe('ReferencePaymentDialog for an all-INSTANT (Product-only) Sale', () => 
   });
 
   it('keeps Pay later and the queue for a Sale with tracked work', () => {
-    render(<PaymentHarness onConfirm={vi.fn(async () => undefined)} kind="tracked" amount="200000.0000" />);
+    render(
+      <PaymentHarness
+        onConfirm={vi.fn(async () => undefined)}
+        kind="tracked"
+        amount="200000.0000"
+      />,
+    );
     expect(screen.getByText('Bayar nanti')).toBeTruthy();
   });
 
@@ -425,7 +476,9 @@ describe('ReferencePaymentDialog for an all-INSTANT (Product-only) Sale', () => 
         onQueue={onQueue}
       />,
     );
-    expect(screen.queryByRole('button', { name: /Masukkan ke antrian|Tambahkan ke antrian/ })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: /Masukkan ke antrian|Tambahkan ke antrian/ }),
+    ).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Selesaikan transaksi' }));
     expect(onQueue).toHaveBeenCalledTimes(1);
   });

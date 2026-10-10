@@ -5,7 +5,10 @@ import { useEffect, useRef, useState } from 'react';
 
 import { useOperationalLocalization } from '../../../app/localization/operational-localization';
 import { useRetainedValue } from '../lib/use-retained-value';
-import { cashierTransactionErrorMessage, isApiErrorCode } from '../transaction/api/cashier-transaction-errors';
+import {
+  cashierTransactionErrorMessage,
+  isApiErrorCode,
+} from '../transaction/api/cashier-transaction-errors';
 import { sanitizePhoneInput, toCanonicalPhone } from '../../../shared/phone/customer-input';
 import type {
   OperationalReceiptDeliveryCommands,
@@ -65,16 +68,22 @@ const localCopy: Record<string, { 'id-ID': string; 'en-US': string }> = {
     'id-ID': 'Belum ada struk yang dikirim untuk transaksi ini.',
     'en-US': 'No receipt has been sent for this transaction.',
   },
-  'Number used last time': { 'id-ID': 'Nomor pengiriman terakhir', 'en-US': 'Number used last time' },
+  'Number used last time': {
+    'id-ID': 'Nomor pengiriman terakhir',
+    'en-US': 'Number used last time',
+  },
   'Phone placeholder': { 'id-ID': 'Contoh: 0812 3456 7890', 'en-US': 'Example: 0812 3456 7890' },
   'Enter a valid WhatsApp number, for example 0812 3456 7890.': {
     'id-ID': 'Masukkan nomor WhatsApp yang valid, contoh 0812 3456 7890.',
     'en-US': 'Enter a valid WhatsApp number, for example 0812 3456 7890.',
   },
-  'This number is used only for this receipt and does not change the customer or transaction data.': {
-    'id-ID': 'Nomor ini hanya dipakai untuk pengiriman struk ini dan tidak mengubah data pelanggan atau transaksi.',
-    'en-US': 'This number is used only for this receipt and does not change the customer or transaction data.',
-  },
+  'This number is used only for this receipt and does not change the customer or transaction data.':
+    {
+      'id-ID':
+        'Nomor ini hanya dipakai untuk pengiriman struk ini dan tidak mengubah data pelanggan atau transaksi.',
+      'en-US':
+        'This number is used only for this receipt and does not change the customer or transaction data.',
+    },
   'WhatsApp receipt delivery is not available in this installation.': {
     'id-ID': 'Pengiriman struk WhatsApp belum tersedia di instalasi ini.',
     'en-US': 'WhatsApp receipt delivery is not available in this installation.',
@@ -187,7 +196,10 @@ export function ReceiptDeliveryIndicatorLine({
         {INDICATOR_COPY[phase][locale]}
       </span>
       {indicator && phase !== 'NEVER' ? (
-        <span className="tabular-nums"> · {indicator.destinationMasked.replace(/^\+\d+\s/, '')}</span>
+        <span className="tabular-nums">
+          {' '}
+          · {indicator.destinationMasked.replace(/^\+\d+\s/, '')}
+        </span>
       ) : null}
     </p>
   );
@@ -396,7 +408,9 @@ export function ReceiptDeliveryDialog({
           <section className={`rounded-xl border px-3 py-3 ${PHASE_SURFACE[phase]}`}>
             <div role="status" aria-atomic="true">
               <div className="flex items-center justify-between gap-3">
-                <p className={`flex items-center gap-1.5 text-sm font-semibold ${PHASE_TONE[phase]}`}>
+                <p
+                  className={`flex items-center gap-1.5 text-sm font-semibold ${PHASE_TONE[phase]}`}
+                >
                   <PhaseIcon className="size-4 shrink-0" aria-hidden="true" />
                   {text(RECEIPT_DELIVERY_PHASE_LABEL[phase])}
                 </p>
@@ -424,7 +438,9 @@ export function ReceiptDeliveryDialog({
               )}
               {phase === 'ACCEPTED' ? (
                 <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                  {text('Accepted by the WhatsApp service. Delivery to the customer is not confirmed.')}
+                  {text(
+                    'Accepted by the WhatsApp service. Delivery to the customer is not confirmed.',
+                  )}
                 </p>
               ) : null}
               {phase === 'FAILED' && latest ? (
@@ -466,7 +482,9 @@ export function ReceiptDeliveryDialog({
                 return (
                   <div
                     key={choice.mode}
-                    className={selected ? 'bg-[var(--color-brand)]/[.07]' : 'bg-[var(--color-surface)]'}
+                    className={
+                      selected ? 'bg-[var(--color-brand)]/[.07]' : 'bg-[var(--color-surface)]'
+                    }
                   >
                     <button
                       type="button"

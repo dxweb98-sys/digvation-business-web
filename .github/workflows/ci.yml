@@ -52,8 +52,8 @@ jobs:
 
       - name: Verify web image identity
         run: |
-          test "$(docker inspect --format '{{ index .Config.Labels \"org.opencontainers.image.revision\" }}' business-backoffice-ci:${{ github.sha }})" = "${{ github.sha }}"
-          test "$(docker inspect --format '{{ index .Config.Labels \"org.opencontainers.image.revision\" }}' business-operational-ci:${{ github.sha }})" = "${{ github.sha }}"
+          test "$(docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' business-backoffice-ci:${{ github.sha }})" = "${{ github.sha }}"
+          test "$(docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' business-operational-ci:${{ github.sha }})" = "${{ github.sha }}"
 
       - name: Web container routing and runtime-config smoke
         run: |

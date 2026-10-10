@@ -1,76 +1,85 @@
 import { expect, test } from '@playwright/test';
 
-test('keeps the summary visible while an overflowing transaction order scrolls', async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto('http://127.0.0.1:5173/', { waitUntil: 'networkidle' });
+import { OPERATIONAL_URL } from './servers';
 
+test('places the order beside the money summary rail from lg and stacks it below on narrow widths', async ({
+  page,
+}, testInfo) => {
+  await page.goto(`${OPERATIONAL_URL}/`, { waitUntil: 'networkidle' });
   await page.evaluate(() => {
     const dialog = document.createElement('section');
-    dialog.className =
-      'pos-reference-transaction-dialog flex h-[92dvh] max-h-[92dvh] w-full flex-col overflow-hidden';
-    dialog.style.cssText =
-      'position:fixed;inset:20px auto auto 20px;width:1100px;border:1px solid black;background:white';
+    dialog.className = 'visual-detail-fixture';
+    dialog.style.cssText = 'position:fixed;inset:0 auto auto 0;width:100%;background:white';
     dialog.innerHTML = `
-      <div style="height:16px"></div>
-      <div style="height:70px">Dialog header</div>
-      <div style="flex:1;min-height:0;overflow:hidden">
-        <div class="pos-transaction-detail-story flex h-full min-h-0 flex-col overflow-hidden gap-5 px-5 py-5">
-          <div style="flex-shrink:0;height:160px">Transaction overview</div>
-          <div class="pos-detail-columns">
-            <div class="pos-detail-column pos-transaction-detail-order min-h-0 overflow-y-auto">
-              <h2>Pesanan</h2><div style="flex-shrink:0;height:1800px">Hair Color / employee assignment</div>
-            </div>
-            <div class="pos-detail-column pos-transaction-detail-summary min-h-0">
-              <h2>Ringkasan</h2><div>Subtotal · Promo · Penggunaan poin · Pajak · Total · payment</div>
-            </div>
-          </div>
+      <div class="pos-transaction-detail-story">
+        <div class="pos-detail-columns">
+          <div class="pos-detail-column pos-transaction-detail-order"><h2>Pesanan</h2><div style="height:600px">Hair Color / employee assignment</div></div>
+          <div class="pos-detail-column pos-transaction-detail-summary"><h2>Ringkasan</h2><div>Subtotal · Promo · Penggunaan poin · Pajak · Total · payment</div></div>
         </div>
-      </div>
-      <div style="height:70px">Footer</div>`;
+      </div>`;
     document.body.append(dialog);
   });
-
   const order = page.locator('.pos-transaction-detail-order');
   const summary = page.locator('.pos-transaction-detail-summary');
-  const footer = page.locator('.pos-reference-transaction-dialog > div:last-child');
-  const summaryTop = await summary.evaluate((element) => element.getBoundingClientRect().top);
+  const rects = () =>
+    Promise.all(
+      [order, summary].map((locator) =>
+        locator.evaluate((el) => el.getBoundingClientRect().toJSON()),
+      ),
+    );
 
-  const orderLayout = await order.evaluate((element) => {
-    const style = getComputedStyle(element);
-    return {
-      clientHeight: element.clientHeight,
-      overflowY: style.overflowY,
-      scrollHeight: element.scrollHeight,
-    };
-  });
-  expect(orderLayout.overflowY).toBe('auto');
-  expect(orderLayout.scrollHeight).toBeGreaterThan(orderLayout.clientHeight);
-  await order.evaluate((element) => {
-    element.scrollTop = 500;
-  });
-
+  // sale-detail-presentation.css: two columns (1.35fr / 0.85fr) from 1024px, left rule on the rail.
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const [wideOrder, wideSummary] = await rects();
+  expect(wideSummary.left).toBeGreaterThanOrEqual(wideOrder.right);
+  expect(Math.round(wideSummary.top)).toBe(Math.round(wideOrder.top));
+  expect(wideOrder.width).toBeGreaterThan(wideSummary.width);
+  expect(await summary.evaluate((el) => getComputedStyle(el).borderLeftWidth)).toBe('1px');
   await expect(summary).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath('reference-transaction-wide.png'),
+    fullPage: true,
+  });
+
+  // Below 1024px the rail stacks under the order with a top rule instead.
+  await page.setViewportSize({ width: 800, height: 900 });
+  const [narrowOrder, narrowSummary] = await rects();
+  expect(narrowSummary.top).toBeGreaterThanOrEqual(narrowOrder.bottom);
+  expect(await summary.evaluate((el) => getComputedStyle(el).borderTopWidth)).toBe('1px');
   await expect(page.getByText('Hair Color / employee assignment')).toBeVisible();
-  await expect(
-    page.getByText('Subtotal · Promo · Penggunaan poin · Pajak · Total · payment'),
-  ).toBeVisible();
-  expect(await summary.evaluate((element) => element.getBoundingClientRect().top)).toBe(summaryTop);
-  await expect(footer).toBeVisible();
 });
 
 test('keeps the compact detail composition coherent across representative transaction states', async ({
   page,
-}) => {
+}, testInfo) => {
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto('http://127.0.0.1:5173/', { waitUntil: 'networkidle' });
+  await page.goto(`${OPERATIONAL_URL}/`, { waitUntil: 'networkidle' });
 
   const states = [
-    ['waiting', 'Menunggu', 'Menunggu pembayaran', 'border-[var(--color-warning)]/35 bg-[var(--color-warning)]/[.08]'],
-    ['in-progress', 'Dikerjakan', 'Belum dibayar', 'border-[var(--color-brand)]/35 bg-[var(--color-brand)]/[.08]'],
-    ['completed', 'Selesai', 'Lunas', 'border-[var(--color-success)]/35 bg-[var(--color-success)]/[.08]'],
-    ['cancelled', 'Dibatalkan', 'Dibalik', 'border-[var(--color-danger)]/35 bg-[var(--color-danger)]/[.08]'],
+    [
+      'waiting',
+      'Menunggu',
+      'Menunggu pembayaran',
+      'border-[var(--color-warning)]/35 bg-[var(--color-warning)]/[.08]',
+    ],
+    [
+      'in-progress',
+      'Dikerjakan',
+      'Belum dibayar',
+      'border-[var(--color-brand)]/35 bg-[var(--color-brand)]/[.08]',
+    ],
+    [
+      'completed',
+      'Selesai',
+      'Lunas',
+      'border-[var(--color-success)]/35 bg-[var(--color-success)]/[.08]',
+    ],
+    [
+      'cancelled',
+      'Dibatalkan',
+      'Dibalik',
+      'border-[var(--color-danger)]/35 bg-[var(--color-danger)]/[.08]',
+    ],
   ] as const;
 
   for (const [id, transactionStatus, paymentStatus, tone] of states) {
@@ -78,7 +87,8 @@ test('keeps the compact detail composition coherent across representative transa
       ({ transactionStatus, paymentStatus, tone }) => {
         document.querySelector('.visual-detail-fixture')?.remove();
         const dialog = document.createElement('section');
-        dialog.className = 'visual-detail-fixture w-full max-w-[1060px] overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]';
+        dialog.className =
+          'visual-detail-fixture w-full max-w-[1060px] overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]';
         dialog.innerHTML = `
           <header class="flex items-center justify-between border-b border-[var(--color-border)] px-5 py-4"><div><p class="text-base font-semibold">Detail transaksi</p><p class="mt-1 font-mono text-xs text-[var(--color-text-muted)]">TRX-2026-0001</p></div><button class="rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm">Tutup</button></header>
           <div class="pos-detail-columns p-5">
@@ -91,11 +101,17 @@ test('keeps the compact detail composition coherent across representative transa
     );
     await expect(page.getByText(transactionStatus, { exact: true })).toBeVisible();
     await expect(page.getByText('Rp197.580')).toHaveCount(2);
-    await page.screenshot({ path: `C:/tmp/reference-transaction-${id}.png`, fullPage: true });
+    await page.screenshot({
+      path: testInfo.outputPath(`reference-transaction-${id}.png`),
+      fullPage: true,
+    });
   }
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByText('Hair Color')).toBeVisible();
   await expect(page.getByText('Pembayaran')).toBeVisible();
-  await page.screenshot({ path: 'C:/tmp/reference-transaction-narrow.png', fullPage: true });
+  await page.screenshot({
+    path: testInfo.outputPath('reference-transaction-narrow.png'),
+    fullPage: true,
+  });
 });

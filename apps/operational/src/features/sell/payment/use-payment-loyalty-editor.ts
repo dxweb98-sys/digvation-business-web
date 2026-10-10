@@ -39,6 +39,7 @@ export function usePaymentLoyaltyEditor({
   const { showToast } = useToast();
   const [editorOpen, setEditorOpen] = useState(false);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- accepted baseline: state is reset when its source changes; moving it to render-time derivation is a behavioural refactor tracked separately
     if (!open) setEditorOpen(false);
   }, [open]);
   const canonicalLoyaltyPoints = wholePointValue(loyaltyPoints);

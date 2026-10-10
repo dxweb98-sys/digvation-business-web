@@ -8,9 +8,7 @@ export function buildCatalogItemBaseInput({
   parsedDefaultDuration: number | null;
 }) {
   const serviceDefinition =
-    form.type === 'SERVICE'
-      ? { defaultDurationMinutes: parsedDefaultDuration }
-      : undefined;
+    form.type === 'SERVICE' ? { defaultDurationMinutes: parsedDefaultDuration } : undefined;
 
   return {
     ...(form.type === 'PRODUCT'
@@ -26,8 +24,7 @@ export function buildCatalogItemBaseInput({
     categoryId: form.categoryId,
     description: form.description.trim() || null,
     lifecycle: form.lifecycle,
-    fulfillmentBehavior:
-      form.type === 'SERVICE' ? ('TRACKED' as const) : ('INSTANT' as const),
+    fulfillmentBehavior: form.type === 'SERVICE' ? ('TRACKED' as const) : ('INSTANT' as const),
     ...(serviceDefinition ? { serviceDefinition } : {}),
   };
 }

@@ -44,19 +44,19 @@ export function usePaginationState({
     setPageState(nextPage > 0 ? nextPage : 1);
   }, []);
 
-  const setPageSize = useCallback((nextPageSize: number) => {
-    setPageSizeState(nextPageSize > 0 ? nextPageSize : initialPageSize);
-    setPageState(1);
-  }, [initialPageSize]);
+  const setPageSize = useCallback(
+    (nextPageSize: number) => {
+      setPageSizeState(nextPageSize > 0 ? nextPageSize : initialPageSize);
+      setPageState(1);
+    },
+    [initialPageSize],
+  );
 
   const resetPage = useCallback(() => {
     setPageState(1);
   }, []);
 
-  const request = useMemo(
-    () => toLimitOffsetPagination({ page, pageSize }),
-    [page, pageSize],
-  );
+  const request = useMemo(() => toLimitOffsetPagination({ page, pageSize }), [page, pageSize]);
 
   return {
     page,
