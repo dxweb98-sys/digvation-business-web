@@ -84,7 +84,9 @@ export function OperationalShell({
   const locations = useMemo(() => {
     const all = operationalAccessQuery.data?.locations ?? [];
     if (canSwitchBranches) return all;
-    const main = all.find((location) => location.id === operationalAccessQuery.data?.mainLocationId);
+    const main = all.find(
+      (location) => location.id === operationalAccessQuery.data?.mainLocationId,
+    );
     return main ? [main] : all.slice(0, 1);
   }, [canSwitchBranches, operationalAccessQuery.data]);
   const selectedLocation = locations.find((location) => location.id === selectedLocationId) ?? null;
