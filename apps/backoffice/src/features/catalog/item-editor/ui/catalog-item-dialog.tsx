@@ -33,8 +33,8 @@ export function CatalogItemDialog({
   canUpdateVariants,
   canManageImage,
   canEditComposition,
-  canSellProducts,
-  canSellServices,
+  canSellProducts = true,
+  canSellServices = true,
   onClose,
   onSaved,
 }: {
@@ -51,8 +51,8 @@ export function CatalogItemDialog({
   canUpdateVariants: boolean;
   canManageImage: boolean;
   canEditComposition: boolean;
-  canSellProducts: boolean;
-  canSellServices: boolean;
+  canSellProducts?: boolean;
+  canSellServices?: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
