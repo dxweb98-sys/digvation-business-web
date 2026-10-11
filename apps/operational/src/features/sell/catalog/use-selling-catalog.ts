@@ -31,9 +31,7 @@ export function useSellingCatalog({
   const [search, setSearch] = useState('');
   const canSellProducts = enabledSelling?.PRODUCT ?? true;
   const canSellServices = enabledSelling?.SERVICE ?? true;
-  const [selectedItemType, setSelectedItemType] = useState<CatalogItemTypeFilter>(() =>
-    canSellServices ? 'SERVICE' : canSellProducts ? 'PRODUCT' : 'ALL',
-  );
+  const [selectedItemType, setSelectedItemType] = useState<CatalogItemTypeFilter>('SERVICE');
   // An entitlement refresh can remove the previously selected selling mode.
   const itemType: CatalogItemTypeFilter =
     selectedItemType === 'SERVICE' && !canSellServices

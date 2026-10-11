@@ -823,7 +823,9 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         <div className="shrink-0 pb-2">
           <div className="flex flex-wrap items-center gap-2 border-b border-(--color-border) pb-2 lg:flex-nowrap">
             {canSellProducts || canSellServices ? (
-              <div className="grid shrink-0 grid-cols-2 rounded-xl bg-(--color-surface-muted)/75 p-1 sm:inline-flex sm:items-center">
+              <div
+                className={`grid shrink-0 ${canSellProducts && canSellServices ? 'grid-cols-2' : 'grid-cols-1'} rounded-xl bg-(--color-surface-muted)/75 p-1 sm:inline-flex sm:items-center`}
+              >
                 {canSellProducts ? (
                   <ReferenceTypeButton
                     active={workspace.itemType === 'PRODUCT'}
