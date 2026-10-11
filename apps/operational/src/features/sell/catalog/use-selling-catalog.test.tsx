@@ -49,7 +49,7 @@ function setup(enabledSelling?: { PRODUCT: boolean; SERVICE: boolean }) {
         locale: 'id-ID',
         sellingLocationId: 'location-1',
         currency: 'IDR',
-        enabledSelling,
+        ...(enabledSelling ? { enabledSelling } : {}),
       }),
     { wrapper },
   );

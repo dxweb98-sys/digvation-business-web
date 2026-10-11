@@ -175,6 +175,8 @@ export function canAccessBackoffice(
   // Employee management belongs to the shared Workforce foundation,
   // not the Attendance feature. Retail-only POS without Commission need not show it.
   if (capability === 'employees' && !session.access.foundations.includes('WORKFORCE')) return false;
+  if (capability === 'employees' && !hasSessionFeature(session.access, 'EMPLOYEE_WORKFORCE'))
+    return false;
   const feature = entitlementForArea[capability];
   if (
     feature &&

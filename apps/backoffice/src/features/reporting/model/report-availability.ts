@@ -99,12 +99,7 @@ export function isDashboardWidgetAvailable(
   widget: DashboardWidget,
 ): boolean {
   if (!isReportAvailable(session, DASHBOARD_REPORT[widget])) return false;
-  // Business Insights is optional; ordinary sales and finance projections
-  // remain visible whenever their own domain/permission is available.
-  if (widget === 'BUSINESS_INSIGHT') {
-    if (!session?.access.entitlements) return true;
-    return hasSessionFeature(session.access, 'BUSINESS_ANALYTICS');
-  }
+  // Every business can use insights when its underlying report and RBAC allow it.
   return true;
 }
 

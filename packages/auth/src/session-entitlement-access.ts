@@ -7,6 +7,8 @@ import type { SessionAccess } from './auth.types';
  */
 export type SessionFeature =
   | 'POS'
+  | 'MULTI_BRANCH'
+  | 'EMPLOYEE_WORKFORCE'
   | 'POS_PRODUCT_SALES'
   | 'POS_SERVICE_SALES'
   | 'POS_PRODUCT_COMMISSION'
@@ -22,6 +24,11 @@ export type SessionFeature =
 export function hasSessionFeature(access: SessionAccess, feature: SessionFeature): boolean {
   const pos = access.products.includes('POS');
   if (feature === 'POS') return pos && (access.entitlements?.products.POS.enabled ?? true);
+  // Insights are part of the dashboard baseline, still subject to report RBAC.
+  if (feature === 'BUSINESS_ANALYTICS') return true;
+  if (feature === 'MULTI_BRANCH' && !access.entitlements?.modules.ORGANIZATION) return true;
+  if (feature === 'EMPLOYEE_WORKFORCE' && !access.entitlements?.modules.EMPLOYEE)
+    return access.foundations.includes('WORKFORCE');
   const hierarchy = access.entitlements;
   const modernHierarchy = Boolean(hierarchy && 'CUSTOMER' in hierarchy.modules);
   // Old POS grants both selling kinds and Product commission by default.
@@ -43,6 +50,10 @@ export function hasSessionFeature(access: SessionAccess, feature: SessionFeature
   const h = access.entitlements;
   if (!h || !('CUSTOMER' in h.modules)) return true;
   switch (feature) {
+    case 'MULTI_BRANCH':
+      return h.modules.ORGANIZATION?.MULTI_BRANCH ?? false;
+    case 'EMPLOYEE_WORKFORCE':
+      return h.modules.EMPLOYEE?.WORKFORCE ?? false;
     case 'POS_PRODUCT_SALES':
       return h.products.POS.enabled && h.products.POS.selling.PRODUCT;
     case 'POS_SERVICE_SALES':
@@ -58,11 +69,9 @@ export function hasSessionFeature(access: SessionAccess, feature: SessionFeature
     case 'FINANCE_OPERATIONS':
       return h.modules.FINANCE.OPERATIONS;
     case 'TAX_FISCAL':
-      return h.modules.FISCAL.TAX;
+      return h.modules.TAX ?? h.modules.FISCAL?.TAX ?? false;
     case 'WORKFORCE_ATTENDANCE':
-      return h.modules.WORKFORCE.ATTENDANCE;
-    case 'BUSINESS_ANALYTICS':
-      return h.modules.ANALYTICS.BUSINESS_INSIGHTS;
+      return h.modules.EMPLOYEE?.ATTENDANCE ?? h.modules.WORKFORCE?.ATTENDANCE ?? false;
   }
 }
 

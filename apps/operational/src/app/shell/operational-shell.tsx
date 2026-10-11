@@ -1,4 +1,4 @@
-import { useAuth } from '@digvation/business-auth';
+import { hasSessionFeature, useAuth } from '@digvation/business-auth';
 import { useConnectivity, useDeploymentBootstrap } from '@digvation/business-runtime';
 import { DAlert, DAvatar, DButton, DDialog, DDropdown, useToast } from '@digvation/ui';
 import {
@@ -80,10 +80,13 @@ export function OperationalShell({
   const routerLocation = useLocation();
   const version = getAppVersion();
   const operationalAccessQuery = useOperationalAccessContext();
-  const locations = useMemo(
-    () => operationalAccessQuery.data?.locations ?? [],
-    [operationalAccessQuery.data],
-  );
+  const canSwitchBranches = hasSessionFeature(session.access, 'MULTI_BRANCH');
+  const locations = useMemo(() => {
+    const all = operationalAccessQuery.data?.locations ?? [];
+    if (canSwitchBranches) return all;
+    const main = all.find((location) => location.id === operationalAccessQuery.data?.mainLocationId);
+    return main ? [main] : all.slice(0, 1);
+  }, [canSwitchBranches, operationalAccessQuery.data]);
   const selectedLocation = locations.find((location) => location.id === selectedLocationId) ?? null;
   const brandSubtitle =
     session.business.name || bootstrap.branding.companyName || copy('Operational');

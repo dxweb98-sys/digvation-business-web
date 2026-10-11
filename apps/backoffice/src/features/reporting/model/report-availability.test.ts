@@ -134,16 +134,16 @@ describe('Tenant-scoped domain entitlement projections', () => {
             },
           },
           modules: {
+            ORGANIZATION: { MULTI_BRANCH: false },
             CATALOG: { enabled: true, PRODUCTS: true, SERVICES: false },
             CUSTOMER: {
               enabled: true,
               MEMBERSHIP: { enabled: false, LOYALTY_POINTS: false },
             },
             COMMERCIAL: { PROMOTIONS: false },
-            WORKFORCE: { EMPLOYEES: false, ATTENDANCE: false },
+            EMPLOYEE: { WORKFORCE: false, ATTENDANCE: false },
             FINANCE: { OPERATIONS: false },
-            FISCAL: { TAX: false },
-            ANALYTICS: { BUSINESS_INSIGHTS: false },
+            TAX: false,
           },
         },
       },
@@ -159,7 +159,7 @@ describe('Tenant-scoped domain entitlement projections', () => {
     expect(canAccessReport(retail, 'attendance')).toBe(false);
     expect(canAccessReport(retail, 'expenses')).toBe(false);
     expect(canAccessReport(retail, 'tax')).toBe(false);
-    expect(canShowDashboardWidget(retail, 'BUSINESS_INSIGHT')).toBe(false);
+    expect(canShowDashboardWidget(retail, 'BUSINESS_INSIGHT')).toBe(true);
     expect(canShowDashboardWidget(retail, 'TOP_ITEMS')).toBe(true);
   });
 
@@ -175,7 +175,7 @@ describe('Tenant-scoped domain entitlement projections', () => {
           modules: {
             ...retail.access.entitlements!.modules,
             FINANCE: { OPERATIONS: true },
-            FISCAL: { TAX: true },
+            TAX: true,
           },
         },
       },

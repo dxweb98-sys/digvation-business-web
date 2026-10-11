@@ -183,7 +183,11 @@ export function BusinessConfigurationPage() {
           <LocationsSection
             items={locations.data?.items ?? []}
             loading={locations.isLoading}
-            canCreate={canCreateLocation}
+            canCreate={
+              canCreateLocation &&
+              (hasSessionFeature(session.access, 'MULTI_BRANCH') ||
+                (!locations.isLoading && locations.data?.total === 0))
+            }
             canUpdate={canUpdateLocation}
             api={api}
             onChanged={() => invalidate(keys.locations)}

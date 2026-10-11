@@ -7,6 +7,8 @@ const access: SessionAccess = {
   capabilities: [
     'POS_PRODUCT_SALES',
     'POS_PRODUCT_COMMISSION',
+    'MULTI_BRANCH',
+    'EMPLOYEE_WORKFORCE',
     'MEMBERSHIP',
     'LOYALTY_POINTS',
     'PROMOTIONS',
@@ -22,16 +24,16 @@ const access: SessionAccess = {
       },
     },
     modules: {
+      ORGANIZATION: { MULTI_BRANCH: true },
       CATALOG: { enabled: true, PRODUCTS: true, SERVICES: false },
       CUSTOMER: {
         enabled: true,
         MEMBERSHIP: { enabled: true, LOYALTY_POINTS: true },
       },
       COMMERCIAL: { PROMOTIONS: true },
-      WORKFORCE: { EMPLOYEES: true, ATTENDANCE: false },
+      EMPLOYEE: { WORKFORCE: true, ATTENDANCE: false },
       FINANCE: { OPERATIONS: false },
-      FISCAL: { TAX: false },
-      ANALYTICS: { BUSINESS_INSIGHTS: false },
+      TAX: false,
     },
   },
 };
@@ -92,6 +94,24 @@ describe('domain entitlement selectors', () => {
     expect(hasSessionFeature(independent, 'POS_PRODUCT_COMMISSION')).toBe(true);
     expect(hasSessionFeature(independent, 'LOYALTY_POINTS')).toBe(true);
     expect(hasSessionFeature(independent, 'MEMBERSHIP')).toBe(false);
+  });
+
+  it('controls multi-branch and Employee Workforce without coupling either to Attendance', () => {
+    const independent: SessionAccess = {
+      ...access,
+      capabilities: ['POS_SERVICE_SALES', 'WORKFORCE_ATTENDANCE'],
+      entitlements: {
+        ...access.entitlements!,
+        modules: {
+          ...access.entitlements!.modules,
+          ORGANIZATION: { MULTI_BRANCH: false },
+          EMPLOYEE: { WORKFORCE: false, ATTENDANCE: true },
+        },
+      },
+    };
+    expect(hasSessionFeature(independent, 'MULTI_BRANCH')).toBe(false);
+    expect(hasSessionFeature(independent, 'EMPLOYEE_WORKFORCE')).toBe(false);
+    expect(hasSessionFeature(independent, 'WORKFORCE_ATTENDANCE')).toBe(true);
   });
 
   it('preserves the flat contract for the older Runtime', () => {

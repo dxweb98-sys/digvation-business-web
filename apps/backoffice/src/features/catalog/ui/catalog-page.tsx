@@ -90,6 +90,16 @@ export function CatalogPage() {
   const canSellServices = Boolean(
     session && hasSessionFeature(session.access, 'POS_SERVICE_SALES'),
   );
+  // Disable standalone Product queries when Product Sales is not entitled.
+  // Service composition uses its own Product component candidate API.
+  const availableItemType: Item['type'] | '' | null =
+    canSellProducts && canSellServices
+      ? itemQuery.type
+      : canSellProducts
+        ? 'PRODUCT'
+        : canSellServices
+          ? 'SERVICE'
+          : null;
   const canViewLoyalty = hasLoyaltyCapability && can('viewLoyalty');
   const canConfigureLoyalty = hasLoyaltyCapability && can('configureLoyalty');
 
@@ -99,7 +109,7 @@ export function CatalogPage() {
     enabled: Boolean(session),
   });
   const items = useListQuery({
-    queryKey: [...keys.items, itemQuery],
+    queryKey: [...keys.items, itemQuery, availableItemType],
     pagination: {
       page: itemPagination.page,
       pageSize: itemPagination.pageSize,
@@ -107,10 +117,10 @@ export function CatalogPage() {
     queryFn: (pagination) =>
       api.listItems({
         ...toItemQuery(itemQuery),
-        ...(!canSellServices && itemQuery.type === 'SERVICE' ? { type: 'PRODUCT' as const } : {}),
+        ...(availableItemType ? { type: availableItemType } : {}),
         ...(pagination ?? itemPagination.request),
       }),
-    enabled: Boolean(session),
+    enabled: Boolean(session && availableItemType !== null),
   });
   const categories = useListQuery({
     queryKey: [...keys.categories, categoryQuery],
@@ -261,7 +271,7 @@ export function CatalogPage() {
                   onChange={(type) => changeItemFilter({ type: (type ?? '') as '' | Item['type'] })}
                   clearable
                   options={[
-                    { label: copy('Product'), value: 'PRODUCT' },
+                    ...(canSellProducts ? [{ label: copy('Product'), value: 'PRODUCT' }] : []),
                     ...(canSellServices ? [{ label: copy('Service'), value: 'SERVICE' }] : []),
                   ]}
                 />
