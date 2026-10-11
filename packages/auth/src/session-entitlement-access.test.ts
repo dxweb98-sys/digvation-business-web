@@ -48,7 +48,7 @@ describe('canonical session feature checks', () => {
   });
 
   it('keeps the original flat entitlement contract during staged deployment', () => {
-    const { entitlements: _unused, ...legacy } = access;
+    const legacy = { ...access, entitlements: undefined };
     expect(hasSessionFeature(legacy, 'MEMBERSHIP')).toBe(true);
     expect(hasSessionFeature({ ...legacy, capabilities: [] }, 'MEMBERSHIP')).toBe(false);
   });
