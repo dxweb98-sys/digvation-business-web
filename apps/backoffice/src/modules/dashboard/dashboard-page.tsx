@@ -305,7 +305,7 @@ export function DashboardPage() {
         </p>
       </section>
 
-      {!canReadSales ? (
+      {!canReadSales && !canReadExpenses ? (
         <DCard
           variant="elevated"
           className="mt-5 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5"
@@ -317,7 +317,7 @@ export function DashboardPage() {
         </DCard>
       ) : null}
 
-      {canReadSales && !locationReady ? (
+      {(canReadSales || canReadExpenses) && !locationReady ? (
         <DCard
           variant="elevated"
           className="mt-5 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5"
@@ -329,6 +329,18 @@ export function DashboardPage() {
               : text('selectLocationDescription')}
           </p>
         </DCard>
+      ) : null}
+
+      {canReadExpenses && !canReadSales && locationReady ? (
+        <section className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <DashboardKpiCard
+            label={text('expensesToday')}
+            value={moneyNumber(approvedExpenses)}
+            context={text('today')}
+            tone="warm"
+            icon={<WalletCards aria-hidden="true" className="size-4" />}
+          />
+        </section>
       ) : null}
 
       {canReadSales && locationReady ? (
