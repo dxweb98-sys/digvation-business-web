@@ -65,6 +65,35 @@ describe('domain entitlement selectors', () => {
     expect(hasSessionFeature(disabled, 'MEMBERSHIP')).toBe(false);
   });
 
+  it('honors independent Loyalty and Product Commission flags in modern sessions', () => {
+    const independent: SessionAccess = {
+      ...access,
+      capabilities: ['POS_PRODUCT_COMMISSION', 'LOYALTY_POINTS'],
+      entitlements: {
+        ...access.entitlements!,
+        products: {
+          POS: {
+            enabled: true,
+            selling: { PRODUCT: false, SERVICE: false },
+            features: { PRODUCT_COMMISSION: true },
+          },
+        },
+        modules: {
+          ...access.entitlements!.modules,
+          CUSTOMER: {
+            ...access.entitlements!.modules.CUSTOMER,
+            MEMBERSHIP: { enabled: false, LOYALTY_POINTS: true },
+          },
+        },
+      },
+    };
+    expect(hasSessionFeature(independent, 'POS_PRODUCT_SALES')).toBe(false);
+    expect(hasSessionFeature(independent, 'POS_SERVICE_SALES')).toBe(false);
+    expect(hasSessionFeature(independent, 'POS_PRODUCT_COMMISSION')).toBe(true);
+    expect(hasSessionFeature(independent, 'LOYALTY_POINTS')).toBe(true);
+    expect(hasSessionFeature(independent, 'MEMBERSHIP')).toBe(false);
+  });
+
   it('preserves the flat contract for the older Runtime', () => {
     const old: SessionAccess = {
       products: ['POS'],

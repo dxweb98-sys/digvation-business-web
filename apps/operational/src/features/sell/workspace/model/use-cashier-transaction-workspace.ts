@@ -1,3 +1,4 @@
+import { hasSessionFeature } from '@digvation/business-auth';
 import { useAuth } from '@digvation/pos-auth';
 import { useConnectivity, useRuntime } from '@digvation/pos-runtime';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -61,7 +62,11 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
   const runtime = useRuntime();
   const operationalLocale = resolveOperationalLocale(runtime.locale);
   const copy = (value: string) => operationalCopy(value, operationalLocale);
-  const { authPort } = useAuth();
+  const { authPort, session } = useAuth();
+  const productSelling = Boolean(session && hasSessionFeature(session.access, 'POS_PRODUCT_SALES'));
+  const serviceSelling = Boolean(session && hasSessionFeature(session.access, 'POS_SERVICE_SALES'));
+  const servicePerformerAccess =
+    serviceSelling && Boolean(session?.access.permissions.includes('fulfillment:update'));
   const queryClient = useQueryClient();
   const connectivity = useConnectivity();
   const navigate = useNavigate();
@@ -99,9 +104,13 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     locale: runtime.locale,
     sellingLocationId: selectedLocationId ?? '',
     currency: runtime.currency,
+    enabledSelling: { PRODUCT: productSelling, SERVICE: serviceSelling },
   });
 
-  const employeeOptions = useEmployeeOptions(transactionAdapter, areEmployeeOptionsEnabled);
+  const employeeOptions = useEmployeeOptions(
+    transactionAdapter,
+    areEmployeeOptionsEnabled && servicePerformerAccess,
+  );
   const paymentRoutesQuery = useQuery({
     queryKey: cashierTransactionKeys.paymentRoutes(selectedLocationId ?? '', runtime.currency),
     queryFn: ({ signal }) =>

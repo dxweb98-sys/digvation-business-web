@@ -1,3 +1,4 @@
+import { hasSessionFeature } from '@digvation/business-auth';
 import { useAuth } from '@digvation/pos-auth';
 import { createDecimal } from '@digvation/pos-money';
 import { useRuntime } from '@digvation/pos-runtime';
@@ -91,6 +92,8 @@ type FulfillmentDestination = 'QUEUE' | 'START_PROCESS';
 export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }) {
   const runtime = useRuntime();
   const { session, authPort } = useAuth();
+  const canSellProducts = hasSessionFeature(session.access, 'POS_PRODUCT_SALES');
+  const canSellServices = hasSessionFeature(session.access, 'POS_SERVICE_SALES');
   const { showToast } = useToast();
   const { copy } = useOperationalLocalization();
   const isLocalDemo = isLocalCashierDemoEnabled();
@@ -819,20 +822,26 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="shrink-0 pb-2">
           <div className="flex flex-wrap items-center gap-2 border-b border-(--color-border) pb-2 lg:flex-nowrap">
-            <div className="grid shrink-0 grid-cols-2 rounded-xl bg-(--color-surface-muted)/75 p-1 sm:inline-flex sm:items-center">
-              <ReferenceTypeButton
-                active={workspace.itemType === 'PRODUCT'}
-                icon={<ShoppingBag className="size-3.5" />}
-                label={copy('Product')}
-                onClick={() => selectType('PRODUCT')}
-              />
-              <ReferenceTypeButton
-                active={workspace.itemType === 'SERVICE'}
-                icon={<Sparkles className="size-3.5" />}
-                label={copy('Service')}
-                onClick={() => selectType('SERVICE')}
-              />
-            </div>
+            {canSellProducts || canSellServices ? (
+              <div className="grid shrink-0 grid-cols-2 rounded-xl bg-(--color-surface-muted)/75 p-1 sm:inline-flex sm:items-center">
+                {canSellProducts ? (
+                  <ReferenceTypeButton
+                    active={workspace.itemType === 'PRODUCT'}
+                    icon={<ShoppingBag className="size-3.5" />}
+                    label={copy('Product')}
+                    onClick={() => selectType('PRODUCT')}
+                  />
+                ) : null}
+                {canSellServices ? (
+                  <ReferenceTypeButton
+                    active={workspace.itemType === 'SERVICE'}
+                    icon={<Sparkles className="size-3.5" />}
+                    label={copy('Service')}
+                    onClick={() => selectType('SERVICE')}
+                  />
+                ) : null}
+              </div>
+            ) : null}
             <div className="shrink-0">
               <SearchInput
                 value={search}

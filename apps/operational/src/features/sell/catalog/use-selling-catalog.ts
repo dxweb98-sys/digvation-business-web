@@ -17,6 +17,7 @@ interface UseSellingCatalogOptions {
   locale: string;
   sellingLocationId: string;
   currency: string;
+  enabledSelling?: { readonly PRODUCT: boolean; readonly SERVICE: boolean };
 }
 
 export function useSellingCatalog({
@@ -24,10 +25,31 @@ export function useSellingCatalog({
   locale,
   sellingLocationId,
   currency,
+  enabledSelling,
 }: UseSellingCatalogOptions) {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
-  const [itemType, setItemType] = useState<CatalogItemTypeFilter>('SERVICE');
+  const canSellProducts = enabledSelling?.PRODUCT ?? true;
+  const canSellServices = enabledSelling?.SERVICE ?? true;
+  const [selectedItemType, setSelectedItemType] = useState<CatalogItemTypeFilter>(() =>
+    canSellServices ? 'SERVICE' : canSellProducts ? 'PRODUCT' : 'ALL',
+  );
+  // An entitlement refresh can remove the previously selected selling mode.
+  const itemType: CatalogItemTypeFilter =
+    selectedItemType === 'SERVICE' && !canSellServices
+      ? canSellProducts
+        ? 'PRODUCT'
+        : 'ALL'
+      : selectedItemType === 'PRODUCT' && !canSellProducts
+        ? canSellServices
+          ? 'SERVICE'
+          : 'ALL'
+        : selectedItemType;
+  const setItemType = (next: CatalogItemTypeFilter) => {
+    if ((next === 'PRODUCT' && !canSellProducts) || (next === 'SERVICE' && !canSellServices))
+      return;
+    setSelectedItemType(next);
+  };
   const catalogQuery = useQuery({
     queryKey: cashierTransactionKeys.operationalCatalog(sellingLocationId, currency),
     queryFn: async ({ signal }) => {
@@ -43,13 +65,18 @@ export function useSellingCatalog({
       ]);
       return { categories: categoriesPage.items, items: itemsPage.items };
     },
-    enabled: Boolean(sellingLocationId && currency),
+    enabled: Boolean(sellingLocationId && currency && (canSellProducts || canSellServices)),
     ...referenceQueryPolicy,
   });
 
   const activeItems = useMemo(
-    () => (catalogQuery.data?.items ?? []).filter(isStandaloneSellable),
-    [catalogQuery.data],
+    () =>
+      (catalogQuery.data?.items ?? []).filter(
+        (item) =>
+          isStandaloneSellable(item) &&
+          (item.type === 'PRODUCT' ? canSellProducts : canSellServices),
+      ),
+    [catalogQuery.data, canSellProducts, canSellServices],
   );
   const items = useMemo(() => {
     const normalizedSearch = search.trim().toLocaleLowerCase(locale);
