@@ -18,9 +18,42 @@ export interface SessionBusiness {
   currency: string;
 }
 
+export interface SessionEntitlementHierarchy {
+  readonly products: {
+    readonly POS: {
+      readonly enabled: boolean;
+      readonly selling: { readonly PRODUCT: boolean; readonly SERVICE: boolean };
+      readonly features: { readonly PRODUCT_COMMISSION: boolean };
+    };
+  };
+  readonly modules: {
+    readonly ORGANIZATION?: { readonly MULTI_BRANCH: boolean };
+    readonly CATALOG: {
+      readonly enabled: boolean;
+      readonly PRODUCTS: boolean;
+      readonly SERVICES: boolean;
+    };
+    readonly CUSTOMER: {
+      readonly enabled: boolean;
+      readonly MEMBERSHIP: { readonly enabled: boolean; readonly LOYALTY_POINTS: boolean };
+    };
+    readonly COMMERCIAL: { readonly PROMOTIONS: boolean };
+    readonly EMPLOYEE?: { readonly WORKFORCE: boolean; readonly ATTENDANCE: boolean };
+    /** Legacy session compatibility during staged rollouts. */
+    readonly WORKFORCE?: { readonly EMPLOYEES: boolean; readonly ATTENDANCE: boolean };
+    readonly FINANCE: { readonly OPERATIONS: boolean };
+    readonly TAX?: boolean;
+    /** Legacy session compatibility during staged rollouts. */
+    readonly FISCAL?: { readonly TAX: boolean };
+    readonly ANALYTICS?: { readonly BUSINESS_INSIGHTS: boolean };
+  };
+}
+
 export interface SessionAccess {
   readonly products: readonly string[];
   readonly capabilities: readonly string[];
+  /** Additive field: older Runtime versions may omit this during rollout. */
+  readonly entitlements?: SessionEntitlementHierarchy;
   readonly foundations: readonly string[];
   readonly permissions: readonly string[];
 }

@@ -1,4 +1,4 @@
-import type { AuthSession } from '@digvation/business-auth';
+import { hasSessionFeature, type AuthSession } from '@digvation/business-auth';
 
 export type ReportType =
   | 'business-performance'
@@ -65,7 +65,27 @@ export function isReportAvailable(session: AuthSession | null, type: ReportType)
   const permission = REPORT_PERMISSION[type] as string | undefined;
   if (!session || !permission) return false;
   if (!session.access.permissions.includes(permission)) return false;
-  if (POS_REPORTS.has(type) && !session.access.products.includes('POS')) return false;
+  if (POS_REPORTS.has(type) && !hasSessionFeature(session.access, 'POS')) return false;
+  // Older Runtimes already filtered the flat permission projection. Domain
+  // hierarchy checks apply when the newer projection is available.
+  const hasDomainHierarchy = Boolean(
+    session.access.entitlements && 'CUSTOMER' in session.access.entitlements.modules,
+  );
+  if (!hasDomainHierarchy) return true;
+  if (type === 'employee-performance' && !session.access.foundations.includes('WORKFORCE'))
+    return false;
+  // A commission report must never appear for a client without the delivered
+  // Product-sales commission capability (Attendance is unrelated).
+  if (type === 'product-commission' && !hasSessionFeature(session.access, 'POS_PRODUCT_COMMISSION'))
+    return false;
+  if (type === 'attendance' && !hasSessionFeature(session.access, 'WORKFORCE_ATTENDANCE'))
+    return false;
+  if (type === 'tax' && !hasSessionFeature(session.access, 'TAX_FISCAL')) return false;
+  if (
+    (type === 'expenses' || type === 'cash') &&
+    !hasSessionFeature(session.access, 'FINANCE_OPERATIONS')
+  )
+    return false;
   return true;
 }
 
@@ -78,7 +98,9 @@ export function isDashboardWidgetAvailable(
   session: AuthSession | null,
   widget: DashboardWidget,
 ): boolean {
-  return isReportAvailable(session, DASHBOARD_REPORT[widget]);
+  if (!isReportAvailable(session, DASHBOARD_REPORT[widget])) return false;
+  // Every business can use insights when its underlying report and RBAC allow it.
+  return true;
 }
 
 /** All dashboard contributions for enabled features are shown. */

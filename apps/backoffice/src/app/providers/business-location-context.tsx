@@ -1,3 +1,4 @@
+import { hasSessionFeature } from '@digvation/business-auth';
 import { useDeploymentBootstrap } from '@digvation/business-runtime';
 import { useQuery } from '@tanstack/react-query';
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
@@ -58,6 +59,7 @@ export function BusinessLocationProvider({ children }: { children: ReactNode }) 
   const canReadOperationalAccess = Boolean(
     session?.access.permissions.includes('operational-access:read'),
   );
+  const canSwitchBranches = Boolean(session && hasSessionFeature(session.access, 'MULTI_BRANCH'));
   const preferenceKey = session
     ? `digvation.backoffice.dashboard.location.v1:${session.business.tenantId}:${session.identity.userId}`
     : 'digvation.backoffice.dashboard.location.v1:anonymous';
@@ -81,8 +83,15 @@ export function BusinessLocationProvider({ children }: { children: ReactNode }) 
         right.name ?? right.displayName ?? right.code,
       );
     });
-    return all;
-  }, [canReadOperationalAccess, query.data?.locations, query.data?.mainLocationId]);
+    if (canSwitchBranches) return all;
+    const main = all.find((location) => location.id === query.data?.mainLocationId);
+    return main ? [main] : all.slice(0, 1);
+  }, [
+    canReadOperationalAccess,
+    canSwitchBranches,
+    query.data?.locations,
+    query.data?.mainLocationId,
+  ]);
 
   const accessibleIds = useMemo(
     () => new Set(locations.map((location) => location.id)),

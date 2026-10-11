@@ -1,4 +1,5 @@
 import { useRuntime } from '@digvation/business-runtime';
+import { hasSessionFeature } from '@digvation/business-auth';
 import {
   DBadge,
   DButton,
@@ -70,15 +71,22 @@ export function BusinessConfigurationPage() {
     () => new CatalogApi(createApiClient(runtime.apiBaseUrl)),
     [createApiClient, runtime.apiBaseUrl],
   );
-  const hasPosProduct = Boolean(session?.effectiveEntitlements.products.includes('POS'));
+  const hasPosProduct = Boolean(session && hasSessionFeature(session.access, 'POS'));
+  const hasTaxCapability = Boolean(session && hasSessionFeature(session.access, 'TAX_FISCAL'));
   const canViewCommission = Boolean(
-    hasPosProduct && session && canPerformBackofficeAction(session, 'viewCommission'),
+    hasPosProduct &&
+    session &&
+    hasSessionFeature(session.access, 'POS_PRODUCT_COMMISSION') &&
+    canPerformBackofficeAction(session, 'viewCommission'),
   );
   const canConfigureCommission = Boolean(
-    hasPosProduct && session && canPerformBackofficeAction(session, 'configureCommission'),
+    hasPosProduct &&
+    session &&
+    hasSessionFeature(session.access, 'POS_PRODUCT_COMMISSION') &&
+    canPerformBackofficeAction(session, 'configureCommission'),
   );
   const hasLoyaltyCapability = Boolean(
-    session?.effectiveEntitlements.capabilities.includes('LOYALTY_POINTS'),
+    session && hasSessionFeature(session.access, 'LOYALTY_POINTS'),
   );
   const canViewLoyalty = Boolean(
     hasLoyaltyCapability && session && canPerformBackofficeAction(session, 'viewLoyalty'),
@@ -151,7 +159,9 @@ export function BusinessConfigurationPage() {
           {canViewProfile ? (
             <DTabsTrigger value="localization">{copy('Localization')}</DTabsTrigger>
           ) : null}
-          {canViewProfile ? <DTabsTrigger value="tax">{copy('Tax')}</DTabsTrigger> : null}
+          {canViewProfile && hasTaxCapability ? (
+            <DTabsTrigger value="tax">{copy('Tax')}</DTabsTrigger>
+          ) : null}
           {canViewProfile ? (
             <DTabsTrigger value="numbering">{copy('Numbering')}</DTabsTrigger>
           ) : null}
@@ -173,7 +183,11 @@ export function BusinessConfigurationPage() {
           <LocationsSection
             items={locations.data?.items ?? []}
             loading={locations.isLoading}
-            canCreate={canCreateLocation}
+            canCreate={
+              canCreateLocation &&
+              (hasSessionFeature(session.access, 'MULTI_BRANCH') ||
+                (!locations.isLoading && locations.data?.total === 0))
+            }
             canUpdate={canUpdateLocation}
             api={api}
             onChanged={() => invalidate(keys.locations)}
@@ -190,15 +204,17 @@ export function BusinessConfigurationPage() {
           />
         </DTabsContent>
 
-        <DTabsContent value="tax" className="mt-5">
-          <TaxSection
-            tax={configuration.data?.tax}
-            loading={configuration.isLoading}
-            canUpdate={canUpdateProfile}
-            api={api}
-            onChanged={() => invalidate(keys.configuration)}
-          />
-        </DTabsContent>
+        {canViewProfile && hasTaxCapability ? (
+          <DTabsContent value="tax" className="mt-5">
+            <TaxSection
+              tax={configuration.data?.tax}
+              loading={configuration.isLoading}
+              canUpdate={canUpdateProfile}
+              api={api}
+              onChanged={() => invalidate(keys.configuration)}
+            />
+          </DTabsContent>
+        ) : null}
 
         {canViewLoyalty ? (
           <DTabsContent value="loyalty" className="mt-5">

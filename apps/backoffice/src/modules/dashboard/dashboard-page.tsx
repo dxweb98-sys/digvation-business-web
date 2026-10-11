@@ -153,6 +153,11 @@ export function DashboardPage() {
   const activityFilters: DashboardFilterState = { ...activity, locationId };
   const previousActivityFilters: DashboardFilterState = { ...previousActivity, locationId };
   const expenseActivityFilters: DashboardFilterState = { ...activityFilters, status: 'APPROVED' };
+  const todayExpenseFilters: DashboardFilterState = {
+    ...periodRange('today'),
+    locationId,
+    status: 'APPROVED',
+  };
   const previousExpenseActivityFilters: DashboardFilterState = {
     ...previousActivityFilters,
     status: 'APPROVED',
@@ -176,6 +181,11 @@ export function DashboardPage() {
     queryKey: ['dashboard', 'business-performance', 'previous-activity', previousActivityFilters],
     queryFn: () => api.report('business-performance', previousActivityFilters),
     enabled: reportEnabled,
+  });
+  const todayExpenses = useQuery({
+    queryKey: ['dashboard', 'expenses', 'today', todayExpenseFilters],
+    queryFn: () => api.report('expenses', todayExpenseFilters),
+    enabled: Boolean(session && canReadExpenses && !canReadSales && locationReady),
   });
   const activityExpenses = useQuery({
     queryKey: ['dashboard', 'expenses', expenseActivityFilters],
@@ -253,6 +263,7 @@ export function DashboardPage() {
   const activityTransactions = numberValue(activityData?.summary.transactionCount);
   const previousActivityTransactions = numberValue(previousActivityData?.summary.transactionCount);
   const approvedExpenses = numberValue(activityExpenseData?.summary.approvedExpenseTotal);
+  const approvedTodayExpenses = numberValue(todayExpenses.data?.summary.approvedExpenseTotal);
   const previousApprovedExpenses = numberValue(
     previousActivityExpenseData?.summary.approvedExpenseTotal,
   );
@@ -305,7 +316,7 @@ export function DashboardPage() {
         </p>
       </section>
 
-      {!canReadSales ? (
+      {!canReadSales && !canReadExpenses ? (
         <DCard
           variant="elevated"
           className="mt-5 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5"
@@ -317,7 +328,7 @@ export function DashboardPage() {
         </DCard>
       ) : null}
 
-      {canReadSales && !locationReady ? (
+      {(canReadSales || canReadExpenses) && !locationReady ? (
         <DCard
           variant="elevated"
           className="mt-5 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5"
@@ -329,6 +340,18 @@ export function DashboardPage() {
               : text('selectLocationDescription')}
           </p>
         </DCard>
+      ) : null}
+
+      {canReadExpenses && !canReadSales && locationReady ? (
+        <section className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <DashboardKpiCard
+            label={text('expensesToday')}
+            value={moneyNumber(approvedTodayExpenses)}
+            context={text('today')}
+            tone="warm"
+            icon={<WalletCards aria-hidden="true" className="size-4" />}
+          />
+        </section>
       ) : null}
 
       {canReadSales && locationReady ? (

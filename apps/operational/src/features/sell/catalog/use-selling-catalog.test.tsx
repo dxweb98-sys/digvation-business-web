@@ -36,7 +36,7 @@ const items: CatalogItem[] = [
   { ...base, id: 'cut', code: 'SVC-1', name: 'Potong Rambut', type: 'SERVICE' },
 ];
 
-function setup() {
+function setup(enabledSelling?: { PRODUCT: boolean; SERVICE: boolean }) {
   const getOperationalCatalog = vi.fn().mockResolvedValue({ categories: [], items });
   const listCatalogVariants = vi.fn();
   const wrapper = ({ children }: { children: ReactNode }) => (
@@ -49,6 +49,7 @@ function setup() {
         locale: 'id-ID',
         sellingLocationId: 'location-1',
         currency: 'IDR',
+        ...(enabledSelling ? { enabledSelling } : {}),
       }),
     { wrapper },
   );
@@ -87,6 +88,33 @@ describe('useSellingCatalog search', () => {
 
     act(() => hook.result.current.setItemType('ALL'));
     expect(hook.result.current.items.map((item) => item.id)).toEqual(['paint', 'cut']);
+  });
+});
+
+describe('selling mode entitlements', () => {
+  it('defaults to Product on retail-only and never exposes Service items', async () => {
+    const { hook } = setup({ PRODUCT: true, SERVICE: false });
+    await waitFor(() => expect(hook.result.current.isLoading).toBe(false));
+    expect(hook.result.current.itemType).toBe('PRODUCT');
+    expect(hook.result.current.activeItems.map((item) => item.id)).toEqual(['paint']);
+    act(() => hook.result.current.setItemType('SERVICE'));
+    expect(hook.result.current.itemType).toBe('PRODUCT');
+  });
+
+  it('defaults to Service on service-only and never exposes Product items', async () => {
+    const { hook } = setup({ PRODUCT: false, SERVICE: true });
+    await waitFor(() => expect(hook.result.current.isLoading).toBe(false));
+    expect(hook.result.current.itemType).toBe('SERVICE');
+    expect(hook.result.current.activeItems.map((item) => item.id)).toEqual(['cut']);
+    act(() => hook.result.current.setItemType('ALL'));
+    expect(hook.result.current.items.map((item) => item.id)).toEqual(['cut']);
+  });
+
+  it('does not fetch the selling catalog when both modes are off', () => {
+    const { hook, getOperationalCatalog } = setup({ PRODUCT: false, SERVICE: false });
+    expect(hook.result.current.itemType).toBe('ALL');
+    expect(hook.result.current.activeItems).toEqual([]);
+    expect(getOperationalCatalog).not.toHaveBeenCalled();
   });
 });
 

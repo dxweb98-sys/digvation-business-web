@@ -1,4 +1,4 @@
-import type { AuthSession } from '@digvation/business-auth';
+import { hasSessionFeature, type AuthSession, type SessionFeature } from '@digvation/business-auth';
 
 export type BackofficeCapability =
   | 'dashboard'
@@ -63,6 +63,15 @@ export type BackofficeAction =
   | 'createReconciliation'
   | 'updateReconciliation';
 
+const entitlementForArea: Partial<Record<BackofficeCapability, SessionFeature>> = {
+  promotions: 'PROMOTIONS',
+  memberships: 'MEMBERSHIP',
+  attendance: 'WORKFORCE_ATTENDANCE',
+  expenses: 'FINANCE_OPERATIONS',
+  financialAccounts: 'FINANCE_OPERATIONS',
+  financialOperations: 'FINANCE_OPERATIONS',
+};
+
 export const BACKOFFICE_ACCESS_PERMISSION = 'backoffice:access';
 
 interface PermissionRequirement {
@@ -100,6 +109,7 @@ const capabilityPermissions: Record<BackofficeCapability, PermissionRequirement>
       'locations:read',
       // Tax Reporting is assignable on its own, independently of transaction access.
       'tax:read',
+      'commission:read',
     ],
   },
   // History shows completed transactions in full, which Runtime grants only with sales:read-completed.
@@ -162,7 +172,17 @@ export function canAccessBackoffice(
   if (!session.access.permissions.includes(BACKOFFICE_ACCESS_PERMISSION)) return false;
   if (capability === 'customers' && !session.access.foundations.includes('CUSTOMER_IDENTITY'))
     return false;
-  if (capability === 'memberships' && !session.access.capabilities.includes('MEMBERSHIP'))
+  // Employee management belongs to the shared Workforce foundation,
+  // not the Attendance feature. Retail-only POS without Commission need not show it.
+  if (capability === 'employees' && !session.access.foundations.includes('WORKFORCE')) return false;
+  if (capability === 'employees' && !hasSessionFeature(session.access, 'EMPLOYEE_WORKFORCE'))
+    return false;
+  const feature = entitlementForArea[capability];
+  if (
+    feature &&
+    (capability === 'memberships' || session.access.entitlements) &&
+    !hasSessionFeature(session.access, feature)
+  )
     return false;
   const requirement = capabilityPermissions[capability];
   const permissions = session.access.permissions;
