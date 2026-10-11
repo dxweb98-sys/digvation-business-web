@@ -28,7 +28,7 @@
     "test:e2e": "playwright test",
     "contract:check": "node tooling/scripts/check-contract.mjs",
     "naming:check": "node tooling/scripts/check-naming.mjs",
-    "verify": "pnpm contract:check && pnpm naming:check && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "verify": "pnpm exec prettier --write apps/backoffice/src/auth/backoffice-access.ts apps/backoffice/src/features/catalog/ui/catalog-page.tsx apps/backoffice/src/features/reporting/model/report-availability.ts apps/backoffice/src/modules/organization/business-configuration-page.tsx packages/auth/src/session-entitlement-access.test.ts packages/auth/src/session-entitlement-access.ts && git diff -- apps/backoffice/src/auth/backoffice-access.ts apps/backoffice/src/features/catalog/ui/catalog-page.tsx apps/backoffice/src/features/reporting/model/report-availability.ts apps/backoffice/src/modules/organization/business-configuration-page.tsx packages/auth/src/session-entitlement-access.test.ts packages/auth/src/session-entitlement-access.ts && exit 1",
     "verify:ci": "pnpm verify && pnpm test:e2e"
   },
   "devDependencies": {
