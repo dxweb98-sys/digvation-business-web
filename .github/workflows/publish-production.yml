@@ -75,8 +75,6 @@ jobs:
             fi
             docker buildx build --push --target "$target" \
               --build-arg "BUILD_REVISION=$GITHUB_SHA" \
-              --cache-from type=gha \
-              --cache-to type=gha,mode=max \
               --metadata-file "$RUNNER_TEMP/$component.json" \
               --tag "$image" .
             digest="$(jq -er '."containerimage.digest"' "$RUNNER_TEMP/$component.json")"
