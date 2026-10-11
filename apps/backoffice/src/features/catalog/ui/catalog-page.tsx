@@ -81,9 +81,15 @@ export function CatalogPage() {
 
   const can = (action: BackofficeAction) =>
     Boolean(session && canPerformBackofficeAction(session, action));
-  const hasLoyaltyCapability = Boolean(session && hasSessionFeature(session.access, 'LOYALTY_POINTS'));
-  const canSellProducts = Boolean(session && hasSessionFeature(session.access, 'POS_PRODUCT_SALES'));
-  const canSellServices = Boolean(session && hasSessionFeature(session.access, 'POS_SERVICE_SALES'));
+  const hasLoyaltyCapability = Boolean(
+    session && hasSessionFeature(session.access, 'LOYALTY_POINTS'),
+  );
+  const canSellProducts = Boolean(
+    session && hasSessionFeature(session.access, 'POS_PRODUCT_SALES'),
+  );
+  const canSellServices = Boolean(
+    session && hasSessionFeature(session.access, 'POS_SERVICE_SALES'),
+  );
   const canViewLoyalty = hasLoyaltyCapability && can('viewLoyalty');
   const canConfigureLoyalty = hasLoyaltyCapability && can('configureLoyalty');
 
@@ -101,7 +107,9 @@ export function CatalogPage() {
     queryFn: (pagination) =>
       api.listItems({
         ...toItemQuery(itemQuery),
-        ...(!canSellServices && itemQuery.type === 'SERVICE' ? { type: 'PRODUCT' as const } : {}),
+        ...(!canSellServices && itemQuery.type === 'SERVICE'
+          ? { type: 'PRODUCT' as const }
+          : {}),
         ...(pagination ?? itemPagination.request),
       }),
     enabled: Boolean(session),

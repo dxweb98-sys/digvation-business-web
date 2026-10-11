@@ -68,9 +68,15 @@ export function isReportAvailable(session: AuthSession | null, type: ReportType)
   if (POS_REPORTS.has(type) && !hasSessionFeature(session.access, 'POS')) return false;
   // A commission report must never appear for a client without the delivered
   // Product-sales commission capability (Attendance is unrelated).
-  if (type === 'product-commission' && !hasSessionFeature(session.access, 'POS_PRODUCT_COMMISSION'))
+  if (
+    type === 'product-commission' &&
+    !hasSessionFeature(session.access, 'POS_PRODUCT_COMMISSION')
+  )
     return false;
-  if (type === 'attendance' && !hasSessionFeature(session.access, 'WORKFORCE_ATTENDANCE'))
+  if (
+    type === 'attendance' &&
+    !hasSessionFeature(session.access, 'WORKFORCE_ATTENDANCE')
+  )
     return false;
   if (type === 'tax' && !hasSessionFeature(session.access, 'TAX_FISCAL'))
     return false;

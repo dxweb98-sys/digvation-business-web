@@ -78,7 +78,16 @@ export function CatalogItemDialog({
   useEffect(() => {
     if (fresh && !canSellProducts && canSellServices)
       editor.actions.setFormField('type', 'SERVICE');
-  }, [fresh, canSellProducts, canSellServices, editor.actions.setFormField]);
+    if (fresh && !canSellProducts && editor.form.type === 'PRODUCT' && editor.form.directlySellable)
+      editor.actions.setFormField('directlySellable', false);
+  }, [
+    fresh,
+    canSellProducts,
+    canSellServices,
+    editor.form.type,
+    editor.form.directlySellable,
+    editor.actions.setFormField,
+  ]);
 
   const { name } = editor.form;
   const { touched: loyaltyTouched, behavior: loyaltyBehavior } = editor.loyalty;

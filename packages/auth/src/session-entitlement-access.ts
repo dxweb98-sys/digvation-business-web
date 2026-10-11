@@ -50,8 +50,10 @@ export function hasSessionFeature(access: SessionAccess, feature: SessionFeature
     case 'MEMBERSHIP':
       return h.modules.CUSTOMER.MEMBERSHIP.enabled;
     case 'LOYALTY_POINTS':
-      return h.modules.CUSTOMER.MEMBERSHIP.enabled &&
-        h.modules.CUSTOMER.MEMBERSHIP.LOYALTY_POINTS;
+      return (
+        h.modules.CUSTOMER.MEMBERSHIP.enabled &&
+        h.modules.CUSTOMER.MEMBERSHIP.LOYALTY_POINTS
+      );
     case 'FINANCE_OPERATIONS':
       return h.modules.FINANCE.OPERATIONS;
     case 'TAX_FISCAL':

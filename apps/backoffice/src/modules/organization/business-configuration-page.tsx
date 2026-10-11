@@ -72,7 +72,9 @@ export function BusinessConfigurationPage() {
     [createApiClient, runtime.apiBaseUrl],
   );
   const hasPosProduct = Boolean(session && hasSessionFeature(session.access, 'POS'));
-  const hasTaxCapability = Boolean(session && hasSessionFeature(session.access, 'TAX_FISCAL'));
+  const hasTaxCapability = Boolean(
+    session && hasSessionFeature(session.access, 'TAX_FISCAL'),
+  );
   const canViewCommission = Boolean(
     hasPosProduct &&
       session &&
@@ -203,11 +205,11 @@ export function BusinessConfigurationPage() {
         {canViewProfile && hasTaxCapability ? (
           <DTabsContent value="tax" className="mt-5">
             <TaxSection
-            tax={configuration.data?.tax}
-            loading={configuration.isLoading}
-            canUpdate={canUpdateProfile}
-            api={api}
-            onChanged={() => invalidate(keys.configuration)}
+              tax={configuration.data?.tax}
+              loading={configuration.isLoading}
+              canUpdate={canUpdateProfile}
+              api={api}
+              onChanged={() => invalidate(keys.configuration)}
             />
           </DTabsContent>
         ) : null}
