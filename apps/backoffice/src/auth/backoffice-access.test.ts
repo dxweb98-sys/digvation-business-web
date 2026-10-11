@@ -118,31 +118,24 @@ describe('Backoffice effective permission access', () => {
   });
 
   it('only exposes Reports navigation when the published catalog has a readable report', () => {
+    const withPos = (session: AuthSession): AuthSession => ({
+      ...session,
+      access: { ...session.access, products: ['POS'] },
+    });
     const employee = backofficeSessionWith('employees:read');
-    const employeePos = {
-      ...employee,
-      access: { ...employee.access, products: ['POS'] },
-    };
     expect(canAccessBackoffice(employee, 'reports')).toBe(false);
-    expect(canAccessBackoffice(employeePos, 'reports')).toBe(true);
+    expect(canAccessBackoffice(withPos(employee), 'reports')).toBe(true);
     expect(canAccessBackoffice(backofficeSessionWith('attendance:read'), 'reports')).toBe(true);
     expect(canAccessBackoffice(backofficeSessionWith(), 'reports')).toBe(false);
 
     // Dormant datasets exist server-side but must not open an empty page.
-    expect(canAccessBackoffice(backofficeSessionWith('settlements:read'), 'reports')).toBe(false);
-    expect(canAccessBackoffice(backofficeSessionWith('reconciliations:read'), 'reports')).toBe(
-      false,
-    );
+    const dormant = backofficeSessionWith('settlements:read', 'reconciliations:read');
+    expect(canAccessBackoffice(dormant, 'reports')).toBe(false);
 
     // Tax Reporting alone opens Reporting only when POS and Tax visibility exist.
     const tax = backofficeSessionWith('tax:read');
     expect(canAccessBackoffice(tax, 'reports')).toBe(false);
-    expect(
-      canAccessBackoffice(
-        { ...tax, access: { ...tax.access, products: ['POS'] } },
-        'reports',
-      ),
-    ).toBe(true);
+    expect(canAccessBackoffice(withPos(tax), 'reports')).toBe(true);
   });
 
   it('does not treat an Operational role name or its permissions as Backoffice authority', () => {
