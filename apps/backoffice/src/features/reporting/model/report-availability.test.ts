@@ -1,7 +1,7 @@
 import type { AuthSession } from '@digvation/business-auth';
 import { describe, expect, it } from 'vitest';
 
-import { canAccessReport } from './report-availability';
+import { canAccessReport, canShowDashboardWidget } from './report-availability';
 
 function session(
   input: {
@@ -102,5 +102,91 @@ describe('Current report catalog availability', () => {
     expect(canAccessReport(session({ permissions: ['tax:read'], products: ['POS'] }), 'tax')).toBe(
       true,
     );
+  });
+});
+
+describe('Tenant-scoped domain entitlement projections', () => {
+  function retailAccess(): AuthSession {
+    const base = session({
+      products: ['POS'],
+      capabilities: ['POS_PRODUCT_SALES'],
+      permissions: [
+        'sales:read',
+        'catalog:read',
+        'employees:read',
+        'commission:read',
+        'attendance:read',
+        'expenses:read',
+        'tax:read',
+      ],
+      foundations: ['IDENTITY_ACCESS', 'CATALOG', 'CUSTOMER_IDENTITY'],
+    });
+    return {
+      ...base,
+      access: {
+        ...base.access,
+        entitlements: {
+          products: {
+            POS: {
+              enabled: true,
+              selling: { PRODUCT: true, SERVICE: false },
+              features: { PRODUCT_COMMISSION: false },
+            },
+          },
+          modules: {
+            CATALOG: { enabled: true, PRODUCTS: true, SERVICES: false },
+            CUSTOMER: {
+              enabled: true,
+              MEMBERSHIP: { enabled: false, LOYALTY_POINTS: false },
+            },
+            COMMERCIAL: { PROMOTIONS: false },
+            WORKFORCE: { EMPLOYEES: false, ATTENDANCE: false },
+            FINANCE: { OPERATIONS: false },
+            FISCAL: { TAX: false },
+            ANALYTICS: { BUSINESS_INSIGHTS: false },
+          },
+        },
+      },
+    };
+  }
+
+  it('retail-only tenant keeps base reports, never exposes disabled domain reports', () => {
+    const retail = retailAccess();
+    expect(canAccessReport(retail, 'transactions')).toBe(true);
+    expect(canAccessReport(retail, 'catalog-performance')).toBe(true);
+    expect(canAccessReport(retail, 'product-commission')).toBe(false);
+    expect(canAccessReport(retail, 'employee-performance')).toBe(false);
+    expect(canAccessReport(retail, 'attendance')).toBe(false);
+    expect(canAccessReport(retail, 'expenses')).toBe(false);
+    expect(canAccessReport(retail, 'tax')).toBe(false);
+    expect(canShowDashboardWidget(retail, 'BUSINESS_INSIGHT')).toBe(false);
+    expect(canShowDashboardWidget(retail, 'TOP_ITEMS')).toBe(true);
+  });
+
+  it('newly entitled finance and tax require grants as well as capabilities', () => {
+    const retail = retailAccess();
+    const enabled = {
+      ...retail,
+      access: {
+        ...retail.access,
+        capabilities: ['POS_PRODUCT_SALES', 'FINANCE_OPERATIONS', 'TAX_FISCAL'],
+        entitlements: {
+          ...retail.access.entitlements!,
+          modules: {
+            ...retail.access.entitlements!.modules,
+            FINANCE: { OPERATIONS: true },
+            FISCAL: { TAX: true },
+          },
+        },
+      },
+    };
+    expect(canAccessReport(enabled, 'expenses')).toBe(true);
+    expect(canAccessReport(enabled, 'tax')).toBe(true);
+    expect(
+      canAccessReport(
+        { ...enabled, access: { ...enabled.access, permissions: ['sales:read'] } },
+        'expenses',
+      ),
+    ).toBe(false);
   });
 });

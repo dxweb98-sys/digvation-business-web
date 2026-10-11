@@ -66,6 +66,17 @@ export function isReportAvailable(session: AuthSession | null, type: ReportType)
   if (!session || !permission) return false;
   if (!session.access.permissions.includes(permission)) return false;
   if (POS_REPORTS.has(type) && !hasSessionFeature(session.access, 'POS')) return false;
+  // Older Runtimes already filtered the flat permission projection. Domain
+  // hierarchy checks apply when the newer projection is available.
+  const hasDomainHierarchy = Boolean(
+    session.access.entitlements && 'CUSTOMER' in session.access.entitlements.modules,
+  );
+  if (!hasDomainHierarchy) return true;
+  if (
+    type === 'employee-performance' &&
+    !session.access.foundations.includes('WORKFORCE')
+  )
+    return false;
   // A commission report must never appear for a client without the delivered
   // Product-sales commission capability (Attendance is unrelated).
   if (type === 'product-commission' && !hasSessionFeature(session.access, 'POS_PRODUCT_COMMISSION'))
@@ -93,8 +104,10 @@ export function isDashboardWidgetAvailable(
   if (!isReportAvailable(session, DASHBOARD_REPORT[widget])) return false;
   // Business Insights is optional; ordinary sales and finance projections
   // remain visible whenever their own domain/permission is available.
-  if (widget === 'BUSINESS_INSIGHT')
-    return Boolean(session && hasSessionFeature(session.access, 'BUSINESS_ANALYTICS'));
+  if (widget === 'BUSINESS_INSIGHT') {
+    if (!session?.access.entitlements) return true;
+    return hasSessionFeature(session.access, 'BUSINESS_ANALYTICS');
+  }
   return true;
 }
 
