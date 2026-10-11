@@ -1,5 +1,8 @@
 import { hasSessionFeature, type AuthSession, type SessionFeature } from '@digvation/business-auth';
 
+import { canAccessReport } from '../features/reporting/model/report-availability';
+import { REPORT_CATALOG } from '../features/reporting/model/report-catalog';
+
 export type BackofficeCapability =
   | 'dashboard'
   | 'catalog'
@@ -95,23 +98,6 @@ const capabilityPermissions: Record<BackofficeCapability, PermissionRequirement>
   financialOperations: {
     allOf: ['cash:read', 'settlements:read', 'reconciliations:read'],
   },
-  reports: {
-    anyOf: [
-      'sales:read',
-      'payments:read',
-      'catalog:read',
-      'employees:read',
-      'attendance:read',
-      'expenses:read',
-      'cash:read',
-      'settlements:read',
-      'reconciliations:read',
-      'locations:read',
-      // Tax Reporting is assignable on its own, independently of transaction access.
-      'tax:read',
-      'commission:read',
-    ],
-  },
   // History shows completed transactions in full, which Runtime grants only with sales:read-completed.
   transactions: { allOf: ['sales:read', 'sales:read-completed'] },
   configuration: { anyOf: ['business-profile:read', 'locations:read'] },
@@ -170,6 +156,11 @@ export function canAccessBackoffice(
   capability: BackofficeCapability,
 ): boolean {
   if (!session.access.permissions.includes(BACKOFFICE_ACCESS_PERMISSION)) return false;
+  // Navigation must use the same *published* catalog and entitlement/permission
+  // filtering as the report selector. Dormant finance report permissions alone
+  // must not expose an empty Reports page.
+  if (capability === 'reports')
+    return REPORT_CATALOG.some(({ type }) => canAccessReport(session, type));
   if (capability === 'customers' && !session.access.foundations.includes('CUSTOMER_IDENTITY'))
     return false;
   // Employee management belongs to the shared Workforce foundation,

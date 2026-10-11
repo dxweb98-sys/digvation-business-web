@@ -30,8 +30,10 @@ export interface ReportControlState {
 const REFERENCE_PERMISSION: Record<ReferenceSource, readonly string[]> = {
   employees: ['employees:read'],
   positions: ['employees:read'],
-  catalogItems: ['catalog:read', 'tax:read'],
-  categories: ['catalog:read', 'tax:read'],
+  // These reference routes require catalog:read on Runtime even when the
+  // *report* itself is available with tax:read only.
+  catalogItems: ['catalog:read'],
+  categories: ['catalog:read'],
   accounts: ['financial-accounts:read'],
 };
 
