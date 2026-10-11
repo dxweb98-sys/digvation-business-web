@@ -2,9 +2,9 @@ name: Frontend CI
 
 on:
   pull_request:
-    branches: [dev, main]
+    branches: [dev, main, stage]
   push:
-    branches: [dev, main]
+    branches: [dev, main, stage]
 
 permissions:
   contents: read
@@ -52,8 +52,8 @@ jobs:
 
       - name: Verify web image identity
         run: |
-          test "$(docker inspect --format '{{ index .Config.Labels \"org.opencontainers.image.revision\" }}' business-backoffice-ci:${{ github.sha }})" = "${{ github.sha }}"
-          test "$(docker inspect --format '{{ index .Config.Labels \"org.opencontainers.image.revision\" }}' business-operational-ci:${{ github.sha }})" = "${{ github.sha }}"
+          test "$(docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' business-backoffice-ci:${{ github.sha }})" = "${{ github.sha }}"
+          test "$(docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' business-operational-ci:${{ github.sha }})" = "${{ github.sha }}"
 
       - name: Web container routing and runtime-config smoke
         run: |
@@ -86,3 +86,53 @@ jobs:
           docker logs business-backoffice-smoke 2>/dev/null || true
           docker logs business-operational-smoke 2>/dev/null || true
           docker rm --force business-backoffice-smoke business-operational-smoke 2>/dev/null || true
+
+
+  production-release-artifacts:
+    name: production-release-artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build all production web images
+        run: |
+          SHA=${{ github.sha }}
+          docker build --target backoffice --build-arg BUILD_REVISION="$SHA" --tag web-backoffice-release:$SHA .
+          docker build --target operational --build-arg BUILD_REVISION="$SHA" --tag web-operational-release:$SHA .
+          docker build --target member-portal --build-arg BUILD_REVISION="$SHA" --tag web-member-release:$SHA .
+
+      - name: Verify production web image identities
+        run: |
+          SHA=${{ github.sha }}
+          for image in web-backoffice-release web-operational-release web-member-release; do
+            test "$(docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' ${image}:$SHA)" = "$SHA"
+          done
+
+      - name: Smoke production web containers
+        run: |
+          set -euo pipefail
+          SHA=${{ github.sha }}
+
+          docker run -d --name web-backoffice-release-smoke -p 18081:8080 web-backoffice-release:$SHA
+          docker run -d --name web-operational-release-smoke -p 18082:8080 web-operational-release:$SHA
+          docker run -d --name web-member-release-smoke -p 18083:8080 web-member-release:$SHA
+
+          cleanup() {
+            docker rm -f web-backoffice-release-smoke web-operational-release-smoke web-member-release-smoke >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          for port in 18081 18082 18083; do
+            ready=false
+            for attempt in $(seq 1 30); do
+              if curl --fail --silent "http://127.0.0.1:$port/healthz" >/dev/null; then
+                ready=true
+                break
+              fi
+              sleep 1
+            done
+            test "$ready" = true
+          done
