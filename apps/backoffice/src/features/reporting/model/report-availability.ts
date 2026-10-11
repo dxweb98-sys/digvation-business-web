@@ -72,10 +72,7 @@ export function isReportAvailable(session: AuthSession | null, type: ReportType)
     session.access.entitlements && 'CUSTOMER' in session.access.entitlements.modules,
   );
   if (!hasDomainHierarchy) return true;
-  if (
-    type === 'employee-performance' &&
-    !session.access.foundations.includes('WORKFORCE')
-  )
+  if (type === 'employee-performance' && !session.access.foundations.includes('WORKFORCE'))
     return false;
   // A commission report must never appear for a client without the delivered
   // Product-sales commission capability (Attendance is unrelated).
