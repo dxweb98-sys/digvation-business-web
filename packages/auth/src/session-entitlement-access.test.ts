@@ -40,9 +40,7 @@ describe('domain entitlement selectors', () => {
   it('intersects entitled domain and actor permissions', () => {
     expect(canUseSessionFeature(access, 'MEMBERSHIP', ['membership:read'])).toBe(true);
     expect(canUseSessionFeature(access, 'MEMBERSHIP', ['membership:update'])).toBe(false);
-    expect(
-      canUseSessionFeature(access, 'POS_PRODUCT_COMMISSION', ['commission:read']),
-    ).toBe(true);
+    expect(canUseSessionFeature(access, 'POS_PRODUCT_COMMISSION', ['commission:read'])).toBe(true);
   });
 
   it('separates retail product selling and service selling', () => {

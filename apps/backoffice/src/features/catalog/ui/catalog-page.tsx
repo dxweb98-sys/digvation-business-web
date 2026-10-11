@@ -107,9 +107,7 @@ export function CatalogPage() {
     queryFn: (pagination) =>
       api.listItems({
         ...toItemQuery(itemQuery),
-        ...(!canSellServices && itemQuery.type === 'SERVICE'
-          ? { type: 'PRODUCT' as const }
-          : {}),
+        ...(!canSellServices && itemQuery.type === 'SERVICE' ? { type: 'PRODUCT' as const } : {}),
         ...(pagination ?? itemPagination.request),
       }),
     enabled: Boolean(session),

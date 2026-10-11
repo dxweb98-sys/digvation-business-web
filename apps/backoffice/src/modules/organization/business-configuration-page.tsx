@@ -72,20 +72,18 @@ export function BusinessConfigurationPage() {
     [createApiClient, runtime.apiBaseUrl],
   );
   const hasPosProduct = Boolean(session && hasSessionFeature(session.access, 'POS'));
-  const hasTaxCapability = Boolean(
-    session && hasSessionFeature(session.access, 'TAX_FISCAL'),
-  );
+  const hasTaxCapability = Boolean(session && hasSessionFeature(session.access, 'TAX_FISCAL'));
   const canViewCommission = Boolean(
     hasPosProduct &&
-      session &&
-      hasSessionFeature(session.access, 'POS_PRODUCT_COMMISSION') &&
-      canPerformBackofficeAction(session, 'viewCommission'),
+    session &&
+    hasSessionFeature(session.access, 'POS_PRODUCT_COMMISSION') &&
+    canPerformBackofficeAction(session, 'viewCommission'),
   );
   const canConfigureCommission = Boolean(
     hasPosProduct &&
-      session &&
-      hasSessionFeature(session.access, 'POS_PRODUCT_COMMISSION') &&
-      canPerformBackofficeAction(session, 'configureCommission'),
+    session &&
+    hasSessionFeature(session.access, 'POS_PRODUCT_COMMISSION') &&
+    canPerformBackofficeAction(session, 'configureCommission'),
   );
   const hasLoyaltyCapability = Boolean(
     session && hasSessionFeature(session.access, 'LOYALTY_POINTS'),
