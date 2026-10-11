@@ -36,4 +36,3 @@ jobs:
         env:
           VITE_BUILD_REVISION: ${{ github.sha }}
         run: pnpm verify
-
