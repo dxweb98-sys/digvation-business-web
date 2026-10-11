@@ -1,8 +1,4 @@
-import {
-  hasSessionFeature,
-  type AuthSession,
-  type SessionFeature,
-} from '@digvation/business-auth';
+import { hasSessionFeature, type AuthSession, type SessionFeature } from '@digvation/business-auth';
 
 export type BackofficeCapability =
   | 'dashboard'
