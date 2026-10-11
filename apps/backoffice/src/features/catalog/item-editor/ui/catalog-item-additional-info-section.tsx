@@ -16,6 +16,8 @@ export function CatalogItemAdditionalInfoSection({
   fresh,
   categoryOptions,
   validDefaultDuration,
+  canSellProducts,
+  canSellServices,
   canViewLoyalty,
   loyaltyRule,
   loyaltyConfiguration,
@@ -27,6 +29,8 @@ export function CatalogItemAdditionalInfoSection({
   fresh: boolean;
   categoryOptions: Category[];
   validDefaultDuration: boolean;
+  canSellProducts: boolean;
+  canSellServices: boolean;
   model: SellingModel;
   canViewLoyalty: boolean;
   loyaltyRule: LoyaltyEarningRule | undefined;
@@ -54,8 +58,8 @@ export function CatalogItemAdditionalInfoSection({
           onChange={(value) => setFormField('type', value as Item['type'])}
           disabled={!fresh}
           options={[
-            { label: 'Produk', value: 'PRODUCT' },
-            { label: 'Layanan / Jasa', value: 'SERVICE' },
+            { label: canSellProducts ? 'Produk' : 'Produk (komponen jasa)', value: 'PRODUCT' },
+            ...(canSellServices ? [{ label: 'Layanan / Jasa', value: 'SERVICE' }] : []),
           ]}
         />
 
@@ -120,6 +124,7 @@ export function CatalogItemAdditionalInfoSection({
             <DCheckbox
               checked={directlySellable}
               onChange={() => setFormField('directlySellable', !directlySellable)}
+              disabled={!canSellProducts}
               className="mt-0.5"
             />
             <span className="min-w-0">
@@ -127,9 +132,11 @@ export function CatalogItemAdditionalInfoSection({
                 Dapat dijual langsung
               </span>
               <span className="mt-0.5 block text-xs leading-5 text-[var(--color-text-muted)]">
-                {directlySellable
-                  ? 'Produk tersedia di kasir dan dapat dipakai sebagai komponen jasa.'
-                  : 'Produk hanya digunakan sebagai komponen jasa.'}
+                {!canSellProducts
+                  ? 'Penjualan produk tidak aktif; produk hanya digunakan sebagai komponen jasa.'
+                  : directlySellable
+                    ? 'Produk tersedia di kasir dan dapat dipakai sebagai komponen jasa.'
+                    : 'Produk hanya digunakan sebagai komponen jasa.'}
               </span>
             </span>
           </label>

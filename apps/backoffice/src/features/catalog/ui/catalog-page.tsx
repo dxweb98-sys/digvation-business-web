@@ -1,4 +1,5 @@
 import { useRuntime } from '@digvation/business-runtime';
+import { hasSessionFeature } from '@digvation/business-auth';
 import {
   DButton,
   DDataTable,
@@ -80,7 +81,9 @@ export function CatalogPage() {
 
   const can = (action: BackofficeAction) =>
     Boolean(session && canPerformBackofficeAction(session, action));
-  const hasLoyaltyCapability = Boolean(session?.access.capabilities.includes('LOYALTY_POINTS'));
+  const hasLoyaltyCapability = Boolean(session && hasSessionFeature(session.access, 'LOYALTY_POINTS'));
+  const canSellProducts = Boolean(session && hasSessionFeature(session.access, 'POS_PRODUCT_SALES'));
+  const canSellServices = Boolean(session && hasSessionFeature(session.access, 'POS_SERVICE_SALES'));
   const canViewLoyalty = hasLoyaltyCapability && can('viewLoyalty');
   const canConfigureLoyalty = hasLoyaltyCapability && can('configureLoyalty');
 
@@ -98,6 +101,7 @@ export function CatalogPage() {
     queryFn: (pagination) =>
       api.listItems({
         ...toItemQuery(itemQuery),
+        ...(!canSellServices && itemQuery.type === 'SERVICE' ? { type: 'PRODUCT' as const } : {}),
         ...(pagination ?? itemPagination.request),
       }),
     enabled: Boolean(session),
@@ -252,7 +256,7 @@ export function CatalogPage() {
                   clearable
                   options={[
                     { label: copy('Product'), value: 'PRODUCT' },
-                    { label: copy('Service'), value: 'SERVICE' },
+                    ...(canSellServices ? [{ label: copy('Service'), value: 'SERVICE' }] : []),
                   ]}
                 />
                 <DSelectFilter
@@ -390,7 +394,9 @@ export function CatalogPage() {
         canCreateVariants={can('createCatalog')}
         canUpdateVariants={can('updateCatalog')}
         canManageImage={can('updateCatalog')}
-        canEditComposition={can('updateCatalog')}
+        canEditComposition={canSellServices && can('updateCatalog')}
+        canSellProducts={canSellProducts}
+        canSellServices={canSellServices}
         onClose={() => setItem(undefined)}
         onSaved={refreshItems}
       />
