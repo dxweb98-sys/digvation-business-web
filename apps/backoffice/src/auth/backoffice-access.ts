@@ -98,6 +98,8 @@ const capabilityPermissions: Record<BackofficeCapability, PermissionRequirement>
   financialOperations: {
     allOf: ['cash:read', 'settlements:read', 'reconciliations:read'],
   },
+  // Evaluated above using the published REPORT_CATALOG; no permissive any-of shortcut.
+  reports: {},
   // History shows completed transactions in full, which Runtime grants only with sales:read-completed.
   transactions: { allOf: ['sales:read', 'sales:read-completed'] },
   configuration: { anyOf: ['business-profile:read', 'locations:read'] },
