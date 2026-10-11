@@ -22,19 +22,25 @@ export interface SessionEntitlementHierarchy {
   readonly products: {
     readonly POS: {
       readonly enabled: boolean;
-      readonly features: {
-        readonly PROMOTIONS: boolean;
-        readonly MEMBERSHIP: {
-          readonly enabled: boolean;
-          readonly LOYALTY_POINTS: boolean;
-        };
-      };
+      readonly selling: { readonly PRODUCT: boolean; readonly SERVICE: boolean };
+      readonly features: { readonly PRODUCT_COMMISSION: boolean };
     };
   };
   readonly modules: {
-    readonly FINANCE: { readonly OPERATIONS: boolean; readonly TAX_FISCAL: boolean };
-    readonly WORKFORCE: { readonly ATTENDANCE: boolean };
-    readonly ANALYTICS: { readonly BUSINESS: boolean };
+    readonly CATALOG: {
+      readonly enabled: boolean;
+      readonly PRODUCTS: boolean;
+      readonly SERVICES: boolean;
+    };
+    readonly CUSTOMER: {
+      readonly enabled: boolean;
+      readonly MEMBERSHIP: { readonly enabled: boolean; readonly LOYALTY_POINTS: boolean };
+    };
+    readonly COMMERCIAL: { readonly PROMOTIONS: boolean };
+    readonly WORKFORCE: { readonly EMPLOYEES: boolean; readonly ATTENDANCE: boolean };
+    readonly FINANCE: { readonly OPERATIONS: boolean };
+    readonly FISCAL: { readonly TAX: boolean };
+    readonly ANALYTICS: { readonly BUSINESS_INSIGHTS: boolean };
   };
 }
 

@@ -109,6 +109,7 @@ const capabilityPermissions: Record<BackofficeCapability, PermissionRequirement>
       'locations:read',
       // Tax Reporting is assignable on its own, independently of transaction access.
       'tax:read',
+      'commission:read',
     ],
   },
   // History shows completed transactions in full, which Runtime grants only with sales:read-completed.
@@ -170,6 +171,13 @@ export function canAccessBackoffice(
 ): boolean {
   if (!session.access.permissions.includes(BACKOFFICE_ACCESS_PERMISSION)) return false;
   if (capability === 'customers' && !session.access.foundations.includes('CUSTOMER_IDENTITY'))
+    return false;
+  // Employee management belongs to the shared Workforce foundation,
+  // not the Attendance feature. Retail-only POS without Commission need not show it.
+  if (
+    capability === 'employees' &&
+    !session.access.foundations.includes('WORKFORCE')
+  )
     return false;
   const feature = entitlementForArea[capability];
   if (

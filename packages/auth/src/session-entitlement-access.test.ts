@@ -4,42 +4,57 @@ import { canUseSessionFeature, hasSessionFeature } from './session-entitlement-a
 
 const access: SessionAccess = {
   products: ['POS'],
-  capabilities: ['MEMBERSHIP', 'LOYALTY_POINTS', 'PROMOTIONS'],
-  foundations: ['CUSTOMER_IDENTITY'],
-  permissions: ['membership:read'],
+  capabilities: [
+    'POS_PRODUCT_SALES', 'POS_PRODUCT_COMMISSION', 'MEMBERSHIP',
+    'LOYALTY_POINTS', 'PROMOTIONS',
+  ],
+  foundations: ['CATALOG', 'CUSTOMER_IDENTITY', 'WORKFORCE'],
+  permissions: ['membership:read', 'commission:read', 'sales:read'],
   entitlements: {
     products: {
       POS: {
         enabled: true,
-        features: { PROMOTIONS: true, MEMBERSHIP: { enabled: true, LOYALTY_POINTS: true } },
+        selling: { PRODUCT: true, SERVICE: false },
+        features: { PRODUCT_COMMISSION: true },
       },
     },
     modules: {
-      FINANCE: { OPERATIONS: false, TAX_FISCAL: false },
-      WORKFORCE: { ATTENDANCE: false },
-      ANALYTICS: { BUSINESS: false },
+      CATALOG: { enabled: true, PRODUCTS: true, SERVICES: false },
+      CUSTOMER: {
+        enabled: true,
+        MEMBERSHIP: { enabled: true, LOYALTY_POINTS: true },
+      },
+      COMMERCIAL: { PROMOTIONS: true },
+      WORKFORCE: { EMPLOYEES: true, ATTENDANCE: false },
+      FINANCE: { OPERATIONS: false },
+      FISCAL: { TAX: false },
+      ANALYTICS: { BUSINESS_INSIGHTS: false },
     },
   },
 };
 
-describe('canonical session feature checks', () => {
-  it('intersects feature and actor permission', () => {
+describe('domain entitlement selectors', () => {
+  it('intersects entitled domain and actor permissions', () => {
     expect(canUseSessionFeature(access, 'MEMBERSHIP', ['membership:read'])).toBe(true);
     expect(canUseSessionFeature(access, 'MEMBERSHIP', ['membership:update'])).toBe(false);
+    expect(canUseSessionFeature(access, 'POS_PRODUCT_COMMISSION', ['commission:read'])).toBe(true);
   });
 
-  it('fails closed when nested hierarchy disables a flat capability', () => {
-    const disabled = {
+  it('separates retail product selling and service selling', () => {
+    expect(hasSessionFeature(access, 'POS_PRODUCT_SALES')).toBe(true);
+    expect(hasSessionFeature(access, 'POS_SERVICE_SALES')).toBe(false);
+  });
+
+  it('denies a feature disabled in hierarchy, even if its flat key appears', () => {
+    const disabled: SessionAccess = {
       ...access,
       entitlements: {
         ...access.entitlements!,
-        products: {
-          POS: {
-            ...access.entitlements!.products.POS,
-            features: {
-              ...access.entitlements!.products.POS.features,
-              MEMBERSHIP: { enabled: false, LOYALTY_POINTS: false },
-            },
+        modules: {
+          ...access.entitlements!.modules,
+          CUSTOMER: {
+            ...access.entitlements!.modules.CUSTOMER,
+            MEMBERSHIP: { enabled: false, LOYALTY_POINTS: false },
           },
         },
       },
@@ -47,14 +62,25 @@ describe('canonical session feature checks', () => {
     expect(hasSessionFeature(disabled, 'MEMBERSHIP')).toBe(false);
   });
 
-  it('keeps the original flat entitlement contract during staged deployment', () => {
-    const legacy: SessionAccess = {
-      products: access.products,
-      capabilities: access.capabilities,
-      foundations: access.foundations,
-      permissions: access.permissions,
+  it('preserves the flat contract for the older Runtime', () => {
+    const old: SessionAccess = {
+      products: ['POS'],
+      capabilities: ['MEMBERSHIP', 'PROMOTIONS'],
+      foundations: [],
+      permissions: ['membership:read'],
     };
-    expect(hasSessionFeature(legacy, 'MEMBERSHIP')).toBe(true);
-    expect(hasSessionFeature({ ...legacy, capabilities: [] }, 'MEMBERSHIP')).toBe(false);
+    expect(hasSessionFeature(old, 'MEMBERSHIP')).toBe(true);
+    expect(hasSessionFeature(old, 'POS_SERVICE_SALES')).toBe(true);
+    expect(hasSessionFeature({ ...old, capabilities: [] }, 'PROMOTIONS')).toBe(false);
+  });
+
+  it('does not require POS for cross-domain Membership', () => {
+    const crossDomain: SessionAccess = {
+      products: [],
+      capabilities: ['MEMBERSHIP', 'LOYALTY_POINTS'],
+      foundations: ['CUSTOMER_IDENTITY'],
+      permissions: ['membership:read'],
+    };
+    expect(hasSessionFeature(crossDomain, 'MEMBERSHIP')).toBe(true);
   });
 });
