@@ -18,9 +18,31 @@ export interface SessionBusiness {
   currency: string;
 }
 
+export interface SessionEntitlementHierarchy {
+  readonly products: {
+    readonly POS: {
+      readonly enabled: boolean;
+      readonly features: {
+        readonly PROMOTIONS: boolean;
+        readonly MEMBERSHIP: {
+          readonly enabled: boolean;
+          readonly LOYALTY_POINTS: boolean;
+        };
+      };
+    };
+  };
+  readonly modules: {
+    readonly FINANCE: { readonly OPERATIONS: boolean; readonly TAX_FISCAL: boolean };
+    readonly WORKFORCE: { readonly ATTENDANCE: boolean };
+    readonly ANALYTICS: { readonly BUSINESS: boolean };
+  };
+}
+
 export interface SessionAccess {
   readonly products: readonly string[];
   readonly capabilities: readonly string[];
+  /** Additive field: older Runtime versions may omit this during rollout. */
+  readonly entitlements?: SessionEntitlementHierarchy;
   readonly foundations: readonly string[];
   readonly permissions: readonly string[];
 }

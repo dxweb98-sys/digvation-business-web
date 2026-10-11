@@ -1,4 +1,8 @@
-import type { AuthSession } from '@digvation/business-auth';
+import {
+  hasSessionFeature,
+  type AuthSession,
+  type SessionFeature,
+} from '@digvation/business-auth';
 
 export type BackofficeCapability =
   | 'dashboard'
@@ -62,6 +66,15 @@ export type BackofficeAction =
   | 'updateSettlement'
   | 'createReconciliation'
   | 'updateReconciliation';
+
+const entitlementForArea: Partial<Record<BackofficeCapability, SessionFeature>> = {
+  promotions: 'PROMOTIONS',
+  memberships: 'MEMBERSHIP',
+  attendance: 'WORKFORCE_ATTENDANCE',
+  expenses: 'FINANCE_OPERATIONS',
+  financialAccounts: 'FINANCE_OPERATIONS',
+  financialOperations: 'FINANCE_OPERATIONS',
+};
 
 export const BACKOFFICE_ACCESS_PERMISSION = 'backoffice:access';
 
@@ -162,7 +175,12 @@ export function canAccessBackoffice(
   if (!session.access.permissions.includes(BACKOFFICE_ACCESS_PERMISSION)) return false;
   if (capability === 'customers' && !session.access.foundations.includes('CUSTOMER_IDENTITY'))
     return false;
-  if (capability === 'memberships' && !session.access.capabilities.includes('MEMBERSHIP'))
+  const feature = entitlementForArea[capability];
+  if (
+    feature &&
+    (capability === 'memberships' || session.access.entitlements) &&
+    !hasSessionFeature(session.access, feature)
+  )
     return false;
   const requirement = capabilityPermissions[capability];
   const permissions = session.access.permissions;
