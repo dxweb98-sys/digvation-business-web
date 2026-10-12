@@ -123,10 +123,9 @@ export function BusinessLocationProvider({ children }: { children: ReactNode }) 
   const fallbackLocationId =
     query.data?.mainLocationId && accessibleIds.has(query.data.mainLocationId)
       ? query.data.mainLocationId
-      : locations[0]?.id ?? '';
+      : (locations[0]?.id ?? '');
   const selectedLocationId = preferredIsValid ? (preferredLocationId ?? '') : fallbackLocationId;
-  const isDenied =
-    canReadOperationalAccess && Boolean(query.data) && locations.length === 0;
+  const isDenied = canReadOperationalAccess && Boolean(query.data) && locations.length === 0;
   const isReady = Boolean(
     canReadOperationalAccess &&
     query.data &&
