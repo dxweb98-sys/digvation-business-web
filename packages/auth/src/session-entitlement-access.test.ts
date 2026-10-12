@@ -126,6 +126,60 @@ describe('domain entitlement selectors', () => {
     expect(hasSessionFeature({ ...old, capabilities: [] }, 'PROMOTIONS')).toBe(false);
   });
 
+  it('separates composition configuration from Service and Product direct selling', () => {
+    const composition: SessionAccess = {
+      ...access,
+      capabilities: ['POS_SERVICE_SALES', 'CATALOG_SERVICE_COMPOSITION'],
+      entitlements: {
+        ...access.entitlements!,
+        products: {
+          POS: {
+            enabled: true,
+            selling: { PRODUCT: false, SERVICE: true },
+            features: { PRODUCT_COMMISSION: false },
+          },
+        },
+        modules: {
+          ...access.entitlements!.modules,
+          CATALOG: {
+            enabled: true,
+            PRODUCTS: false,
+            SERVICES: true,
+            SERVICE_COMPOSITION: true,
+          },
+        },
+      },
+    };
+    expect(hasSessionFeature(composition, 'CATALOG_SERVICE_COMPOSITION')).toBe(true);
+    expect(hasSessionFeature(composition, 'POS_PRODUCT_SALES')).toBe(false);
+    const disabled: SessionAccess = {
+      ...composition,
+      capabilities: ['POS_SERVICE_SALES'],
+      entitlements: {
+        ...composition.entitlements!,
+        modules: {
+          ...composition.entitlements!.modules,
+          CATALOG: {
+            ...composition.entitlements!.modules.CATALOG,
+            SERVICE_COMPOSITION: false,
+          },
+        },
+      },
+    };
+    expect(hasSessionFeature(disabled, 'CATALOG_SERVICE_COMPOSITION')).toBe(false);
+    const legacy: SessionAccess = {
+      ...disabled,
+      entitlements: {
+        ...disabled.entitlements!,
+        modules: {
+          ...disabled.entitlements!.modules,
+          CATALOG: { enabled: true, PRODUCTS: false, SERVICES: true },
+        },
+      },
+    };
+    expect(hasSessionFeature(legacy, 'CATALOG_SERVICE_COMPOSITION')).toBe(true);
+  });
+
   it('does not require POS for cross-domain Membership', () => {
     const crossDomain: SessionAccess = {
       products: [],

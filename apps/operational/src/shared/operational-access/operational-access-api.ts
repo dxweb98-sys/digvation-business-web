@@ -42,7 +42,7 @@ export const operationalAccessKeys = {
  */
 export function useOperationalAccessContext() {
   const bootstrap = useDeploymentBootstrap();
-  const { authPort } = useAuth();
+  const { authPort, session } = useAuth();
   const client = useMemo(
     () =>
       new ApiClient({
@@ -55,8 +55,17 @@ export function useOperationalAccessContext() {
   );
   const api = useMemo(() => new OperationalAccessApi(client), [client]);
   return useQuery({
-    queryKey: operationalAccessKeys.context(),
+    queryKey: [
+      ...operationalAccessKeys.context(),
+      session.business.tenantId,
+      session.identity.userId,
+      session.contextVersion,
+    ],
     queryFn: ({ signal }) => api.context(signal),
     ...referenceQueryPolicy,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+    refetchInterval: 30_000,
   });
 }

@@ -32,6 +32,8 @@ export interface SessionEntitlementHierarchy {
       readonly enabled: boolean;
       readonly PRODUCTS: boolean;
       readonly SERVICES: boolean;
+      /** Additive: older Runtime sessions did not project this flag. */
+      readonly SERVICE_COMPOSITION?: boolean;
     };
     readonly CUSTOMER: {
       readonly enabled: boolean;
