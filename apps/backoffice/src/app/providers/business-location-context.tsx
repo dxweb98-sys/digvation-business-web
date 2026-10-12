@@ -115,10 +115,10 @@ export function BusinessLocationProvider({ children }: { children: ReactNode }) 
   );
   const preferredIsValid = Boolean(preferredLocationId && accessibleIds.has(preferredLocationId));
   useEffect(() => {
-    if (query.data && preferredLocationId && !preferredIsValid) {
-      setPreferredLocationId(null);
-      clearPreference(preferenceKey);
-    }
+    if (!query.data || !preferredLocationId || preferredIsValid) return;
+    clearPreference(preferenceKey);
+    const reset = window.setTimeout(() => setPreferredLocationId(null), 0);
+    return () => window.clearTimeout(reset);
   }, [preferenceKey, preferredIsValid, preferredLocationId, query.data]);
   const fallbackLocationId =
     query.data?.mainLocationId && accessibleIds.has(query.data.mainLocationId)
