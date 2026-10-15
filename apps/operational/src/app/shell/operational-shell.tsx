@@ -1,6 +1,6 @@
 import { hasSessionFeature, useAuth } from '@digvation/business-auth';
 import { useConnectivity, useDeploymentBootstrap } from '@digvation/business-runtime';
-import { DAlert, DAvatar, DButton, DDialog, DDropdown, useToast } from '@digvation/ui';
+import { DAlert, DAvatar, DButton, DDialog, DDropdown, DInput, useToast } from '@digvation/ui';
 import {
   Building2,
   Check,
@@ -13,7 +13,7 @@ import {
   MessageCircle,
   UserRound,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 
 import { useOperationalLocalization } from '../localization/operational-localization';
@@ -21,8 +21,10 @@ import { getAppVersion } from '../version/app-version';
 import { OperationalNotificationBell } from '../../features/notifications/operational-notification-bell';
 import { useOperationalAccessContext } from '../../shared/operational-access/operational-access-api';
 import {
+  createRuntimePasswordChange,
+  PasswordChangeCooldownError,
+  PasswordChangeError,
   PasswordChangeUnavailableError,
-  unavailablePasswordChange,
   type OperationalPasswordChangePort,
 } from './operational-password-change';
 import type { OperationalNavigationSection } from '../../shared/navigation/operational-navigation';
@@ -57,17 +59,39 @@ interface OperationalShellProps {
 
 export function OperationalShell({
   navigationSections,
-  passwordChange = unavailablePasswordChange,
+  passwordChange: passwordChangeOverride,
 }: OperationalShellProps) {
   const bootstrap = useDeploymentBootstrap();
   const connectivity = useConnectivity();
   const { copy, label } = useOperationalLocalization();
-  const { session, logout } = useAuth();
+  const { session, logout, authPort } = useAuth();
+  const passwordChange = useMemo(
+    () =>
+      passwordChangeOverride ??
+      createRuntimePasswordChange({
+        apiBaseUrl: bootstrap.apiBaseUrl,
+        getAccessToken: () => authPort.getAccessToken?.() ?? Promise.resolve(null),
+      }),
+    [authPort, bootstrap.apiBaseUrl, passwordChangeOverride],
+  );
   const { showToast } = useToast();
   const [isLoggingOut, setLoggingOut] = useState(false);
   const [isAccountDialogOpen, setAccountDialogOpen] = useState(false);
   const [resetLinkState, setResetLinkState] = useState<
-    { kind: 'idle' | 'pending' | 'sent' } | { kind: 'failed'; reason: 'unavailable' | 'failed' }
+    | { kind: 'idle' | 'pending' | 'sent' }
+    | { kind: 'failed'; reason: 'unavailable' | 'failed' | 'cooldown' }
+  >({ kind: 'idle' });
+  const [passwordForm, setPasswordForm] = useState({
+    open: false,
+    current: '',
+    next: '',
+    confirmation: '',
+    touched: false,
+  });
+  const [changeState, setChangeState] = useState<
+    | { kind: 'idle' | 'pending' | 'changed' }
+    | { kind: 'incorrect' }
+    | { kind: 'failed'; reason: 'policy' | 'throttled' | 'session' | 'failed' }
   >({ kind: 'idle' });
   const {
     selectedLocationId,
@@ -109,6 +133,32 @@ export function OperationalShell({
     if (resolved !== selectedLocationId) selectLocation(resolved);
   }, [locations, operationalAccessQuery.data?.mainLocationId, selectLocation, selectedLocationId]);
 
+  if (operationalAccessQuery.isError) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[var(--color-background)] p-6 text-center">
+        <section className="max-w-md rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+          <h1 className="text-lg font-semibold">
+            {copy('Operational access could not be loaded')}
+          </h1>
+          <p className="mt-2 text-sm text-[var(--color-text-muted)]">
+            {copy('Check your connection and try again.')}
+          </p>
+          <div className="mt-5 flex justify-center gap-2">
+            <DButton variant="secondary" onClick={() => void logout()}>
+              {copy('Logout')}
+            </DButton>
+            <DButton
+              loading={operationalAccessQuery.isFetching}
+              onClick={() => void operationalAccessQuery.refetch()}
+            >
+              {copy('Try again')}
+            </DButton>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
   if (operationalAccessQuery.isSuccess && locations.length === 0) {
     return (
       <main className="grid min-h-screen place-items-center bg-[var(--color-background)] p-6 text-center">
@@ -118,6 +168,11 @@ export function OperationalShell({
           </h1>
           <p className="mt-2 text-sm text-[var(--color-text-muted)]">
             {copy('This account has no authorized operational location.')}
+          </p>
+          <p className="mt-2 text-sm text-[var(--color-text-muted)]">
+            {copy(
+              'Ask your business administrator to grant location access in Backoffice, then sign in again.',
+            )}
           </p>
           <DButton className="mt-5" variant="secondary" onClick={() => void logout()}>
             {copy('Logout')}
@@ -171,13 +226,67 @@ export function OperationalShell({
     } catch (error) {
       setResetLinkState({
         kind: 'failed',
-        reason: error instanceof PasswordChangeUnavailableError ? 'unavailable' : 'failed',
+        reason:
+          error instanceof PasswordChangeUnavailableError
+            ? 'unavailable'
+            : error instanceof PasswordChangeCooldownError
+              ? 'cooldown'
+              : 'failed',
       });
     }
   };
 
+  const newLength = [...passwordForm.next].length;
+  const newValid = newLength >= 10 && newLength <= 128;
+  const sameAsCurrent = passwordForm.next.length > 0 && passwordForm.next === passwordForm.current;
+  const passwordFormValid =
+    passwordForm.current.length > 0 &&
+    newValid &&
+    !sameAsCurrent &&
+    passwordForm.confirmation === passwordForm.next;
+
+  const submitPasswordChange = async (event: FormEvent) => {
+    event.preventDefault();
+    if (changeState.kind === 'pending') return;
+    setPasswordForm((form) => ({ ...form, touched: true }));
+    if (!passwordFormValid) return;
+    setChangeState({ kind: 'pending' });
+    try {
+      await passwordChange.changePassword({
+        currentPassword: passwordForm.current,
+        newPassword: passwordForm.next,
+      });
+      setPasswordForm({ open: true, current: '', next: '', confirmation: '', touched: false });
+      setChangeState({ kind: 'changed' });
+    } catch (error) {
+      if (error instanceof PasswordChangeError && error.reason === 'incorrect')
+        setChangeState({ kind: 'incorrect' });
+      else if (error instanceof PasswordChangeUnavailableError)
+        setChangeState({ kind: 'failed', reason: 'failed' });
+      else
+        setChangeState({
+          kind: 'failed',
+          reason:
+            error instanceof PasswordChangeError
+              ? (error.reason as 'policy' | 'throttled' | 'session' | 'failed')
+              : 'failed',
+        });
+    }
+  };
+
+  const closeAccountDialog = () => {
+    const finished = changeState.kind === 'changed';
+    setAccountDialogOpen(false);
+    setPasswordForm({ open: false, current: '', next: '', confirmation: '', touched: false });
+    setChangeState({ kind: 'idle' });
+    // The Runtime has already revoked every session; return to the sign-in screen.
+    if (finished) void logout().catch(() => undefined);
+  };
+
   const openAccountDialog = () => {
     setResetLinkState({ kind: 'idle' });
+    setChangeState({ kind: 'idle' });
+    setPasswordForm({ open: false, current: '', next: '', confirmation: '', touched: false });
     setAccountDialogOpen(true);
   };
 
@@ -381,7 +490,7 @@ export function OperationalShell({
 
       <DDialog
         open={isAccountDialogOpen}
-        onClose={() => setAccountDialogOpen(false)}
+        onClose={closeAccountDialog}
         title={copy('Account')}
         description={copy('Operational account information for the active session.')}
         ariaLabel={copy('Account information')}
@@ -399,7 +508,7 @@ export function OperationalShell({
             >
               {copy('Logout')}
             </DButton>
-            <DButton variant="secondary" onClick={() => setAccountDialogOpen(false)}>
+            <DButton variant="secondary" onClick={closeAccountDialog}>
               {copy('Close')}
             </DButton>
           </div>
@@ -460,54 +569,192 @@ export function OperationalShell({
             </div>
           </dl>
 
-          <section className="rounded-[var(--radius-control)] border border-[var(--color-border)] p-3">
+          <section
+            aria-labelledby="operational-password-heading"
+            className="space-y-3 rounded-[var(--radius-control)] border border-[var(--color-border)] p-3"
+          >
             <div className="flex items-start gap-2.5">
               <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full bg-[var(--color-brand)]/10 text-[var(--color-brand)]">
                 <KeyRound className="size-4" aria-hidden="true" />
               </span>
               <div className="min-w-0">
-                <p className="text-sm font-semibold">{copy('Request password change')}</p>
+                <p id="operational-password-heading" className="text-sm font-semibold">
+                  {copy('Password')}
+                </p>
+                <p className="mt-0.5 text-xs leading-5 text-[var(--color-text-muted)]">
+                  {copy(
+                    'Enter your current password and a new one. After it succeeds, all your sessions end and you sign in again.',
+                  )}
+                </p>
+              </div>
+            </div>
+
+            {changeState.kind === 'changed' ? (
+              <DAlert variant="success" role="status">
+                {copy(
+                  'Password changed. All sessions have ended; sign in again with the new password.',
+                )}
+              </DAlert>
+            ) : passwordForm.open ? (
+              <form
+                className="space-y-3"
+                onSubmit={(event) => void submitPasswordChange(event)}
+                noValidate
+              >
+                <DInput
+                  id="operational-current-password"
+                  name="current-password"
+                  label={copy('Current password')}
+                  type="password"
+                  value={passwordForm.current}
+                  onChange={(value) => {
+                    setPasswordForm((form) => ({ ...form, current: value }));
+                    if (changeState.kind === 'incorrect') setChangeState({ kind: 'idle' });
+                  }}
+                  autoComplete="current-password"
+                  error={
+                    changeState.kind === 'incorrect'
+                      ? copy('The current password is incorrect.')
+                      : undefined
+                  }
+                  disabled={changeState.kind === 'pending'}
+                  autoFocus
+                />
+                <DInput
+                  id="operational-new-password"
+                  name="new-password"
+                  label={copy('New password')}
+                  type="password"
+                  value={passwordForm.next}
+                  onChange={(value) => setPasswordForm((form) => ({ ...form, next: value }))}
+                  onBlur={() => setPasswordForm((form) => ({ ...form, touched: true }))}
+                  autoComplete="new-password"
+                  hint={copy('At least 10 characters.')}
+                  error={
+                    !passwordForm.touched
+                      ? undefined
+                      : !newValid
+                        ? copy('Password must contain 10 to 128 characters.')
+                        : sameAsCurrent
+                          ? copy('The new password must differ from the current password.')
+                          : undefined
+                  }
+                  disabled={changeState.kind === 'pending'}
+                />
+                <DInput
+                  id="operational-confirm-password"
+                  name="confirm-password"
+                  label={copy('Confirm new password')}
+                  type="password"
+                  value={passwordForm.confirmation}
+                  onChange={(value) =>
+                    setPasswordForm((form) => ({ ...form, confirmation: value }))
+                  }
+                  onBlur={() => setPasswordForm((form) => ({ ...form, touched: true }))}
+                  autoComplete="new-password"
+                  error={
+                    (passwordForm.touched || passwordForm.confirmation.length > 0) &&
+                    passwordForm.confirmation !== passwordForm.next
+                      ? copy('Password confirmation does not match.')
+                      : undefined
+                  }
+                  disabled={changeState.kind === 'pending'}
+                />
+                {changeState.kind === 'failed' ? (
+                  <DAlert variant="danger" role="alert">
+                    {copy(
+                      changeState.reason === 'policy'
+                        ? 'Password must contain 10 to 128 characters.'
+                        : changeState.reason === 'throttled'
+                          ? 'Too many attempts. Try again shortly.'
+                          : changeState.reason === 'session'
+                            ? 'Your session has ended. Sign in again, then try once more.'
+                            : 'The password could not be changed. Try again shortly.',
+                    )}
+                  </DAlert>
+                ) : null}
+                <div className="flex justify-end gap-2">
+                  <DButton
+                    size="sm"
+                    variant="secondary"
+                    type="button"
+                    disabled={changeState.kind === 'pending'}
+                    onClick={() => {
+                      setPasswordForm({
+                        open: false,
+                        current: '',
+                        next: '',
+                        confirmation: '',
+                        touched: false,
+                      });
+                      setChangeState({ kind: 'idle' });
+                    }}
+                  >
+                    {copy('Cancel')}
+                  </DButton>
+                  <DButton size="sm" type="submit" loading={changeState.kind === 'pending'}>
+                    {copy('Change password')}
+                  </DButton>
+                </div>
+              </form>
+            ) : (
+              <div className="flex justify-end">
+                <DButton
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setPasswordForm((form) => ({ ...form, open: true }))}
+                >
+                  {copy('Change password')}
+                </DButton>
+              </div>
+            )}
+
+            {changeState.kind === 'changed' ? null : (
+              <div className="border-t border-[var(--color-border)] pt-3">
+                <p className="text-xs font-semibold">{copy('Forgot your current password?')}</p>
                 <p className="mt-0.5 text-xs leading-5 text-[var(--color-text-muted)]">
                   {copy(
                     'A link to set a new password will be sent to the WhatsApp number registered on your account.',
                   )}
                 </p>
-              </div>
-            </div>
-            {resetLinkState.kind === 'sent' ? (
-              <div
-                className="operational-view-enter mt-3 flex items-center gap-2 rounded-[var(--radius-control)] bg-[var(--color-success)]/10 px-3 py-2 text-xs font-semibold text-[var(--color-success)]"
-                aria-live="polite"
-              >
-                <MessageCircle className="size-4 shrink-0" aria-hidden="true" />
-                {copy('Link sent to your WhatsApp.')}
-              </div>
-            ) : (
-              <>
-                {resetLinkState.kind === 'failed' ? (
-                  <DAlert
-                    variant={resetLinkState.reason === 'unavailable' ? 'warning' : 'danger'}
-                    role="alert"
-                    className="mt-3"
+                {resetLinkState.kind === 'sent' ? (
+                  <div
+                    className="operational-view-enter mt-3 flex items-center gap-2 rounded-[var(--radius-control)] bg-[var(--color-success)]/10 px-3 py-2 text-xs font-semibold text-[var(--color-success)]"
+                    aria-live="polite"
                   >
-                    {copy(
-                      resetLinkState.reason === 'unavailable'
-                        ? 'Password change is not available yet. Contact your administrator.'
-                        : 'The request could not be sent. Try again.',
-                    )}
-                  </DAlert>
-                ) : null}
-                <div className="mt-3 flex justify-end">
-                  <DButton
-                    size="sm"
-                    variant="outline"
-                    loading={resetLinkState.kind === 'pending'}
-                    onClick={() => void requestPasswordResetLink()}
-                  >
-                    {copy('Send reset link via WhatsApp')}
-                  </DButton>
-                </div>
-              </>
+                    <MessageCircle className="size-4 shrink-0" aria-hidden="true" />
+                    {copy('Link submitted to WhatsApp.')}
+                  </div>
+                ) : (
+                  <>
+                    {resetLinkState.kind === 'failed' ? (
+                      <DAlert
+                        variant={resetLinkState.reason === 'unavailable' ? 'warning' : 'danger'}
+                        role="alert"
+                        className="mt-3"
+                      >
+                        {copy(
+                          resetLinkState.reason === 'unavailable'
+                            ? 'Password change is not available yet. Contact your administrator.'
+                            : resetLinkState.reason === 'cooldown'
+                              ? 'A link was sent a moment ago. Check WhatsApp or try again shortly.'
+                              : 'The request could not be sent. Try again.',
+                        )}
+                      </DAlert>
+                    ) : null}
+                    <div className="mt-3 flex justify-end">
+                      <DButton
+                        size="sm"
+                        variant="outline"
+                        loading={resetLinkState.kind === 'pending'}
+                        onClick={() => void requestPasswordResetLink()}
+                      >
+                        {copy('Send reset link via WhatsApp')}
+                      </DButton>
+                    </div>
+                  </>
+                )}
+              </div>
             )}
           </section>
         </div>

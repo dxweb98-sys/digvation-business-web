@@ -3,6 +3,122 @@ import type { OperationalLocale } from './operational-localization';
 type LocalizedCopy = Record<OperationalLocale, string>;
 
 const posCopy: Record<string, LocalizedCopy> = {
+  'Operational is not enabled for this business': {
+    'id-ID': 'Operasional belum diaktifkan untuk bisnis ini',
+    'en-US': 'Operational is not enabled for this business',
+  },
+  'No Operational module is available for your account': {
+    'id-ID': 'Belum ada modul Operasional untuk akun Anda',
+    'en-US': 'No Operational module is available for your account',
+  },
+  'The modules used in Operational have not been enabled for this business. Contact your business administrator.':
+    {
+      'id-ID':
+        'Modul yang dipakai di Operasional belum diaktifkan untuk bisnis ini. Hubungi administrator bisnis Anda.',
+      'en-US':
+        'The modules used in Operational have not been enabled for this business. Contact your business administrator.',
+    },
+  'Your role does not include Sell, Customers or Expenses. Ask your business administrator to update your role in Backoffice, then check again.':
+    {
+      'id-ID':
+        'Peran Anda belum mencakup Jual, Pelanggan, atau Pengeluaran. Minta administrator bisnis memperbarui peran Anda di Backoffice, lalu periksa lagi.',
+      'en-US':
+        'Your role does not include Sell, Customers or Expenses. Ask your business administrator to update your role in Backoffice, then check again.',
+    },
+  'Your access has not changed yet.': {
+    'id-ID': 'Akses Anda belum berubah.',
+    'en-US': 'Your access has not changed yet.',
+  },
+  'Access could not be checked. Try again.': {
+    'id-ID': 'Akses belum dapat diperiksa. Coba lagi.',
+    'en-US': 'Access could not be checked. Try again.',
+  },
+  'Use another account': { 'id-ID': 'Gunakan akun lain', 'en-US': 'Use another account' },
+  'Check again': { 'id-ID': 'Periksa lagi', 'en-US': 'Check again' },
+  'Go to Sell': { 'id-ID': 'Buka Jual', 'en-US': 'Go to Sell' },
+  'Go to Expenses': { 'id-ID': 'Buka Pengeluaran', 'en-US': 'Go to Expenses' },
+  'Go to Customers': { 'id-ID': 'Buka Pelanggan', 'en-US': 'Go to Customers' },
+  'Operational access could not be loaded': {
+    'id-ID': 'Akses operasional belum dapat dimuat',
+    'en-US': 'Operational access could not be loaded',
+  },
+  'Check your connection and try again.': {
+    'id-ID': 'Periksa koneksi Anda lalu coba lagi.',
+    'en-US': 'Check your connection and try again.',
+  },
+  'Try again': { 'id-ID': 'Coba lagi', 'en-US': 'Try again' },
+  'Ask your business administrator to grant location access in Backoffice, then sign in again.': {
+    'id-ID': 'Minta administrator bisnis memberi akses lokasi di Backoffice, lalu masuk lagi.',
+    'en-US':
+      'Ask your business administrator to grant location access in Backoffice, then sign in again.',
+  },
+  Password: { 'id-ID': 'Kata sandi', 'en-US': 'Password' },
+  'Change password': { 'id-ID': 'Ubah kata sandi', 'en-US': 'Change password' },
+  'Change with your current password': {
+    'id-ID': 'Ubah dengan kata sandi saat ini',
+    'en-US': 'Change with your current password',
+  },
+  'Current password': { 'id-ID': 'Kata sandi saat ini', 'en-US': 'Current password' },
+  'New password': { 'id-ID': 'Kata sandi baru', 'en-US': 'New password' },
+  'Confirm new password': {
+    'id-ID': 'Konfirmasi kata sandi baru',
+    'en-US': 'Confirm new password',
+  },
+  'At least 10 characters.': {
+    'id-ID': 'Minimal 10 karakter.',
+    'en-US': 'At least 10 characters.',
+  },
+  'Password must contain 10 to 128 characters.': {
+    'id-ID': 'Kata sandi harus terdiri dari 10 sampai 128 karakter.',
+    'en-US': 'Password must contain 10 to 128 characters.',
+  },
+  'Password confirmation does not match.': {
+    'id-ID': 'Konfirmasi kata sandi belum sama.',
+    'en-US': 'Password confirmation does not match.',
+  },
+  'The new password must differ from the current password.': {
+    'id-ID': 'Kata sandi baru harus berbeda dari kata sandi saat ini.',
+    'en-US': 'The new password must differ from the current password.',
+  },
+  'The current password is incorrect.': {
+    'id-ID': 'Kata sandi saat ini tidak benar.',
+    'en-US': 'The current password is incorrect.',
+  },
+  'Your session has ended. Sign in again, then try once more.': {
+    'id-ID': 'Sesi Anda sudah berakhir. Masuk lagi, lalu coba kembali.',
+    'en-US': 'Your session has ended. Sign in again, then try once more.',
+  },
+  'Too many attempts. Try again shortly.': {
+    'id-ID': 'Terlalu banyak percobaan. Coba lagi beberapa saat lagi.',
+    'en-US': 'Too many attempts. Try again shortly.',
+  },
+  'The password could not be changed. Try again shortly.': {
+    'id-ID': 'Kata sandi belum dapat diubah. Coba lagi beberapa saat lagi.',
+    'en-US': 'The password could not be changed. Try again shortly.',
+  },
+  'Password changed. All sessions have ended; sign in again with the new password.': {
+    'id-ID':
+      'Kata sandi berhasil diubah. Semua sesi telah berakhir; masuk lagi dengan kata sandi baru.',
+    'en-US': 'Password changed. All sessions have ended; sign in again with the new password.',
+  },
+  'Sign in again': { 'id-ID': 'Masuk lagi', 'en-US': 'Sign in again' },
+  'Enter your current password and a new one. After it succeeds, all your sessions end and you sign in again.':
+    {
+      'id-ID':
+        'Masukkan kata sandi saat ini dan kata sandi baru. Setelah berhasil, semua sesi Anda berakhir dan Anda perlu masuk lagi.',
+      'en-US':
+        'Enter your current password and a new one. After it succeeds, all your sessions end and you sign in again.',
+    },
+  'Forgot your current password?': {
+    'id-ID': 'Lupa kata sandi saat ini?',
+    'en-US': 'Forgot your current password?',
+  },
+  'Link submitted to WhatsApp.': {
+    'id-ID':
+      'Tautan telah diserahkan ke penyedia WhatsApp. Jika belum masuk, coba lagi sebentar lagi.',
+    'en-US':
+      'The link was handed to WhatsApp for delivery. If it does not arrive, try again shortly.',
+  },
   'Pay later': { 'id-ID': 'Bayar nanti', 'en-US': 'Pay later' },
   'Payment timing': { 'id-ID': 'Waktu & Cara Pembayaran', 'en-US': 'Payment timing' },
   'Pay and add to queue': {
@@ -24,6 +140,10 @@ const posCopy: Record<string, LocalizedCopy> = {
       'Tautan untuk membuat kata sandi baru akan dikirim ke nomor WhatsApp yang terdaftar pada akun Anda.',
     'en-US':
       'A link to set a new password will be sent to the WhatsApp number registered on your account.',
+  },
+  'A link was sent a moment ago. Check WhatsApp or try again shortly.': {
+    'id-ID': 'Tautan baru saja dikirim. Periksa WhatsApp atau coba lagi sebentar lagi.',
+    'en-US': 'A link was sent a moment ago. Check WhatsApp or try again shortly.',
   },
   'Link sent to your WhatsApp.': {
     'id-ID': 'Tautan sudah dikirim ke WhatsApp Anda.',
