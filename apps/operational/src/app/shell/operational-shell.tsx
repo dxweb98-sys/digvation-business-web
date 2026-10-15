@@ -87,7 +87,7 @@ export function OperationalShell({
     const main = all.find(
       (location) => location.id === operationalAccessQuery.data?.mainLocationId,
     );
-    return main ? [main] : all.slice(0, 1);
+    return main ? [main] : [];
   }, [canSwitchBranches, operationalAccessQuery.data]);
   const selectedLocation = locations.find((location) => location.id === selectedLocationId) ?? null;
   const brandSubtitle =

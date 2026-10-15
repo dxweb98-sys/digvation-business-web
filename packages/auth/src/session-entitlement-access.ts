@@ -11,6 +11,7 @@ export type SessionFeature =
   | 'EMPLOYEE_WORKFORCE'
   | 'POS_PRODUCT_SALES'
   | 'POS_SERVICE_SALES'
+  | 'CATALOG_SERVICE_COMPOSITION'
   | 'POS_PRODUCT_COMMISSION'
   | 'PROMOTIONS'
   | 'MEMBERSHIP'
@@ -26,6 +27,12 @@ export function hasSessionFeature(access: SessionAccess, feature: SessionFeature
   if (feature === 'POS') return pos && (access.entitlements?.products.POS.enabled ?? true);
   // Insights are part of the dashboard baseline, still subject to report RBAC.
   if (feature === 'BUSINESS_ANALYTICS') return true;
+  if (feature === 'CATALOG_SERVICE_COMPOSITION') {
+    const configured = access.entitlements?.modules.CATALOG?.SERVICE_COMPOSITION;
+    // Old Runtime sessions predate the independent flag. Preserve their
+    // existing Service composition access during a staged rollout.
+    return pos && hasSessionFeature(access, 'POS_SERVICE_SALES') && (configured ?? true);
+  }
   if (feature === 'MULTI_BRANCH' && !access.entitlements?.modules.ORGANIZATION) return true;
   if (feature === 'EMPLOYEE_WORKFORCE' && !access.entitlements?.modules.EMPLOYEE)
     return access.foundations.includes('WORKFORCE');

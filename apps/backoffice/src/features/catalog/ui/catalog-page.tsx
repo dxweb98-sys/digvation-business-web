@@ -90,6 +90,9 @@ export function CatalogPage() {
   const canSellServices = Boolean(
     session && hasSessionFeature(session.access, 'POS_SERVICE_SALES'),
   );
+  const canConfigureComposition = Boolean(
+    session && hasSessionFeature(session.access, 'CATALOG_SERVICE_COMPOSITION'),
+  );
   // Disable standalone Product queries when Product Sales is not entitled.
   // Service composition uses its own Product component candidate API.
   const availableItemType: Item['type'] | '' | null =
@@ -410,7 +413,7 @@ export function CatalogPage() {
         canCreateVariants={can('createCatalog')}
         canUpdateVariants={can('updateCatalog')}
         canManageImage={can('updateCatalog')}
-        canEditComposition={canSellServices && can('updateCatalog')}
+        canEditComposition={canSellServices && canConfigureComposition && can('updateCatalog')}
         canSellProducts={canSellProducts}
         canSellServices={canSellServices}
         onClose={() => setItem(undefined)}
