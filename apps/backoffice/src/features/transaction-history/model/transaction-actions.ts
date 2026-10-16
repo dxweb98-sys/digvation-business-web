@@ -15,11 +15,10 @@ export interface RefundablePayment {
 /**
  * Why Reverse cannot be used yet, from the same payment facts the detail shows.
  * - `PAYMENT_PENDING`: a payment is still pending.
- * - `REFUND_REQUIRED`: succeeded money remains; refund it here first.
- * - `PROVIDER_REFUND_REQUIRED`: succeeded non-cash money remains, which this application cannot
- *   refund (provider-backed refunds need the provider's authoritative flow).
+ * - `REFUND_REQUIRED`: received money remains; it must really be returned here first. A refund is a
+ *   real disbursement, never a way to cancel an entry that was recorded by mistake.
  */
-export type ReverseBlock = 'PAYMENT_PENDING' | 'REFUND_REQUIRED' | 'PROVIDER_REFUND_REQUIRED';
+export type ReverseBlock = 'PAYMENT_PENDING' | 'REFUND_REQUIRED';
 
 export interface TransactionActions {
   refundable: RefundablePayment[];
@@ -38,8 +37,11 @@ export interface TransactionActions {
 }
 
 /**
- * Which follow-up commands to offer. Only a completed, not yet reversed Sale qualifies. Refunds are
- * offered for cash payments with an uncompensated balance. Reverse becomes actionable only once no
+ * Which follow-up commands to offer. Only a completed, not yet reversed Sale qualifies. Payments
+ * are recorded and confirmed manually, so a refund is offered for every payment, whatever its
+ * method, that still has an uncompensated balance: the operator chooses the CASH or BANK_TRANSFER
+ * route the money really leaves through. Runtime remains the authority. Reverse becomes actionable
+ * only once no
  * payment is pending and every succeeded payment is fully compensated — the Runtime reversal rule.
  */
 export function transactionActions(
@@ -58,16 +60,12 @@ export function transactionActions(
       maxAmount: remainingCapacity(payment, sale),
     }))
     .filter(({ maxAmount }) => toMoneyUnits(maxAmount) > 0n);
-  const isCash = ({ payment }: RefundablePayment) =>
-    payment.method === 'CASH' && !payment.providerReference;
-  const refundable = outstanding.filter(isCash);
+  const refundable = outstanding;
   const reverseBlock: ReverseBlock | null = composition.hasPending
     ? 'PAYMENT_PENDING'
-    : outstanding.some((entry) => !isCash(entry))
-      ? 'PROVIDER_REFUND_REQUIRED'
-      : outstanding.length
-        ? 'REFUND_REQUIRED'
-        : null;
+    : outstanding.length
+      ? 'REFUND_REQUIRED'
+      : null;
   const showReverse = completed && permissions.reverse;
   const canCorrect =
     Boolean(permissions.correct) &&
@@ -103,7 +101,11 @@ const ACTION_ERROR_COPY: Record<string, string> = {
   SALE_ALREADY_REVERSED: 'This transaction has already been reversed.',
   SALE_VERSION_CONFLICT: 'This transaction changed in the meantime. Reload it and try again.',
   PAYMENT_REFUND_PROVIDER_CONFIRMATION_REQUIRED:
-    'This payment went through a provider and must be refunded in that provider’s flow.',
+    'This payment is controlled by an external provider and must be refunded in that provider’s flow.',
+  PAYMENT_REFUND_FORBIDDEN: 'You are not allowed to return money.',
+  REFUND_DISBURSEMENT_REQUIRED: 'Choose how the refund is returned.',
+  REFUND_DISBURSEMENT_INVALID:
+    'That refund account is not available for this location. Choose another one.',
   PAYMENT_REFUND_EXCEEDS_SOURCE: 'The amount is more than what is left to refund on this payment.',
   PAYMENT_REFUND_FINALIZED_REQUIRED: 'Only payments of a completed transaction can be refunded.',
   PAYMENT_REFUND_AMOUNT_INVALID: 'Enter a refund amount greater than zero.',

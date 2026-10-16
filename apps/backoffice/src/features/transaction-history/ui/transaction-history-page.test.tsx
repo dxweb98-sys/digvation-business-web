@@ -99,9 +99,9 @@ describe('TransactionDetailDialog', () => {
   it('places refund and reversal in the footer, never in the body', async () => {
     renderDetail(SCENARIOS.paid);
     const dialog = await screen.findByRole('dialog');
-    const refund = await within(dialog).findByRole('button', { name: 'Kembalikan dana' });
-    const reverse = within(dialog).getByRole('button', { name: 'Reversal transaksi' });
-    expect(within(dialog).getAllByRole('button', { name: 'Kembalikan dana' })).toHaveLength(1);
+    const refund = await within(dialog).findByRole('button', { name: 'Pengembalian dana' });
+    const reverse = within(dialog).getByRole('button', { name: 'Batalkan transaksi' });
+    expect(within(dialog).getAllByRole('button', { name: 'Pengembalian dana' })).toHaveLength(1);
     const footer = refund.closest('div.flex')!.parentElement!;
     expect(footer.contains(reverse)).toBe(true);
     expect(within(footer).getByRole('button', { name: 'Tutup' })).toBeTruthy();
@@ -112,26 +112,40 @@ describe('TransactionDetailDialog', () => {
     renderDetail(SCENARIOS.paid, { refund: false, reverse: false });
     const dialog = within(await screen.findByRole('dialog'));
     await dialog.findByText('Hair Coloring');
-    expect(dialog.queryByRole('button', { name: 'Kembalikan dana' })).toBeNull();
-    expect(dialog.queryByRole('button', { name: 'Reversal transaksi' })).toBeNull();
+    expect(dialog.queryByRole('button', { name: 'Pengembalian dana' })).toBeNull();
+    expect(dialog.queryByRole('button', { name: 'Batalkan transaksi' })).toBeNull();
     cleanup();
 
     renderDetail(SCENARIOS.reversed);
     const reversed = within(await screen.findByRole('dialog'));
     await reversed.findByText('Customer complaint');
-    expect(reversed.queryByRole('button', { name: 'Kembalikan dana' })).toBeNull();
-    expect(reversed.queryByRole('button', { name: 'Reversal transaksi' })).toBeNull();
+    expect(reversed.queryByRole('button', { name: 'Pengembalian dana' })).toBeNull();
+    expect(reversed.queryByRole('button', { name: 'Batalkan transaksi' })).toBeNull();
     expect(reversed.getByText('Pengembalian untuk CASH')).toBeTruthy();
   });
 
   it('refunds the single cash payment with its exact remaining amount', async () => {
     const refundPayment = vi.fn(async () => SCENARIOS.paid);
     renderDetail(SCENARIOS.paid, undefined, { refundPayment });
-    fireEvent.click(await screen.findByRole('button', { name: 'Kembalikan dana' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Pengembalian dana' }));
     const refund = within(await screen.findByRole('dialog', { name: 'Kembalikan pembayaran' }));
-    fireEvent.click(refund.getByRole('button', { name: 'Kembalikan dana' }));
+    fireEvent.click(refund.getByLabelText('Dana dikembalikan melalui'));
+    fireEvent.click(
+      await screen.findByRole('option', { name: 'Jalur tunai yang sama dengan pembayaran' }),
+    );
+    fireEvent.change(refund.getByLabelText('Alasan pengembalian'), {
+      target: { value: 'Pelanggan batal' },
+    });
+    fireEvent.click(refund.getByRole('button', { name: 'Pengembalian dana' }));
     await waitFor(() =>
-      expect(refundPayment).toHaveBeenCalledWith('sale-d', 'cash-d', 3, '250000'),
+      expect(refundPayment).toHaveBeenCalledWith(
+        'sale-d',
+        'cash-d',
+        3,
+        '250000',
+        'Pelanggan batal',
+        undefined,
+      ),
     );
   });
 

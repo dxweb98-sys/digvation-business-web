@@ -125,23 +125,24 @@ describe('Transaction detail actions', () => {
   it('disables Reverse with an explanation while money is uncompensated', async () => {
     renderDetail(SCENARIOS.paid);
     const dialog = within(await screen.findByRole('dialog'));
-    const reverse = await dialog.findByRole('button', { name: 'Reversal transaksi' });
+    const reverse = await dialog.findByRole('button', { name: 'Batalkan transaksi' });
     expect((reverse as HTMLButtonElement).disabled).toBe(true);
     const hint = dialog.getByText(
-      'Kembalikan semua pembayaran yang berhasil sebelum mereversal transaksi ini.',
+      'Uang yang benar-benar diterima harus dikembalikan sebelum transaksi ini dapat dibatalkan. Pembayaran yang salah input belum dapat dihapus di sini.',
     );
     expect(reverse.getAttribute('aria-describedby')).toBe(hint.closest('p')!.id);
   });
 
-  it('explains the provider limitation of a split payment with a bank part', async () => {
+  it('offers the refund of a remaining bank part and keeps Reverse disabled with the reason', async () => {
     renderDetail(SCENARIOS.partiallyRefunded);
     const dialog = within(await screen.findByRole('dialog'));
     expect(
-      await dialog.findByText(/Pembayaran non-tunai harus dikembalikan melalui penyedianya/),
+      await dialog.findByText(/Uang yang benar-benar diterima harus dikembalikan/),
     ).toBeTruthy();
-    expect(dialog.queryByRole('button', { name: 'Kembalikan dana' })).toBeNull();
+    expect(dialog.queryByText(/penyedia/i)).toBeNull();
+    expect(dialog.getByRole('button', { name: 'Pengembalian dana' })).toBeTruthy();
     expect(
-      (dialog.getByRole('button', { name: 'Reversal transaksi' }) as HTMLButtonElement).disabled,
+      (dialog.getByRole('button', { name: 'Batalkan transaksi' }) as HTMLButtonElement).disabled,
     ).toBe(true);
   });
 
@@ -149,15 +150,15 @@ describe('Transaction detail actions', () => {
     const reverse = vi.fn(async () => SCENARIOS.readyToReverse);
     renderDetail(SCENARIOS.readyToReverse, undefined, { reverse });
     const parent = await screen.findByRole('dialog', { name: 'Detail transaksi' });
-    const button = await within(parent).findByRole('button', { name: 'Reversal transaksi' });
+    const button = await within(parent).findByRole('button', { name: 'Batalkan transaksi' });
     expect((button as HTMLButtonElement).disabled).toBe(false);
 
     fireEvent.click(button);
-    await screen.findByRole('dialog', { name: 'Reversal transaksi' });
+    await screen.findByRole('dialog', { name: 'Batalkan transaksi' });
     expect(screen.getAllByRole('dialog')).toHaveLength(2);
     fireEvent.keyDown(document, { key: 'Escape' });
     await waitFor(() =>
-      expect(screen.getByRole('dialog', { name: 'Reversal transaksi' }).className).toMatch(
+      expect(screen.getByRole('dialog', { name: 'Batalkan transaksi' }).className).toMatch(
         /opacity-0/,
       ),
     );
@@ -165,10 +166,10 @@ describe('Transaction detail actions', () => {
       /opacity-100/,
     );
 
-    fireEvent.click(within(parent).getByRole('button', { name: 'Reversal transaksi' }));
-    const child = within(await screen.findByRole('dialog', { name: 'Reversal transaksi' }));
+    fireEvent.click(within(parent).getByRole('button', { name: 'Batalkan transaksi' }));
+    const child = within(await screen.findByRole('dialog', { name: 'Batalkan transaksi' }));
     fireEvent.change(child.getByRole('textbox'), { target: { value: 'Komplain pelanggan' } });
-    const submit = child.getByRole('button', { name: 'Reversal transaksi' });
+    const submit = child.getByRole('button', { name: 'Batalkan transaksi' });
     fireEvent.click(submit);
     fireEvent.click(submit);
     await waitFor(() => expect(reverse).toHaveBeenCalledTimes(1));
@@ -178,7 +179,7 @@ describe('Transaction detail actions', () => {
   it('closing the refund dialog returns to the transaction detail', async () => {
     renderDetail(SCENARIOS.paid);
     const parent = await screen.findByRole('dialog', { name: 'Detail transaksi' });
-    fireEvent.click(await within(parent).findByRole('button', { name: 'Kembalikan dana' }));
+    fireEvent.click(await within(parent).findByRole('button', { name: 'Pengembalian dana' }));
     const refund = within(await screen.findByRole('dialog', { name: 'Kembalikan pembayaran' }));
     fireEvent.click(refund.getByRole('button', { name: 'Batal' }));
     await waitFor(() =>
@@ -191,6 +192,106 @@ describe('Transaction detail actions', () => {
     );
   });
 
+  it('sends the chosen payout route for a QRIS payment refunded by bank transfer', async () => {
+    const refundPayment = vi.fn(async () => SCENARIOS.paid);
+    const sale: Sale = {
+      ...SCENARIOS.paid,
+      totalAmount: '150000.0000',
+      payments: [testPayment('qris-x', 'SUCCEEDED', '150000.0000', { method: 'QRIS' })],
+    };
+    const paymentRoutes = vi.fn(async () => [
+      {
+        id: 'route-bank-b',
+        paymentMethod: 'BANK_TRANSFER' as const,
+        currency: 'IDR',
+        financialAccountName: 'Rekening B',
+      },
+      {
+        id: 'route-qris-a',
+        paymentMethod: 'QRIS' as const,
+        currency: 'IDR',
+        financialAccountName: 'Akun QRIS A',
+      },
+    ]);
+    renderDetail(sale, undefined, { refundPayment, paymentRoutes });
+    fireEvent.click(await screen.findByRole('button', { name: 'Pengembalian dana' }));
+    const refund = within(await screen.findByRole('dialog', { name: 'Kembalikan pembayaran' }));
+    const submit = refund.getByRole('button', { name: 'Pengembalian dana' }) as HTMLButtonElement;
+    expect(submit.disabled).toBe(true);
+    fireEvent.change(refund.getByRole('textbox', { name: /Jumlah pengembalian/ }), {
+      target: { value: '50.000' },
+    });
+    fireEvent.click(refund.getByLabelText('Dana dikembalikan melalui'));
+    // A QRIS route can receive money but never pays it out, so it is not offered.
+    expect(screen.queryByRole('option', { name: /QRIS/ })).toBeNull();
+    fireEvent.click(await screen.findByRole('option', { name: /Rekening B/ }));
+    expect(submit.disabled).toBe(true);
+    fireEvent.change(refund.getByLabelText('Alasan pengembalian'), {
+      target: { value: 'Pelanggan batal' },
+    });
+    expect(submit.disabled).toBe(false);
+    fireEvent.click(submit);
+    await waitFor(() =>
+      expect(refundPayment).toHaveBeenCalledWith(
+        'sale-d',
+        'qris-x',
+        3,
+        '50000',
+        'Pelanggan batal',
+        {
+          method: 'BANK_TRANSFER',
+          paymentRouteId: 'route-bank-b',
+        },
+      ),
+    );
+  });
+
+  it('shows why money was returned and the Sale reversed, by whom and when', async () => {
+    const sale: Sale = {
+      ...SCENARIOS.reversed,
+      reversal: {
+        reason: 'Transaksi salah input',
+        reversedAt: '2026-10-01T08:00:00.000Z',
+        reversedBy: 'Dewi Pemilik',
+      },
+      payments: [
+        testPayment('cash-f', 'SUCCEEDED', '250000.0000', {
+          financeFinancialAccountNameSnapshot: 'Kas Utama',
+        }),
+        testPayment('refund-f', 'SUCCEEDED', '-200000.0000', {
+          kind: 'REFUND',
+          financeFinancialAccountNameSnapshot: 'Rekening B',
+          createdBy: 'Dewi Pemilik',
+          terminalAt: '2026-10-01T07:00:00.000Z',
+          refund: {
+            id: 'refund-record',
+            kind: 'MANUAL',
+            reason: 'PAYMENT_REFUND',
+            externalReference: null,
+            note: 'Pelanggan komplain rasa',
+            adjustmentId: null,
+            allocations: [{ sourcePaymentId: 'cash-f', amount: '200000.0000' }],
+          },
+        }),
+        // Recorded before explanations were required: still listed, without a reason.
+        testPayment('refund-legacy', 'SUCCEEDED', '-50000.0000', {
+          kind: 'REFUND',
+          providerReference: 'REFUND:cash-f',
+          refundOfPaymentId: 'cash-f',
+          financeFinancialAccountNameSnapshot: 'Kas Utama',
+        }),
+      ],
+    };
+    renderDetail(sale);
+    const dialog = within(await screen.findByRole('dialog'));
+    expect(await dialog.findByText('Pelanggan komplain rasa')).toBeTruthy();
+    expect(dialog.getAllByText('Alasan pengembalian:')).toHaveLength(1);
+    expect(dialog.getAllByText('Dikembalikan oleh:')).toHaveLength(2);
+    expect(dialog.getAllByText('Dewi Pemilik').length).toBeGreaterThanOrEqual(2);
+    expect(dialog.getByText('Transaksi salah input')).toBeTruthy();
+    expect(dialog.getByText('Direversal oleh')).toBeTruthy();
+  });
+
   it('sends the canonical refund amount, never the displayed grouping', async () => {
     const refundPayment = vi.fn(async () => SCENARIOS.paid);
     const sale: Sale = {
@@ -199,14 +300,28 @@ describe('Transaction detail actions', () => {
       payments: [testPayment('cash-x', 'SUCCEEDED', '535464.0000')],
     };
     renderDetail(sale, undefined, { refundPayment });
-    fireEvent.click(await screen.findByRole('button', { name: 'Kembalikan dana' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Pengembalian dana' }));
     const refund = within(await screen.findByRole('dialog', { name: 'Kembalikan pembayaran' }));
-    const amount = refund.getByRole('textbox') as HTMLInputElement;
+    const amount = refund.getByRole('textbox', { name: /Jumlah pengembalian/ }) as HTMLInputElement;
     expect(amount.value).toBe('535.464');
     fireEvent.change(amount, { target: { value: '535.464' } });
-    fireEvent.click(refund.getByRole('button', { name: 'Kembalikan dana' }));
+    fireEvent.click(refund.getByLabelText('Dana dikembalikan melalui'));
+    fireEvent.click(
+      await screen.findByRole('option', { name: 'Jalur tunai yang sama dengan pembayaran' }),
+    );
+    fireEvent.change(refund.getByLabelText('Alasan pengembalian'), {
+      target: { value: 'Pelanggan batal' },
+    });
+    fireEvent.click(refund.getByRole('button', { name: 'Pengembalian dana' }));
     await waitFor(() =>
-      expect(refundPayment).toHaveBeenCalledWith('sale-d', 'cash-x', 3, '535464'),
+      expect(refundPayment).toHaveBeenCalledWith(
+        'sale-d',
+        'cash-x',
+        3,
+        '535464',
+        'Pelanggan batal',
+        undefined,
+      ),
     );
   });
 
@@ -218,9 +333,16 @@ describe('Transaction detail actions', () => {
       });
     });
     renderDetail(SCENARIOS.paid, undefined, { refundPayment });
-    fireEvent.click(await screen.findByRole('button', { name: 'Kembalikan dana' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Pengembalian dana' }));
     const refund = within(await screen.findByRole('dialog', { name: 'Kembalikan pembayaran' }));
-    fireEvent.click(refund.getByRole('button', { name: 'Kembalikan dana' }));
+    fireEvent.click(refund.getByLabelText('Dana dikembalikan melalui'));
+    fireEvent.click(
+      await screen.findByRole('option', { name: 'Jalur tunai yang sama dengan pembayaran' }),
+    );
+    fireEvent.change(refund.getByLabelText('Alasan pengembalian'), {
+      target: { value: 'Pelanggan batal' },
+    });
+    fireEvent.click(refund.getByRole('button', { name: 'Pengembalian dana' }));
     expect(
       await refund.findByText('Jumlah melebihi sisa yang dapat dikembalikan dari pembayaran ini.'),
     ).toBeTruthy();
