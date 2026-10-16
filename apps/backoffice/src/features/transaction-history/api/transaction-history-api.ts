@@ -18,7 +18,7 @@ export type PaymentKind = 'PAYMENT' | 'REFUND' | 'CORRECTION_IN' | 'CORRECTION_O
 export interface PaymentRefundRecord {
   id: string;
   kind: 'MANUAL';
-  reason: 'ORDER_ADJUSTMENT' | 'SALE_VOID';
+  reason: 'ORDER_ADJUSTMENT' | 'SALE_VOID' | 'PAYMENT_REFUND';
   externalReference: string | null;
   note: string | null;
   adjustmentId: string | null;
@@ -49,6 +49,9 @@ export interface Payment {
   financeFinancialAccountNameSnapshot?: string | null;
   terminalAt: string | null;
   createdAt: string;
+  /** On a refund fact: display name of who returned the money, resolved by Runtime. */
+  createdBy?: string | null;
+  createdByPresence?: 'USER' | 'SYSTEM' | 'UNAVAILABLE' | null;
 }
 
 export interface PaymentCorrectionMovement {
@@ -96,6 +99,13 @@ export interface PaymentComposition {
   totalPaid: string;
 }
 
+/** The route a refund is really returned through, with the operator's optional reference. */
+export interface RefundPayout {
+  method: 'CASH' | 'BANK_TRANSFER';
+  paymentRouteId: string;
+  externalReference?: string;
+}
+
 /** An active payment route a correction may attribute money to. */
 export interface CorrectionRoute {
   id: string;
@@ -114,6 +124,8 @@ export interface SaleReversal {
   reason: string;
   reversedAt: string;
   reversedByActorId?: string | null;
+  /** Display name of who reversed the Sale, resolved by Runtime. */
+  reversedBy?: string | null;
 }
 
 export interface SaleLoyaltyRedemption {
@@ -300,10 +312,23 @@ export class TransactionHistoryApi {
   get(id: string) {
     return this.client.get<Sale>(`/api/v1/sales/${id}`);
   }
-  refundPayment(saleId: string, paymentId: string, expectedVersion: number, amount: string) {
+  /**
+   * `payout` names the CASH or BANK_TRANSFER route the money really leaves through (its account is
+   * the outflow). It is required for a non-cash payment; a cash payment returns on its own cash
+   * route without it. The refund stays attributed to the payment being returned. `reason` is the
+   * operator's required explanation.
+   */
+  refundPayment(
+    saleId: string,
+    paymentId: string,
+    expectedVersion: number,
+    amount: string,
+    reason: string,
+    payout?: RefundPayout,
+  ) {
     return this.client.post<Sale>(
       `/api/v1/sales/${saleId}/payments/${paymentId}/refund`,
-      { expectedVersion, amount },
+      { expectedVersion, amount, reason, ...(payout ? { refundDisbursement: payout } : {}) },
       { headers: { 'idempotency-key': crypto.randomUUID() } },
     );
   }
