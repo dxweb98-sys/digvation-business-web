@@ -234,7 +234,6 @@ export function TransactionPaymentsSection({
                               copy(PAYMENT_METHOD_LABELS[refund.method]),
                               copy('Manual refund'),
                               refund.refund.externalReference,
-                              refund.refund.note,
                             ]
                               .filter(Boolean)
                               .join(' · ')}
@@ -245,6 +244,29 @@ export function TransactionPaymentsSection({
                       ) : (
                         copy(PAYMENT_METHOD_LABELS[refund.method])
                       )}
+                      <dl className="mt-1 space-y-0.5 text-xs text-[var(--color-text-muted)]">
+                        {/* Refunds recorded before explanations were required have none. */}
+                        {refund.refund?.note ? (
+                          <div className="flex gap-1.5">
+                            <dt>{copy('Refund reason')}:</dt>
+                            <dd className="min-w-0 break-words text-[var(--color-text)]">
+                              {refund.refund.note}
+                            </dd>
+                          </div>
+                        ) : null}
+                        <div className="flex gap-1.5">
+                          <dt>{copy('Refunded by')}:</dt>
+                          <dd className="min-w-0 break-words text-[var(--color-text)]">
+                            {refund.createdBy ?? '—'}
+                          </dd>
+                        </div>
+                        <div className="flex gap-1.5">
+                          <dt>{copy('Refunded on')}:</dt>
+                          <dd className="text-[var(--color-text)]">
+                            {dateTime(refund.terminalAt ?? refund.createdAt)}
+                          </dd>
+                        </div>
+                      </dl>
                     </span>
                     <span className="shrink-0 font-semibold tabular-nums text-[var(--color-danger)]">
                       {formatMoney(refund.appliedAmount, refund.currency)}

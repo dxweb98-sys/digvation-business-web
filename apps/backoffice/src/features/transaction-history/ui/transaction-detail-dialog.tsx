@@ -39,9 +39,8 @@ export const transactionDetailKeys = {
 
 const REVERSE_BLOCK_COPY: Record<ReverseBlock, string> = {
   PAYMENT_PENDING: 'Resolve the pending payment before reversing this transaction.',
-  REFUND_REQUIRED: 'Refund all completed payments before reversing this transaction.',
-  PROVIDER_REFUND_REQUIRED:
-    'Non-cash payments must be refunded through their provider, so this transaction can’t be reversed here yet.',
+  REFUND_REQUIRED:
+    'Money that was really received must be refunded before this transaction can be reversed. A payment entered by mistake cannot be removed here yet.',
 };
 
 type ActionDialog = 'refund' | 'reverse' | 'correct' | null;
@@ -89,7 +88,10 @@ export function TransactionDetailDialog({
   const correctionRoutes = useQuery({
     queryKey: ['transaction-correction-routes', sale?.sellingLocationId, sale?.currency],
     queryFn: () => api.paymentRoutes!(sale!.sellingLocationId, sale!.currency),
-    enabled: action === 'correct' && Boolean(sale) && Boolean(api.paymentRoutes),
+    enabled:
+      (action === 'correct' || action === 'refund' || action === 'reverse') &&
+      Boolean(sale) &&
+      Boolean(api.paymentRoutes),
   });
 
   const openAction = (next: Exclude<ActionDialog, null>) => {
@@ -202,10 +204,12 @@ export function TransactionDetailDialog({
             key={`refund-${actionSession}`}
             open={action === 'refund'}
             refundable={actions.refundable}
+            routes={correctionRoutes.data ?? []}
+            routesLoading={correctionRoutes.isLoading}
             onClose={() => setAction(null)}
-            onRefund={(paymentId, amount) =>
+            onRefund={(paymentId, amount, reason, payout) =>
               run(
-                () => api.refundPayment(sale.id, paymentId, sale.version, amount),
+                () => api.refundPayment(sale.id, paymentId, sale.version, amount, reason, payout),
                 'Payment refunded.',
                 'Could not refund this payment.',
               )
@@ -230,10 +234,14 @@ export function TransactionDetailDialog({
           <TransactionReverseDialog
             key={`reverse-${actionSession}`}
             open={action === 'reverse'}
+            refundAmount={actions.reverseRefundAmount}
+            currency={sale.currency}
+            routes={correctionRoutes.data ?? []}
+            routesLoading={correctionRoutes.isLoading}
             onClose={() => setAction(null)}
-            onReverse={(reason) =>
+            onReverse={(reason, payout) =>
               run(
-                () => api.reverse(sale.id, sale.version, reason),
+                () => api.reverse(sale.id, sale.version, reason, payout),
                 'Transaction reversed.',
                 'Could not reverse this transaction.',
               )
@@ -340,6 +348,7 @@ function TransactionDetailBody({
               label={copy('Reversed on')}
               value={dateTime(sale.reversal.reversedAt)}
             />
+            <RecordInfoTile label={copy('Reversed by')} value={sale.reversal.reversedBy ?? '—'} />
           </RecordPanelBody>
         </RecordPanel>
       ) : null}

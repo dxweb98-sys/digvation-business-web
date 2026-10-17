@@ -1,5 +1,5 @@
 {
-  "apiBaseUrl": "http://127.0.0.1:4003",
+  "apiBaseUrl": "http://localhost:4003",
   "deploymentProfile": "DEDICATED",
   "workspaceResolution": {
     "mode": "FIXED",

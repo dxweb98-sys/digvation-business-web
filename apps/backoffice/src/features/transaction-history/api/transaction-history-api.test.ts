@@ -6,14 +6,35 @@ describe('TransactionHistoryApi reversal commands', () => {
     const post = vi.fn().mockResolvedValue({});
     const api = new TransactionHistoryApi({ post } as never);
 
-    await api.refundPayment('sale-1', 'payment-1', 4, '25.0000');
+    await api.refundPayment('sale-1', 'payment-1', 4, '25.0000', 'Pelanggan batal');
 
     expect(post).toHaveBeenCalledWith(
       '/api/v1/sales/sale-1/payments/payment-1/refund',
-      { expectedVersion: 4, amount: '25.0000' },
+      { expectedVersion: 4, amount: '25.0000', reason: 'Pelanggan batal' },
       expect.objectContaining({
         headers: expect.objectContaining({ 'idempotency-key': expect.any(String) }),
       }),
+    );
+  });
+
+  it('names the payout route of a non-cash refund explicitly', async () => {
+    const post = vi.fn().mockResolvedValue({});
+    const api = new TransactionHistoryApi({ post } as never);
+
+    await api.refundPayment('sale-1', 'payment-1', 4, '25.0000', 'Pelanggan batal', {
+      method: 'BANK_TRANSFER',
+      paymentRouteId: 'route-1',
+    });
+
+    expect(post).toHaveBeenCalledWith(
+      '/api/v1/sales/sale-1/payments/payment-1/refund',
+      {
+        expectedVersion: 4,
+        amount: '25.0000',
+        reason: 'Pelanggan batal',
+        refundDisbursement: { method: 'BANK_TRANSFER', paymentRouteId: 'route-1' },
+      },
+      expect.anything(),
     );
   });
 
