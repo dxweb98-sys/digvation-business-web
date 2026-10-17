@@ -65,6 +65,25 @@ When Codebase Memory MCP is available:
 
 For every frontend UI/UX task in this repository, use the installed `uiuxpromax` skill automatically before materially changing layouts, forms, interactions, responsive behavior, visual hierarchy, or reusable UI patterns. Existing Digvation Design System components/tokens and repository reality remain authoritative.
 
+## Figma-driven UI work
+
+When a task gives a Figma link (Figma MCP server) for a redesign:
+
+- read `docs/design/figma/README.md` and the matching file spec (`backoffice-file.md` or
+  `operational-file.md`); the frame name `<Module> / <Screen> / <Breakpoint>` maps to the code
+  location listed there;
+- map Figma components to `@digvation/ui` `D*` components by name and variant properties to props
+  as listed in `docs/design/figma/design-system-library.md`; do not generate replacement markup
+  for something the design system already provides;
+- map Figma variables to the semantic CSS variables (`--color-*`, `--radius-control/card/panel`,
+  `--shadow-*`); never hard-code hex colors, since `--color-brand` is re-tinted per deployment;
+- implement every breakpoint shown in the section (mobile, tablet, desktop; Operational also
+  tablet landscape) with the Tailwind breakpoints `sm`, `md`, `lg`, `xl`;
+- a redesign is a presentation change: keep data fetching, permissions, entitlement gating,
+  money handling, and domain behavior unchanged;
+- a component or pattern missing from `@digvation/ui` is reported, not silently forked into an
+  app.
+
 ## Repository boundaries
 
 This repository owns Digvation's shared business frontend experiences.
