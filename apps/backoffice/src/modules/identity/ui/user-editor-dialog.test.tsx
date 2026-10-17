@@ -35,7 +35,12 @@ const user = {
   roles: [{ id: 'r-1', code: 'STAFF', name: 'Staff', systemKey: null }],
 } as unknown as AccessUser;
 
-function renderEditor(api: Record<string, unknown>, canManageRoles = false) {
+function renderEditor(
+  api: Record<string, unknown>,
+  canManageRoles = false,
+  target: AccessUser = user,
+  currentUserId?: string,
+) {
   const onChanged = vi.fn();
   const onClose = vi.fn();
   render(
@@ -44,7 +49,8 @@ function renderEditor(api: Record<string, unknown>, canManageRoles = false) {
         <DToastProvider>
           <BackofficeLocalizationProvider>
             <UserEditorDialog
-              user={user}
+              user={target}
+              {...(currentUserId ? { currentUserId } : {})}
               roles={[]}
               api={api as never}
               operationalAccess={{} as never}
@@ -113,5 +119,88 @@ describe('UserEditorDialog username', () => {
     expect(onClose).not.toHaveBeenCalled();
     fireEvent.change(field(/Username masuk/), { target: { value: 'free.name' } });
     await waitFor(() => expect(document.body.textContent).not.toContain(message));
+  });
+});
+
+describe('UserEditorDialog email', () => {
+  const withEmail = (email: string | null, verified: boolean, extra: object = {}) =>
+    ({
+      ...user,
+      email,
+      emailVerifiedAt: verified ? '2026-10-18T00:00:00.000Z' : null,
+      ...extra,
+    }) as unknown as AccessUser;
+  const owner = {
+    ...user,
+    id: 'owner-1',
+    roles: [{ id: 'r-o', code: 'OWNER', name: 'Owner', systemKey: 'OWNER' }],
+  } as unknown as AccessUser;
+
+  it('states the verification status in words', () => {
+    renderEditor({ updateUser: vi.fn() }, false, withEmail(null, false));
+    expect(document.body.textContent).toContain('Belum diisi');
+    cleanup();
+    renderEditor({ updateUser: vi.fn() }, false, withEmail('siti@usaha.com', false));
+    expect(document.body.textContent).toContain('Belum diverifikasi');
+    cleanup();
+    renderEditor({ updateUser: vi.fn() }, false, withEmail('siti@usaha.com', true));
+    expect(document.body.textContent).toContain('Terverifikasi');
+  });
+
+  it('saves a new email without touching other account details', async () => {
+    const target = withEmail(null, false);
+    const updateUser = vi.fn().mockResolvedValue(target);
+    renderEditor({ updateUser }, false, target);
+    fireEvent.change(field(/^Email/), { target: { value: ' siti@usaha.com ' } });
+    await press('Simpan perubahan');
+    await waitFor(() => expect(updateUser).toHaveBeenCalledTimes(1));
+    expect(updateUser).toHaveBeenCalledWith(target, { email: 'siti@usaha.com' });
+  });
+
+  it('removes an email when the field is cleared, and blocks an invalid one', async () => {
+    const target = withEmail('siti@usaha.com', true);
+    const updateUser = vi.fn().mockResolvedValue(target);
+    renderEditor({ updateUser }, false, target);
+    fireEvent.change(field(/^Email/), { target: { value: 'bukan-email' } });
+    await press('Simpan perubahan');
+    expect(updateUser).not.toHaveBeenCalled();
+    expect(document.body.textContent).toContain('Masukkan alamat email yang valid');
+    fireEvent.change(field(/^Email/), { target: { value: '' } });
+    await press('Simpan perubahan');
+    await waitFor(() => expect(updateUser).toHaveBeenCalledWith(target, { email: null }));
+  });
+
+  it('sends a verification link only for a saved, unverified address', async () => {
+    const target = withEmail('siti@usaha.com', false);
+    const requestUserEmailVerification = vi.fn().mockResolvedValue({ completed: true });
+    renderEditor({ updateUser: vi.fn(), requestUserEmailVerification }, false, target);
+    await press('Kirim tautan verifikasi');
+    await waitFor(() => expect(requestUserEmailVerification).toHaveBeenCalledWith(target));
+    fireEvent.change(field(/^Email/), { target: { value: 'baru@usaha.com' } });
+    expect(
+      [...document.body.querySelectorAll('button')].some(
+        (node) => node.textContent === 'Kirim tautan verifikasi',
+      ),
+    ).toBe(false);
+  });
+
+  it('does not offer verification for an already verified email', () => {
+    renderEditor({ updateUser: vi.fn() }, false, withEmail('siti@usaha.com', true));
+    expect(document.body.textContent).not.toContain('Kirim tautan verifikasi');
+  });
+
+  it('shows an Owner email read-only to others, but lets an Owner manage their own', async () => {
+    const protectedOwner = { ...owner, email: 'owner@usaha.com', emailVerifiedAt: null };
+    renderEditor({ updateUser: vi.fn() }, false, protectedOwner as AccessUser, 'manager-1');
+    expect(document.body.textContent).toContain('owner@usaha.com');
+    expect(field(/^Email/)).toBeNull();
+    cleanup();
+    const updateUser = vi.fn().mockResolvedValue(owner);
+    renderEditor({ updateUser }, false, owner, owner.id);
+    fireEvent.change(field(/^Email/), { target: { value: 'owner@usaha.com' } });
+    await press('Simpan perubahan');
+    await waitFor(() =>
+      expect(updateUser).toHaveBeenCalledWith(owner, { email: 'owner@usaha.com' }),
+    );
   });
 });

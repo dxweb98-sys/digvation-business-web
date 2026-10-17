@@ -31,6 +31,8 @@ import { invitationStatusOf } from './model/invitation-status';
 import { InvitationDialog } from './ui/invitation-dialog';
 import { RoleEditorDialog } from './ui/role-editor-dialog';
 import { UserEditorDialog } from './ui/user-editor-dialog';
+import { EmailStatusBadge } from './ui/email-status-badge';
+import { emailStatusOf } from './model/identity-form';
 import { OperationalAccessApi } from '../operational-access/operational-access-api';
 
 const keys = {
@@ -207,6 +209,7 @@ export function AccessControlPage() {
           canViewLocations={canViewLocations || canManageLocations}
           canManageLocations={canManageLocations}
           canViewSecurityActivity={canViewSecurityActivity}
+          currentUserId={session.identity.userId}
           onClose={() => setEditingUser(null)}
           onChanged={() => invalidate(keys.users)}
         />
@@ -371,6 +374,16 @@ function UsersTable({
       render: (user) => user.roles.map((role) => role.name).join(', ') || '-',
     },
     {
+      key: 'email',
+      label: copy('Email'),
+      render: (user) => (
+        <div className="min-w-0 space-y-1">
+          {user.email ? <p className="break-words text-sm">{user.email}</p> : null}
+          <EmailStatusBadge status={emailStatusOf(user)} />
+        </div>
+      ),
+    },
+    {
       key: 'status',
       label: copy('Status'),
       render: (user) => (
@@ -424,6 +437,14 @@ function InvitationsTable({
         <div>
           <p className="font-medium">{invitation.displayName}</p>
           <p className="text-xs text-[var(--color-text-muted)]">{invitation.phoneE164}</p>
+          {invitation.email ? (
+            <p className="break-words text-xs text-[var(--color-text-muted)]">{invitation.email}</p>
+          ) : null}
+          <p className="text-xs text-[var(--color-text-muted)]">
+            {invitation.deliveryChannel === 'EMAIL'
+              ? copy('Sent via email')
+              : copy('Sent via WhatsApp')}
+          </p>
         </div>
       ),
     },

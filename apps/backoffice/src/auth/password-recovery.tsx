@@ -29,6 +29,8 @@ export interface PasswordRecoveryPort {
   request(input: PasswordRecoveryRequest): Promise<void>;
   /** Completes recovery from the one-time link; the Runtime ends every session of the account. */
   confirm(input: PasswordResetReference & { newPassword: string }): Promise<void>;
+  /** Confirms ownership of an account email from its one-time link; recovery may then use it. */
+  confirmEmailVerification(input: PasswordResetReference): Promise<void>;
 }
 
 export class PasswordRecoveryUnavailableError extends Error {
@@ -41,6 +43,7 @@ export class PasswordRecoveryUnavailableError extends Error {
 export const unavailablePasswordRecovery: PasswordRecoveryPort = {
   request: () => Promise.reject(new PasswordRecoveryUnavailableError()),
   confirm: () => Promise.reject(new PasswordResetError('network')),
+  confirmEmailVerification: () => Promise.reject(new PasswordResetError('network')),
 };
 
 const PasswordRecoveryContext = createContext<PasswordRecoveryPort>(unavailablePasswordRecovery);

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  emailStatusOf,
   emptyInvitationForm,
   identityConflictOf,
   sanitizePhoneField,
@@ -34,6 +35,8 @@ describe('invitation form model', () => {
       displayName: '  ',
       phone: '12',
       username: 'a b',
+      deliveryChannel: 'WHATSAPP',
+      email: '',
       roleIds: [],
     });
     expect(result.valid).toBe(false);
@@ -60,5 +63,33 @@ describe('invitation form model', () => {
     expect(identityConflictOf('USER_USERNAME_ALREADY_EXISTS')?.field).toBe('username');
     expect(identityConflictOf('INVITATION_USERNAME_PENDING')?.field).toBe('username');
     expect(identityConflictOf('SOMETHING_ELSE')).toBeNull();
+    expect(identityConflictOf('USER_EMAIL_ALREADY_EXISTS')?.field).toBe('email');
+    expect(identityConflictOf('INVITATION_EMAIL_PENDING')?.field).toBe('email');
+  });
+
+  it('requires a valid email only when the invitation is sent by email', () => {
+    expect(validateInvitationForm({ ...valid, deliveryChannel: 'EMAIL' }).issues.email).toBe(
+      'EMAIL_REQUIRED',
+    );
+    expect(
+      validateInvitationForm({ ...valid, deliveryChannel: 'EMAIL', email: 'not-an-email' }).issues
+        .email,
+    ).toBe('EMAIL_INVALID');
+    expect(validateInvitationForm({ ...valid, email: '' }).valid).toBe(true);
+    expect(validateInvitationForm({ ...valid, email: 'bad' }).issues.email).toBe('EMAIL_INVALID');
+    expect(
+      toCreateInvitationInput({ ...valid, deliveryChannel: 'EMAIL', email: ' siti@usaha.com ' }),
+    ).toMatchObject({ email: 'siti@usaha.com', deliveryChannel: 'EMAIL' });
+    expect(toCreateInvitationInput(valid)).not.toHaveProperty('email');
+    expect(toCreateInvitationInput(valid).deliveryChannel).toBe('WHATSAPP');
+  });
+
+  it('reports whether an email can receive recovery links', () => {
+    expect(emailStatusOf({})).toBe('MISSING');
+    expect(emailStatusOf({ email: null, emailVerifiedAt: null })).toBe('MISSING');
+    expect(emailStatusOf({ email: 'a@b.co', emailVerifiedAt: null })).toBe('UNVERIFIED');
+    expect(emailStatusOf({ email: 'a@b.co', emailVerifiedAt: '2026-10-18T00:00:00Z' })).toBe(
+      'VERIFIED',
+    );
   });
 });
