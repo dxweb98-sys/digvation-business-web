@@ -143,6 +143,20 @@ export const backofficeMessages = {
     activationIncompleteTitle: 'Buka kembali tautan undangan',
     activationIncompleteDescription:
       'Tautan aktivasi ini tidak lengkap atau halaman dimuat ulang. Buka kembali tautan dari pesan undangan Anda.',
+    verifyEmailTitle: 'Verifikasi alamat email',
+    verifyEmailDescription:
+      'Konfirmasikan bahwa alamat email ini milik Anda. Setelah terverifikasi, tautan pemulihan kata sandi dapat dikirim ke email ini.',
+    verifyEmailSubmit: 'Konfirmasi email',
+    verifyEmailSubmitting: 'Mengonfirmasi…',
+    verifyEmailDoneTitle: 'Email terverifikasi',
+    verifyEmailDoneDescription:
+      'Alamat email Anda sudah terverifikasi dan dapat dipakai untuk memulihkan akun.',
+    verifyEmailInvalidTitle: 'Tautan tidak valid atau sudah digunakan',
+    verifyEmailInvalidDescription:
+      'Tautan ini tidak dapat dipakai lagi, atau alamat email akun sudah diganti. Minta tautan verifikasi baru kepada admin Anda.',
+    verifyEmailExpiredTitle: 'Tautan sudah kedaluwarsa',
+    verifyEmailExpiredDescription:
+      'Tautan ini melewati batas waktu. Minta tautan verifikasi baru kepada admin Anda.',
   },
   en: {
     dashboard: 'Dashboard',
@@ -288,5 +302,19 @@ export const backofficeMessages = {
     activationIncompleteTitle: 'Reopen your invitation link',
     activationIncompleteDescription:
       'This activation link is incomplete or the page was reloaded. Open the link from your invitation message again.',
+    verifyEmailTitle: 'Verify your email address',
+    verifyEmailDescription:
+      'Confirm that this email address is yours. Once verified, password recovery links can be sent to it.',
+    verifyEmailSubmit: 'Confirm email',
+    verifyEmailSubmitting: 'Confirming…',
+    verifyEmailDoneTitle: 'Email verified',
+    verifyEmailDoneDescription:
+      'Your email address is verified and can be used to recover your account.',
+    verifyEmailInvalidTitle: 'Link is not valid or was already used',
+    verifyEmailInvalidDescription:
+      'This link can no longer be used, or the account email was changed. Ask your administrator for a new verification link.',
+    verifyEmailExpiredTitle: 'Link has expired',
+    verifyEmailExpiredDescription:
+      'This link is past its time limit. Ask your administrator for a new verification link.',
   },
 } as const;

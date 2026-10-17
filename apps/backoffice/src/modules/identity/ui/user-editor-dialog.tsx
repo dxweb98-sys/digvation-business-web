@@ -8,7 +8,7 @@ import {
   DInput,
   useToast,
 } from '@digvation/ui';
-import { MessageCircle } from 'lucide-react';
+import { Mail, MessageCircle } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -28,10 +28,14 @@ import type {
 import type { AccessControlApi, AccessRole, AccessUser } from '../access-control-api';
 import {
   DISPLAY_NAME_MAX,
+  EMAIL_MAX,
   USERNAME_PATTERN,
+  emailStatusOf,
   identityConflictOf,
+  isEmailAddress,
   type IdentityConflict,
 } from '../model/identity-form';
+import { EmailStatusBadge } from './email-status-badge';
 import { useIdentityConflictCopy } from './identity-conflict-copy';
 import { OwnerGrantNotice, selectsOwner } from './owner-grant-notice';
 import { passwordResetsKey, SecurityActivityPanel } from './security-activity-panel';
@@ -55,6 +59,7 @@ export function UserEditorDialog({
   canViewLocations,
   canManageLocations,
   canViewSecurityActivity = false,
+  currentUserId,
   onClose,
   onChanged,
 }: {
@@ -68,6 +73,8 @@ export function UserEditorDialog({
   canManageLocations: boolean;
   /** users:read and activity:read: shows the password link history. */
   canViewSecurityActivity?: boolean;
+  /** The signed-in user: an Owner may manage only their own email here. */
+  currentUserId?: string;
   onClose: () => void;
   onChanged: () => void;
 }) {
@@ -88,6 +95,9 @@ export function UserEditorDialog({
   const [saving, setSaving] = useState(false);
   const [confirmingLink, setConfirmingLink] = useState(false);
   const [sendingLink, setSendingLink] = useState(false);
+  const [email, setEmail] = useState(user.email ?? '');
+  const [emailConflict, setEmailConflict] = useState<IdentityConflict | null>(null);
+  const [sendingVerification, setSendingVerification] = useState(false);
 
   const locationAccess = useQuery({
     queryKey: ['access-control', 'locations', user.id],
@@ -108,31 +118,46 @@ export function UserEditorDialog({
   const usernameInvalid =
     canUpdateProfile && usernameChanged && !USERNAME_PATTERN.test(username.trim());
   const ownerUnconfirmed = canManageRoles && selectsOwner(roles, selectedRoles) && !ownerConfirmed;
-  const editable = !isOwner && (canManageRoles || canManageLocations || canUpdateProfile);
+  const emailStatus = emailStatusOf(user);
+  // Owners are protected: only an Owner manages their own email from here.
+  const canEditEmail =
+    canUpdateProfile &&
+    user.status !== 'PENDING_ACTIVATION' &&
+    (!isOwner || user.id === currentUserId);
+  const emailChanged = email.trim() !== (user.email ?? '');
+  const emailInvalid =
+    canEditEmail && emailChanged && Boolean(email.trim()) && !isEmailAddress(email);
+  const editable =
+    (!isOwner && (canManageRoles || canManageLocations || canUpdateProfile)) ||
+    (isOwner && canEditEmail);
 
   const save = async () => {
     setAttempted(true);
-    if (nameMissing || usernameInvalid || ownerUnconfirmed || saving) return;
+    if (nameMissing || usernameInvalid || emailInvalid || ownerUnconfirmed || saving) return;
     setSaving(true);
     try {
       // Each write bumps the user's version, so chain the returned record into the next call.
       let current = user;
       if (canUpdateProfile) {
-        const profile: { displayName?: string; username?: string; status?: 'ACTIVE' | 'DISABLED' } =
-          {};
-        if (displayName.trim() !== user.displayName) profile.displayName = displayName.trim();
-        if (usernameChanged) profile.username = username.trim();
-        if (accountActive !== (user.status !== 'DISABLED'))
-          profile.status = accountActive ? 'ACTIVE' : 'DISABLED';
-        if (
-          profile.displayName !== undefined ||
-          profile.username !== undefined ||
-          profile.status !== undefined
-        )
-          current = await api.updateUser(user, profile);
+        const profile: {
+          displayName?: string;
+          username?: string;
+          status?: 'ACTIVE' | 'DISABLED';
+          email?: string | null;
+        } = {};
+        if (!isOwner) {
+          if (displayName.trim() !== user.displayName) profile.displayName = displayName.trim();
+          if (usernameChanged) profile.username = username.trim();
+          if (accountActive !== (user.status !== 'DISABLED'))
+            profile.status = accountActive ? 'ACTIVE' : 'DISABLED';
+        }
+        // A new or changed address is saved unverified by the Runtime; an empty field removes it.
+        if (canEditEmail && emailChanged) profile.email = email.trim() || null;
+        if (Object.keys(profile).length) current = await api.updateUser(user, profile);
       }
-      if (canManageRoles) await api.replaceUserRoles(current, selectedRoles);
-      if (canManageLocations)
+      // An Owner's roles, status and locations are never changed from this dialog.
+      if (!isOwner && canManageRoles) await api.replaceUserRoles(current, selectedRoles);
+      if (!isOwner && canManageLocations)
         await operationalAccess.replaceUserLocations(user.id, locationSelection);
       onChanged();
       onClose();
@@ -144,6 +169,7 @@ export function UserEditorDialog({
         // A taken username is shown under its field; the profile write is a single request, so
         // nothing else was saved yet and the user can correct it and save again.
         if (identity?.field === 'username') setUsernameConflict(identity.code);
+        else if (identity?.field === 'email') setEmailConflict(identity.code);
         else showToast({ variant: 'danger', title: failure.safeMessage });
       }
     } finally {
@@ -176,7 +202,35 @@ export function UserEditorDialog({
     }
   };
 
+  const sendEmailVerification = async () => {
+    setSendingVerification(true);
+    try {
+      await api.requestUserEmailVerification(user);
+      showToast({ variant: 'success', title: copy('Verification link sent.') });
+    } catch (error) {
+      if (isSessionExpiredError(error)) return;
+      const failure = normalizeBackofficeApiError(
+        error,
+        copy('Could not send the verification link.'),
+      );
+      showToast({
+        variant: 'danger',
+        title:
+          failure.code === 'EMAIL_VERIFICATION_COOLDOWN'
+            ? copy('A link was sent a moment ago. Try again shortly.')
+            : failure.code === 'EMAIL_DELIVERY_UNAVAILABLE'
+              ? copy('Email delivery is not set up yet. Contact your administrator.')
+              : failure.safeMessage,
+      });
+    } finally {
+      setSendingVerification(false);
+    }
+  };
+
   const canSendLink = canUpdateProfile && user.status === 'ACTIVE';
+  // Verification goes to the saved address; an unsaved edit must be saved first.
+  const canSendVerification =
+    canEditEmail && user.status === 'ACTIVE' && emailStatus === 'UNVERIFIED' && !emailChanged;
 
   return (
     <DDialog
@@ -268,6 +322,71 @@ export function UserEditorDialog({
                   </span>
                 </span>
               </label>
+            </div>
+          </RecordPanel>
+        ) : null}
+
+        {canEditEmail || (canUpdateProfile && isOwner) ? (
+          <RecordPanel>
+            <div className="flex items-center justify-between gap-3">
+              <RecordSectionLabel>{copy('Email')}</RecordSectionLabel>
+              <EmailStatusBadge status={emailStatus} />
+            </div>
+            <div className="mt-4 space-y-3">
+              {canEditEmail ? (
+                <DInput
+                  label={copy('Email (optional)')}
+                  value={email}
+                  maxLength={EMAIL_MAX}
+                  onChange={(value) => {
+                    setEmailConflict(null);
+                    setEmail(value);
+                  }}
+                  type="email"
+                  inputMode="email"
+                  autoCapitalize="none"
+                  autoComplete="off"
+                  placeholder={copy('For example, siti@business.com')}
+                  hint={copy(
+                    'A new or changed address stays unverified until its owner confirms it. Only a verified email receives password links.',
+                  )}
+                  error={
+                    attempted && emailInvalid
+                      ? copy('Enter a valid email address, for example name@business.com.')
+                      : emailConflict
+                        ? conflictCopy[emailConflict]
+                        : undefined
+                  }
+                  disabled={saving}
+                />
+              ) : (
+                <p className="break-words text-sm text-[var(--color-text)]">{user.email ?? '-'}</p>
+              )}
+              {canSendVerification ? (
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="min-w-0 text-xs leading-5 text-[var(--color-text-muted)] sm:flex-1">
+                    {copy(
+                      'Send a one-time link to this address. Only its owner can verify it; you cannot mark it verified.',
+                    )}
+                  </p>
+                  <DButton
+                    size="sm"
+                    variant="outline"
+                    className="self-start sm:self-auto"
+                    leftIcon={<Mail className="size-4" aria-hidden="true" />}
+                    onClick={() => void sendEmailVerification()}
+                    loading={sendingVerification}
+                    disabled={saving || sendingVerification}
+                  >
+                    {copy('Send verification link')}
+                  </DButton>
+                </div>
+              ) : null}
+              {emailStatus !== 'VERIFIED' ? (
+                <p className="text-xs leading-5 text-[var(--color-text-muted)]">
+                  {copy('Until an email is verified, password links are sent via WhatsApp.')}
+                </p>
+              ) : null}
             </div>
           </RecordPanel>
         ) : null}
@@ -367,9 +486,15 @@ export function UserEditorDialog({
         onConfirm={() => void sendPasswordLink()}
         loading={sendingLink}
         title={copy('Send password link?')}
-        message={copy(
-          'A one-time link is sent via WhatsApp to the number registered for this user. It replaces any link that is still pending. Their current password and sessions stay valid until they use the link.',
-        )}
+        message={
+          emailStatus === 'VERIFIED'
+            ? copy(
+                'A one-time link is sent to the verified email of this user. It replaces any link that is still pending. Their current password and sessions stay valid until they use the link.',
+              )
+            : copy(
+                'A one-time link is sent via WhatsApp to the number registered for this user. It replaces any link that is still pending. Their current password and sessions stay valid until they use the link.',
+              )
+        }
         confirmLabel={copy('Send password link')}
         variant="primary"
       />

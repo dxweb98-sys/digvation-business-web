@@ -36,7 +36,11 @@ function renderRecovery(
     <DeploymentBootstrapProvider config={config}>
       <BackofficeLocalizationProvider>
         <PasswordRecoveryProvider
-          port={{ confirm: () => Promise.reject(new Error('unused')), ...recoveryPort }}
+          port={{
+            confirm: () => Promise.reject(new Error('unused')),
+            confirmEmailVerification: () => Promise.reject(new Error('unused')),
+            ...recoveryPort,
+          }}
         >
           <MemoryRouter initialEntries={['/forgot-password']}>
             <BackofficePasswordRecoveryPage />

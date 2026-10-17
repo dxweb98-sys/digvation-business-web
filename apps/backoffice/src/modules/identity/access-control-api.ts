@@ -39,15 +39,22 @@ export interface AccessUser {
   username: string | null;
   displayName: string;
   status: 'ACTIVE' | 'PENDING_ACTIVATION' | 'DISABLED';
+  /** Optional; used for recovery only once its owner verified it. */
+  email?: string | null;
+  emailVerifiedAt?: string | null;
   version: number;
   roles: AccessRole[];
 }
+
+export type InvitationDeliveryChannel = 'WHATSAPP' | 'EMAIL';
 
 export interface UserInvitation {
   id: string;
   phoneE164: string;
   username: string | null;
   displayName: string;
+  email?: string | null;
+  deliveryChannel?: InvitationDeliveryChannel;
   expiresAt: string;
   resendAvailableAt: string;
   acceptedAt: string | null;
@@ -131,6 +138,8 @@ export class AccessControlApi {
     username?: string;
     displayName: string;
     roleIds: string[];
+    email?: string;
+    deliveryChannel?: InvitationDeliveryChannel;
   }) {
     return this.client.post<UserInvitation>('/api/v1/user-invitations', input);
   }
@@ -163,14 +172,27 @@ export class AccessControlApi {
   }
   updateUser(
     user: AccessUser,
-    input: { displayName?: string; username?: string; status?: 'ACTIVE' | 'DISABLED' },
+    input: {
+      displayName?: string;
+      username?: string;
+      status?: 'ACTIVE' | 'DISABLED';
+      /** A new address is saved unverified; null removes it. */
+      email?: string | null;
+    },
   ) {
     return this.client.patch<AccessUser>(`/api/v1/users/${user.id}`, {
       expectedVersion: user.version,
       ...input,
     });
   }
-  /** Sends a one-time password link to the user's registered phone; the caller never sees it. */
+  /** Sends a one-time ownership link to the user's unverified email; the caller never sees it. */
+  requestUserEmailVerification(user: AccessUser) {
+    return this.client.post<{ completed: true }>(`/api/v1/users/${user.id}/email-verification`, {});
+  }
+  /**
+   * Sends a one-time password link: to the user's verified email, otherwise to the registered
+   * phone. The caller never sees it.
+   */
   requestUserPasswordLink(user: AccessUser) {
     return this.client.post<{ completed: true }>(`/api/v1/users/${user.id}/password-reset`, {});
   }

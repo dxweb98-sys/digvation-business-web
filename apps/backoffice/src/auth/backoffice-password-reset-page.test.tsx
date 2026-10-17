@@ -55,6 +55,7 @@ function port(overrides: Partial<PasswordRecoveryPort> = {}): PasswordRecoveryPo
   return {
     request: vi.fn().mockResolvedValue(undefined),
     confirm: vi.fn().mockResolvedValue(undefined),
+    confirmEmailVerification: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }
