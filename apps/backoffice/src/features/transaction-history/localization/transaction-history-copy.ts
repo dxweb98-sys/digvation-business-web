@@ -254,6 +254,22 @@ export const transactionHistoryCopy: Record<string, { id: string; en: string }> 
     id: 'Semua pembayaran yang berhasil harus dikembalikan penuh sebelum transaksi ini dapat direversal.',
     en: 'All successful payments must be fully refunded before this transaction can be reversed.',
   },
+  'Received money to return': {
+    id: 'Uang diterima yang dikembalikan',
+    en: 'Received money to return',
+  },
+  'Return money and reverse': {
+    id: 'Kembalikan dana & batalkan',
+    en: 'Return money and reverse',
+  },
+  'The money was really returned to the customer.': {
+    id: 'Uang sudah benar-benar dikembalikan ke pelanggan.',
+    en: 'The money was really returned to the customer.',
+  },
+  'Confirm that the money was returned to the customer.': {
+    id: 'Konfirmasi bahwa uang sudah dikembalikan ke pelanggan.',
+    en: 'Confirm that the money was returned to the customer.',
+  },
   'Transaction reversed.': { id: 'Transaksi berhasil direversal.', en: 'Transaction reversed.' },
   'Could not reverse this transaction.': {
     id: 'Transaksi ini tidak dapat direversal.',

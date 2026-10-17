@@ -149,8 +149,9 @@ for (const [name, viewport] of [
     await page.getByText('Lihat transaksi').click();
     const detail = page.getByRole('dialog').first();
     await expect(detail.getByRole('button', { name: 'Pengembalian dana' })).toBeVisible();
-    // Reversal stays separate and blocked until the money is really returned.
-    await expect(detail.getByRole('button', { name: 'Batalkan transaksi' })).toBeDisabled();
+    // Reversal is its own action: for a user who may return money it returns what is still held
+    // in one confirmed step (backoffice-reverse-dialog.spec.ts); a standalone refund stays here.
+    await expect(detail.getByRole('button', { name: 'Batalkan transaksi' })).toBeEnabled();
     await detail.getByRole('button', { name: 'Pengembalian dana' }).click();
 
     const dialog = page.getByRole('dialog', { name: 'Kembalikan pembayaran' });

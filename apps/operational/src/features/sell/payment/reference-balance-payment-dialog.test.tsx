@@ -38,7 +38,7 @@ const route: PaymentRoute = {
 type PaymentFixture = { status: 'SUCCEEDED' | 'PENDING'; appliedAmount: string };
 
 /** A queued Sale with tracked work: payment timing was decided at checkout. */
-function queuedSale(payments: PaymentFixture[] = []) {
+function queuedSale(payments: PaymentFixture[] = [], totalAmount = '166500.0000') {
   return {
     id: 'sale-1',
     saleNumber: 'TRX-1',
@@ -46,7 +46,7 @@ function queuedSale(payments: PaymentFixture[] = []) {
     status: 'OPEN',
     operationalState: 'QUEUED',
     version: 1,
-    totalAmount: '166500.0000',
+    totalAmount,
     payments: payments.map((payment, index) => ({
       id: `payment-${index}`,
       method: 'CASH',
@@ -67,15 +67,23 @@ const paidFiftyThousand = [{ status: 'SUCCEEDED' as const, appliedAmount: '50000
 function QueuePaymentHarness({
   payments = [],
   availableToPay,
+  totalAmount,
+  initialAppliedAmount,
   paymentError = null,
   onPay,
 }: {
   payments?: PaymentFixture[];
   availableToPay: string;
+  totalAmount?: string;
+  /** An amount the workspace still holds from before the Sale changed. */
+  initialAppliedAmount?: string;
   paymentError?: string | null;
   onPay: (amount: string) => Promise<void>;
 }) {
-  const [appliedAmount, setAppliedAmount] = useState(() => currencyInputFromAmount(availableToPay));
+  const [appliedAmount, setAppliedAmount] = useState(() =>
+    currencyInputFromAmount(initialAppliedAmount ?? availableToPay),
+  );
+  // Cash received follows the balance due (the workspace resets it whenever that balance changes).
   const [tender, setTender] = useState(() => currencyInputFromAmount(availableToPay));
   const [shownAvailable, setShownAvailable] = useState(availableToPay);
   if (availableToPay !== shownAvailable) {
@@ -88,7 +96,7 @@ function QueuePaymentHarness({
     <DeploymentBootstrapProvider config={bootstrap}>
       <DToastProvider>
         <ReferenceBalancePaymentDialog
-          sale={queuedSale(payments)}
+          sale={queuedSale(payments, totalAmount)}
           availableToPay={availableToPay}
           locale="id-ID"
           paymentRoutes={[route]}
@@ -110,7 +118,7 @@ function QueuePaymentHarness({
           onPaymentReference={vi.fn()}
           onTender={setTender}
           onTransitionPayment={vi.fn()}
-          onPay={() => onPay(appliedAmount)}
+          onPay={(allocation) => onPay(allocation)}
         />
       </DToastProvider>
     </DeploymentBootstrapProvider>
@@ -266,5 +274,29 @@ describe('ReferenceBalancePaymentDialog payment from the queue', () => {
     });
     expect(onPay).toHaveBeenCalledTimes(2);
     expect(onPay).toHaveBeenLastCalledWith('50000');
+  });
+
+  it('after an item is added to a partly paid Sale, collects the new balance, never the old one', async () => {
+    // Total 200.000, 80.000 already paid; a 50.000 item raises the total to 250.000. The workspace
+    // still holds the 120.000 it prepared before the item was added.
+    const onPay = vi.fn(async () => undefined);
+    render(
+      <QueuePaymentHarness
+        totalAmount="250000.0000"
+        payments={[{ status: 'SUCCEEDED', appliedAmount: '80000.0000' }]}
+        availableToPay="170000.0000"
+        initialAppliedAmount="120000.0000"
+        onPay={onPay}
+      />,
+    );
+    expect(fullTab().getAttribute('aria-selected')).toBe('true');
+    expect(payButton().textContent).toMatch(/170[.,]000/);
+    expect(screen.queryByText('Pembayaran kurang')).toBeNull();
+    fireEvent.click(payButton());
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Konfirmasi dan selesaikan' }));
+    });
+    // The confirmed amount is the amount sent: the 80.000 already paid is never charged again.
+    expect(onPay).toHaveBeenCalledWith('170000');
   });
 });

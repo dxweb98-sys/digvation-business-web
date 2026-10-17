@@ -89,7 +89,9 @@ export function TransactionDetailDialog({
     queryKey: ['transaction-correction-routes', sale?.sellingLocationId, sale?.currency],
     queryFn: () => api.paymentRoutes!(sale!.sellingLocationId, sale!.currency),
     enabled:
-      (action === 'correct' || action === 'refund') && Boolean(sale) && Boolean(api.paymentRoutes),
+      (action === 'correct' || action === 'refund' || action === 'reverse') &&
+      Boolean(sale) &&
+      Boolean(api.paymentRoutes),
   });
 
   const openAction = (next: Exclude<ActionDialog, null>) => {
@@ -232,10 +234,14 @@ export function TransactionDetailDialog({
           <TransactionReverseDialog
             key={`reverse-${actionSession}`}
             open={action === 'reverse'}
+            refundAmount={actions.reverseRefundAmount}
+            currency={sale.currency}
+            routes={correctionRoutes.data ?? []}
+            routesLoading={correctionRoutes.isLoading}
             onClose={() => setAction(null)}
-            onReverse={(reason) =>
+            onReverse={(reason, payout) =>
               run(
-                () => api.reverse(sale.id, sale.version, reason),
+                () => api.reverse(sale.id, sale.version, reason, payout),
                 'Transaction reversed.',
                 'Could not reverse this transaction.',
               )

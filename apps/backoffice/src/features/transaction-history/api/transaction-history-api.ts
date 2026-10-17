@@ -348,10 +348,18 @@ export class TransactionHistoryApi {
       headers: { 'idempotency-key': idempotencyKey },
     });
   }
-  reverse(saleId: string, expectedVersion: number, reason: string) {
+  /**
+   * Reverses a completed Sale. With `payout`, Runtime also records, in the same step, that the
+   * money still held was really returned through that route (the operator confirmed it).
+   */
+  reverse(saleId: string, expectedVersion: number, reason: string, payout?: RefundPayout) {
     return this.client.post<Sale>(
       `/api/v1/sales/${saleId}/reverse`,
-      { expectedVersion, reason },
+      {
+        expectedVersion,
+        reason,
+        ...(payout ? { refundDisbursement: payout, moneyReturned: true } : {}),
+      },
       { headers: { 'idempotency-key': crypto.randomUUID() } },
     );
   }

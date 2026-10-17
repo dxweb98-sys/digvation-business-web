@@ -69,6 +69,7 @@ import { ReferencePaymentDialog } from '../../payment/reference-payment-dialog';
 import { ReferenceTransactionDetail } from '../../transaction/ui/reference-transaction-detail';
 import { ReferenceOrderAdjustmentDialog } from '../../adjustment/reference-order-adjustment-dialog';
 import { ReferenceBalancePaymentDialog } from '../../payment/reference-balance-payment-dialog';
+import { useOutstandingBalanceReset } from '../../payment/payment-dialog-state';
 import { ReferenceCancelDialog } from '../../transaction/ui/reference-cancel-dialog';
 import { useSaleCustomerContext } from '../../customer/model/use-sale-customer-context';
 import { useSellingCatalogFilter } from '../../catalog/use-selling-catalog-filter';
@@ -256,6 +257,21 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     queuePaymentTarget && queueContextSale?.id === queuePaymentTarget.id
       ? queueContextSale
       : queuePaymentTarget;
+  // What is still due is read from the Sale as currently shown (an item added after an earlier
+  // payment raises it), never from the amount captured when the dialog opened.
+  const queuePaymentDue = displayedQueuePaymentTarget
+    ? paymentProgress(displayedQueuePaymentTarget).remainingAmount
+    : null;
+  // Whichever payment dialog is open prepares its amount and cash received from the balance due
+  // whenever that balance changes; partial payments already recorded are never charged again.
+  useOutstandingBalanceReset(
+    queuePaymentDue ?? (checkoutOpen && sale ? paymentProgress(sale).remainingAmount : null),
+    (due) => {
+      const amount = currencyInputFromAmount(due);
+      setPaymentAmount(amount);
+      setTender(amount);
+    },
+  );
   const { setAdjustmentTarget, displayedAdjustmentTarget, openAdjustment } = useOrderAdjustment({
     workspace,
     session,
@@ -596,12 +612,12 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       }
     });
 
-  const payQueueBalance = () =>
+  const payQueueBalance = (allocationOverride?: string) =>
     sendPaymentOnce(async () => {
       const transaction = displayedQueuePaymentTarget;
-      if (!transaction || !queuePaymentAmount) return;
-      const due = currencyInputFromAmount(queuePaymentAmount);
-      const allocation = normalizeCurrencyPaymentInput(paymentAmount);
+      if (!transaction || !queuePaymentAmount || !queuePaymentDue) return;
+      const due = currencyInputFromAmount(queuePaymentDue);
+      const allocation = normalizeCurrencyPaymentInput(allocationOverride ?? paymentAmount);
       if (
         !isPositiveDecimal(allocation) ||
         createDecimal(allocation).greaterThan(createDecimal(due))
@@ -1186,7 +1202,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
 
       <ReferenceBalancePaymentDialog
         sale={displayedQueuePaymentTarget}
-        availableToPay={queuePaymentAmount}
+        availableToPay={queuePaymentDue}
         locale={workspace.locale}
         paymentRoutes={workspace.paymentRoutes}
         isPaymentRoutesLoading={workspace.isLoadingPaymentRoutes}
