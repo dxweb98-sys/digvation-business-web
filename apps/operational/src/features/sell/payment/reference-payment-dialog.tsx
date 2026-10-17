@@ -143,7 +143,6 @@ export function ReferencePaymentDialog({
 }) {
   const { copy, label } = useOperationalLocalization();
   const [step, setStep] = usePaymentDialogStep(open);
-  const [allocationMode, setAllocationMode] = usePaymentAllocationMode(open);
   const loyalty = usePaymentLoyaltyEditor({
     open,
     locale,
@@ -165,6 +164,11 @@ export function ReferencePaymentDialog({
   const progress = sale
     ? paymentProgress(sale)
     : { paidAmount: '0.0000', pendingAmount: '0.0000', remainingAmount: total };
+  // A changed balance (an added item, a recalculated Sale) returns to paying it in full.
+  const [allocationMode, setAllocationMode] = usePaymentAllocationMode(
+    open,
+    progress.remainingAmount,
+  );
   const amountScale = amountFractionDigits(progress.remainingAmount);
   const normalizedAllocation =
     allocationMode === 'FULL'
