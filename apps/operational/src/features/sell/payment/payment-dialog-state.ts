@@ -25,6 +25,23 @@ export function usePaymentAllocationMode(open: boolean, outstandingAmount?: stri
 }
 
 /**
+ * Calls `onChange` once whenever the outstanding balance being collected changes (an item was
+ * added, a payment recorded, the Sale recalculated), so the amount and cash received are prepared
+ * from the new balance instead of the one shown earlier. A failed attempt leaves the balance, and
+ * so the cashier's input, as it was.
+ */
+export function useOutstandingBalanceReset(
+  outstandingAmount: string | null,
+  onChange: (outstandingAmount: string) => void,
+) {
+  const [shownOutstanding, setShownOutstanding] = useState(outstandingAmount);
+  if (outstandingAmount !== shownOutstanding) {
+    setShownOutstanding(outstandingAmount);
+    if (outstandingAmount !== null) onChange(outstandingAmount);
+  }
+}
+
+/**
  * Keeps the confirmation step inside the payment dialog so Escape, overlay and focus handling stay
  * with one DS dialog. It resets to editing whenever the dialog is reopened. A closing dialog keeps
  * showing the step it was closed from, so its exit transition never snaps back to the edit layout.

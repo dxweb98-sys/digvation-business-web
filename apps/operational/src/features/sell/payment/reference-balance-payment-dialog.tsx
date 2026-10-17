@@ -67,8 +67,8 @@ export function ReferenceBalancePaymentDialog({
   onPaymentReference: (reference: string) => void;
   onTender: (amount: string) => void;
   onTransitionPayment: (payment: Payment, status: TerminalPaymentStatus) => void;
-  /** Sends the confirmed payment to Runtime. Resolves once Runtime has answered. */
-  onPay: () => Promise<void>;
+  /** Sends the confirmed amount, exactly as shown, to Runtime. Resolves once Runtime has answered. */
+  onPay: (allocation: string) => Promise<void>;
 }) {
   const { copy, label } = useOperationalLocalization();
   const [step, setStep] = usePaymentDialogStep(sale !== null);
@@ -88,9 +88,12 @@ export function ReferenceBalancePaymentDialog({
   const progress = paymentProgress(sale);
   const remainingToAllocate = availableToPay ?? progress.remainingAmount;
   const amountScale = amountFractionDigits(remainingToAllocate);
-  const normalizedAllocation = appliedAmount
-    ? normalizeCurrencyPaymentInput(appliedAmount)
-    : currencyInputFromAmount(remainingToAllocate);
+  // Paying in full always collects the current outstanding balance, never an amount kept from
+  // before the Sale changed.
+  const normalizedAllocation =
+    allocationMode === 'FULL' || !appliedAmount
+      ? currencyInputFromAmount(remainingToAllocate)
+      : normalizeCurrencyPaymentInput(appliedAmount);
   const intent = paymentIntent(sale, normalizedAllocation);
   const allocationPositive = isPositiveDecimal(normalizedAllocation);
   const overAllocated =
@@ -131,7 +134,7 @@ export function ReferenceBalancePaymentDialog({
     onClose();
   };
   const confirmPayment = async () => {
-    await onPay();
+    await onPay(normalizedAllocation);
     setStep('edit');
   };
   // Choosing a partial payment keeps the current amount for the cashier to change; returning to

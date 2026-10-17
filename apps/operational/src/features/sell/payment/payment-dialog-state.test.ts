@@ -1,7 +1,11 @@
 import { act, renderHook } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { usePaymentAllocationMode, usePaymentDialogStep } from './payment-dialog-state';
+import {
+  useOutstandingBalanceReset,
+  usePaymentAllocationMode,
+  usePaymentDialogStep,
+} from './payment-dialog-state';
 
 describe('usePaymentAllocationMode', () => {
   it('returns to the full balance when the outstanding amount changes, not on a failed attempt', () => {
@@ -69,5 +73,26 @@ describe('usePaymentDialogStep', () => {
     rerender({ open: false });
     rerender({ open: true });
     expect(result.current[0]).toBe('edit');
+  });
+});
+
+describe('useOutstandingBalanceReset', () => {
+  it('prepares the new balance once when it changes, never for an unchanged one', () => {
+    const onChange = vi.fn();
+    const { rerender } = renderHook(
+      ({ outstanding }) => useOutstandingBalanceReset(outstanding, onChange),
+      { initialProps: { outstanding: null as string | null } },
+    );
+    // 200.000 total, 80.000 paid: 120.000 due when the dialog opens.
+    rerender({ outstanding: '120000.0000' });
+    expect(onChange).toHaveBeenLastCalledWith('120000.0000');
+    rerender({ outstanding: '120000.0000' });
+    expect(onChange).toHaveBeenCalledTimes(1);
+    // A 50.000 item is added: 170.000 is now due.
+    rerender({ outstanding: '170000.0000' });
+    expect(onChange).toHaveBeenLastCalledWith('170000.0000');
+    // The dialog closes: nothing to prepare.
+    rerender({ outstanding: null });
+    expect(onChange).toHaveBeenCalledTimes(2);
   });
 });

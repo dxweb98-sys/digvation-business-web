@@ -1,6 +1,7 @@
 import type { Payment, Sale } from '../api/transaction-history-api';
 import {
   effectivePaymentEntries,
+  fromMoneyUnits,
   remainingCapacity,
   toMoneyUnits,
   transactionPaymentComposition,
@@ -15,8 +16,9 @@ export interface RefundablePayment {
 /**
  * Why Reverse cannot be used yet, from the same payment facts the detail shows.
  * - `PAYMENT_PENDING`: a payment is still pending.
- * - `REFUND_REQUIRED`: received money remains; it must really be returned here first. A refund is a
- *   real disbursement, never a way to cancel an entry that was recorded by mistake.
+ * - `REFUND_REQUIRED`: received money remains and this user may not return money, so someone who
+ *   may must refund it first. A refund is a real disbursement, never a way to cancel an entry that
+ *   was recorded by mistake.
  */
 export type ReverseBlock = 'PAYMENT_PENDING' | 'REFUND_REQUIRED';
 
@@ -29,6 +31,11 @@ export interface TransactionActions {
   canReverse: boolean;
   reverseBlock: ReverseBlock | null;
   /**
+   * Received money still held when reversing: the reversal returns it in the same confirmed step
+   * (the operator names the payout route). `null` when nothing remains.
+   */
+  reverseRefundAmount: string | null;
+  /**
    * Correcting how received money was recorded is offered: permitted, the Sale is not voided or
    * reversed, and Runtime's effective composition holds money on a route. Runtime stays the
    * authority and refuses anything else.
@@ -40,9 +47,9 @@ export interface TransactionActions {
  * Which follow-up commands to offer. Only a completed, not yet reversed Sale qualifies. Payments
  * are recorded and confirmed manually, so a refund is offered for every payment, whatever its
  * method, that still has an uncompensated balance: the operator chooses the CASH or BANK_TRANSFER
- * route the money really leaves through. Runtime remains the authority. Reverse becomes actionable
- * only once no
- * payment is pending and every succeeded payment is fully compensated — the Runtime reversal rule.
+ * route the money really leaves through. Runtime remains the authority. Reverse is actionable once no
+ * payment is pending; money still held is returned in the same confirmed reversal by a user who may
+ * return money, otherwise it must be refunded first — the Runtime reversal rule.
  */
 export function transactionActions(
   sale: Pick<
@@ -63,9 +70,10 @@ export function transactionActions(
   const refundable = outstanding;
   const reverseBlock: ReverseBlock | null = composition.hasPending
     ? 'PAYMENT_PENDING'
-    : outstanding.length
+    : outstanding.length && !permissions.refund
       ? 'REFUND_REQUIRED'
       : null;
+  const held = outstanding.reduce((sum, { maxAmount }) => sum + toMoneyUnits(maxAmount), 0n);
   const showReverse = completed && permissions.reverse;
   const canCorrect =
     Boolean(permissions.correct) &&
@@ -82,6 +90,7 @@ export function transactionActions(
     showReverse,
     canReverse: showReverse && reverseBlock === null,
     reverseBlock: showReverse ? reverseBlock : null,
+    reverseRefundAmount: showReverse && held > 0n ? fromMoneyUnits(held) : null,
   };
 }
 
@@ -97,6 +106,8 @@ const ACTION_ERROR_COPY: Record<string, string> = {
   SALE_REVERSAL_PAYMENT_COMPENSATION_REQUIRED:
     'Refund all completed payments before reversing this transaction.',
   SALE_REVERSAL_PAYMENT_PENDING: 'Resolve the pending payment before reversing this transaction.',
+  SALE_REVERSAL_REFUND_CONFIRMATION_REQUIRED:
+    'Confirm that the money was returned to the customer.',
   SALE_REVERSAL_FINALIZED_REQUIRED: 'Only a completed transaction can be reversed.',
   SALE_ALREADY_REVERSED: 'This transaction has already been reversed.',
   SALE_VERSION_CONFLICT: 'This transaction changed in the meantime. Reload it and try again.',

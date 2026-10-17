@@ -122,8 +122,8 @@ describe('Transaction detail cards', () => {
 });
 
 describe('Transaction detail actions', () => {
-  it('disables Reverse with an explanation while money is uncompensated', async () => {
-    renderDetail(SCENARIOS.paid);
+  it('disables Reverse with an explanation while money is held and the user may not return it', async () => {
+    renderDetail(SCENARIOS.paid, { refund: false, reverse: true });
     const dialog = within(await screen.findByRole('dialog'));
     const reverse = await dialog.findByRole('button', { name: 'Batalkan transaksi' });
     expect((reverse as HTMLButtonElement).disabled).toBe(true);
@@ -133,17 +133,62 @@ describe('Transaction detail actions', () => {
     expect(reverse.getAttribute('aria-describedby')).toBe(hint.closest('p')!.id);
   });
 
-  it('offers the refund of a remaining bank part and keeps Reverse disabled with the reason', async () => {
+  it('offers the refund of a remaining bank part and the one-step reversal of what is left', async () => {
     renderDetail(SCENARIOS.partiallyRefunded);
     const dialog = within(await screen.findByRole('dialog'));
-    expect(
-      await dialog.findByText(/Uang yang benar-benar diterima harus dikembalikan/),
-    ).toBeTruthy();
+    expect(await dialog.findByRole('button', { name: 'Pengembalian dana' })).toBeTruthy();
     expect(dialog.queryByText(/penyedia/i)).toBeNull();
-    expect(dialog.getByRole('button', { name: 'Pengembalian dana' })).toBeTruthy();
+    expect(dialog.queryByText(/Uang yang benar-benar diterima harus dikembalikan/)).toBeNull();
     expect(
       (dialog.getByRole('button', { name: 'Batalkan transaksi' }) as HTMLButtonElement).disabled,
-    ).toBe(true);
+    ).toBe(false);
+  });
+
+  it('reverses a paid sale in one confirmed step: payout route, confirmation and reason', async () => {
+    const reverse = vi.fn(async () => SCENARIOS.paid);
+    const paymentRoutes = vi.fn(async () => [
+      {
+        id: 'route-cash',
+        paymentMethod: 'CASH' as const,
+        currency: 'IDR',
+        financialAccountName: 'Kas Laci',
+      },
+      {
+        id: 'route-qris',
+        paymentMethod: 'QRIS' as const,
+        currency: 'IDR',
+        financialAccountName: 'Akun QRIS',
+      },
+    ]);
+    renderDetail(SCENARIOS.paid, undefined, { reverse, paymentRoutes });
+    const parent = await screen.findByRole('dialog', { name: 'Detail transaksi' });
+    fireEvent.click(await within(parent).findByRole('button', { name: 'Batalkan transaksi' }));
+    const child = within(await screen.findByRole('dialog', { name: 'Batalkan transaksi' }));
+    expect(child.getByText('Uang diterima yang dikembalikan', { exact: false })).toBeTruthy();
+    const submit = child.getByRole('button', {
+      name: 'Kembalikan dana & batalkan',
+    }) as HTMLButtonElement;
+    fireEvent.change(child.getByLabelText('Alasan'), { target: { value: 'Transaksi salah' } });
+    expect(submit.disabled).toBe(true);
+    fireEvent.click(child.getByLabelText('Dana dikembalikan melalui'));
+    expect(screen.queryByRole('option', { name: /QRIS/ })).toBeNull();
+    fireEvent.click(await screen.findByRole('option', { name: /Kas Laci/ }));
+    // The money must really have been returned: no confirmation, no reversal.
+    expect(submit.disabled).toBe(true);
+    fireEvent.click(child.getByRole('checkbox', { name: /Uang sudah benar-benar dikembalikan/ }));
+    expect(submit.disabled).toBe(false);
+    fireEvent.click(submit);
+    fireEvent.click(submit);
+    await waitFor(() => expect(reverse).toHaveBeenCalledTimes(1));
+    expect(reverse).toHaveBeenCalledWith(
+      SCENARIOS.paid.id,
+      SCENARIOS.paid.version,
+      'Transaksi salah',
+      {
+        method: 'CASH',
+        paymentRouteId: 'route-cash',
+      },
+    );
   });
 
   it('reverses once fully refunded; nested dialogs keep the parent and Escape closes only the top', async () => {
@@ -173,7 +218,9 @@ describe('Transaction detail actions', () => {
     fireEvent.click(submit);
     fireEvent.click(submit);
     await waitFor(() => expect(reverse).toHaveBeenCalledTimes(1));
-    expect(reverse).toHaveBeenCalledWith('sale-m', 3, 'Komplain pelanggan');
+    expect(reverse).toHaveBeenCalledWith('sale-m', 3, 'Komplain pelanggan', undefined);
+    // Nothing was held, so nothing is returned and no confirmation was asked.
+    expect(child.queryByRole('checkbox')).toBeNull();
   });
 
   it('closing the refund dialog returns to the transaction detail', async () => {
