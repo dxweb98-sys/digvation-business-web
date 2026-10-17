@@ -8,30 +8,39 @@ import {
 import { SCENARIOS, testPayment, testSale } from './transaction-test-fixtures';
 
 const all = { refund: true, reverse: true };
+/** May reverse but not return money: received money must be refunded by someone who may. */
+const reverseOnly = { refund: false, reverse: true };
 const finalized = (payments: ReturnType<typeof testPayment>[], total = '250000.0000') =>
   testSale({ status: 'FINALIZED', totalAmount: total, payments });
 
 describe('transactionActions — reverse eligibility', () => {
-  it('blocks reversal while successful money is uncompensated and offers the refund', () => {
+  it('reverses a paid sale in one step, returning the money still held', () => {
     expect(transactionActions(SCENARIOS.paid, all)).toMatchObject({
       canRefund: true,
       showReverse: true,
+      canReverse: true,
+      reverseBlock: null,
+      reverseRefundAmount: SCENARIOS.paid.totalAmount,
+    });
+    // Without the refund permission the money must be returned by someone who may, first.
+    expect(transactionActions(SCENARIOS.paid, reverseOnly)).toMatchObject({
       canReverse: false,
       reverseBlock: 'REFUND_REQUIRED',
     });
   });
 
-  it('keeps reversal blocked after a partial refund', () => {
+  it('returns only what is left after a partial refund', () => {
     const sale = finalized([
       testPayment('cash', 'SUCCEEDED', '250000.0000'),
       testPayment('refund', 'SUCCEEDED', '-100000.0000', { refundOfPaymentId: 'cash' }),
     ]);
     expect(transactionActions(sale, all)).toMatchObject({
       canRefund: true,
-      canReverse: false,
-      reverseBlock: 'REFUND_REQUIRED',
+      canReverse: true,
+      reverseRefundAmount: '150000.0000',
     });
     expect(transactionActions(sale, all).refundable[0]!.maxAmount).toBe('150000.0000');
+    expect(transactionActions(sale, reverseOnly).reverseBlock).toBe('REFUND_REQUIRED');
   });
 
   it('allows reversal once every successful payment is fully compensated', () => {
@@ -43,11 +52,12 @@ describe('transactionActions — reverse eligibility', () => {
       canRefund: false,
       canReverse: true,
       reverseBlock: null,
+      reverseRefundAmount: null,
     });
   });
 
-  it('requires every source of a split payment to be compensated', () => {
-    const cashOnly = finalized(
+  it('returns every uncompensated source of a split payment, whatever its method', () => {
+    const cashRefunded = finalized(
       [
         testPayment('bca', 'SUCCEEDED', '174825.0000', { method: 'BANK_TRANSFER' }),
         testPayment('cash', 'SUCCEEDED', '535464.0000'),
@@ -55,12 +65,15 @@ describe('transactionActions — reverse eligibility', () => {
       ],
       '710289.0000',
     );
-    // Cash is refunded; the bank transfer can only be refunded through its provider.
-    expect(transactionActions(cashOnly, all)).toMatchObject({
-      canRefund: false,
-      canReverse: false,
-      reverseBlock: 'PROVIDER_REFUND_REQUIRED',
+    // Manually recorded payments are all returnable: the bank transfer is still to be returned.
+    expect(transactionActions(cashRefunded, all)).toMatchObject({
+      canRefund: true,
+      canReverse: true,
+      reverseRefundAmount: '174825.0000',
     });
+    expect(
+      transactionActions(cashRefunded, all).refundable.map(({ payment }) => payment.id),
+    ).toEqual(['bca']);
     const bothOpen = finalized(
       [
         testPayment('bca', 'SUCCEEDED', '174825.0000', { method: 'BANK_TRANSFER' }),
@@ -70,11 +83,47 @@ describe('transactionActions — reverse eligibility', () => {
     );
     expect(transactionActions(bothOpen, all)).toMatchObject({
       canRefund: true,
-      canReverse: false,
-      reverseBlock: 'PROVIDER_REFUND_REQUIRED',
+      canReverse: true,
+      reverseRefundAmount: '710289.0000',
     });
-    expect(transactionActions(bothOpen, all).refundable.map(({ payment }) => payment.id)).toEqual([
-      'cash',
+    expect(transactionActions(bothOpen, reverseOnly).reverseBlock).toBe('REFUND_REQUIRED');
+    expect(
+      transactionActions(bothOpen, all)
+        .refundable.map(({ payment }) => payment.id)
+        .sort(),
+    ).toEqual(['bca', 'cash']);
+  });
+
+  it('treats a bank transfer with an operator reference like any other manual payment', () => {
+    const referenced = finalized(
+      [
+        testPayment('bank', 'SUCCEEDED', '100000.0000', {
+          method: 'BANK_TRANSFER',
+          providerReference: 'TRX-889',
+        }),
+      ],
+      '100000.0000',
+    );
+    expect(transactionActions(referenced, all)).toMatchObject({
+      canRefund: true,
+      reverseRefundAmount: '100000.0000',
+    });
+    expect(transactionActions(referenced, reverseOnly).reverseBlock).toBe('REFUND_REQUIRED');
+  });
+
+  it('offers QRIS and e-wallet money for a manual refund or a one-step reversal', () => {
+    const qris = finalized(
+      [testPayment('qris', 'SUCCEEDED', '100000.0000', { method: 'QRIS' })],
+      '100000.0000',
+    );
+    const actions = transactionActions(qris, all);
+    expect(actions).toMatchObject({
+      canRefund: true,
+      canReverse: true,
+      reverseRefundAmount: '100000.0000',
+    });
+    expect(actions.refundable.map((entry) => [entry.payment.id, entry.maxAmount])).toEqual([
+      ['qris', '100000.0000'],
     ]);
   });
 

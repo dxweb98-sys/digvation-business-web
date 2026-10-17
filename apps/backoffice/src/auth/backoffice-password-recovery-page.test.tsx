@@ -28,11 +28,20 @@ const bootstrap = {
   defaults: { locale: 'id-ID', country: 'ID' },
 } satisfies DeploymentBootstrapConfig;
 
-function renderRecovery(port: PasswordRecoveryPort, config: DeploymentBootstrapConfig = bootstrap) {
+function renderRecovery(
+  recoveryPort: Pick<PasswordRecoveryPort, 'request'>,
+  config: DeploymentBootstrapConfig = bootstrap,
+) {
   return render(
     <DeploymentBootstrapProvider config={config}>
       <BackofficeLocalizationProvider>
-        <PasswordRecoveryProvider port={port}>
+        <PasswordRecoveryProvider
+          port={{
+            confirm: () => Promise.reject(new Error('unused')),
+            confirmEmailVerification: () => Promise.reject(new Error('unused')),
+            ...recoveryPort,
+          }}
+        >
           <MemoryRouter initialEntries={['/forgot-password']}>
             <BackofficePasswordRecoveryPage />
           </MemoryRouter>

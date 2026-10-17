@@ -211,11 +211,19 @@ export const transactionHistoryCopy: Record<string, { id: string; en: string }> 
   Reversal: { id: 'Reversal', en: 'Reversal' },
   Reason: { id: 'Alasan', en: 'Reason' },
   'Reversed on': { id: 'Direversal pada', en: 'Reversed on' },
+  'Reversed by': { id: 'Direversal oleh', en: 'Reversed by' },
+  'Refund reason': { id: 'Alasan pengembalian', en: 'Refund reason' },
+  'Refunded by': { id: 'Dikembalikan oleh', en: 'Refunded by' },
+  'Refunded on': { id: 'Dikembalikan pada', en: 'Refunded on' },
+  'For example, the customer cancelled the order': {
+    id: 'Contoh: pelanggan membatalkan pesanan',
+    en: 'For example, the customer cancelled the order',
+  },
   Close: { id: 'Tutup', en: 'Close' },
   Cancel: { id: 'Batal', en: 'Cancel' },
 
   // Refund
-  Refund: { id: 'Kembalikan dana', en: 'Refund' },
+  Refund: { id: 'Pengembalian dana', en: 'Refund' },
   'Refund payment': { id: 'Kembalikan pembayaran', en: 'Refund payment' },
   'Payment to refund': { id: 'Pembayaran yang dikembalikan', en: 'Payment to refund' },
   'Select a payment': { id: 'Pilih pembayaran', en: 'Select a payment' },
@@ -225,10 +233,10 @@ export const transactionHistoryCopy: Record<string, { id: string; en: string }> 
     id: 'Masukkan jumlah hingga sisa yang dapat dikembalikan.',
     en: 'Enter an amount up to the refundable balance.',
   },
-  'Only cash payments can be refunded here. Payments through a provider are refunded in that provider’s own flow.':
+  'Record a refund only when money was really returned to the customer. A payment entered by mistake is not a refund.':
     {
-      id: 'Hanya pembayaran tunai yang dapat dikembalikan di sini. Pembayaran melalui penyedia dikembalikan lewat alur penyedia tersebut.',
-      en: 'Only cash payments can be refunded here. Payments through a provider are refunded in that provider’s own flow.',
+      id: 'Catat pengembalian dana hanya jika uang benar-benar dikembalikan kepada pelanggan. Pembayaran yang salah input bukan pengembalian dana.',
+      en: 'Record a refund only when money was really returned to the customer. A payment entered by mistake is not a refund.',
     },
   'Payment refunded.': { id: 'Dana berhasil dikembalikan.', en: 'Payment refunded.' },
   'Could not refund this payment.': {
@@ -237,7 +245,7 @@ export const transactionHistoryCopy: Record<string, { id: string; en: string }> 
   },
 
   // Reverse
-  'Reverse transaction': { id: 'Reversal transaksi', en: 'Reverse transaction' },
+  'Reverse transaction': { id: 'Batalkan transaksi', en: 'Reverse transaction' },
   'For example, Customer returned the item': {
     id: 'Contoh: Pelanggan mengembalikan barang',
     en: 'For example, Customer returned the item',
@@ -245,6 +253,22 @@ export const transactionHistoryCopy: Record<string, { id: string; en: string }> 
   'All successful payments must be fully refunded before this transaction can be reversed.': {
     id: 'Semua pembayaran yang berhasil harus dikembalikan penuh sebelum transaksi ini dapat direversal.',
     en: 'All successful payments must be fully refunded before this transaction can be reversed.',
+  },
+  'Received money to return': {
+    id: 'Uang diterima yang dikembalikan',
+    en: 'Received money to return',
+  },
+  'Return money and reverse': {
+    id: 'Kembalikan dana & batalkan',
+    en: 'Return money and reverse',
+  },
+  'The money was really returned to the customer.': {
+    id: 'Uang sudah benar-benar dikembalikan ke pelanggan.',
+    en: 'The money was really returned to the customer.',
+  },
+  'Confirm that the money was returned to the customer.': {
+    id: 'Konfirmasi bahwa uang sudah dikembalikan ke pelanggan.',
+    en: 'Confirm that the money was returned to the customer.',
   },
   'Transaction reversed.': { id: 'Transaksi berhasil direversal.', en: 'Transaction reversed.' },
   'Could not reverse this transaction.': {
@@ -288,11 +312,42 @@ export const transactionHistoryCopy: Record<string, { id: string; en: string }> 
     id: 'Selesaikan pembayaran yang masih menunggu sebelum mereversal transaksi ini.',
     en: 'Resolve the pending payment before reversing this transaction.',
   },
-  'Non-cash payments must be refunded through their provider, so this transaction can’t be reversed here yet.':
+  'Money that was really received must be refunded before this transaction can be reversed. A payment entered by mistake cannot be removed here yet.':
     {
-      id: 'Pembayaran non-tunai harus dikembalikan melalui penyedianya, sehingga transaksi ini belum dapat direversal di sini.',
-      en: 'Non-cash payments must be refunded through their provider, so this transaction can’t be reversed here yet.',
+      id: 'Uang yang benar-benar diterima harus dikembalikan sebelum transaksi ini dapat dibatalkan. Pembayaran yang salah input belum dapat dihapus di sini.',
+      en: 'Money that was really received must be refunded before this transaction can be reversed. A payment entered by mistake cannot be removed here yet.',
     },
+  'Choose how the refund is returned.': {
+    id: 'Pilih bagaimana dana dikembalikan.',
+    en: 'Choose how the refund is returned.',
+  },
+  'That refund account is not available for this location. Choose another one.': {
+    id: 'Rekening pengembalian itu tidak tersedia untuk lokasi ini. Pilih yang lain.',
+    en: 'That refund account is not available for this location. Choose another one.',
+  },
+  'Return the money through': { id: 'Dana dikembalikan melalui', en: 'Return the money through' },
+  'Same cash route as the payment': {
+    id: 'Jalur tunai yang sama dengan pembayaran',
+    en: 'Same cash route as the payment',
+  },
+  'Choose the account the money leaves from': {
+    id: 'Pilih rekening asal uang keluar',
+    en: 'Choose the account the money leaves from',
+  },
+  'No cash or bank transfer route is available for this location.': {
+    id: 'Tidak ada jalur tunai atau transfer bank yang tersedia untuk lokasi ini.',
+    en: 'No cash or bank transfer route is available for this location.',
+  },
+  'Transfer reference': { id: 'Referensi transfer', en: 'Transfer reference' },
+  'Money leaves from': { id: 'Uang keluar dari', en: 'Money leaves from' },
+  'Still refundable on this payment after this refund': {
+    id: 'Sisa yang dapat dikembalikan pada pembayaran ini setelah pengembalian ini',
+    en: 'Still refundable on this payment after this refund',
+  },
+  'The original payment keeps its own account.': {
+    id: 'Pembayaran asal tetap tercatat pada rekeningnya sendiri.',
+    en: 'The original payment keeps its own account.',
+  },
   'Only a completed transaction can be reversed.': {
     id: 'Hanya transaksi yang sudah selesai yang dapat direversal.',
     en: 'Only a completed transaction can be reversed.',
@@ -305,9 +360,14 @@ export const transactionHistoryCopy: Record<string, { id: string; en: string }> 
     id: 'Transaksi ini telah berubah. Muat ulang lalu coba lagi.',
     en: 'This transaction changed in the meantime. Reload it and try again.',
   },
-  'This payment went through a provider and must be refunded in that provider’s flow.': {
-    id: 'Pembayaran ini melalui penyedia dan harus dikembalikan lewat alur penyedia tersebut.',
-    en: 'This payment went through a provider and must be refunded in that provider’s flow.',
+  'This payment is controlled by an external provider and must be refunded in that provider’s flow.':
+    {
+      id: 'Pembayaran ini dikendalikan penyedia eksternal dan harus dikembalikan lewat alur penyedia tersebut.',
+      en: 'This payment is controlled by an external provider and must be refunded in that provider’s flow.',
+    },
+  'You are not allowed to return money.': {
+    id: 'Anda tidak memiliki izin untuk mengembalikan dana.',
+    en: 'You are not allowed to return money.',
   },
   'The amount is more than what is left to refund on this payment.': {
     id: 'Jumlah melebihi sisa yang dapat dikembalikan dari pembayaran ini.',

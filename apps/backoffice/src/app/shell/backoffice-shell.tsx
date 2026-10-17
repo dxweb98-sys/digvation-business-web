@@ -25,6 +25,8 @@ import { useState } from 'react';
 
 import { canAccessBackoffice, type BackofficeCapability } from '../../auth/backoffice-access';
 import { useBackofficeAuth } from '../../auth/backoffice-auth-context';
+import { BackofficePasswordLinkDialog } from '../../auth/backoffice-password-link-dialog';
+import { ProfileDialog } from '../../modules/identity/ui/profile-dialog';
 import { NotificationBell } from '../../modules/notifications';
 import {
   type BackofficeMessageKey,
@@ -131,6 +133,8 @@ export function BackofficeShell() {
   const location = useLocation();
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [activeBranchSelectorOpen, setActiveBranchSelectorOpen] = useState(false);
 
   const [previousLocationKey, setPreviousLocationKey] = useState(location.key);
@@ -297,16 +301,24 @@ export function BackofficeShell() {
                 </div>
                 <button
                   type="button"
-                  disabled
-                  className="mt-1 flex h-9 w-full items-center gap-2 rounded-[var(--radius-control)] px-2.5 text-left text-sm text-[var(--color-text-muted)] disabled:cursor-not-allowed disabled:opacity-60"
+                  role="menuitem"
+                  onClick={() => {
+                    setAccountMenuOpen(false);
+                    setProfileOpen(true);
+                  }}
+                  className="mt-1 flex h-9 w-full items-center gap-2 rounded-[var(--radius-control)] px-2.5 text-left text-sm text-[var(--color-text)] hover:bg-[var(--color-surface-muted)]"
                 >
                   <UserCircle className="size-4" />
                   {t('profile')}
                 </button>
                 <button
                   type="button"
-                  disabled
-                  className="flex h-9 w-full items-center gap-2 rounded-[var(--radius-control)] px-2.5 text-left text-sm text-[var(--color-text-muted)] disabled:cursor-not-allowed disabled:opacity-60"
+                  role="menuitem"
+                  onClick={() => {
+                    setAccountMenuOpen(false);
+                    setChangePasswordOpen(true);
+                  }}
+                  className="flex h-9 w-full items-center gap-2 rounded-[var(--radius-control)] px-2.5 text-left text-sm text-[var(--color-text)] hover:bg-[var(--color-surface-muted)]"
                 >
                   <KeyRound className="size-4" />
                   {t('changePassword')}
@@ -329,6 +341,11 @@ export function BackofficeShell() {
           <Outlet />
         </div>
       </main>
+      <ProfileDialog open={profileOpen} onClose={() => setProfileOpen(false)} />
+      <BackofficePasswordLinkDialog
+        open={changePasswordOpen}
+        onClose={() => setChangePasswordOpen(false)}
+      />
     </div>
   );
 }
