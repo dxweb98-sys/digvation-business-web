@@ -11,34 +11,17 @@ import type { OperationalNavigationSection } from '../../shared/navigation/opera
 import { posSellOperationalNavigation } from '../../features/sell/pos-operational-navigation';
 import { financeOperationalNavigation } from '../../features/expenses/finance-operational-navigation';
 import { OperationalExpensesPage } from '../../features/expenses/operational-expenses-page';
+import { customerOperationalNavigation, OperationalCustomersPage } from '../../features/customers';
 import {
-  customerOperationalNavigation,
-  canReadOperationalCustomers,
-  OperationalCustomersPage,
-} from '../../features/customers';
+  canAccessOperationalExpenses,
+  resolveOperationalSurfaceAccess,
+} from '../../shared/operational-access/operational-surface-access';
 
-export function canAccessOperationalExpenses(
-  permissions: readonly string[],
-  hasFinanceOperations: boolean,
-) {
-  return (
-    hasFinanceOperations &&
-    (permissions.includes('expenses:read') ||
-      permissions.includes('expenses:read-own') ||
-      permissions.includes('expenses:create'))
-  );
-}
+export { canAccessOperationalExpenses };
 
 function useOperationalSurfaceAccess() {
   const { session } = useAuth();
-  const permissions = session.access.permissions;
-  const hasPos = session.access.products.includes('POS');
-  const hasFinance = session.access.capabilities.includes('FINANCE_OPERATIONS');
-  return {
-    canSell: hasPos && permissions.includes('sales:create'),
-    canAccessExpenses: canAccessOperationalExpenses(permissions, hasFinance),
-    canAccessCustomers: canReadOperationalCustomers(permissions, session.access.foundations),
-  };
+  return resolveOperationalSurfaceAccess(session.access);
 }
 
 function OperationalLayout() {
@@ -83,22 +66,30 @@ function OperationalLayout() {
 
 function OperationalHome() {
   const access = useOperationalSurfaceAccess();
-  if (access.canSell) return <Navigate to="/sell" replace />;
-  if (access.canAccessExpenses) return <Navigate to="/expenses" replace />;
-  if (access.canAccessCustomers) return <Navigate to="/customers" replace />;
-  return <Navigate to="/login" replace />;
+  return <Navigate to={access.home ?? '/login'} replace />;
 }
+
+const homeLabel = {
+  '/sell': 'Go to Sell',
+  '/expenses': 'Go to Expenses',
+  '/customers': 'Go to Customers',
+} as const;
 
 export function OperationalNotFoundRoute() {
   const navigate = useNavigate();
+  const access = useOperationalSurfaceAccess();
+  const { copy } = useOperationalLocalization();
+  const home = access.home;
   return (
     <SystemStatePage
       state="not-found"
       variant="content"
       action={
-        <DButton variant="secondary" size="sm" onClick={() => navigate('/')}>
-          Kembali ke Jual
-        </DButton>
+        home ? (
+          <DButton variant="secondary" size="sm" onClick={() => navigate(home)}>
+            {copy(homeLabel[home])}
+          </DButton>
+        ) : undefined
       }
     />
   );
@@ -106,13 +97,18 @@ export function OperationalNotFoundRoute() {
 
 function OperationalAccessDeniedRoute() {
   const navigate = useNavigate();
+  const access = useOperationalSurfaceAccess();
+  const { copy } = useOperationalLocalization();
+  const home = access.home;
   return (
     <SystemStatePage
       state="forbidden"
       action={
-        <DButton variant="secondary" size="sm" onClick={() => navigate('/')}>
-          Kembali ke Jual
-        </DButton>
+        home ? (
+          <DButton variant="secondary" size="sm" onClick={() => navigate(home)}>
+            {copy(homeLabel[home])}
+          </DButton>
+        ) : undefined
       }
     />
   );

@@ -1,9 +1,4 @@
-import {
-  AuthProvider,
-  type AuthPort,
-  type AuthSession,
-  type SessionEndReason,
-} from '@digvation/business-auth';
+import { AuthProvider, type AuthPort, type AuthSession } from '@digvation/business-auth';
 import {
   AuthenticatedRuntimeProjectionProvider,
   ConnectivityProvider,
@@ -22,24 +17,13 @@ import { useCallback, useEffect, useRef, useState, type TransitionEvent } from '
 import { operationalQueryClientDefaults } from '../data/operational-cache-policy';
 import { operationalCopy, type OperationalLocale } from '../localization/operational-localization';
 import { OperationalLoginPage } from '../auth/operational-login-page';
-import { canReadOperationalCustomers } from '../../features/customers';
+import { resolveOperationalSurfaceAccess } from '../../shared/operational-access/operational-surface-access';
+import { OperationalAccessDenied } from '../auth/operational-access-denied';
 import { OperationalSessionProvider } from '../../shared/operational-access/operational-session-provider';
 import { PosOperationalSessionProvider } from '../../features/sell/session/pos-operational-session-provider';
 
 function runtimeLocale(locale: string): OperationalLocale {
   return locale === 'en-US' ? 'en-US' : 'id-ID';
-}
-
-function hasImplementedOperationalSurface(session: AuthSession): boolean {
-  const permissions = session.access.permissions;
-  const hasPos =
-    session.access.products.includes('POS') &&
-    permissions.some((permission) => permission.startsWith('sales:'));
-  const hasExpenses =
-    session.access.capabilities.includes('FINANCE_OPERATIONS') &&
-    permissions.some((permission) => permission.startsWith('expenses:'));
-  const hasCustomers = canReadOperationalCustomers(permissions, session.access.foundations);
-  return hasPos || hasExpenses || hasCustomers;
 }
 
 const queryClient = new QueryClient({
@@ -64,20 +48,17 @@ function OperationalAuthBoundary({ session, authPort, router }: OperationalAuthB
   const locale = runtimeLocale(authenticatedSession?.preferences.locale ?? 'id-ID');
   const copy = (value: string) => operationalCopy(value, locale);
 
-  const handleSessionEnded = useCallback(
-    (_reason: SessionEndReason) => {
-      if (sessionEnded.current) return;
-      sessionEnded.current = true;
-      setLoggingOut(false);
-      setAuthenticatedSession(null);
-      showToast({
-        variant: 'warning',
-        title: copy('Your session has ended. Sign in again.'),
-      });
-      void authPort.logout();
-    },
-    [authPort, copy, showToast],
-  );
+  const handleSessionEnded = useCallback(() => {
+    if (sessionEnded.current) return;
+    sessionEnded.current = true;
+    setLoggingOut(false);
+    setAuthenticatedSession(null);
+    showToast({
+      variant: 'warning',
+      title: copy('Your session has ended. Sign in again.'),
+    });
+    void authPort.logout();
+  }, [authPort, copy, showToast]);
 
   useEffect(() => {
     if (!authPort.subscribeSessionEnded) return undefined;
@@ -110,20 +91,34 @@ function OperationalAuthBoundary({ session, authPort, router }: OperationalAuthB
     return <OperationalLoginPage authPort={authPort} onAuthenticated={handleAuthenticated} />;
   }
 
-  const allowed =
-    authenticatedSession.access.foundations.includes('OPERATIONAL_ACCESS') &&
-    hasImplementedOperationalSurface(authenticatedSession);
+  const surface = resolveOperationalSurfaceAccess(authenticatedSession.access);
+  const operationalEnabled = authenticatedSession.access.foundations.includes('OPERATIONAL_ACCESS');
+  const denial = !operationalEnabled ? 'MODULE_NOT_ENABLED' : surface.denial;
 
-  if (!allowed) {
+  if (denial || !surface.home) {
     return (
-      <main className="grid min-h-screen place-items-center bg-[var(--color-background)] p-6 text-center">
-        <section className="max-w-md rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
-          <h1 className="text-lg font-semibold">{copy('Operational access unavailable')}</h1>
-          <p className="mt-2 text-sm text-[var(--color-text-muted)]">
-            {copy('Contact an administrator if this access should be available.')}
-          </p>
-        </section>
-      </main>
+      <OperationalAccessDenied
+        reason={denial ?? 'NO_PERMITTED_MODULE'}
+        copy={copy}
+        onChangeAccount={() => {
+          sessionEnded.current = true;
+          void authPort.logout().finally(() => setAuthenticatedSession(null));
+        }}
+        onCheckAgain={async () => {
+          const refreshed = await authPort.refreshSessionContext();
+          if (!refreshed) {
+            setAuthenticatedSession(null);
+            return true;
+          }
+          const next = resolveOperationalSurfaceAccess(refreshed.access);
+          const enabled = refreshed.access.foundations.includes('OPERATIONAL_ACCESS');
+          if (enabled && next.home) {
+            setAuthenticatedSession(refreshed);
+            return true;
+          }
+          return false;
+        }}
+      />
     );
   }
 

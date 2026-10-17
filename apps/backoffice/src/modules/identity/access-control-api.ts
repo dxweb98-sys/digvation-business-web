@@ -56,6 +56,36 @@ export interface UserInvitation {
   roles: AccessRole[];
 }
 
+/** The signed-in user's own account, as the Runtime reports it. */
+export interface SelfProfile {
+  id: string;
+  username: string | null;
+  displayName: string;
+  phoneE164: string;
+  version: number;
+  roles: Array<{ id: string; code: string; name: string; systemKey: 'OWNER' | null }>;
+}
+
+export type PasswordResetStatus =
+  'PENDING' | 'DELIVERY_FAILED' | 'EXPIRED' | 'COMPLETED' | 'CANCELLED' | 'SUPERSEDED' | 'CLOSED';
+
+/** One password link request: states and actors only, never the link or token. */
+export interface PasswordResetChallenge {
+  id: string;
+  status: PasswordResetStatus;
+  requestedAt: string;
+  expiresAt: string;
+  resendAvailableAt: string;
+  requestedVia: 'SELF' | 'ADMIN' | 'PUBLIC' | null;
+  requestedBy: string | null;
+  completedAt: string | null;
+  cancelledAt: string | null;
+  cancelledBy: string | null;
+  supersededAt: string | null;
+  replacedByChallengeId: string | null;
+  deliveryFailedAt: string | null;
+}
+
 export interface Page<T> {
   items: T[];
   total?: number;
@@ -71,6 +101,13 @@ export interface PageRequest {
 export class AccessControlApi {
   public constructor(private readonly client: ApiClient) {}
 
+  getSelf() {
+    return this.client.get<SelfProfile>('/api/v1/auth/me');
+  }
+  /** Self-service: display name and username only; roles, status and phone are never sent. */
+  updateSelf(input: { displayName?: string; username?: string }) {
+    return this.client.patch<SelfProfile>('/api/v1/auth/me', input);
+  }
   listRoles(page: PageRequest) {
     return this.client.get<Page<AccessRole>>(
       `/api/v1/roles?limit=${page.limit}&offset=${page.offset}`,
@@ -123,6 +160,31 @@ export class AccessControlApi {
       expectedVersion: role.version,
       status: 'INACTIVE',
     });
+  }
+  updateUser(
+    user: AccessUser,
+    input: { displayName?: string; username?: string; status?: 'ACTIVE' | 'DISABLED' },
+  ) {
+    return this.client.patch<AccessUser>(`/api/v1/users/${user.id}`, {
+      expectedVersion: user.version,
+      ...input,
+    });
+  }
+  /** Sends a one-time password link to the user's registered phone; the caller never sees it. */
+  requestUserPasswordLink(user: AccessUser) {
+    return this.client.post<{ completed: true }>(`/api/v1/users/${user.id}/password-reset`, {});
+  }
+  async listPasswordResets(userId: string) {
+    const page = await this.client.get<Page<PasswordResetChallenge>>(
+      `/api/v1/users/${userId}/password-resets`,
+    );
+    return page.items;
+  }
+  cancelPasswordReset(userId: string, challengeId: string) {
+    return this.client.post<PasswordResetChallenge>(
+      `/api/v1/users/${userId}/password-resets/${challengeId}/cancel`,
+      {},
+    );
   }
   replaceUserRoles(user: AccessUser, roleIds: string[]) {
     return this.client.put<AccessUser>(`/api/v1/users/${user.id}/roles`, {

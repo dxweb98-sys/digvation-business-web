@@ -3,6 +3,122 @@ import type { OperationalLocale } from './operational-localization';
 type LocalizedCopy = Record<OperationalLocale, string>;
 
 const posCopy: Record<string, LocalizedCopy> = {
+  'Operational is not enabled for this business': {
+    'id-ID': 'Operasional belum diaktifkan untuk bisnis ini',
+    'en-US': 'Operational is not enabled for this business',
+  },
+  'No Operational module is available for your account': {
+    'id-ID': 'Belum ada modul Operasional untuk akun Anda',
+    'en-US': 'No Operational module is available for your account',
+  },
+  'The modules used in Operational have not been enabled for this business. Contact your business administrator.':
+    {
+      'id-ID':
+        'Modul yang dipakai di Operasional belum diaktifkan untuk bisnis ini. Hubungi administrator bisnis Anda.',
+      'en-US':
+        'The modules used in Operational have not been enabled for this business. Contact your business administrator.',
+    },
+  'Your role does not include Sell, Customers or Expenses. Ask your business administrator to update your role in Backoffice, then check again.':
+    {
+      'id-ID':
+        'Peran Anda belum mencakup Jual, Pelanggan, atau Pengeluaran. Minta administrator bisnis memperbarui peran Anda di Backoffice, lalu periksa lagi.',
+      'en-US':
+        'Your role does not include Sell, Customers or Expenses. Ask your business administrator to update your role in Backoffice, then check again.',
+    },
+  'Your access has not changed yet.': {
+    'id-ID': 'Akses Anda belum berubah.',
+    'en-US': 'Your access has not changed yet.',
+  },
+  'Access could not be checked. Try again.': {
+    'id-ID': 'Akses belum dapat diperiksa. Coba lagi.',
+    'en-US': 'Access could not be checked. Try again.',
+  },
+  'Use another account': { 'id-ID': 'Gunakan akun lain', 'en-US': 'Use another account' },
+  'Check again': { 'id-ID': 'Periksa lagi', 'en-US': 'Check again' },
+  'Go to Sell': { 'id-ID': 'Buka Jual', 'en-US': 'Go to Sell' },
+  'Go to Expenses': { 'id-ID': 'Buka Pengeluaran', 'en-US': 'Go to Expenses' },
+  'Go to Customers': { 'id-ID': 'Buka Pelanggan', 'en-US': 'Go to Customers' },
+  'Operational access could not be loaded': {
+    'id-ID': 'Akses operasional belum dapat dimuat',
+    'en-US': 'Operational access could not be loaded',
+  },
+  'Check your connection and try again.': {
+    'id-ID': 'Periksa koneksi Anda lalu coba lagi.',
+    'en-US': 'Check your connection and try again.',
+  },
+  'Try again': { 'id-ID': 'Coba lagi', 'en-US': 'Try again' },
+  'Ask your business administrator to grant location access in Backoffice, then sign in again.': {
+    'id-ID': 'Minta administrator bisnis memberi akses lokasi di Backoffice, lalu masuk lagi.',
+    'en-US':
+      'Ask your business administrator to grant location access in Backoffice, then sign in again.',
+  },
+  Password: { 'id-ID': 'Kata sandi', 'en-US': 'Password' },
+  'Change password': { 'id-ID': 'Ubah kata sandi', 'en-US': 'Change password' },
+  'Change with your current password': {
+    'id-ID': 'Ubah dengan kata sandi saat ini',
+    'en-US': 'Change with your current password',
+  },
+  'Current password': { 'id-ID': 'Kata sandi saat ini', 'en-US': 'Current password' },
+  'New password': { 'id-ID': 'Kata sandi baru', 'en-US': 'New password' },
+  'Confirm new password': {
+    'id-ID': 'Konfirmasi kata sandi baru',
+    'en-US': 'Confirm new password',
+  },
+  'At least 10 characters.': {
+    'id-ID': 'Minimal 10 karakter.',
+    'en-US': 'At least 10 characters.',
+  },
+  'Password must contain 10 to 128 characters.': {
+    'id-ID': 'Kata sandi harus terdiri dari 10 sampai 128 karakter.',
+    'en-US': 'Password must contain 10 to 128 characters.',
+  },
+  'Password confirmation does not match.': {
+    'id-ID': 'Konfirmasi kata sandi belum sama.',
+    'en-US': 'Password confirmation does not match.',
+  },
+  'The new password must differ from the current password.': {
+    'id-ID': 'Kata sandi baru harus berbeda dari kata sandi saat ini.',
+    'en-US': 'The new password must differ from the current password.',
+  },
+  'The current password is incorrect.': {
+    'id-ID': 'Kata sandi saat ini tidak benar.',
+    'en-US': 'The current password is incorrect.',
+  },
+  'Your session has ended. Sign in again, then try once more.': {
+    'id-ID': 'Sesi Anda sudah berakhir. Masuk lagi, lalu coba kembali.',
+    'en-US': 'Your session has ended. Sign in again, then try once more.',
+  },
+  'Too many attempts. Try again shortly.': {
+    'id-ID': 'Terlalu banyak percobaan. Coba lagi beberapa saat lagi.',
+    'en-US': 'Too many attempts. Try again shortly.',
+  },
+  'The password could not be changed. Try again shortly.': {
+    'id-ID': 'Kata sandi belum dapat diubah. Coba lagi beberapa saat lagi.',
+    'en-US': 'The password could not be changed. Try again shortly.',
+  },
+  'Password changed. All sessions have ended; sign in again with the new password.': {
+    'id-ID':
+      'Kata sandi berhasil diubah. Semua sesi telah berakhir; masuk lagi dengan kata sandi baru.',
+    'en-US': 'Password changed. All sessions have ended; sign in again with the new password.',
+  },
+  'Sign in again': { 'id-ID': 'Masuk lagi', 'en-US': 'Sign in again' },
+  'Enter your current password and a new one. After it succeeds, all your sessions end and you sign in again.':
+    {
+      'id-ID':
+        'Masukkan kata sandi saat ini dan kata sandi baru. Setelah berhasil, semua sesi Anda berakhir dan Anda perlu masuk lagi.',
+      'en-US':
+        'Enter your current password and a new one. After it succeeds, all your sessions end and you sign in again.',
+    },
+  'Forgot your current password?': {
+    'id-ID': 'Lupa kata sandi saat ini?',
+    'en-US': 'Forgot your current password?',
+  },
+  'Link submitted to WhatsApp.': {
+    'id-ID':
+      'Tautan telah diserahkan ke penyedia WhatsApp. Jika belum masuk, coba lagi sebentar lagi.',
+    'en-US':
+      'The link was handed to WhatsApp for delivery. If it does not arrive, try again shortly.',
+  },
   'Pay later': { 'id-ID': 'Bayar nanti', 'en-US': 'Pay later' },
   'Payment timing': { 'id-ID': 'Waktu & Cara Pembayaran', 'en-US': 'Payment timing' },
   'Pay and add to queue': {
@@ -24,6 +140,10 @@ const posCopy: Record<string, LocalizedCopy> = {
       'Tautan untuk membuat kata sandi baru akan dikirim ke nomor WhatsApp yang terdaftar pada akun Anda.',
     'en-US':
       'A link to set a new password will be sent to the WhatsApp number registered on your account.',
+  },
+  'A link was sent a moment ago. Check WhatsApp or try again shortly.': {
+    'id-ID': 'Tautan baru saja dikirim. Periksa WhatsApp atau coba lagi sebentar lagi.',
+    'en-US': 'A link was sent a moment ago. Check WhatsApp or try again shortly.',
   },
   'Link sent to your WhatsApp.': {
     'id-ID': 'Tautan sudah dikirim ke WhatsApp Anda.',
@@ -339,10 +459,15 @@ const posCopy: Record<string, LocalizedCopy> = {
   },
   Update: { 'id-ID': 'Perbarui', 'en-US': 'Update' },
   'Use member points for this transaction. Points are consumed only when the sale is finalized.': {
-    'id-ID': 'Gunakan poin member untuk transaksi ini. Poin baru dipotong saat transaksi berhasil diselesaikan.',
-    'en-US': 'Use member points for this transaction. Points are consumed only when the sale is finalized.',
+    'id-ID':
+      'Gunakan poin member untuk transaksi ini. Poin baru dipotong saat transaksi berhasil diselesaikan.',
+    'en-US':
+      'Use member points for this transaction. Points are consumed only when the sale is finalized.',
   },
-  'Loading loyalty points…': { 'id-ID': 'Memuat poin loyalty…', 'en-US': 'Loading loyalty points…' },
+  'Loading loyalty points…': {
+    'id-ID': 'Memuat poin loyalty…',
+    'en-US': 'Loading loyalty points…',
+  },
   'Use all': { 'id-ID': 'Pakai semua', 'en-US': 'Use all' },
   'Fill all': { 'id-ID': 'Isi semua', 'en-US': 'Fill all' },
   'Insufficient loyalty points': {
@@ -838,7 +963,8 @@ const posCopy: Record<string, LocalizedCopy> = {
   },
   'No payment amount needs to be entered.': {
     'id-ID': 'Nominal otomatis mengikuti sisa tagihan, jadi tidak perlu diisi.',
-    'en-US': 'The amount follows the remaining balance automatically, so no amount needs to be entered.',
+    'en-US':
+      'The amount follows the remaining balance automatically, so no amount needs to be entered.',
   },
   'This payment completes the transaction.': {
     'id-ID': 'Pembayaran ini menyelesaikan transaksi.',
@@ -994,8 +1120,14 @@ const posCopy: Record<string, LocalizedCopy> = {
     'en-US': 'Optional. The salesperson earns commission when the sale is completed.',
   },
   'Included components': { 'id-ID': 'Komponen termasuk', 'en-US': 'Included components' },
-  'Required additional items': { 'id-ID': 'Item tambahan wajib', 'en-US': 'Required additional items' },
-  'Choose at least one additional item.': { 'id-ID': 'Pilih minimal satu item tambahan.', 'en-US': 'Choose at least one additional item.' },
+  'Required additional items': {
+    'id-ID': 'Item tambahan wajib',
+    'en-US': 'Required additional items',
+  },
+  'Choose at least one additional item.': {
+    'id-ID': 'Pilih minimal satu item tambahan.',
+    'en-US': 'Choose at least one additional item.',
+  },
   'Search additional item': { 'id-ID': 'Cari item tambahan', 'en-US': 'Search additional item' },
   'Additional item': { 'id-ID': 'Item tambahan', 'en-US': 'Additional item' },
   'Additional items total': { 'id-ID': 'Item tambahan', 'en-US': 'Additional items' },
@@ -1006,11 +1138,17 @@ const posCopy: Record<string, LocalizedCopy> = {
   'Item total': { 'id-ID': 'Total item', 'en-US': 'Item total' },
   'Choose a variant': { 'id-ID': 'Pilih varian', 'en-US': 'Choose a variant' },
   'No matching items': { 'id-ID': 'Tidak ada item yang cocok.', 'en-US': 'No matching items.' },
-  'Price for this selection is unavailable.': { 'id-ID': 'Harga pilihan ini belum tersedia.', 'en-US': 'Price for this selection is unavailable.' },
+  'Price for this selection is unavailable.': {
+    'id-ID': 'Harga pilihan ini belum tersedia.',
+    'en-US': 'Price for this selection is unavailable.',
+  },
   Used: { 'id-ID': 'Digunakan', 'en-US': 'Used' },
   'Component usage': { 'id-ID': 'Pemakaian komponen', 'en-US': 'Component usage' },
   'Fixed component': { 'id-ID': 'Tetap', 'en-US': 'Fixed' },
-  'Selected during transaction': { 'id-ID': 'Dipilih saat transaksi', 'en-US': 'Selected during transaction' },
+  'Selected during transaction': {
+    'id-ID': 'Dipilih saat transaksi',
+    'en-US': 'Selected during transaction',
+  },
   Unit: { 'id-ID': 'Unit', 'en-US': 'Unit' },
   of: { 'id-ID': 'dari', 'en-US': 'of' },
   'units ready': { 'id-ID': 'unit lengkap', 'en-US': 'units ready' },
@@ -1021,44 +1159,114 @@ const posCopy: Record<string, LocalizedCopy> = {
   Units: { 'id-ID': 'Unit', 'en-US': 'Units' },
   'Unit configuration': { 'id-ID': 'Konfigurasi unit', 'en-US': 'Unit configuration' },
   'Configure each unit': { 'id-ID': 'Atur setiap unit', 'en-US': 'Configure each unit' },
-  'Each unit can have different additional items.': { 'id-ID': 'Setiap unit boleh memakai item tambahan yang berbeda.', 'en-US': 'Each unit can have different additional items.' },
-  'Apply to all units': { 'id-ID': 'Terapkan ke semua unit', 'en-US': 'Apply to all units' },
-  'The replacement item is no longer available.': { 'id-ID': 'Item pengganti tidak lagi tersedia.', 'en-US': 'The replacement item is no longer available.' },
-  'The selected variant is no longer available.': { 'id-ID': 'Varian yang dipilih sudah tidak tersedia.', 'en-US': 'The selected variant is no longer available.' },
-  'Item price was not found for this location.': { 'id-ID': 'Harga item tidak ditemukan untuk lokasi ini.', 'en-US': 'Item price was not found for this location.' },
-  'The transaction item was not found.': { 'id-ID': 'Baris transaksi tidak ditemukan.', 'en-US': 'The transaction item was not found.' },
-  'The transaction changed. Reload it before correcting.': { 'id-ID': 'Transaksi telah berubah. Muat ulang sebelum melakukan koreksi.', 'en-US': 'The transaction changed. Reload it before correcting.' },
-  'The corrected total would be lower than the payments already received.': { 'id-ID': 'Total setelah koreksi lebih kecil dari pembayaran yang sudah diterima.', 'en-US': 'The corrected total would be lower than the payments already received.' },
-  'This item cannot be corrected: its work is completed, a performer is assigned before work started, or a manual price or discount is set.': {
-    'id-ID': 'Item ini tidak dapat dikoreksi: pekerjaannya sudah selesai, pelaksana sudah ditetapkan sebelum pekerjaan dimulai, atau ada harga manual atau diskon.',
-    'en-US': 'This item cannot be corrected: its work is completed, a performer is assigned before work started, or a manual price or discount is set.',
+  'Each unit can have different additional items.': {
+    'id-ID': 'Setiap unit boleh memakai item tambahan yang berbeda.',
+    'en-US': 'Each unit can have different additional items.',
   },
+  'Apply to all units': { 'id-ID': 'Terapkan ke semua unit', 'en-US': 'Apply to all units' },
+  'The replacement item is no longer available.': {
+    'id-ID': 'Item pengganti tidak lagi tersedia.',
+    'en-US': 'The replacement item is no longer available.',
+  },
+  'The selected variant is no longer available.': {
+    'id-ID': 'Varian yang dipilih sudah tidak tersedia.',
+    'en-US': 'The selected variant is no longer available.',
+  },
+  'Item price was not found for this location.': {
+    'id-ID': 'Harga item tidak ditemukan untuk lokasi ini.',
+    'en-US': 'Item price was not found for this location.',
+  },
+  'The transaction item was not found.': {
+    'id-ID': 'Baris transaksi tidak ditemukan.',
+    'en-US': 'The transaction item was not found.',
+  },
+  'The transaction changed. Reload it before correcting.': {
+    'id-ID': 'Transaksi telah berubah. Muat ulang sebelum melakukan koreksi.',
+    'en-US': 'The transaction changed. Reload it before correcting.',
+  },
+  'The corrected total would be lower than the payments already received.': {
+    'id-ID': 'Total setelah koreksi lebih kecil dari pembayaran yang sudah diterima.',
+    'en-US': 'The corrected total would be lower than the payments already received.',
+  },
+  'This item cannot be corrected: its work is completed, a performer is assigned before work started, or a manual price or discount is set.':
+    {
+      'id-ID':
+        'Item ini tidak dapat dikoreksi: pekerjaannya sudah selesai, pelaksana sudah ditetapkan sebelum pekerjaan dimulai, atau ada harga manual atau diskon.',
+      'en-US':
+        'This item cannot be corrected: its work is completed, a performer is assigned before work started, or a manual price or discount is set.',
+    },
   'Enter the reason for this correction.': {
     'id-ID': 'Isi alasan koreksi.',
     'en-US': 'Enter the reason for this correction.',
   },
   'Correcting a transaction in progress needs the progressed adjustment permission.': {
-    'id-ID': 'Koreksi transaksi yang sedang dikerjakan memerlukan izin penyesuaian transaksi berjalan.',
+    'id-ID':
+      'Koreksi transaksi yang sedang dikerjakan memerlukan izin penyesuaian transaksi berjalan.',
     'en-US': 'Correcting a transaction in progress needs the progressed adjustment permission.',
   },
-  'The lower total must be returned through the payment provider, which is not available here. Ask a supervisor.': {
-    'id-ID': 'Selisih harus dikembalikan melalui penyedia pembayaran, yang belum tersedia di sini. Hubungi supervisor.',
-    'en-US': 'The lower total must be returned through the payment provider, which is not available here. Ask a supervisor.',
+  'The lower total must be returned through the payment provider, which is not available here. Ask a supervisor.':
+    {
+      'id-ID':
+        'Selisih harus dikembalikan melalui penyedia pembayaran, yang belum tersedia di sini. Hubungi supervisor.',
+      'en-US':
+        'The lower total must be returned through the payment provider, which is not available here. Ask a supervisor.',
+    },
+  'The transaction is already closed and cannot be changed.': {
+    'id-ID': 'Transaksi sudah selesai dan tidak dapat diubah.',
+    'en-US': 'The transaction is already closed and cannot be changed.',
   },
-  'The transaction is already closed and cannot be changed.': { 'id-ID': 'Transaksi sudah selesai dan tidak dapat diubah.', 'en-US': 'The transaction is already closed and cannot be changed.' },
-  'A payment is still waiting for confirmation.': { 'id-ID': 'Ada pembayaran yang masih menunggu konfirmasi.', 'en-US': 'A payment is still waiting for confirmation.' },
-  'Choose an additional item for every unit that requires one.': { 'id-ID': 'Pilih item tambahan untuk setiap unit yang mewajibkannya.', 'en-US': 'Choose an additional item for every unit that requires one.' },
-  'An additional item is no longer available.': { 'id-ID': 'Ada item tambahan yang tidak lagi tersedia.', 'en-US': 'An additional item is no longer available.' },
-  'An additional item is already part of this item.': { 'id-ID': 'Item tambahan sudah menjadi bagian dari item ini.', 'en-US': 'An additional item is already part of this item.' },
-  'An additional item was chosen twice.': { 'id-ID': 'Ada item tambahan yang dipilih dua kali.', 'en-US': 'An additional item was chosen twice.' },
-  'An item cannot be its own additional item.': { 'id-ID': 'Item tidak boleh menjadi item tambahannya sendiri.', 'en-US': 'An item cannot be its own additional item.' },
-  'An additional item is no longer active.': { 'id-ID': 'Ada item tambahan yang sudah tidak aktif.', 'en-US': 'An additional item is no longer active.' },
-  'An additional item has no selling price at this location.': { 'id-ID': 'Ada item tambahan yang belum memiliki harga jual di lokasi ini.', 'en-US': 'An additional item has no selling price at this location.' },
-  'Choose a variant for the additional item.': { 'id-ID': 'Pilih varian untuk item tambahan.', 'en-US': 'Choose a variant for the additional item.' },
-  'The chosen variant of an additional item is not valid.': { 'id-ID': 'Varian item tambahan yang dipilih tidak valid.', 'en-US': 'The chosen variant of an additional item is not valid.' },
+  'A payment is still waiting for confirmation.': {
+    'id-ID': 'Ada pembayaran yang masih menunggu konfirmasi.',
+    'en-US': 'A payment is still waiting for confirmation.',
+  },
+  'Choose an additional item for every unit that requires one.': {
+    'id-ID': 'Pilih item tambahan untuk setiap unit yang mewajibkannya.',
+    'en-US': 'Choose an additional item for every unit that requires one.',
+  },
+  'An additional item is no longer available.': {
+    'id-ID': 'Ada item tambahan yang tidak lagi tersedia.',
+    'en-US': 'An additional item is no longer available.',
+  },
+  'An additional item is already part of this item.': {
+    'id-ID': 'Item tambahan sudah menjadi bagian dari item ini.',
+    'en-US': 'An additional item is already part of this item.',
+  },
+  'An additional item was chosen twice.': {
+    'id-ID': 'Ada item tambahan yang dipilih dua kali.',
+    'en-US': 'An additional item was chosen twice.',
+  },
+  'An item cannot be its own additional item.': {
+    'id-ID': 'Item tidak boleh menjadi item tambahannya sendiri.',
+    'en-US': 'An item cannot be its own additional item.',
+  },
+  'An additional item is no longer active.': {
+    'id-ID': 'Ada item tambahan yang sudah tidak aktif.',
+    'en-US': 'An additional item is no longer active.',
+  },
+  'An additional item has no selling price at this location.': {
+    'id-ID': 'Ada item tambahan yang belum memiliki harga jual di lokasi ini.',
+    'en-US': 'An additional item has no selling price at this location.',
+  },
+  'Choose a variant for the additional item.': {
+    'id-ID': 'Pilih varian untuk item tambahan.',
+    'en-US': 'Choose a variant for the additional item.',
+  },
+  'The chosen variant of an additional item is not valid.': {
+    'id-ID': 'Varian item tambahan yang dipilih tidak valid.',
+    'en-US': 'The chosen variant of an additional item is not valid.',
+  },
   'Use additional items': { 'id-ID': 'Gunakan item tambahan', 'en-US': 'Use additional items' },
-  'Additional items are required for this item.': { 'id-ID': 'Item ini wajib memakai item tambahan.', 'en-US': 'Additional items are required for this item.' },
-  'No eligible additional items are available for this branch. Set a selling price for a Product in Backoffice, then try again.': { 'id-ID': 'Belum ada item tambahan yang memenuhi syarat di cabang ini. Atur harga jual Product di Backoffice, lalu coba lagi.', 'en-US': 'No eligible additional items are available for this branch. Set a selling price for a Product in Backoffice, then try again.' },
+  'Additional items are required for this item.': {
+    'id-ID': 'Item ini wajib memakai item tambahan.',
+    'en-US': 'Additional items are required for this item.',
+  },
+  'No eligible additional items are available for this branch. Set a selling price for a Product in Backoffice, then try again.':
+    {
+      'id-ID':
+        'Belum ada item tambahan yang memenuhi syarat di cabang ini. Atur harga jual Product di Backoffice, lalu coba lagi.',
+      'en-US':
+        'No eligible additional items are available for this branch. Set a selling price for a Product in Backoffice, then try again.',
+    },
   'Item price': { 'id-ID': 'Harga item', 'en-US': 'Item price' },
   'Save changes': { 'id-ID': 'Simpan perubahan', 'en-US': 'Save changes' },
   'Edit item': { 'id-ID': 'Ubah item', 'en-US': 'Edit item' },
@@ -1068,8 +1276,14 @@ const posCopy: Record<string, LocalizedCopy> = {
   },
   'Additional items': { 'id-ID': 'Item tambahan', 'en-US': 'Additional items' },
   'Additional items subtotal': { 'id-ID': 'Item tambahan', 'en-US': 'Additional items' },
-  'Complete or remove the unfinished additional item.': { 'id-ID': 'Lengkapi atau hapus item tambahan yang belum selesai.', 'en-US': 'Complete or remove the unfinished additional item.' },
-  'Variant-specific components': { 'id-ID': 'Komponen khusus varian', 'en-US': 'Variant-specific components' },
+  'Complete or remove the unfinished additional item.': {
+    'id-ID': 'Lengkapi atau hapus item tambahan yang belum selesai.',
+    'en-US': 'Complete or remove the unfinished additional item.',
+  },
+  'Variant-specific components': {
+    'id-ID': 'Komponen khusus varian',
+    'en-US': 'Variant-specific components',
+  },
 };
 
 export function operationalPosCopy(value: string, locale: OperationalLocale): string | undefined {

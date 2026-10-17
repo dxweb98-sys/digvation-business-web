@@ -14,6 +14,10 @@ import type { RouterProviderProps } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 
 import { BackofficeAuthProvider, useBackofficeAuth } from '../../auth/backoffice-auth-context';
+import {
+  AccountActivationProvider,
+  type AccountActivationPort,
+} from '../../auth/account-activation';
 import { PasswordRecoveryProvider, type PasswordRecoveryPort } from '../../auth/password-recovery';
 import { useBackofficeStartupReady } from '../bootstrap/backoffice-startup';
 import { resolveBackofficeLocale } from '../localization/backoffice-locale';
@@ -34,6 +38,7 @@ interface BackofficeProvidersProps {
   bootstrap: DeploymentBootstrapConfig;
   auth: AuthPort;
   passwordRecovery: PasswordRecoveryPort;
+  accountActivation: AccountActivationPort;
   router: RouterProviderProps['router'];
 }
 
@@ -41,6 +46,7 @@ export function BackofficeProviders({
   bootstrap,
   auth,
   passwordRecovery,
+  accountActivation,
   router,
 }: BackofficeProvidersProps) {
   return (
@@ -48,7 +54,9 @@ export function BackofficeProviders({
       <ConnectivityProvider>
         <BackofficeLocalizationProvider>
           <PasswordRecoveryProvider port={passwordRecovery}>
-            <BackofficeDesignSystemProviders auth={auth} router={router} />
+            <AccountActivationProvider port={accountActivation}>
+              <BackofficeDesignSystemProviders auth={auth} router={router} />
+            </AccountActivationProvider>
           </PasswordRecoveryProvider>
         </BackofficeLocalizationProvider>
       </ConnectivityProvider>
