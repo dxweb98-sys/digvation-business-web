@@ -29,7 +29,9 @@
     "contract:check": "node tooling/scripts/check-contract.mjs",
     "naming:check": "node tooling/scripts/check-naming.mjs",
     "verify": "pnpm contract:check && pnpm naming:check && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
-    "verify:ci": "pnpm verify && pnpm test:e2e"
+    "verify:ci": "pnpm verify && pnpm test:e2e",
+    "design:tokens": "node tooling/design/export-figma-tokens.mjs",
+    "design:capture": "pnpm build:backoffice && pnpm build:operational && playwright test -c tooling/design/playwright.config.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
