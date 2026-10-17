@@ -42,11 +42,12 @@ installed, either run `pnpm exec playwright install chromium` or point
 
 1. Create a Figma file named **Digvation Design System**.
 2. Install the **Tokens Studio for Figma** plugin → Load from file → `digvation-tokens.json`.
-   Create themes: `light` = `global` + `mode/light` + `radius/soft`, `dark` = `global` +
-   `mode/dark` + `radius/soft` (add `compact`/`rounded` themes if needed), then **Export to
-   Figma Variables**.
-3. Create text styles, grids, and components as listed in `design-system-library.md`.
-4. **Publish** the library (Assets → Libraries → Publish).
+3. Enable only the `global`, `light`, and `radius-soft` sets, then **Styles & Variables →
+   Export styles & variables → Token Sets → Export to Figma** (options in
+   `design-system-library.md`, section 01 Foundations). This creates the color, spacing,
+   radius, and font variables, the shadow effect styles, and the text styles.
+4. Create grids and components as listed in `design-system-library.md`.
+5. **Publish** the library (Assets → Libraries → Publish).
 
 ## Step 3: Bring the current UI into the product files
 

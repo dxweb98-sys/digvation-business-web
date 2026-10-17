@@ -1,7 +1,7 @@
 /**
  * Exports the Digvation Design System tokens (the semantic CSS variables shipped by
- * `@digvation/ui/styles.css`) as a W3C design-token JSON file that Figma can import, either
- * through the Tokens Studio plugin or as Figma Variables.
+ * `@digvation/ui/styles.css`) as a Tokens Studio JSON file, which the Tokens Studio for Figma
+ * plugin turns into Figma variables, effect styles, and text styles.
  *
  * The design system package stays the source of truth: re-run this after upgrading
  * `@digvation/ui` instead of editing the generated file by hand.
@@ -56,46 +56,42 @@ function rem(value) {
   return match ? `${Number(match[1]) * 16}px` : value;
 }
 
-const px = (length) => (length === '0' ? '0px' : length);
+// Tokens Studio's own token format: unitless numbers as strings, `value`/`type` keys.
+const number = (length) => String(Number.parseFloat(rem(length)));
 
-/** Converts `x y blur [spread] color` layers into W3C shadow token values. */
+/** Converts `x y blur [spread] color` layers into Tokens Studio drop shadows. */
 function shadow(value) {
   return value.split(',').map((layer) => {
     const parts = layer.trim().split(/\s+/);
-    const color = parts.pop();
-    const [offsetX, offsetY, blur, spread = '0'] = parts.map(px);
-    return { offsetX, offsetY, blur, spread: px(spread), color: hex(color) };
+    const color = hex(parts.pop());
+    const [x, y, blur, spread = '0'] = parts.map(number);
+    return { x, y, blur, spread, color, type: 'dropShadow' };
   });
 }
 
-const token = (type, value, description) => ({
-  $type: type,
-  $value: value,
-  ...(description ? { $description: description } : {}),
-});
+const token = (type, value) => ({ value, type });
 
-function colorSet(source) {
-  const colors = {};
+function modeSet(source) {
+  const color = {};
   for (const [name, value] of Object.entries(source)) {
-    if (!name.startsWith('color-')) continue;
-    colors[name.slice('color-'.length)] = token('color', hex(value));
+    if (name.startsWith('color-')) color[name.slice('color-'.length)] = token('color', hex(value));
   }
-  return colors;
-}
-
-function shadowSet(source) {
   const shadows = {};
-  for (const name of ['shadow-sm', 'shadow-md', 'shadow-lg']) {
-    shadows[name.slice('shadow-'.length)] = token('shadow', shadow(source[name]));
+  for (const size of ['sm', 'md', 'lg']) {
+    shadows[size] = token('boxShadow', shadow(source[`shadow-${size}`]));
   }
-  shadows.panel = token('shadow', '{shadow.md}');
-  return shadows;
+  // --shadow-panel is var(--shadow-md).
+  shadows.panel = token('boxShadow', shadow(source['shadow-md']));
+  return { color, shadow: shadows };
 }
 
 const radiusSet = (source) => ({
-  control: token('dimension', source['radius-control']),
-  card: token('dimension', source['radius-card']),
-  panel: token('dimension', source['radius-panel']),
+  radius: Object.fromEntries(
+    ['control', 'card', 'panel'].map((name) => [
+      name,
+      token('borderRadius', number(source[`radius-${name}`])),
+    ]),
+  ),
 });
 
 const spacingSteps = [0, 0.5, 1, 1.5, 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 24];
@@ -103,65 +99,80 @@ const spacingUnit = Number.parseFloat(rem(base.spacing));
 const spacing = Object.fromEntries(
   spacingSteps.map((step) => [
     String(step).replace('.', '_'),
-    token('dimension', `${step * spacingUnit}px`),
+    token('spacing', String(step * spacingUnit)),
   ]),
 );
 
-const fontSize = {};
-const lineHeight = {};
+const fontSizes = {};
+const lineHeights = {};
 for (const size of ['xs', 'sm', 'base', 'lg', 'xl', '2xl', '3xl']) {
-  const sizePx = Number.parseFloat(rem(base[`text-${size}`]));
-  fontSize[size] = token('dimension', `${sizePx}px`);
+  fontSizes[size] = token('fontSizes', number(base[`text-${size}`]));
   // Tailwind writes line heights as calc(<line height rem> / <font size rem>).
   const ratio = /calc\(([\d.]+)\s*\/\s*([\d.]+)\)/.exec(base[`text-${size}--line-height`]);
-  lineHeight[size] = token('dimension', `${Math.round(Number(ratio[1]) * 16)}px`);
+  lineHeights[size] = token('lineHeights', String(Math.round(Number(ratio[1]) * 16)));
 }
 
 const primaryFont = light['font-sans'].split(',')[0].replace(/['"]/g, '').trim();
 
+// Text styles from docs/design/figma/design-system-library.md.
+const textStyles = [
+  ['display', '3xl', '3xl', 'bold'],
+  ['heading', '2xl', '2xl', 'bold'],
+  ['heading', 'xl', 'xl', 'semibold'],
+  ['heading', 'lg', 'lg', 'semibold'],
+  ['body', 'base', 'base', 'regular'],
+  ['body', 'sm', 'sm', 'regular'],
+  ['body', 'sm-medium', 'sm', 'medium'],
+  ['caption', 'xs', 'xs', 'medium'],
+  ['eyebrow', 'xs', 'xs', 'bold'],
+];
+const typography = {};
+for (const [group, name, size, weight] of textStyles) {
+  const eyebrow = group === 'eyebrow';
+  typography[group] ??= {};
+  typography[group][name] = token('typography', {
+    fontFamily: '{fontFamilies.sans}',
+    fontWeight: `{fontWeights.${weight}}`,
+    fontSize: `{fontSizes.${size}}`,
+    lineHeight: `{lineHeights.${size}}`,
+    letterSpacing: eyebrow ? '14%' : '0%',
+    paragraphSpacing: '0',
+    textCase: eyebrow ? 'uppercase' : 'none',
+    textDecoration: 'none',
+  });
+}
+
 const tokens = {
   global: {
     spacing,
-    radius: {
-      sm: token('dimension', rem(base['radius-sm'])),
-      md: token('dimension', rem(base['radius-md'])),
-      lg: token('dimension', rem(base['radius-lg'])),
-      xl: token('dimension', rem(base['radius-xl'])),
-      '2xl': token('dimension', rem(base['radius-2xl'])),
+    borderRadius: Object.fromEntries(
+      ['sm', 'md', 'lg', 'xl', '2xl'].map((size) => [
+        size,
+        token('borderRadius', number(base[`radius-${size}`])),
+      ]),
+    ),
+    fontFamilies: { sans: token('fontFamilies', primaryFont) },
+    fontWeights: {
+      regular: token('fontWeights', 'Regular'),
+      medium: token('fontWeights', 'Medium'),
+      semibold: token('fontWeights', 'SemiBold'),
+      bold: token('fontWeights', 'Bold'),
     },
-    font: {
-      family: { sans: token('fontFamily', primaryFont) },
-      weight: {
-        regular: token('fontWeight', 400),
-        medium: token('fontWeight', Number(base['font-weight-medium'])),
-        semibold: token('fontWeight', Number(base['font-weight-semibold'])),
-        bold: token('fontWeight', Number(base['font-weight-bold'])),
-      },
-      size: fontSize,
-      lineHeight,
-    },
+    fontSizes,
+    lineHeights,
+    typography,
   },
-  'mode/light': { color: colorSet(light), shadow: shadowSet(light) },
-  'mode/dark': {
-    // Dark mode only overrides part of the palette; the accents are shared with light mode.
-    color: { ...colorSet(light), ...colorSet(dark) },
-    shadow: shadowSet(dark),
-  },
-  'radius/soft': { radius: radiusSet(light) },
-  'radius/compact': { radius: radiusSet(compact) },
-  'radius/rounded': { radius: radiusSet(rounded) },
+  light: modeSet(light),
+  // Dark mode only overrides part of the palette; the accents are shared with light mode.
+  dark: modeSet({ ...light, ...dark }),
+  'radius-soft': radiusSet(light),
+  'radius-compact': radiusSet(compact),
+  'radius-rounded': radiusSet(rounded),
   $themes: [],
   $metadata: {
     source: `@digvation/ui@${uiVersion} dist/styles.css`,
     note: 'Generated by tooling/design/export-figma-tokens.mjs. Do not edit by hand.',
-    tokenSetOrder: [
-      'global',
-      'mode/light',
-      'mode/dark',
-      'radius/soft',
-      'radius/compact',
-      'radius/rounded',
-    ],
+    tokenSetOrder: ['global', 'light', 'dark', 'radius-soft', 'radius-compact', 'radius-rounded'],
   },
 };
 
