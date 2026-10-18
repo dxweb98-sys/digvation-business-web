@@ -315,7 +315,7 @@ describe('Operational Member detail', () => {
     const dialog = within(await openRina());
     await dialog.findByText('MEMBER-001');
 
-    for (const name of ['Tutup', 'Ubah data']) {
+    for (const name of ['Tutup', 'Ubah profil']) {
       const button = dialog.getByRole('button', { name });
       expect(button.closest('.overflow-y-auto')).toBeNull();
     }
@@ -376,7 +376,7 @@ describe('Operational Member profile editing', () => {
     renderView(api, true);
     const dialog = within(await openRina());
 
-    fireEvent.click(await dialog.findByRole('button', { name: 'Ubah data' }));
+    fireEvent.click(await dialog.findByRole('button', { name: 'Ubah profil' }));
     const phone = dialog.getByLabelText('Nomor telepon') as HTMLInputElement;
     expect(phone.value).toBe('081234567890');
     fireEvent.change(phone, { target: { value: '0812 3456 7890' } });
@@ -401,7 +401,7 @@ describe('Operational Member profile editing', () => {
     renderView(api, true);
     const dialog = within(await openRina());
 
-    fireEvent.click(await dialog.findByRole('button', { name: 'Ubah data' }));
+    fireEvent.click(await dialog.findByRole('button', { name: 'Ubah profil' }));
     fireEvent.change(dialog.getByLabelText('Nomor telepon'), { target: { value: '0812' } });
     fireEvent.click(dialog.getByRole('button', { name: 'Simpan' }));
 
@@ -418,7 +418,7 @@ describe('Operational Member profile editing', () => {
     renderView(api, true);
     const dialog = within(await openRina());
 
-    fireEvent.click(await dialog.findByRole('button', { name: 'Ubah data' }));
+    fireEvent.click(await dialog.findByRole('button', { name: 'Ubah profil' }));
     fireEvent.change(dialog.getByLabelText('Nomor telepon'), {
       target: { value: '+628111222333' },
     });
@@ -433,7 +433,7 @@ describe('Operational Member profile editing', () => {
   it('does not offer to edit points, ledger, member number or NIK', async () => {
     renderView(fakeApi(), true);
     const dialog = within(await openRina());
-    fireEvent.click(await dialog.findByRole('button', { name: 'Ubah data' }));
+    fireEvent.click(await dialog.findByRole('button', { name: 'Ubah profil' }));
 
     expect(
       dialog.getAllByRole('textbox').map((field) => (field as HTMLInputElement).value),
