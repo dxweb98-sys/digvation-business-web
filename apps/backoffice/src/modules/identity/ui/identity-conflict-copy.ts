@@ -13,5 +13,9 @@ export function useIdentityConflictCopy(): Record<IdentityConflict, string> {
     INVITATION_USERNAME_PENDING: copy(
       'This username already has a pending invitation. Resend or revoke it first.',
     ),
+    USER_EMAIL_ALREADY_EXISTS: copy('This email already belongs to a user.'),
+    INVITATION_EMAIL_PENDING: copy(
+      'This email already has a pending invitation. Resend or revoke it first.',
+    ),
   };
 }

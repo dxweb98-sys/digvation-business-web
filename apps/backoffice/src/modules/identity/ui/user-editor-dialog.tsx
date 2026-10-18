@@ -1,15 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import {
-  DBadge,
-  DButton,
-  DCheckbox,
-  DConfirmDialog,
-  DDialog,
-  DInput,
-  useToast,
-} from '@digvation/ui';
-import { MessageCircle } from 'lucide-react';
-import { useQueryClient } from '@tanstack/react-query';
+import { DBadge, DButton, DCheckbox, DDialog, DInput, useToast } from '@digvation/ui';
 import { useState } from 'react';
 
 import { normalizeBackofficeApiError } from '../../../app/api/backoffice-api-error';
@@ -28,13 +18,17 @@ import type {
 import type { AccessControlApi, AccessRole, AccessUser } from '../access-control-api';
 import {
   DISPLAY_NAME_MAX,
+  EMAIL_MAX,
   USERNAME_PATTERN,
+  emailStatusOf,
   identityConflictOf,
+  isEmailAddress,
   type IdentityConflict,
 } from '../model/identity-form';
+import { EmailStatusBadge } from './email-status-badge';
 import { useIdentityConflictCopy } from './identity-conflict-copy';
 import { OwnerGrantNotice, selectsOwner } from './owner-grant-notice';
-import { passwordResetsKey, SecurityActivityPanel } from './security-activity-panel';
+import { SecurityActivityPanel } from './security-activity-panel';
 import { RoleOptionList } from './role-option-list';
 
 function toggle(values: string[], id: string): string[] {
@@ -52,9 +46,11 @@ export function UserEditorDialog({
   operationalAccess,
   canManageRoles,
   canUpdateProfile,
+  canUpdateIdentity = false,
   canViewLocations,
   canManageLocations,
   canViewSecurityActivity = false,
+  currentUserId,
   onClose,
   onChanged,
 }: {
@@ -63,19 +59,23 @@ export function UserEditorDialog({
   api: AccessControlApi;
   operationalAccess: OperationalAccessApi;
   canManageRoles: boolean;
+  /** Identity attributes are Owner-only; account status remains separately permissioned. */
   canUpdateProfile: boolean;
+  canUpdateIdentity?: boolean;
   canViewLocations: boolean;
   canManageLocations: boolean;
   /** users:read and activity:read: shows the password link history. */
   canViewSecurityActivity?: boolean;
+  /** The signed-in user, used to preserve protected Owner account boundaries. */
+  currentUserId?: string;
   onClose: () => void;
   onChanged: () => void;
 }) {
   const { copy } = useBackofficeLocalization();
   const { showToast } = useToast();
-  const queryClient = useQueryClient();
   const [displayName, setDisplayName] = useState(user.displayName);
   const [username, setUsername] = useState(user.username ?? '');
+  const [phoneE164, setPhoneE164] = useState(user.phoneE164);
   const [usernameConflict, setUsernameConflict] = useState<IdentityConflict | null>(null);
   const conflictCopy = useIdentityConflictCopy();
   const [accountActive, setAccountActive] = useState(user.status !== 'DISABLED');
@@ -86,8 +86,8 @@ export function UserEditorDialog({
   const [attempted, setAttempted] = useState(false);
   const [ownerConfirmed, setOwnerConfirmed] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [confirmingLink, setConfirmingLink] = useState(false);
-  const [sendingLink, setSendingLink] = useState(false);
+  const [email, setEmail] = useState(user.email ?? '');
+  const [emailConflict, setEmailConflict] = useState<IdentityConflict | null>(null);
 
   const locationAccess = useQuery({
     queryKey: ['access-control', 'locations', user.id],
@@ -102,37 +102,65 @@ export function UserEditorDialog({
   const locationSelection = selectedLocations ?? assignedLocationIds;
 
   const isOwner = user.roles.some((role) => role.systemKey === 'OWNER');
-  const nameMissing = canUpdateProfile && !displayName.trim();
+  const nameMissing = canUpdateIdentity && !displayName.trim();
   const usernameChanged = username.trim() !== (user.username ?? '');
   // An unchanged username is never re-validated; a changed one must follow the Runtime pattern.
   const usernameInvalid =
-    canUpdateProfile && usernameChanged && !USERNAME_PATTERN.test(username.trim());
+    canUpdateIdentity && usernameChanged && !USERNAME_PATTERN.test(username.trim());
+  const phoneChanged = phoneE164.trim() !== user.phoneE164;
+  const phoneInvalid =
+    canUpdateIdentity && phoneChanged && !/^\+[1-9]\d{7,14}$/.test(phoneE164.trim());
   const ownerUnconfirmed = canManageRoles && selectsOwner(roles, selectedRoles) && !ownerConfirmed;
-  const editable = !isOwner && (canManageRoles || canManageLocations || canUpdateProfile);
+  const emailStatus = emailStatusOf(user);
+  // Owners are protected: only an Owner manages their own email from here.
+  const canEditEmail =
+    canUpdateIdentity &&
+    user.status !== 'PENDING_ACTIVATION' &&
+    (!isOwner || user.id === currentUserId);
+  const emailChanged = email.trim() !== (user.email ?? '');
+  const emailInvalid =
+    canEditEmail && emailChanged && Boolean(email.trim()) && !isEmailAddress(email);
+  const editable =
+    (!isOwner && (canManageRoles || canManageLocations || canUpdateProfile || canUpdateIdentity)) ||
+    (isOwner && canEditEmail);
 
   const save = async () => {
     setAttempted(true);
-    if (nameMissing || usernameInvalid || ownerUnconfirmed || saving) return;
+    if (
+      nameMissing ||
+      usernameInvalid ||
+      phoneInvalid ||
+      emailInvalid ||
+      ownerUnconfirmed ||
+      saving
+    )
+      return;
     setSaving(true);
     try {
       // Each write bumps the user's version, so chain the returned record into the next call.
       let current = user;
-      if (canUpdateProfile) {
-        const profile: { displayName?: string; username?: string; status?: 'ACTIVE' | 'DISABLED' } =
-          {};
-        if (displayName.trim() !== user.displayName) profile.displayName = displayName.trim();
-        if (usernameChanged) profile.username = username.trim();
-        if (accountActive !== (user.status !== 'DISABLED'))
+      if (canUpdateProfile || canUpdateIdentity) {
+        const profile: {
+          displayName?: string;
+          username?: string;
+          phoneE164?: string;
+          status?: 'ACTIVE' | 'DISABLED';
+          email?: string | null;
+        } = {};
+        if (!isOwner && canUpdateIdentity) {
+          if (displayName.trim() !== user.displayName) profile.displayName = displayName.trim();
+          if (usernameChanged) profile.username = username.trim();
+          if (phoneChanged) profile.phoneE164 = phoneE164.trim();
+        }
+        if (!isOwner && canUpdateProfile && accountActive !== (user.status !== 'DISABLED'))
           profile.status = accountActive ? 'ACTIVE' : 'DISABLED';
-        if (
-          profile.displayName !== undefined ||
-          profile.username !== undefined ||
-          profile.status !== undefined
-        )
-          current = await api.updateUser(user, profile);
+        // A new or changed address is saved unverified by the Runtime; an empty field removes it.
+        if (canEditEmail && emailChanged) profile.email = email.trim() || null;
+        if (Object.keys(profile).length) current = await api.updateUser(user, profile);
       }
-      if (canManageRoles) await api.replaceUserRoles(current, selectedRoles);
-      if (canManageLocations)
+      // An Owner's roles, status and locations are never changed from this dialog.
+      if (!isOwner && canManageRoles) await api.replaceUserRoles(current, selectedRoles);
+      if (!isOwner && canManageLocations)
         await operationalAccess.replaceUserLocations(user.id, locationSelection);
       onChanged();
       onClose();
@@ -144,39 +172,13 @@ export function UserEditorDialog({
         // A taken username is shown under its field; the profile write is a single request, so
         // nothing else was saved yet and the user can correct it and save again.
         if (identity?.field === 'username') setUsernameConflict(identity.code);
+        else if (identity?.field === 'email') setEmailConflict(identity.code);
         else showToast({ variant: 'danger', title: failure.safeMessage });
       }
     } finally {
       setSaving(false);
     }
   };
-
-  const sendPasswordLink = async () => {
-    setSendingLink(true);
-    try {
-      await api.requestUserPasswordLink(user);
-      setConfirmingLink(false);
-      void queryClient.invalidateQueries({ queryKey: passwordResetsKey(user.id) });
-      showToast({ variant: 'success', title: copy('Password link sent.') });
-    } catch (error) {
-      if (isSessionExpiredError(error)) return;
-      const failure = normalizeBackofficeApiError(error, copy('Could not send the password link.'));
-      setConfirmingLink(false);
-      showToast({
-        variant: 'danger',
-        title:
-          failure.code === 'PASSWORD_RESET_COOLDOWN'
-            ? copy('A link was sent a moment ago. Try again shortly.')
-            : failure.code === 'USER_NOT_ACTIVE'
-              ? copy('This account is inactive, so a password link cannot be sent.')
-              : failure.safeMessage,
-      });
-    } finally {
-      setSendingLink(false);
-    }
-  };
-
-  const canSendLink = canUpdateProfile && user.status === 'ACTIVE';
 
   return (
     <DDialog
@@ -211,7 +213,7 @@ export function UserEditorDialog({
       <div className="space-y-4">
         {isOwner ? (
           <RecordPanel>
-            <p className="text-sm text-[var(--color-text-muted)]">
+            <p className="text-sm text-(--color-text-muted)">
               {copy(
                 'Owner is a protected role. Its roles and status are not changed here; an Owner edits their own name and username from Profile.',
               )}
@@ -219,7 +221,7 @@ export function UserEditorDialog({
           </RecordPanel>
         ) : null}
 
-        {canUpdateProfile && !isOwner ? (
+        {canUpdateIdentity && !isOwner ? (
           <RecordPanel>
             <RecordSectionLabel>{copy('Profile')}</RecordSectionLabel>
             <div className="mt-4 space-y-4">
@@ -253,21 +255,81 @@ export function UserEditorDialog({
                 }
                 disabled={saving}
               />
-              <label className="flex cursor-pointer items-start gap-3 text-sm">
-                <DCheckbox
-                  checked={accountActive}
-                  onChange={() => setAccountActive((value) => !value)}
+              <DInput
+                label={copy('Phone number')}
+                value={phoneE164}
+                onChange={(value) => setPhoneE164(value)}
+                inputMode="tel"
+                hint={copy('Use international format, for example +628123456789.')}
+                error={
+                  attempted && phoneInvalid
+                    ? copy('Enter a valid phone number in international format.')
+                    : undefined
+                }
+                disabled={saving}
+              />
+              {canUpdateProfile ? (
+                <label className="flex cursor-pointer items-start gap-3 text-sm">
+                  <DCheckbox
+                    checked={accountActive}
+                    onChange={() => setAccountActive((value) => !value)}
+                    disabled={saving}
+                  />
+                  <span className="min-w-0">
+                    <span className="block font-medium text-(--color-text)">
+                      {copy('Account is active')}
+                    </span>
+                    <span className="mt-0.5 block text-xs leading-5 text-(--color-text-muted)">
+                      {copy('Inactive users cannot sign in and their sessions are ended.')}
+                    </span>
+                  </span>
+                </label>
+              ) : null}
+            </div>
+          </RecordPanel>
+        ) : null}
+
+        {canEditEmail || (isOwner && Boolean(user.email)) ? (
+          <RecordPanel>
+            <div className="flex items-center justify-between gap-3">
+              <RecordSectionLabel>{copy('Email')}</RecordSectionLabel>
+              <EmailStatusBadge status={emailStatus} />
+            </div>
+            <div className="mt-4 space-y-3">
+              {canEditEmail ? (
+                <DInput
+                  label={copy('Email (optional)')}
+                  value={email}
+                  maxLength={EMAIL_MAX}
+                  onChange={(value) => {
+                    setEmailConflict(null);
+                    setEmail(value);
+                  }}
+                  type="email"
+                  inputMode="email"
+                  autoCapitalize="none"
+                  autoComplete="off"
+                  placeholder={copy('For example, siti@business.com')}
+                  hint={copy(
+                    'A new or changed address stays unverified until its owner confirms it. Only a verified email receives password links.',
+                  )}
+                  error={
+                    attempted && emailInvalid
+                      ? copy('Enter a valid email address, for example name@business.com.')
+                      : emailConflict
+                        ? conflictCopy[emailConflict]
+                        : undefined
+                  }
                   disabled={saving}
                 />
-                <span className="min-w-0">
-                  <span className="block font-medium text-[var(--color-text)]">
-                    {copy('Account is active')}
-                  </span>
-                  <span className="mt-0.5 block text-xs leading-5 text-[var(--color-text-muted)]">
-                    {copy('Inactive users cannot sign in and their sessions are ended.')}
-                  </span>
-                </span>
-              </label>
+              ) : (
+                <p className="wrap-break-word text-sm text-(--color-text)">{user.email ?? '-'}</p>
+              )}
+              {emailStatus !== 'VERIFIED' ? (
+                <p className="text-xs leading-5 text-(--color-text-muted)">
+                  {copy('Verify this email before a password link can be sent.')}
+                </p>
+              ) : null}
             </div>
           </RecordPanel>
         ) : null}
@@ -297,14 +359,14 @@ export function UserEditorDialog({
         {canViewLocations && !isOwner ? (
           <RecordPanel>
             <RecordSectionLabel>{copy('Location Access')}</RecordSectionLabel>
-            <p className="mt-3 text-xs leading-5 text-[var(--color-text-muted)]">
+            <p className="mt-3 text-xs leading-5 text-(--color-text-muted)">
               {copy('Without an assigned location this user cannot work at any location.')}
             </p>
-            <div className="mt-3 divide-y divide-[var(--color-border)] overflow-hidden rounded-[var(--radius-control)] border border-[var(--color-border)]">
+            <div className="mt-3 divide-y divide-(--color-border) overflow-hidden rounded-(--radius-control) border border-(--color-border)">
               {locations.map((location) => (
                 <label
                   key={location.id}
-                  className="flex cursor-pointer items-start gap-3 px-3 py-3 text-sm hover:bg-[var(--color-surface-muted)]"
+                  className="flex cursor-pointer items-start gap-3 px-3 py-3 text-sm hover:bg-(--color-surface-muted)"
                 >
                   <DCheckbox
                     checked={locationSelection.includes(location.id)}
@@ -316,38 +378,15 @@ export function UserEditorDialog({
                     disabled={!canManageLocations || saving}
                   />
                   <span className="min-w-0 flex-1">
-                    <span className="block break-words font-medium text-[var(--color-text)]">
+                    <span className="block wrap-break-word font-medium text-(--color-text)">
                       {location.name}
                     </span>
-                    <span className="mt-0.5 block text-xs text-[var(--color-text-muted)]">
+                    <span className="mt-0.5 block text-xs text-(--color-text-muted)">
                       {location.code}
                     </span>
                   </span>
                 </label>
               ))}
-            </div>
-          </RecordPanel>
-        ) : null}
-
-        {canSendLink ? (
-          <RecordPanel>
-            <RecordSectionLabel>{copy('Security')}</RecordSectionLabel>
-            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="min-w-0 text-xs leading-5 text-[var(--color-text-muted)] sm:flex-1">
-                {copy(
-                  'Send a one-time link so this user can set a new password. You never see or set the password.',
-                )}
-              </p>
-              <DButton
-                size="sm"
-                variant="outline"
-                className="self-start sm:self-auto"
-                leftIcon={<MessageCircle className="size-4" aria-hidden="true" />}
-                onClick={() => setConfirmingLink(true)}
-                disabled={saving}
-              >
-                {copy('Send password link')}
-              </DButton>
             </div>
           </RecordPanel>
         ) : null}
@@ -360,19 +399,6 @@ export function UserEditorDialog({
           />
         ) : null}
       </div>
-
-      <DConfirmDialog
-        open={confirmingLink}
-        onClose={() => setConfirmingLink(false)}
-        onConfirm={() => void sendPasswordLink()}
-        loading={sendingLink}
-        title={copy('Send password link?')}
-        message={copy(
-          'A one-time link is sent via WhatsApp to the number registered for this user. It replaces any link that is still pending. Their current password and sessions stay valid until they use the link.',
-        )}
-        confirmLabel={copy('Send password link')}
-        variant="primary"
-      />
     </DDialog>
   );
 }

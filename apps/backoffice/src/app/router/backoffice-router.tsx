@@ -9,6 +9,10 @@ import {
 } from '../../auth/backoffice-account-activation-page';
 import { AuthorizedRoute } from '../../auth/authorized-route';
 import { BackofficeLoginPage, PASSWORD_RECOVERY_PATH } from '../../auth/backoffice-login-page';
+import {
+  BackofficeEmailVerificationPage,
+  EMAIL_VERIFICATION_PATH,
+} from '../../auth/backoffice-email-verification-page';
 import { BackofficePasswordRecoveryPage } from '../../auth/backoffice-password-recovery-page';
 import {
   BackofficePasswordResetPage,
@@ -63,6 +67,7 @@ export const backofficeRouter = createBrowserRouter([
   { path: '/login', element: <BackofficeLoginPage /> },
   { path: PASSWORD_RECOVERY_PATH, element: <BackofficePasswordRecoveryPage /> },
   { path: PASSWORD_RESET_PATH, element: <BackofficePasswordResetPage /> },
+  { path: EMAIL_VERIFICATION_PATH, element: <BackofficeEmailVerificationPage /> },
   { path: ACCOUNT_ACTIVATION_PATH, element: <BackofficeAccountActivationPage /> },
   {
     element: <AuthenticatedRoute />,

@@ -39,17 +39,17 @@ export const backofficeMessages = {
     forgotPassword: 'Lupa kata sandi?',
     backToSignIn: 'Kembali ke login',
     passwordRecoveryDescription:
-      'Masukkan username atau nomor yang terdaftar. Tautan untuk membuat kata sandi baru akan dikirim melalui WhatsApp ke nomor yang terhubung dengan akun Anda.',
+      'Masukkan email terverifikasi Anda. Tautan untuk membuat kata sandi baru akan dikirim ke alamat tersebut.',
     passwordRecoverySubmit: 'Kirim tautan',
     passwordRecoverySending: 'Mengirim…',
-    passwordRecoveryIdentifierRequired: 'Masukkan username atau nomor yang terdaftar.',
+    passwordRecoveryIdentifierRequired: 'Masukkan email terverifikasi Anda.',
     passwordRecoveryUnavailable:
       'Pemulihan kata sandi belum dapat digunakan saat ini. Hubungi administrator bisnis Anda.',
     passwordRecoveryFailed: 'Permintaan belum berhasil dikirim. Coba lagi beberapa saat lagi.',
-    passwordRecoverySentTitle: 'Periksa WhatsApp Anda',
+    passwordRecoverySentTitle: 'Periksa email Anda',
     passwordRecoverySentDescription:
-      'Jika akun tersebut terdaftar, tautan untuk membuat kata sandi baru telah dikirim ke nomor WhatsApp yang terhubung dengan akun.',
-    usernameOrPhone: 'Nama pengguna atau nomor telepon',
+      'Jika akun tersebut terdaftar, tautan untuk membuat kata sandi baru telah dikirim ke email terverifikasinya.',
+    usernameOrPhone: 'Email terverifikasi',
     password: 'Kata sandi',
     signInFieldsRequired: 'Lengkapi data masuk terlebih dahulu.',
     signInFailed: 'Belum berhasil masuk. Periksa kembali nama pengguna dan kata sandi Anda.',
@@ -101,14 +101,14 @@ export const backofficeMessages = {
     activationRetry: 'Coba lagi',
     passwordLinkHeading: 'Kirim tautan kata sandi baru',
     passwordLinkDescription:
-      'Tautan sekali pakai untuk membuat kata sandi baru akan dikirim melalui WhatsApp ke nomor yang terdaftar pada akun Anda. Kata sandi lama tetap berlaku sampai Anda menggantinya.',
+      'Tautan sekali pakai untuk membuat kata sandi baru akan dikirim ke email terverifikasi Anda. Kata sandi lama tetap berlaku sampai Anda menggantinya.',
     passwordLinkSend: 'Kirim tautan',
     passwordLinkCancel: 'Batal',
     passwordLinkDone: 'Selesai',
     passwordLinkSent:
-      'Tautan telah diserahkan ke penyedia WhatsApp untuk dikirim ke nomor Anda. Jika belum masuk, coba lagi sebentar lagi. Semua sesi lama berakhir setelah kata sandi diganti.',
+      'Tautan telah dikirim ke email terverifikasi Anda. Jika belum masuk, coba lagi sebentar lagi. Semua sesi lama berakhir setelah kata sandi diganti.',
     passwordLinkCooldown:
-      'Tautan baru saja dikirim. Periksa WhatsApp Anda atau coba lagi sebentar lagi.',
+      'Tautan baru saja dikirim. Periksa email Anda atau coba lagi sebentar lagi.',
     passwordLinkUnavailable:
       'Tautan belum dapat dikirim saat ini. Hubungi administrator bisnis Anda.',
     passwordLinkFailed: 'Tautan belum berhasil dikirim. Coba lagi beberapa saat lagi.',
@@ -125,7 +125,7 @@ export const backofficeMessages = {
     changePasswordSessionExpired: 'Sesi Anda sudah berakhir. Masuk lagi, lalu coba kembali.',
     changePasswordThrottled: 'Terlalu banyak percobaan. Coba lagi beberapa saat lagi.',
     changePasswordFailed: 'Kata sandi belum dapat diubah. Coba lagi beberapa saat lagi.',
-    passwordLinkSwitch: 'Lupa kata sandi saat ini? Kirim tautan lewat WhatsApp',
+    passwordLinkSwitch: 'Lupa kata sandi saat ini? Kirim tautan lewat email',
     passwordLinkBack: 'Kembali ke ubah dengan kata sandi',
     resetTitle: 'Buat kata sandi baru',
     resetDescription: 'Masukkan kata sandi baru untuk akun Anda.',
@@ -143,6 +143,20 @@ export const backofficeMessages = {
     activationIncompleteTitle: 'Buka kembali tautan undangan',
     activationIncompleteDescription:
       'Tautan aktivasi ini tidak lengkap atau halaman dimuat ulang. Buka kembali tautan dari pesan undangan Anda.',
+    verifyEmailTitle: 'Verifikasi alamat email',
+    verifyEmailDescription:
+      'Konfirmasikan bahwa alamat email ini milik Anda. Setelah terverifikasi, tautan pemulihan kata sandi dapat dikirim ke email ini.',
+    verifyEmailSubmit: 'Konfirmasi email',
+    verifyEmailSubmitting: 'Mengonfirmasi…',
+    verifyEmailDoneTitle: 'Email terverifikasi',
+    verifyEmailDoneDescription:
+      'Alamat email Anda sudah terverifikasi dan dapat dipakai untuk memulihkan akun.',
+    verifyEmailInvalidTitle: 'Tautan tidak valid atau sudah digunakan',
+    verifyEmailInvalidDescription:
+      'Tautan ini tidak dapat dipakai lagi, atau alamat email akun sudah diganti. Minta tautan verifikasi baru kepada admin Anda.',
+    verifyEmailExpiredTitle: 'Tautan sudah kedaluwarsa',
+    verifyEmailExpiredDescription:
+      'Tautan ini melewati batas waktu. Minta tautan verifikasi baru kepada admin Anda.',
   },
   en: {
     dashboard: 'Dashboard',
@@ -184,17 +198,17 @@ export const backofficeMessages = {
     forgotPassword: 'Forgot password?',
     backToSignIn: 'Back to sign in',
     passwordRecoveryDescription:
-      'Enter your registered username or phone number. A link to create a new password will be sent via WhatsApp to the number linked to your account.',
+      'Enter your verified email address. A link to create a new password will be sent there.',
     passwordRecoverySubmit: 'Send link',
     passwordRecoverySending: 'Sending…',
-    passwordRecoveryIdentifierRequired: 'Enter your registered username or phone number.',
+    passwordRecoveryIdentifierRequired: 'Enter your verified email address.',
     passwordRecoveryUnavailable:
       'Password recovery is not available yet. Contact your business administrator.',
     passwordRecoveryFailed: 'The request could not be sent. Please try again shortly.',
-    passwordRecoverySentTitle: 'Check your WhatsApp',
+    passwordRecoverySentTitle: 'Check your email',
     passwordRecoverySentDescription:
-      'If the account is registered, a link to create a new password has been sent to the WhatsApp number linked to it.',
-    usernameOrPhone: 'Username or phone',
+      'If the account is registered, a link to create a new password has been sent to its verified email address.',
+    usernameOrPhone: 'Verified email',
     password: 'Password',
     signInFieldsRequired: 'Complete your sign-in details first.',
     signInFailed: "We couldn't sign you in. Check your username and password.",
@@ -247,13 +261,13 @@ export const backofficeMessages = {
     activationRetry: 'Try again',
     passwordLinkHeading: 'Send a link to set a new password',
     passwordLinkDescription:
-      'A one-time link to create a new password will be sent via WhatsApp to the number registered on your account. Your current password stays valid until you change it.',
+      'A one-time link to create a new password will be sent to your verified email address. Your current password stays valid until you change it.',
     passwordLinkSend: 'Send link',
     passwordLinkCancel: 'Cancel',
     passwordLinkDone: 'Done',
     passwordLinkSent:
-      'The link was handed to WhatsApp for delivery to your registered number. If it does not arrive, try again shortly. All earlier sessions end once the password changes.',
-    passwordLinkCooldown: 'A link was sent a moment ago. Check your WhatsApp or try again shortly.',
+      'The link was sent to your verified email address. If it does not arrive, try again shortly. All earlier sessions end once the password changes.',
+    passwordLinkCooldown: 'A link was sent a moment ago. Check your email or try again shortly.',
     passwordLinkUnavailable:
       'The link could not be sent right now. Contact your business administrator.',
     passwordLinkFailed: 'The link could not be sent. Please try again shortly.',
@@ -270,7 +284,7 @@ export const backofficeMessages = {
     changePasswordSessionExpired: 'Your session has ended. Sign in again, then try once more.',
     changePasswordThrottled: 'Too many attempts. Try again shortly.',
     changePasswordFailed: 'The password could not be changed. Please try again shortly.',
-    passwordLinkSwitch: 'Forgot your current password? Send a link by WhatsApp',
+    passwordLinkSwitch: 'Forgot your current password? Send a link by email',
     passwordLinkBack: 'Back to changing with your password',
     resetTitle: 'Create a new password',
     resetDescription: 'Enter a new password for your account.',
@@ -288,5 +302,19 @@ export const backofficeMessages = {
     activationIncompleteTitle: 'Reopen your invitation link',
     activationIncompleteDescription:
       'This activation link is incomplete or the page was reloaded. Open the link from your invitation message again.',
+    verifyEmailTitle: 'Verify your email address',
+    verifyEmailDescription:
+      'Confirm that this email address is yours. Once verified, password recovery links can be sent to it.',
+    verifyEmailSubmit: 'Confirm email',
+    verifyEmailSubmitting: 'Confirming…',
+    verifyEmailDoneTitle: 'Email verified',
+    verifyEmailDoneDescription:
+      'Your email address is verified and can be used to recover your account.',
+    verifyEmailInvalidTitle: 'Link is not valid or was already used',
+    verifyEmailInvalidDescription:
+      'This link can no longer be used, or the account email was changed. Ask your administrator for a new verification link.',
+    verifyEmailExpiredTitle: 'Link has expired',
+    verifyEmailExpiredDescription:
+      'This link is past its time limit. Ask your administrator for a new verification link.',
   },
 } as const;

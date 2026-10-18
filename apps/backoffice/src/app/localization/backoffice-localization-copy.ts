@@ -1308,6 +1308,34 @@ export const backofficeCopy: Record<string, { id: string; en: string }> = {
     id: 'Profil diperbarui.',
     en: 'Profile updated.',
   },
+  'Email security': {
+    id: 'Keamanan email',
+    en: 'Email security',
+  },
+  'Password links are sent only to your verified email.': {
+    id: 'Tautan kata sandi hanya dikirim ke email Anda yang terverifikasi.',
+    en: 'Password links are sent only to your verified email.',
+  },
+  'Verify this email before it can receive password links.': {
+    id: 'Verifikasi email ini sebelum dapat menerima tautan kata sandi.',
+    en: 'Verify this email before it can receive password links.',
+  },
+  'Add an email in Edit profile to receive password links.': {
+    id: 'Tambahkan email melalui Ubah profil untuk menerima tautan kata sandi.',
+    en: 'Add an email in Edit profile to receive password links.',
+  },
+  'Ask an administrator to add or update your email.': {
+    id: 'Minta administrator untuk menambahkan atau memperbarui email Anda.',
+    en: 'Ask an administrator to add or update your email.',
+  },
+  'Use international format, for example +628123456789.': {
+    id: 'Gunakan format internasional, misalnya +628123456789.',
+    en: 'Use international format, for example +628123456789.',
+  },
+  'Enter a valid phone number in international format.': {
+    id: 'Masukkan nomor telepon yang valid dalam format internasional.',
+    en: 'Enter a valid phone number in international format.',
+  },
   'Could not update your profile.': {
     id: 'Profil tidak dapat diperbarui.',
     en: 'Could not update your profile.',
@@ -1494,4 +1522,125 @@ export const backofficeCopy: Record<string, { id: string; en: string }> = {
     id: 'Pratinjau kode peran',
     en: 'Role code preview',
   },
+  'Send invitation via': {
+    id: 'Kirim undangan melalui',
+    en: 'Send invitation via',
+  },
+  WhatsApp: {
+    id: 'WhatsApp',
+    en: 'WhatsApp',
+  },
+  Email: {
+    id: 'Email',
+    en: 'Email',
+  },
+  'Email (optional)': {
+    id: 'Email (opsional)',
+    en: 'Email (optional)',
+  },
+  'The activation link is sent to the phone number.': {
+    id: 'Tautan aktivasi dikirim ke nomor telepon.',
+    en: 'The activation link is sent to the phone number.',
+  },
+  'The activation link is sent to the email address, which is verified when the user activates.': {
+    id: 'Tautan aktivasi dikirim ke alamat email, dan email langsung terverifikasi saat pengguna mengaktifkan akun.',
+    en: 'The activation link is sent to the email address, which is verified when the user activates.',
+  },
+  'Kept on the account for sign-in and WhatsApp recovery.': {
+    id: 'Tetap disimpan di akun untuk masuk dan pemulihan lewat WhatsApp.',
+    en: 'Kept on the account for sign-in and WhatsApp recovery.',
+  },
+  'For example, siti@business.com': {
+    id: 'Contoh: siti@usaha.com',
+    en: 'For example, siti@business.com',
+  },
+  'The invitation link is sent here and the address is verified on activation.': {
+    id: 'Tautan undangan dikirim ke sini dan alamatnya terverifikasi saat akun diaktifkan.',
+    en: 'The invitation link is sent here and the address is verified on activation.',
+  },
+  'Saved unverified. It can be verified later for password recovery.': {
+    id: 'Disimpan sebagai belum diverifikasi. Dapat diverifikasi nanti untuk pemulihan kata sandi.',
+    en: 'Saved unverified. It can be verified later for password recovery.',
+  },
+  'Enter the email address the invitation is sent to.': {
+    id: 'Masukkan alamat email tujuan undangan.',
+    en: 'Enter the email address the invitation is sent to.',
+  },
+  'Enter a valid email address, for example name@business.com.': {
+    id: 'Masukkan alamat email yang valid, misalnya nama@usaha.com.',
+    en: 'Enter a valid email address, for example name@business.com.',
+  },
+  'This email already belongs to a user.': {
+    id: 'Email ini sudah dipakai pengguna lain.',
+    en: 'This email already belongs to a user.',
+  },
+  'This email already has a pending invitation. Resend or revoke it first.': {
+    id: 'Email ini masih memiliki undangan yang menunggu. Kirim ulang atau batalkan undangan itu terlebih dahulu.',
+    en: 'This email already has a pending invitation. Resend or revoke it first.',
+  },
+  'Not verified': {
+    id: 'Belum diverifikasi',
+    en: 'Not verified',
+  },
+  Verified: {
+    id: 'Terverifikasi',
+    en: 'Verified',
+  },
+  'Verification link sent.': {
+    id: 'Tautan verifikasi dikirim.',
+    en: 'Verification link sent.',
+  },
+  'Could not send the verification link.': {
+    id: 'Tautan verifikasi belum berhasil dikirim.',
+    en: 'Could not send the verification link.',
+  },
+  'Email delivery is not set up yet. Contact your administrator.': {
+    id: 'Pengiriman email belum diatur. Hubungi administrator Anda.',
+    en: 'Email delivery is not set up yet. Contact your administrator.',
+  },
+  'A new or changed address stays unverified until its owner confirms it. Only a verified email receives password links.':
+    {
+      id: 'Alamat baru atau yang diubah tetap belum diverifikasi sampai pemiliknya mengonfirmasi. Hanya email terverifikasi yang menerima tautan kata sandi.',
+      en: 'A new or changed address stays unverified until its owner confirms it. Only a verified email receives password links.',
+    },
+  'Send a one-time link to this address. Only its owner can verify it; you cannot mark it verified.':
+    {
+      id: 'Kirim tautan sekali pakai ke alamat ini. Hanya pemilik email yang dapat memverifikasinya; Anda tidak dapat menandainya terverifikasi.',
+      en: 'Send a one-time link to this address. Only its owner can verify it; you cannot mark it verified.',
+    },
+  'Send verification link': {
+    id: 'Kirim tautan verifikasi',
+    en: 'Send verification link',
+  },
+  'Send verification link?': {
+    id: 'Kirim tautan verifikasi?',
+    en: 'Send verification link?',
+  },
+  'A one-time link is sent to this user email. Only the email owner can verify it.': {
+    id: 'Tautan sekali pakai dikirim ke email pengguna ini. Hanya pemilik email yang dapat memverifikasinya.',
+    en: 'A one-time link is sent to this user email. Only the email owner can verify it.',
+  },
+  'A one-time link is sent to the verified email of this user. It replaces any link that is still pending.':
+    {
+      id: 'Tautan sekali pakai dikirim ke email terverifikasi pengguna ini. Tautan ini menggantikan tautan yang masih menunggu.',
+      en: 'A one-time link is sent to the verified email of this user. It replaces any link that is still pending.',
+    },
+  'Until an email is verified, password links are sent via WhatsApp.': {
+    id: 'Selama email belum diverifikasi, tautan kata sandi dikirim lewat WhatsApp.',
+    en: 'Until an email is verified, password links are sent via WhatsApp.',
+  },
+  'A one-time link is sent to the verified email of this user. It replaces any link that is still pending. Their current password and sessions stay valid until they use the link.':
+    {
+      id: 'Tautan sekali pakai dikirim ke email terverifikasi pengguna ini. Tautan ini menggantikan tautan yang masih menunggu. Kata sandi dan sesi saat ini tetap berlaku sampai tautan dipakai.',
+      en: 'A one-time link is sent to the verified email of this user. It replaces any link that is still pending. Their current password and sessions stay valid until they use the link.',
+    },
+  'Sent via email': {
+    id: 'Dikirim lewat email',
+    en: 'Sent via email',
+  },
+  'Sent via WhatsApp': {
+    id: 'Dikirim lewat WhatsApp',
+    en: 'Sent via WhatsApp',
+  },
+  'Email not set': { id: 'Belum diisi', en: 'Email not set' },
 };

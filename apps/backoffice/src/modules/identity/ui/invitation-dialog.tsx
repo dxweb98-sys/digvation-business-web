@@ -14,12 +14,14 @@ import {
 import type { AccessControlApi, AccessRole } from '../access-control-api';
 import {
   DISPLAY_NAME_MAX,
+  EMAIL_MAX,
   emptyInvitationForm,
   identityConflictOf,
   sanitizePhoneField,
   toCreateInvitationInput,
   validateInvitationForm,
   type IdentityConflict,
+  type IdentityConflictField,
 } from '../model/identity-form';
 import { useIdentityConflictCopy } from './identity-conflict-copy';
 import { OwnerGrantNotice, selectsOwner } from './owner-grant-notice';
@@ -51,7 +53,7 @@ export function InvitationDialog({
   const [ownerConfirmed, setOwnerConfirmed] = useState(false);
   const [conflict, setConflict] = useState<{
     code: IdentityConflict;
-    field: 'phone' | 'username';
+    field: IdentityConflictField;
   } | null>(null);
   const validation = validateInvitationForm(form.values);
   const issue = attempted ? validation.issues : {};
@@ -73,6 +75,15 @@ export function InvitationDialog({
       : conflict?.field === 'username'
         ? conflictCopy[conflict.code]
         : undefined;
+
+  const emailError =
+    issue.email === 'EMAIL_REQUIRED'
+      ? copy('Enter the email address the invitation is sent to.')
+      : issue.email === 'EMAIL_INVALID'
+        ? copy('Enter a valid email address, for example name@business.com.')
+        : conflict?.field === 'email'
+          ? conflictCopy[conflict.code]
+          : undefined;
 
   const save = async () => {
     setAttempted(true);
@@ -135,7 +146,7 @@ export function InvitationDialog({
                 inputMode="tel"
                 autoComplete="off"
                 placeholder="081234567890"
-                hint={copy('The invitation link is sent to this WhatsApp number.')}
+                hint={copy('Kept on the account for sign-in and account identification.')}
                 error={phoneError}
                 disabled={saving}
               />
@@ -154,6 +165,31 @@ export function InvitationDialog({
                 disabled={saving}
               />
             </div>
+          </div>
+        </RecordPanel>
+
+        <RecordPanel>
+          <RecordSectionLabel>{copy('Invitation email')}</RecordSectionLabel>
+          <div className="mt-4">
+            <DInput
+              label={copy('Email')}
+              value={form.values.email}
+              maxLength={EMAIL_MAX}
+              onChange={(value) => {
+                setConflict((current) => (current?.field === 'email' ? null : current));
+                form.setField('email', value);
+              }}
+              type="email"
+              inputMode="email"
+              autoCapitalize="none"
+              autoComplete="off"
+              placeholder={copy('For example, siti@business.com')}
+              hint={copy(
+                'The activation link is sent here and the address is verified on activation.',
+              )}
+              error={emailError}
+              disabled={saving}
+            />
           </div>
         </RecordPanel>
 

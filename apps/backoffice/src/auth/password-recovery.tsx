@@ -1,8 +1,8 @@
 import { createContext, useContext, type ReactNode } from 'react';
 
 export interface PasswordRecoveryRequest {
-  /** Username or phone number registered on the account. */
-  identifier: string;
+  /** Verified account email address. */
+  email: string;
 }
 
 export interface PasswordResetReference {
@@ -11,6 +11,8 @@ export interface PasswordResetReference {
   /** One-time opaque credential from the link fragment. Never persisted or logged. */
   token: string;
 }
+
+export type PasswordResetDestination = 'BACKOFFICE' | 'OPERATIONAL' | 'NONE';
 
 export type PasswordResetFailure = 'invalid' | 'expired' | 'password-policy' | 'network';
 
@@ -21,14 +23,17 @@ export class PasswordResetError extends Error {
 }
 
 /**
- * Backoffice boundary for the WhatsApp password-recovery engine. Implementations resolve the
- * workspace from trusted deployment bootstrap and deliver to the phone registered on the account;
- * the sign-in surface never collects workspace or destination numbers.
+ * Backoffice boundary for verified-email password recovery. Implementations resolve the workspace
+ * from trusted deployment bootstrap; the sign-in surface never collects a phone destination.
  */
 export interface PasswordRecoveryPort {
   request(input: PasswordRecoveryRequest): Promise<void>;
   /** Completes recovery from the one-time link; the Runtime ends every session of the account. */
-  confirm(input: PasswordResetReference & { newPassword: string }): Promise<void>;
+  confirm(input: PasswordResetReference & { newPassword: string }): Promise<{
+    destination: PasswordResetDestination;
+  }>;
+  /** Confirms ownership of an account email from its one-time link; recovery may then use it. */
+  confirmEmailVerification(input: PasswordResetReference): Promise<void>;
 }
 
 export class PasswordRecoveryUnavailableError extends Error {
@@ -41,6 +46,7 @@ export class PasswordRecoveryUnavailableError extends Error {
 export const unavailablePasswordRecovery: PasswordRecoveryPort = {
   request: () => Promise.reject(new PasswordRecoveryUnavailableError()),
   confirm: () => Promise.reject(new PasswordResetError('network')),
+  confirmEmailVerification: () => Promise.reject(new PasswordResetError('network')),
 };
 
 const PasswordRecoveryContext = createContext<PasswordRecoveryPort>(unavailablePasswordRecovery);

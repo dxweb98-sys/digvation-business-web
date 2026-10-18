@@ -8,7 +8,6 @@ import {
   ChartNoAxesCombined,
   ClipboardList,
   CircleUserRound,
-  KeyRound,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -19,6 +18,7 @@ import {
   ContactRound,
   WalletCards,
   type LucideIcon,
+  ChevronDown,
 } from 'lucide-react';
 import { NavLink, Outlet, useLocation } from 'react-router';
 import { useState } from 'react';
@@ -157,10 +157,10 @@ export function BackofficeShell() {
   });
 
   return (
-    <div className="backoffice-shell flex h-screen w-full min-w-0 overflow-hidden bg-[var(--color-background)]">
-      <aside className="backoffice-shell__sidebar hidden min-h-0 shrink-0 flex-col border-r border-[var(--color-border)] bg-[var(--color-surface)] shadow-[1px_0_0_var(--color-border)] md:flex md:w-[232px] lg:w-[280px]">
-        <div className="flex min-h-16 items-center gap-3 border-b border-[var(--color-border)] px-5 py-3">
-          <div className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-[var(--radius-control)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]">
+    <div className="backoffice-shell flex h-screen w-full min-w-0 overflow-hidden bg-(--color-background)">
+      <aside className="backoffice-shell__sidebar hidden min-h-0 shrink-0 flex-col border-r border-(--color-border) bg-(--color-surface) shadow-[1px_0_0_var(--color-border)] md:flex md:w-58 lg:w-70">
+        <div className="flex min-h-16 items-center gap-3 border-b border-(--color-border) px-5 py-3">
+          <div className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-(--radius-control) bg-(--color-brand)/10 text-(--color-brand)">
             {bootstrap.branding.logoUrl ? (
               <img
                 src={bootstrap.branding.logoUrl}
@@ -168,16 +168,14 @@ export function BackofficeShell() {
                 className="size-full object-contain p-1"
               />
             ) : (
-              <Building2 className="size-[18px]" strokeWidth={2.2} />
+              <Building2 className="size-4.5" strokeWidth={2.2} />
             )}
           </div>
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold leading-5 text-[var(--color-text)]">
+            <p className="truncate text-sm font-semibold leading-5 text-(--color-text)">
               {bootstrap.branding.productName}
             </p>
-            <p className="truncate text-xs leading-4 text-[var(--color-text-muted)]">
-              {brandSubtitle}
-            </p>
+            <p className="truncate text-xs leading-4 text-(--color-text-muted)">{brandSubtitle}</p>
           </div>
         </div>
 
@@ -185,7 +183,7 @@ export function BackofficeShell() {
           <NavigationGroups session={session} />
         </nav>
 
-        <div className="mt-auto hidden border-t border-[var(--color-border)] md:block">
+        <div className="mt-auto hidden border-t border-(--color-border) md:block">
           <div className="px-4 py-3">
             <div className="flex min-w-0 items-center gap-3">
               <DAvatar
@@ -193,25 +191,25 @@ export function BackofficeShell() {
                 name={session.identity.displayName}
                 fallback={<UserRound className="size-4" aria-label={t('userAccount')} />}
                 size="sm"
-                className="shrink-0 bg-[var(--color-brand)]/10 text-xs font-bold text-[var(--color-brand)]"
+                className="shrink-0 bg-(--color-brand)/10 text-xs font-bold text-(--color-brand)"
               />
               <span className="min-w-0">
-                <span className="block truncate text-sm font-medium leading-5 text-[var(--color-text)]">
+                <span className="block truncate text-sm font-medium leading-5 text-(--color-text)">
                   {session.identity.displayName}
                 </span>
-                <span className="block truncate text-xs leading-4 text-[var(--color-text-muted)]">
+                <span className="block truncate text-xs leading-4 text-(--color-text-muted)">
                   {roleContext}
                 </span>
               </span>
             </div>
           </div>
-          <div className="border-t border-[var(--color-border)] px-3 py-2">
+          <div className="border-t border-(--color-border) px-3 py-2">
             <DButton
               variant="ghost"
               type="button"
               leftIcon={<LogOut className="size-4 shrink-0" />}
               onClick={() => void logout()}
-              className="flex h-9 w-full items-center justify-start gap-2.5 px-3 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)]"
+              className="flex h-9 w-full items-center justify-start gap-2.5 px-3 text-(--color-text-muted) hover:bg-(--color-surface-muted) hover:text-(--color-text)"
             >
               {t('logout')}
             </DButton>
@@ -220,7 +218,7 @@ export function BackofficeShell() {
       </aside>
 
       <main className="backoffice-shell__main flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden">
-        <header className="flex h-16 w-full shrink-0 items-center justify-between gap-4 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-5 shadow-[0_1px_0_var(--color-border)] md:px-6 lg:px-8">
+        <header className="flex h-16 w-full shrink-0 items-center justify-between gap-4 border-b border-(--color-border) bg-(--color-surface) px-5 shadow-[0_1px_0_var(--color-border)] md:px-6 lg:px-8">
           <div className="flex min-w-0 items-center gap-2">
             <div className="backoffice-shell__mobile-navigation md:hidden">
               <DDropdown
@@ -233,7 +231,7 @@ export function BackofficeShell() {
                 contentClassName="w-[min(320px,calc(100vw-24px))] max-h-[calc(100vh-88px)] overflow-y-auto"
                 trigger={() => (
                   <DButton variant="ghost" size="icon" aria-label={t('openNavigation')}>
-                    <Menu className="size-[18px]" />
+                    <Menu className="size-4.5" />
                   </DButton>
                 )}
               >
@@ -248,18 +246,15 @@ export function BackofficeShell() {
             />
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
-            <p className="backoffice-shell__header-date hidden text-xs text-[var(--color-text-muted)] md:block">
+            <p className="backoffice-shell__header-date hidden text-xs text-(--color-text-muted) md:block">
               {currentDate}
             </p>
             <span
-              className="backoffice-shell__header-metadata hidden h-5 w-px bg-[var(--color-border)] md:block"
+              className="backoffice-shell__header-metadata hidden h-5 w-px bg-(--color-border) md:block"
               aria-hidden="true"
             />
-            <span className="backoffice-shell__header-status hidden items-center gap-1.5 text-xs text-[var(--color-text-muted)] md:flex">
-              <span
-                className="size-1.5 rounded-full bg-[var(--color-success)]"
-                aria-hidden="true"
-              />
+            <span className="backoffice-shell__header-status hidden items-center gap-1.5 text-xs text-(--color-text-muted) md:flex">
+              <span className="size-1.5 rounded-full bg-(--color-success)" aria-hidden="true" />
               {t('online')}
             </span>
             <NotificationBell />
@@ -273,8 +268,9 @@ export function BackofficeShell() {
               trigger={() => (
                 <button
                   type="button"
-                  className="grid size-9 place-items-center border-0 bg-transparent p-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/25"
+                  className={`flex h-9 items-center gap-1 rounded-full border-0 px-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-focus) ${accountMenuOpen ? 'bg-(--color-surface-muted)' : 'bg-(--color-surface-muted)/75 hover:bg-(--color-surface-muted)'}`}
                   aria-label={t('openAccountMenu')}
+                  aria-expanded={accountMenuOpen}
                 >
                   <DAvatar
                     alt=""
@@ -285,19 +281,18 @@ export function BackofficeShell() {
                       )
                     }
                     size="sm"
-                    className="shrink-0 text-xs font-bold text-[var(--color-brand)]"
+                    className="shrink-0 bg-transparent text-xs font-bold text-(--color-brand) [&_*]:border-0 [&_*]:bg-transparent"
                   />
+                  <ChevronDown className="size-3.5 text-(--color-text-muted)" aria-hidden="true" />
                 </button>
               )}
             >
               <div className="p-1.5">
-                <div className="border-b border-[var(--color-border)] px-2.5 py-2.5">
-                  <p className="truncate text-sm font-semibold text-[var(--color-text)]">
+                <div className="border-b border-(--color-border) px-2.5 py-2.5">
+                  <p className="truncate text-sm font-semibold text-(--color-text)">
                     {session.identity.displayName}
                   </p>
-                  <p className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">
-                    {roleContext}
-                  </p>
+                  <p className="mt-0.5 truncate text-xs text-(--color-text-muted)">{roleContext}</p>
                 </div>
                 <button
                   type="button"
@@ -306,29 +301,17 @@ export function BackofficeShell() {
                     setAccountMenuOpen(false);
                     setProfileOpen(true);
                   }}
-                  className="mt-1 flex h-9 w-full items-center gap-2 rounded-[var(--radius-control)] px-2.5 text-left text-sm text-[var(--color-text)] hover:bg-[var(--color-surface-muted)]"
+                  className="mt-1 flex h-9 w-full items-center gap-2 rounded-(--radius-control) px-2.5 text-left text-sm text-(--color-text) hover:bg-(--color-surface-muted)"
                 >
                   <UserCircle className="size-4" />
                   {t('profile')}
                 </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setAccountMenuOpen(false);
-                    setChangePasswordOpen(true);
-                  }}
-                  className="flex h-9 w-full items-center gap-2 rounded-[var(--radius-control)] px-2.5 text-left text-sm text-[var(--color-text)] hover:bg-[var(--color-surface-muted)]"
-                >
-                  <KeyRound className="size-4" />
-                  {t('changePassword')}
-                </button>
-                <div className="my-1 border-t border-[var(--color-border)]" />
+                <div className="my-1 border-t border-(--color-border)" />
                 <button
                   type="button"
                   role="menuitem"
                   onClick={() => void logout()}
-                  className="flex h-9 w-full items-center gap-2 rounded-[var(--radius-control)] px-2.5 text-left text-sm font-medium text-[var(--color-text)] hover:bg-[var(--color-surface-muted)]"
+                  className="flex h-9 w-full items-center gap-2 rounded-(--radius-control) px-2.5 text-left text-sm font-medium text-(--color-text) hover:bg-(--color-surface-muted)"
                 >
                   <LogOut className="size-4" />
                   {t('logout')}
@@ -341,7 +324,11 @@ export function BackofficeShell() {
           <Outlet />
         </div>
       </main>
-      <ProfileDialog open={profileOpen} onClose={() => setProfileOpen(false)} />
+      <ProfileDialog
+        open={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        onRequestPasswordLink={() => setChangePasswordOpen(true)}
+      />
       <BackofficePasswordLinkDialog
         open={changePasswordOpen}
         onClose={() => setChangePasswordOpen(false)}
@@ -362,7 +349,7 @@ function NavigationGroups({ session }: { session: AuthSession }) {
         if (!items.length) return null;
         return (
           <div key={section.label} className="mt-3">
-            <p className="px-3 pb-1 text-[12px] font-semibold text-[var(--color-text-muted)]">
+            <p className="px-3 pb-1 text-[12px] font-semibold text-(--color-text-muted)">
               {t(section.label)}
             </p>
             <div className="space-y-0.5 pl-3">
@@ -391,15 +378,15 @@ function NavigationLink({ item, nested = false }: { item: NavigationItem; nested
       to={item.to}
       className={({ isActive }) =>
         [
-          'flex h-9 items-center justify-start gap-2 rounded-[var(--radius-control)] text-sm font-medium transition-colors duration-150',
+          'flex h-9 items-center justify-start gap-2 rounded-(--radius-control) text-sm font-medium transition-colors duration-150',
           nested ? 'px-3' : 'px-3',
           isActive
-            ? 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]'
-            : 'text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)]',
+            ? 'bg-(--color-brand)/10 text-(--color-brand)'
+            : 'text-(--color-text-muted) hover:bg-(--color-surface-muted) hover:text-(--color-text)',
         ].join(' ')
       }
     >
-      <Icon className="size-[18px] shrink-0" />
+      <Icon className="size-4.5 shrink-0" />
       {label}
     </NavLink>
   );

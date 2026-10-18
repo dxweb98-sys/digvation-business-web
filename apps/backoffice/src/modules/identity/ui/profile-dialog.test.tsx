@@ -38,6 +38,8 @@ const self = (systemKey: 'OWNER' | null) => ({
   username: 'siti.rahma',
   displayName: 'Siti Rahma',
   phoneE164: '+628123456789',
+  email: 'siti@example.com',
+  emailVerifiedAt: '2026-10-18T00:00:00.000Z',
   version: 2,
   roles: [
     { id: 'r-1', code: systemKey ?? 'STAFF', name: systemKey ? 'Owner' : 'Staff', systemKey },
@@ -74,23 +76,51 @@ const save = async () => {
     fireEvent.click(target);
   });
 };
+const openEditor = async () => {
+  const target = await waitFor(() => {
+    const button = [...document.body.querySelectorAll('button')].find((node) =>
+      /Ubah profil/.test(node.textContent ?? ''),
+    );
+    expect(button).toBeTruthy();
+    return button!;
+  });
+  await act(async () => {
+    fireEvent.click(target);
+  });
+};
 
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
 });
 
-describe.each([
-  ['non-Owner', null],
-  ['Owner', 'OWNER' as const],
-])('ProfileDialog (%s)', (_label, systemKey) => {
+describe('ProfileDialog (Owner)', () => {
+  const systemKey = 'OWNER' as const;
+  it('opens on a read-only account overview and enters edit mode only on request', async () => {
+    client.get.mockResolvedValue(self(systemKey));
+    renderDialog();
+
+    await waitFor(() => expect(document.body.textContent).toContain('siti@example.com'));
+    expect(field(/Nama tampilan/)).toBeNull();
+
+    fireEvent.click(
+      [...document.body.querySelectorAll('button')].find((node) =>
+        /Ubah profil/.test(node.textContent ?? ''),
+      )!,
+    );
+
+    await waitFor(() => expect(field(/Nama tampilan/)?.value).toBe('Siti Rahma'));
+  });
+
   it('shows the account, keeps the phone read-only and sends only changed fields', async () => {
     client.get.mockResolvedValue(self(systemKey));
     client.patch.mockResolvedValue(self(systemKey));
     const { onClose } = renderDialog();
+    await openEditor();
     await waitFor(() => expect(field(/Nama tampilan/)?.value).toBe('Siti Rahma'));
     expect(field(/Nomor telepon terverifikasi/).value).toBe('+628123456789');
     expect(field(/Nomor telepon terverifikasi/).disabled).toBe(true);
+    expect(field(/Email/).value).toBe('siti@example.com');
     fireEvent.change(field(/Nama tampilan/), { target: { value: ' Siti R ' } });
     await save();
     await waitFor(() => expect(client.patch).toHaveBeenCalledTimes(1));
@@ -99,10 +129,28 @@ describe.each([
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 
+  it('saves a changed email as unverified account data', async () => {
+    client.get.mockResolvedValue(self(systemKey));
+    client.patch.mockResolvedValue({
+      ...self(systemKey),
+      email: 'baru@example.com',
+      emailVerifiedAt: null,
+    });
+    renderDialog();
+    await openEditor();
+    await waitFor(() => expect(field(/Email/).value).toBe('siti@example.com'));
+    fireEvent.change(field(/Email/), { target: { value: 'baru@example.com' } });
+    await save();
+    await waitFor(() =>
+      expect(client.patch).toHaveBeenCalledWith('/api/v1/auth/me', { email: 'baru@example.com' }),
+    );
+  });
+
   it('shows a username conflict under the field and never sends invalid names', async () => {
     client.get.mockResolvedValue(self(systemKey));
     client.patch.mockRejectedValue({ status: 409, code: 'USER_USERNAME_ALREADY_EXISTS' });
     const { onClose } = renderDialog();
+    await openEditor();
     await waitFor(() => expect(field(/Username masuk/)?.value).toBe('siti.rahma'));
     fireEvent.change(field(/Username masuk/), { target: { value: 'x' } });
     await save();
@@ -111,5 +159,25 @@ describe.each([
     await save();
     await waitFor(() => expect(document.body.textContent).toContain('sudah dipakai'));
     expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+describe('ProfileDialog (Manager/Cashier)', () => {
+  it('keeps identity attributes read-only while retaining verification resend', async () => {
+    client.get.mockResolvedValue({ ...self(null), emailVerifiedAt: null });
+    renderDialog();
+
+    await waitFor(() => expect(document.body.textContent).toContain('siti@example.com'));
+    expect(
+      [...document.body.querySelectorAll('button')].some((node) =>
+        /Ubah profil/.test(node.textContent ?? ''),
+      ),
+    ).toBe(false);
+    expect(field(/Nama tampilan/)).toBeNull();
+    expect(
+      [...document.body.querySelectorAll('button')].some((node) =>
+        /Kirim tautan verifikasi/.test(node.textContent ?? ''),
+      ),
+    ).toBe(true);
   });
 });

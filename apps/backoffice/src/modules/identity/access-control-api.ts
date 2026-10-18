@@ -38,7 +38,11 @@ export interface AccessUser {
   id: string;
   username: string | null;
   displayName: string;
+  phoneE164: string;
   status: 'ACTIVE' | 'PENDING_ACTIVATION' | 'DISABLED';
+  /** Optional; used for recovery only once its owner verified it. */
+  email?: string | null;
+  emailVerifiedAt?: string | null;
   version: number;
   roles: AccessRole[];
 }
@@ -48,6 +52,7 @@ export interface UserInvitation {
   phoneE164: string;
   username: string | null;
   displayName: string;
+  email?: string | null;
   expiresAt: string;
   resendAvailableAt: string;
   acceptedAt: string | null;
@@ -62,6 +67,8 @@ export interface SelfProfile {
   username: string | null;
   displayName: string;
   phoneE164: string;
+  email: string | null;
+  emailVerifiedAt: string | null;
   version: number;
   roles: Array<{ id: string; code: string; name: string; systemKey: 'OWNER' | null }>;
 }
@@ -104,9 +111,12 @@ export class AccessControlApi {
   getSelf() {
     return this.client.get<SelfProfile>('/api/v1/auth/me');
   }
-  /** Self-service: display name and username only; roles, status and phone are never sent. */
-  updateSelf(input: { displayName?: string; username?: string }) {
+  /** Self-service only; roles, status and phone are never sent. */
+  updateSelf(input: { displayName?: string; username?: string; email?: string | null }) {
     return this.client.patch<SelfProfile>('/api/v1/auth/me', input);
+  }
+  requestOwnEmailVerification() {
+    return this.client.post<{ completed: true }>('/api/v1/auth/email-verification/request', {});
   }
   listRoles(page: PageRequest) {
     return this.client.get<Page<AccessRole>>(
@@ -131,6 +141,7 @@ export class AccessControlApi {
     username?: string;
     displayName: string;
     roleIds: string[];
+    email: string;
   }) {
     return this.client.post<UserInvitation>('/api/v1/user-invitations', input);
   }
@@ -163,14 +174,25 @@ export class AccessControlApi {
   }
   updateUser(
     user: AccessUser,
-    input: { displayName?: string; username?: string; status?: 'ACTIVE' | 'DISABLED' },
+    input: {
+      displayName?: string;
+      username?: string;
+      phoneE164?: string;
+      status?: 'ACTIVE' | 'DISABLED';
+      /** A new address is saved unverified; null removes it. */
+      email?: string | null;
+    },
   ) {
     return this.client.patch<AccessUser>(`/api/v1/users/${user.id}`, {
       expectedVersion: user.version,
       ...input,
     });
   }
-  /** Sends a one-time password link to the user's registered phone; the caller never sees it. */
+  /** Sends a one-time ownership link to the user's unverified email; the caller never sees it. */
+  requestUserEmailVerification(user: AccessUser) {
+    return this.client.post<{ completed: true }>(`/api/v1/users/${user.id}/email-verification`, {});
+  }
+  /** Sends a one-time password link only to the user's verified email. */
   requestUserPasswordLink(user: AccessUser) {
     return this.client.post<{ completed: true }>(`/api/v1/users/${user.id}/password-reset`, {});
   }

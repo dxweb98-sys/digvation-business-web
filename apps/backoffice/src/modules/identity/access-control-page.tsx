@@ -13,7 +13,7 @@ import {
 } from '@digvation/ui';
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Ban, Pencil, Plus, RefreshCw, UserCog, UserPlus } from 'lucide-react';
+import { Ban, KeyRound, Mail, Pencil, Plus, RefreshCw, UserCog, UserPlus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
@@ -31,6 +31,8 @@ import { invitationStatusOf } from './model/invitation-status';
 import { InvitationDialog } from './ui/invitation-dialog';
 import { RoleEditorDialog } from './ui/role-editor-dialog';
 import { UserEditorDialog } from './ui/user-editor-dialog';
+import { EmailStatusBadge } from './ui/email-status-badge';
+import { emailStatusOf } from './model/identity-form';
 import { OperationalAccessApi } from '../operational-access/operational-access-api';
 
 const keys = {
@@ -54,6 +56,7 @@ export function AccessControlPage() {
   const runtime = useRuntime();
   const queryClient = useQueryClient();
   const { copy, locale } = useBackofficeLocalization();
+  const { showToast } = useToast();
   const api = useMemo(
     () => new AccessControlApi(createApiClient(runtime.apiBaseUrl)),
     [createApiClient, runtime.apiBaseUrl],
@@ -72,6 +75,8 @@ export function AccessControlPage() {
   );
   const canManageUsers = Boolean(session && canPerformBackofficeAction(session, 'manageUserRoles'));
   const canUpdateUsers = Boolean(session && canPerformBackofficeAction(session, 'updateUsers'));
+  const isOwner = Boolean(session?.identity.roles.some((role) => role.systemKey === 'OWNER'));
+  const canUpdateUserIdentity = isOwner && canUpdateUsers;
   const canViewSecurityActivity = Boolean(
     session && canPerformBackofficeAction(session, 'viewSecurityActivity'),
   );
@@ -86,6 +91,8 @@ export function AccessControlPage() {
   const [editingRole, setEditingRole] = useState<AccessRole | null | undefined>();
   const [deactivatingRole, setDeactivatingRole] = useState<AccessRole | null>(null);
   const [editingUser, setEditingUser] = useState<AccessUser | null>(null);
+  const [verifyingUser, setVerifyingUser] = useState<AccessUser | null>(null);
+  const [resettingUser, setResettingUser] = useState<AccessUser | null>(null);
   const [inviting, setInviting] = useState(false);
   const [revokingInvitation, setRevokingInvitation] = useState<UserInvitation | null>(null);
 
@@ -114,6 +121,33 @@ export function AccessControlPage() {
 
   const invalidate = (key: readonly string[]) =>
     void queryClient.invalidateQueries({ queryKey: key });
+
+  const sendEmailVerification = async () => {
+    if (!verifyingUser) return;
+    try {
+      await api.requestUserEmailVerification(verifyingUser);
+      setVerifyingUser(null);
+      showToast({ variant: 'success', title: copy('Verification link sent.') });
+    } catch (error) {
+      const failure = normalizeBackofficeApiError(
+        error,
+        copy('Could not send the verification link.'),
+      );
+      showToast({ variant: 'danger', title: failure.safeMessage });
+    }
+  };
+
+  const sendPasswordLink = async () => {
+    if (!resettingUser) return;
+    try {
+      await api.requestUserPasswordLink(resettingUser);
+      setResettingUser(null);
+      showToast({ variant: 'success', title: copy('Password link sent.') });
+    } catch (error) {
+      const failure = normalizeBackofficeApiError(error, copy('Could not send the password link.'));
+      showToast({ variant: 'danger', title: failure.safeMessage });
+    }
+  };
 
   const actions =
     section === 'roles' && canCreateRole ? (
@@ -165,7 +199,11 @@ export function AccessControlPage() {
               users={users.data?.items ?? []}
               loading={users.isLoading}
               canEdit={canManageUsers || canManageLocations || canUpdateUsers}
+              canManageSecurity={canUpdateUsers}
+              canManageOwnerSecurity={isOwner}
               onEdit={setEditingUser}
+              onRequestVerification={setVerifyingUser}
+              onRequestPasswordLink={setResettingUser}
             />
           </DTabsContent>
         ) : null}
@@ -204,9 +242,11 @@ export function AccessControlPage() {
           operationalAccess={operationalAccess}
           canManageRoles={canManageUsers}
           canUpdateProfile={canUpdateUsers}
+          canUpdateIdentity={canUpdateUserIdentity}
           canViewLocations={canViewLocations || canManageLocations}
           canManageLocations={canManageLocations}
           canViewSecurityActivity={canViewSecurityActivity}
+          currentUserId={session.identity.userId}
           onClose={() => setEditingUser(null)}
           onChanged={() => invalidate(keys.users)}
         />
@@ -234,6 +274,28 @@ export function AccessControlPage() {
         message={copy("Users will no longer receive this role's permissions.")}
         confirmLabel={copy('Deactivate')}
         variant="danger"
+      />
+      <DConfirmDialog
+        open={Boolean(verifyingUser)}
+        onClose={() => setVerifyingUser(null)}
+        onConfirm={() => void sendEmailVerification()}
+        title={copy('Send verification link?')}
+        message={copy(
+          'A one-time link is sent to this user email. Only the email owner can verify it.',
+        )}
+        confirmLabel={copy('Send verification link')}
+        variant="primary"
+      />
+      <DConfirmDialog
+        open={Boolean(resettingUser)}
+        onClose={() => setResettingUser(null)}
+        onConfirm={() => void sendPasswordLink()}
+        title={copy('Send password link?')}
+        message={copy(
+          'A one-time link is sent to the verified email of this user. It replaces any link that is still pending.',
+        )}
+        confirmLabel={copy('Send password link')}
+        variant="primary"
       />
       <DConfirmDialog
         open={Boolean(revokingInvitation)}
@@ -280,14 +342,14 @@ function RolesTable({
             <button
               type="button"
               onClick={() => onEdit(role)}
-              className="rounded-sm text-left font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/25"
+              className="rounded-sm text-left font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-focus)/25"
             >
               {role.name}
             </button>
           ) : (
             <p className="font-medium">{role.name}</p>
           )}
-          <p className="text-xs text-[var(--color-text-muted)]">{role.code}</p>
+          <p className="text-xs text-(--color-text-muted)">{role.code}</p>
         </div>
       ),
     },
@@ -336,12 +398,20 @@ function UsersTable({
   users,
   loading,
   canEdit,
+  canManageSecurity,
+  canManageOwnerSecurity,
   onEdit,
+  onRequestVerification,
+  onRequestPasswordLink,
 }: {
   users: AccessUser[];
   loading: boolean;
   canEdit: boolean;
+  canManageSecurity: boolean;
+  canManageOwnerSecurity: boolean;
   onEdit: (user: AccessUser) => void;
+  onRequestVerification: (user: AccessUser) => void;
+  onRequestPasswordLink: (user: AccessUser) => void;
 }) {
   const { copy } = useBackofficeLocalization();
   const columns: TableColumn<AccessUser>[] = [
@@ -354,14 +424,14 @@ function UsersTable({
             <button
               type="button"
               onClick={() => onEdit(user)}
-              className="rounded-sm text-left font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/25"
+              className="rounded-sm text-left font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-focus)/25"
             >
               {user.displayName}
             </button>
           ) : (
             <p className="font-medium">{user.displayName}</p>
           )}
-          <p className="text-xs text-[var(--color-text-muted)]">{user.username ?? '-'}</p>
+          <p className="text-xs text-(--color-text-muted)">{user.username ?? '-'}</p>
         </div>
       ),
     },
@@ -369,6 +439,16 @@ function UsersTable({
       key: 'roles',
       label: copy('Roles'),
       render: (user) => user.roles.map((role) => role.name).join(', ') || '-',
+    },
+    {
+      key: 'email',
+      label: copy('Email'),
+      render: (user) => (
+        <div className="min-w-0 space-y-1">
+          {user.email ? <p className="wrap-break-word text-sm">{user.email}</p> : null}
+          <EmailStatusBadge status={emailStatusOf(user)} />
+        </div>
+      ),
     },
     {
       key: 'status',
@@ -393,6 +473,27 @@ function UsersTable({
           icon: <Pencil className="size-4" />,
           onClick: onEdit,
           show: () => canEdit,
+        },
+        {
+          label: copy('Send verification link'),
+          icon: <Mail className="size-4" />,
+          onClick: onRequestVerification,
+          show: (user) =>
+            canManageSecurity &&
+            (canManageOwnerSecurity || !user.roles.some((role) => role.systemKey === 'OWNER')) &&
+            user.status === 'ACTIVE' &&
+            Boolean(user.email) &&
+            !user.emailVerifiedAt,
+        },
+        {
+          label: copy('Send password link'),
+          icon: <KeyRound className="size-4" />,
+          onClick: onRequestPasswordLink,
+          show: (user) =>
+            canManageSecurity &&
+            (canManageOwnerSecurity || !user.roles.some((role) => role.systemKey === 'OWNER')) &&
+            user.status === 'ACTIVE' &&
+            Boolean(user.emailVerifiedAt),
         },
       ]}
     />
@@ -423,7 +524,11 @@ function InvitationsTable({
       render: (invitation) => (
         <div>
           <p className="font-medium">{invitation.displayName}</p>
-          <p className="text-xs text-[var(--color-text-muted)]">{invitation.phoneE164}</p>
+          <p className="text-xs text-(--color-text-muted)">{invitation.phoneE164}</p>
+          {invitation.email ? (
+            <p className="wrap-break-word text-xs text-(--color-text-muted)">{invitation.email}</p>
+          ) : null}
+          <p className="text-xs text-(--color-text-muted)">{copy('Sent via email')}</p>
         </div>
       ),
     },
@@ -453,7 +558,7 @@ function InvitationsTable({
                 : 'Valid until';
         return (
           <span className="text-sm">
-            <span className="text-[var(--color-text-muted)]">{copy(label)} </span>
+            <span className="text-(--color-text-muted)">{copy(label)} </span>
             {formatDate(new Date(when ?? invitation.expiresAt), {
               dateStyle: 'medium',
               timeStyle: 'short',
