@@ -56,17 +56,19 @@ function status(history: ReceiptDeliveryAttempt[] = []): OperationalReceiptDeliv
   };
 }
 
-function setup(
-  initial: OperationalReceiptDeliveryStatus,
-  target: ReceiptDeliveryTarget = TARGET,
-) {
+function setup(initial: OperationalReceiptDeliveryStatus, target: ReceiptDeliveryTarget = TARGET) {
   let current = initial;
   const commands = {
     getReceiptDeliveryStatus: vi.fn(async () => current),
     requestReceiptDelivery: vi.fn(async () => {
       // Runtime appends a new attempt; earlier attempts stay.
       current = status([
-        attempt({ deliveryId: 'delivery-new', status: 'QUEUED', failureCategory: null, failedAt: null }),
+        attempt({
+          deliveryId: 'delivery-new',
+          status: 'QUEUED',
+          failureCategory: null,
+          failedAt: null,
+        }),
         ...current.history,
       ]);
       return { deliveryId: 'delivery-new', channel: 'WHATSAPP' as const, state: 'QUEUED' as const };
@@ -195,11 +197,19 @@ describe('ReceiptDeliveryDialog', () => {
 
   it('retries an earlier corrected number by reference, without knowing the number', async () => {
     const { commands } = setup(
-      status([attempt({ deliveryId: 'delivery-7', customerDestination: false, destinationMasked: '+62 •••• 8888' })]),
+      status([
+        attempt({
+          deliveryId: 'delivery-7',
+          customerDestination: false,
+          destinationMasked: '+62 •••• 8888',
+        }),
+      ]),
     );
 
     expect(await screen.findByText(/Nomor pengiriman terakhir/)).toBeTruthy();
-    expect(screen.getByRole('radio', { name: /Nomor pengiriman terakhir/ }).getAttribute('aria-checked')).toBe('true');
+    expect(
+      screen.getByRole('radio', { name: /Nomor pengiriman terakhir/ }).getAttribute('aria-checked'),
+    ).toBe('true');
     fireEvent.click(screen.getByRole('button', { name: /Coba lagi/ }));
 
     await waitFor(() => expect(commands.requestReceiptDelivery).toHaveBeenCalledTimes(1));
@@ -236,7 +246,9 @@ describe('ReceiptDeliveryDialog', () => {
     }) as HTMLInputElement;
     fireEvent.change(input, { target: { value: '0812 9999' } });
     fireEvent.change(input, { target: { value: '0812 9999 7777' } });
-    expect(screen.getByRole('radio', { name: /Nomor lain/ }).getAttribute('aria-checked')).toBe('true');
+    expect(screen.getByRole('radio', { name: /Nomor lain/ }).getAttribute('aria-checked')).toBe(
+      'true',
+    );
     fireEvent.click(screen.getByRole('button', { name: /Kirim ke nomor baru/ }));
 
     await waitFor(() => expect(commands.requestReceiptDelivery).toHaveBeenCalledTimes(1));
@@ -283,14 +295,21 @@ describe('ReceiptDeliveryDialog', () => {
     setup(status(), { ...TARGET, customerPhone: null });
 
     expect(await screen.findByRole('radio', { name: /Nomor pelanggan/ })).toBeTruthy();
-    expect(screen.getByRole('radio', { name: /Nomor pelanggan/ }).textContent).toContain('+62 •••• 1231');
+    expect(screen.getByRole('radio', { name: /Nomor pelanggan/ }).textContent).toContain(
+      '+62 •••• 1231',
+    );
     expect(document.body.textContent).not.toMatch(/812 3123 1231|6281231231231/);
   });
 
   it('lists earlier attempts with their outcome', async () => {
     setup(
       status([
-        attempt({ deliveryId: 'delivery-2', status: 'SENT', failureCategory: null, failedAt: null }),
+        attempt({
+          deliveryId: 'delivery-2',
+          status: 'SENT',
+          failureCategory: null,
+          failedAt: null,
+        }),
         attempt({ deliveryId: 'delivery-1' }),
       ]),
     );

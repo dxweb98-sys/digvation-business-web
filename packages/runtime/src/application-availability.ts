@@ -1,7 +1,4 @@
-import type {
-  ApplicationId,
-  DeploymentBootstrapConfig,
-} from './runtime-config.types';
+import type { ApplicationId, DeploymentBootstrapConfig } from './runtime-config.types';
 
 export function assertApplicationEnabled(
   config: DeploymentBootstrapConfig,

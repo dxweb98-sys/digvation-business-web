@@ -3,10 +3,7 @@ import type { ApiClient } from '@digvation/business-api';
 export type NotificationCategory = 'FINANCE' | 'TRANSACTION';
 export type NotificationSeverity = 'INFO' | 'WARNING' | 'CRITICAL';
 export type NotificationType =
-  | 'EXPENSE_APPROVAL_REQUIRED'
-  | 'EXPENSE_APPROVED'
-  | 'EXPENSE_REJECTED'
-  | 'PAYMENT_FAILED';
+  'EXPENSE_APPROVAL_REQUIRED' | 'EXPENSE_APPROVED' | 'EXPENSE_REJECTED' | 'PAYMENT_FAILED';
 
 export interface BusinessNotification {
   id: string;

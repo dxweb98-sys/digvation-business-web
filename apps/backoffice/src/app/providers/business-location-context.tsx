@@ -1,6 +1,7 @@
+import { hasSessionFeature } from '@digvation/business-auth';
 import { useDeploymentBootstrap } from '@digvation/business-runtime';
 import { useQuery } from '@tanstack/react-query';
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { useBackofficeAuth } from '../../auth/backoffice-auth-context';
 
@@ -39,6 +40,15 @@ function readPreference(key: string): string | null {
   }
 }
 
+function clearPreference(key: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // Location preference is never an authorization source.
+  }
+}
+
 function writePreference(key: string, value: string): void {
   if (typeof window === 'undefined') return;
   try {
@@ -55,9 +65,10 @@ export function BusinessLocationProvider({ children }: { children: ReactNode }) 
     () => createApiClient(bootstrap.apiBaseUrl),
     [bootstrap.apiBaseUrl, createApiClient],
   );
-  const canReadOperationalAccess = Boolean(
-    session?.access.permissions.includes('operational-access:read'),
-  );
+  // The self-scoped context endpoint requires auth:self, not permission to
+  // administer other users' assignments.
+  const canReadOperationalAccess = Boolean(session);
+  const canSwitchBranches = Boolean(session && hasSessionFeature(session.access, 'MULTI_BRANCH'));
   const preferenceKey = session
     ? `digvation.backoffice.dashboard.location.v1:${session.business.tenantId}:${session.identity.userId}`
     : 'digvation.backoffice.dashboard.location.v1:anonymous';
@@ -66,9 +77,16 @@ export function BusinessLocationProvider({ children }: { children: ReactNode }) 
   );
 
   const query = useQuery({
-    queryKey: ['operational-location-context'],
+    queryKey: [
+      'operational-location-context',
+      session?.business.tenantId,
+      session?.identity.userId,
+      session?.contextVersion,
+    ],
     queryFn: () => api.get<OperationalAccess>('/api/v1/operational-access/context'),
     enabled: canReadOperationalAccess,
+    refetchOnWindowFocus: true,
+    refetchInterval: 30_000,
   });
 
   const locations = useMemo(() => {
@@ -81,23 +99,33 @@ export function BusinessLocationProvider({ children }: { children: ReactNode }) 
         right.name ?? right.displayName ?? right.code,
       );
     });
-    return all;
-  }, [canReadOperationalAccess, query.data?.locations, query.data?.mainLocationId]);
+    if (canSwitchBranches) return all;
+    const main = all.find((location) => location.id === query.data?.mainLocationId);
+    return main ? [main] : [];
+  }, [
+    canReadOperationalAccess,
+    canSwitchBranches,
+    query.data?.locations,
+    query.data?.mainLocationId,
+  ]);
 
   const accessibleIds = useMemo(
     () => new Set(locations.map((location) => location.id)),
     [locations],
   );
   const preferredIsValid = Boolean(preferredLocationId && accessibleIds.has(preferredLocationId));
+  useEffect(() => {
+    if (!query.data || !preferredLocationId || preferredIsValid) return;
+    clearPreference(preferenceKey);
+    const reset = window.setTimeout(() => setPreferredLocationId(null), 0);
+    return () => window.clearTimeout(reset);
+  }, [preferenceKey, preferredIsValid, preferredLocationId, query.data]);
   const fallbackLocationId =
-    query.data?.mainLocationId ??
-    (query.data?.resolution === 'AUTO_RESOLVED'
-      ? (query.data.selectedLocationId ?? '')
-      : locations.length === 1
-        ? locations[0]!.id
-        : '');
+    query.data?.mainLocationId && accessibleIds.has(query.data.mainLocationId)
+      ? query.data.mainLocationId
+      : (locations[0]?.id ?? '');
   const selectedLocationId = preferredIsValid ? (preferredLocationId ?? '') : fallbackLocationId;
-  const isDenied = canReadOperationalAccess && query.data?.resolution === 'DENIED';
+  const isDenied = canReadOperationalAccess && Boolean(query.data) && locations.length === 0;
   const isReady = Boolean(
     canReadOperationalAccess &&
     query.data &&

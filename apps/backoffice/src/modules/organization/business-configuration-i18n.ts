@@ -19,10 +19,11 @@ const configurationCopy: Record<string, { id: string; en: string }> = {
     id: 'Pajak diatur satu kali untuk bisnis dan dihitung oleh Runtime pada total transaksi.',
     en: 'Tax is configured once for the business and applied by Runtime to transaction totals.',
   },
-  'New transactions use this business tax. Existing finalized transactions keep their recorded tax.': {
-    id: 'Transaksi baru menggunakan pajak bisnis ini. Transaksi yang sudah selesai tetap menyimpan pajak yang tercatat.',
-    en: 'New transactions use this business tax. Existing finalized transactions keep their recorded tax.',
-  },
+  'New transactions use this business tax. Existing finalized transactions keep their recorded tax.':
+    {
+      id: 'Transaksi baru menggunakan pajak bisnis ini. Transaksi yang sudah selesai tetap menyimpan pajak yang tercatat.',
+      en: 'New transactions use this business tax. Existing finalized transactions keep their recorded tax.',
+    },
   'When disabled, new transactions have zero tax.': {
     id: 'Jika dinonaktifkan, pajak transaksi baru adalah nol.',
     en: 'When disabled, new transactions have zero tax.',

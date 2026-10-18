@@ -5,7 +5,8 @@ import {
   resolveBootstrapWorkspace,
 } from '@digvation/business-runtime';
 
-import { unavailablePasswordRecovery } from '../../auth/password-recovery';
+import { HttpAccountActivationAdapter } from '../../auth/http-account-activation.adapter';
+import { HttpPasswordRecoveryAdapter } from '../../auth/http-password-recovery.adapter';
 import { BackofficeProviders } from '../providers/backoffice-providers';
 import { backofficeRouter } from '../router/backoffice-router';
 import type { BackofficeStartupResult } from './backoffice-startup';
@@ -21,9 +22,12 @@ export async function bootstrapBackoffice(): Promise<BackofficeStartupResult> {
     resolveBootstrapWorkspace(bootstrap),
     'backoffice',
   );
-  // Integration point: replace with the Runtime WhatsApp recovery adapter (constructed like the auth
-  // adapter from apiBaseUrl + trusted bootstrap workspace) once that engine is available.
-  const passwordRecovery = unavailablePasswordRecovery;
+  const passwordRecovery = new HttpPasswordRecoveryAdapter(
+    bootstrap.apiBaseUrl,
+    resolveBootstrapWorkspace(bootstrap),
+  );
+
+  const accountActivation = new HttpAccountActivationAdapter(bootstrap.apiBaseUrl);
 
   return {
     branding: bootstrap.branding,
@@ -32,6 +36,7 @@ export async function bootstrapBackoffice(): Promise<BackofficeStartupResult> {
         bootstrap={bootstrap}
         auth={auth}
         passwordRecovery={passwordRecovery}
+        accountActivation={accountActivation}
         router={backofficeRouter}
       />
     ),

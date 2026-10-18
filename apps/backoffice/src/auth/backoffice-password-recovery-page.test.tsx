@@ -28,11 +28,20 @@ const bootstrap = {
   defaults: { locale: 'id-ID', country: 'ID' },
 } satisfies DeploymentBootstrapConfig;
 
-function renderRecovery(port: PasswordRecoveryPort, config: DeploymentBootstrapConfig = bootstrap) {
+function renderRecovery(
+  recoveryPort: Pick<PasswordRecoveryPort, 'request'>,
+  config: DeploymentBootstrapConfig = bootstrap,
+) {
   return render(
     <DeploymentBootstrapProvider config={config}>
       <BackofficeLocalizationProvider>
-        <PasswordRecoveryProvider port={port}>
+        <PasswordRecoveryProvider
+          port={{
+            confirm: () => Promise.reject(new Error('unused')),
+            confirmEmailVerification: () => Promise.reject(new Error('unused')),
+            ...recoveryPort,
+          }}
+        >
           <MemoryRouter initialEntries={['/forgot-password']}>
             <BackofficePasswordRecoveryPage />
           </MemoryRouter>
@@ -44,7 +53,7 @@ function renderRecovery(port: PasswordRecoveryPort, config: DeploymentBootstrapC
 
 async function submitIdentifier(container: HTMLElement, identifier: string) {
   const view = within(container);
-  fireEvent.change(container.querySelector('#backoffice-recovery-identifier')!, {
+  fireEvent.change(container.querySelector('#backoffice-recovery-email')!, {
     target: { value: identifier },
   });
   await act(async () => {
@@ -64,10 +73,10 @@ describe('BackofficePasswordRecoveryPage', () => {
     const request = vi.fn().mockResolvedValue(undefined);
     const { container } = renderRecovery({ request });
 
-    await submitIdentifier(container, ' owner ');
+    await submitIdentifier(container, ' owner@business.com ');
 
-    expect(request).toHaveBeenCalledWith({ identifier: 'owner' });
-    expect(within(container).queryByText('Periksa WhatsApp Anda')).not.toBeNull();
+    expect(request).toHaveBeenCalledWith({ email: 'owner@business.com' });
+    expect(within(container).queryByText('Periksa email Anda')).not.toBeNull();
   });
 
   it('reports an unavailable recovery engine without claiming success', async () => {
@@ -75,18 +84,18 @@ describe('BackofficePasswordRecoveryPage', () => {
       request: () => Promise.reject(new PasswordRecoveryUnavailableError()),
     });
 
-    await submitIdentifier(container, 'owner');
+    await submitIdentifier(container, 'owner@business.com');
 
     expect(within(container).getByRole('alert').textContent).toContain(
       'Pemulihan kata sandi belum dapat digunakan',
     );
-    expect(within(container).queryByText('Periksa WhatsApp Anda')).toBeNull();
+    expect(within(container).queryByText('Periksa email Anda')).toBeNull();
   });
 
   it('keeps the request action pending while the recovery port is in flight', async () => {
     const { container } = renderRecovery({ request: () => new Promise<void>(() => undefined) });
 
-    await submitIdentifier(container, 'owner');
+    await submitIdentifier(container, 'owner@business.com');
 
     expect(within(container).queryByText('Mengirim…')).not.toBeNull();
   });

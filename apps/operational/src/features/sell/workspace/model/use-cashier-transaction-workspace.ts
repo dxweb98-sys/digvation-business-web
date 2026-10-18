@@ -1,3 +1,4 @@
+import { hasSessionFeature } from '@digvation/business-auth';
 import { useAuth } from '@digvation/pos-auth';
 import { useConnectivity, useRuntime } from '@digvation/pos-runtime';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -22,10 +23,7 @@ import {
 } from '../../cart/cart-draft';
 import { MAX_CONFIGURATION_UNITS, opensItemConfigurator } from '../../cart/item-configurator-model';
 import { blocksNewTransaction, hasTrackedWork } from '../../transaction/model/sale-lifecycle';
-import type {
-  ItemConfiguration,
-  ItemConfiguratorState,
-} from '../../cart/item-configurator';
+import type { ItemConfiguration, ItemConfiguratorState } from '../../cart/item-configurator';
 import type { VariantPickerContext, VariantPickerState } from './variant-selection';
 import {
   createCashierTransactionAdapter,
@@ -64,7 +62,11 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
   const runtime = useRuntime();
   const operationalLocale = resolveOperationalLocale(runtime.locale);
   const copy = (value: string) => operationalCopy(value, operationalLocale);
-  const { authPort } = useAuth();
+  const { authPort, session } = useAuth();
+  const productSelling = Boolean(session && hasSessionFeature(session.access, 'POS_PRODUCT_SALES'));
+  const serviceSelling = Boolean(session && hasSessionFeature(session.access, 'POS_SERVICE_SALES'));
+  const servicePerformerAccess =
+    serviceSelling && Boolean(session?.access.permissions.includes('fulfillment:update'));
   const queryClient = useQueryClient();
   const connectivity = useConnectivity();
   const navigate = useNavigate();
@@ -102,9 +104,13 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     locale: runtime.locale,
     sellingLocationId: selectedLocationId ?? '',
     currency: runtime.currency,
+    enabledSelling: { PRODUCT: productSelling, SERVICE: serviceSelling },
   });
 
-  const employeeOptions = useEmployeeOptions(transactionAdapter, areEmployeeOptionsEnabled);
+  const employeeOptions = useEmployeeOptions(
+    transactionAdapter,
+    areEmployeeOptionsEnabled && servicePerformerAccess,
+  );
   const paymentRoutesQuery = useQuery({
     queryKey: cashierTransactionKeys.paymentRoutes(selectedLocationId ?? '', runtime.currency),
     queryFn: ({ signal }) =>
@@ -252,7 +258,12 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
             quantity: String(group.quantity),
             additions: group.additionalComponents,
           }))
-        : [{ quantity: selection.quantity ?? '1', additions: selection.additionalComponents ?? [] }];
+        : [
+            {
+              quantity: selection.quantity ?? '1',
+              additions: selection.additionalComponents ?? [],
+            },
+          ];
       const updated = await command.runMutation(async () => {
         let expectedVersion = target.version;
         let latest: Sale | null = null;
@@ -369,7 +380,9 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
       ...(salespeople ? { salespeople } : {}),
       ...(componentPerformers ? { componentPerformers } : {}),
       itemOption:
-        variants.length > 0 && item.variantSelectionMode === 'OPTIONAL' ? { price: ownPrice } : null,
+        variants.length > 0 && item.variantSelectionMode === 'OPTIONAL'
+          ? { price: ownPrice }
+          : null,
       itemPrice: variants.length === 0 ? ownPrice : null,
       pricesByVariantId: resolvedVariants.pricesByVariantId,
       unavailableVariantIds: resolvedVariants.unavailableVariantIds,
@@ -459,7 +472,9 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     try {
       // A line of the persisted OPEN Sale is edited through Runtime, never with Web-side state.
       const persistedLine = editLineId
-        ? saleWorkspace.sale?.lines.find((line) => line.id === editLineId && line.removedAt === null)
+        ? saleWorkspace.sale?.lines.find(
+            (line) => line.id === editLineId && line.removedAt === null,
+          )
         : undefined;
       if (persistedLine) {
         saleWorkspace.replaceSaleLine(persistedLine, {
@@ -517,7 +532,9 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     const persistedLine = draftLine
       ? undefined
       : saleWorkspace.sale?.lines.find((entry) => entry.id === lineId && entry.removedAt === null);
-    const item = draftLine?.catalogItem ?? (persistedLine ? catalog.findItem(persistedLine.catalogItemId) : null);
+    const item =
+      draftLine?.catalogItem ??
+      (persistedLine ? catalog.findItem(persistedLine.catalogItemId) : null);
     if (!item) {
       if (persistedLine)
         command.reportError(new Error(copy('This item is no longer available for editing.')));
@@ -627,7 +644,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
       return await loadQueueContext(saleId);
     } catch (error) {
       command.reportError(error);
-      throw new Error(copy('The latest transaction could not be loaded.'));
+      throw new Error(copy('The latest transaction could not be loaded.'), { cause: error });
     }
   };
 
@@ -948,9 +965,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
       if (workLines.some((line) => line.fulfillment?.status === 'WAITING')) {
         throw new Error(copy('Start all work before completing the transaction.'));
       }
-      if (
-        workLines.some((line) => !line.fulfillment || line.fulfillment.status === 'CANCELED')
-      ) {
+      if (workLines.some((line) => !line.fulfillment || line.fulfillment.status === 'CANCELED')) {
         throw new Error(copy('Canceled work cannot be completed as an active transaction.'));
       }
       for (const trackedLine of workLines) {
@@ -1049,10 +1064,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     paymentRouteId?: string,
   ) => core.createPayment(method, appliedAmount, tenderedAmount, providerReference, paymentRouteId);
 
-  const voidQueuedSale = async (
-    targetSale: Sale,
-    refundDisbursement?: RefundDisbursementInput,
-  ) => {
+  const voidQueuedSale = async (targetSale: Sale, refundDisbursement?: RefundDisbursementInput) => {
     command.clearNotice();
     try {
       const authoritative = await transactionAdapter.getSale(targetSale.id);

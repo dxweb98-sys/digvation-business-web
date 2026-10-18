@@ -114,6 +114,18 @@ describe('payment correction draft', () => {
     ).toBe(false);
   });
 
+  it('offers correction on queued, in-progress and completed Sales alike', () => {
+    for (const [status, operationalState] of [
+      ['OPEN', 'QUEUED'],
+      ['OPEN', 'IN_PROGRESS'],
+      ['FINALIZED', 'COMPLETED'],
+    ] as const)
+      expect(
+        canCorrectPayments(sale({ status, operationalState }), ['payments:correct']),
+        `${status}/${operationalState}`,
+      ).toBe(true);
+  });
+
   it('starts the shared editor from the route-bound effective composition only', () => {
     const legacy = sale({
       paymentComposition: {

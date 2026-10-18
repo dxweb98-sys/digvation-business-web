@@ -1068,4 +1068,579 @@ export const backofficeCopy: Record<string, { id: string; en: string }> = {
   'Tax rule': { id: 'Aturan pajak', en: 'Tax rule' },
   'Tax category': { id: 'Kategori pajak', en: 'Tax category' },
   Pricing: { id: 'Penetapan harga', en: 'Pricing' },
+  'Manage user': { id: 'Kelola pengguna', en: 'Manage user' },
+  'Account is active': { id: 'Akun aktif', en: 'Account is active' },
+  'Inactive users cannot sign in and their sessions are ended.': {
+    id: 'Pengguna nonaktif tidak dapat masuk dan sesinya diakhiri.',
+    en: 'Inactive users cannot sign in and their sessions are ended.',
+  },
+  'Enter a display name.': { id: 'Masukkan nama tampilan.', en: 'Enter a display name.' },
+  'Invite user': { id: 'Undang pengguna', en: 'Invite user' },
+  Invitations: { id: 'Undangan', en: 'Invitations' },
+  'Revoke invitation?': { id: 'Batalkan undangan?', en: 'Revoke invitation?' },
+  'The pending invitation can no longer be used to activate an account.': {
+    id: 'Undangan yang menunggu tidak dapat lagi dipakai untuk mengaktifkan akun.',
+    en: 'The pending invitation can no longer be used to activate an account.',
+  },
+  Revoke: { id: 'Batalkan', en: 'Revoke' },
+  'No roles have been configured yet.': {
+    id: 'Belum ada peran yang dikonfigurasi.',
+    en: 'No roles have been configured yet.',
+  },
+  'No users have been created yet.': {
+    id: 'Belum ada pengguna.',
+    en: 'No users have been created yet.',
+  },
+  Expires: { id: 'Berlaku hingga', en: 'Expires' },
+  'Invitation resent.': { id: 'Undangan dikirim ulang.', en: 'Invitation resent.' },
+  'Could not resend invitation.': {
+    id: 'Undangan belum berhasil dikirim ulang.',
+    en: 'Could not resend invitation.',
+  },
+  'No invitations have been created yet.': {
+    id: 'Belum ada undangan.',
+    en: 'No invitations have been created yet.',
+  },
+  'Resend invitation': { id: 'Kirim ulang undangan', en: 'Resend invitation' },
+  'Revoke invitation': { id: 'Batalkan undangan', en: 'Revoke invitation' },
+  'For example, MANAGER': { id: 'Contoh: MANAGER', en: 'For example, MANAGER' },
+  results: { id: 'hasil', en: 'results' },
+  'Search permissions...': { id: 'Cari izin...', en: 'Search permissions...' },
+  'No permissions found': { id: 'Izin tidak ditemukan', en: 'No permissions found' },
+  'User access updated.': { id: 'Akses pengguna diperbarui.', en: 'User access updated.' },
+  'Could not update user access.': {
+    id: 'Akses pengguna belum berhasil diperbarui.',
+    en: 'Could not update user access.',
+  },
+  'User access': { id: 'Akses pengguna', en: 'User access' },
+  'Save access': { id: 'Simpan akses', en: 'Save access' },
+  'Owner access is protected and cannot be narrowed here.': {
+    id: 'Akses Owner dilindungi dan tidak dapat dipersempit di sini.',
+    en: 'Owner access is protected and cannot be narrowed here.',
+  },
+  'Location Access': { id: 'Akses lokasi', en: 'Location Access' },
+  'Invitation created.': { id: 'Undangan dibuat.', en: 'Invitation created.' },
+  'Could not create invitation.': {
+    id: 'Undangan belum berhasil dibuat.',
+    en: 'Could not create invitation.',
+  },
+  'Send invitation': { id: 'Kirim undangan', en: 'Send invitation' },
+  'Username (optional)': { id: 'Username (opsional)', en: 'Username (optional)' },
+  'For example, cashier.main': { id: 'Contoh: kasir.utama', en: 'For example, cashier.main' },
+  'For example, Siti Rahma': { id: 'Contoh: Siti Rahma', en: 'For example, Siti Rahma' },
+  Accepted: { id: 'Diterima', en: 'Accepted' },
+  Revoked: { id: 'Dibatalkan', en: 'Revoked' },
+  'Account details': { id: 'Detail akun', en: 'Account details' },
+  'Phone number': { id: 'Nomor telepon', en: 'Phone number' },
+  'Enter a phone number.': { id: 'Masukkan nomor telepon.', en: 'Enter a phone number.' },
+  'Enter a valid Indonesian phone number, for example 081234567890.': {
+    id: 'Masukkan nomor telepon Indonesia yang valid, misalnya 081234567890.',
+    en: 'Enter a valid Indonesian phone number, for example 081234567890.',
+  },
+  'The invitation link is sent to this WhatsApp number.': {
+    id: 'Tautan undangan dikirim ke nomor WhatsApp ini.',
+    en: 'The invitation link is sent to this WhatsApp number.',
+  },
+  'Optional sign-in name. It is not case-sensitive.': {
+    id: 'Nama masuk opsional. Tidak membedakan huruf besar dan kecil.',
+    en: 'Optional sign-in name. It is not case-sensitive.',
+  },
+  'Use 3 to 64 letters, numbers, dot, underscore, or hyphen.': {
+    id: 'Gunakan 3 sampai 64 huruf, angka, titik, garis bawah, atau tanda hubung.',
+    en: 'Use 3 to 64 letters, numbers, dot, underscore, or hyphen.',
+  },
+  'Select at least one role.': { id: 'Pilih minimal satu peran.', en: 'Select at least one role.' },
+  'This phone number already belongs to a user.': {
+    id: 'Nomor telepon ini sudah dipakai pengguna lain.',
+    en: 'This phone number already belongs to a user.',
+  },
+  'This phone number already has a pending invitation. Resend or revoke it first.': {
+    id: 'Nomor telepon ini masih memiliki undangan yang menunggu. Kirim ulang atau batalkan undangan itu terlebih dahulu.',
+    en: 'This phone number already has a pending invitation. Resend or revoke it first.',
+  },
+  'This username already belongs to a user.': {
+    id: 'Username ini sudah dipakai pengguna lain.',
+    en: 'This username already belongs to a user.',
+  },
+  'This username already has a pending invitation. Resend or revoke it first.': {
+    id: 'Username ini masih memiliki undangan yang menunggu. Kirim ulang atau batalkan undangan itu terlebih dahulu.',
+    en: 'This username already has a pending invitation. Resend or revoke it first.',
+  },
+  'Full access to the whole organization. Only an Owner can grant it.': {
+    id: 'Akses penuh ke seluruh organisasi. Hanya Owner yang dapat memberikannya.',
+    en: 'Full access to the whole organization. Only an Owner can grant it.',
+  },
+  permissions: { id: 'izin', en: 'permissions' },
+  'Save changes': { id: 'Simpan perubahan', en: 'Save changes' },
+  'Without an assigned location this user cannot work at any location.': {
+    id: 'Tanpa lokasi yang ditetapkan, pengguna ini tidak dapat bekerja di lokasi mana pun.',
+    en: 'Without an assigned location this user cannot work at any location.',
+  },
+  'Send a one-time link so this user can set a new password. You never see or set the password.': {
+    id: 'Kirim tautan sekali pakai agar pengguna ini dapat membuat kata sandi baru. Anda tidak pernah melihat atau menetapkan kata sandinya.',
+    en: 'Send a one-time link so this user can set a new password. You never see or set the password.',
+  },
+  'Send password link': { id: 'Kirim tautan kata sandi', en: 'Send password link' },
+  'Send password link?': { id: 'Kirim tautan kata sandi?', en: 'Send password link?' },
+  'A one-time link is sent via WhatsApp to the number registered for this user. Their current password and sessions stay valid until they use the link.':
+    {
+      id: 'Tautan sekali pakai dikirim melalui WhatsApp ke nomor yang terdaftar untuk pengguna ini. Kata sandi dan sesi mereka tetap berlaku sampai tautan dipakai.',
+      en: 'A one-time link is sent via WhatsApp to the number registered for this user. Their current password and sessions stay valid until they use the link.',
+    },
+  'Password link sent.': { id: 'Tautan kata sandi dikirim.', en: 'Password link sent.' },
+  'Could not send the password link.': {
+    id: 'Tautan kata sandi belum berhasil dikirim.',
+    en: 'Could not send the password link.',
+  },
+  'A link was sent a moment ago. Try again shortly.': {
+    id: 'Tautan baru saja dikirim. Coba lagi sebentar lagi.',
+    en: 'A link was sent a moment ago. Try again shortly.',
+  },
+  'This account is inactive, so a password link cannot be sent.': {
+    id: 'Akun ini nonaktif, sehingga tautan kata sandi tidak dapat dikirim.',
+    en: 'This account is inactive, so a password link cannot be sent.',
+  },
+  'Sign-in username': { id: 'Username masuk', en: 'Sign-in username' },
+  'Not case-sensitive. The user keeps their current sessions and uses the new name at the next sign-in.':
+    {
+      id: 'Tidak membedakan huruf besar dan kecil. Sesi pengguna saat ini tetap aktif dan nama baru dipakai pada saat masuk berikutnya.',
+      en: 'Not case-sensitive. The user keeps their current sessions and uses the new name at the next sign-in.',
+    },
+  'Permission categories': { id: 'Kategori izin', en: 'Permission categories' },
+  'All results': { id: 'Semua hasil', en: 'All results' },
+  'Select all': { id: 'Pilih semua', en: 'Select all' },
+  'Clear selection': { id: 'Hapus pilihan', en: 'Clear selection' },
+  selected: { id: 'dipilih', en: 'selected' },
+  'View permission details': { id: 'Lihat detail izin', en: 'View permission details' },
+  'Hide permission details': { id: 'Sembunyikan detail izin', en: 'Hide permission details' },
+  'System roles have built-in permissions that cannot be changed.': {
+    id: 'Peran sistem memiliki izin bawaan yang tidak dapat diubah.',
+    en: 'System roles have built-in permissions that cannot be changed.',
+  },
+  'Discard changes?': { id: 'Buang perubahan?', en: 'Discard changes?' },
+  'You have unsaved changes to this role. Discard them?': {
+    id: 'Ada perubahan peran yang belum disimpan. Buang perubahan?',
+    en: 'You have unsaved changes to this role. Discard them?',
+  },
+  Discard: { id: 'Buang', en: 'Discard' },
+  'Keep editing': { id: 'Lanjutkan mengedit', en: 'Keep editing' },
+  categories: { id: 'kategori', en: 'categories' },
+  'Full access to every permission.': {
+    id: 'Akses penuh ke semua izin.',
+    en: 'Full access to every permission.',
+  },
+  'Valid until': {
+    id: 'Berlaku hingga',
+    en: 'Valid until',
+  },
+  'Accepted on': {
+    id: 'Diterima pada',
+    en: 'Accepted on',
+  },
+  'Revoked on': {
+    id: 'Dibatalkan pada',
+    en: 'Revoked on',
+  },
+  'Expired on': {
+    id: 'Kedaluwarsa pada',
+    en: 'Expired on',
+  },
+  Expired: {
+    id: 'Kedaluwarsa',
+    en: 'Expired',
+  },
+  'generated from the name': {
+    id: 'dibuat dari nama',
+    en: 'generated from the name',
+  },
+  'Edit code': {
+    id: 'Ubah kode',
+    en: 'Edit code',
+  },
+  'This code is reserved. Choose another role code.': {
+    id: 'Kode ini dicadangkan. Pilih kode peran lain.',
+    en: 'This code is reserved. Choose another role code.',
+  },
+  'Use 1 to 64 letters, numbers, dot, underscore, or hyphen.': {
+    id: 'Gunakan 1 sampai 64 huruf, angka, titik, garis bawah, atau tanda hubung.',
+    en: 'Use 1 to 64 letters, numbers, dot, underscore, or hyphen.',
+  },
+  'A role with this code already exists. Change the code or the name.': {
+    id: 'Peran dengan kode ini sudah ada. Ubah kode atau namanya.',
+    en: 'A role with this code already exists. Change the code or the name.',
+  },
+  'Leave empty to use the code generated from the name. The code cannot be changed after the role is created.':
+    {
+      id: 'Kosongkan untuk memakai kode yang dibuat dari nama. Kode tidak dapat diubah setelah peran dibuat.',
+      en: 'Leave empty to use the code generated from the name. The code cannot be changed after the role is created.',
+    },
+  'distinct permissions selected': {
+    id: 'izin berbeda dipilih',
+    en: 'distinct permissions selected',
+  },
+  'Some permissions apply to both Backoffice and Operational, so the per-area totals add up to more than the distinct total.':
+    {
+      id: 'Sebagian izin berlaku untuk Backoffice dan Operasional sekaligus, sehingga jumlah per area lebih besar daripada total izin berbeda.',
+      en: 'Some permissions apply to both Backoffice and Operational, so the per-area totals add up to more than the distinct total.',
+    },
+  'A person can hold several roles. They receive everything every selected role allows.': {
+    id: 'Satu orang dapat memiliki beberapa peran. Ia menerima semua yang diizinkan setiap peran yang dipilih.',
+    en: 'A person can hold several roles. They receive everything every selected role allows.',
+  },
+  'Owner gives full access to the whole organization. Adding other roles does not reduce it.': {
+    id: 'Owner memberi akses penuh ke seluruh organisasi. Menambahkan peran lain tidak menguranginya.',
+    en: 'Owner gives full access to the whole organization. Adding other roles does not reduce it.',
+  },
+  'I confirm this person becomes an Owner.': {
+    id: 'Saya konfirmasi orang ini menjadi Owner.',
+    en: 'I confirm this person becomes an Owner.',
+  },
+  'Confirm the Owner role to continue.': {
+    id: 'Konfirmasi peran Owner untuk melanjutkan.',
+    en: 'Confirm the Owner role to continue.',
+  },
+  'Owner is a protected role. Its roles and status are not changed here; an Owner edits their own name and username from Profile.':
+    {
+      id: 'Owner adalah peran yang dilindungi. Peran dan statusnya tidak diubah di sini; Owner mengubah nama dan username sendiri dari Profil.',
+      en: 'Owner is a protected role. Its roles and status are not changed here; an Owner edits their own name and username from Profile.',
+    },
+  'Profile updated.': {
+    id: 'Profil diperbarui.',
+    en: 'Profile updated.',
+  },
+  'Email security': {
+    id: 'Keamanan email',
+    en: 'Email security',
+  },
+  'Password links are sent only to your verified email.': {
+    id: 'Tautan kata sandi hanya dikirim ke email Anda yang terverifikasi.',
+    en: 'Password links are sent only to your verified email.',
+  },
+  'Verify this email before it can receive password links.': {
+    id: 'Verifikasi email ini sebelum dapat menerima tautan kata sandi.',
+    en: 'Verify this email before it can receive password links.',
+  },
+  'Add an email in Edit profile to receive password links.': {
+    id: 'Tambahkan email melalui Ubah profil untuk menerima tautan kata sandi.',
+    en: 'Add an email in Edit profile to receive password links.',
+  },
+  'Ask an administrator to add or update your email.': {
+    id: 'Minta administrator untuk menambahkan atau memperbarui email Anda.',
+    en: 'Ask an administrator to add or update your email.',
+  },
+  'Use international format, for example +628123456789.': {
+    id: 'Gunakan format internasional, misalnya +628123456789.',
+    en: 'Use international format, for example +628123456789.',
+  },
+  'Enter a valid phone number in international format.': {
+    id: 'Masukkan nomor telepon yang valid dalam format internasional.',
+    en: 'Enter a valid phone number in international format.',
+  },
+  'Could not update your profile.': {
+    id: 'Profil tidak dapat diperbarui.',
+    en: 'Could not update your profile.',
+  },
+  'Could not load your profile.': {
+    id: 'Profil tidak dapat dimuat.',
+    en: 'Could not load your profile.',
+  },
+  'Not case-sensitive. You stay signed in and use the new name the next time you sign in.': {
+    id: 'Tidak membedakan huruf besar dan kecil. Anda tetap masuk dan memakai nama baru saat masuk berikutnya.',
+    en: 'Not case-sensitive. You stay signed in and use the new name the next time you sign in.',
+  },
+  'Verified phone number': {
+    id: 'Nomor telepon terverifikasi',
+    en: 'Verified phone number',
+  },
+  'Ask an administrator to change the phone number on your account.': {
+    id: 'Minta administrator untuk mengubah nomor telepon akun Anda.',
+    en: 'Ask an administrator to change the phone number on your account.',
+  },
+  'Roles and account status are managed by an administrator.': {
+    id: 'Peran dan status akun dikelola oleh administrator.',
+    en: 'Roles and account status are managed by an administrator.',
+  },
+  'Security activity': {
+    id: 'Aktivitas keamanan',
+    en: 'Security activity',
+  },
+  'Waiting for the user': {
+    id: 'Menunggu pengguna',
+    en: 'Waiting for the user',
+  },
+  'Not delivered': {
+    id: 'Tidak terkirim',
+    en: 'Not delivered',
+  },
+  'Password set': {
+    id: 'Kata sandi diatur',
+    en: 'Password set',
+  },
+  Replaced: {
+    id: 'Digantikan',
+    en: 'Replaced',
+  },
+  Closed: {
+    id: 'Ditutup',
+    en: 'Closed',
+  },
+  'Password link cancelled.': {
+    id: 'Tautan kata sandi dibatalkan.',
+    en: 'Password link cancelled.',
+  },
+  'Could not cancel the password link.': {
+    id: 'Tautan kata sandi tidak dapat dibatalkan.',
+    en: 'Could not cancel the password link.',
+  },
+  'This link is no longer pending.': {
+    id: 'Tautan ini sudah tidak menunggu.',
+    en: 'This link is no longer pending.',
+  },
+  'Could not load password link history.': {
+    id: 'Riwayat tautan kata sandi tidak dapat dimuat.',
+    en: 'Could not load password link history.',
+  },
+  'No password links have been requested for this user.': {
+    id: 'Belum ada tautan kata sandi yang diminta untuk pengguna ini.',
+    en: 'No password links have been requested for this user.',
+  },
+  'an administrator': {
+    id: 'administrator',
+    en: 'an administrator',
+  },
+  'Requested by the user': {
+    id: 'Diminta oleh pengguna',
+    en: 'Requested by the user',
+  },
+  'Requested from the sign-in page': {
+    id: 'Diminta dari halaman masuk',
+    en: 'Requested from the sign-in page',
+  },
+  'Requester not recorded': {
+    id: 'Peminta tidak tercatat',
+    en: 'Requester not recorded',
+  },
+  'Password set on': {
+    id: 'Kata sandi diatur pada',
+    en: 'Password set on',
+  },
+  'Cancelled on': {
+    id: 'Dibatalkan pada',
+    en: 'Cancelled on',
+  },
+  by: {
+    id: 'oleh',
+    en: 'by',
+  },
+  'Replaced by a newer link.': {
+    id: 'Digantikan oleh tautan yang lebih baru.',
+    en: 'Replaced by a newer link.',
+  },
+  'Closed before outcomes were recorded.': {
+    id: 'Ditutup sebelum hasilnya dicatat.',
+    en: 'Closed before outcomes were recorded.',
+  },
+  'The message provider did not accept this link. Send a new one.': {
+    id: 'Penyedia pesan tidak menerima tautan ini. Kirim tautan baru.',
+    en: 'The message provider did not accept this link. Send a new one.',
+  },
+  'Provider acceptance is not proof that the user read the message.': {
+    id: 'Diterima penyedia pesan bukan bukti pengguna sudah membacanya.',
+    en: 'Provider acceptance is not proof that the user read the message.',
+  },
+  'Cancel this password link?': {
+    id: 'Batalkan tautan kata sandi ini?',
+    en: 'Cancel this password link?',
+  },
+  'The link stops working immediately. The user keeps their current password.': {
+    id: 'Tautan langsung tidak berlaku. Pengguna tetap memakai kata sandi saat ini.',
+    en: 'The link stops working immediately. The user keeps their current password.',
+  },
+  'Cancel link': {
+    id: 'Batalkan tautan',
+    en: 'Cancel link',
+  },
+  'Keep link': {
+    id: 'Pertahankan tautan',
+    en: 'Keep link',
+  },
+  'A one-time link is sent via WhatsApp to the number registered for this user. It replaces any link that is still pending. Their current password and sessions stay valid until they use the link.':
+    {
+      id: 'Tautan sekali pakai dikirim lewat WhatsApp ke nomor yang terdaftar untuk pengguna ini. Tautan yang masih menunggu akan diganti. Kata sandi dan sesi saat ini tetap berlaku sampai tautan dipakai.',
+      en: 'A one-time link is sent via WhatsApp to the number registered for this user. It replaces any link that is still pending. Their current password and sessions stay valid until they use the link.',
+    },
+  'Search permissions in all areas...': {
+    id: 'Cari izin di semua area...',
+    en: 'Search permissions in all areas...',
+  },
+  'Access area': {
+    id: 'Area akses',
+    en: 'Access area',
+  },
+  Results: {
+    id: 'Hasil',
+    en: 'Results',
+  },
+  'Show matches in': {
+    id: 'Tampilkan hasil di',
+    en: 'Show matches in',
+  },
+  'Select category': {
+    id: 'Pilih kategori ini',
+    en: 'Select category',
+  },
+  'Clear category': {
+    id: 'Kosongkan kategori ini',
+    en: 'Clear category',
+  },
+  'Select all results': {
+    id: 'Pilih semua hasil',
+    en: 'Select all results',
+  },
+  'Clear results': {
+    id: 'Kosongkan hasil',
+    en: 'Clear results',
+  },
+  'Choose an access area, then a category. Your selection is kept when you switch.': {
+    id: 'Pilih area akses, lalu kategori. Pilihan Anda tetap tersimpan saat berpindah.',
+    en: 'Choose an access area, then a category. Your selection is kept when you switch.',
+  },
+  'Custom role code': {
+    id: 'Kode peran kustom',
+    en: 'Custom role code',
+  },
+  'Letters, numbers, dot, underscore or hyphen. The code cannot be changed after the role is created.':
+    {
+      id: 'Huruf, angka, titik, garis bawah, atau tanda hubung. Kode tidak dapat diubah setelah peran dibuat.',
+      en: 'Letters, numbers, dot, underscore or hyphen. The code cannot be changed after the role is created.',
+    },
+  'Use generated code': {
+    id: 'Gunakan kode otomatis',
+    en: 'Use generated code',
+  },
+  'Role code preview': {
+    id: 'Pratinjau kode peran',
+    en: 'Role code preview',
+  },
+  'Send invitation via': {
+    id: 'Kirim undangan melalui',
+    en: 'Send invitation via',
+  },
+  WhatsApp: {
+    id: 'WhatsApp',
+    en: 'WhatsApp',
+  },
+  Email: {
+    id: 'Email',
+    en: 'Email',
+  },
+  'Email (optional)': {
+    id: 'Email (opsional)',
+    en: 'Email (optional)',
+  },
+  'The activation link is sent to the phone number.': {
+    id: 'Tautan aktivasi dikirim ke nomor telepon.',
+    en: 'The activation link is sent to the phone number.',
+  },
+  'The activation link is sent to the email address, which is verified when the user activates.': {
+    id: 'Tautan aktivasi dikirim ke alamat email, dan email langsung terverifikasi saat pengguna mengaktifkan akun.',
+    en: 'The activation link is sent to the email address, which is verified when the user activates.',
+  },
+  'Kept on the account for sign-in and WhatsApp recovery.': {
+    id: 'Tetap disimpan di akun untuk masuk dan pemulihan lewat WhatsApp.',
+    en: 'Kept on the account for sign-in and WhatsApp recovery.',
+  },
+  'For example, siti@business.com': {
+    id: 'Contoh: siti@usaha.com',
+    en: 'For example, siti@business.com',
+  },
+  'The invitation link is sent here and the address is verified on activation.': {
+    id: 'Tautan undangan dikirim ke sini dan alamatnya terverifikasi saat akun diaktifkan.',
+    en: 'The invitation link is sent here and the address is verified on activation.',
+  },
+  'Saved unverified. It can be verified later for password recovery.': {
+    id: 'Disimpan sebagai belum diverifikasi. Dapat diverifikasi nanti untuk pemulihan kata sandi.',
+    en: 'Saved unverified. It can be verified later for password recovery.',
+  },
+  'Enter the email address the invitation is sent to.': {
+    id: 'Masukkan alamat email tujuan undangan.',
+    en: 'Enter the email address the invitation is sent to.',
+  },
+  'Enter a valid email address, for example name@business.com.': {
+    id: 'Masukkan alamat email yang valid, misalnya nama@usaha.com.',
+    en: 'Enter a valid email address, for example name@business.com.',
+  },
+  'This email already belongs to a user.': {
+    id: 'Email ini sudah dipakai pengguna lain.',
+    en: 'This email already belongs to a user.',
+  },
+  'This email already has a pending invitation. Resend or revoke it first.': {
+    id: 'Email ini masih memiliki undangan yang menunggu. Kirim ulang atau batalkan undangan itu terlebih dahulu.',
+    en: 'This email already has a pending invitation. Resend or revoke it first.',
+  },
+  'Not verified': {
+    id: 'Belum diverifikasi',
+    en: 'Not verified',
+  },
+  Verified: {
+    id: 'Terverifikasi',
+    en: 'Verified',
+  },
+  'Verification link sent.': {
+    id: 'Tautan verifikasi dikirim.',
+    en: 'Verification link sent.',
+  },
+  'Could not send the verification link.': {
+    id: 'Tautan verifikasi belum berhasil dikirim.',
+    en: 'Could not send the verification link.',
+  },
+  'Email delivery is not set up yet. Contact your administrator.': {
+    id: 'Pengiriman email belum diatur. Hubungi administrator Anda.',
+    en: 'Email delivery is not set up yet. Contact your administrator.',
+  },
+  'A new or changed address stays unverified until its owner confirms it. Only a verified email receives password links.':
+    {
+      id: 'Alamat baru atau yang diubah tetap belum diverifikasi sampai pemiliknya mengonfirmasi. Hanya email terverifikasi yang menerima tautan kata sandi.',
+      en: 'A new or changed address stays unverified until its owner confirms it. Only a verified email receives password links.',
+    },
+  'Send a one-time link to this address. Only its owner can verify it; you cannot mark it verified.':
+    {
+      id: 'Kirim tautan sekali pakai ke alamat ini. Hanya pemilik email yang dapat memverifikasinya; Anda tidak dapat menandainya terverifikasi.',
+      en: 'Send a one-time link to this address. Only its owner can verify it; you cannot mark it verified.',
+    },
+  'Send verification link': {
+    id: 'Kirim tautan verifikasi',
+    en: 'Send verification link',
+  },
+  'Send verification link?': {
+    id: 'Kirim tautan verifikasi?',
+    en: 'Send verification link?',
+  },
+  'A one-time link is sent to this user email. Only the email owner can verify it.': {
+    id: 'Tautan sekali pakai dikirim ke email pengguna ini. Hanya pemilik email yang dapat memverifikasinya.',
+    en: 'A one-time link is sent to this user email. Only the email owner can verify it.',
+  },
+  'A one-time link is sent to the verified email of this user. It replaces any link that is still pending.':
+    {
+      id: 'Tautan sekali pakai dikirim ke email terverifikasi pengguna ini. Tautan ini menggantikan tautan yang masih menunggu.',
+      en: 'A one-time link is sent to the verified email of this user. It replaces any link that is still pending.',
+    },
+  'Until an email is verified, password links are sent via WhatsApp.': {
+    id: 'Selama email belum diverifikasi, tautan kata sandi dikirim lewat WhatsApp.',
+    en: 'Until an email is verified, password links are sent via WhatsApp.',
+  },
+  'A one-time link is sent to the verified email of this user. It replaces any link that is still pending. Their current password and sessions stay valid until they use the link.':
+    {
+      id: 'Tautan sekali pakai dikirim ke email terverifikasi pengguna ini. Tautan ini menggantikan tautan yang masih menunggu. Kata sandi dan sesi saat ini tetap berlaku sampai tautan dipakai.',
+      en: 'A one-time link is sent to the verified email of this user. It replaces any link that is still pending. Their current password and sessions stay valid until they use the link.',
+    },
+  'Sent via email': {
+    id: 'Dikirim lewat email',
+    en: 'Sent via email',
+  },
+  'Sent via WhatsApp': {
+    id: 'Dikirim lewat WhatsApp',
+    en: 'Sent via WhatsApp',
+  },
+  'Email not set': { id: 'Belum diisi', en: 'Email not set' },
 };

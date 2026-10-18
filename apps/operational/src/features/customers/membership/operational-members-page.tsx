@@ -73,6 +73,7 @@ export function OperationalMembersPage() {
   const canEdit = canEditOperationalMemberProfile(
     session.access.permissions,
     session.access.capabilities,
+    session.access,
   );
   const cacheScope = JSON.stringify([
     session.business.tenantId,

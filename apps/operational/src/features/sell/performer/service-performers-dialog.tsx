@@ -389,7 +389,9 @@ function StatusText({ ok, children }: { ok: boolean; children: string }) {
   return (
     <span
       className={`flex min-w-0 items-center gap-1.5 text-xs ${
-        ok ? 'font-normal text-[var(--color-text-muted)]' : 'font-medium text-[var(--color-warning)]'
+        ok
+          ? 'font-normal text-[var(--color-text-muted)]'
+          : 'font-medium text-[var(--color-warning)]'
       }`}
     >
       {ok ? null : <AlertTriangle className="size-3.5 shrink-0" aria-hidden="true" />}
@@ -431,7 +433,9 @@ export function ServicePerformersDialog({
     ),
   );
   const [allocations, setAllocations] = useState<Record<string, PerformerAllocation>>(() =>
-    Object.fromEntries(Object.entries(initial).map(([key, value]) => [key, cloneAllocation(value)])),
+    Object.fromEntries(
+      Object.entries(initial).map(([key, value]) => [key, cloneAllocation(value)]),
+    ),
   );
   const [openUnit, setOpenUnit] = useState<string | null>(targets[0]?.key ?? null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
@@ -443,7 +447,12 @@ export function ServicePerformersDialog({
     (target) => !sameAllocation(allocations[target.key]!, initial[target.key]!),
   );
   const nameOf = (employeeId: string) =>
-    employeeDisplayName(line ?? sale.lines[0]!, employeeId, employees, copy('Employee unavailable'));
+    employeeDisplayName(
+      line ?? sale.lines[0]!,
+      employeeId,
+      employees,
+      copy('Employee unavailable'),
+    );
   const issueOf = (key: string) => resolveAllocation(allocations[key]!).issue;
   const setUnit = (key: string, next: PerformerAllocation) => {
     setError(null);
@@ -452,9 +461,7 @@ export function ServicePerformersDialog({
   const applyToAll = (key: string) => {
     setError(null);
     setAllocations(
-      Object.fromEntries(
-        targets.map((target) => [target.key, cloneAllocation(allocations[key]!)]),
-      ),
+      Object.fromEntries(targets.map((target) => [target.key, cloneAllocation(allocations[key]!)])),
     );
   };
 

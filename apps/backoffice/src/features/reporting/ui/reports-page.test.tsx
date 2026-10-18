@@ -88,6 +88,17 @@ describe('Report catalog in the selector', () => {
   });
 });
 
+describe('Report reference request boundaries', () => {
+  it('does not request Catalog reference endpoints using only tax:read', async () => {
+    const fake = open('/?type=tax', ['tax:read']);
+    await waitFor(() =>
+      expect(fake.requests.some((url) => url.includes('/reports/tax'))).toBe(true),
+    );
+    expect(fake.requests.some((url) => url.includes('/catalog/items'))).toBe(false);
+    expect(fake.requests.some((url) => url.includes('/catalog/categories'))).toBe(false);
+  });
+});
+
 describe('Report hierarchy', () => {
   it('renders only returned KPIs, no fake chart, and no record table for business performance', async () => {
     open('/?type=business-performance', ['sales:read'], {

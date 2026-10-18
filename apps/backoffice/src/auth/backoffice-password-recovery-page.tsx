@@ -1,6 +1,6 @@
 import { resolveBootstrapWorkspace, useDeploymentBootstrap } from '@digvation/business-runtime';
 import { DAlert, DButton, DInput } from '@digvation/ui';
-import { ArrowLeft, MessageCircle } from 'lucide-react';
+import { ArrowLeft, Mail } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router';
 
@@ -25,7 +25,7 @@ export function BackofficePasswordRecoveryPage() {
   const navigate = useNavigate();
   const { copy, t } = useBackofficeLocalization();
   const hasTrustedWorkspace = Boolean(resolveBootstrapWorkspace(bootstrap));
-  const [identifier, setIdentifier] = useState('');
+  const [email, setEmail] = useState('');
   const [state, setState] = useState<RecoveryState>({ kind: 'idle' });
 
   if (status === 'hydrating') return null;
@@ -36,13 +36,13 @@ export function BackofficePasswordRecoveryPage() {
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (isSubmitting || !hasTrustedWorkspace) return;
-    if (!identifier.trim()) {
+    if (!email.trim()) {
       setState({ kind: 'failed', reason: 'required' });
       return;
     }
     setState({ kind: 'submitting' });
     try {
-      await recovery.request({ identifier: identifier.trim() });
+      await recovery.request({ email: email.trim() });
       setState({ kind: 'sent' });
     } catch (failure) {
       setState({
@@ -57,7 +57,7 @@ export function BackofficePasswordRecoveryPage() {
       <BackofficeAuthShell>
         <div aria-live="polite">
           <span className="grid size-12 place-items-center rounded-full bg-[color-mix(in_srgb,var(--color-success)_14%,var(--color-surface))] text-[var(--color-success)]">
-            <MessageCircle className="size-5" aria-hidden="true" />
+            <Mail className="size-5" aria-hidden="true" />
           </span>
           <h1 className="mt-5 text-2xl font-bold leading-8 tracking-[-0.02em] text-[var(--color-text)]">
             {t('passwordRecoverySentTitle')}
@@ -102,20 +102,22 @@ export function BackofficePasswordRecoveryPage() {
           </DAlert>
         )}
         <DInput
-          id="backoffice-recovery-identifier"
-          name="username"
-          label={t('usernameOrPhone')}
-          value={identifier}
+          id="backoffice-recovery-email"
+          name="email"
+          label={copy('Verified email')}
+          value={email}
           onChange={(value) => {
-            setIdentifier(value);
+            setEmail(value);
             if (state.kind === 'failed') setState({ kind: 'idle' });
           }}
-          autoComplete="username"
+          type="email"
+          inputMode="email"
+          autoComplete="email"
           autoCapitalize="none"
           spellCheck={false}
           autoFocus
           disabled={isSubmitting}
-          placeholder={copy('Enter your username or phone number')}
+          placeholder={copy('name@business.com')}
         />
         {errorMessage ? (
           <DAlert

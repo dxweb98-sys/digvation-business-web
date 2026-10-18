@@ -71,7 +71,9 @@ export function fetchResolvedPrice(
       );
       return Promise.resolve(price);
     }
-    return Promise.reject(new Error('Operational catalog has no current price for this selection.'));
+    return Promise.reject(
+      new Error('Operational catalog has no current price for this selection.'),
+    );
   }
 
   return queryClient.fetchQuery({
@@ -107,7 +109,9 @@ export async function fetchResolvedVariantPrices(
     const projection = operationalCatalog(queryClient, input);
     const item = projection?.items.find((candidate) => candidate.id === input.catalogItemId);
     const entries = input.catalogVariantIds.map((catalogVariantId) => {
-      const price = item?.variants?.find((variant) => variant.id === catalogVariantId)?.resolvedPrice;
+      const price = item?.variants?.find(
+        (variant) => variant.id === catalogVariantId,
+      )?.resolvedPrice;
       return { catalogVariantId, amount: price?.amount ?? null } as const;
     });
     return {

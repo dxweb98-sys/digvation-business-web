@@ -1,0 +1,85 @@
+name: One-time Branch Housekeeping
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - .github/workflows/branch-housekeeping-once.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: branch-housekeeping
+  cancel-in-progress: false
+
+jobs:
+  archive-and-prune:
+    if: github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Archive heads before deleting extra branches
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const keep = new Set(['main', 'dev', 'dev-workshop', 'stage', 'stage-workshop']);
+            const { owner, repo } = context.repo;
+            const branches = await github.paginate(
+              github.rest.repos.listBranches,
+              { owner, repo, per_page: 100 }
+            );
+            const existing = new Set(branches.map(item => item.name));
+            const missing = [...keep].filter(name => !existing.has(name));
+            if (missing.length) {
+              core.setFailed('Cannot prune: required branches missing: ' + missing.join(', '));
+              return;
+            }
+            let removed = 0;
+            const errors = [];
+            for (const item of branches) {
+              if (keep.has(item.name)) continue;
+              if (item.protected) {
+                errors.push(item.name + ': protected');
+                continue;
+              }
+              const current = await github.rest.git.getRef({
+                owner, repo, ref: 'heads/' + item.name
+              });
+              const sha = current.data.object.sha;
+              const tagName = 'archive/20261011/' + item.name;
+              const tagRef = 'refs/tags/' + tagName;
+              try {
+                await github.rest.git.createRef({
+                  owner, repo, ref: tagRef, sha
+                });
+              } catch (error) {
+                if (error.status !== 422) {
+                  errors.push(item.name + ': archive failed - ' + error.message);
+                  continue;
+                }
+                const oldTag = await github.rest.git.getRef({
+                  owner, repo, ref: 'tags/' + tagName
+                });
+                if (oldTag.data.object.sha !== sha) {
+                  errors.push(item.name + ': archive points at different SHA');
+                  continue;
+                }
+              }
+              try {
+                await github.rest.git.deleteRef({
+                  owner, repo, ref: 'heads/' + item.name
+                });
+                removed += 1;
+              } catch (error) {
+                errors.push(item.name + ': delete failed - ' + error.message);
+              }
+            }
+            await core.summary
+              .addHeading('Branch cleanup')
+              .addRaw('Preserved: ' + [...keep].join(', ') + '\n\n')
+              .addRaw('Archived and deleted: ' + removed + '\n\n')
+              .addRaw('Failures: ' + errors.length + '\n\n')
+              .write();
+            if (errors.length) core.setFailed(errors.join('\n'));

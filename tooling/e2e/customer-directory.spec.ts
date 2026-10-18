@@ -1,5 +1,7 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 
+import { BACKOFFICE_URL, OPERATIONAL_URL } from './servers';
+
 const locationId = '11111111-1111-4111-8111-111111111111';
 const at = '2026-10-03T01:00:00.000Z';
 const regular = {
@@ -203,7 +205,7 @@ async function fixture(page: Page, surface: 'operational' | 'backoffice') {
   });
   return {
     state,
-    url: surface === 'operational' ? 'http://127.0.0.1:5176' : 'http://127.0.0.1:5174',
+    url: surface === 'operational' ? OPERATIONAL_URL : BACKOFFICE_URL,
   };
 }
 
@@ -350,7 +352,7 @@ for (const width of [390, 430, 1280]) {
     ).toBeVisible();
     await shot(page, info, 'same-name-and-phone-suggestions');
     await page.getByRole('option', { name: 'Dicky Darmawan +628123456789', exact: true }).click();
-    await page.getByRole('button', { name: 'Gunakan Pelanggan', exact: true }).click();
+    await page.getByRole('button', { name: 'Lanjutkan', exact: true }).click();
     await expect(page.getByRole('dialog', { name: 'Pilih Pelanggan', exact: true })).toHaveCount(0);
     await expect(
       page.getByText('Dicky Darmawan', { exact: true }).filter({ visible: true }).first(),

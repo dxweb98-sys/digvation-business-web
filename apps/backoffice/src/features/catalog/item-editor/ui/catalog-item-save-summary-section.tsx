@@ -1,8 +1,4 @@
-import {
-  sellingModelCopy,
-  sellsItemItself,
-  type SellingModel,
-} from '../../model/catalog-selling';
+import { sellingModelCopy, sellsItemItself, type SellingModel } from '../../model/catalog-selling';
 import { isValidSellingPrice } from '../model/variant-price-draft';
 import type { useCatalogItemEditor } from '../model/use-catalog-item-editor';
 
@@ -22,10 +18,7 @@ export function CatalogItemSaveSummarySection({
   const { variants, defaultPrice } = editor.form;
 
   return (
-    <section
-      aria-label="Akan disimpan"
-      className="mt-5 border-t border-[var(--color-border)] pt-4"
-    >
+    <section aria-label="Akan disimpan" className="mt-5 border-t border-[var(--color-border)] pt-4">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.04em] text-[var(--color-text)]">
           Akan disimpan

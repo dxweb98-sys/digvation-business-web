@@ -1,4 +1,5 @@
 import { useRuntime } from '@digvation/business-runtime';
+import { hasSessionFeature } from '@digvation/business-auth';
 import {
   DButton,
   DDataTable,
@@ -80,7 +81,28 @@ export function CatalogPage() {
 
   const can = (action: BackofficeAction) =>
     Boolean(session && canPerformBackofficeAction(session, action));
-  const hasLoyaltyCapability = Boolean(session?.access.capabilities.includes('LOYALTY_POINTS'));
+  const hasLoyaltyCapability = Boolean(
+    session && hasSessionFeature(session.access, 'LOYALTY_POINTS'),
+  );
+  const canSellProducts = Boolean(
+    session && hasSessionFeature(session.access, 'POS_PRODUCT_SALES'),
+  );
+  const canSellServices = Boolean(
+    session && hasSessionFeature(session.access, 'POS_SERVICE_SALES'),
+  );
+  const canConfigureComposition = Boolean(
+    session && hasSessionFeature(session.access, 'CATALOG_SERVICE_COMPOSITION'),
+  );
+  // Disable standalone Product queries when Product Sales is not entitled.
+  // Service composition uses its own Product component candidate API.
+  const availableItemType: Item['type'] | '' | null =
+    canSellProducts && canSellServices
+      ? itemQuery.type
+      : canSellProducts
+        ? 'PRODUCT'
+        : canSellServices
+          ? 'SERVICE'
+          : null;
   const canViewLoyalty = hasLoyaltyCapability && can('viewLoyalty');
   const canConfigureLoyalty = hasLoyaltyCapability && can('configureLoyalty');
 
@@ -90,7 +112,7 @@ export function CatalogPage() {
     enabled: Boolean(session),
   });
   const items = useListQuery({
-    queryKey: [...keys.items, itemQuery],
+    queryKey: [...keys.items, itemQuery, availableItemType],
     pagination: {
       page: itemPagination.page,
       pageSize: itemPagination.pageSize,
@@ -98,9 +120,10 @@ export function CatalogPage() {
     queryFn: (pagination) =>
       api.listItems({
         ...toItemQuery(itemQuery),
+        ...(availableItemType ? { type: availableItemType } : {}),
         ...(pagination ?? itemPagination.request),
       }),
-    enabled: Boolean(session),
+    enabled: Boolean(session && availableItemType !== null),
   });
   const categories = useListQuery({
     queryKey: [...keys.categories, categoryQuery],
@@ -251,8 +274,8 @@ export function CatalogPage() {
                   onChange={(type) => changeItemFilter({ type: (type ?? '') as '' | Item['type'] })}
                   clearable
                   options={[
-                    { label: copy('Product'), value: 'PRODUCT' },
-                    { label: copy('Service'), value: 'SERVICE' },
+                    ...(canSellProducts ? [{ label: copy('Product'), value: 'PRODUCT' }] : []),
+                    ...(canSellServices ? [{ label: copy('Service'), value: 'SERVICE' }] : []),
                   ]}
                 />
                 <DSelectFilter
@@ -390,7 +413,9 @@ export function CatalogPage() {
         canCreateVariants={can('createCatalog')}
         canUpdateVariants={can('updateCatalog')}
         canManageImage={can('updateCatalog')}
-        canEditComposition={can('updateCatalog')}
+        canEditComposition={canSellServices && canConfigureComposition && can('updateCatalog')}
+        canSellProducts={canSellProducts}
+        canSellServices={canSellServices}
         onClose={() => setItem(undefined)}
         onSaved={refreshItems}
       />

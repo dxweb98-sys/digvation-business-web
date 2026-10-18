@@ -72,9 +72,7 @@ export function useCatalogItemEditorData({
     enabled: Boolean(item && canViewLoyalty),
   });
 
-  const loyaltyRule = loyaltyRules.data?.find(
-    (candidate) => candidate.catalogItemId === item?.id,
-  );
+  const loyaltyRule = loyaltyRules.data?.find((candidate) => candidate.catalogItemId === item?.id);
 
   return {
     existingImage,

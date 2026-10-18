@@ -29,6 +29,10 @@ export default tseslint.config(
     rules: {
       '@typescript-eslint/consistent-type-imports': ['error', { prefer: 'type-imports' }],
       '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', ignoreRestSiblings: true },
+      ],
       '@typescript-eslint/naming-convention': [
         'error',
         { selector: 'default', format: ['camelCase'] },
@@ -38,7 +42,9 @@ export default tseslint.config(
           format: ['camelCase', 'UPPER_CASE', 'PascalCase'],
         },
         { selector: 'function', format: ['camelCase', 'PascalCase'] },
-        { selector: 'parameter', format: ['camelCase', 'PascalCase'] },
+        { selector: 'parameter', format: ['camelCase', 'PascalCase'], leadingUnderscore: 'allow' },
+        // Component stubs in vi.mock factories keep the component's PascalCase name.
+        { selector: 'objectLiteralMethod', format: ['camelCase', 'PascalCase'] },
         { selector: 'typeLike', format: ['PascalCase'] },
         { selector: 'enumMember', format: ['UPPER_CASE'] },
         { selector: 'objectLiteralProperty', format: null },

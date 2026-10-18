@@ -356,10 +356,7 @@ export function useSaleCoreController({
       if (!intent) throw new Error('No active Sale is available for payment.');
       return mutateAsync(intent);
     },
-    transitionPayment: async (
-      payment: Payment,
-      status: Exclude<PaymentStatus, 'PENDING'>,
-    ) => {
+    transitionPayment: async (payment: Payment, status: Exclude<PaymentStatus, 'PENDING'>) => {
       const intent = withSale((currentSale) => ({
         kind: 'paymentTransition' as const,
         saleId: currentSale.id,

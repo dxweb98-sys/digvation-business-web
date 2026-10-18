@@ -3,9 +3,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import type { ServiceCompositionDraft } from './service-composition-draft';
 import type { VariantPriceDraft } from './variant-price-draft';
 import type { LoyaltyEarningBehavior } from '../../../../modules/loyalty/loyalty-api';
-import {
-  catalogItemEditorReducer,
-} from './catalog-item-editor-reducer';
+import { catalogItemEditorReducer } from './catalog-item-editor-reducer';
 import {
   createCatalogItemEditorState,
   type CatalogItemEditorForm,
@@ -49,10 +47,7 @@ export function useCatalogItemEditor(item: CatalogItemEditorSource | null | unde
   }, [identity, item]);
 
   const setFormField = useCallback(
-    <K extends keyof CatalogItemEditorForm>(
-      field: K,
-      value: CatalogItemEditorForm[K],
-    ) => {
+    <K extends keyof CatalogItemEditorForm>(field: K, value: CatalogItemEditorForm[K]) => {
       dispatch({
         type: 'FORM_FIELD_CHANGED',
         field,

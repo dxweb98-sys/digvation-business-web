@@ -26,17 +26,19 @@ const catalogItem = {
   name: 'Hair Cut',
   type: 'SERVICE',
   categoryId: category.id,
-  taxCategoryId: null,
   description: null,
   lifecycle: 'ACTIVE',
   fulfillmentBehavior: 'INSTANT',
+  variantSelectionMode: 'REQUIRED',
+  productUsage: 'STANDALONE_AND_COMPONENT',
+  requireAdditionalItemAtSale: false,
   version: 1,
   createdAt: '2026-09-02T00:00:00.000Z',
   updatedAt: '2026-09-02T00:00:00.000Z',
   serviceDefinition: {
     defaultDurationMinutes: null,
-    employeeAssignmentMode: 'NONE',
-    allowEmployeeContribution: false,
+    employeeAssignmentMode: 'REQUIRED',
+    allowEmployeeContribution: true,
   },
 };
 
@@ -124,6 +126,19 @@ function createSaleWithLine(version = 2, quantity = '1.0000', total = '125000.00
   };
 }
 
+function resolvedPrice() {
+  return {
+    catalogPriceId: '55555555-5555-4555-8555-555555555555',
+    catalogItemId: catalogItem.id,
+    catalogVariantId: null,
+    locationId: branch.id,
+    currency: 'IDR',
+    amount: '125000.0000',
+    effectiveAt: '2026-09-02T00:00:00.000Z',
+    sourceScope: { catalogVariantId: null, locationId: branch.id },
+  };
+}
+
 function envelope<T>(data: T) {
   return {
     success: true,
@@ -144,13 +159,11 @@ function failure(code: string, message: string) {
 
 interface RouteState {
   currentSale: ReturnType<typeof createEmptySale> | ReturnType<typeof createSaleWithLine>;
+  /** Sale-creating requests: the cart stays local until checkout, so these must stay at zero. */
   createRequests: number;
-  addRequests: number;
   salesListRequests: number;
-  quantityExpectedVersions: number[];
-  removeExpectedVersions: number[];
-  conflictOnNextQuantity: boolean;
-  failFirstAdd: boolean;
+  previewQuantities: string[];
+  failPreview: boolean;
 }
 
 async function installRoutes(page: Page, options: Partial<RouteState> = {}) {
@@ -164,12 +177,9 @@ async function installRoutes(page: Page, options: Partial<RouteState> = {}) {
   const state: RouteState = {
     currentSale: createEmptySale(),
     createRequests: 0,
-    addRequests: 0,
     salesListRequests: 0,
-    quantityExpectedVersions: [],
-    removeExpectedVersions: [],
-    conflictOnNextQuantity: false,
-    failFirstAdd: false,
+    previewQuantities: [],
+    failPreview: false,
     ...options,
   };
 
@@ -182,23 +192,31 @@ async function installRoutes(page: Page, options: Partial<RouteState> = {}) {
     const url = new URL(request.url());
     const method = request.method();
 
-    if (method === 'GET' && url.pathname === '/api/v1/auth/me') {
+    // Canonical browser-session hydration (replaces the legacy auth/me + runtime/context pair).
+    if (method === 'GET' && url.pathname === '/api/v1/session/context') {
       await route.fulfill({
         json: envelope({
-          id: 'e2e-operational-user',
-          displayName: 'E2E Operational User',
-          roles: [{ permissions: ['sales:create', 'sales:read'] }],
-        }),
-      });
-      return;
-    }
-    if (method === 'GET' && url.pathname === '/api/v1/runtime/context') {
-      await route.fulfill({
-        json: envelope({
-          effectiveProducts: ['POS'],
-          effectiveCapabilities: [],
-          effectiveFoundations: ['OPERATIONAL_ACCESS', 'ORGANIZATION_LOCATION', 'CATALOG'],
-          effectivePermissions: ['sales:create', 'sales:read'],
+          identity: {
+            userId: 'e2e-operational-user',
+            displayName: 'E2E Operational User',
+            username: 'e2e.operational',
+            roles: [],
+          },
+          business: { tenantId: branch.id, name: 'E2E Business', currency: 'IDR' },
+          access: {
+            products: ['POS'],
+            capabilities: [],
+            foundations: ['OPERATIONAL_ACCESS', 'ORGANIZATION_LOCATION', 'CATALOG'],
+            permissions: ['auth:self', 'sales:create', 'sales:read', 'catalog:read'],
+          },
+          preferences: {
+            locale: 'id-ID',
+            timezone: 'Asia/Jakarta',
+            dateFormat: 'DD/MM/YYYY',
+            timeFormat: 'HH:mm',
+          },
+          deployment: { profile: 'DEDICATED' },
+          contextVersion: 'cashier-e2e-context',
         }),
       });
       return;
@@ -212,6 +230,80 @@ async function installRoutes(page: Page, options: Partial<RouteState> = {}) {
           mainLocationId: branch.id,
           locations: [{ id: branch.id, code: branch.code, name: branch.name }],
         }),
+      });
+      return;
+    }
+    if (method === 'POST' && url.pathname === '/api/v1/operational/transactions/pricing-preview') {
+      const body = request.postDataJSON() as { lines: Array<{ quantity: string }> };
+      state.previewQuantities.push(body.lines[0]?.quantity ?? '');
+      if (state.failPreview) {
+        await route.fulfill({
+          status: 409,
+          json: failure('CATALOG_PRICE_NOT_FOUND', 'No effective price for this selection'),
+        });
+        return;
+      }
+      const quantity = Number(body.lines[0]?.quantity ?? '0');
+      const total = (quantity * 125000).toFixed(4);
+      await route.fulfill({
+        json: envelope({
+          currency: 'IDR',
+          grossAmount: total,
+          promotions: [],
+          discountAmount: '0.0000',
+          netPreTaxAmount: total,
+          taxRate: null,
+          taxPriceTreatment: null,
+          taxAmount: '0.0000',
+          totalAmount: total,
+        }),
+      });
+      return;
+    }
+    if (method === 'GET' && url.pathname === '/api/v1/notifications/unread-count') {
+      await route.fulfill({ json: envelope({ count: 0 }) });
+      return;
+    }
+    if (method === 'GET' && url.pathname === '/api/v1/sales/configuration/tax') {
+      await route.fulfill({
+        json: envelope({
+          enabled: false,
+          rate: '0.11',
+          version: 1,
+          createdAt: null,
+          updatedAt: null,
+        }),
+      });
+      return;
+    }
+    if (method === 'GET' && url.pathname === '/api/v1/operational/catalog') {
+      await route.fulfill({
+        json: envelope({
+          categories: [category],
+          items: [
+            {
+              ...catalogItem,
+              displayPrice: { amount: '125000.0000', currency: 'IDR', kind: 'EXACT' },
+              resolvedPrice: resolvedPrice(),
+              variants: [],
+            },
+          ],
+        }),
+      });
+      return;
+    }
+    if (method === 'GET' && url.pathname === '/api/v1/operational/employees') {
+      await route.fulfill({ json: envelope({ items: [], limit: 100, offset: 0 }) });
+      return;
+    }
+    if (method === 'GET' && url.pathname === '/api/v1/operational/payment-routes') {
+      await route.fulfill({ json: envelope({ items: [], limit: 0, offset: 0 }) });
+      return;
+    }
+    if (method === 'GET' && url.pathname === '/api/v1/operational/queue') {
+      state.salesListRequests += 1;
+      await route.fulfill({
+        json: envelope({ items: [state.currentSale], limit: 100, offset: 0 }),
       });
       return;
     }
@@ -254,74 +346,14 @@ async function installRoutes(page: Page, options: Partial<RouteState> = {}) {
       await route.fulfill({ json: envelope({ items: [], limit: 100, offset: 0 }) });
       return;
     }
-    if (method === 'POST' && url.pathname === '/api/v1/sales') {
+    if (
+      method === 'POST' &&
+      ['/api/v1/operational/transactions', '/api/v1/operational/transactions/empty'].includes(
+        url.pathname,
+      )
+    ) {
       state.createRequests += 1;
-      expect(request.headers()['idempotency-key']).toBeTruthy();
-      expect(request.postDataJSON()).toEqual({ sellingLocationId: branch.id, currency: 'IDR' });
-      state.currentSale = createEmptySale();
-      await route.fulfill({ status: 201, json: envelope(state.currentSale) });
-      return;
-    }
-    if (method === 'GET' && url.pathname === `/api/v1/sales/${saleId}`) {
-      await route.fulfill({ json: envelope(state.currentSale) });
-      return;
-    }
-    if (method === 'GET' && url.pathname === '/api/v1/sales') {
-      state.salesListRequests += 1;
-      await route.fulfill({
-        json: envelope({ items: [state.currentSale], limit: 100, offset: 0 }),
-      });
-      return;
-    }
-    if (method === 'POST' && url.pathname === `/api/v1/sales/${saleId}/lines`) {
-      state.addRequests += 1;
-      expect(request.headers()['idempotency-key']).toBeTruthy();
-      expect(request.postDataJSON()).toEqual({
-        expectedVersion: 1,
-        catalogItemId: catalogItem.id,
-        quantity: '1',
-      });
-      if (state.failFirstAdd && state.addRequests === 1) {
-        await route.fulfill({
-          status: 409,
-          json: failure('CATALOG_PRICE_NOT_FOUND', 'No effective price for this selection'),
-        });
-        return;
-      }
-      state.currentSale = createSaleWithLine();
-      await route.fulfill({ status: 201, json: envelope(state.currentSale) });
-      return;
-    }
-    if (method === 'POST' && url.pathname === `/api/v1/sales/${saleId}/lines/${lineId}/quantity`) {
-      const body = request.postDataJSON() as { expectedVersion: number; quantity: string };
-      state.quantityExpectedVersions.push(body.expectedVersion);
-      if (state.conflictOnNextQuantity) {
-        state.conflictOnNextQuantity = false;
-        state.currentSale = createSaleWithLine(3);
-        await route.fulfill({
-          status: 409,
-          json: failure('SALE_VERSION_CONFLICT', 'Sale changed; reload before retrying'),
-        });
-        return;
-      }
-      state.currentSale = createSaleWithLine(3, '2.0000', '250000.0000');
-      await route.fulfill({ json: envelope(state.currentSale) });
-      return;
-    }
-    if (method === 'POST' && url.pathname === `/api/v1/sales/${saleId}/lines/${lineId}/remove`) {
-      const body = request.postDataJSON() as { expectedVersion: number };
-      state.removeExpectedVersions.push(body.expectedVersion);
-      const removedLine = {
-        ...createLine('2.0000', '250000.0000'),
-        removedAt: '2026-09-02T00:05:00.000Z',
-      };
-      state.currentSale = {
-        ...createEmptySale(),
-        version: 4,
-        updatedAt: '2026-09-02T00:05:00.000Z',
-        lines: [removedLine],
-      } as ReturnType<typeof createSaleWithLine>;
-      await route.fulfill({ json: envelope(state.currentSale) });
+      await route.fulfill({ status: 500, json: failure('E2E_UNEXPECTED_CREATE', url.pathname) });
       return;
     }
 
@@ -331,12 +363,15 @@ async function installRoutes(page: Page, options: Partial<RouteState> = {}) {
   return state;
 }
 
-async function startSaleFromFirstItem(page: Page) {
+async function addFirstItemToCart(page: Page) {
   await page.goto('/sell');
   await expect(page.getByRole('button', { name: /Cabang aktif Main Branch/i })).toBeVisible();
   await expect(page.getByText(/Rp\s?125\.000/)).toBeVisible();
   await page.getByRole('button', { name: 'Tambah Hair Cut', exact: true }).click();
+  await page.getByRole('button', { name: 'Tambahkan ke keranjang' }).click();
 }
+
+const cartDialog = (page: Page) => page.locator('[role="dialog"][aria-label="Keranjang"]').first();
 
 test('idle Sell does not poll the Sales list continuously', async ({ page }) => {
   const state = await installRoutes(page);
@@ -351,7 +386,7 @@ test('idle Sell does not poll the Sales list continuously', async ({ page }) => 
   expect(state.salesListRequests).toBe(baseline);
 });
 
-test('Operational keeps a fixed left sidebar below the old lg breakpoint', async ({ page }) => {
+test('Operational keeps a fixed left sidebar below the lg breakpoint', async ({ page }) => {
   await page.setViewportSize({ width: 900, height: 800 });
   await installRoutes(page);
 
@@ -363,93 +398,55 @@ test('Operational keeps a fixed left sidebar below the old lg breakpoint', async
   const contentBox = await page.locator('main').first().boundingBox();
   expect(sidebarBox).not.toBeNull();
   expect(contentBox).not.toBeNull();
-  expect(sidebarBox!.width).toBeGreaterThanOrEqual(250);
-  expect(sidebarBox!.width).toBeLessThanOrEqual(260);
+  // operational-shell.tsx: `md:w-[232px] lg:w-[280px]`; 900px sits in the md range.
+  expect(sidebarBox!.width).toBe(232);
   expect(contentBox!.x).toBeGreaterThanOrEqual(sidebarBox!.width);
 });
 
-test('lazy start creates the Sale only when the first item is added', async ({ page }) => {
+test('adding the first item keeps the cart local and creates no Sale', async ({ page }) => {
   const state = await installRoutes(page);
 
   await page.goto('/sell');
-  await expect(
-    page.locator('[role="dialog"][aria-label="Keranjang"]').first().getByText('Keranjang kosong'),
-  ).toBeVisible();
+  await expect(cartDialog(page).getByText('Keranjang kosong')).toBeVisible();
   await expect(page.getByRole('button', { name: /Cabang aktif Main Branch/i })).toBeVisible();
 
   await page.getByRole('button', { name: 'Tambah Hair Cut', exact: true }).click();
+  await page.getByRole('button', { name: 'Tambahkan ke keranjang' }).click();
 
-  await expect(page).toHaveURL(new RegExp(`/sell/${saleId}$`));
+  await expect(page).toHaveURL(/\/sell$/);
   await page.getByRole('button', { name: 'Keranjang', exact: true }).click();
-  await expect(
-    page
-      .locator('[role="dialog"][aria-label="Keranjang"]')
-      .first()
-      .getByText('Hair Cut', { exact: true }),
-  ).toBeVisible();
-  expect(state.createRequests).toBe(1);
-  expect(state.addRequests).toBe(1);
+  await expect(cartDialog(page).getByText('Hair Cut', { exact: true })).toBeVisible();
+  await expect(cartDialog(page).getByText('Estimasi total')).toBeVisible();
+  expect(state.createRequests).toBe(0);
+  expect(state.previewQuantities).toEqual(['1.0000']);
 });
 
-test('first-line failure preserves the created empty OPEN Sale', async ({ page }) => {
-  const state = await installRoutes(page, { failFirstAdd: true });
+test('a failed pricing preview keeps the cart item and still creates no Sale', async ({ page }) => {
+  const state = await installRoutes(page, { failPreview: true });
 
-  await startSaleFromFirstItem(page);
+  await addFirstItemToCart(page);
+  await page.getByRole('button', { name: 'Keranjang', exact: true }).click();
 
-  await expect(page).toHaveURL(new RegExp(`/sell/${saleId}$`));
-  await expect(page.getByRole('alert')).toContainText(
-    'Harga item belum tersedia untuk pilihan ini.',
-  );
-  await expect(page.getByText('Harga item belum tersedia untuk pilihan ini.')).toBeVisible();
-  expect(state.createRequests).toBe(1);
-  expect(state.addRequests).toBe(1);
+  await expect(cartDialog(page).getByText('Hair Cut', { exact: true })).toBeVisible();
+  expect(state.createRequests).toBe(0);
+  expect(state.previewQuantities.length).toBeGreaterThan(0);
 });
 
-test('quantity and remove use the latest authoritative Sale version', async ({ page }) => {
+test('quantity and remove change only the local cart and re-price it through the preview', async ({
+  page,
+}) => {
   const state = await installRoutes(page);
-  await startSaleFromFirstItem(page);
+  await addFirstItemToCart(page);
 
   await page.getByRole('button', { name: 'Keranjang', exact: true }).click();
-  const cart = page.locator('[role="dialog"][aria-label="Keranjang"]').first();
+  const cart = cartDialog(page);
   await cart.getByRole('button', { name: 'Tambah jumlah Hair Cut' }).click();
-  await expect(cart.getByLabel('Jumlah Hair Cut')).toHaveText('2');
-  expect(state.quantityExpectedVersions).toEqual([2]);
+  await expect(cart.getByRole('status', { name: 'Jumlah Hair Cut' })).toHaveText('2');
+  await expect.poll(() => state.previewQuantities.at(-1)).toBe('2.0000');
 
   await cart.getByRole('button', { name: 'Hapus Hair Cut' }).click();
   await expect(cart.getByText('Keranjang kosong')).toBeVisible();
-  expect(state.removeExpectedVersions).toEqual([3]);
-});
-
-test('version conflict reloads latest Sale and never auto-replays the command', async ({
-  page,
-}) => {
-  const state = await installRoutes(page, { conflictOnNextQuantity: true });
-  await startSaleFromFirstItem(page);
-
-  await page.getByRole('button', { name: 'Keranjang', exact: true }).click();
-  await page
-    .locator('[role="dialog"][aria-label="Keranjang"]')
-    .first()
-    .getByRole('button', { name: 'Tambah jumlah Hair Cut' })
-    .click();
-
-  await expect(
-    page.getByText('Transaksi telah berubah. Tinjau data terbaru sebelum melanjutkan.'),
-  ).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Sudah ditinjau' })).toBeVisible();
-  expect(state.quantityExpectedVersions).toEqual([2]);
-
-  await page.waitForTimeout(250);
-  expect(state.quantityExpectedVersions).toEqual([2]);
-  await page.getByRole('button', { name: 'Tutup keranjang aktif' }).click();
-  await page.getByRole('button', { name: 'Sudah ditinjau' }).click();
-  await page.getByRole('button', { name: 'Keranjang', exact: true }).click();
-  await expect(
-    page
-      .locator('[role="dialog"][aria-label="Keranjang"]')
-      .first()
-      .getByRole('button', { name: 'Tambah jumlah Hair Cut' }),
-  ).toBeEnabled();
+  expect(state.createRequests).toBe(0);
 });
 
 test('queued transactions render without creating or adding a Sale', async ({ page }) => {
@@ -464,5 +461,4 @@ test('queued transactions render without creating or adding a Sale', async ({ pa
   await expect(page.getByText(`Transaksi ${saleId.slice(0, 8)}`)).toBeVisible();
 
   expect(state.createRequests).toBe(0);
-  expect(state.addRequests).toBe(0);
 });

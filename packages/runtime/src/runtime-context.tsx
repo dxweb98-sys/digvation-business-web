@@ -8,8 +8,9 @@ import type {
 import { resolveBootstrapWorkspace } from './workspace-resolution';
 
 const DeploymentBootstrapContext = createContext<DeploymentBootstrapConfig | null>(null);
-const AuthenticatedRuntimeProjectionContext =
-  createContext<AuthenticatedRuntimeProjection | null>(null);
+const AuthenticatedRuntimeProjectionContext = createContext<AuthenticatedRuntimeProjection | null>(
+  null,
+);
 
 const THEME_COLOR_PROPERTIES: Record<keyof ThemeColorConfig, string> = {
   background: '--color-background',

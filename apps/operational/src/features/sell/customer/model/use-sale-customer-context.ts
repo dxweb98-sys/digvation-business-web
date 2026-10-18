@@ -85,6 +85,7 @@ export function useSaleCustomerContext({
   });
   useEffect(() => {
     if (activeCustomer?.type !== 'MEMBER') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- accepted baseline: state is reset when its source changes; moving it to render-time derivation is a behavioural refactor tracked separately
       if (selectedMember) setSelectedMember(null);
       return;
     }

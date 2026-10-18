@@ -138,7 +138,7 @@ describe('Operational canonical Customers', () => {
   it('edits the canonical profile with its current version through Customer API', async () => {
     const api = setup(false, true);
     fireEvent.click((await screen.findAllByText('Dicky'))[0]!);
-    fireEvent.click(await screen.findByRole('button', { name: 'Ubah data' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Ubah profil' }));
     expect((screen.getByLabelText('Nomor telepon') as HTMLInputElement).value).toBe('08123456789');
     fireEvent.change(screen.getByLabelText('Nomor telepon'), {
       target: { value: '+6281234567890' },

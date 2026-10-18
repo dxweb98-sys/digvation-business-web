@@ -1,4 +1,5 @@
 import { useRuntime } from '@digvation/business-runtime';
+import { hasSessionFeature } from '@digvation/business-auth';
 import {
   DBadge,
   DButton,
@@ -70,15 +71,22 @@ export function BusinessConfigurationPage() {
     () => new CatalogApi(createApiClient(runtime.apiBaseUrl)),
     [createApiClient, runtime.apiBaseUrl],
   );
-  const hasPosProduct = Boolean(session?.effectiveEntitlements.products.includes('POS'));
+  const hasPosProduct = Boolean(session && hasSessionFeature(session.access, 'POS'));
+  const hasTaxCapability = Boolean(session && hasSessionFeature(session.access, 'TAX_FISCAL'));
   const canViewCommission = Boolean(
-    hasPosProduct && session && canPerformBackofficeAction(session, 'viewCommission'),
+    hasPosProduct &&
+    session &&
+    hasSessionFeature(session.access, 'POS_PRODUCT_COMMISSION') &&
+    canPerformBackofficeAction(session, 'viewCommission'),
   );
   const canConfigureCommission = Boolean(
-    hasPosProduct && session && canPerformBackofficeAction(session, 'configureCommission'),
+    hasPosProduct &&
+    session &&
+    hasSessionFeature(session.access, 'POS_PRODUCT_COMMISSION') &&
+    canPerformBackofficeAction(session, 'configureCommission'),
   );
   const hasLoyaltyCapability = Boolean(
-    session?.effectiveEntitlements.capabilities.includes('LOYALTY_POINTS'),
+    session && hasSessionFeature(session.access, 'LOYALTY_POINTS'),
   );
   const canViewLoyalty = Boolean(
     hasLoyaltyCapability && session && canPerformBackofficeAction(session, 'viewLoyalty'),
@@ -151,14 +159,14 @@ export function BusinessConfigurationPage() {
           {canViewProfile ? (
             <DTabsTrigger value="localization">{copy('Localization')}</DTabsTrigger>
           ) : null}
-          {canViewProfile ? <DTabsTrigger value="tax">{copy('Tax')}</DTabsTrigger> : null}
+          {canViewProfile && hasTaxCapability ? (
+            <DTabsTrigger value="tax">{copy('Tax')}</DTabsTrigger>
+          ) : null}
           {canViewProfile ? (
             <DTabsTrigger value="numbering">{copy('Numbering')}</DTabsTrigger>
           ) : null}
           {canViewLoyalty ? <DTabsTrigger value="loyalty">Loyalty</DTabsTrigger> : null}
-          {canViewCommission ? (
-            <DTabsTrigger value="commission">Komisi Produk</DTabsTrigger>
-          ) : null}
+          {canViewCommission ? <DTabsTrigger value="commission">Komisi Produk</DTabsTrigger> : null}
         </DTabsList>
 
         <DTabsContent value="profile" className="mt-5">
@@ -175,7 +183,11 @@ export function BusinessConfigurationPage() {
           <LocationsSection
             items={locations.data?.items ?? []}
             loading={locations.isLoading}
-            canCreate={canCreateLocation}
+            canCreate={
+              canCreateLocation &&
+              (hasSessionFeature(session.access, 'MULTI_BRANCH') ||
+                (!locations.isLoading && locations.data?.total === 0))
+            }
             canUpdate={canUpdateLocation}
             api={api}
             onChanged={() => invalidate(keys.locations)}
@@ -192,15 +204,17 @@ export function BusinessConfigurationPage() {
           />
         </DTabsContent>
 
-        <DTabsContent value="tax" className="mt-5">
-          <TaxSection
-            tax={configuration.data?.tax}
-            loading={configuration.isLoading}
-            canUpdate={canUpdateProfile}
-            api={api}
-            onChanged={() => invalidate(keys.configuration)}
-          />
-        </DTabsContent>
+        {canViewProfile && hasTaxCapability ? (
+          <DTabsContent value="tax" className="mt-5">
+            <TaxSection
+              tax={configuration.data?.tax}
+              loading={configuration.isLoading}
+              canUpdate={canUpdateProfile}
+              api={api}
+              onChanged={() => invalidate(keys.configuration)}
+            />
+          </DTabsContent>
+        ) : null}
 
         {canViewLoyalty ? (
           <DTabsContent value="loyalty" className="mt-5">
@@ -214,7 +228,12 @@ export function BusinessConfigurationPage() {
               api={commissionApi}
               canConfigure={canConfigureCommission}
               loadProducts={(q) =>
-                catalogApi.listItems({ type: 'PRODUCT', lifecycle: 'ACTIVE', limit: 20, ...(q ? { q } : {}) })
+                catalogApi.listItems({
+                  type: 'PRODUCT',
+                  lifecycle: 'ACTIVE',
+                  limit: 20,
+                  ...(q ? { q } : {}),
+                })
               }
             />
           </DTabsContent>
@@ -327,7 +346,6 @@ function ProfileSection({
   );
 }
 
-
 function percentageFromTaxRate(rate: string): string {
   const [whole = '0', fraction = ''] = rate.trim().split('.');
   if (whole === '1') return '100';
@@ -381,10 +399,7 @@ function TaxSection({
 
   const percent = Number(draftPercent);
   const validPercent =
-    draftPercent.trim().length > 0 &&
-    Number.isFinite(percent) &&
-    percent >= 0 &&
-    percent <= 100;
+    draftPercent.trim().length > 0 && Number.isFinite(percent) && percent >= 0 && percent <= 100;
 
   const save = async () => {
     if (!tax || saving || !validPercent) return;
@@ -401,10 +416,8 @@ function TaxSection({
       if (!isSessionExpiredError(error))
         showToast({
           variant: 'danger',
-          title: normalizeBackofficeApiError(
-            error,
-            copy('Could not update tax configuration.'),
-          ).safeMessage,
+          title: normalizeBackofficeApiError(error, copy('Could not update tax configuration.'))
+            .safeMessage,
         });
     } finally {
       setSaving(false);

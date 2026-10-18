@@ -54,9 +54,10 @@ export class ActivityApi {
   constructor(private readonly client: ApiClient) {}
   list(query: Query) {
     const params = new URLSearchParams(
-      Object.entries(query).filter(
-        ([, value]) => value !== undefined && value !== '',
-      ) as [string, string][],
+      Object.entries(query).filter(([, value]) => value !== undefined && value !== '') as [
+        string,
+        string,
+      ][],
     );
     return this.client.get<ActivityPageResult>(`/api/v1/activity?${params}`);
   }

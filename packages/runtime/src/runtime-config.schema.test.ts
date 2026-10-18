@@ -18,7 +18,7 @@ function bootstrap(overrides: Record<string, unknown> = {}) {
       radius: 'ROUNDED',
       colors: { brand: '#123456', accentCoral: '#F3A08B' },
     },
-    defaults: { locale: 'id-ID', defaultCountry: 'ID' },
+    defaults: { locale: 'id-ID', country: 'ID' },
     ...overrides,
   };
 }
@@ -31,7 +31,7 @@ describe('deployment bootstrap schema', () => {
       deploymentProfile: 'DEDICATED',
       applications: { operational: true, backoffice: true },
       branding: { mode: 'WHITE_LABEL', productName: 'Point of Sale' },
-      defaults: { locale: 'id-ID', defaultCountry: 'ID' },
+      defaults: { locale: 'id-ID', country: 'ID' },
     });
     expect(parsed).not.toHaveProperty('currency');
     expect(parsed).not.toHaveProperty('effectiveEntitlements');

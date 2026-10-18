@@ -33,9 +33,7 @@ describe('operational cache policy', () => {
   it('polls only the live operational signals, and not faster than before', () => {
     expect(liveQueryPolicy.refetchOnWindowFocus).toBe(true);
     expect(QUEUE_REFRESH_INTERVAL_MS).toBeGreaterThanOrEqual(5_000);
-    expect(NOTIFICATION_REFRESH_INTERVAL_MS).toBeGreaterThanOrEqual(
-      QUEUE_REFRESH_INTERVAL_MS,
-    );
+    expect(NOTIFICATION_REFRESH_INTERVAL_MS).toBeGreaterThanOrEqual(QUEUE_REFRESH_INTERVAL_MS);
   });
 
   it('keeps answers in memory long enough to survive a round trip between pages', () => {

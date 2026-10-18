@@ -89,7 +89,7 @@ describe('Customer picker phone', () => {
     expect(api.searchCustomers).toHaveBeenCalledWith('Dicky', expect.any(AbortSignal));
     expect(onChoose).not.toHaveBeenCalled();
     fireEvent.click(choice);
-    fireEvent.click(screen.getByRole('button', { name: 'Gunakan Pelanggan' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Lanjutkan' }));
     expect(onChoose).toHaveBeenCalledWith({
       type: 'NON_MEMBER',
       referenceId: 'c-b',
@@ -135,7 +135,7 @@ describe('Customer picker phone', () => {
     });
     type(name(), 'Andir');
     fireEvent.click(await screen.findByRole('option', { name: /Andir.*Member/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Gunakan Pelanggan' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Lanjutkan' }));
     expect(onChoose).toHaveBeenCalledWith(
       { type: 'MEMBER', referenceId: enrolled.customerId },
       expect.objectContaining({ id: enrolled.id, customerId: enrolled.customerId }),

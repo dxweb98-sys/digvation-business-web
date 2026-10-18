@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { assertApplicationEnabled } from './application-availability';
 import type { DeploymentBootstrapConfig } from './runtime-config.types';
 
-function bootstrap(applications: DeploymentBootstrapConfig['applications']): DeploymentBootstrapConfig {
+function bootstrap(
+  applications: DeploymentBootstrapConfig['applications'],
+): DeploymentBootstrapConfig {
   return {
     apiBaseUrl: '',
     deploymentProfile: 'SHARED',
@@ -15,7 +17,7 @@ function bootstrap(applications: DeploymentBootstrapConfig['applications']): Dep
       companyName: 'Digvation',
     },
     theme: { preset: 'DIGVATION_LIGHT', radius: 'SOFT' },
-    defaults: { locale: 'en-US', defaultCountry: 'US' },
+    defaults: { locale: 'en-US', country: 'US' },
   };
 }
 

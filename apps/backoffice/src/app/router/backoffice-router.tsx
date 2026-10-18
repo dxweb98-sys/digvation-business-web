@@ -3,9 +3,21 @@ import { DButton } from '@digvation/ui';
 import { createBrowserRouter, useNavigate } from 'react-router';
 
 import { AuthenticatedRoute } from '../../auth/authenticated-route';
+import {
+  ACCOUNT_ACTIVATION_PATH,
+  BackofficeAccountActivationPage,
+} from '../../auth/backoffice-account-activation-page';
 import { AuthorizedRoute } from '../../auth/authorized-route';
 import { BackofficeLoginPage, PASSWORD_RECOVERY_PATH } from '../../auth/backoffice-login-page';
+import {
+  BackofficeEmailVerificationPage,
+  EMAIL_VERIFICATION_PATH,
+} from '../../auth/backoffice-email-verification-page';
 import { BackofficePasswordRecoveryPage } from '../../auth/backoffice-password-recovery-page';
+import {
+  BackofficePasswordResetPage,
+  PASSWORD_RESET_PATH,
+} from '../../auth/backoffice-password-reset-page';
 import { UnauthorizedPage } from '../../routes/authorization/unauthorized-page';
 import { DashboardPage } from '../../modules/dashboard/dashboard-page';
 import { BackofficeShell } from '../shell/backoffice-shell';
@@ -54,6 +66,9 @@ function BackofficeApplicationErrorRoute() {
 export const backofficeRouter = createBrowserRouter([
   { path: '/login', element: <BackofficeLoginPage /> },
   { path: PASSWORD_RECOVERY_PATH, element: <BackofficePasswordRecoveryPage /> },
+  { path: PASSWORD_RESET_PATH, element: <BackofficePasswordResetPage /> },
+  { path: EMAIL_VERIFICATION_PATH, element: <BackofficeEmailVerificationPage /> },
+  { path: ACCOUNT_ACTIVATION_PATH, element: <BackofficeAccountActivationPage /> },
   {
     element: <AuthenticatedRoute />,
     errorElement: <BackofficeApplicationErrorRoute />,

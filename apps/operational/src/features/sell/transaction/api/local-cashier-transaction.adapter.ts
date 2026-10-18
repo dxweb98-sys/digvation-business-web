@@ -8,6 +8,7 @@ import type {
   CreateSaleInput,
   DiscountInput,
   FulfillmentInput,
+  LoyaltyRedemptionInput,
   PaymentTransitionInput,
   PriceOverrideInput,
   SaleTaxConfiguration,
@@ -357,16 +358,16 @@ export class LocalCashierTransactionAdapter implements SaleTransactionPort {
 
   public async applyLoyaltyRedemption(
     _saleId: string,
-    _input: import('./cashier-transaction.adapter').LoyaltyRedemptionInput,
+    _input: LoyaltyRedemptionInput,
     _idempotencyKey: string,
-  ): Promise<import('../model/cashier-transaction.types').Sale> {
+  ): Promise<Sale> {
     throw new Error('Loyalty redemption requires the Runtime-backed Operational adapter.');
   }
   public async removeLoyaltyRedemption(
     _saleId: string,
     _expectedVersion: number,
     _idempotencyKey: string,
-  ): Promise<import('../model/cashier-transaction.types').Sale> {
+  ): Promise<Sale> {
     throw new Error('Loyalty redemption requires the Runtime-backed Operational adapter.');
   }
   public async setSaleLineQuantity(

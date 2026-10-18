@@ -157,9 +157,7 @@ export class EmployeesApi {
   public constructor(private readonly client: ApiClient) {}
 
   list(query: EmployeeQuery) {
-    return this.client.get<EmployeePage>(
-      `/api/v1/employees?${buildQueryString(query)}`,
-    );
+    return this.client.get<EmployeePage>(`/api/v1/employees?${buildQueryString(query)}`);
   }
 
   get(id: string) {

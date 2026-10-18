@@ -1,3 +1,4 @@
+import { hasSessionFeature } from '@digvation/business-auth';
 import { useAuth } from '@digvation/pos-auth';
 import { createDecimal } from '@digvation/pos-money';
 import { useRuntime } from '@digvation/pos-runtime';
@@ -31,11 +32,7 @@ import {
 import type { Payment, Sale } from '../../transaction/model/cashier-transaction.types';
 import type { useCashierTransactionWorkspace } from '../model/use-cashier-transaction-workspace';
 
-import {
-  currencyInputFromAmount,
-  normalizeCurrencyPaymentInput,
-  PosNumericInput,
-} from '../../lib/pos-controls';
+import { currencyInputFromAmount, normalizeCurrencyPaymentInput } from '../../lib/pos-controls';
 import { SaleAdjustmentControls } from '../../adjustment/sale-adjustment-controls';
 import { SaleLineTaskDialog } from '../../queue/sale-line-task-dialog';
 import { ServicePerformersDialog } from '../../performer/service-performers-dialog';
@@ -72,6 +69,7 @@ import { ReferencePaymentDialog } from '../../payment/reference-payment-dialog';
 import { ReferenceTransactionDetail } from '../../transaction/ui/reference-transaction-detail';
 import { ReferenceOrderAdjustmentDialog } from '../../adjustment/reference-order-adjustment-dialog';
 import { ReferenceBalancePaymentDialog } from '../../payment/reference-balance-payment-dialog';
+import { useOutstandingBalanceReset } from '../../payment/payment-dialog-state';
 import { ReferenceCancelDialog } from '../../transaction/ui/reference-cancel-dialog';
 import { useSaleCustomerContext } from '../../customer/model/use-sale-customer-context';
 import { useSellingCatalogFilter } from '../../catalog/use-selling-catalog-filter';
@@ -95,6 +93,8 @@ type FulfillmentDestination = 'QUEUE' | 'START_PROCESS';
 export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }) {
   const runtime = useRuntime();
   const { session, authPort } = useAuth();
+  const canSellProducts = hasSessionFeature(session.access, 'POS_PRODUCT_SALES');
+  const canSellServices = hasSessionFeature(session.access, 'POS_SERVICE_SALES');
   const { showToast } = useToast();
   const { copy } = useOperationalLocalization();
   const isLocalDemo = isLocalCashierDemoEnabled();
@@ -257,6 +257,21 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     queuePaymentTarget && queueContextSale?.id === queuePaymentTarget.id
       ? queueContextSale
       : queuePaymentTarget;
+  // What is still due is read from the Sale as currently shown (an item added after an earlier
+  // payment raises it), never from the amount captured when the dialog opened.
+  const queuePaymentDue = displayedQueuePaymentTarget
+    ? paymentProgress(displayedQueuePaymentTarget).remainingAmount
+    : null;
+  // Whichever payment dialog is open prepares its amount and cash received from the balance due
+  // whenever that balance changes; partial payments already recorded are never charged again.
+  useOutstandingBalanceReset(
+    queuePaymentDue ?? (checkoutOpen && sale ? paymentProgress(sale).remainingAmount : null),
+    (due) => {
+      const amount = currencyInputFromAmount(due);
+      setPaymentAmount(amount);
+      setTender(amount);
+    },
+  );
   const { setAdjustmentTarget, displayedAdjustmentTarget, openAdjustment } = useOrderAdjustment({
     workspace,
     session,
@@ -597,12 +612,12 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       }
     });
 
-  const payQueueBalance = () =>
+  const payQueueBalance = (allocationOverride?: string) =>
     sendPaymentOnce(async () => {
       const transaction = displayedQueuePaymentTarget;
-      if (!transaction || !queuePaymentAmount) return;
-      const due = currencyInputFromAmount(queuePaymentAmount);
-      const allocation = normalizeCurrencyPaymentInput(paymentAmount);
+      if (!transaction || !queuePaymentAmount || !queuePaymentDue) return;
+      const due = currencyInputFromAmount(queuePaymentDue);
+      const allocation = normalizeCurrencyPaymentInput(allocationOverride ?? paymentAmount);
       if (
         !isPositiveDecimal(allocation) ||
         createDecimal(allocation).greaterThan(createDecimal(due))
@@ -823,20 +838,28 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="shrink-0 pb-2">
           <div className="flex flex-wrap items-center gap-2 border-b border-(--color-border) pb-2 lg:flex-nowrap">
-            <div className="grid shrink-0 grid-cols-2 rounded-xl bg-(--color-surface-muted)/75 p-1 sm:inline-flex sm:items-center">
-              <ReferenceTypeButton
-                active={workspace.itemType === 'PRODUCT'}
-                icon={<ShoppingBag className="size-3.5" />}
-                label={copy('Product')}
-                onClick={() => selectType('PRODUCT')}
-              />
-              <ReferenceTypeButton
-                active={workspace.itemType === 'SERVICE'}
-                icon={<Sparkles className="size-3.5" />}
-                label={copy('Service')}
-                onClick={() => selectType('SERVICE')}
-              />
-            </div>
+            {canSellProducts || canSellServices ? (
+              <div
+                className={`grid shrink-0 ${canSellProducts && canSellServices ? 'grid-cols-2' : 'grid-cols-1'} rounded-xl bg-(--color-surface-muted)/75 p-1 sm:inline-flex sm:items-center`}
+              >
+                {canSellProducts ? (
+                  <ReferenceTypeButton
+                    active={workspace.itemType === 'PRODUCT'}
+                    icon={<ShoppingBag className="size-3.5" />}
+                    label={copy('Product')}
+                    onClick={() => selectType('PRODUCT')}
+                  />
+                ) : null}
+                {canSellServices ? (
+                  <ReferenceTypeButton
+                    active={workspace.itemType === 'SERVICE'}
+                    icon={<Sparkles className="size-3.5" />}
+                    label={copy('Service')}
+                    onClick={() => selectType('SERVICE')}
+                  />
+                ) : null}
+              </div>
+            ) : null}
             <div className="shrink-0">
               <SearchInput
                 value={search}
@@ -1179,7 +1202,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
 
       <ReferenceBalancePaymentDialog
         sale={displayedQueuePaymentTarget}
-        availableToPay={queuePaymentAmount}
+        availableToPay={queuePaymentDue}
         locale={workspace.locale}
         paymentRoutes={workspace.paymentRoutes}
         isPaymentRoutesLoading={workspace.isLoadingPaymentRoutes}

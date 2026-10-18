@@ -1,10 +1,6 @@
 import { DBadge, DCurrencyInput } from '@digvation/ui';
 
-import {
-  sellingModelCopy,
-  sellsItemItself,
-  type SellingModel,
-} from '../../model/catalog-selling';
+import { sellingModelCopy, sellsItemItself, type SellingModel } from '../../model/catalog-selling';
 import { SellingModeChoice } from '../../ui/catalog-selling';
 import type { useCatalogItemEditor } from '../model/use-catalog-item-editor';
 

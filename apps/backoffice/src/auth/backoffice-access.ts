@@ -1,4 +1,7 @@
-import type { AuthSession } from '@digvation/business-auth';
+import { hasSessionFeature, type AuthSession, type SessionFeature } from '@digvation/business-auth';
+
+import { canAccessReport } from '../features/reporting/model/report-availability';
+import { REPORT_CATALOG } from '../features/reporting/model/report-catalog';
 
 export type BackofficeCapability =
   | 'dashboard'
@@ -25,6 +28,8 @@ export type BackofficeAction =
   | 'viewUsers'
   | 'inviteUsers'
   | 'manageUserRoles'
+  | 'updateUsers'
+  | 'viewSecurityActivity'
   | 'viewOperationalAccess'
   | 'manageOperationalAccess'
   | 'viewBusinessProfile'
@@ -63,6 +68,15 @@ export type BackofficeAction =
   | 'createReconciliation'
   | 'updateReconciliation';
 
+const entitlementForArea: Partial<Record<BackofficeCapability, SessionFeature>> = {
+  promotions: 'PROMOTIONS',
+  memberships: 'MEMBERSHIP',
+  attendance: 'WORKFORCE_ATTENDANCE',
+  expenses: 'FINANCE_OPERATIONS',
+  financialAccounts: 'FINANCE_OPERATIONS',
+  financialOperations: 'FINANCE_OPERATIONS',
+};
+
 export const BACKOFFICE_ACCESS_PERMISSION = 'backoffice:access';
 
 interface PermissionRequirement {
@@ -86,22 +100,8 @@ const capabilityPermissions: Record<BackofficeCapability, PermissionRequirement>
   financialOperations: {
     allOf: ['cash:read', 'settlements:read', 'reconciliations:read'],
   },
-  reports: {
-    anyOf: [
-      'sales:read',
-      'payments:read',
-      'catalog:read',
-      'employees:read',
-      'attendance:read',
-      'expenses:read',
-      'cash:read',
-      'settlements:read',
-      'reconciliations:read',
-      'locations:read',
-      // Tax Reporting is assignable on its own, independently of transaction access.
-      'tax:read',
-    ],
-  },
+  // Evaluated above using the published REPORT_CATALOG; no permissive any-of shortcut.
+  reports: {},
   // History shows completed transactions in full, which Runtime grants only with sales:read-completed.
   transactions: { allOf: ['sales:read', 'sales:read-completed'] },
   configuration: { anyOf: ['business-profile:read', 'locations:read'] },
@@ -116,6 +116,8 @@ const actionPermissions: Record<BackofficeAction, readonly string[]> = {
   viewUsers: ['users:read'],
   inviteUsers: ['users:invite'],
   manageUserRoles: ['users:roles'],
+  updateUsers: ['users:update'],
+  viewSecurityActivity: ['users:read', 'activity:read'],
   viewOperationalAccess: ['operational-access:read'],
   manageOperationalAccess: ['operational-access:update'],
   viewBusinessProfile: ['business-profile:read'],
@@ -160,9 +162,24 @@ export function canAccessBackoffice(
   capability: BackofficeCapability,
 ): boolean {
   if (!session.access.permissions.includes(BACKOFFICE_ACCESS_PERMISSION)) return false;
+  // Navigation must use the same *published* catalog and entitlement/permission
+  // filtering as the report selector. Dormant finance report permissions alone
+  // must not expose an empty Reports page.
+  if (capability === 'reports')
+    return REPORT_CATALOG.some(({ type }) => canAccessReport(session, type));
   if (capability === 'customers' && !session.access.foundations.includes('CUSTOMER_IDENTITY'))
     return false;
-  if (capability === 'memberships' && !session.access.capabilities.includes('MEMBERSHIP'))
+  // Employee management belongs to the shared Workforce foundation,
+  // not the Attendance feature. Retail-only POS without Commission need not show it.
+  if (capability === 'employees' && !session.access.foundations.includes('WORKFORCE')) return false;
+  if (capability === 'employees' && !hasSessionFeature(session.access, 'EMPLOYEE_WORKFORCE'))
+    return false;
+  const feature = entitlementForArea[capability];
+  if (
+    feature &&
+    (capability === 'memberships' || session.access.entitlements) &&
+    !hasSessionFeature(session.access, feature)
+  )
     return false;
   const requirement = capabilityPermissions[capability];
   const permissions = session.access.permissions;

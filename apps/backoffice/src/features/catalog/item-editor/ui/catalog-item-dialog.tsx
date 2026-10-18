@@ -33,6 +33,8 @@ export function CatalogItemDialog({
   canUpdateVariants,
   canManageImage,
   canEditComposition,
+  canSellProducts = true,
+  canSellServices = true,
   onClose,
   onSaved,
 }: {
@@ -49,6 +51,8 @@ export function CatalogItemDialog({
   canUpdateVariants: boolean;
   canManageImage: boolean;
   canEditComposition: boolean;
+  canSellProducts?: boolean;
+  canSellServices?: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -68,6 +72,22 @@ export function CatalogItemDialog({
   };
   const { formatMoney } = useCatalogLocalization();
   const editor = useCatalogItemEditor(item);
+
+  // Service-only clients start a new item as a Service; Products may still be
+  // catalogued as components even when direct Product selling is not enabled.
+  useEffect(() => {
+    if (fresh && !canSellProducts && canSellServices)
+      editor.actions.setFormField('type', 'SERVICE');
+    if (fresh && !canSellProducts && editor.form.type === 'PRODUCT' && editor.form.directlySellable)
+      editor.actions.setFormField('directlySellable', false);
+  }, [
+    fresh,
+    canSellProducts,
+    canSellServices,
+    editor.form.type,
+    editor.form.directlySellable,
+    editor.actions.setFormField,
+  ]);
 
   const { name } = editor.form;
   const { touched: loyaltyTouched, behavior: loyaltyBehavior } = editor.loyalty;
@@ -330,6 +350,8 @@ export function CatalogItemDialog({
                 categoryOptions={categoryOptions}
                 validDefaultDuration={validDefaultDuration}
                 model={model}
+                canSellProducts={canSellProducts}
+                canSellServices={canSellServices}
                 canViewLoyalty={canViewLoyalty}
                 loyaltyRule={loyaltyRule}
                 loyaltyConfiguration={loyaltyConfiguration.data}

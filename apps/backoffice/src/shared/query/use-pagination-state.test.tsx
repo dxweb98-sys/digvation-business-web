@@ -1,10 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import {
-  toLimitOffsetPagination,
-  usePaginationState,
-} from './use-pagination-state';
+import { toLimitOffsetPagination, usePaginationState } from './use-pagination-state';
 
 describe('pagination state', () => {
   it('maps UI page/pageSize to the Runtime limit/offset contract', () => {

@@ -75,8 +75,7 @@ export function createCatalogItemEditorState(
       categoryId: item?.categoryId ?? null,
       description: item?.description ?? '',
       lifecycle: item?.lifecycle ?? 'DRAFT',
-      defaultDurationMinutes:
-        item?.serviceDefinition?.defaultDurationMinutes?.toString() ?? '',
+      defaultDurationMinutes: item?.serviceDefinition?.defaultDurationMinutes?.toString() ?? '',
       variantSelectionMode: item?.variantSelectionMode ?? 'OPTIONAL',
       directlySellable: item?.productUsage !== 'COMPONENT_ONLY',
       requireAdditionalItemAtSale: item?.requireAdditionalItemAtSale === true,

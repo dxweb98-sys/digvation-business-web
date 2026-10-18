@@ -10,7 +10,12 @@ import { useOperationalLocalization } from '../../../app/localization/operationa
 import { createCashierTransactionAdapter } from '../transaction/api/cashier-transaction-adapter-factory';
 import { cashierTransactionErrorMessage } from '../transaction/api/cashier-transaction-errors';
 import { cashierTransactionKeys } from '../transaction/api/cashier-transaction-keys';
-import type { ApiPage, DiscountType, Sale, SaleAdjustment } from '../transaction/model/cashier-transaction.types';
+import type {
+  ApiPage,
+  DiscountType,
+  Sale,
+  SaleAdjustment,
+} from '../transaction/model/cashier-transaction.types';
 import type { useCashierTransactionWorkspace } from '../workspace/model/use-cashier-transaction-workspace';
 import { checkoutAdjustmentRows } from '../transaction/model/sale-presentation';
 import { actionBlockMessage } from '../workspace/model/sale-workspace-view-model';
@@ -358,7 +363,9 @@ export function SaleAdjustmentControls({
       variant={placement === 'payment' ? 'outline' : 'primary'}
       disabled={preparing}
       loading={preparing}
-      leftIcon={placement === 'payment' ? <Plus className="size-4" /> : <BadgePercent className="size-4" />}
+      leftIcon={
+        placement === 'payment' ? <Plus className="size-4" /> : <BadgePercent className="size-4" />
+      }
       onClick={() => void prepareAndOpen()}
     >
       {placement === 'payment'
