@@ -240,7 +240,7 @@ for (const width of [390, 430, 1280]) {
       await expect(page.getByText(transaction.saleNumber, { exact: true })).toBeVisible();
       await expect(page.getByText(/Saldo Poin|Poin saat ini|Nomor Member/)).toHaveCount(0);
       await shot(page, info, 'regular-detail');
-      await page.getByRole('button', { name: /Edit profil|Ubah data/, exact: false }).click();
+      await page.getByRole('button', { name: /Edit profil|Ubah profil|Ubah data/, exact: false }).click();
       const editablePhone = page.getByRole('dialog').getByRole('textbox').nth(1);
       await expect(editablePhone).toHaveValue(/^08\d+$/);
       await expect(editablePhone).not.toHaveValue(/\s|\+/);
