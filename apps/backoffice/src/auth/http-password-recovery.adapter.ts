@@ -1,4 +1,3 @@
-import { toCanonicalMemberPhone } from '../modules/membership/member-phone';
 import {
   PasswordRecoveryUnavailableError,
   PasswordResetError,
@@ -22,7 +21,7 @@ const REJECTION_BY_CODE: Record<string, PasswordResetError['reason']> = {
 };
 
 /**
- * Public Runtime adapter for WhatsApp password recovery. The workspace comes from trusted
+ * Public Runtime adapter for verified-email password recovery. The workspace comes from trusted
  * deployment bootstrap, never from user input; the reset credential travels only in the POST body.
  */
 export class HttpPasswordRecoveryAdapter implements PasswordRecoveryPort {
@@ -36,7 +35,7 @@ export class HttpPasswordRecoveryAdapter implements PasswordRecoveryPort {
     // The Runtime answers identically for known and unknown accounts (non-enumerating).
     const response = await this.post('password-reset/request', {
       workspace: this.workspace,
-      identifier: normalizeRecoveryIdentifier(input.identifier),
+      identifier: input.email.trim().toLowerCase(),
     });
     if (!response.ok) throw new Error('PASSWORD_RECOVERY_REQUEST_FAILED');
   }
@@ -101,5 +100,5 @@ async function rejection(response: Response): Promise<void> {
 function normalizeRecoveryIdentifier(identifier: string): string {
   const trimmed = identifier.trim();
   if (!/^[+\d][\d\s().+-]*$/.test(trimmed)) return trimmed;
-  return toCanonicalMemberPhone(trimmed) ?? trimmed;
+  return trimmed;
 }

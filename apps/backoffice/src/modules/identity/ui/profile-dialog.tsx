@@ -1,5 +1,5 @@
 import { useDeploymentBootstrap } from '@digvation/business-runtime';
-import { DBadge, DDialog, DInput, useToast } from '@digvation/ui';
+import { DBadge, DButton, DDialog, DInput, useToast } from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
@@ -15,6 +15,7 @@ import {
 import { AccessControlApi, type SelfProfile } from '../access-control-api';
 import {
   DISPLAY_NAME_MAX,
+  isEmailAddress,
   USERNAME_PATTERN,
   identityConflictOf,
   type IdentityConflict,
@@ -74,6 +75,7 @@ function ProfileForm({
   const { showToast } = useToast();
   const [displayName, setDisplayName] = useState(profile?.displayName ?? '');
   const [username, setUsername] = useState(profile?.username ?? '');
+  const [email, setEmail] = useState(profile?.email ?? '');
   const [attempted, setAttempted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [conflict, setConflict] = useState<IdentityConflict | null>(null);
@@ -85,15 +87,19 @@ function ProfileForm({
   const usernameInvalid =
     usernameChanged && (!username.trim() || !USERNAME_PATTERN.test(username.trim()));
   const dirty = nameChanged || usernameChanged;
+  const emailChanged = Boolean(profile) && email.trim() !== (profile?.email ?? '');
+  const emailInvalid = emailChanged && Boolean(email.trim()) && !isEmailAddress(email);
+  const canVerifyEmail = Boolean(profile?.email) && !profile?.emailVerifiedAt && !emailChanged;
 
   const save = async () => {
     setAttempted(true);
-    if (!profile || nameMissing || usernameInvalid || !dirty || saving) return;
+    if (!profile || nameMissing || usernameInvalid || emailInvalid || !(dirty || emailChanged) || saving) return;
     setSaving(true);
     try {
       await api.updateSelf({
         ...(nameChanged ? { displayName: displayName.trim() } : {}),
         ...(usernameChanged ? { username: username.trim() } : {}),
+        ...(emailChanged ? { email: email.trim() || null } : {}),
       });
       await onSaved();
       showToast({ variant: 'success', title: copy('Profile updated.') });
@@ -120,7 +126,7 @@ function ProfileForm({
           onClose={onClose}
           onSave={() => void save()}
           saving={saving}
-          disabled={!profile || !dirty}
+          disabled={!profile || !(dirty || emailChanged) || emailInvalid}
           saveLabel={copy('Save changes')}
         />
       }
@@ -147,6 +153,40 @@ function ProfileForm({
                 disabled={saving}
                 autoFocus
               />
+              <DInput
+                label={copy('Email')}
+                value={email}
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                onChange={setEmail}
+                error={attempted && emailInvalid ? copy('Enter a valid email address.') : undefined}
+                hint={
+                  profile.emailVerifiedAt
+                    ? copy('Verified. Password links are sent to this address.')
+                    : copy('Unverified. Confirm the ownership link before password links can be sent.')
+                }
+                disabled={saving}
+              />
+              {canVerifyEmail ? (
+                <DButton
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  disabled={saving}
+                  onClick={async () => {
+                    try {
+                      await api.requestOwnEmailVerification();
+                      showToast({ variant: 'success', title: copy('Verification link sent.') });
+                    } catch (error) {
+                      if (!isSessionExpiredError(error))
+                        showToast({ variant: 'danger', title: copy('Could not send the verification link.') });
+                    }
+                  }}
+                >
+                  {copy('Send verification link')}
+                </DButton>
+              ) : null}
               <DInput
                 label={copy('Sign-in username')}
                 value={username}

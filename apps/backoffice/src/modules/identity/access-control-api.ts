@@ -69,6 +69,8 @@ export interface SelfProfile {
   username: string | null;
   displayName: string;
   phoneE164: string;
+  email: string | null;
+  emailVerifiedAt: string | null;
   version: number;
   roles: Array<{ id: string; code: string; name: string; systemKey: 'OWNER' | null }>;
 }
@@ -111,9 +113,12 @@ export class AccessControlApi {
   getSelf() {
     return this.client.get<SelfProfile>('/api/v1/auth/me');
   }
-  /** Self-service: display name and username only; roles, status and phone are never sent. */
-  updateSelf(input: { displayName?: string; username?: string }) {
+  /** Self-service only; roles, status and phone are never sent. */
+  updateSelf(input: { displayName?: string; username?: string; email?: string | null }) {
     return this.client.patch<SelfProfile>('/api/v1/auth/me', input);
+  }
+  requestOwnEmailVerification() {
+    return this.client.post<{ completed: true }>('/api/v1/auth/email-verification/request', {});
   }
   listRoles(page: PageRequest) {
     return this.client.get<Page<AccessRole>>(

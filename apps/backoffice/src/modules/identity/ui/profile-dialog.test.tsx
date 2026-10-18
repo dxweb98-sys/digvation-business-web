@@ -38,6 +38,8 @@ const self = (systemKey: 'OWNER' | null) => ({
   username: 'siti.rahma',
   displayName: 'Siti Rahma',
   phoneE164: '+628123456789',
+  email: 'siti@example.com',
+  emailVerifiedAt: '2026-10-18T00:00:00.000Z',
   version: 2,
   roles: [
     { id: 'r-1', code: systemKey ?? 'STAFF', name: systemKey ? 'Owner' : 'Staff', systemKey },
@@ -91,12 +93,25 @@ describe.each([
     await waitFor(() => expect(field(/Nama tampilan/)?.value).toBe('Siti Rahma'));
     expect(field(/Nomor telepon terverifikasi/).value).toBe('+628123456789');
     expect(field(/Nomor telepon terverifikasi/).disabled).toBe(true);
+    expect(field(/Email/).value).toBe('siti@example.com');
     fireEvent.change(field(/Nama tampilan/), { target: { value: ' Siti R ' } });
     await save();
     await waitFor(() => expect(client.patch).toHaveBeenCalledTimes(1));
     expect(client.patch).toHaveBeenCalledWith('/api/v1/auth/me', { displayName: 'Siti R' });
     await waitFor(() => expect(refreshSessionContext).toHaveBeenCalled());
     await waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
+
+  it('saves a changed email as unverified account data', async () => {
+    client.get.mockResolvedValue(self(systemKey));
+    client.patch.mockResolvedValue({ ...self(systemKey), email: 'baru@example.com', emailVerifiedAt: null });
+    renderDialog();
+    await waitFor(() => expect(field(/Email/).value).toBe('siti@example.com'));
+    fireEvent.change(field(/Email/), { target: { value: 'baru@example.com' } });
+    await save();
+    await waitFor(() =>
+      expect(client.patch).toHaveBeenCalledWith('/api/v1/auth/me', { email: 'baru@example.com' }),
+    );
   });
 
   it('shows a username conflict under the field and never sends invalid names', async () => {

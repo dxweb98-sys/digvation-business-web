@@ -27,6 +27,7 @@ import {
   PasswordChangeUnavailableError,
   type OperationalPasswordChangePort,
 } from './operational-password-change';
+import { OperationalProfileDialog } from './operational-profile-dialog';
 import type { OperationalNavigationSection } from '../../shared/navigation/operational-navigation';
 import { resolveOperationalLocationSelection } from '../../shared/operational-access/operational-location-selection';
 import { useOperationalSession } from '../../shared/operational-access/operational-session-provider';
@@ -489,7 +490,7 @@ export function OperationalShell({
       </DDialog>
 
       <DDialog
-        open={isAccountDialogOpen}
+        open={false}
         onClose={closeAccountDialog}
         title={copy('Account')}
         description={copy('Operational account information for the active session.')}
@@ -759,6 +760,13 @@ export function OperationalShell({
           </section>
         </div>
       </DDialog>
+      <OperationalProfileDialog
+        open={isAccountDialogOpen}
+        onClose={closeAccountDialog}
+        apiBaseUrl={bootstrap.apiBaseUrl}
+        getAccessToken={() => authPort.getAccessToken?.() ?? Promise.resolve(null)}
+        passwordChange={passwordChange}
+      />
     </div>
   );
 }

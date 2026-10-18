@@ -1,8 +1,8 @@
 import { createContext, useContext, type ReactNode } from 'react';
 
 export interface PasswordRecoveryRequest {
-  /** Username or phone number registered on the account. */
-  identifier: string;
+  /** Verified account email address. */
+  email: string;
 }
 
 export interface PasswordResetReference {
@@ -21,9 +21,8 @@ export class PasswordResetError extends Error {
 }
 
 /**
- * Backoffice boundary for the WhatsApp password-recovery engine. Implementations resolve the
- * workspace from trusted deployment bootstrap and deliver to the phone registered on the account;
- * the sign-in surface never collects workspace or destination numbers.
+ * Backoffice boundary for verified-email password recovery. Implementations resolve the workspace
+ * from trusted deployment bootstrap; the sign-in surface never collects a phone destination.
  */
 export interface PasswordRecoveryPort {
   request(input: PasswordRecoveryRequest): Promise<void>;
