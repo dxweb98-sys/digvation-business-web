@@ -83,6 +83,7 @@ describe('InvitationDialog Owner assignment', () => {
     expect(roleBox('Staff').checked).toBe(false);
     fireEvent.change(field(/Nama tampilan|Display name/), { target: { value: 'Siti Rahma' } });
     fireEvent.change(field(/Nomor telepon|Phone number/), { target: { value: '081234567890' } });
+    fireEvent.change(field(/^Email$/), { target: { value: 'siti@business.com' } });
     fireEvent.click(roleBox('Staff'));
     expect(roleBox('Staff').checked).toBe(true);
     await send();
@@ -95,6 +96,7 @@ describe('InvitationDialog Owner assignment', () => {
     renderDialog(createInvitation);
     fireEvent.change(field(/Nama tampilan|Display name/), { target: { value: 'Siti Rahma' } });
     fireEvent.change(field(/Nomor telepon|Phone number/), { target: { value: '081234567890' } });
+    fireEvent.change(field(/^Email$/), { target: { value: 'siti@business.com' } });
     fireEvent.click(roleBox('Staff'));
     fireEvent.click(roleBox('Owner'));
     expect(text()).toContain('tidak menguranginya');

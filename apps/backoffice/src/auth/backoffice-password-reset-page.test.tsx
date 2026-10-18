@@ -54,7 +54,7 @@ function renderPage(port: PasswordRecoveryPort, entry = LINK) {
 function port(overrides: Partial<PasswordRecoveryPort> = {}): PasswordRecoveryPort {
   return {
     request: vi.fn().mockResolvedValue(undefined),
-    confirm: vi.fn().mockResolvedValue(undefined),
+    confirm: vi.fn().mockResolvedValue({ destination: 'BACKOFFICE' }),
     confirmEmailVerification: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
@@ -141,7 +141,7 @@ describe('BackofficePasswordResetPage', () => {
     const confirm = vi
       .fn()
       .mockRejectedValueOnce(new PasswordResetError('network'))
-      .mockResolvedValueOnce(undefined);
+      .mockResolvedValueOnce({ destination: 'BACKOFFICE' });
     const { container } = renderPage(port({ confirm }));
     fill(container, PASSWORD, PASSWORD);
     await act(async () => {
