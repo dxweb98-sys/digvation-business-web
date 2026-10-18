@@ -13,6 +13,7 @@ const valid = {
   ...emptyInvitationForm(),
   displayName: 'Siti Rahma',
   phone: '081234567890',
+  email: 'siti@usaha.com',
   roleIds: ['3f1c9e0e-6a54-4a52-8d57-0d1a5a0f6a11'],
 };
 
@@ -35,7 +36,6 @@ describe('invitation form model', () => {
       displayName: '  ',
       phone: '12',
       username: 'a b',
-      deliveryChannel: 'WHATSAPP',
       email: '',
       roleIds: [],
     });
@@ -44,6 +44,7 @@ describe('invitation form model', () => {
       displayName: 'DISPLAY_NAME_REQUIRED',
       phone: 'PHONE_INVALID',
       username: 'USERNAME_INVALID',
+      email: 'EMAIL_REQUIRED',
       roles: 'ROLE_REQUIRED',
     });
     expect(validateInvitationForm({ ...valid, phone: '' }).issues.phone).toBe('PHONE_REQUIRED');
@@ -67,21 +68,17 @@ describe('invitation form model', () => {
     expect(identityConflictOf('INVITATION_EMAIL_PENDING')?.field).toBe('email');
   });
 
-  it('requires a valid email only when the invitation is sent by email', () => {
-    expect(validateInvitationForm({ ...valid, deliveryChannel: 'EMAIL' }).issues.email).toBe(
-      'EMAIL_REQUIRED',
-    );
-    expect(
-      validateInvitationForm({ ...valid, deliveryChannel: 'EMAIL', email: 'not-an-email' }).issues
-        .email,
-    ).toBe('EMAIL_INVALID');
-    expect(validateInvitationForm({ ...valid, email: '' }).valid).toBe(true);
+  it('requires a valid email and sends only Runtime CreateInvitationDto fields', () => {
+    expect(validateInvitationForm({ ...valid, email: '' }).issues.email).toBe('EMAIL_REQUIRED');
     expect(validateInvitationForm({ ...valid, email: 'bad' }).issues.email).toBe('EMAIL_INVALID');
     expect(
-      toCreateInvitationInput({ ...valid, deliveryChannel: 'EMAIL', email: ' siti@usaha.com ' }),
-    ).toMatchObject({ email: 'siti@usaha.com', deliveryChannel: 'EMAIL' });
-    expect(toCreateInvitationInput(valid)).not.toHaveProperty('email');
-    expect(toCreateInvitationInput(valid).deliveryChannel).toBe('WHATSAPP');
+      toCreateInvitationInput({ ...valid, email: ' siti@usaha.com ' }),
+    ).toEqual({
+      phoneE164: '+6281234567890',
+      displayName: 'Siti Rahma',
+      roleIds: valid.roleIds,
+      email: 'siti@usaha.com',
+    });
   });
 
   it('reports whether an email can receive recovery links', () => {

@@ -384,7 +384,7 @@ export function UserEditorDialog({
               ) : null}
               {emailStatus !== 'VERIFIED' ? (
                 <p className="text-xs leading-5 text-[var(--color-text-muted)]">
-                  {copy('Until an email is verified, password links are sent via WhatsApp.')}
+                  {copy('Verify this email before a password link can be sent.')}
                 </p>
               ) : null}
             </div>
@@ -491,9 +491,7 @@ export function UserEditorDialog({
             ? copy(
                 'A one-time link is sent to the verified email of this user. It replaces any link that is still pending. Their current password and sessions stay valid until they use the link.',
               )
-            : copy(
-                'A one-time link is sent via WhatsApp to the number registered for this user. It replaces any link that is still pending. Their current password and sessions stay valid until they use the link.',
-              )
+            : copy('A verified email is required before a password link can be sent.')
         }
         confirmLabel={copy('Send password link')}
         variant="primary"

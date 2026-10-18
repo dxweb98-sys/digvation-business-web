@@ -10,15 +10,12 @@ export const EMAIL_MAX = 254;
 /** A practical shape check; the Runtime decides validity and uniqueness. */
 export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
-export type InvitationChannel = 'WHATSAPP' | 'EMAIL';
-
 export interface InvitationFormValues {
   displayName: string;
   /** Typed in Indonesian national format (08…); stored and sent as E.164. */
   phone: string;
   username: string;
-  /** Where the activation link goes. EMAIL needs an address and verifies it on activation. */
-  deliveryChannel: InvitationChannel;
+  /** Required activation-link address; Runtime verifies it on activation. */
   email: string;
   roleIds: string[];
 }
@@ -38,7 +35,6 @@ export const emptyInvitationForm = (): InvitationFormValues => ({
   displayName: '',
   phone: '',
   username: '',
-  deliveryChannel: 'WHATSAPP',
   email: '',
   roleIds: [],
 });
@@ -58,8 +54,8 @@ export function validateInvitationForm(values: InvitationFormValues): {
   const username = values.username.trim();
   if (username && !USERNAME_PATTERN.test(username)) issues.username = 'USERNAME_INVALID';
   const email = values.email.trim();
-  if (values.deliveryChannel === 'EMAIL' && !email) issues.email = 'EMAIL_REQUIRED';
-  else if (email && !isEmailAddress(email)) issues.email = 'EMAIL_INVALID';
+  if (!email) issues.email = 'EMAIL_REQUIRED';
+  else if (!isEmailAddress(email)) issues.email = 'EMAIL_INVALID';
   if (values.roleIds.length === 0) issues.roles = 'ROLE_REQUIRED';
   return { valid: Object.keys(issues).length === 0, issues };
 }
@@ -74,8 +70,7 @@ export function toCreateInvitationInput(values: InvitationFormValues) {
     ...(username ? { username } : {}),
     displayName: values.displayName.trim(),
     roleIds: values.roleIds,
-    ...(email ? { email } : {}),
-    deliveryChannel: values.deliveryChannel,
+    email,
   };
 }
 
@@ -86,7 +81,7 @@ export function isEmailAddress(value: string): boolean {
 
 export type EmailStatus = 'MISSING' | 'UNVERIFIED' | 'VERIFIED';
 
-/** Recovery by email needs a verified address; anything else stays on WhatsApp. */
+/** Recovery by email needs a verified address. */
 export function emailStatusOf(user: {
   email?: string | null;
   emailVerifiedAt?: string | null;

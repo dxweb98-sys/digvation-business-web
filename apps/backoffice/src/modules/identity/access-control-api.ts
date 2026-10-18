@@ -46,15 +46,12 @@ export interface AccessUser {
   roles: AccessRole[];
 }
 
-export type InvitationDeliveryChannel = 'WHATSAPP' | 'EMAIL';
-
 export interface UserInvitation {
   id: string;
   phoneE164: string;
   username: string | null;
   displayName: string;
   email?: string | null;
-  deliveryChannel?: InvitationDeliveryChannel;
   expiresAt: string;
   resendAvailableAt: string;
   acceptedAt: string | null;
@@ -143,8 +140,7 @@ export class AccessControlApi {
     username?: string;
     displayName: string;
     roleIds: string[];
-    email?: string;
-    deliveryChannel?: InvitationDeliveryChannel;
+    email: string;
   }) {
     return this.client.post<UserInvitation>('/api/v1/user-invitations', input);
   }

@@ -1,4 +1,4 @@
-import { DDialog, DInput, DRadio, useToast } from '@digvation/ui';
+import { DDialog, DInput, useToast } from '@digvation/ui';
 import { useState } from 'react';
 
 import { normalizeBackofficeApiError } from '../../../app/api/backoffice-api-error';
@@ -22,7 +22,6 @@ import {
   validateInvitationForm,
   type IdentityConflict,
   type IdentityConflictField,
-  type InvitationChannel,
 } from '../model/identity-form';
 import { useIdentityConflictCopy } from './identity-conflict-copy';
 import { OwnerGrantNotice, selectsOwner } from './owner-grant-notice';
@@ -77,7 +76,6 @@ export function InvitationDialog({
         ? conflictCopy[conflict.code]
         : undefined;
 
-  const emailChannel = form.values.deliveryChannel === 'EMAIL';
   const emailError =
     issue.email === 'EMAIL_REQUIRED'
       ? copy('Enter the email address the invitation is sent to.')
@@ -86,20 +84,6 @@ export function InvitationDialog({
         : conflict?.field === 'email'
           ? conflictCopy[conflict.code]
           : undefined;
-  const channels: Array<{ value: InvitationChannel; label: string; description: string }> = [
-    {
-      value: 'WHATSAPP',
-      label: copy('WhatsApp'),
-      description: copy('The activation link is sent to the phone number.'),
-    },
-    {
-      value: 'EMAIL',
-      label: copy('Email'),
-      description: copy(
-        'The activation link is sent to the email address, which is verified when the user activates.',
-      ),
-    },
-  ];
 
   const save = async () => {
     setAttempted(true);
@@ -162,11 +146,7 @@ export function InvitationDialog({
                 inputMode="tel"
                 autoComplete="off"
                 placeholder="081234567890"
-                hint={
-                  emailChannel
-                    ? copy('Kept on the account for sign-in and WhatsApp recovery.')
-                    : copy('The invitation link is sent to this WhatsApp number.')
-                }
+                hint={copy('Kept on the account for sign-in and account identification.')}
                 error={phoneError}
                 disabled={saving}
               />
@@ -189,42 +169,10 @@ export function InvitationDialog({
         </RecordPanel>
 
         <RecordPanel>
-          <RecordSectionLabel>{copy('Send invitation via')}</RecordSectionLabel>
-          <fieldset className="mt-4 grid gap-2.5 sm:grid-cols-2" disabled={saving}>
-            <legend className="sr-only">{copy('Send invitation via')}</legend>
-            {channels.map((channel) => {
-              const checked = form.values.deliveryChannel === channel.value;
-              return (
-                <label
-                  key={channel.value}
-                  className={`flex min-h-20 cursor-pointer gap-3 rounded-xl border px-3.5 py-3 transition-colors ${
-                    checked
-                      ? 'border-[var(--color-brand)] bg-[var(--color-brand)]/[0.035] shadow-[inset_0_0_0_1px_var(--color-brand)]'
-                      : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-muted)]/50'
-                  } ${saving ? 'cursor-not-allowed opacity-60' : ''}`}
-                >
-                  <DRadio
-                    name="invitation-delivery-channel"
-                    value={channel.value}
-                    checked={checked}
-                    onChange={() => form.setField('deliveryChannel', channel.value)}
-                    className="mt-0.5"
-                  />
-                  <span className="min-w-0">
-                    <span className="block text-sm font-semibold text-[var(--color-text)]">
-                      {channel.label}
-                    </span>
-                    <span className="mt-1 block text-xs leading-5 text-[var(--color-text-muted)]">
-                      {channel.description}
-                    </span>
-                  </span>
-                </label>
-              );
-            })}
-          </fieldset>
+          <RecordSectionLabel>{copy('Invitation email')}</RecordSectionLabel>
           <div className="mt-4">
             <DInput
-              label={emailChannel ? copy('Email') : copy('Email (optional)')}
+              label={copy('Email')}
               value={form.values.email}
               maxLength={EMAIL_MAX}
               onChange={(value) => {
@@ -236,13 +184,7 @@ export function InvitationDialog({
               autoCapitalize="none"
               autoComplete="off"
               placeholder={copy('For example, siti@business.com')}
-              hint={
-                emailChannel
-                  ? copy(
-                      'The invitation link is sent here and the address is verified on activation.',
-                    )
-                  : copy('Saved unverified. It can be verified later for password recovery.')
-              }
+              hint={copy('The activation link is sent here and the address is verified on activation.')}
               error={emailError}
               disabled={saving}
             />

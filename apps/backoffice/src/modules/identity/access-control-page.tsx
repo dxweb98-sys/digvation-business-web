@@ -441,9 +441,7 @@ function InvitationsTable({
             <p className="break-words text-xs text-[var(--color-text-muted)]">{invitation.email}</p>
           ) : null}
           <p className="text-xs text-[var(--color-text-muted)]">
-            {invitation.deliveryChannel === 'EMAIL'
-              ? copy('Sent via email')
-              : copy('Sent via WhatsApp')}
+            {copy('Sent via email')}
           </p>
         </div>
       ),

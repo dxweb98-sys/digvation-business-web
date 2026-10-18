@@ -84,6 +84,7 @@ describe('InvitationDialog', () => {
     type(field('Nomor telepon'), '+62 812-3456-7890');
     expect(field('Nomor telepon').value).toBe('081234567890');
     type(field(/Username/), 'siti.rahma');
+    type(field('Email'), 'siti@usaha.com');
     fireEvent.click(document.body.querySelector('input[type="checkbox"]')!);
     await click('Kirim undangan');
     await waitFor(() => expect(createInvitation).toHaveBeenCalledTimes(1));
@@ -92,22 +93,19 @@ describe('InvitationDialog', () => {
       username: 'siti.rahma',
       displayName: 'Siti Rahma',
       roleIds: [roles[0]!.id],
-      deliveryChannel: 'WHATSAPP',
+      email: 'siti@usaha.com',
     });
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
   });
 
-  const chooseEmail = () =>
-    fireEvent.click(document.body.querySelector('input[type="radio"][value="EMAIL"]')!);
   const roleCheckbox = () => document.body.querySelector('input[type="checkbox"]')!;
 
-  it('requires a valid email when the invitation is sent by email', async () => {
+  it('requires a valid email for every invitation', async () => {
     const createInvitation = vi.fn();
     renderDialog(createInvitation);
     type(field('Nama tampilan'), 'Siti Rahma');
     type(field('Nomor telepon'), '081234567890');
     fireEvent.click(roleCheckbox());
-    chooseEmail();
     await click('Kirim undangan');
     expect(createInvitation).not.toHaveBeenCalled();
     expect(document.body.textContent).toContain('Masukkan alamat email tujuan undangan.');
@@ -125,12 +123,11 @@ describe('InvitationDialog', () => {
     type(field('Nama tampilan'), 'Siti Rahma');
     type(field('Nomor telepon'), '081234567890');
     fireEvent.click(roleCheckbox());
-    chooseEmail();
     type(field('Email'), 'siti@usaha.com');
     await click('Kirim undangan');
     await waitFor(() => expect(createInvitation).toHaveBeenCalledTimes(1));
     expect(createInvitation).toHaveBeenCalledWith(
-      expect.objectContaining({ email: 'siti@usaha.com', deliveryChannel: 'EMAIL' }),
+      expect.objectContaining({ email: 'siti@usaha.com' }),
     );
   });
 
@@ -142,7 +139,6 @@ describe('InvitationDialog', () => {
     type(field('Nama tampilan'), 'Siti Rahma');
     type(field('Nomor telepon'), '081234567890');
     fireEvent.click(roleCheckbox());
-    chooseEmail();
     type(field('Email'), 'siti@usaha.com');
     await click('Kirim undangan');
     const message = 'Email ini sudah dipakai pengguna lain.';
@@ -177,6 +173,7 @@ describe('InvitationDialog', () => {
     renderDialog(createInvitation);
     type(field('Nama tampilan'), 'Siti Rahma');
     type(field('Nomor telepon'), '081234567890');
+    type(field('Email'), 'siti@usaha.com');
     if (code.includes('USERNAME')) type(field(/Username/), 'siti.rahma');
     fireEvent.click(document.body.querySelector('input[type="checkbox"]')!);
     await click('Kirim undangan');
