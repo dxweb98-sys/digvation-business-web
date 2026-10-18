@@ -1,32 +1,13 @@
 import { hasSessionFeature, useAuth } from '@digvation/business-auth';
 import { useConnectivity, useDeploymentBootstrap } from '@digvation/business-runtime';
-import { DAlert, DAvatar, DButton, DDialog, DDropdown, DInput, useToast } from '@digvation/ui';
-import {
-  Building2,
-  Check,
-  ChevronDown,
-  ChevronsUpDown,
-  KeyRound,
-  LogOut,
-  MapPin,
-  Menu,
-  MessageCircle,
-  UserRound,
-} from 'lucide-react';
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { DAvatar, DButton, DDialog, DDropdown, useToast } from '@digvation/ui';
+import { Building2, ChevronDown, Check, LogOut, MapPin, Menu, UserCircle, UserRound } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 
 import { useOperationalLocalization } from '../localization/operational-localization';
-import { getAppVersion } from '../version/app-version';
 import { OperationalNotificationBell } from '../../features/notifications/operational-notification-bell';
 import { useOperationalAccessContext } from '../../shared/operational-access/operational-access-api';
-import {
-  createRuntimePasswordChange,
-  PasswordChangeCooldownError,
-  PasswordChangeError,
-  PasswordChangeUnavailableError,
-  type OperationalPasswordChangePort,
-} from './operational-password-change';
 import { OperationalProfileDialog } from './operational-profile-dialog';
 import type { OperationalNavigationSection } from '../../shared/navigation/operational-navigation';
 import { resolveOperationalLocationSelection } from '../../shared/operational-access/operational-location-selection';
@@ -54,46 +35,17 @@ function identityInitials(displayName: string): string | null {
 
 interface OperationalShellProps {
   navigationSections: readonly OperationalNavigationSection[];
-  /** Integration point for the Runtime-backed WhatsApp password-reset engine. */
-  passwordChange?: OperationalPasswordChangePort;
 }
 
-export function OperationalShell({
-  navigationSections,
-  passwordChange: passwordChangeOverride,
-}: OperationalShellProps) {
+export function OperationalShell({ navigationSections }: OperationalShellProps) {
   const bootstrap = useDeploymentBootstrap();
   const connectivity = useConnectivity();
   const { copy, label } = useOperationalLocalization();
   const { session, logout, authPort } = useAuth();
-  const passwordChange = useMemo(
-    () =>
-      passwordChangeOverride ??
-      createRuntimePasswordChange({
-        apiBaseUrl: bootstrap.apiBaseUrl,
-        getAccessToken: () => authPort.getAccessToken?.() ?? Promise.resolve(null),
-      }),
-    [authPort, bootstrap.apiBaseUrl, passwordChangeOverride],
-  );
   const { showToast } = useToast();
   const [isLoggingOut, setLoggingOut] = useState(false);
-  const [isAccountDialogOpen, setAccountDialogOpen] = useState(false);
-  const [resetLinkState, setResetLinkState] = useState<
-    | { kind: 'idle' | 'pending' | 'sent' }
-    | { kind: 'failed'; reason: 'unavailable' | 'failed' | 'cooldown' }
-  >({ kind: 'idle' });
-  const [passwordForm, setPasswordForm] = useState({
-    open: false,
-    current: '',
-    next: '',
-    confirmation: '',
-    touched: false,
-  });
-  const [changeState, setChangeState] = useState<
-    | { kind: 'idle' | 'pending' | 'changed' }
-    | { kind: 'incorrect' }
-    | { kind: 'failed'; reason: 'policy' | 'throttled' | 'session' | 'failed' }
-  >({ kind: 'idle' });
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [isProfileOpen, setProfileOpen] = useState(false);
   const {
     selectedLocationId,
     selectLocation,
@@ -103,7 +55,6 @@ export function OperationalShell({
   } = useOperationalSession();
   const navigate = useNavigate();
   const routerLocation = useLocation();
-  const version = getAppVersion();
   const operationalAccessQuery = useOperationalAccessContext();
   const canSwitchBranches = hasSessionFeature(session.access, 'MULTI_BRANCH');
   const locations = useMemo(() => {
@@ -119,11 +70,7 @@ export function OperationalShell({
     session.business.name || bootstrap.branding.companyName || copy('Operational');
   const userInitials = identityInitials(session.identity.displayName);
   const primaryRole = session.identity.roles[0] ?? null;
-  const usernameLabel = session.identity.username?.trim()
-    ? `@${session.identity.username.trim()}`
-    : null;
-  const userContextLabel = [usernameLabel, primaryRole?.name ?? null].filter(Boolean).join(' · ');
-  const headerIdentityContext = userContextLabel || copy('Account');
+  const roleContext = primaryRole?.name ?? copy('Account');
 
   useEffect(() => {
     const resolved = resolveOperationalLocationSelection(
@@ -136,12 +83,12 @@ export function OperationalShell({
 
   if (operationalAccessQuery.isError) {
     return (
-      <main className="grid min-h-screen place-items-center bg-[var(--color-background)] p-6 text-center">
-        <section className="max-w-md rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+      <main className="grid min-h-screen place-items-center bg-(--color-background) p-6 text-center">
+        <section className="max-w-md rounded-xl border border-(--color-border) bg-(--color-surface) p-6">
           <h1 className="text-lg font-semibold">
             {copy('Operational access could not be loaded')}
           </h1>
-          <p className="mt-2 text-sm text-[var(--color-text-muted)]">
+          <p className="mt-2 text-sm text-(--color-text-muted)">
             {copy('Check your connection and try again.')}
           </p>
           <div className="mt-5 flex justify-center gap-2">
@@ -162,15 +109,15 @@ export function OperationalShell({
 
   if (operationalAccessQuery.isSuccess && locations.length === 0) {
     return (
-      <main className="grid min-h-screen place-items-center bg-[var(--color-background)] p-6 text-center">
-        <section className="max-w-md rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+      <main className="grid min-h-screen place-items-center bg-(--color-background) p-6 text-center">
+        <section className="max-w-md rounded-xl border border-(--color-border) bg-(--color-surface) p-6">
           <h1 className="text-lg font-semibold">
             {copy('Operational location access unavailable')}
           </h1>
-          <p className="mt-2 text-sm text-[var(--color-text-muted)]">
+          <p className="mt-2 text-sm text-(--color-text-muted)">
             {copy('This account has no authorized operational location.')}
           </p>
-          <p className="mt-2 text-sm text-[var(--color-text-muted)]">
+          <p className="mt-2 text-sm text-(--color-text-muted)">
             {copy(
               'Ask your business administrator to grant location access in Backoffice, then sign in again.',
             )}
@@ -218,109 +165,65 @@ export function OperationalShell({
     }
   };
 
-  const requestPasswordResetLink = async () => {
-    if (resetLinkState.kind === 'pending') return;
-    setResetLinkState({ kind: 'pending' });
-    try {
-      await passwordChange.requestResetLink();
-      setResetLinkState({ kind: 'sent' });
-    } catch (error) {
-      setResetLinkState({
-        kind: 'failed',
-        reason:
-          error instanceof PasswordChangeUnavailableError
-            ? 'unavailable'
-            : error instanceof PasswordChangeCooldownError
-              ? 'cooldown'
-              : 'failed',
-      });
-    }
-  };
-
-  const newLength = [...passwordForm.next].length;
-  const newValid = newLength >= 10 && newLength <= 128;
-  const sameAsCurrent = passwordForm.next.length > 0 && passwordForm.next === passwordForm.current;
-  const passwordFormValid =
-    passwordForm.current.length > 0 &&
-    newValid &&
-    !sameAsCurrent &&
-    passwordForm.confirmation === passwordForm.next;
-
-  const submitPasswordChange = async (event: FormEvent) => {
-    event.preventDefault();
-    if (changeState.kind === 'pending') return;
-    setPasswordForm((form) => ({ ...form, touched: true }));
-    if (!passwordFormValid) return;
-    setChangeState({ kind: 'pending' });
-    try {
-      await passwordChange.changePassword({
-        currentPassword: passwordForm.current,
-        newPassword: passwordForm.next,
-      });
-      setPasswordForm({ open: true, current: '', next: '', confirmation: '', touched: false });
-      setChangeState({ kind: 'changed' });
-    } catch (error) {
-      if (error instanceof PasswordChangeError && error.reason === 'incorrect')
-        setChangeState({ kind: 'incorrect' });
-      else if (error instanceof PasswordChangeUnavailableError)
-        setChangeState({ kind: 'failed', reason: 'failed' });
-      else
-        setChangeState({
-          kind: 'failed',
-          reason:
-            error instanceof PasswordChangeError
-              ? (error.reason as 'policy' | 'throttled' | 'session' | 'failed')
-              : 'failed',
-        });
-    }
-  };
-
-  const closeAccountDialog = () => {
-    const finished = changeState.kind === 'changed';
-    setAccountDialogOpen(false);
-    setPasswordForm({ open: false, current: '', next: '', confirmation: '', touched: false });
-    setChangeState({ kind: 'idle' });
-    // The Runtime has already revoked every session; return to the sign-in screen.
-    if (finished) void logout().catch(() => undefined);
-  };
-
-  const openAccountDialog = () => {
-    setResetLinkState({ kind: 'idle' });
-    setChangeState({ kind: 'idle' });
-    setPasswordForm({ open: false, current: '', next: '', confirmation: '', touched: false });
-    setAccountDialogOpen(true);
-  };
-
-  // The single account entry point: sidebar on desktop, navigation menu on mobile.
-  const profileButton = (
-    <button
-      type="button"
-      onClick={openAccountDialog}
-      aria-label={copy('Open account information')}
-      aria-haspopup="dialog"
-      aria-expanded={isAccountDialogOpen}
-      className="flex w-full min-w-0 items-center gap-3 rounded-[var(--radius-control)] px-2 py-2 text-left transition-colors duration-150 hover:bg-[var(--color-surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/25"
+  const accountMenu = (
+    <DDropdown
+      open={accountMenuOpen}
+      onOpenChange={setAccountMenuOpen}
+      placement="bottom-end"
+      contentPadding={false}
+      minWidth={240}
+      closeOnItemClick
+      trigger={() => (
+        <button
+          type="button"
+          aria-label={copy('Open account information')}
+          aria-haspopup="menu"
+          aria-expanded={accountMenuOpen}
+          className={`flex h-9 items-center gap-1 rounded-full border-0 px-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-focus) ${accountMenuOpen ? 'bg-(--color-surface-muted)' : 'bg-(--color-surface-muted)/75 hover:bg-(--color-surface-muted)'}`}
+        >
+          <DAvatar
+            alt=""
+            name={session.identity.displayName}
+            fallback={userInitials ?? <UserRound className="size-4" aria-hidden="true" />}
+            size="sm"
+            className="shrink-0 bg-transparent text-xs font-bold text-(--color-brand) [&_*]:border-0 [&_*]:bg-transparent"
+          />
+          <ChevronDown className="size-3.5 text-(--color-text-muted)" aria-hidden="true" />
+        </button>
+      )}
     >
-      <DAvatar
-        alt=""
-        name={session.identity.displayName}
-        fallback={userInitials ?? <UserRound className="size-4" aria-label={copy('Account')} />}
-        size="sm"
-        className="shrink-0 bg-[var(--color-brand)]/10 text-xs font-bold text-[var(--color-brand)]"
-      />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium leading-5 text-[var(--color-text)]">
-          {session.identity.displayName}
-        </span>
-        <span className="block truncate text-xs leading-4 text-[var(--color-text-muted)]">
-          {usernameLabel ?? primaryRole?.name ?? copy('Account')}
-        </span>
-      </span>
-      <ChevronsUpDown
-        className="size-4 shrink-0 text-[var(--color-text-muted)]"
-        aria-hidden="true"
-      />
-    </button>
+      <div className="p-1.5">
+        <div className="border-b border-(--color-border) px-2.5 py-2.5">
+          <p className="truncate text-sm font-semibold text-(--color-text)">
+            {session.identity.displayName}
+          </p>
+          <p className="mt-0.5 truncate text-xs text-(--color-text-muted)">{roleContext}</p>
+        </div>
+        <button
+          type="button"
+          role="menuitem"
+          onClick={() => {
+            setAccountMenuOpen(false);
+            setProfileOpen(true);
+          }}
+          className="mt-1 flex h-9 w-full items-center gap-2 rounded-(--radius-control) px-2.5 text-left text-sm text-(--color-text) hover:bg-(--color-surface-muted) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-focus)"
+        >
+          <UserCircle className="size-4" aria-hidden="true" />
+          {copy('Profile')}
+        </button>
+        <div className="my-1 border-t border-(--color-border)" />
+        <button
+          type="button"
+          role="menuitem"
+          onClick={() => void handleLogout()}
+          disabled={isLoggingOut}
+          className="flex h-9 w-full items-center gap-2 rounded-(--radius-control) px-2.5 text-left text-sm font-medium text-(--color-text) hover:bg-(--color-surface-muted) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-focus) disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <LogOut className="size-4" aria-hidden="true" />
+          {copy('Logout')}
+        </button>
+      </div>
+    </DDropdown>
   );
 
   const branchLabel =
@@ -328,10 +231,10 @@ export function OperationalShell({
     copy(operationalAccessQuery.isLoading ? 'Loading branch' : 'Choose branch');
 
   return (
-    <div className="operational-shell flex h-screen w-full min-w-0 overflow-hidden bg-[var(--color-background)]">
-      <aside className="operational-shell__sidebar hidden min-h-0 shrink-0 flex-col border-r border-[var(--color-border)] bg-[var(--color-surface)] shadow-[1px_0_0_var(--color-border)] md:flex md:w-[232px] lg:w-[280px]">
-        <div className="flex min-h-16 items-center gap-3 border-b border-[var(--color-border)] px-5 py-3">
-          <div className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-[var(--radius-control)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]">
+    <div className="operational-shell flex h-screen w-full min-w-0 overflow-hidden bg-(--color-background)">
+      <aside className="operational-shell__sidebar hidden min-h-0 shrink-0 flex-col border-r border-(--color-border) bg-(--color-surface) shadow-[1px_0_0_var(--color-border)] md:flex md:w-58 lg:w-70">
+        <div className="flex min-h-16 items-center gap-3 border-b border-(--color-border) px-5 py-3">
+          <div className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-(--radius-control) bg-(--color-brand)/10 text-(--color-brand)">
             {bootstrap.branding.logoUrl ? (
               <img
                 src={bootstrap.branding.logoUrl}
@@ -339,16 +242,14 @@ export function OperationalShell({
                 className="size-full object-contain p-1"
               />
             ) : (
-              <Building2 className="size-[18px]" strokeWidth={2.2} />
+              <Building2 className="size-4.5" strokeWidth={2.2} />
             )}
           </div>
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold leading-5 text-[var(--color-text)]">
+            <p className="truncate text-sm font-semibold leading-5 text-(--color-text)">
               {bootstrap.branding.productName}
             </p>
-            <p className="truncate text-xs leading-4 text-[var(--color-text-muted)]">
-              {brandSubtitle}
-            </p>
+            <p className="truncate text-xs leading-4 text-(--color-text-muted)">{brandSubtitle}</p>
           </div>
         </div>
 
@@ -363,12 +264,10 @@ export function OperationalShell({
         <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
           <OperationalNavigationGroups navigationSections={navigationSections} />
         </nav>
-
-        <div className="mt-auto border-t border-[var(--color-border)] p-2">{profileButton}</div>
       </aside>
 
       <main className="operational-shell__main flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden">
-        <header className="flex h-16 w-full shrink-0 items-center justify-between gap-4 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-5 shadow-[0_1px_0_var(--color-border)] md:px-6 lg:px-8">
+        <header className="flex h-16 w-full shrink-0 items-center justify-between gap-4 border-b border-(--color-border) bg-(--color-surface) px-5 shadow-[0_1px_0_var(--color-border)] md:px-6 lg:px-8">
           <div className="flex min-w-0 items-center gap-2 md:gap-3">
             <div className="operational-shell__mobile-navigation md:hidden">
               <DDropdown
@@ -379,11 +278,11 @@ export function OperationalShell({
                 contentClassName="w-[min(320px,calc(100vw-24px))] max-h-[calc(100vh-88px)] overflow-y-auto"
                 trigger={() => (
                   <DButton variant="ghost" size="icon" aria-label={copy('Open navigation')}>
-                    <Menu className="size-[18px]" />
+                    <Menu className="size-4.5" />
                   </DButton>
                 )}
               >
-                <div className="border-b border-[var(--color-border)] p-3">
+                <div className="border-b border-(--color-border) p-3">
                   <BranchButton
                     branchLabel={branchLabel}
                     canChoose={locations.length > 1}
@@ -393,25 +292,25 @@ export function OperationalShell({
                 <nav className="p-3">
                   <OperationalNavigationGroups navigationSections={navigationSections} />
                 </nav>
-                <div className="border-t border-[var(--color-border)] p-2">{profileButton}</div>
               </DDropdown>
             </div>
             <span
               className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-bold ${
                 connectivity.state === 'OFFLINE'
-                  ? 'bg-[var(--color-accent-coral)]/45'
-                  : 'bg-[var(--color-accent-mint)]/55'
+                  ? 'bg-(--color-accent-coral)/45'
+                  : 'bg-(--color-accent-mint)/55'
               }`}
             >
               <span className="size-1.5 rounded-full bg-current" /> {label(connectivity.state)}
             </span>
-            <span className="operational-shell__header-date hidden text-xs text-[var(--color-text-muted)] md:inline">
+            <span className="operational-shell__header-date hidden text-xs text-(--color-text-muted) md:inline">
               {formatCurrentDate(session.preferences.locale)}
             </span>
           </div>
 
           <div className="flex min-w-0 items-center gap-1.5">
             <OperationalNotificationBell />
+            {accountMenu}
           </div>
         </header>
 
@@ -428,24 +327,22 @@ export function OperationalShell({
         closeOnOverlay
         showClose={false}
         noPadding
-        className="w-full max-w-md rounded-t-[var(--radius-panel)] bg-[var(--color-surface)] shadow-2xl sm:rounded-[var(--radius-panel)]"
+        className="w-full max-w-md rounded-t-(--radius-panel) bg-(--color-surface) shadow-2xl sm:rounded-(--radius-panel)"
       >
-        <div className="border-b border-[var(--color-border)] px-5 py-4">
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-brand)]">
+        <div className="border-b border-(--color-border) px-5 py-4">
+          <p className="text-xs font-bold uppercase tracking-[0.14em] text-(--color-brand)">
             {copy('Branch')}
           </p>
           <h2 className="mt-1 text-lg font-bold">{copy('Choose active branch')}</h2>
-          <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+          <p className="mt-1 text-sm text-(--color-text-muted)">
             {copy('Select the location used for your active operation.')}
           </p>
         </div>
         <div className="max-h-[min(420px,60vh)] overflow-y-auto p-3">
           {operationalAccessQuery.isLoading ? (
-            <p className="p-3 text-sm text-[var(--color-text-muted)]">
-              {copy('Loading branches...')}
-            </p>
+            <p className="p-3 text-sm text-(--color-text-muted)">{copy('Loading branches...')}</p>
           ) : locations.length === 0 ? (
-            <div className="p-3 text-sm text-[var(--color-text-muted)]">
+            <div className="p-3 text-sm text-(--color-text-muted)">
               {copy('No active branches are available for this workspace.')}
             </div>
           ) : (
@@ -458,10 +355,10 @@ export function OperationalShell({
                     key={location.id}
                     type="button"
                     onClick={() => handleLocationSelect(location.id)}
-                    className={`flex w-full items-center justify-between gap-3 rounded-[var(--radius-control)] px-3 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] ${
+                    className={`flex w-full items-center justify-between gap-3 rounded-(--radius-control) px-3 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-focus) ${
                       isSelected
-                        ? 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]'
-                        : 'hover:bg-[var(--color-surface-muted)]'
+                        ? 'bg-(--color-brand)/10 text-(--color-brand)'
+                        : 'hover:bg-(--color-surface-muted)'
                     }`}
                   >
                     <span className="flex min-w-0 items-center gap-3">
@@ -470,7 +367,7 @@ export function OperationalShell({
                         <span className="block truncate text-sm font-semibold">
                           {location.name}
                         </span>
-                        <span className="mt-0.5 block truncate text-xs text-[var(--color-text-muted)]">
+                        <span className="mt-0.5 block truncate text-xs text-(--color-text-muted)">
                           {location.code}
                         </span>
                       </span>
@@ -482,290 +379,18 @@ export function OperationalShell({
             </div>
           )}
         </div>
-        <div className="border-t border-[var(--color-border)] px-5 py-3 text-right">
+        <div className="border-t border-(--color-border) px-5 py-3 text-right">
           <DButton variant="secondary" onClick={closeBranchPicker}>
             {copy('Close')}
           </DButton>
         </div>
       </DDialog>
 
-      <DDialog
-        open={false}
-        onClose={closeAccountDialog}
-        title={copy('Account')}
-        description={copy('Operational account information for the active session.')}
-        ariaLabel={copy('Account information')}
-        closeOnEscape
-        closeOnOverlay
-        className="w-full max-w-md"
-        footer={
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <DButton
-              variant="ghost"
-              leftIcon={<LogOut className="size-4" />}
-              loading={isLoggingOut}
-              onClick={() => void handleLogout()}
-              className="text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10"
-            >
-              {copy('Logout')}
-            </DButton>
-            <DButton variant="secondary" onClick={closeAccountDialog}>
-              {copy('Close')}
-            </DButton>
-          </div>
-        }
-      >
-        <div className="space-y-5">
-          <div className="flex min-w-0 items-center gap-3.5">
-            <DAvatar
-              alt=""
-              name={session.identity.displayName}
-              fallback={
-                userInitials ?? <UserRound className="size-5" aria-label={copy('Account')} />
-              }
-              size="lg"
-              className="shrink-0 bg-[var(--color-brand)]/10 text-sm font-bold text-[var(--color-brand)]"
-            />
-            <div className="min-w-0">
-              <p className="truncate text-base font-semibold text-[var(--color-text)]">
-                {session.identity.displayName}
-              </p>
-              <p className="mt-0.5 truncate text-sm text-[var(--color-text-muted)]">
-                {headerIdentityContext}
-              </p>
-            </div>
-          </div>
-
-          <dl className="divide-y divide-[var(--color-border)] rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface-muted)]/35">
-            <div className="flex items-center justify-between gap-3 px-3 py-2.5">
-              <dt className="text-xs text-[var(--color-text-muted)]">{copy('Active branch')}</dt>
-              <dd className="flex min-w-0 items-center gap-2">
-                <span className="truncate text-sm font-semibold">{branchLabel}</span>
-                {locations.length > 1 ? (
-                  <DButton
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 px-2 text-[11px]"
-                    onClick={() => {
-                      setAccountDialogOpen(false);
-                      openBranchPicker();
-                    }}
-                  >
-                    {copy('Switch branch')}
-                  </DButton>
-                ) : null}
-              </dd>
-            </div>
-            {primaryRole ? (
-              <div className="flex items-center justify-between gap-3 px-3 py-2.5">
-                <dt className="text-xs text-[var(--color-text-muted)]">{copy('Role')}</dt>
-                <dd className="truncate text-sm font-medium">{primaryRole.name}</dd>
-              </div>
-            ) : null}
-            <div className="flex items-center justify-between gap-3 px-3 py-2.5">
-              <dt className="text-xs text-[var(--color-text-muted)]">{copy('App version')}</dt>
-              <dd className="font-mono text-xs text-[var(--color-text-muted)]">
-                {version.version}
-              </dd>
-            </div>
-          </dl>
-
-          <section
-            aria-labelledby="operational-password-heading"
-            className="space-y-3 rounded-[var(--radius-control)] border border-[var(--color-border)] p-3"
-          >
-            <div className="flex items-start gap-2.5">
-              <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full bg-[var(--color-brand)]/10 text-[var(--color-brand)]">
-                <KeyRound className="size-4" aria-hidden="true" />
-              </span>
-              <div className="min-w-0">
-                <p id="operational-password-heading" className="text-sm font-semibold">
-                  {copy('Password')}
-                </p>
-                <p className="mt-0.5 text-xs leading-5 text-[var(--color-text-muted)]">
-                  {copy(
-                    'Enter your current password and a new one. After it succeeds, all your sessions end and you sign in again.',
-                  )}
-                </p>
-              </div>
-            </div>
-
-            {changeState.kind === 'changed' ? (
-              <DAlert variant="success" role="status">
-                {copy(
-                  'Password changed. All sessions have ended; sign in again with the new password.',
-                )}
-              </DAlert>
-            ) : passwordForm.open ? (
-              <form
-                className="space-y-3"
-                onSubmit={(event) => void submitPasswordChange(event)}
-                noValidate
-              >
-                <DInput
-                  id="operational-current-password"
-                  name="current-password"
-                  label={copy('Current password')}
-                  type="password"
-                  value={passwordForm.current}
-                  onChange={(value) => {
-                    setPasswordForm((form) => ({ ...form, current: value }));
-                    if (changeState.kind === 'incorrect') setChangeState({ kind: 'idle' });
-                  }}
-                  autoComplete="current-password"
-                  error={
-                    changeState.kind === 'incorrect'
-                      ? copy('The current password is incorrect.')
-                      : undefined
-                  }
-                  disabled={changeState.kind === 'pending'}
-                  autoFocus
-                />
-                <DInput
-                  id="operational-new-password"
-                  name="new-password"
-                  label={copy('New password')}
-                  type="password"
-                  value={passwordForm.next}
-                  onChange={(value) => setPasswordForm((form) => ({ ...form, next: value }))}
-                  onBlur={() => setPasswordForm((form) => ({ ...form, touched: true }))}
-                  autoComplete="new-password"
-                  hint={copy('At least 10 characters.')}
-                  error={
-                    !passwordForm.touched
-                      ? undefined
-                      : !newValid
-                        ? copy('Password must contain 10 to 128 characters.')
-                        : sameAsCurrent
-                          ? copy('The new password must differ from the current password.')
-                          : undefined
-                  }
-                  disabled={changeState.kind === 'pending'}
-                />
-                <DInput
-                  id="operational-confirm-password"
-                  name="confirm-password"
-                  label={copy('Confirm new password')}
-                  type="password"
-                  value={passwordForm.confirmation}
-                  onChange={(value) =>
-                    setPasswordForm((form) => ({ ...form, confirmation: value }))
-                  }
-                  onBlur={() => setPasswordForm((form) => ({ ...form, touched: true }))}
-                  autoComplete="new-password"
-                  error={
-                    (passwordForm.touched || passwordForm.confirmation.length > 0) &&
-                    passwordForm.confirmation !== passwordForm.next
-                      ? copy('Password confirmation does not match.')
-                      : undefined
-                  }
-                  disabled={changeState.kind === 'pending'}
-                />
-                {changeState.kind === 'failed' ? (
-                  <DAlert variant="danger" role="alert">
-                    {copy(
-                      changeState.reason === 'policy'
-                        ? 'Password must contain 10 to 128 characters.'
-                        : changeState.reason === 'throttled'
-                          ? 'Too many attempts. Try again shortly.'
-                          : changeState.reason === 'session'
-                            ? 'Your session has ended. Sign in again, then try once more.'
-                            : 'The password could not be changed. Try again shortly.',
-                    )}
-                  </DAlert>
-                ) : null}
-                <div className="flex justify-end gap-2">
-                  <DButton
-                    size="sm"
-                    variant="secondary"
-                    type="button"
-                    disabled={changeState.kind === 'pending'}
-                    onClick={() => {
-                      setPasswordForm({
-                        open: false,
-                        current: '',
-                        next: '',
-                        confirmation: '',
-                        touched: false,
-                      });
-                      setChangeState({ kind: 'idle' });
-                    }}
-                  >
-                    {copy('Cancel')}
-                  </DButton>
-                  <DButton size="sm" type="submit" loading={changeState.kind === 'pending'}>
-                    {copy('Change password')}
-                  </DButton>
-                </div>
-              </form>
-            ) : (
-              <div className="flex justify-end">
-                <DButton
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setPasswordForm((form) => ({ ...form, open: true }))}
-                >
-                  {copy('Change password')}
-                </DButton>
-              </div>
-            )}
-
-            {changeState.kind === 'changed' ? null : (
-              <div className="border-t border-[var(--color-border)] pt-3">
-                <p className="text-xs font-semibold">{copy('Forgot your current password?')}</p>
-                <p className="mt-0.5 text-xs leading-5 text-[var(--color-text-muted)]">
-                  {copy(
-                    'A link to set a new password will be sent to the WhatsApp number registered on your account.',
-                  )}
-                </p>
-                {resetLinkState.kind === 'sent' ? (
-                  <div
-                    className="operational-view-enter mt-3 flex items-center gap-2 rounded-[var(--radius-control)] bg-[var(--color-success)]/10 px-3 py-2 text-xs font-semibold text-[var(--color-success)]"
-                    aria-live="polite"
-                  >
-                    <MessageCircle className="size-4 shrink-0" aria-hidden="true" />
-                    {copy('Link submitted to WhatsApp.')}
-                  </div>
-                ) : (
-                  <>
-                    {resetLinkState.kind === 'failed' ? (
-                      <DAlert
-                        variant={resetLinkState.reason === 'unavailable' ? 'warning' : 'danger'}
-                        role="alert"
-                        className="mt-3"
-                      >
-                        {copy(
-                          resetLinkState.reason === 'unavailable'
-                            ? 'Password change is not available yet. Contact your administrator.'
-                            : resetLinkState.reason === 'cooldown'
-                              ? 'A link was sent a moment ago. Check WhatsApp or try again shortly.'
-                              : 'The request could not be sent. Try again.',
-                        )}
-                      </DAlert>
-                    ) : null}
-                    <div className="mt-3 flex justify-end">
-                      <DButton
-                        size="sm"
-                        variant="outline"
-                        loading={resetLinkState.kind === 'pending'}
-                        onClick={() => void requestPasswordResetLink()}
-                      >
-                        {copy('Send reset link via WhatsApp')}
-                      </DButton>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-          </section>
-        </div>
-      </DDialog>
       <OperationalProfileDialog
-        open={isAccountDialogOpen}
-        onClose={closeAccountDialog}
+        open={isProfileOpen}
+        onClose={() => setProfileOpen(false)}
         apiBaseUrl={bootstrap.apiBaseUrl}
         getAccessToken={() => authPort.getAccessToken?.() ?? Promise.resolve(null)}
-        passwordChange={passwordChange}
       />
     </div>
   );
@@ -787,20 +412,18 @@ function BranchButton({
       onClick={onClick}
       disabled={!canChoose}
       aria-label={`${copy('Active branch')} ${branchLabel}`}
-      className="flex min-w-0 w-full items-center gap-2.5 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface-muted)]/55 px-3 py-2.5 text-left transition-[background-color,border-color,box-shadow] duration-150 enabled:hover:border-[var(--color-brand)]/30 enabled:hover:bg-[var(--color-surface-muted)] disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
+      className="flex min-w-0 w-full items-center gap-2.5 rounded-(--radius-control) border border-(--color-border) bg-(--color-surface-muted)/55 px-3 py-2.5 text-left transition-[background-color,border-color,box-shadow] duration-150 enabled:hover:border-(--color-brand)/30 enabled:hover:bg-(--color-surface-muted) disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-focus)"
     >
-      <MapPin className="size-3.5 shrink-0 text-[var(--color-brand)]" />
+      <MapPin className="size-3.5 shrink-0 text-(--color-brand)" />
       <span className="min-w-0 flex-1">
-        <span className="block text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">
+        <span className="block text-[9px] font-bold uppercase tracking-[0.12em] text-(--color-text-muted)">
           {copy('Active branch')}
         </span>
-        <span className="mt-0.5 block truncate text-sm font-semibold text-[var(--color-text)]">
+        <span className="mt-0.5 block truncate text-sm font-semibold text-(--color-text)">
           {branchLabel}
         </span>
       </span>
-      {canChoose ? (
-        <ChevronDown className="size-3.5 shrink-0 text-[var(--color-text-muted)]" />
-      ) : null}
+      {canChoose ? <ChevronDown className="size-3.5 shrink-0 text-(--color-text-muted)" /> : null}
     </button>
   );
 }
@@ -814,7 +437,7 @@ function OperationalNavigationGroups({
     <>
       {navigationSections.map((section) => (
         <div key={section.label} className="mt-3 first:mt-0">
-          <p className="px-3 pb-1 text-[12px] font-semibold text-[var(--color-text-muted)]">
+          <p className="px-3 pb-1 text-[12px] font-semibold text-(--color-text-muted)">
             {section.label}
           </p>
           <div className="space-y-0.5 pl-3">
@@ -824,14 +447,14 @@ function OperationalNavigationGroups({
                 to={to}
                 className={({ isActive }) =>
                   [
-                    'flex h-9 items-center justify-start gap-2 rounded-[var(--radius-control)] px-3 text-sm font-medium transition-colors duration-150',
+                    'flex h-9 items-center justify-start gap-2 rounded-(--radius-control) px-3 text-sm font-medium transition-colors duration-150',
                     isActive
-                      ? 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]'
-                      : 'text-[var(--color-text-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text)]',
+                      ? 'bg-(--color-brand)/10 text-(--color-brand)'
+                      : 'text-(--color-text-muted) hover:bg-(--color-surface-muted) hover:text-(--color-text)',
                   ].join(' ')
                 }
               >
-                <Icon className="size-[18px] shrink-0" />
+                <Icon className="size-4.5 shrink-0" />
                 {label}
               </NavLink>
             ))}

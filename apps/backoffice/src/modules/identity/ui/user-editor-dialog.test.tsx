@@ -30,6 +30,7 @@ const user = {
   id: 'u-1',
   displayName: 'Siti Rahma',
   username: 'siti.rahma',
+  phoneE164: '+628123456789',
   status: 'ACTIVE',
   version: 4,
   roles: [{ id: 'r-1', code: 'STAFF', name: 'Staff', systemKey: null }],
@@ -40,6 +41,7 @@ function renderEditor(
   canManageRoles = false,
   target: AccessUser = user,
   currentUserId?: string,
+  canUpdateIdentity = true,
 ) {
   const onChanged = vi.fn();
   const onClose = vi.fn();
@@ -56,6 +58,7 @@ function renderEditor(
               operationalAccess={{} as never}
               canManageRoles={canManageRoles}
               canUpdateProfile
+              canUpdateIdentity={canUpdateIdentity}
               canViewLocations={false}
               canManageLocations={false}
               onClose={onClose}
@@ -170,18 +173,10 @@ describe('UserEditorDialog email', () => {
     await waitFor(() => expect(updateUser).toHaveBeenCalledWith(target, { email: null }));
   });
 
-  it('sends a verification link only for a saved, unverified address', async () => {
+  it('keeps verification dispatch outside the editor after it moves to the user-table action', () => {
     const target = withEmail('siti@usaha.com', false);
-    const requestUserEmailVerification = vi.fn().mockResolvedValue({ completed: true });
-    renderEditor({ updateUser: vi.fn(), requestUserEmailVerification }, false, target);
-    await press('Kirim tautan verifikasi');
-    await waitFor(() => expect(requestUserEmailVerification).toHaveBeenCalledWith(target));
-    fireEvent.change(field(/^Email/), { target: { value: 'baru@usaha.com' } });
-    expect(
-      [...document.body.querySelectorAll('button')].some(
-        (node) => node.textContent === 'Kirim tautan verifikasi',
-      ),
-    ).toBe(false);
+    renderEditor({ updateUser: vi.fn() }, false, target);
+    expect(document.body.textContent).not.toContain('Kirim tautan verifikasi');
   });
 
   it('does not offer verification for an already verified email', () => {

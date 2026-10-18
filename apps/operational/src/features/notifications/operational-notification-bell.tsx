@@ -12,7 +12,11 @@ import {
   liveQueryPolicy,
 } from '../../app/data/operational-cache-policy';
 import { useOperationalLocalization } from '../../app/localization/operational-localization';
-import { NotificationApi, type BusinessNotification } from './notification-api';
+import {
+  NotificationApi,
+  type BusinessNotification,
+  type NotificationSeverity,
+} from './notification-api';
 
 const recentLimit = 6;
 
@@ -178,17 +182,17 @@ export function OperationalNotificationBell() {
                 type="button"
                 onClick={() => void handleNotification(notification)}
                 className={[
-                  'flex w-full items-start gap-3 border-b border-[var(--color-border)] px-4 py-3 text-left transition-colors hover:bg-[var(--color-surface-muted)]',
+                  'group flex w-full items-start gap-3 border-b border-[var(--color-border)] px-4 py-3.5 text-left transition-colors hover:bg-[var(--color-surface-muted)] focus-visible:relative focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-focus)]',
                   notification.readAt ? '' : 'bg-[var(--color-brand)]/[0.04]',
                 ].join(' ')}
               >
                 <span
                   className={[
-                    'mt-1.5 size-2 shrink-0 rounded-full',
-                    notification.readAt ? '' : 'bg-[var(--color-brand)]',
+                    'mt-1 flex size-5 shrink-0 items-center justify-center rounded-full border',
+                    notification.readAt ? 'border-transparent bg-[var(--color-surface-muted)]/60' : 'border-[var(--color-brand)]/20 bg-[var(--color-brand)]/10',
                   ].join(' ')}
                   aria-hidden="true"
-                />
+                ><span className={notification.readAt ? 'size-1 rounded-full bg-[var(--color-text-muted)]/50' : 'size-1.5 rounded-full bg-[var(--color-brand)]'} /></span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold text-[var(--color-text)]">
                     {notificationTitle(locale, notification)}
@@ -211,12 +215,27 @@ export function OperationalNotificationBell() {
             </p>
           )}
         </div>
+        <div className="border-t border-[var(--color-border)] p-2">
+          <DButton
+            variant="ghost"
+            className="w-full"
+            onClick={() => {
+              setOpen(false);
+              navigate('/notifications');
+            }}
+          >
+            {locale === 'id-ID' ? 'Lihat semua notifikasi' : 'View all notifications'}
+          </DButton>
+        </div>
       </div>
     </DDropdown>
   );
 }
 
-function notificationTitle(locale: 'id-ID' | 'en-US', notification: BusinessNotification): string {
+export function notificationTitle(
+  locale: 'id-ID' | 'en-US',
+  notification: BusinessNotification,
+): string {
   const id = locale === 'id-ID';
   switch (notification.type) {
     case 'EXPENSE_APPROVAL_REQUIRED':
@@ -230,7 +249,7 @@ function notificationTitle(locale: 'id-ID' | 'en-US', notification: BusinessNoti
   }
 }
 
-function notificationContext(
+export function notificationContext(
   locale: 'id-ID' | 'en-US',
   notification: BusinessNotification,
   formatMoney: (amount: string, currency: string) => string,
@@ -267,7 +286,16 @@ function notificationContext(
   }
 }
 
-function safeOperationalNotificationPath(path: string | null): string | null {
+export function notificationSeverityLabel(
+  locale: 'id-ID' | 'en-US',
+  severity: NotificationSeverity,
+): string {
+  if (severity === 'CRITICAL') return locale === 'id-ID' ? 'Kritis' : 'Critical';
+  if (severity === 'WARNING') return locale === 'id-ID' ? 'Perlu perhatian' : 'Needs attention';
+  return locale === 'id-ID' ? 'Info' : 'Info';
+}
+
+export function safeOperationalNotificationPath(path: string | null): string | null {
   // Transaction history lives in Backoffice, so only Operational routes are linked here.
   return path === '/expenses' ? path : null;
 }

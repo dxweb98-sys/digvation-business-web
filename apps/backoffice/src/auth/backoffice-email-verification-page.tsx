@@ -138,10 +138,10 @@ export function BackofficeEmailVerificationPage() {
   const isSubmitting = state.kind === 'submitting';
   return (
     <BackofficeAuthShell>
-      <h1 className="text-2xl font-bold leading-8 tracking-[-0.02em] text-[var(--color-text)]">
+      <h1 className="text-2xl font-bold leading-8 tracking-[-0.02em] text-(--color-text)">
         {t('verifyEmailTitle')}
       </h1>
-      <p className="mt-1.5 text-sm leading-6 text-[var(--color-text-muted)]">
+      <p className="mt-1.5 text-sm leading-6 text-(--color-text-muted)">
         {t('verifyEmailDescription')}
       </p>
       <DButton

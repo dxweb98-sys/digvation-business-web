@@ -12,6 +12,8 @@ export interface PasswordResetReference {
   token: string;
 }
 
+export type PasswordResetDestination = 'BACKOFFICE' | 'OPERATIONAL' | 'NONE';
+
 export type PasswordResetFailure = 'invalid' | 'expired' | 'password-policy' | 'network';
 
 export class PasswordResetError extends Error {
@@ -27,7 +29,9 @@ export class PasswordResetError extends Error {
 export interface PasswordRecoveryPort {
   request(input: PasswordRecoveryRequest): Promise<void>;
   /** Completes recovery from the one-time link; the Runtime ends every session of the account. */
-  confirm(input: PasswordResetReference & { newPassword: string }): Promise<void>;
+  confirm(input: PasswordResetReference & { newPassword: string }): Promise<{
+    destination: PasswordResetDestination;
+  }>;
   /** Confirms ownership of an account email from its one-time link; recovery may then use it. */
   confirmEmailVerification(input: PasswordResetReference): Promise<void>;
 }

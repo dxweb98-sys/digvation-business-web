@@ -8,6 +8,7 @@ import { BackofficeAuthShell } from './backoffice-auth-shell';
 import { PASSWORD_RECOVERY_PATH } from './backoffice-login-page';
 import {
   PasswordResetError,
+  type PasswordResetDestination,
   usePasswordRecovery,
   type PasswordResetReference,
 } from './password-recovery';
@@ -62,6 +63,7 @@ export function BackofficePasswordResetPage() {
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
   const [touched, setTouched] = useState(false);
+  const [destination, setDestination] = useState<PasswordResetDestination>('BACKOFFICE');
   const submitting = useRef(false);
 
   useEffect(() => {
@@ -111,10 +113,11 @@ export function BackofficePasswordResetPage() {
     submitting.current = true;
     setState({ kind: 'submitting' });
     try {
-      await recovery.confirm({ ...link, newPassword: password });
+      const completion = await recovery.confirm({ ...link, newPassword: password });
       setReference(null);
       setPassword('');
       setConfirmation('');
+      setDestination(completion.destination);
       setState({ kind: 'done' });
     } catch (failure) {
       const reason = failure instanceof PasswordResetError ? failure.reason : 'network';
@@ -135,7 +138,7 @@ export function BackofficePasswordResetPage() {
           </span>
           <h1 className={titleClassName}>{t('resetDoneTitle')}</h1>
           <p className={descriptionClassName}>{t('resetDoneDescription')}</p>
-          <DButton size="lg" fullWidth className="mt-7" onClick={() => void navigate('/login')}>
+          <DButton size="lg" fullWidth className="mt-7" onClick={() => navigateAfterReset(destination, navigate)}>
             {t('activationGoToSignIn')}
           </DButton>
         </div>
@@ -232,4 +235,22 @@ export function BackofficePasswordResetPage() {
       </form>
     </BackofficeAuthShell>
   );
+}
+
+function navigateAfterReset(destination: PasswordResetDestination, navigate: ReturnType<typeof useNavigate>) {
+  if (destination !== 'OPERATIONAL') {
+    navigate('/login');
+    return;
+  }
+  const configuredOrigin = import.meta.env.VITE_OPERATIONAL_APP_ORIGIN;
+  const localOrigin = window.location.hostname === 'localhost' ? 'http://localhost:5173' : undefined;
+  const origin = configuredOrigin || localOrigin;
+  if (!origin) return;
+  try {
+    const url = new URL('/', origin);
+    if (url.protocol !== 'https:' && url.hostname !== 'localhost') return;
+    window.location.assign(url.toString());
+  } catch {
+    // A build-time origin misconfiguration must not become an arbitrary redirect.
+  }
 }

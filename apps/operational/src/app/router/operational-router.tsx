@@ -11,6 +11,7 @@ import type { OperationalNavigationSection } from '../../shared/navigation/opera
 import { posSellOperationalNavigation } from '../../features/sell/pos-operational-navigation';
 import { financeOperationalNavigation } from '../../features/expenses/finance-operational-navigation';
 import { OperationalExpensesPage } from '../../features/expenses/operational-expenses-page';
+import { OperationalNotificationsPage } from '../../features/notifications/operational-notifications-page';
 import { customerOperationalNavigation, OperationalCustomersPage } from '../../features/customers';
 import {
   canAccessOperationalExpenses,
@@ -169,6 +170,7 @@ export const operationalRouter = createBrowserRouter([
       { path: '/sell/:saleId', element: <SellRoute /> },
       { path: '/expenses', element: <ExpensesRoute /> },
       { path: '/customers', element: <CustomersRoute /> },
+      { path: '/notifications', element: <OperationalNotificationsPage /> },
       { path: '/members', element: <Navigate to="/customers" replace /> },
       { path: '*', element: <OperationalNotFoundRoute /> },
     ],

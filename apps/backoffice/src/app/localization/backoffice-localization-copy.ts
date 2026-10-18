@@ -1308,6 +1308,34 @@ export const backofficeCopy: Record<string, { id: string; en: string }> = {
     id: 'Profil diperbarui.',
     en: 'Profile updated.',
   },
+  'Email security': {
+    id: 'Keamanan email',
+    en: 'Email security',
+  },
+  'Password links are sent only to your verified email.': {
+    id: 'Tautan kata sandi hanya dikirim ke email Anda yang terverifikasi.',
+    en: 'Password links are sent only to your verified email.',
+  },
+  'Verify this email before it can receive password links.': {
+    id: 'Verifikasi email ini sebelum dapat menerima tautan kata sandi.',
+    en: 'Verify this email before it can receive password links.',
+  },
+  'Add an email in Edit profile to receive password links.': {
+    id: 'Tambahkan email melalui Ubah profil untuk menerima tautan kata sandi.',
+    en: 'Add an email in Edit profile to receive password links.',
+  },
+  'Ask an administrator to add or update your email.': {
+    id: 'Minta administrator untuk menambahkan atau memperbarui email Anda.',
+    en: 'Ask an administrator to add or update your email.',
+  },
+  'Use international format, for example +628123456789.': {
+    id: 'Gunakan format internasional, misalnya +628123456789.',
+    en: 'Use international format, for example +628123456789.',
+  },
+  'Enter a valid phone number in international format.': {
+    id: 'Masukkan nomor telepon yang valid dalam format internasional.',
+    en: 'Enter a valid phone number in international format.',
+  },
   'Could not update your profile.': {
     id: 'Profil tidak dapat diperbarui.',
     en: 'Could not update your profile.',
@@ -1583,6 +1611,18 @@ export const backofficeCopy: Record<string, { id: string; en: string }> = {
   'Send verification link': {
     id: 'Kirim tautan verifikasi',
     en: 'Send verification link',
+  },
+  'Send verification link?': {
+    id: 'Kirim tautan verifikasi?',
+    en: 'Send verification link?',
+  },
+  'A one-time link is sent to this user email. Only the email owner can verify it.': {
+    id: 'Tautan sekali pakai dikirim ke email pengguna ini. Hanya pemilik email yang dapat memverifikasinya.',
+    en: 'A one-time link is sent to this user email. Only the email owner can verify it.',
+  },
+  'A one-time link is sent to the verified email of this user. It replaces any link that is still pending.': {
+    id: 'Tautan sekali pakai dikirim ke email terverifikasi pengguna ini. Tautan ini menggantikan tautan yang masih menunggu.',
+    en: 'A one-time link is sent to the verified email of this user. It replaces any link that is still pending.',
   },
   'Until an email is verified, password links are sent via WhatsApp.': {
     id: 'Selama email belum diverifikasi, tautan kata sandi dikirim lewat WhatsApp.',

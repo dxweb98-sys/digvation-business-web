@@ -38,6 +38,7 @@ export interface AccessUser {
   id: string;
   username: string | null;
   displayName: string;
+  phoneE164: string;
   status: 'ACTIVE' | 'PENDING_ACTIVATION' | 'DISABLED';
   /** Optional; used for recovery only once its owner verified it. */
   email?: string | null;
@@ -176,6 +177,7 @@ export class AccessControlApi {
     input: {
       displayName?: string;
       username?: string;
+      phoneE164?: string;
       status?: 'ACTIVE' | 'DISABLED';
       /** A new address is saved unverified; null removes it. */
       email?: string | null;
@@ -190,10 +192,7 @@ export class AccessControlApi {
   requestUserEmailVerification(user: AccessUser) {
     return this.client.post<{ completed: true }>(`/api/v1/users/${user.id}/email-verification`, {});
   }
-  /**
-   * Sends a one-time password link: to the user's verified email, otherwise to the registered
-   * phone. The caller never sees it.
-   */
+  /** Sends a one-time password link only to the user's verified email. */
   requestUserPasswordLink(user: AccessUser) {
     return this.client.post<{ completed: true }>(`/api/v1/users/${user.id}/password-reset`, {});
   }

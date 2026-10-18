@@ -3,11 +3,13 @@ import {
   PasswordResetError,
   type PasswordRecoveryPort,
   type PasswordRecoveryRequest,
+  type PasswordResetDestination,
   type PasswordResetReference,
 } from './password-recovery';
 
 interface ApiEnvelope {
   success?: boolean;
+  data?: { destination?: PasswordResetDestination };
   error?: { code?: string };
 }
 
@@ -40,14 +42,19 @@ export class HttpPasswordRecoveryAdapter implements PasswordRecoveryPort {
     if (!response.ok) throw new Error('PASSWORD_RECOVERY_REQUEST_FAILED');
   }
 
-  public async confirm(input: PasswordResetReference & { newPassword: string }): Promise<void> {
+  public async confirm(input: PasswordResetReference & { newPassword: string }): Promise<{ destination: PasswordResetDestination }> {
     const response = await this.post('password-reset/link/confirm', {
       workspace: input.workspace,
       challengeId: input.challengeId,
       token: input.token,
       newPassword: input.newPassword,
     });
-    return rejection(response);
+    await rejection(response);
+    const payload = (await response.json()) as ApiEnvelope;
+    const destination = payload.data?.destination;
+    if (destination !== 'BACKOFFICE' && destination !== 'OPERATIONAL' && destination !== 'NONE')
+      throw new PasswordResetError('network');
+    return { destination };
   }
 
   public async confirmEmailVerification(input: PasswordResetReference): Promise<void> {
