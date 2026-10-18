@@ -53,13 +53,11 @@ describe('BackofficePasswordLinkDialog', () => {
   it('shows cooldown without claiming success', async () => {
     vi.stubGlobal(
       'fetch',
-      vi
-        .fn()
-        .mockResolvedValue({
-          ok: false,
-          status: 409,
-          json: () => Promise.resolve({ error: { code: 'PASSWORD_RESET_COOLDOWN' } }),
-        }),
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 409,
+        json: () => Promise.resolve({ error: { code: 'PASSWORD_RESET_COOLDOWN' } }),
+      }),
     );
     renderDialog();
     fireEvent.click(screen.getByRole('button', { name: 'Kirim tautan' }));
