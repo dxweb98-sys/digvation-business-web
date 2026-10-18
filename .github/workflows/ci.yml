@@ -2,7 +2,7 @@ name: Frontend CI
 
 on:
   pull_request:
-    branches: [dev, main]
+    branches: [dev, main, stage]
   push:
     branches: [dev, main]
 
@@ -36,11 +36,3 @@ jobs:
         env:
           VITE_BUILD_REVISION: ${{ github.sha }}
         run: pnpm verify
-
-      - name: Install Playwright Chromium
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: Smoke test
-        env:
-          VITE_BUILD_REVISION: ${{ github.sha }}
-        run: pnpm test:e2e

@@ -1,0 +1,23 @@
+{
+  "apiBaseUrl": "",
+  "deploymentProfile": "DEDICATED",
+  "workspaceResolution": {
+    "mode": "LOGIN"
+  },
+  "applications": {
+    "backoffice": true,
+    "operational": true
+  },
+  "branding": {
+    "mode": "DIGVATION_DEFAULT",
+    "productName": "Digvation Business"
+  },
+  "theme": {
+    "preset": "DIGVATION_LIGHT",
+    "radius": "SOFT"
+  },
+  "defaults": {
+    "locale": "id-ID",
+    "country": "ID"
+  }
+}

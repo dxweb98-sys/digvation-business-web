@@ -2,39 +2,38 @@ import { useRuntime } from '@digvation/business-runtime';
 import {
   DBadge,
   DButton,
-  DCheckbox,
   DConfirmDialog,
   DDataTable,
-  DDialog,
-  DInput,
+  DTabs,
+  DTabsContent,
+  DTabsList,
+  DTabsTrigger,
   useToast,
   type TableColumn,
 } from '@digvation/ui';
+
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Ban, Pencil, Plus, RefreshCw, UserCog, UserPlus } from 'lucide-react';
-import { useMemo, useState, type ReactNode } from 'react';
+import { Ban, KeyRound, Mail, Pencil, Plus, RefreshCw, UserCog, UserPlus } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
-import {
-  BackofficePage,
-  BackofficePageHeader,
-} from '../../app/layout/backoffice-page';
+import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
 import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
 import { canPerformBackofficeAction } from '../../auth/backoffice-access';
-import {
-  isSessionExpiredError,
-  useBackofficeAuth,
-} from '../../auth/backoffice-auth-context';
+import { isSessionExpiredError, useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import {
   AccessControlApi,
   type AccessRole,
   type AccessUser,
   type UserInvitation,
 } from './access-control-api';
-import {
-  OperationalAccessApi,
-  type OperationalLocation,
-} from '../operational-access/operational-access-api';
+import { invitationStatusOf } from './model/invitation-status';
+import { InvitationDialog } from './ui/invitation-dialog';
+import { RoleEditorDialog } from './ui/role-editor-dialog';
+import { UserEditorDialog } from './ui/user-editor-dialog';
+import { EmailStatusBadge } from './ui/email-status-badge';
+import { emailStatusOf } from './model/identity-form';
+import { OperationalAccessApi } from '../operational-access/operational-access-api';
 
 const keys = {
   roles: ['access-control', 'roles'] as const,
@@ -45,11 +44,19 @@ const keys = {
 const pageSize = 50;
 type Section = 'roles' | 'users' | 'invitations';
 
+const accessCopy = {
+  pageDescription: {
+    id: 'Kelola pengguna, peran, undangan, izin, dan akses lokasi.',
+    en: 'Manage users, roles, invitations, permissions, and location access.',
+  },
+} as const;
+
 export function AccessControlPage() {
   const { session, createApiClient } = useBackofficeAuth();
   const runtime = useRuntime();
   const queryClient = useQueryClient();
-  const { copy } = useBackofficeLocalization();
+  const { copy, locale } = useBackofficeLocalization();
+  const { showToast } = useToast();
   const api = useMemo(
     () => new AccessControlApi(createApiClient(runtime.apiBaseUrl)),
     [createApiClient, runtime.apiBaseUrl],
@@ -59,23 +66,19 @@ export function AccessControlPage() {
     [createApiClient, runtime.apiBaseUrl],
   );
 
-  const canViewUsers = Boolean(
-    session && canPerformBackofficeAction(session, 'viewUsers'),
-  );
-  const canInviteUsers = Boolean(
-    session && canPerformBackofficeAction(session, 'inviteUsers'),
-  );
-  const canCreateRole = Boolean(
-    session && canPerformBackofficeAction(session, 'createRole'),
-  );
-  const canUpdateRole = Boolean(
-    session && canPerformBackofficeAction(session, 'updateRole'),
-  );
+  const canViewUsers = Boolean(session && canPerformBackofficeAction(session, 'viewUsers'));
+  const canInviteUsers = Boolean(session && canPerformBackofficeAction(session, 'inviteUsers'));
+  const canCreateRole = Boolean(session && canPerformBackofficeAction(session, 'createRole'));
+  const canUpdateRole = Boolean(session && canPerformBackofficeAction(session, 'updateRole'));
   const canManagePermissions = Boolean(
     session && canPerformBackofficeAction(session, 'manageRolePermissions'),
   );
-  const canManageUsers = Boolean(
-    session && canPerformBackofficeAction(session, 'manageUserRoles'),
+  const canManageUsers = Boolean(session && canPerformBackofficeAction(session, 'manageUserRoles'));
+  const canUpdateUsers = Boolean(session && canPerformBackofficeAction(session, 'updateUsers'));
+  const isOwner = Boolean(session?.identity.roles.some((role) => role.systemKey === 'OWNER'));
+  const canUpdateUserIdentity = isOwner && canUpdateUsers;
+  const canViewSecurityActivity = Boolean(
+    session && canPerformBackofficeAction(session, 'viewSecurityActivity'),
   );
   const canViewLocations = Boolean(
     session && canPerformBackofficeAction(session, 'viewOperationalAccess'),
@@ -88,9 +91,10 @@ export function AccessControlPage() {
   const [editingRole, setEditingRole] = useState<AccessRole | null | undefined>();
   const [deactivatingRole, setDeactivatingRole] = useState<AccessRole | null>(null);
   const [editingUser, setEditingUser] = useState<AccessUser | null>(null);
+  const [verifyingUser, setVerifyingUser] = useState<AccessUser | null>(null);
+  const [resettingUser, setResettingUser] = useState<AccessUser | null>(null);
   const [inviting, setInviting] = useState(false);
-  const [revokingInvitation, setRevokingInvitation] =
-    useState<UserInvitation | null>(null);
+  const [revokingInvitation, setRevokingInvitation] = useState<UserInvitation | null>(null);
 
   const roles = useQuery({
     queryKey: keys.roles,
@@ -118,6 +122,33 @@ export function AccessControlPage() {
   const invalidate = (key: readonly string[]) =>
     void queryClient.invalidateQueries({ queryKey: key });
 
+  const sendEmailVerification = async () => {
+    if (!verifyingUser) return;
+    try {
+      await api.requestUserEmailVerification(verifyingUser);
+      setVerifyingUser(null);
+      showToast({ variant: 'success', title: copy('Verification link sent.') });
+    } catch (error) {
+      const failure = normalizeBackofficeApiError(
+        error,
+        copy('Could not send the verification link.'),
+      );
+      showToast({ variant: 'danger', title: failure.safeMessage });
+    }
+  };
+
+  const sendPasswordLink = async () => {
+    if (!resettingUser) return;
+    try {
+      await api.requestUserPasswordLink(resettingUser);
+      setResettingUser(null);
+      showToast({ variant: 'success', title: copy('Password link sent.') });
+    } catch (error) {
+      const failure = normalizeBackofficeApiError(error, copy('Could not send the password link.'));
+      showToast({ variant: 'danger', title: failure.safeMessage });
+    }
+  };
+
   const actions =
     section === 'roles' && canCreateRole ? (
       <DButton leftIcon={<Plus className="size-4" />} onClick={() => setEditingRole(null)}>
@@ -134,33 +165,25 @@ export function AccessControlPage() {
       <BackofficePageHeader
         eyebrow={copy('Configuration')}
         title={copy('Access Control')}
-        description={copy(
-          'Manage business users, roles, invitations, permissions, and operational location access.',
-        )}
+        description={accessCopy.pageDescription[locale]}
         actions={actions}
       />
 
-      <div className="mt-7 flex gap-1 border-b border-[var(--color-border)]">
-        <SectionButton active={section === 'roles'} onClick={() => setSection('roles')}>
-          {copy('Roles')}
-        </SectionButton>
-        {canViewUsers ? (
-          <SectionButton active={section === 'users'} onClick={() => setSection('users')}>
-            {copy('Users')}
-          </SectionButton>
-        ) : null}
-        {canViewUsers ? (
-          <SectionButton
-            active={section === 'invitations'}
-            onClick={() => setSection('invitations')}
-          >
-            {copy('Invitations')}
-          </SectionButton>
-        ) : null}
-      </div>
+      <DTabs
+        defaultValue="roles"
+        value={section}
+        onValueChange={(value) => setSection(value as Section)}
+        className="mt-6"
+      >
+        <DTabsList className="max-w-full overflow-x-auto">
+          <DTabsTrigger value="roles">{copy('Roles')}</DTabsTrigger>
+          {canViewUsers ? <DTabsTrigger value="users">{copy('Users')}</DTabsTrigger> : null}
+          {canViewUsers ? (
+            <DTabsTrigger value="invitations">{copy('Invitations')}</DTabsTrigger>
+          ) : null}
+        </DTabsList>
 
-      <div className="mt-5">
-        {section === 'roles' ? (
+        <DTabsContent value="roles" className="mt-4">
           <RolesTable
             roles={roles.data?.items ?? []}
             loading={roles.isLoading}
@@ -169,32 +192,40 @@ export function AccessControlPage() {
             onEdit={setEditingRole}
             onDeactivate={setDeactivatingRole}
           />
+        </DTabsContent>
+        {canViewUsers ? (
+          <DTabsContent value="users" className="mt-4">
+            <UsersTable
+              users={users.data?.items ?? []}
+              loading={users.isLoading}
+              canEdit={canManageUsers || canManageLocations || canUpdateUsers}
+              canManageSecurity={canUpdateUsers}
+              canManageOwnerSecurity={isOwner}
+              onEdit={setEditingUser}
+              onRequestVerification={setVerifyingUser}
+              onRequestPasswordLink={setResettingUser}
+            />
+          </DTabsContent>
         ) : null}
-        {section === 'users' && canViewUsers ? (
-          <UsersTable
-            users={users.data?.items ?? []}
-            loading={users.isLoading}
-            canEdit={canManageUsers || canManageLocations}
-            onEdit={setEditingUser}
-          />
+        {canViewUsers ? (
+          <DTabsContent value="invitations" className="mt-4">
+            <InvitationsTable
+              invitations={invitations.data?.items ?? []}
+              loading={invitations.isLoading}
+              canManage={canInviteUsers}
+              api={api}
+              onChanged={() => invalidate(keys.invitations)}
+              onRevoke={setRevokingInvitation}
+            />
+          </DTabsContent>
         ) : null}
-        {section === 'invitations' && canViewUsers ? (
-          <InvitationsTable
-            invitations={invitations.data?.items ?? []}
-            loading={invitations.isLoading}
-            canManage={canInviteUsers}
-            api={api}
-            onChanged={() => invalidate(keys.invitations)}
-            onRevoke={setRevokingInvitation}
-          />
-        ) : null}
-      </div>
+      </DTabs>
 
       {editingRole !== undefined ? (
-        <RoleEditor
+        <RoleEditorDialog
           key={editingRole?.id ?? 'new'}
           role={editingRole}
-          permissions={permissions.data?.items.map((item) => item.key) ?? []}
+          permissions={permissions.data?.items ?? []}
           api={api}
           canUpdate={canUpdateRole}
           canManagePermissions={canManagePermissions}
@@ -203,15 +234,19 @@ export function AccessControlPage() {
         />
       ) : null}
       {editingUser ? (
-        <UserEditor
+        <UserEditorDialog
           key={editingUser.id}
           user={editingUser}
           roles={roles.data?.items ?? []}
           api={api}
           operationalAccess={operationalAccess}
           canManageRoles={canManageUsers}
+          canUpdateProfile={canUpdateUsers}
+          canUpdateIdentity={canUpdateUserIdentity}
           canViewLocations={canViewLocations || canManageLocations}
           canManageLocations={canManageLocations}
+          canViewSecurityActivity={canViewSecurityActivity}
+          currentUserId={session.identity.userId}
           onClose={() => setEditingUser(null)}
           onChanged={() => invalidate(keys.users)}
         />
@@ -230,12 +265,10 @@ export function AccessControlPage() {
         onClose={() => setDeactivatingRole(null)}
         onConfirm={() => {
           if (!deactivatingRole) return;
-          void api
-            .deactivateRole(deactivatingRole)
-            .then(() => {
-              invalidate(keys.roles);
-              setDeactivatingRole(null);
-            });
+          void api.deactivateRole(deactivatingRole).then(() => {
+            invalidate(keys.roles);
+            setDeactivatingRole(null);
+          });
         }}
         title={copy('Deactivate role?')}
         message={copy("Users will no longer receive this role's permissions.")}
@@ -243,16 +276,36 @@ export function AccessControlPage() {
         variant="danger"
       />
       <DConfirmDialog
+        open={Boolean(verifyingUser)}
+        onClose={() => setVerifyingUser(null)}
+        onConfirm={() => void sendEmailVerification()}
+        title={copy('Send verification link?')}
+        message={copy(
+          'A one-time link is sent to this user email. Only the email owner can verify it.',
+        )}
+        confirmLabel={copy('Send verification link')}
+        variant="primary"
+      />
+      <DConfirmDialog
+        open={Boolean(resettingUser)}
+        onClose={() => setResettingUser(null)}
+        onConfirm={() => void sendPasswordLink()}
+        title={copy('Send password link?')}
+        message={copy(
+          'A one-time link is sent to the verified email of this user. It replaces any link that is still pending.',
+        )}
+        confirmLabel={copy('Send password link')}
+        variant="primary"
+      />
+      <DConfirmDialog
         open={Boolean(revokingInvitation)}
         onClose={() => setRevokingInvitation(null)}
         onConfirm={() => {
           if (!revokingInvitation) return;
-          void api
-            .revokeInvitation(revokingInvitation.id)
-            .then(() => {
-              invalidate(keys.invitations);
-              setRevokingInvitation(null);
-            });
+          void api.revokeInvitation(revokingInvitation.id).then(() => {
+            invalidate(keys.invitations);
+            setRevokingInvitation(null);
+          });
         }}
         title={copy('Revoke invitation?')}
         message={copy('The pending invitation can no longer be used to activate an account.')}
@@ -260,30 +313,6 @@ export function AccessControlPage() {
         variant="danger"
       />
     </BackofficePage>
-  );
-}
-
-function SectionButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
-        active
-          ? 'border-[var(--color-brand)] text-[var(--color-text)]'
-          : 'border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
-      }`}
-    >
-      {children}
-    </button>
   );
 }
 
@@ -309,8 +338,18 @@ function RolesTable({
       label: copy('Role'),
       render: (role) => (
         <div>
-          <p className="font-medium">{role.name}</p>
-          <p className="text-xs text-[var(--color-text-muted)]">{role.code}</p>
+          {canEdit ? (
+            <button
+              type="button"
+              onClick={() => onEdit(role)}
+              className="rounded-sm text-left font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-focus)/25"
+            >
+              {role.name}
+            </button>
+          ) : (
+            <p className="font-medium">{role.name}</p>
+          )}
+          <p className="text-xs text-(--color-text-muted)">{role.code}</p>
         </div>
       ),
     },
@@ -318,7 +357,7 @@ function RolesTable({
       key: 'status',
       label: copy('Status'),
       render: (role) => (
-        <DBadge variant={role.status === 'ACTIVE' ? 'outline' : 'secondary'}>
+        <DBadge variant={role.status === 'ACTIVE' ? 'success' : 'secondary'}>
           {copy(role.status === 'ACTIVE' ? 'Active' : 'Inactive')}
         </DBadge>
       ),
@@ -359,12 +398,20 @@ function UsersTable({
   users,
   loading,
   canEdit,
+  canManageSecurity,
+  canManageOwnerSecurity,
   onEdit,
+  onRequestVerification,
+  onRequestPasswordLink,
 }: {
   users: AccessUser[];
   loading: boolean;
   canEdit: boolean;
+  canManageSecurity: boolean;
+  canManageOwnerSecurity: boolean;
   onEdit: (user: AccessUser) => void;
+  onRequestVerification: (user: AccessUser) => void;
+  onRequestPasswordLink: (user: AccessUser) => void;
 }) {
   const { copy } = useBackofficeLocalization();
   const columns: TableColumn<AccessUser>[] = [
@@ -373,22 +420,44 @@ function UsersTable({
       label: copy('User'),
       render: (user) => (
         <div>
-          <p className="font-medium">{user.displayName}</p>
-          <p className="text-xs text-[var(--color-text-muted)]">
-            {user.username ?? '—'}
-          </p>
+          {canEdit ? (
+            <button
+              type="button"
+              onClick={() => onEdit(user)}
+              className="rounded-sm text-left font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-focus)/25"
+            >
+              {user.displayName}
+            </button>
+          ) : (
+            <p className="font-medium">{user.displayName}</p>
+          )}
+          <p className="text-xs text-(--color-text-muted)">{user.username ?? '-'}</p>
         </div>
       ),
     },
     {
       key: 'roles',
       label: copy('Roles'),
-      render: (user) => user.roles.map((role) => role.name).join(', ') || '—',
+      render: (user) => user.roles.map((role) => role.name).join(', ') || '-',
+    },
+    {
+      key: 'email',
+      label: copy('Email'),
+      render: (user) => (
+        <div className="min-w-0 space-y-1">
+          {user.email ? <p className="wrap-break-word text-sm">{user.email}</p> : null}
+          <EmailStatusBadge status={emailStatusOf(user)} />
+        </div>
+      ),
     },
     {
       key: 'status',
       label: copy('Status'),
-      render: (user) => <DBadge variant="outline">{copy(user.status)}</DBadge>,
+      render: (user) => (
+        <DBadge variant={user.status === 'ACTIVE' ? 'success' : 'secondary'}>
+          {copy(user.status === 'ACTIVE' ? 'Active' : 'Inactive')}
+        </DBadge>
+      ),
     },
   ];
   return (
@@ -400,10 +469,31 @@ function UsersTable({
       emptyMessage={copy('No users have been created yet.')}
       actions={[
         {
-          label: copy('Manage roles'),
+          label: copy('Manage user'),
           icon: <Pencil className="size-4" />,
           onClick: onEdit,
           show: () => canEdit,
+        },
+        {
+          label: copy('Send verification link'),
+          icon: <Mail className="size-4" />,
+          onClick: onRequestVerification,
+          show: (user) =>
+            canManageSecurity &&
+            (canManageOwnerSecurity || !user.roles.some((role) => role.systemKey === 'OWNER')) &&
+            user.status === 'ACTIVE' &&
+            Boolean(user.email) &&
+            !user.emailVerifiedAt,
+        },
+        {
+          label: copy('Send password link'),
+          icon: <KeyRound className="size-4" />,
+          onClick: onRequestPasswordLink,
+          show: (user) =>
+            canManageSecurity &&
+            (canManageOwnerSecurity || !user.roles.some((role) => role.systemKey === 'OWNER')) &&
+            user.status === 'ACTIVE' &&
+            Boolean(user.emailVerifiedAt),
         },
       ]}
     />
@@ -425,7 +515,7 @@ function InvitationsTable({
   onChanged: () => void;
   onRevoke: (invitation: UserInvitation) => void;
 }) {
-  const { copy } = useBackofficeLocalization();
+  const { copy, formatDate } = useBackofficeLocalization();
   const { showToast } = useToast();
   const columns: TableColumn<UserInvitation>[] = [
     {
@@ -434,37 +524,78 @@ function InvitationsTable({
       render: (invitation) => (
         <div>
           <p className="font-medium">{invitation.displayName}</p>
-          <p className="text-xs text-[var(--color-text-muted)]">
-            {invitation.phoneE164}
-          </p>
+          <p className="text-xs text-(--color-text-muted)">{invitation.phoneE164}</p>
+          {invitation.email ? (
+            <p className="wrap-break-word text-xs text-(--color-text-muted)">{invitation.email}</p>
+          ) : null}
+          <p className="text-xs text-(--color-text-muted)">{copy('Sent via email')}</p>
         </div>
       ),
     },
     {
       key: 'roles',
       label: copy('Roles'),
-      render: (invitation) =>
-        invitation.roles.map((role) => role.name).join(', ') || '—',
+      render: (invitation) => invitation.roles.map((role) => role.name).join(', ') || '-',
     },
     {
       key: 'expiresAt',
-      label: copy('Expires'),
-      render: (invitation) => new Date(invitation.expiresAt).toLocaleString(),
+      label: copy('Date'),
+      render: (invitation) => {
+        const status = invitationStatusOf(invitation);
+        const when =
+          status === 'ACCEPTED'
+            ? invitation.acceptedAt
+            : status === 'REVOKED'
+              ? invitation.revokedAt
+              : invitation.expiresAt;
+        const label =
+          status === 'ACCEPTED'
+            ? 'Accepted on'
+            : status === 'REVOKED'
+              ? 'Revoked on'
+              : status === 'EXPIRED'
+                ? 'Expired on'
+                : 'Valid until';
+        return (
+          <span className="text-sm">
+            <span className="text-(--color-text-muted)">{copy(label)} </span>
+            {formatDate(new Date(when ?? invitation.expiresAt), {
+              dateStyle: 'medium',
+              timeStyle: 'short',
+            })}
+          </span>
+        );
+      },
     },
     {
       key: 'acceptedAt',
       label: copy('Status'),
-      render: (invitation) => (
-        <DBadge variant={invitation.acceptedAt ? 'outline' : 'secondary'}>
-          {copy(
-            invitation.acceptedAt
-              ? 'Accepted'
-              : invitation.revokedAt
-                ? 'Revoked'
-                : 'Pending',
-          )}
-        </DBadge>
-      ),
+      render: (invitation) => {
+        const status = invitationStatusOf(invitation);
+        return (
+          <DBadge
+            variant={
+              status === 'ACCEPTED'
+                ? 'success'
+                : status === 'REVOKED'
+                  ? 'secondary'
+                  : status === 'EXPIRED'
+                    ? 'danger'
+                    : 'warning'
+            }
+          >
+            {copy(
+              status === 'ACCEPTED'
+                ? 'Accepted'
+                : status === 'REVOKED'
+                  ? 'Revoked'
+                  : status === 'EXPIRED'
+                    ? 'Expired'
+                    : 'Pending',
+            )}
+          </DBadge>
+        );
+      },
     },
   ];
 
@@ -477,7 +608,8 @@ function InvitationsTable({
       if (!isSessionExpiredError(error))
         showToast({
           variant: 'danger',
-          title: normalizeBackofficeApiError(error, copy('Could not resend invitation.')).safeMessage,
+          title: normalizeBackofficeApiError(error, copy('Could not resend invitation.'))
+            .safeMessage,
         });
     }
   };
@@ -505,337 +637,9 @@ function InvitationsTable({
           icon: <Ban className="size-4" />,
           variant: 'danger',
           onClick: onRevoke,
-          show: (invitation) =>
-            canManage && !invitation.acceptedAt && !invitation.revokedAt,
+          show: (invitation) => canManage && !invitation.acceptedAt && !invitation.revokedAt,
         },
       ]}
     />
-  );
-}
-
-function RoleEditor({
-  role,
-  permissions,
-  api,
-  canUpdate,
-  canManagePermissions,
-  onClose,
-  onChanged,
-}: {
-  role: AccessRole | null | undefined;
-  permissions: string[];
-  api: AccessControlApi;
-  canUpdate: boolean;
-  canManagePermissions: boolean;
-  onClose: () => void;
-  onChanged: () => void;
-}) {
-  const { copy } = useBackofficeLocalization();
-  const { showToast } = useToast();
-  const isNew = role === null;
-  const [code, setCode] = useState('');
-  const [name, setName] = useState(role?.name ?? '');
-  const [selected, setSelected] = useState<string[]>(role?.permissions ?? []);
-
-  const save = async () => {
-    if (!name.trim() || (isNew && !code.trim())) return;
-    try {
-      if (isNew) {
-        await api.createRole({
-          code: code.trim().toUpperCase(),
-          name: name.trim(),
-          permissions: selected,
-        });
-      } else if (role && !role.systemKey) {
-        let current = role;
-        if (canUpdate && name.trim() !== role.name)
-          current = await api.updateRole(role, name.trim());
-        if (canManagePermissions)
-          await api.replacePermissions(current, selected);
-      }
-      onChanged();
-      onClose();
-      showToast({ variant: 'success', title: copy('Role updated.') });
-    } catch (error) {
-      if (!isSessionExpiredError(error))
-        showToast({
-          variant: 'danger',
-          title: normalizeBackofficeApiError(error, copy('Could not save role.')).safeMessage,
-        });
-    }
-  };
-
-  return (
-    <DDialog
-      open={role !== undefined}
-      onClose={onClose}
-      title={copy(isNew ? 'Create role' : 'Manage role')}
-      size="lg"
-      footer={
-        !role?.systemKey && (isNew || canUpdate || canManagePermissions) ? (
-          <div className="flex justify-end gap-2">
-            <DButton variant="secondary" onClick={onClose}>{copy('Cancel')}</DButton>
-            <DButton onClick={() => void save()} disabled={!name.trim() || (isNew && !code.trim())}>
-              {copy('Save role')}
-            </DButton>
-          </div>
-        ) : null
-      }
-    >
-      <div className="space-y-5">
-        {!role?.systemKey ? (
-          <div className="grid gap-4 sm:grid-cols-2">
-            {isNew ? (
-              <DInput label={copy('Role code')} value={code} onChange={(value) => setCode(value.toUpperCase())} />
-            ) : null}
-            <DInput label={copy('Role name')} value={name} onChange={setName} disabled={!isNew && !canUpdate} />
-          </div>
-        ) : (
-          <p className="text-sm text-[var(--color-text-muted)]">
-            {copy('System roles are protected by the Business Runtime authorization policy.')}
-          </p>
-        )}
-        <div>
-          <p className="text-sm font-semibold">{copy('Permissions')}</p>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            {permissions.map((permission) => (
-              <label key={permission} className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm">
-                <DCheckbox
-                  checked={selected.includes(permission)}
-                  onChange={() => setSelected((values) => values.includes(permission) ? values.filter((item) => item !== permission) : [...values, permission])}
-                  disabled={Boolean(role?.systemKey) || (!isNew && !canManagePermissions)}
-                />
-                {permission}
-              </label>
-            ))}
-          </div>
-        </div>
-      </div>
-    </DDialog>
-  );
-}
-
-function UserEditor({
-  user,
-  roles,
-  api,
-  operationalAccess,
-  canManageRoles,
-  canViewLocations,
-  canManageLocations,
-  onClose,
-  onChanged,
-}: {
-  user: AccessUser | null;
-  roles: AccessRole[];
-  api: AccessControlApi;
-  operationalAccess: OperationalAccessApi;
-  canManageRoles: boolean;
-  canViewLocations: boolean;
-  canManageLocations: boolean;
-  onClose: () => void;
-  onChanged: () => void;
-}) {
-  const { copy } = useBackofficeLocalization();
-  const { showToast } = useToast();
-  const [selectedRoles, setSelectedRoles] = useState<string[]>(() =>
-    user?.roles.map((role) => role.id) ?? [],
-  );
-  const [selectedLocations, setSelectedLocations] = useState<string[] | null>(null);
-
-  const locationAccess = useQuery({
-    queryKey: ['access-control', 'locations', user?.id],
-    queryFn: async () => ({
-      available: await operationalAccess.context(),
-      assigned: await operationalAccess.listUserLocations(user!.id),
-    }),
-    enabled: Boolean(user && canViewLocations),
-  });
-
-  const assignedLocationIds = locationAccess.data?.assigned.map((item) => item.id) ?? [];
-  const effectiveSelectedLocations = selectedLocations ?? assignedLocationIds;
-
-  const save = async () => {
-    if (!user) return;
-    try {
-      if (canManageRoles)
-        await api.replaceUserRoles(user, selectedRoles);
-      if (canManageLocations)
-        await operationalAccess.replaceUserLocations(user.id, effectiveSelectedLocations);
-      onChanged();
-      onClose();
-      showToast({ variant: 'success', title: copy('User access updated.') });
-    } catch (error) {
-      if (!isSessionExpiredError(error))
-        showToast({
-          variant: 'danger',
-          title: normalizeBackofficeApiError(error, copy('Could not update user access.')).safeMessage,
-        });
-    }
-  };
-
-  const locations: OperationalLocation[] = locationAccess.data?.available.locations ?? [];
-  const isOwner = Boolean(user?.roles.some((role) => role.systemKey === 'OWNER'));
-
-  return (
-    <DDialog
-      open={Boolean(user)}
-      onClose={onClose}
-      title={`${copy('User access')}: ${user?.displayName ?? ''}`}
-      size="lg"
-      footer={
-        !isOwner && (canManageRoles || canManageLocations) ? (
-          <div className="flex justify-end gap-2">
-            <DButton variant="secondary" onClick={onClose}>{copy('Cancel')}</DButton>
-            <DButton onClick={() => void save()}>{copy('Save access')}</DButton>
-          </div>
-        ) : null
-      }
-    >
-      {isOwner ? (
-        <p className="text-sm text-[var(--color-text-muted)]">
-          {copy('Owner access is protected and cannot be narrowed here.')}
-        </p>
-      ) : (
-        <div className="space-y-6">
-          <SelectionList
-            title={copy('Roles')}
-            items={roles.filter((role) => role.status === 'ACTIVE').map((role) => ({ id: role.id, label: role.name }))}
-            selected={selectedRoles}
-            disabled={!canManageRoles}
-            onToggle={(id) => setSelectedRoles((values) => values.includes(id) ? values.filter((item) => item !== id) : [...values, id])}
-          />
-          {canViewLocations ? (
-            <SelectionList
-              title={copy('Location Access')}
-              items={locations.map((location) => ({ id: location.id, label: `${location.code} — ${location.name}` }))}
-              selected={effectiveSelectedLocations}
-              disabled={!canManageLocations}
-              onToggle={(id) =>
-                setSelectedLocations((values) => {
-                  const current = values ?? assignedLocationIds;
-                  return current.includes(id)
-                    ? current.filter((item) => item !== id)
-                    : [...current, id];
-                })
-              }
-            />
-          ) : null}
-        </div>
-      )}
-    </DDialog>
-  );
-}
-
-function InvitationDialog({
-  roles,
-  api,
-  onClose,
-  onChanged,
-}: {
-  roles: AccessRole[];
-  api: AccessControlApi;
-  onClose: () => void;
-  onChanged: () => void;
-}) {
-  const { copy } = useBackofficeLocalization();
-  const { showToast } = useToast();
-  const [phone, setPhone] = useState('');
-  const [username, setUsername] = useState('');
-  const [displayName, setDisplayName] = useState('');
-  const [roleIds, setRoleIds] = useState<string[]>([]);
-  const [saving, setSaving] = useState(false);
-
-  const valid = /^\+[1-9]\d{7,14}$/.test(phone.trim()) && Boolean(displayName.trim());
-  const save = async () => {
-    if (!valid || saving) return;
-    setSaving(true);
-    try {
-      await api.createInvitation({
-        phoneE164: phone.trim(),
-        ...(username.trim() ? { username: username.trim() } : {}),
-        displayName: displayName.trim(),
-        roleIds,
-      });
-      onChanged();
-      onClose();
-      showToast({ variant: 'success', title: copy('Invitation created.') });
-    } catch (error) {
-      if (!isSessionExpiredError(error))
-        showToast({
-          variant: 'danger',
-          title: normalizeBackofficeApiError(error, copy('Could not create invitation.')).safeMessage,
-        });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <DDialog
-      open
-      onClose={onClose}
-      title={copy('Invite user')}
-      description={copy('Use the existing Runtime invitation contract. The user activates the account through the invitation flow.')}
-      size="lg"
-      footer={
-        <div className="flex justify-end gap-2">
-          <DButton variant="secondary" onClick={onClose}>{copy('Cancel')}</DButton>
-          <DButton onClick={() => void save()} disabled={!valid || saving}>{copy('Send invitation')}</DButton>
-        </div>
-      }
-    >
-      <div className="grid gap-4 sm:grid-cols-2">
-        <DInput label={copy('Phone (E.164)')} value={phone} onChange={setPhone} placeholder="+628111111111" />
-        <DInput label={copy('Username (optional)')} value={username} onChange={setUsername} />
-        <DInput label={copy('Display name')} value={displayName} onChange={setDisplayName} />
-      </div>
-      <div className="mt-5">
-        <p className="text-sm font-semibold">{copy('Roles')}</p>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          {roles.map((role) => (
-            <label key={role.id} className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm">
-              <DCheckbox
-                checked={roleIds.includes(role.id)}
-                onChange={() => setRoleIds((values) => values.includes(role.id) ? values.filter((item) => item !== role.id) : [...values, role.id])}
-              />
-              {role.name}
-            </label>
-          ))}
-        </div>
-      </div>
-    </DDialog>
-  );
-}
-
-function SelectionList({
-  title,
-  items,
-  selected,
-  disabled,
-  onToggle,
-}: {
-  title: string;
-  items: Array<{ id: string; label: string }>;
-  selected: string[];
-  disabled: boolean;
-  onToggle: (id: string) => void;
-}) {
-  return (
-    <div>
-      <p className="text-sm font-semibold">{title}</p>
-      <div className="mt-3 grid gap-2 sm:grid-cols-2">
-        {items.map((item) => (
-          <label key={item.id} className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm">
-            <DCheckbox
-              checked={selected.includes(item.id)}
-              onChange={() => onToggle(item.id)}
-              disabled={disabled}
-            />
-            {item.label}
-          </label>
-        ))}
-      </div>
-    </div>
   );
 }

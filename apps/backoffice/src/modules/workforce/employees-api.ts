@@ -1,5 +1,7 @@
 import type { ApiClient } from '@digvation/business-api';
 
+import { buildQueryString } from '../../shared/api/build-query-string';
+
 export type RecordStatus = 'ACTIVE' | 'INACTIVE';
 export type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'LEAVE' | 'SICK';
 
@@ -20,6 +22,13 @@ export interface Employee {
   displayName: string;
   positionId: string | null;
   position: EmployeePosition | null;
+  /** Employee-level opt-in to be a Service performer. Position rules still apply. */
+  servicePerformerEligible: boolean;
+  canPerformServices: boolean;
+  /** Employee-level opt-in for Product sales attribution. Independent from Service eligibility. */
+  productSalesEligible: boolean;
+  /** Effective Runtime fact: ACTIVE and productSalesEligible. */
+  canSellProducts: boolean;
   joinedOn: string | null;
   status: RecordStatus;
   version: number;
@@ -49,6 +58,7 @@ export interface EmployeeStatusHistoryEntry {
   transitionedAt: string;
   actorId: string;
   actorKind: string;
+  actor: { id: string; kind: string; displayName: string | null } | null;
 }
 
 export interface EmployeeDetail extends Employee {
@@ -109,12 +119,16 @@ export interface CreateEmployeeInput {
   code?: string;
   displayName: string;
   positionId?: string | null;
+  servicePerformerEligible?: boolean;
+  productSalesEligible?: boolean;
   joinedOn?: string | null;
 }
 
 export interface UpdateEmployeeInput {
   displayName?: string;
   positionId?: string | null;
+  servicePerformerEligible?: boolean;
+  productSalesEligible?: boolean;
   status?: Employee['status'];
   joinedOn?: string | null;
   statusReason?: string | null;
@@ -139,21 +153,11 @@ export interface UpsertAttendanceInput {
   note?: string | null;
 }
 
-function queryString(query: Record<string, string | number | undefined>) {
-  const params = new URLSearchParams();
-  Object.entries(query).forEach(([key, value]) => {
-    if (value !== undefined && value !== '') params.set(key, String(value));
-  });
-  return params.toString();
-}
-
 export class EmployeesApi {
   public constructor(private readonly client: ApiClient) {}
 
   list(query: EmployeeQuery) {
-    return this.client.get<EmployeePage>(
-      `/api/v1/employees?${queryString(query as unknown as Record<string, string | number | undefined>)}`,
-    );
+    return this.client.get<EmployeePage>(`/api/v1/employees?${buildQueryString(query)}`);
   }
 
   get(id: string) {
@@ -173,7 +177,7 @@ export class EmployeesApi {
 
   listPositions(query: EmployeePositionQuery) {
     return this.client.get<EmployeePositionPage>(
-      `/api/v1/employees/positions?${queryString(query as unknown as Record<string, string | number | undefined>)}`,
+      `/api/v1/employees/positions?${buildQueryString(query)}`,
     );
   }
 
@@ -190,7 +194,7 @@ export class EmployeesApi {
 
   listAttendance(query: AttendanceQuery) {
     return this.client.get<EmployeeAttendancePage>(
-      `/api/v1/employees/attendance?${queryString(query as unknown as Record<string, string | number | undefined>)}`,
+      `/api/v1/employees/attendance?${buildQueryString(query)}`,
     );
   }
 

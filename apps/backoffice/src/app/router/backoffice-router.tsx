@@ -1,26 +1,77 @@
-import { createBrowserRouter } from 'react-router';
+import { SystemStatePage } from '@digvation/business-system-states';
+import { DButton } from '@digvation/ui';
+import { createBrowserRouter, useNavigate } from 'react-router';
 
 import { AuthenticatedRoute } from '../../auth/authenticated-route';
+import {
+  ACCOUNT_ACTIVATION_PATH,
+  BackofficeAccountActivationPage,
+} from '../../auth/backoffice-account-activation-page';
 import { AuthorizedRoute } from '../../auth/authorized-route';
-import { BackofficeLoginPage } from '../../auth/backoffice-login-page';
+import { BackofficeLoginPage, PASSWORD_RECOVERY_PATH } from '../../auth/backoffice-login-page';
+import {
+  BackofficeEmailVerificationPage,
+  EMAIL_VERIFICATION_PATH,
+} from '../../auth/backoffice-email-verification-page';
+import { BackofficePasswordRecoveryPage } from '../../auth/backoffice-password-recovery-page';
+import {
+  BackofficePasswordResetPage,
+  PASSWORD_RESET_PATH,
+} from '../../auth/backoffice-password-reset-page';
 import { UnauthorizedPage } from '../../routes/authorization/unauthorized-page';
 import { DashboardPage } from '../../modules/dashboard/dashboard-page';
 import { BackofficeShell } from '../shell/backoffice-shell';
 import { AccessControlPage } from '../../modules/identity';
 import { BusinessSettingsPage } from '../../modules/organization';
-import { CatalogPage } from '../../modules/catalog';
-import { TaxPage } from '../../modules/tax';
+import { CatalogPage } from '../../features/catalog';
+import { CustomersPage } from '../../features/customers';
+import { PromotionsPage } from '../../modules/promotions';
 import { EmployeesPage } from '../../modules/workforce';
-import { ExpensesPage, FinancialAccountsPage } from '../../modules/finance';
-import { TransactionHistoryPage } from '../../modules/pos';
-import { ReportsPage } from '../../modules/reporting';
+import { MembersPage } from '../../modules/membership';
+import { FinancialAccountsPage } from '../../features/financial-accounts';
+import { ExpensesPage } from '../../features/expenses';
+import { TransactionHistoryPage } from '../../features/transaction-history';
+import { ReportsPage } from '../../features/reporting';
 import { ActivityPage } from '../../modules/activity';
 import { NotificationsPage } from '../../modules/notifications';
 
+function BackofficeNotFoundRoute() {
+  const navigate = useNavigate();
+  return (
+    <SystemStatePage
+      state="not-found"
+      variant="content"
+      action={
+        <DButton variant="secondary" size="sm" onClick={() => navigate('/')}>
+          Kembali ke dashboard
+        </DButton>
+      }
+    />
+  );
+}
+
+function BackofficeApplicationErrorRoute() {
+  return (
+    <SystemStatePage
+      state="application-error"
+      action={
+        <DButton variant="secondary" size="sm" onClick={() => window.location.reload()}>
+          Coba lagi
+        </DButton>
+      }
+    />
+  );
+}
+
 export const backofficeRouter = createBrowserRouter([
   { path: '/login', element: <BackofficeLoginPage /> },
+  { path: PASSWORD_RECOVERY_PATH, element: <BackofficePasswordRecoveryPage /> },
+  { path: PASSWORD_RESET_PATH, element: <BackofficePasswordResetPage /> },
+  { path: EMAIL_VERIFICATION_PATH, element: <BackofficeEmailVerificationPage /> },
+  { path: ACCOUNT_ACTIVATION_PATH, element: <BackofficeAccountActivationPage /> },
   {
     element: <AuthenticatedRoute />,
+    errorElement: <BackofficeApplicationErrorRoute />,
     children: [
       {
         element: <BackofficeShell />,
@@ -34,8 +85,20 @@ export const backofficeRouter = createBrowserRouter([
             children: [{ path: '/catalog', element: <CatalogPage /> }],
           },
           {
+            element: <AuthorizedRoute capability="promotions" />,
+            children: [{ path: '/promotions', element: <PromotionsPage /> }],
+          },
+          {
             element: <AuthorizedRoute capability="employees" />,
             children: [{ path: '/employees', element: <EmployeesPage /> }],
+          },
+          {
+            element: <AuthorizedRoute capability="memberships" />,
+            children: [{ path: '/memberships', element: <MembersPage /> }],
+          },
+          {
+            element: <AuthorizedRoute capability="customers" />,
+            children: [{ path: '/customers', element: <CustomersPage /> }],
           },
           {
             element: <AuthorizedRoute capability="financialAccounts" />,
@@ -63,10 +126,6 @@ export const backofficeRouter = createBrowserRouter([
             children: [{ path: '/business', element: <BusinessSettingsPage /> }],
           },
           {
-            element: <AuthorizedRoute capability="tax" />,
-            children: [{ path: '/tax', element: <TaxPage /> }],
-          },
-          {
             element: <AuthorizedRoute capability="activity" />,
             children: [{ path: '/activity', element: <ActivityPage /> }],
           },
@@ -80,8 +139,5 @@ export const backofficeRouter = createBrowserRouter([
       },
     ],
   },
-  {
-    path: '*',
-    element: <BackofficeLoginPage />,
-  },
+  { path: '*', element: <BackofficeNotFoundRoute /> },
 ]);

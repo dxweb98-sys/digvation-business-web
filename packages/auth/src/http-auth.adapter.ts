@@ -7,58 +7,41 @@ import type {
 } from './auth.types';
 import { BrowserSessionClient } from './browser-session-client';
 
-interface AuthUser {
-  id: string;
-  displayName: string;
-  roles: Array<{ permissions: string[] }>;
-}
 interface ApiResponse<T> {
   success: boolean;
   data?: T;
-  error?: { code?: string };
+  error?: { code?: string; message?: string };
 }
 
 /** Browser adapter for authenticated Business Web experiences. */
 export class HttpAuthAdapter implements AuthPort {
   private readonly sessionClient: BrowserSessionClient;
+  private readonly sessionChannel: string;
 
   public constructor(
     private readonly apiBaseUrl: string,
-    private readonly workspace: string,
+    private readonly workspace: string | undefined,
     storageNamespace = 'business-web',
   ) {
+    this.sessionChannel = storageNamespace;
     this.sessionClient = new BrowserSessionClient(apiBaseUrl, storageNamespace);
   }
 
   public async me(): Promise<AuthSession | null> {
-    const accessToken = this.sessionClient.getAccessToken();
+    const accessToken = await this.sessionClient.restoreAccessToken();
     if (!accessToken) return null;
-    try {
-      return await this.currentUser(accessToken);
-    } catch (error) {
-      if (!isUnauthorized(error)) throw error;
-    }
-
-    const refreshed = await this.sessionClient.refreshAccessToken();
-    if (refreshed.kind !== 'refreshed') return null;
-    try {
-      return await this.currentUser(refreshed.accessToken);
-    } catch (error) {
-      if (isUnauthorized(error)) return null;
-      throw error;
-    }
+    return this.hydrateWithSingleRefresh(accessToken);
   }
 
   public async login(input: AuthLoginInput): Promise<AuthSession> {
-    const accessToken = await this.sessionClient.login(
-      this.workspace,
-      input.identifier,
-      input.password,
-    );
+    const workspace = input.workspace ?? this.workspace;
+    if (!workspace) throw new Error('AUTH_WORKSPACE_REQUIRED');
+
+    const accessToken = await this.sessionClient.login(workspace, input.identifier, input.password);
     try {
-      return await this.currentUser(accessToken);
+      return await this.currentSession(accessToken);
     } catch (error) {
-      this.sessionClient.clearClientSession();
+      await this.sessionClient.logout();
       throw error;
     }
   }
@@ -67,12 +50,18 @@ export class HttpAuthAdapter implements AuthPort {
     return this.sessionClient.logout();
   }
 
+  public async refreshSessionContext(): Promise<AuthSession | null> {
+    const accessToken = await this.sessionClient.getUsableAccessToken();
+    if (!accessToken) return null;
+    return this.hydrateWithSingleRefresh(accessToken);
+  }
+
   public async requestPasswordChange(): Promise<void> {
     throw new Error('PASSWORD_CHANGE_NOT_SUPPORTED');
   }
 
   public async getAccessToken(forceRefresh = false): Promise<string | null> {
-    if (!forceRefresh) return this.sessionClient.getAccessToken();
+    if (!forceRefresh) return this.sessionClient.getUsableAccessToken();
     const refreshed = await this.sessionClient.refreshAccessToken();
     if (refreshed.kind === 'refreshed') return refreshed.accessToken;
     if (refreshed.kind === 'deferred') return this.sessionClient.getAccessToken();
@@ -87,16 +76,28 @@ export class HttpAuthAdapter implements AuthPort {
     return this.sessionClient.subscribeSessionEnded(listener);
   }
 
-  private async currentUser(accessToken: string): Promise<AuthSession> {
-    const user = await this.request<AuthUser>('/api/v1/auth/me', { method: 'GET', accessToken });
-    return {
-      identity: {
-        userId: user.id,
-        displayName: user.displayName,
-        workspace: this.workspace,
-        permissions: [...new Set(['auth:self', ...user.roles.flatMap((role) => role.permissions)])],
-      },
-    };
+  private async hydrateWithSingleRefresh(accessToken: string): Promise<AuthSession | null> {
+    try {
+      return await this.currentSession(accessToken);
+    } catch (error) {
+      if (!isUnauthorized(error)) throw error;
+    }
+
+    const refreshed = await this.sessionClient.refreshAccessToken();
+    if (refreshed.kind !== 'refreshed') return null;
+    try {
+      return await this.currentSession(refreshed.accessToken);
+    } catch (error) {
+      if (isUnauthorized(error)) return null;
+      throw error;
+    }
+  }
+
+  private currentSession(accessToken: string): Promise<AuthSession> {
+    return this.request<AuthSession>('/api/v1/session/context', {
+      method: 'GET',
+      accessToken,
+    });
   }
 
   private async request<T>(
@@ -104,6 +105,7 @@ export class HttpAuthAdapter implements AuthPort {
     options: { method: 'GET'; accessToken: string },
   ): Promise<T> {
     const headers = new Headers();
+    headers.set('X-Digvation-Session-Channel', this.sessionChannel);
     headers.set('authorization', `Bearer ${options.accessToken}`);
     const response = await fetch(`${this.apiBaseUrl}${path}`, {
       method: options.method,
@@ -112,17 +114,22 @@ export class HttpAuthAdapter implements AuthPort {
     });
     const payload = (await response.json()) as ApiResponse<T>;
     if (!response.ok || !payload.success || payload.data === undefined)
-      throw new AuthenticationError(response.status, payload.error?.code ?? 'AUTH_REQUEST_FAILED');
+      throw new AuthenticationError(
+        response.status,
+        payload.error?.code ?? 'AUTH_REQUEST_FAILED',
+        payload.error?.message ?? 'Authentication request failed.',
+      );
     return payload.data;
   }
 }
 
-class AuthenticationError extends Error {
+export class AuthenticationError extends Error {
   public constructor(
     public readonly status: number,
     public readonly code: string,
+    message: string,
   ) {
-    super(code);
+    super(message);
   }
 }
 

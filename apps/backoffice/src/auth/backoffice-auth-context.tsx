@@ -8,150 +8,149 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import type { SessionEndReason } from '@digvation/business-auth';
+import type {
+  AuthLoginInput,
+  AuthPort,
+  LegacyCompatibleAuthSession,
+  SessionEndReason,
+} from '@digvation/business-auth';
+import { withLegacySessionAliases } from '@digvation/business-auth';
 import { useToast } from '@digvation/ui';
 import { ApiClient } from '@digvation/business-api';
 
-import { isBackofficeSessionExpired } from '../app/api/backoffice-api-error';
-import { useBackofficeLocalization } from '../app/localization/backoffice-localization';
-import type { BackofficeSession, LoginCredentials } from './auth-session';
-import type { HttpAuthAdapter } from './http-auth-adapter';
+import {
+  isBackofficeSessionExpired,
+  normalizeBackofficeApiError,
+} from '../app/api/backoffice-api-error';
+import { useBackofficeLocalization } from '../app/localization/backoffice-localization-base';
 
-type AuthenticationStatus = 'hydrating' | 'authenticated' | 'unauthenticated';
+type AuthenticationStatus = 'hydrating' | 'authenticated' | 'unauthenticated' | 'unavailable';
 
 interface BackofficeAuthContextValue {
   status: AuthenticationStatus;
-  session: BackofficeSession | null;
-  login(input: LoginCredentials): Promise<void>;
+  session: LegacyCompatibleAuthSession | null;
+  login(input: AuthLoginInput): Promise<void>;
   logout(): Promise<void>;
-  refresh(): Promise<void>;
+  refreshSessionContext(): Promise<void>;
   getAccessToken(): Promise<string | null>;
   createApiClient(baseUrl: string): ApiClient;
 }
 
 const BackofficeAuthContext = createContext<BackofficeAuthContextValue | null>(null);
-const BUSINESS_CONFIGURATION_CHANGED_EVENT =
-  'digvation:business-configuration-changed';
-const SESSION_END_TRANSITION_MS = 5_000;
-const IDLE_SESSION_ENDED_MESSAGE =
-  'Sesi Anda telah berakhir karena tidak ada aktivitas. Silakan masuk kembali.';
+const BUSINESS_CONFIGURATION_CHANGED_EVENT = 'digvation:business-configuration-changed';
 
 export function BackofficeAuthProvider({
   auth,
   children,
 }: {
-  auth: HttpAuthAdapter;
+  auth: AuthPort;
   children: ReactNode;
 }) {
   const [status, setStatus] = useState<AuthenticationStatus>('hydrating');
-  const [session, setSession] = useState<BackofficeSession | null>(null);
+  const [session, setSession] = useState<LegacyCompatibleAuthSession | null>(null);
   const { showToast } = useToast();
   const { t } = useBackofficeLocalization();
   const sessionExpired = useRef(false);
-  const sessionEndTimer = useRef<number | null>(null);
-
-  const clearSessionEndTimer = useCallback(() => {
-    if (sessionEndTimer.current === null) return;
-    window.clearTimeout(sessionEndTimer.current);
-    sessionEndTimer.current = null;
-  }, []);
 
   const expireSession = useCallback(
-    (reason: SessionEndReason) => {
+    (_reason: SessionEndReason) => {
       if (sessionExpired.current) return;
       sessionExpired.current = true;
-      clearSessionEndTimer();
       setSession(null);
-      setStatus('hydrating');
-      showToast({
-        variant: 'warning',
-        title: reason === 'idle' ? IDLE_SESSION_ENDED_MESSAGE : t('sessionExpired'),
-      });
+      setStatus('unauthenticated');
+      showToast({ variant: 'warning', title: t('sessionExpired') });
       void auth.logout();
-      sessionEndTimer.current = window.setTimeout(() => {
-        sessionEndTimer.current = null;
-        setStatus('unauthenticated');
-      }, SESSION_END_TRANSITION_MS);
     },
-    [auth, clearSessionEndTimer, showToast, t],
+    [auth, showToast, t],
   );
 
-  useEffect(() => auth.subscribeSessionEnded(expireSession), [auth, expireSession]);
+  useEffect(() => auth.subscribeSessionEnded?.(expireSession), [auth, expireSession]);
 
   useEffect(() => {
     let isMounted = true;
-    void auth.restore().then(
+    void auth.me().then(
       (restored) => {
         if (!isMounted || sessionExpired.current) return;
-        setSession(restored);
+        setSession(restored ? withLegacySessionAliases(restored) : null);
         setStatus(restored ? 'authenticated' : 'unauthenticated');
       },
-      () => {
+      (error: unknown) => {
         if (!isMounted || sessionExpired.current) return;
         setSession(null);
-        setStatus('unauthenticated');
+        const normalized = normalizeBackofficeApiError(error);
+        if (normalized.code === 'BACKOFFICE_ACCESS_DENIED') {
+          setStatus('unauthenticated');
+          showToast({ variant: 'warning', title: normalized.safeMessage });
+          void auth.logout();
+          return;
+        }
+        setStatus('unavailable');
       },
     );
     return () => {
       isMounted = false;
     };
-  }, [auth]);
-
-  useEffect(() => () => clearSessionEndTimer(), [clearSessionEndTimer]);
+  }, [auth, showToast]);
 
   const login = useCallback(
-    async (input: LoginCredentials) => {
+    async (input: AuthLoginInput) => {
       const authenticated = await auth.login(input);
-      clearSessionEndTimer();
       sessionExpired.current = false;
-      setSession(authenticated);
+      setSession(withLegacySessionAliases(authenticated));
       setStatus('authenticated');
     },
-    [auth, clearSessionEndTimer],
+    [auth],
   );
 
   const logout = useCallback(async () => {
-    clearSessionEndTimer();
     sessionExpired.current = false;
-    await auth.logout();
+    const revocation = auth.logout();
     setSession(null);
     setStatus('unauthenticated');
     showToast({ variant: 'success', title: t('signedOut') });
-  }, [auth, clearSessionEndTimer, showToast, t]);
+    await revocation;
+  }, [auth, showToast, t]);
 
-  const refresh = useCallback(async () => {
-    const restored = await auth.restore();
-    if (!restored) {
-      setSession(null);
-      setStatus('unauthenticated');
-      return;
+  const refreshSessionContext = useCallback(async () => {
+    try {
+      const refreshed = await auth.refreshSessionContext();
+      if (!refreshed) {
+        setSession(null);
+        setStatus('unauthenticated');
+        return;
+      }
+      sessionExpired.current = false;
+      setSession(withLegacySessionAliases(refreshed));
+      setStatus('authenticated');
+    } catch {
+      setStatus('unavailable');
     }
-    sessionExpired.current = false;
-    setSession(restored);
-    setStatus('authenticated');
   }, [auth]);
 
   useEffect(() => {
     const handleConfigurationChanged = () => {
-      void refresh();
+      void refreshSessionContext();
     };
-    window.addEventListener(
-      BUSINESS_CONFIGURATION_CHANGED_EVENT,
-      handleConfigurationChanged,
-    );
+    window.addEventListener(BUSINESS_CONFIGURATION_CHANGED_EVENT, handleConfigurationChanged);
     return () =>
-      window.removeEventListener(
-        BUSINESS_CONFIGURATION_CHANGED_EVENT,
-        handleConfigurationChanged,
-      );
-  }, [refresh]);
+      window.removeEventListener(BUSINESS_CONFIGURATION_CHANGED_EVENT, handleConfigurationChanged);
+  }, [refreshSessionContext]);
 
-  const getAccessToken = useCallback(() => auth.getAccessToken(), [auth]);
-  const refreshAccessToken = useCallback(() => auth.refreshAccessToken(), [auth]);
+  const getAccessToken = useCallback(
+    () => auth.getAccessToken?.() ?? Promise.resolve(null),
+    [auth],
+  );
+  const refreshAccessToken = useCallback(
+    () =>
+      auth.refreshAccessToken?.() ??
+      Promise.resolve({ kind: 'ended' as const, reason: 'invalid' as const }),
+    [auth],
+  );
   const createApiClient = useCallback(
     (baseUrl: string) =>
       new ApiClient({
         baseUrl,
+        applicationSurface: 'backoffice',
         getAccessToken,
         refreshAccessToken,
         onSessionEnded: expireSession,
@@ -160,8 +159,16 @@ export function BackofficeAuthProvider({
   );
 
   const value = useMemo(
-    () => ({ status, session, login, logout, refresh, getAccessToken, createApiClient }),
-    [createApiClient, getAccessToken, login, logout, refresh, session, status],
+    () => ({
+      status,
+      session,
+      login,
+      logout,
+      refreshSessionContext,
+      getAccessToken,
+      createApiClient,
+    }),
+    [createApiClient, getAccessToken, login, logout, refreshSessionContext, session, status],
   );
   return <BackofficeAuthContext.Provider value={value}>{children}</BackofficeAuthContext.Provider>;
 }

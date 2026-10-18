@@ -161,17 +161,27 @@ export function NotificationBell() {
                 type="button"
                 onClick={() => void handleNotification(notification)}
                 className={[
-                  'flex w-full items-start gap-3 border-b border-[var(--color-border)] px-4 py-3 text-left transition-colors hover:bg-[var(--color-surface-muted)]',
+                  'group flex w-full items-start gap-3 border-b border-[var(--color-border)] px-4 py-3.5 text-left transition-colors hover:bg-[var(--color-surface-muted)] focus-visible:relative focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-focus)]',
                   notification.readAt ? '' : 'bg-[var(--color-brand)]/[0.04]',
                 ].join(' ')}
               >
                 <span
                   className={[
-                    'mt-1.5 size-2 shrink-0 rounded-full',
-                    notification.readAt ? 'bg-transparent' : 'bg-[var(--color-brand)]',
+                    'mt-1 flex size-5 shrink-0 items-center justify-center rounded-full border',
+                    notification.readAt
+                      ? 'border-transparent bg-[var(--color-surface-muted)]/60'
+                      : 'border-[var(--color-brand)]/20 bg-[var(--color-brand)]/10',
                   ].join(' ')}
                   aria-hidden="true"
-                />
+                >
+                  <span
+                    className={
+                      notification.readAt
+                        ? 'size-1 rounded-full bg-[var(--color-text-muted)]/50'
+                        : 'size-1.5 rounded-full bg-[var(--color-brand)]'
+                    }
+                  />
+                </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold text-[var(--color-text)]">
                     {notificationTitle(locale, notification)}

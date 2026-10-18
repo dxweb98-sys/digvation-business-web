@@ -58,7 +58,7 @@ export function PaymentMixCard({
       />
 
       {sorted.length ? (
-        <div className="mt-5 grid items-center gap-5 sm:grid-cols-[140px_minmax(0,1fr)]">
+        <div className="mt-5 flex flex-col items-center gap-5">
           <div className="relative mx-auto size-34">
             <div className="absolute inset-0 rounded-full" style={{ background: donut }} />
             <div className="absolute inset-5.75 flex flex-col items-center justify-center rounded-full bg-(--color-surface) text-center">
@@ -71,7 +71,7 @@ export function PaymentMixCard({
             </div>
           </div>
 
-          <div className="space-y-3">
+          <div className="w-full space-y-3">
             {sorted.map((point, index) => {
               const value = numeric(point.value);
               const ratio = total > 0 ? (value / total) * 100 : 0;

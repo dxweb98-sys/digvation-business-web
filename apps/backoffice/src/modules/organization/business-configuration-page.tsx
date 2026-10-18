@@ -1,4 +1,5 @@
 import { useRuntime } from '@digvation/business-runtime';
+import { hasSessionFeature } from '@digvation/business-auth';
 import {
   DBadge,
   DButton,
@@ -9,6 +10,8 @@ import {
   DInput,
   DSelect,
   DSkeleton,
+  DTextarea,
+  DToggle,
   DTabs,
   DTabsContent,
   DTabsList,
@@ -21,23 +24,24 @@ import { CircleOff, MapPinPlus, Pencil } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
 
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
-import {
-  BackofficePage,
-  BackofficePageHeader,
-} from '../../app/layout/backoffice-page';
+import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
 import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
 import { canPerformBackofficeAction } from '../../auth/backoffice-access';
-import {
-  isSessionExpiredError,
-  useBackofficeAuth,
-} from '../../auth/backoffice-auth-context';
+import { isSessionExpiredError, useBackofficeAuth } from '../../auth/backoffice-auth-context';
 import {
   BusinessSettingsApi,
   type BusinessPreferences,
   type BusinessProfile,
+  type BusinessTaxConfiguration,
   type NumberingPreference,
   type SellingLocation,
 } from './business-settings-api';
+import { useBusinessConfigurationI18n } from './business-configuration-i18n';
+import { LoyaltyApi } from '../loyalty/loyalty-api';
+import { LoyaltyConfigurationSection } from '../loyalty/loyalty-configuration-section';
+import { CatalogApi } from '../../features/catalog/api/catalog-api';
+import { ProductCommissionApi } from '../commission/product-commission-api';
+import { ProductCommissionSection } from '../commission/product-commission-section';
 
 const keys = {
   configuration: ['business-settings', 'configuration'] as const,
@@ -55,6 +59,41 @@ export function BusinessConfigurationPage() {
     [createApiClient, runtime.apiBaseUrl],
   );
 
+  const loyaltyApi = useMemo(
+    () => new LoyaltyApi(createApiClient(runtime.apiBaseUrl)),
+    [createApiClient, runtime.apiBaseUrl],
+  );
+  const commissionApi = useMemo(
+    () => new ProductCommissionApi(createApiClient(runtime.apiBaseUrl)),
+    [createApiClient, runtime.apiBaseUrl],
+  );
+  const catalogApi = useMemo(
+    () => new CatalogApi(createApiClient(runtime.apiBaseUrl)),
+    [createApiClient, runtime.apiBaseUrl],
+  );
+  const hasPosProduct = Boolean(session && hasSessionFeature(session.access, 'POS'));
+  const hasTaxCapability = Boolean(session && hasSessionFeature(session.access, 'TAX_FISCAL'));
+  const canViewCommission = Boolean(
+    hasPosProduct &&
+    session &&
+    hasSessionFeature(session.access, 'POS_PRODUCT_COMMISSION') &&
+    canPerformBackofficeAction(session, 'viewCommission'),
+  );
+  const canConfigureCommission = Boolean(
+    hasPosProduct &&
+    session &&
+    hasSessionFeature(session.access, 'POS_PRODUCT_COMMISSION') &&
+    canPerformBackofficeAction(session, 'configureCommission'),
+  );
+  const hasLoyaltyCapability = Boolean(
+    session && hasSessionFeature(session.access, 'LOYALTY_POINTS'),
+  );
+  const canViewLoyalty = Boolean(
+    hasLoyaltyCapability && session && canPerformBackofficeAction(session, 'viewLoyalty'),
+  );
+  const canConfigureLoyalty = Boolean(
+    hasLoyaltyCapability && session && canPerformBackofficeAction(session, 'configureLoyalty'),
+  );
   const canViewProfile = Boolean(
     session && canPerformBackofficeAction(session, 'viewBusinessProfile'),
   );
@@ -91,7 +130,15 @@ export function BusinessConfigurationPage() {
 
   const invalidate = (queryKey: readonly string[]) =>
     void queryClient.invalidateQueries({ queryKey });
-  const firstTab = canViewProfile ? 'profile' : 'locations';
+  const firstTab = canViewProfile
+    ? 'profile'
+    : canViewLocations
+      ? 'locations'
+      : canViewLoyalty
+        ? 'loyalty'
+        : canViewCommission
+          ? 'commission'
+          : 'profile';
 
   return (
     <BackofficePage>
@@ -105,20 +152,21 @@ export function BusinessConfigurationPage() {
 
       <DTabs defaultValue={firstTab} className="mt-6">
         <DTabsList>
-          {canViewProfile ? (
-            <DTabsTrigger value="profile">{copy('Profile')}</DTabsTrigger>
-          ) : null}
+          {canViewProfile ? <DTabsTrigger value="profile">{copy('Profile')}</DTabsTrigger> : null}
           {canViewLocations ? (
             <DTabsTrigger value="locations">{copy('Locations')}</DTabsTrigger>
           ) : null}
           {canViewProfile ? (
-            <DTabsTrigger value="localization">
-              {copy('Localization')}
-            </DTabsTrigger>
+            <DTabsTrigger value="localization">{copy('Localization')}</DTabsTrigger>
+          ) : null}
+          {canViewProfile && hasTaxCapability ? (
+            <DTabsTrigger value="tax">{copy('Tax')}</DTabsTrigger>
           ) : null}
           {canViewProfile ? (
             <DTabsTrigger value="numbering">{copy('Numbering')}</DTabsTrigger>
           ) : null}
+          {canViewLoyalty ? <DTabsTrigger value="loyalty">Loyalty</DTabsTrigger> : null}
+          {canViewCommission ? <DTabsTrigger value="commission">Komisi Produk</DTabsTrigger> : null}
         </DTabsList>
 
         <DTabsContent value="profile" className="mt-5">
@@ -135,7 +183,11 @@ export function BusinessConfigurationPage() {
           <LocationsSection
             items={locations.data?.items ?? []}
             loading={locations.isLoading}
-            canCreate={canCreateLocation}
+            canCreate={
+              canCreateLocation &&
+              (hasSessionFeature(session.access, 'MULTI_BRANCH') ||
+                (!locations.isLoading && locations.data?.total === 0))
+            }
             canUpdate={canUpdateLocation}
             api={api}
             onChanged={() => invalidate(keys.locations)}
@@ -151,6 +203,41 @@ export function BusinessConfigurationPage() {
             onChanged={() => invalidate(keys.configuration)}
           />
         </DTabsContent>
+
+        {canViewProfile && hasTaxCapability ? (
+          <DTabsContent value="tax" className="mt-5">
+            <TaxSection
+              tax={configuration.data?.tax}
+              loading={configuration.isLoading}
+              canUpdate={canUpdateProfile}
+              api={api}
+              onChanged={() => invalidate(keys.configuration)}
+            />
+          </DTabsContent>
+        ) : null}
+
+        {canViewLoyalty ? (
+          <DTabsContent value="loyalty" className="mt-5">
+            <LoyaltyConfigurationSection api={loyaltyApi} canConfigure={canConfigureLoyalty} />
+          </DTabsContent>
+        ) : null}
+
+        {canViewCommission ? (
+          <DTabsContent value="commission" className="mt-5">
+            <ProductCommissionSection
+              api={commissionApi}
+              canConfigure={canConfigureCommission}
+              loadProducts={(q) =>
+                catalogApi.listItems({
+                  type: 'PRODUCT',
+                  lifecycle: 'ACTIVE',
+                  limit: 20,
+                  ...(q ? { q } : {}),
+                })
+              }
+            />
+          </DTabsContent>
+        ) : null}
 
         <DTabsContent value="numbering" className="mt-5">
           <NumberingSection
@@ -209,10 +296,8 @@ function ProfileSection({
       if (!isSessionExpiredError(error))
         showToast({
           variant: 'danger',
-          title: normalizeBackofficeApiError(
-            error,
-            copy('Could not update business profile.'),
-          ).safeMessage,
+          title: normalizeBackofficeApiError(error, copy('Could not update business profile.'))
+            .safeMessage,
         });
     }
   };
@@ -237,17 +322,13 @@ function ProfileSection({
       {loading ? (
         <DSkeleton className="mt-5 h-7 w-56" />
       ) : (
-        <p className="mt-5 text-lg font-semibold">
-          {profile?.name ?? copy('Not configured')}
-        </p>
+        <p className="mt-5 text-lg font-semibold">{profile?.name ?? copy('Not configured')}</p>
       )}
       <DDialog
         open={open}
         onClose={close}
         title={copy('Business profile')}
-        description={copy(
-          'Update the business identity consumed by authenticated applications.',
-        )}
+        description={copy('Update the business identity consumed by authenticated applications.')}
         footer={
           <div className="flex justify-end gap-2">
             <DButton variant="secondary" onClick={close}>
@@ -259,12 +340,159 @@ function ProfileSection({
           </div>
         }
       >
-        <DInput
-          label={copy('Business name')}
-          value={name}
-          onChange={setDraftName}
-          autoFocus
-        />
+        <DInput label={copy('Business name')} value={name} onChange={setDraftName} autoFocus />
+      </DDialog>
+    </Card>
+  );
+}
+
+function percentageFromTaxRate(rate: string): string {
+  const [whole = '0', fraction = ''] = rate.trim().split('.');
+  if (whole === '1') return '100';
+  const padded = fraction.padEnd(2, '0');
+  const integer = padded.slice(0, 2).replace(/^0+(?=\d)/, '') || '0';
+  const decimal = padded.slice(2).replace(/0+$/, '');
+  return decimal ? `${integer}.${decimal}` : integer;
+}
+
+function taxRateFromPercentage(value: string): string {
+  const [rawWhole = '0', fraction = ''] = value.trim().split('.');
+  const whole = rawWhole.replace(/^0+(?=\d)/, '') || '0';
+  if (whole === '100') return '1';
+  const digits = `${whole.padStart(2, '0')}${fraction}`.replace(/0+$/, '');
+  return digits ? `0.${digits}` : '0';
+}
+
+function TaxSection({
+  tax,
+  loading,
+  canUpdate,
+  api,
+  onChanged,
+}: {
+  tax?: BusinessTaxConfiguration | undefined;
+  loading: boolean;
+  canUpdate: boolean;
+  api: BusinessSettingsApi;
+  onChanged: () => void;
+}) {
+  const { copy } = useBusinessConfigurationI18n();
+  const { showToast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [draftEnabled, setDraftEnabled] = useState(false);
+  const [draftPercent, setDraftPercent] = useState('11');
+  const [saving, setSaving] = useState(false);
+
+  const configuredPercent = tax ? percentageFromTaxRate(tax.rate) : '11';
+
+  const edit = () => {
+    if (!tax) return;
+    setDraftEnabled(tax.enabled);
+    setDraftPercent(configuredPercent);
+    setOpen(true);
+  };
+
+  const close = () => {
+    if (saving) return;
+    setOpen(false);
+  };
+
+  const percent = Number(draftPercent);
+  const validPercent =
+    draftPercent.trim().length > 0 && Number.isFinite(percent) && percent >= 0 && percent <= 100;
+
+  const save = async () => {
+    if (!tax || saving || !validPercent) return;
+    setSaving(true);
+    try {
+      await api.updateTax(tax, {
+        enabled: draftEnabled,
+        rate: taxRateFromPercentage(draftPercent),
+      });
+      onChanged();
+      setOpen(false);
+      showToast({ variant: 'success', title: copy('Tax configuration updated.') });
+    } catch (error) {
+      if (!isSessionExpiredError(error))
+        showToast({
+          variant: 'danger',
+          title: normalizeBackofficeApiError(error, copy('Could not update tax configuration.'))
+            .safeMessage,
+        });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Card>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 className="font-semibold">{copy('Tax')}</h2>
+          <p className="mt-1 max-w-2xl text-sm text-(--color-text-muted)">
+            {copy(
+              'Tax is configured once for the business and applied by Runtime to transaction totals.',
+            )}
+          </p>
+        </div>
+        {canUpdate && tax ? (
+          <DButton variant="secondary" size="sm" onClick={edit}>
+            {copy('Edit tax')}
+          </DButton>
+        ) : null}
+      </div>
+
+      {loading ? (
+        <DSkeleton className="mt-5 h-16" />
+      ) : tax ? (
+        <dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2">
+          <Fact label={copy('Enable tax')} value={copy(tax.enabled ? 'Active' : 'Inactive')} />
+          <Fact label={copy('Tax percentage')} value={`${configuredPercent}%`} />
+        </dl>
+      ) : null}
+
+      <DDialog
+        open={open}
+        onClose={close}
+        title={copy('Tax')}
+        description={copy(
+          'New transactions use this business tax. Existing finalized transactions keep their recorded tax.',
+        )}
+        footer={
+          <div className="flex justify-end gap-2">
+            <DButton variant="secondary" onClick={close} disabled={saving}>
+              {copy('Cancel')}
+            </DButton>
+            <DButton onClick={() => void save()} loading={saving} disabled={!validPercent}>
+              {copy('Save tax')}
+            </DButton>
+          </div>
+        }
+      >
+        <div className="space-y-5">
+          <div className="flex items-center justify-between gap-5 rounded-(--radius-control) border border-(--color-border) px-4 py-3">
+            <div>
+              <p className="text-sm font-medium">{copy('Enable tax')}</p>
+              <p className="mt-1 text-xs text-(--color-text-muted)">
+                {copy('When disabled, new transactions have zero tax.')}
+              </p>
+            </div>
+            <DToggle
+              checked={draftEnabled}
+              onChange={setDraftEnabled}
+              ariaLabel={copy('Enable tax')}
+            />
+          </div>
+          <DInput
+            label={copy('Tax percentage')}
+            inputMode="decimal"
+            value={draftPercent}
+            onChange={setDraftPercent}
+            placeholder="11"
+            hint={copy('Enter a percentage from 0 to 100.')}
+            error={validPercent ? undefined : copy('Tax percentage must be between 0 and 100.')}
+          />
+        </div>
       </DDialog>
     </Card>
   );
@@ -286,13 +514,14 @@ function LocalizationSection({
   const { copy } = useBackofficeLocalization();
   const { showToast } = useToast();
   const [open, setOpen] = useState(false);
-  const [draftLocale, setDraftLocale] =
-    useState<BusinessPreferences['defaultLocale'] | null>(null);
+  const [draftLocale, setDraftLocale] = useState<BusinessPreferences['defaultLocale'] | null>(null);
   const [draftTimezone, setDraftTimezone] = useState<string | null>(null);
-  const [draftDateFormat, setDraftDateFormat] =
-    useState<BusinessPreferences['dateFormat'] | null>(null);
-  const [draftTimeFormat, setDraftTimeFormat] =
-    useState<BusinessPreferences['timeFormat'] | null>(null);
+  const [draftDateFormat, setDraftDateFormat] = useState<BusinessPreferences['dateFormat'] | null>(
+    null,
+  );
+  const [draftTimeFormat, setDraftTimeFormat] = useState<BusinessPreferences['timeFormat'] | null>(
+    null,
+  );
   const locale = draftLocale ?? preferences?.defaultLocale ?? 'id-ID';
   const timezone = draftTimezone ?? preferences?.timezone ?? 'Asia/Jakarta';
   const dateFormat = draftDateFormat ?? preferences?.dateFormat ?? 'DD/MM/YYYY';
@@ -321,10 +550,8 @@ function LocalizationSection({
       if (!isSessionExpiredError(error))
         showToast({
           variant: 'danger',
-          title: normalizeBackofficeApiError(
-            error,
-            copy('Could not update localization.'),
-          ).safeMessage,
+          title: normalizeBackofficeApiError(error, copy('Could not update localization.'))
+            .safeMessage,
         });
     }
   };
@@ -397,11 +624,7 @@ function LocalizationSection({
               label: value,
             }))}
             onValueChange={(value) => {
-              if (
-                value === 'DD/MM/YYYY' ||
-                value === 'MM/DD/YYYY' ||
-                value === 'YYYY-MM-DD'
-              )
+              if (value === 'DD/MM/YYYY' || value === 'MM/DD/YYYY' || value === 'YYYY-MM-DD')
                 setDraftDateFormat(value);
             }}
           />
@@ -432,7 +655,7 @@ function Fact({ label, value }: { label: string; value: string }) {
   );
 }
 
-function LocationsSection({
+export function LocationsSection({
   items,
   loading,
   canCreate,
@@ -459,13 +682,21 @@ function LocationsSection({
       render: (item) => (
         <div className="flex gap-2">
           <span className="font-medium">{item.name}</span>
-          {item.isMain ? (
-            <DBadge variant="secondary">{copy('Main Branch')}</DBadge>
-          ) : null}
+          {item.isMain ? <DBadge variant="secondary">{copy('Main Branch')}</DBadge> : null}
         </div>
       ),
     },
     { key: 'code', label: copy('Code') },
+    {
+      key: 'address',
+      label: copy('Address'),
+      render: (item) =>
+        item.address ? (
+          <span className="text-sm">{item.address}</span>
+        ) : (
+          <span className="text-sm text-slate-400">{copy('Not set')}</span>
+        ),
+    },
     {
       key: 'status',
       label: copy('Status'),
@@ -488,10 +719,8 @@ function LocationsSection({
       if (!isSessionExpiredError(error))
         showToast({
           variant: 'danger',
-          title: normalizeBackofficeApiError(
-            error,
-            copy('Could not save selling location.'),
-          ).safeMessage,
+          title: normalizeBackofficeApiError(error, copy('Could not save selling location.'))
+            .safeMessage,
         });
     }
   };
@@ -506,10 +735,7 @@ function LocationsSection({
         emptyMessage={copy('No selling locations have been created yet.')}
         headerActions={
           canCreate ? (
-            <DButton
-              leftIcon={<MapPinPlus className="size-4" />}
-              onClick={() => setEditing(null)}
-            >
+            <DButton leftIcon={<MapPinPlus className="size-4" />} onClick={() => setEditing(null)}>
               {copy('Add location')}
             </DButton>
           ) : null
@@ -558,7 +784,7 @@ function LocationsSection({
   );
 }
 
-function LocationDialog({
+export function LocationDialog({
   location,
   items,
   api,
@@ -576,6 +802,7 @@ function LocationDialog({
   const isNew = location === null;
   const [code, setCode] = useState('');
   const [name, setName] = useState(location?.name ?? '');
+  const [address, setAddress] = useState(location?.address ?? '');
   const [main, setMain] = useState(
     Boolean(location?.isMain) || (location === null && items.length === 0),
   );
@@ -588,11 +815,13 @@ function LocationDialog({
           code: code.trim().toUpperCase(),
           name: name.trim(),
           setAsMain: main || undefined,
+          address: address.trim(),
         });
       else if (location)
         await api.updateLocation(location, {
           name: name.trim(),
           setAsMain: main && !location.isMain ? true : undefined,
+          address: address.trim(),
         });
       onChanged();
       onClose();
@@ -604,10 +833,8 @@ function LocationDialog({
       if (!isSessionExpiredError(error))
         showToast({
           variant: 'danger',
-          title: normalizeBackofficeApiError(
-            error,
-            copy('Could not save selling location.'),
-          ).safeMessage,
+          title: normalizeBackofficeApiError(error, copy('Could not save selling location.'))
+            .safeMessage,
         });
     }
   };
@@ -622,10 +849,7 @@ function LocationDialog({
           <DButton variant="secondary" onClick={onClose}>
             {copy('Cancel')}
           </DButton>
-          <DButton
-            onClick={() => void save()}
-            disabled={!name.trim() || (isNew && !code.trim())}
-          >
+          <DButton onClick={() => void save()} disabled={!name.trim() || (isNew && !code.trim())}>
             {copy('Save location')}
           </DButton>
         </div>
@@ -643,6 +867,7 @@ function LocationDialog({
           />
         )}
         <DInput label={copy('Selling location')} value={name} onChange={setName} />
+        <DTextarea label={copy('Address')} value={address} onChange={setAddress} />
         <label className="flex items-center gap-2 text-sm">
           <DCheckbox
             checked={main}
@@ -674,9 +899,7 @@ function NumberingSection({
   const { copy } = useBackofficeLocalization();
   const { showToast } = useToast();
   const [editing, setEditing] = useState<NumberingPreference | null>(null);
-  const visible = preferences.filter(
-    (item) => item.namespace !== 'INVOICE' || invoiceApplicable,
-  );
+  const visible = preferences.filter((item) => item.namespace !== 'INVOICE' || invoiceApplicable);
   const labels: Record<NumberingPreference['namespace'], string> = {
     PRODUCT: copy('Product'),
     SERVICE: copy('Service'),
@@ -701,10 +924,7 @@ function NumberingSection({
       ) : (
         <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {visible.map((item) => (
-            <div
-              key={item.namespace}
-              className="rounded-lg border border-(--color-border) p-4"
-            >
+            <div key={item.namespace} className="rounded-lg border border-(--color-border) p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-semibold">{labels[item.namespace]}</p>
@@ -713,18 +933,12 @@ function NumberingSection({
                   </p>
                 </div>
                 {canUpdate ? (
-                  <DButton
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setEditing(item)}
-                  >
+                  <DButton variant="secondary" size="sm" onClick={() => setEditing(item)}>
                     {copy('Edit')}
                   </DButton>
                 ) : null}
               </div>
-              <p className="mt-4 text-xs text-(--color-text-muted)">
-                {copy('Current sequence')}
-              </p>
+              <p className="mt-4 text-xs text-(--color-text-muted)">{copy('Current sequence')}</p>
               <p className="mt-1 font-mono font-semibold">{item.currentSequence}</p>
             </div>
           ))}
@@ -781,10 +995,8 @@ function NumberingDialog({
       if (!isSessionExpiredError(error))
         showToast({
           variant: 'danger',
-          title: normalizeBackofficeApiError(
-            error,
-            copy('Could not update numbering.'),
-          ).safeMessage,
+          title: normalizeBackofficeApiError(error, copy('Could not update numbering.'))
+            .safeMessage,
         });
     }
   };

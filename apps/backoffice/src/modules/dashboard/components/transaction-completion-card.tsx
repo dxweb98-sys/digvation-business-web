@@ -44,13 +44,7 @@ export function TransactionCompletionCard({
             aria-label={`${rate.toFixed(0)}% ${text('finalizedOf')}`}
           >
             <defs>
-              <linearGradient
-                id="transactionCompletionGauge"
-                x1="0"
-                y1="0"
-                x2="1"
-                y2="0"
-              >
+              <linearGradient id="transactionCompletionGauge" x1="0" y1="0" x2="1" y2="0">
                 <stop offset="0%" stopColor="#3b82f6" />
                 <stop offset="100%" stopColor="#10b981" />
               </linearGradient>

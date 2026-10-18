@@ -2,6 +2,7 @@ import { ApiError } from './api-error';
 import type { ApiEnvelope, ApiFailureEnvelope } from './api.types';
 
 export type SessionEndReason = 'idle' | 'invalid';
+export type ApplicationSurface = 'backoffice' | 'operational';
 export type AccessTokenRefreshResult =
   | { kind: 'refreshed'; accessToken: string }
   | { kind: 'deferred' }
@@ -9,6 +10,7 @@ export type AccessTokenRefreshResult =
 
 export interface ApiClientOptions {
   baseUrl: string;
+  applicationSurface?: ApplicationSurface;
   getAccessToken?: (forceRefresh?: boolean) => Promise<string | null>;
   refreshAccessToken?: () => Promise<AccessTokenRefreshResult>;
   onSessionEnded?: (reason: SessionEndReason) => void;
@@ -29,6 +31,23 @@ export class ApiClient {
       signal: options.signal ?? null,
       headers: new Headers(options.headers),
     });
+  }
+
+  /**
+   * Authenticated binary download (e.g. an `.xlsx` file). Shares authentication, refresh and
+   * session-expiry handling with every other request; failures still use the JSON error envelope.
+   */
+  public getBinary(path: string, options: ApiRequestOptions = {}): Promise<Blob> {
+    return this.request<Blob>(
+      path,
+      {
+        method: 'GET',
+        signal: options.signal ?? null,
+        headers: new Headers(options.headers),
+      },
+      true,
+      'blob',
+    );
   }
 
   public post<T>(path: string, body: unknown, options: ApiRequestOptions = {}): Promise<T> {
@@ -84,10 +103,17 @@ export class ApiClient {
     });
   }
 
-  private async request<T>(path: string, init: RequestInit, mayRefresh = true): Promise<T> {
+  private async request<T>(
+    path: string,
+    init: RequestInit,
+    mayRefresh = true,
+    successBody: 'json' | 'blob' = 'json',
+  ): Promise<T> {
     const token = await this.options.getAccessToken?.();
     const headers = new Headers(init.headers);
 
+    if (this.options.applicationSurface)
+      headers.set('X-Digvation-Session-Channel', this.options.applicationSurface);
     if (token) headers.set('authorization', `Bearer ${token}`);
     else headers.delete('authorization');
 
@@ -97,21 +123,25 @@ export class ApiClient {
       headers,
     });
 
+    if (successBody === 'blob' && response.ok) return (await response.blob()) as T;
+
     const payload = (await response.json()) as ApiEnvelope<T> | ApiFailureEnvelope;
 
     if (!response.ok || !payload.success) {
       if (response.status === 401 && mayRefresh) {
         const latestToken = await this.options.getAccessToken?.();
-        if (latestToken && latestToken !== token) return this.request<T>(path, init, false);
+        if (latestToken && latestToken !== token)
+          return this.request<T>(path, init, false, successBody);
 
         if (this.options.refreshAccessToken) {
           const refreshed = await this.options.refreshAccessToken();
-          if (refreshed.kind === 'refreshed') return this.request<T>(path, init, false);
+          if (refreshed.kind === 'refreshed')
+            return this.request<T>(path, init, false, successBody);
           if (refreshed.kind === 'ended') this.options.onSessionEnded?.(refreshed.reason);
         } else if (this.options.getAccessToken) {
           const refreshedToken = await this.options.getAccessToken(true);
           if (refreshedToken && refreshedToken !== token)
-            return this.request<T>(path, init, false);
+            return this.request<T>(path, init, false, successBody);
           this.options.onUnauthorized?.();
         } else {
           this.options.onUnauthorized?.();

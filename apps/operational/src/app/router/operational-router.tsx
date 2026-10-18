@@ -1,41 +1,35 @@
-import { Navigate, createBrowserRouter } from 'react-router';
+import { useAuth } from '@digvation/business-auth';
+import { SystemStatePage } from '@digvation/business-system-states';
+import { DButton } from '@digvation/ui';
+import { Navigate, createBrowserRouter, useNavigate } from 'react-router';
 import type { ReactNode } from 'react';
 
 import { useOperationalLocalization } from '../localization/operational-localization';
-import { useOperationalAvailability } from '../providers/operational-availability-context';
 import { SellPage } from '../../routes/sell/sell-page';
-import { OperationalShell } from '../../modules/operational/operational-shell';
-import type { OperationalNavigationSection } from '../../modules/operational/operational-navigation';
+import { OperationalShell } from '../shell/operational-shell';
+import type { OperationalNavigationSection } from '../../shared/navigation/operational-navigation';
+import { posSellOperationalNavigation } from '../../features/sell/pos-operational-navigation';
+import { financeOperationalNavigation } from '../../features/expenses/finance-operational-navigation';
+import { OperationalExpensesPage } from '../../features/expenses/operational-expenses-page';
+import { OperationalNotificationsPage } from '../../features/notifications/operational-notifications-page';
+import { customerOperationalNavigation, OperationalCustomersPage } from '../../features/customers';
 import {
-  posHistoryOperationalNavigation,
-  posSellOperationalNavigation,
-} from '../../modules/pos/pos-operational-navigation';
-import { OperationalTransactionHistoryPage } from '../../modules/pos/operational-transaction-history-page';
-import { financeOperationalNavigation } from '../../modules/finance/finance-operational-navigation';
-import { OperationalExpensesPage } from '../../modules/finance/operational-expenses-page';
+  canAccessOperationalExpenses,
+  resolveOperationalSurfaceAccess,
+} from '../../shared/operational-access/operational-surface-access';
+
+export { canAccessOperationalExpenses };
 
 function useOperationalSurfaceAccess() {
-  const availability = useOperationalAvailability();
-  const permissions = availability.effectivePermissions;
-  const hasPos = availability.effectiveEntitlements.products.includes('POS');
-  const hasFinance =
-    availability.effectiveEntitlements.capabilities.includes('FINANCE_OPERATIONS');
-  return {
-    canSell: hasPos && permissions.includes('sales:create'),
-    canReadSales: hasPos && permissions.includes('sales:read'),
-    canReadExpenses:
-      hasFinance &&
-      (permissions.includes('expenses:read') || permissions.includes('expenses:read-own')),
-  };
+  const { session } = useAuth();
+  return resolveOperationalSurfaceAccess(session.access);
 }
 
 function OperationalLayout() {
   const access = useOperationalSurfaceAccess();
   const { copy } = useOperationalLocalization();
-  const salesItems = [
-    ...(access.canSell ? posSellOperationalNavigation.items : []),
-    ...(access.canReadSales ? posHistoryOperationalNavigation.items : []),
-  ];
+  // Transaction history belongs to Backoffice; Operational only runs the sale.
+  const salesItems = access.canSell ? posSellOperationalNavigation.items : [];
   const navigationSections: OperationalNavigationSection[] = [
     ...(salesItems.length
       ? [
@@ -45,7 +39,18 @@ function OperationalLayout() {
           },
         ]
       : []),
-    ...(access.canReadExpenses
+    ...(access.canAccessCustomers
+      ? [
+          {
+            label: copy(customerOperationalNavigation.label),
+            items: customerOperationalNavigation.items.map((item) => ({
+              ...item,
+              label: copy(item.label),
+            })),
+          },
+        ]
+      : []),
+    ...(access.canAccessExpenses
       ? [
           {
             label: copy(financeOperationalNavigation.label),
@@ -62,14 +67,69 @@ function OperationalLayout() {
 
 function OperationalHome() {
   const access = useOperationalSurfaceAccess();
-  if (access.canSell) return <Navigate to="/sell" replace />;
-  if (access.canReadSales) return <Navigate to="/transactions" replace />;
-  if (access.canReadExpenses) return <Navigate to="/expenses" replace />;
-  return <Navigate to="/login" replace />;
+  return <Navigate to={access.home ?? '/login'} replace />;
+}
+
+const homeLabel = {
+  '/sell': 'Go to Sell',
+  '/expenses': 'Go to Expenses',
+  '/customers': 'Go to Customers',
+} as const;
+
+export function OperationalNotFoundRoute() {
+  const navigate = useNavigate();
+  const access = useOperationalSurfaceAccess();
+  const { copy } = useOperationalLocalization();
+  const home = access.home;
+  return (
+    <SystemStatePage
+      state="not-found"
+      variant="content"
+      action={
+        home ? (
+          <DButton variant="secondary" size="sm" onClick={() => navigate(home)}>
+            {copy(homeLabel[home])}
+          </DButton>
+        ) : undefined
+      }
+    />
+  );
+}
+
+function OperationalAccessDeniedRoute() {
+  const navigate = useNavigate();
+  const access = useOperationalSurfaceAccess();
+  const { copy } = useOperationalLocalization();
+  const home = access.home;
+  return (
+    <SystemStatePage
+      state="forbidden"
+      action={
+        home ? (
+          <DButton variant="secondary" size="sm" onClick={() => navigate(home)}>
+            {copy(homeLabel[home])}
+          </DButton>
+        ) : undefined
+      }
+    />
+  );
+}
+
+function OperationalApplicationErrorRoute() {
+  return (
+    <SystemStatePage
+      state="application-error"
+      action={
+        <DButton variant="secondary" size="sm" onClick={() => window.location.reload()}>
+          Coba lagi
+        </DButton>
+      }
+    />
+  );
 }
 
 function SurfaceGate({ allowed, children }: { allowed: boolean; children: ReactNode }) {
-  return allowed ? <>{children}</> : <OperationalHome />;
+  return allowed ? <>{children}</> : <OperationalAccessDeniedRoute />;
 }
 
 function SellRoute() {
@@ -81,20 +141,20 @@ function SellRoute() {
   );
 }
 
-function TransactionHistoryRoute() {
-  const { canReadSales } = useOperationalSurfaceAccess();
+function ExpensesRoute() {
+  const { canAccessExpenses } = useOperationalSurfaceAccess();
   return (
-    <SurfaceGate allowed={canReadSales}>
-      <OperationalTransactionHistoryPage />
+    <SurfaceGate allowed={canAccessExpenses}>
+      <OperationalExpensesPage />
     </SurfaceGate>
   );
 }
 
-function ExpensesRoute() {
-  const { canReadExpenses } = useOperationalSurfaceAccess();
+function CustomersRoute() {
+  const { canAccessCustomers } = useOperationalSurfaceAccess();
   return (
-    <SurfaceGate allowed={canReadExpenses}>
-      <OperationalExpensesPage />
+    <SurfaceGate allowed={canAccessCustomers}>
+      <OperationalCustomersPage />
     </SurfaceGate>
   );
 }
@@ -103,12 +163,16 @@ export const operationalRouter = createBrowserRouter([
   { path: '/login', element: <Navigate to="/" replace /> },
   {
     element: <OperationalLayout />,
+    errorElement: <OperationalApplicationErrorRoute />,
     children: [
       { index: true, element: <OperationalHome /> },
       { path: '/sell', element: <SellRoute /> },
       { path: '/sell/:saleId', element: <SellRoute /> },
-      { path: '/transactions', element: <TransactionHistoryRoute /> },
       { path: '/expenses', element: <ExpensesRoute /> },
+      { path: '/customers', element: <CustomersRoute /> },
+      { path: '/notifications', element: <OperationalNotificationsPage /> },
+      { path: '/members', element: <Navigate to="/customers" replace /> },
+      { path: '*', element: <OperationalNotFoundRoute /> },
     ],
   },
 ]);

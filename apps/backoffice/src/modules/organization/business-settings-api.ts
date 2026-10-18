@@ -29,9 +29,19 @@ export interface BusinessPreferences {
   updatedAt: string | null;
 }
 
+export interface BusinessTaxConfiguration {
+  enabled: boolean;
+  /** Decimal fraction from Runtime; "0.11" means 11%. */
+  rate: string;
+  version: number;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
 export interface EffectiveBusinessConfiguration {
   profile: BusinessProfile & { configured: boolean };
   preferences: BusinessPreferences;
+  tax: BusinessTaxConfiguration;
 }
 
 export interface NumberingPreference {
@@ -51,6 +61,7 @@ export interface SellingLocation {
   status: 'ACTIVE' | 'INACTIVE';
   version: number;
   isMain: boolean;
+  address: string | null;
 }
 
 export interface Page<T> {
@@ -104,6 +115,18 @@ export class BusinessSettingsApi {
     );
   }
 
+  updateTax(
+    tax: BusinessTaxConfiguration,
+    input: Pick<BusinessTaxConfiguration, 'enabled' | 'rate'>,
+  ) {
+    return configurationChanged(
+      this.client.patch<BusinessTaxConfiguration>('/api/v1/business-configuration/tax', {
+        expectedVersion: tax.version,
+        ...input,
+      }),
+    );
+  }
+
   getNumbering() {
     return this.client.get<NumberingPreference[]>('/api/v1/business-configuration/numbering');
   }
@@ -130,7 +153,12 @@ export class BusinessSettingsApi {
     );
   }
 
-  createLocation(input: { code: string; name: string; setAsMain?: boolean | undefined }) {
+  createLocation(input: {
+    code: string;
+    name: string;
+    setAsMain?: boolean | undefined;
+    address?: string | null;
+  }) {
     return this.client.post<SellingLocation>('/api/v1/locations', input);
   }
 
@@ -140,6 +168,7 @@ export class BusinessSettingsApi {
       name?: string;
       status?: SellingLocation['status'];
       setAsMain?: boolean | undefined;
+      address?: string | null;
     },
   ) {
     return this.client.patch<SellingLocation>(`/api/v1/locations/${location.id}`, {

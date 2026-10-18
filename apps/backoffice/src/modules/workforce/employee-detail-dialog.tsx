@@ -10,7 +10,7 @@ import {
   type TableColumn,
 } from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
-import { UserRound } from 'lucide-react';
+import { Pencil } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
 
 import type {
@@ -23,6 +23,13 @@ import type {
 } from './employees-api';
 import { AttendanceBadge } from './attendance-panel';
 import { useWorkforceLocalization } from './workforce-localization';
+import {
+  EmployeeStatusBadge,
+  ServiceEligibilityStatus,
+  WorkforceDialogTitle,
+  WorkforcePanel,
+  WorkforcePanelHeader,
+} from './workforce-surfaces';
 
 type AttendancePeriodMode = 'DAY' | 'MONTH' | 'RANGE';
 type AttendanceStatusFilter = 'ALL' | AttendanceStatus;
@@ -37,6 +44,7 @@ export function EmployeeDetailDialog({
   api,
   attendanceEnabled,
   onClose,
+  onEdit,
 }: {
   open: boolean;
   employee: EmployeeDetail | undefined;
@@ -45,6 +53,8 @@ export function EmployeeDetailDialog({
   api: EmployeesApi;
   attendanceEnabled: boolean;
   onClose: () => void;
+  /** Offered only to users who may update employees. */
+  onEdit?: (employee: Employee) => void;
 }) {
   const { copy, formatDate, locale } = useWorkforceLocalization();
   const today = dateKey(new Date());
@@ -141,17 +151,17 @@ export function EmployeeDetailDialog({
       open={open}
       onClose={onClose}
       size="xl"
-      title={copy('Employee details')}
-      description={
-        employee
-          ? `${employee.code} · ${employee.position?.name ?? copy('Position not set')}`
-          : undefined
-      }
+      title={<WorkforceDialogTitle title={copy('Employee details')} />}
       footer={
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
           <DButton variant="secondary" onClick={onClose}>
             {copy('Close')}
           </DButton>
+          {employee && onEdit ? (
+            <DButton leftIcon={<Pencil className="size-4" />} onClick={() => onEdit(employee)}>
+              {copy('Edit employee')}
+            </DButton>
+          ) : null}
         </div>
       }
     >
@@ -167,47 +177,43 @@ export function EmployeeDetailDialog({
       ) : (
         employee && (
           <div className="space-y-5">
-            <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4 sm:p-5">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex min-w-0 items-start gap-3">
-                  <div className="grid size-12 shrink-0 place-items-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
-                    <UserRound
-                      aria-hidden="true"
-                      className="size-5 text-[var(--color-text-muted)]"
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
-                      {copy('Employee profile')}
-                    </p>
-                    <h2 className="mt-1 break-words text-xl font-semibold tracking-tight">
-                      {employee.displayName}
-                    </h2>
-                    <p className="mt-1 text-sm text-[var(--color-text-muted)]">{employee.code}</p>
-                  </div>
-                </div>
+            <WorkforcePanel className="p-5">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="min-w-0 break-words text-xl font-semibold tracking-tight text-[var(--color-text)]">
+                  {employee.displayName}
+                </h2>
                 <EmployeeStatusBadge status={employee.status} />
               </div>
-
-              <div className="mt-5 grid gap-4 border-t border-[var(--color-border)] pt-4 sm:grid-cols-3">
-                <SummaryFact
+              <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--color-text-muted)]">
+                <span className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-2 py-0.5 font-mono text-[11px] text-[var(--color-text)]">
+                  {employee.code}
+                </span>
+                <span>•</span>
+                <span className="min-w-0 break-words">
+                  {employee.position?.name ?? copy('Position not set')}
+                </span>
+              </div>
+              <dl className="mt-4 grid gap-x-6 gap-y-4 border-t border-[var(--color-border)] pt-4 sm:grid-cols-3">
+                <Field
                   label={copy('Position')}
                   value={employee.position?.name ?? copy('Not set')}
+                  emphasized
                 />
-                <SummaryFact
+                <Field
                   label={copy('Join date')}
                   value={formatJoinedOn(employee.joinedOn, formatDate, copy)}
                 />
-                <SummaryFact label={copy('Tenure')} value={formatTenure(employee.joinedOn, copy)} />
-              </div>
-            </section>
+                <Field label={copy('Tenure')} value={formatTenure(employee.joinedOn, copy)} />
+              </dl>
+            </WorkforcePanel>
 
-            <DetailCard
-              title={copy('Employment information')}
-              description={copy(
-                'Service eligibility is controlled by the employee position. Catalog service assignment mode still decides whether assignment is optional or required.',
-              )}
-            >
+            <WorkforcePanel>
+              <WorkforcePanelHeader
+                title={copy('Employment information')}
+                description={copy(
+                  'Service work needs an active employee enabled as a Service performer, with an active position that allows Service assignment.',
+                )}
+              />
               <DetailGrid>
                 <Field label={copy('Employee code')} value={employee.code} />
                 <Field label={copy('Display name')} value={employee.displayName} />
@@ -217,26 +223,16 @@ export function EmployeeDetailDialog({
                 />
                 <Field
                   label={copy('Service assignment')}
+                  value={<ServiceEligibilityStatus employee={employee} />}
+                />
+                <Field
+                  label={copy('Product sales')}
                   value={
-                    employee.position ? (
-                      <DBadge
-                        variant={
-                          employee.position.status === 'ACTIVE' &&
-                          employee.position.serviceAssignmentEnabled
-                            ? 'success'
-                            : 'secondary'
-                        }
-                      >
-                        {copy(
-                          employee.position.status === 'ACTIVE' &&
-                            employee.position.serviceAssignmentEnabled
-                            ? 'Can perform services'
-                            : 'Cannot perform services',
-                        )}
-                      </DBadge>
-                    ) : (
-                      copy('Not set')
-                    )
+                    <DBadge variant={employee.canSellProducts ? 'success' : 'secondary'}>
+                      {copy(
+                        employee.canSellProducts ? 'Can sell products' : 'Cannot sell products',
+                      )}
+                    </DBadge>
                   }
                 />
                 <Field
@@ -248,148 +244,157 @@ export function EmployeeDetailDialog({
                   value={formatJoinedOn(employee.joinedOn, formatDate, copy)}
                 />
               </DetailGrid>
-            </DetailCard>
+            </WorkforcePanel>
 
             {attendanceEnabled ? (
-              <DetailCard
-                title={copy('Attendance history')}
-                description={copy(
-                  'Review attendance history by day, month, or a custom date range.',
-                )}
-              >
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  <DSelect
-                    label={copy('Period')}
-                    value={attendanceMode}
-                    clearable={false}
-                    options={[
-                      { value: 'DAY', label: copy('Daily') },
-                      { value: 'MONTH', label: copy('Monthly') },
-                      { value: 'RANGE', label: copy('Date range') },
-                    ]}
-                    onValueChange={(value) => {
-                      setAttendanceMode(value as AttendancePeriodMode);
-                      setAttendanceOffset(0);
-                    }}
-                  />
-
-                  {attendanceMode === 'DAY' ? (
-                    <DDatePicker
-                      label={copy('Attendance date')}
-                      value={attendanceDay}
-                      onChange={(value) => {
-                        if (!value) return;
-                        setAttendanceDay(value);
-                        setAttendanceOffset(0);
-                      }}
-                      variant="date"
-                    />
-                  ) : null}
-
-                  {attendanceMode === 'MONTH' ? (
+              <WorkforcePanel>
+                <WorkforcePanelHeader
+                  title={copy('Attendance history')}
+                  description={copy(
+                    'Review attendance history by day, month, or a custom date range.',
+                  )}
+                />
+                <div className="p-5">
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                     <DSelect
-                      label={copy('Month')}
-                      value={attendanceMonth}
+                      label={copy('Period')}
+                      value={attendanceMode}
                       clearable={false}
-                      options={monthOptions}
+                      options={[
+                        { value: 'DAY', label: copy('Daily') },
+                        { value: 'MONTH', label: copy('Monthly') },
+                        { value: 'RANGE', label: copy('Date range') },
+                      ]}
                       onValueChange={(value) => {
-                        if (typeof value !== 'string') return;
-                        setAttendanceMonth(value);
+                        setAttendanceMode(value as AttendancePeriodMode);
                         setAttendanceOffset(0);
                       }}
                     />
-                  ) : null}
 
-                  {attendanceMode === 'RANGE' ? (
-                    <DRangeDatePicker
-                      label={copy('Date range')}
-                      value={{ start: attendanceFrom, end: attendanceTo }}
+                    {attendanceMode === 'DAY' ? (
+                      <DDatePicker
+                        label={copy('Attendance date')}
+                        value={attendanceDay}
+                        onChange={(value) => {
+                          if (!value) return;
+                          setAttendanceDay(value);
+                          setAttendanceOffset(0);
+                        }}
+                        variant="date"
+                      />
+                    ) : null}
+
+                    {attendanceMode === 'MONTH' ? (
+                      <DSelect
+                        label={copy('Month')}
+                        value={attendanceMonth}
+                        clearable={false}
+                        options={monthOptions}
+                        onValueChange={(value) => {
+                          if (typeof value !== 'string') return;
+                          setAttendanceMonth(value);
+                          setAttendanceOffset(0);
+                        }}
+                      />
+                    ) : null}
+
+                    {attendanceMode === 'RANGE' ? (
+                      <DRangeDatePicker
+                        label={copy('Date range')}
+                        value={{ start: attendanceFrom, end: attendanceTo }}
+                        clearable={false}
+                        onChange={(value) => {
+                          if (!value.start || !value.end) return;
+                          setAttendanceFrom(value.start);
+                          setAttendanceTo(value.end);
+                          setAttendanceOffset(0);
+                        }}
+                      />
+                    ) : null}
+
+                    <DSelect
+                      label={copy('Attendance status')}
+                      value={attendanceStatus}
                       clearable={false}
-                      onChange={(value) => {
-                        if (!value.start || !value.end) return;
-                        setAttendanceFrom(value.start);
-                        setAttendanceTo(value.end);
+                      options={[
+                        { value: 'ALL', label: copy('All statuses') },
+                        { value: 'PRESENT', label: copy('Present') },
+                        { value: 'ABSENT', label: copy('Absent') },
+                        { value: 'LEAVE', label: copy('Leave') },
+                        { value: 'SICK', label: copy('Sick') },
+                      ]}
+                      onValueChange={(value) => {
+                        setAttendanceStatus(value as AttendanceStatusFilter);
                         setAttendanceOffset(0);
                       }}
                     />
-                  ) : null}
+                  </div>
 
-                  <DSelect
-                    label={copy('Attendance status')}
-                    value={attendanceStatus}
-                    clearable={false}
-                    options={[
-                      { value: 'ALL', label: copy('All statuses') },
-                      { value: 'PRESENT', label: copy('Present') },
-                      { value: 'ABSENT', label: copy('Absent') },
-                      { value: 'LEAVE', label: copy('Leave') },
-                      { value: 'SICK', label: copy('Sick') },
-                    ]}
-                    onValueChange={(value) => {
-                      setAttendanceStatus(value as AttendanceStatusFilter);
-                      setAttendanceOffset(0);
-                    }}
-                  />
-                </div>
-
-                <p className="mt-4 text-sm font-medium text-[var(--color-text)]">
-                  {attendanceCounts.isLoading ? '—' : totalRecords} {copy('attendance records')}
-                </p>
-                <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  <SummaryFact
-                    label={copy('Present')}
-                    value={attendanceCounts.isLoading ? '—' : String(counts.PRESENT)}
-                  />
-                  <SummaryFact
-                    label={copy('Absent')}
-                    value={attendanceCounts.isLoading ? '—' : String(counts.ABSENT)}
-                  />
-                  <SummaryFact
-                    label={copy('Leave')}
-                    value={attendanceCounts.isLoading ? '—' : String(counts.LEAVE)}
-                  />
-                  <SummaryFact
-                    label={copy('Sick')}
-                    value={attendanceCounts.isLoading ? '—' : String(counts.SICK)}
-                  />
-                </div>
-                <div className="mt-4">
-                  {attendance.isError || attendanceCounts.isError ? (
-                    <p className="mb-3 text-sm text-[var(--color-text-muted)]">
-                      {copy('Could not load attendance history.')}
+                  <div className="mt-5 flex flex-wrap items-baseline justify-between gap-3">
+                    <p className="text-sm font-medium text-[var(--color-text)]">
+                      {attendanceCounts.isLoading ? '—' : totalRecords} {copy('attendance records')}
                     </p>
-                  ) : null}
-                  <DDataTable
-                    columns={attendanceColumns(copy, formatDate)}
-                    data={attendance.data?.items ?? []}
-                    loading={attendance.isLoading}
-                    rowKey="id"
-                    emptyMessage={copy('No attendance history is available.')}
-                    pagination={{
-                      page: Math.floor(attendanceOffset / attendancePageSize) + 1,
-                      pageSize: attendancePageSize,
-                      total: attendance.data?.total ?? 0,
-                    }}
-                    onPageChange={(page) => setAttendanceOffset((page - 1) * attendancePageSize)}
-                    onPageSizeChange={(nextPageSize) => {
-                      setAttendancePageSize(nextPageSize);
-                      setAttendanceOffset(0);
-                    }}
-                  />
+                  </div>
+                  <dl className="mt-3 grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <Field
+                      label={copy('Present')}
+                      value={attendanceCounts.isLoading ? '—' : String(counts.PRESENT)}
+                    />
+                    <Field
+                      label={copy('Absent')}
+                      value={attendanceCounts.isLoading ? '—' : String(counts.ABSENT)}
+                    />
+                    <Field
+                      label={copy('Leave')}
+                      value={attendanceCounts.isLoading ? '—' : String(counts.LEAVE)}
+                    />
+                    <Field
+                      label={copy('Sick')}
+                      value={attendanceCounts.isLoading ? '—' : String(counts.SICK)}
+                    />
+                  </dl>
+                  <div className="mt-4">
+                    {attendance.isError || attendanceCounts.isError ? (
+                      <p className="mb-3 text-sm text-[var(--color-text-muted)]">
+                        {copy('Could not load attendance history.')}
+                      </p>
+                    ) : null}
+                    <DDataTable
+                      columns={attendanceColumns(copy, formatDate)}
+                      data={attendance.data?.items ?? []}
+                      loading={attendance.isLoading}
+                      rowKey="id"
+                      emptyMessage={copy('No attendance history is available.')}
+                      pagination={{
+                        page: Math.floor(attendanceOffset / attendancePageSize) + 1,
+                        pageSize: attendancePageSize,
+                        total: attendance.data?.total ?? 0,
+                      }}
+                      onPageChange={(page) => setAttendanceOffset((page - 1) * attendancePageSize)}
+                      onPageSizeChange={(nextPageSize) => {
+                        setAttendancePageSize(nextPageSize);
+                        setAttendanceOffset(0);
+                      }}
+                    />
+                  </div>
                 </div>
-              </DetailCard>
+              </WorkforcePanel>
             ) : null}
 
-            <DetailCard
-              title={copy('Lifecycle history')}
-              description={copy(
-                'Status changes remain auditable and do not remove historical employee references.',
-              )}
-            >
-              <LifecycleHistory employee={employee} copy={copy} formatDate={formatDate} />
-            </DetailCard>
+            <WorkforcePanel>
+              <WorkforcePanelHeader
+                title={copy('Lifecycle history')}
+                description={copy(
+                  'Status changes remain auditable and do not remove historical employee references.',
+                )}
+              />
+              <div className="p-5">
+                <LifecycleHistory employee={employee} copy={copy} formatDate={formatDate} />
+              </div>
+            </WorkforcePanel>
 
-            <DetailCard title={copy('System information')}>
+            <WorkforcePanel>
+              <WorkforcePanelHeader title={copy('System information')} />
               <DetailGrid>
                 <Field
                   label={copy('Created')}
@@ -407,7 +412,7 @@ export function EmployeeDetailDialog({
                 />
                 <Field label={copy('Record version')} value={String(employee.version)} />
               </DetailGrid>
-            </DetailCard>
+            </WorkforcePanel>
           </div>
         )
       )}
@@ -455,15 +460,6 @@ function attendanceColumns(
   ];
 }
 
-function EmployeeStatusBadge({ status }: { status: Employee['status'] }) {
-  const { copy } = useWorkforceLocalization();
-  return (
-    <DBadge variant={status === 'ACTIVE' ? 'success' : 'secondary'}>
-      {copy(status === 'ACTIVE' ? 'Active' : 'Inactive')}
-    </DBadge>
-  );
-}
-
 function LifecycleHistory({
   employee,
   copy,
@@ -507,9 +503,7 @@ function LifecycleHistory({
       key: 'actor',
       label: copy('Changed by'),
       render: (event) =>
-        event.actorId
-          ? `${copy(event.actorKind === 'machine' ? 'Machine' : 'User')} · ${event.actorId}`
-          : copy('Not set'),
+        event.actorDisplayName ?? copy(event.actorKind === 'machine' ? 'System' : 'Not set'),
     },
   ];
   return (
@@ -529,6 +523,7 @@ interface LifecycleEvent {
   reason: string | null;
   actorId: string | null;
   actorKind: string | null;
+  actorDisplayName: string | null;
 }
 
 function lifecycleEvents(employee: EmployeeDetail): LifecycleEvent[] {
@@ -541,13 +536,14 @@ function lifecycleEvents(employee: EmployeeDetail): LifecycleEvent[] {
           reason: null,
           actorId: null,
           actorKind: null,
+          actorDisplayName: null,
         },
       ]
     : [];
   return [...joined, ...employee.statusHistory.map(historyEvent)];
 }
 
-function historyEvent(entry: EmployeeStatusHistoryEntry): LifecycleEvent {
+export function historyEvent(entry: EmployeeStatusHistoryEntry): LifecycleEvent {
   return {
     id: entry.id,
     event: entry.newStatus === 'INACTIVE' ? 'DEACTIVATED' : 'REACTIVATED',
@@ -555,49 +551,35 @@ function historyEvent(entry: EmployeeStatusHistoryEntry): LifecycleEvent {
     reason: entry.reason,
     actorId: entry.actorId,
     actorKind: entry.actorKind,
+    actorDisplayName: entry.actor?.displayName ?? null,
   };
 }
 
-function SummaryFact({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0 rounded-lg bg-[var(--color-surface-muted)] p-3">
-      <p className="text-xs font-medium text-[var(--color-text-muted)]">{label}</p>
-      <p className="mt-1 break-words font-medium">{value}</p>
-    </div>
-  );
+function DetailGrid({ children }: { children: ReactNode }) {
+  return <dl className="grid gap-x-6 gap-y-5 p-5 sm:grid-cols-2 lg:grid-cols-3">{children}</dl>;
 }
 
-function DetailCard({
-  title,
-  description,
-  children,
+function Field({
+  label,
+  value,
+  emphasized = false,
 }: {
-  title: string;
-  description?: string;
-  children: ReactNode;
+  label: string;
+  value: ReactNode;
+  emphasized?: boolean;
 }) {
   return (
-    <section className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:p-5">
-      <div>
-        <h3 className="text-sm font-semibold text-[var(--color-text)]">{title}</h3>
-        {description ? (
-          <p className="mt-1 max-w-3xl text-sm text-[var(--color-text-muted)]">{description}</p>
-        ) : null}
-      </div>
-      <div className="mt-4 min-w-0">{children}</div>
-    </section>
-  );
-}
-
-function DetailGrid({ children }: { children: ReactNode }) {
-  return <dl className="grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">{children}</dl>;
-}
-
-function Field({ label, value }: { label: string; value: ReactNode }) {
-  return (
     <div className="min-w-0">
-      <dt className="text-xs font-medium text-[var(--color-text-muted)]">{label}</dt>
-      <dd className="mt-1 break-words text-[var(--color-text)]">{value}</dd>
+      <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+        {label}
+      </dt>
+      <dd
+        className={`mt-1 break-words text-[var(--color-text)] ${
+          emphasized ? 'text-base font-semibold' : 'text-sm font-medium'
+        }`}
+      >
+        {value}
+      </dd>
     </div>
   );
 }

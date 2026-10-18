@@ -1,16 +1,44 @@
-import { assertApplicationEnabled, HttpRuntimeConfigAdapter } from '@digvation/business-runtime';
+import { HttpAuthAdapter } from '@digvation/business-auth';
+import {
+  assertApplicationEnabled,
+  HttpDeploymentBootstrapAdapter,
+  resolveBootstrapWorkspace,
+} from '@digvation/business-runtime';
 
-import { HttpAuthAdapter } from '../../auth/http-auth-adapter';
+import { HttpAccountActivationAdapter } from '../../auth/http-account-activation.adapter';
+import { HttpPasswordRecoveryAdapter } from '../../auth/http-password-recovery.adapter';
 import { BackofficeProviders } from '../providers/backoffice-providers';
 import { backofficeRouter } from '../router/backoffice-router';
+import type { BackofficeStartupResult } from './backoffice-startup';
 
-export async function bootstrapBackoffice() {
-  const runtimePort = new HttpRuntimeConfigAdapter();
-  const runtime = await runtimePort.load();
-  document.title = `${runtime.branding.productName} Backoffice`;
+export async function bootstrapBackoffice(): Promise<BackofficeStartupResult> {
+  const bootstrapPort = new HttpDeploymentBootstrapAdapter();
+  const bootstrap = await bootstrapPort.load();
+  document.title = `${bootstrap.branding.productName} Backoffice`;
 
-  assertApplicationEnabled(runtime, 'backoffice');
-  const auth = new HttpAuthAdapter(runtime.apiBaseUrl, runtime.workspace);
+  assertApplicationEnabled(bootstrap, 'backoffice');
+  const auth = new HttpAuthAdapter(
+    bootstrap.apiBaseUrl,
+    resolveBootstrapWorkspace(bootstrap),
+    'backoffice',
+  );
+  const passwordRecovery = new HttpPasswordRecoveryAdapter(
+    bootstrap.apiBaseUrl,
+    resolveBootstrapWorkspace(bootstrap),
+  );
 
-  return <BackofficeProviders runtime={runtime} auth={auth} router={backofficeRouter} />;
+  const accountActivation = new HttpAccountActivationAdapter(bootstrap.apiBaseUrl);
+
+  return {
+    branding: bootstrap.branding,
+    element: (
+      <BackofficeProviders
+        bootstrap={bootstrap}
+        auth={auth}
+        passwordRecovery={passwordRecovery}
+        accountActivation={accountActivation}
+        router={backofficeRouter}
+      />
+    ),
+  };
 }

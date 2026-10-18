@@ -1,9 +1,15 @@
-import type { BackofficeSession } from './auth-session';
+import { hasSessionFeature, type AuthSession, type SessionFeature } from '@digvation/business-auth';
+
+import { canAccessReport } from '../features/reporting/model/report-availability';
+import { REPORT_CATALOG } from '../features/reporting/model/report-catalog';
 
 export type BackofficeCapability =
   | 'dashboard'
   | 'catalog'
+  | 'promotions'
   | 'employees'
+  | 'memberships'
+  | 'customers'
   | 'attendance'
   | 'finance'
   | 'expenses'
@@ -12,7 +18,6 @@ export type BackofficeCapability =
   | 'reports'
   | 'transactions'
   | 'configuration'
-  | 'tax'
   | 'accessControl'
   | 'activity';
 
@@ -23,6 +28,8 @@ export type BackofficeAction =
   | 'viewUsers'
   | 'inviteUsers'
   | 'manageUserRoles'
+  | 'updateUsers'
+  | 'viewSecurityActivity'
   | 'viewOperationalAccess'
   | 'manageOperationalAccess'
   | 'viewBusinessProfile'
@@ -36,13 +43,18 @@ export type BackofficeAction =
   | 'viewPricing'
   | 'createPricing'
   | 'cancelPricing'
-  | 'viewTax'
-  | 'createTax'
-  | 'updateTax'
-  | 'cancelTax'
+  | 'createPromotion'
+  | 'updatePromotion'
   | 'createEmployee'
   | 'updateEmployee'
   | 'manageAttendance'
+  | 'enrollMember'
+  | 'manageMember'
+  | 'manageCustomer'
+  | 'viewLoyalty'
+  | 'configureLoyalty'
+  | 'viewCommission'
+  | 'configureCommission'
   | 'createFinancialAccount'
   | 'updateFinancialAccount'
   | 'updatePaymentRouting'
@@ -56,6 +68,17 @@ export type BackofficeAction =
   | 'createReconciliation'
   | 'updateReconciliation';
 
+const entitlementForArea: Partial<Record<BackofficeCapability, SessionFeature>> = {
+  promotions: 'PROMOTIONS',
+  memberships: 'MEMBERSHIP',
+  attendance: 'WORKFORCE_ATTENDANCE',
+  expenses: 'FINANCE_OPERATIONS',
+  financialAccounts: 'FINANCE_OPERATIONS',
+  financialOperations: 'FINANCE_OPERATIONS',
+};
+
+export const BACKOFFICE_ACCESS_PERMISSION = 'backoffice:access';
+
 interface PermissionRequirement {
   allOf?: readonly string[];
   anyOf?: readonly string[];
@@ -64,7 +87,10 @@ interface PermissionRequirement {
 const capabilityPermissions: Record<BackofficeCapability, PermissionRequirement> = {
   dashboard: { allOf: ['auth:self'] },
   catalog: { allOf: ['catalog:read'] },
+  promotions: { allOf: ['promotions:read'] },
   employees: { allOf: ['employees:read'] },
+  memberships: { allOf: ['membership:read'] },
+  customers: { allOf: ['customers:read'] },
   attendance: { allOf: ['attendance:read'] },
   finance: { allOf: ['payments:read'] },
   expenses: { allOf: ['expenses:read'] },
@@ -74,24 +100,11 @@ const capabilityPermissions: Record<BackofficeCapability, PermissionRequirement>
   financialOperations: {
     allOf: ['cash:read', 'settlements:read', 'reconciliations:read'],
   },
-  reports: {
-    anyOf: [
-      'sales:read',
-      'payments:read',
-      'catalog:read',
-      'employees:read',
-      'attendance:read',
-      'expenses:read',
-      'cash:read',
-      'settlements:read',
-      'reconciliations:read',
-      'tax:read',
-      'locations:read',
-    ],
-  },
-  transactions: { allOf: ['sales:read'] },
+  // Evaluated above using the published REPORT_CATALOG; no permissive any-of shortcut.
+  reports: {},
+  // History shows completed transactions in full, which Runtime grants only with sales:read-completed.
+  transactions: { allOf: ['sales:read', 'sales:read-completed'] },
   configuration: { anyOf: ['business-profile:read', 'locations:read'] },
-  tax: { allOf: ['tax:read'] },
   accessControl: { allOf: ['roles:read'] },
   activity: { allOf: ['activity:read'] },
 };
@@ -103,6 +116,8 @@ const actionPermissions: Record<BackofficeAction, readonly string[]> = {
   viewUsers: ['users:read'],
   inviteUsers: ['users:invite'],
   manageUserRoles: ['users:roles'],
+  updateUsers: ['users:update'],
+  viewSecurityActivity: ['users:read', 'activity:read'],
   viewOperationalAccess: ['operational-access:read'],
   manageOperationalAccess: ['operational-access:update'],
   viewBusinessProfile: ['business-profile:read'],
@@ -116,13 +131,18 @@ const actionPermissions: Record<BackofficeAction, readonly string[]> = {
   viewPricing: ['pricing:read'],
   createPricing: ['pricing:create'],
   cancelPricing: ['pricing:cancel'],
-  viewTax: ['tax:read'],
-  createTax: ['tax:create'],
-  updateTax: ['tax:update'],
-  cancelTax: ['tax:cancel'],
+  createPromotion: ['promotions:create'],
+  updatePromotion: ['promotions:update'],
   createEmployee: ['employees:create'],
   updateEmployee: ['employees:update'],
   manageAttendance: ['attendance:manage'],
+  enrollMember: ['membership:enroll'],
+  manageMember: ['customers:manage', 'membership:update'],
+  manageCustomer: ['customers:manage'],
+  viewLoyalty: ['loyalty:read'],
+  configureLoyalty: ['loyalty:configure'],
+  viewCommission: ['commission:read'],
+  configureCommission: ['commission:configure'],
   createFinancialAccount: ['financial-accounts:create'],
   updateFinancialAccount: ['financial-accounts:update'],
   updatePaymentRouting: ['payment-routing:update'],
@@ -138,25 +158,43 @@ const actionPermissions: Record<BackofficeAction, readonly string[]> = {
 };
 
 export function canAccessBackoffice(
-  session: BackofficeSession,
+  session: AuthSession,
   capability: BackofficeCapability,
 ): boolean {
+  if (!session.access.permissions.includes(BACKOFFICE_ACCESS_PERMISSION)) return false;
+  // Navigation must use the same *published* catalog and entitlement/permission
+  // filtering as the report selector. Dormant finance report permissions alone
+  // must not expose an empty Reports page.
+  if (capability === 'reports')
+    return REPORT_CATALOG.some(({ type }) => canAccessReport(session, type));
+  if (capability === 'customers' && !session.access.foundations.includes('CUSTOMER_IDENTITY'))
+    return false;
+  // Employee management belongs to the shared Workforce foundation,
+  // not the Attendance feature. Retail-only POS without Commission need not show it.
+  if (capability === 'employees' && !session.access.foundations.includes('WORKFORCE')) return false;
+  if (capability === 'employees' && !hasSessionFeature(session.access, 'EMPLOYEE_WORKFORCE'))
+    return false;
+  const feature = entitlementForArea[capability];
+  if (
+    feature &&
+    (capability === 'memberships' || session.access.entitlements) &&
+    !hasSessionFeature(session.access, feature)
+  )
+    return false;
   const requirement = capabilityPermissions[capability];
-  const permissions = session.identity.permissions;
-  const hasAll = (requirement.allOf ?? []).every((permission) =>
-    permissions.includes(permission),
-  );
+  const permissions = session.access.permissions;
+  const hasAll = (requirement.allOf ?? []).every((permission) => permissions.includes(permission));
   const hasAny =
-    !requirement.anyOf ||
-    requirement.anyOf.some((permission) => permissions.includes(permission));
+    !requirement.anyOf || requirement.anyOf.some((permission) => permissions.includes(permission));
   return hasAll && hasAny;
 }
 
 export function canPerformBackofficeAction(
-  session: BackofficeSession,
+  session: AuthSession,
   action: BackofficeAction,
 ): boolean {
+  if (!session.access.permissions.includes(BACKOFFICE_ACCESS_PERMISSION)) return false;
   return actionPermissions[action].every((permission) =>
-    session.identity.permissions.includes(permission),
+    session.access.permissions.includes(permission),
   );
 }

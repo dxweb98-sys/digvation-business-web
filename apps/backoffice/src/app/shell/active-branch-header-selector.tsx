@@ -15,7 +15,7 @@ export function ActiveBranchHeaderSelector({
     useBusinessLocation();
   const { text } = useDashboardI18n();
 
-  if (!isReady) return null;
+  if (!isReady || locations.length < 2) return null;
 
   const selected = locations.find((location) => location.id === selectedLocationId);
   if (!selected) return null;

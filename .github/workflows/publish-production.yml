@@ -1,0 +1,103 @@
+name: Publish Production Web (main only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Approved SemVer without v prefix (e.g. 1.3.2)
+        type: string
+        required: true
+
+permissions:
+  contents: write
+  actions: read
+  packages: write
+
+concurrency:
+  group: production-web-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: publish-production-web
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      IMAGE: ghcr.io/${{ github.repository }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Verify main revision, SemVer and release gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION='${{ inputs.version }}'
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Version must be MAJOR.MINOR.PATCH'; exit 1; }
+          git fetch --no-tags origin main
+          test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" || { echo 'main advanced; restart release'; exit 1; }
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "Release v$VERSION already exists; refusing to overwrite"
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" >/dev/null 2>&1; then
+            echo "Tag v$VERSION already exists"
+            exit 1
+          fi
+          for WF in ci.yml release-validation.yml; do
+            success="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$WF/runs?head_sha=$GITHUB_SHA&event=push&per_page=20" --jq '[.workflow_runs[] | select(.conclusion == "success")] | length')"
+            test "$success" -ge 1 || { echo "No successful $WF on this main SHA"; exit 1; }
+          done
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@v3
+      - name: Build immutable images from main (never staging)
+        shell: bash
+        run: |
+          set -euo pipefail
+          SHORT="$(printf '%s' "$GITHUB_SHA" | cut -c1-12)"
+          : > "$RUNNER_TEMP/image-lines.jsonl"
+          while IFS=: read -r component target; do
+            tag="v$VERSION-$component-$SHORT"
+            image="$IMAGE:$tag"
+            if docker buildx imagetools inspect "$image" >/dev/null 2>&1; then
+              echo "Immutable image tag already exists: $image"
+              exit 1
+            fi
+            docker buildx build --push --target "$target" \
+              --build-arg "BUILD_REVISION=$GITHUB_SHA" \
+              --metadata-file "$RUNNER_TEMP/$component.json" \
+              --tag "$image" .
+            digest="$(jq -er '."containerimage.digest"' "$RUNNER_TEMP/$component.json")"
+            jq -cn --arg component "$component" --arg target "$target" \
+              --arg tag "$image" --arg ref "$IMAGE@$digest" \
+              '{component:$component,target:$target,tag:$tag,immutable_ref:$ref}' >> "$RUNNER_TEMP/image-lines.jsonl"
+          done <<'TARGETS'
+          backoffice:backoffice
+          operational:operational
+          member-portal:member-portal
+          TARGETS
+          jq -s --arg version "v$VERSION" --arg repository "$GITHUB_REPOSITORY" \
+            --arg source_branch "main" --arg revision "$GITHUB_SHA" \
+            '{version:$version,repository:$repository,source_branch:$source_branch,revision:$revision,images:.}' \
+            "$RUNNER_TEMP/image-lines.jsonl" > "$RUNNER_TEMP/production-web-manifest.json"
+      - name: Publish manifest and versioned GitHub release
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "v$VERSION" "$RUNNER_TEMP/production-web-manifest.json" \
+            --target "$GITHUB_SHA" \
+            --title "Web v$VERSION" \
+            --notes "Images built from the approved main commit $GITHUB_SHA. Use immutable_ref digests with dgvctl; staging images are not used."
+          echo "### Web production release v$VERSION" >> "$GITHUB_STEP_SUMMARY"
+          echo "Source: main / $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+          cat "$RUNNER_TEMP/production-web-manifest.json" >> "$GITHUB_STEP_SUMMARY"

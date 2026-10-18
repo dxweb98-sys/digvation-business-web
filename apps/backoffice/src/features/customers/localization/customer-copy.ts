@@ -1,0 +1,52 @@
+export const customerCopy = {
+  Customers: { id: 'Pelanggan', en: 'Customers' },
+  description: {
+    id: 'Kelola identitas pelanggan dan lihat transaksi terakhir.',
+    en: 'Manage customer identities and view recent transactions.',
+  },
+  search: { id: 'Cari nama atau nomor telepon', en: 'Search name or phone' },
+  Name: { id: 'Nama', en: 'Name' },
+  Phone: { id: 'Telepon', en: 'Phone' },
+  Status: { id: 'Status', en: 'Status' },
+  Active: { id: 'Aktif', en: 'Active' },
+  Inactive: { id: 'Tidak aktif', en: 'Inactive' },
+  Member: { id: 'Member', en: 'Member' },
+  Regular: { id: 'Pelanggan Umum', en: 'Regular Customer' },
+  Type: { id: 'Jenis pelanggan', en: 'Customer type' },
+  Detail: { id: 'Detail pelanggan', en: 'Customer details' },
+  Edit: { id: 'Edit profil', en: 'Edit profile' },
+  Identity: { id: 'Identitas pelanggan', en: 'Customer identity' },
+  Transactions: { id: 'Transaksi selesai terakhir', en: 'Recent finalized transactions' },
+  HistoryNote: {
+    id: 'Menampilkan maksimal 10 transaksi selesai terbaru.',
+    en: 'Showing up to 10 recent finalized transactions.',
+  },
+  NoTransactions: {
+    id: 'Belum ada transaksi selesai untuk pelanggan ini.',
+    en: 'This customer has no finalized transactions yet.',
+  },
+  NoCustomers: { id: 'Belum ada pelanggan.', en: 'No customers yet.' },
+  NoResults: { id: 'Tidak ada pelanggan yang sesuai.', en: 'No matching customers.' },
+  LoadError: {
+    id: 'Pelanggan tidak dapat dimuat. Coba lagi.',
+    en: 'Customers could not be loaded. Try again.',
+  },
+  Retry: { id: 'Coba lagi', en: 'Retry' },
+  Close: { id: 'Tutup', en: 'Close' },
+  Cancel: { id: 'Batal', en: 'Cancel' },
+  Save: { id: 'Simpan', en: 'Save' },
+  Membership: { id: 'Buka Membership', en: 'Open Membership' },
+  MemberNumber: { id: 'Nomor Member', en: 'Member number' },
+  ProfileNote: {
+    id: 'Perubahan profil tidak mengubah identitas pada transaksi yang sudah selesai.',
+    en: 'Profile changes do not change identity snapshots on finalized transactions.',
+  },
+  NationalPhone: {
+    id: 'Masukkan nomor nasional, misalnya 081234567890.',
+    en: 'Enter a national number, for example 081234567890.',
+  },
+  Validation: {
+    id: 'Isi nama dan nomor telepon nasional yang valid.',
+    en: 'Enter a name and a valid national phone number.',
+  },
+} satisfies Record<string, { id: string; en: string }>;

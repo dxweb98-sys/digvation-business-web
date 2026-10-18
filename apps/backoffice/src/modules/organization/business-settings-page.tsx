@@ -1,6 +1,7 @@
 import {
   DBadge,
   DButton,
+  DCheckbox,
   DConfirmDialog,
   DDialog,
   DDataTable,
@@ -15,14 +16,8 @@ import { useMemo, useState } from 'react';
 
 import { useRuntime } from '@digvation/business-runtime';
 import { canPerformBackofficeAction } from '../../auth/backoffice-access';
-import {
-  isSessionExpiredError,
-  useBackofficeAuth,
-} from '../../auth/backoffice-auth-context';
-import {
-  BackofficePage,
-  BackofficePageHeader,
-} from '../../app/layout/backoffice-page';
+import { isSessionExpiredError, useBackofficeAuth } from '../../auth/backoffice-auth-context';
+import { BackofficePage, BackofficePageHeader } from '../../app/layout/backoffice-page';
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
 import { useBackofficeLocalization } from '../../app/localization/backoffice-localization';
 import {
@@ -49,14 +44,12 @@ export function BusinessSettingsPage() {
   const { showToast } = useToast();
   const { copy } = useBackofficeLocalization();
   const [editingProfile, setEditingProfile] = useState<BusinessProfile | null>(null);
-  const [editingLocation, setEditingLocation] = useState<
-    SellingLocation | null | undefined
-  >(undefined);
-  const [deactivatingLocation, setDeactivatingLocation] =
-    useState<SellingLocation | null>(null);
+  const [editingLocation, setEditingLocation] = useState<SellingLocation | null | undefined>(
+    undefined,
+  );
+  const [deactivatingLocation, setDeactivatingLocation] = useState<SellingLocation | null>(null);
   const [locationsOffset, setLocationsOffset] = useState(0);
-  const [locationsPageSize, setLocationsPageSize] =
-    useState(locationPageLimit);
+  const [locationsPageSize, setLocationsPageSize] = useState(locationPageLimit);
 
   const canViewProfile = session
     ? canPerformBackofficeAction(session, 'viewBusinessProfile')
@@ -79,11 +72,7 @@ export function BusinessSettingsPage() {
     enabled: canViewProfile,
   });
   const locationsQuery = useQuery({
-    queryKey: [
-      ...businessSettingsKeys.locations,
-      locationsOffset,
-      locationsPageSize,
-    ],
+    queryKey: [...businessSettingsKeys.locations, locationsOffset, locationsPageSize],
     queryFn: () =>
       api.listLocations({
         limit: locationsPageSize,
@@ -102,9 +91,7 @@ export function BusinessSettingsPage() {
 
   if (!session) return null;
 
-  const currentMainLocation = locationsQuery.data?.items.find(
-    (location) => location.isMain,
-  );
+  const currentMainLocation = locationsQuery.data?.items.find((location) => location.isMain);
   const hasLocations = (locationsQuery.data?.total ?? 0) > 0;
 
   return (
@@ -137,9 +124,7 @@ export function BusinessSettingsPage() {
           onDeactivate={setDeactivatingLocation}
           offset={locationsQuery.data?.offset ?? locationsOffset}
           pageSize={locationsPageSize}
-          onPageChange={(page) =>
-            setLocationsOffset((page - 1) * locationsPageSize)
-          }
+          onPageChange={(page) => setLocationsOffset((page - 1) * locationsPageSize)}
           onPageSizeChange={(pageSize) => {
             setLocationsPageSize(pageSize);
             setLocationsOffset(0);
@@ -225,11 +210,7 @@ function ProfileCard({
           </div>
         </div>
         {canUpdate && profile ? (
-          <DButton
-            variant="secondary"
-            size="sm"
-            onClick={() => onEdit(profile)}
-          >
+          <DButton variant="secondary" size="sm" onClick={() => onEdit(profile)}>
             {copy('Edit profile')}
           </DButton>
         ) : null}
@@ -237,9 +218,7 @@ function ProfileCard({
       {isLoading ? (
         <DSkeleton className="mt-5 h-6 w-52" />
       ) : (
-        <p className="mt-5 text-lg font-semibold">
-          {profile?.name ?? copy('Not configured')}
-        </p>
+        <p className="mt-5 text-lg font-semibold">{profile?.name ?? copy('Not configured')}</p>
       )}
     </section>
   );
@@ -280,9 +259,7 @@ function LocationsPanel({
       render: (location) => (
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-medium">{location.name}</span>
-          {location.isMain ? (
-            <DBadge variant="secondary">{copy('Main Branch')}</DBadge>
-          ) : null}
+          {location.isMain ? <DBadge variant="secondary">{copy('Main Branch')}</DBadge> : null}
         </div>
       ),
     },
@@ -291,9 +268,7 @@ function LocationsPanel({
       key: 'status',
       label: copy('Status'),
       render: (location) => (
-        <DBadge
-          variant={location.status === 'ACTIVE' ? 'outline' : 'secondary'}
-        >
+        <DBadge variant={location.status === 'ACTIVE' ? 'success' : 'secondary'}>
           {copy(location.status === 'ACTIVE' ? 'Active' : 'Inactive')}
         </DBadge>
       ),
@@ -309,10 +284,7 @@ function LocationsPanel({
         emptyMessage={copy('No selling locations have been created yet.')}
         headerActions={
           canCreate ? (
-            <DButton
-              leftIcon={<MapPinPlus className="size-4" />}
-              onClick={onCreate}
-            >
+            <DButton leftIcon={<MapPinPlus className="size-4" />} onClick={onCreate}>
               {copy('Add location')}
             </DButton>
           ) : null
@@ -337,8 +309,7 @@ function LocationsPanel({
                   icon: <CircleOff className="size-4" />,
                   variant: 'danger',
                   onClick: onDeactivate,
-                  show: (location) =>
-                    location.status === 'ACTIVE' && !location.isMain,
+                  show: (location) => location.status === 'ACTIVE' && !location.isMain,
                 },
               ]
             : []
@@ -376,10 +347,8 @@ function ProfileEditor({
       if (!isSessionExpiredError(error))
         showToast({
           variant: 'danger',
-          title: normalizeBackofficeApiError(
-            error,
-            copy('Could not update business profile.'),
-          ).safeMessage,
+          title: normalizeBackofficeApiError(error, copy('Could not update business profile.'))
+            .safeMessage,
         });
     }
   };
@@ -388,9 +357,7 @@ function ProfileEditor({
       open={Boolean(profile)}
       onClose={onClose}
       title={copy('Business profile')}
-      description={copy(
-        'Set the name that identifies this business in POS records.',
-      )}
+      description={copy('Set the name that identifies this business in POS records.')}
       footer={
         <div className="flex justify-end gap-2">
           <DButton variant="secondary" onClick={onClose}>
@@ -471,18 +438,15 @@ function LocationEditor({
       if (!isSessionExpiredError(error))
         showToast({
           variant: 'danger',
-          title: normalizeBackofficeApiError(
-            error,
-            copy('Could not save selling location.'),
-          ).safeMessage,
+          title: normalizeBackofficeApiError(error, copy('Could not save selling location.'))
+            .safeMessage,
         });
     }
   };
 
   const save = () => {
     if (!name.trim() || (isNew && !code.trim())) return;
-    const movesExistingMain =
-      setAsMain && !isCurrentMain && hasLocations && !firstLocation;
+    const movesExistingMain = setAsMain && !isCurrentMain && hasLocations && !firstLocation;
     if (movesExistingMain) {
       setConfirmMainChange(true);
       return;
@@ -501,9 +465,7 @@ function LocationEditor({
       <DDialog
         open={location !== undefined}
         onClose={onClose}
-        title={
-          isNew ? copy('Add selling location') : copy('Edit selling location')
-        }
+        title={isNew ? copy('Add selling location') : copy('Edit selling location')}
         description={
           isNew
             ? copy(
@@ -516,10 +478,7 @@ function LocationEditor({
             <DButton variant="secondary" onClick={onClose}>
               {copy('Cancel')}
             </DButton>
-            <DButton
-              onClick={save}
-              disabled={!name.trim() || (isNew && !code.trim())}
-            >
+            <DButton onClick={save} disabled={!name.trim() || (isNew && !code.trim())}>
               {copy('Save location')}
             </DButton>
           </div>
@@ -534,11 +493,7 @@ function LocationEditor({
               placeholder="MAIN"
             />
           ) : (
-            <DInput
-              label={copy('Location code')}
-              value={location?.code ?? ''}
-              disabled
-            />
+            <DInput label={copy('Location code')} value={location?.code ?? ''} disabled />
           )}
           <DInput
             label={copy('Location name')}
@@ -549,31 +504,30 @@ function LocationEditor({
           />
         </div>
 
-        <label className="mt-5 flex items-start gap-3 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-4 py-3">
-          <input
-            type="checkbox"
-            checked={setAsMain}
-            disabled={isCurrentMain || firstLocation}
-            onChange={(event) => setSetAsMain(event.target.checked)}
-            className="mt-0.5 size-4 accent-[var(--color-brand)]"
-          />
-          <span className="min-w-0">
-            <span className="block text-sm font-medium">
-              {copy('Set as Main Branch')}
+        <section className="mt-5 border-t border-[var(--color-border)] pt-4">
+          <label className="flex items-start gap-3">
+            <DCheckbox
+              checked={setAsMain}
+              disabled={isCurrentMain || firstLocation}
+              onChange={() => setSetAsMain((current) => !current)}
+              className="mt-0.5"
+            />
+            <span className="min-w-0">
+              <span className="block text-sm font-medium">{copy('Set as Main Branch')}</span>
+              <span className="mt-0.5 block text-xs leading-5 text-[var(--color-text-muted)]">
+                {isCurrentMain
+                  ? copy(
+                      'This is the current Main Branch. Choose another active location to move the Main Branch.',
+                    )
+                  : firstLocation
+                    ? copy('The first active location becomes Main Branch automatically.')
+                    : copy(
+                        'Main Branch is used as the default location for Dashboard and other business workflows.',
+                      )}
+              </span>
             </span>
-            <span className="mt-0.5 block text-xs leading-5 text-[var(--color-text-muted)]">
-              {isCurrentMain
-                ? copy(
-                    'This is the current Main Branch. Choose another active location to move the Main Branch.',
-                  )
-                : firstLocation
-                  ? copy('The first active location becomes Main Branch automatically.')
-                  : copy(
-                      'Main Branch is used as the default location for Dashboard and other business workflows.',
-                    )}
-            </span>
-          </span>
-        </label>
+          </label>
+        </section>
       </DDialog>
 
       <DConfirmDialog

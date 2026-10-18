@@ -1,31 +1,19 @@
-import type { RuntimeAvailabilityConfig } from '@digvation/business-runtime';
-import { createContext, useContext, type ReactNode } from 'react';
+import { useAuth, type AuthSession } from '@digvation/business-auth';
 
-const OperationalAvailabilityContext = createContext<RuntimeAvailabilityConfig | null>(null);
+export type OperationalAvailability = AuthSession['access'];
 
-export function OperationalAvailabilityProvider({
-  availability,
-  children,
-}: {
-  availability: RuntimeAvailabilityConfig;
-  children: ReactNode;
-}) {
-  return (
-    <OperationalAvailabilityContext.Provider value={availability}>
-      {children}
-    </OperationalAvailabilityContext.Provider>
-  );
-}
-
-export function useOperationalAvailability(): RuntimeAvailabilityConfig {
-  const value = useContext(OperationalAvailabilityContext);
-  if (!value) throw new Error('OperationalAvailabilityProvider is missing.');
-  return value;
+/**
+ * Transitional compatibility helper for Operational consumers that have not
+ * yet moved to session.access directly. It owns no state and performs no
+ * network request; Runtime's authenticated session context remains canonical.
+ */
+export function useOperationalAvailability(): OperationalAvailability {
+  return useAuth().session.access;
 }
 
 export function hasOperationalPermission(
-  availability: RuntimeAvailabilityConfig,
+  availability: OperationalAvailability,
   permission: string,
 ): boolean {
-  return availability.effectivePermissions.includes(permission);
+  return availability.permissions.includes(permission);
 }

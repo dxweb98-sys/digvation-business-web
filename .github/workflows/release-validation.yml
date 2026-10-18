@@ -1,0 +1,59 @@
+name: Release Validation
+
+on:
+  push:
+    branches: [main]
+  merge_group:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release-gate:
+    name: release-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Enable Corepack
+        run: corepack enable
+      - name: Prepare pnpm
+        run: corepack prepare pnpm@11.22.0 --activate
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: E2E smoke
+        env:
+          VITE_BUILD_REVISION: ${{ github.sha }}
+        run: pnpm test:e2e
+      - name: Build production surface containers
+        shell: bash
+        run: |
+          set -euo pipefail
+          for target in backoffice operational member-portal; do
+            docker build --target "$target" --build-arg BUILD_REVISION="$GITHUB_SHA" -t "release-check-$target:$GITHUB_SHA" .
+          done
+      - name: Health smoke all three web surfaces
+        shell: bash
+        run: |
+          set -euo pipefail
+          cleanup() {
+            docker rm -f release-check-backoffice release-check-operational release-check-member-portal >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          docker run -d --name release-check-backoffice -p 18081:8080 "release-check-backoffice:$GITHUB_SHA"
+          docker run -d --name release-check-operational -p 18082:8080 "release-check-operational:$GITHUB_SHA"
+          docker run -d --name release-check-member-portal -p 18083:8080 "release-check-member-portal:$GITHUB_SHA"
+          for port in 18081 18082 18083; do
+            ready=false
+            for attempt in $(seq 1 30); do
+              if curl -fsS "http://127.0.0.1:$port/healthz" >/dev/null; then ready=true; break; fi
+              sleep 1
+            done
+            test "$ready" = true
+          done

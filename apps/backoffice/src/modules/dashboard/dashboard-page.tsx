@@ -1,12 +1,7 @@
 import { useRuntime } from '@digvation/business-runtime';
 import { DCard } from '@digvation/ui';
 import { useQuery } from '@tanstack/react-query';
-import {
-  CircleDollarSign,
-  Hash,
-  PackageCheck,
-  ReceiptText,
-} from 'lucide-react';
+import { CircleDollarSign, ReceiptText, TrendingUp, WalletCards } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { BackofficePage } from '../../app/layout/backoffice-page';
@@ -17,7 +12,7 @@ import {
   canAccessReport,
   canShowDashboardWidget,
   isReportAvailable,
-} from '../reporting/report-availability';
+} from '../../features/reporting';
 import { BusinessInsightWidget } from './components/business-insight-widget';
 import { BusinessPerformanceCard } from './components/business-performance-card';
 import { DashboardKpiCard } from './components/dashboard-kpi-card';
@@ -67,17 +62,12 @@ function recentRange(days: number, date = new Date()): DateRange {
   return { from: localDateKey(from), to };
 }
 
-function previousRange(
-  from: string,
-  to: string,
-): Pick<DashboardFilterState, 'from' | 'to'> {
+function previousRange(from: string, to: string): Pick<DashboardFilterState, 'from' | 'to'> {
   const start = Date.parse(`${from}T00:00:00Z`);
   const end = Date.parse(`${to}T00:00:00Z`);
   const spanDays = Math.max(1, Math.round((end - start) / DAY_MS) + 1);
   const previousEnd = new Date(start - DAY_MS);
-  const previousStart = new Date(
-    previousEnd.getTime() - (spanDays - 1) * DAY_MS,
-  );
+  const previousStart = new Date(previousEnd.getTime() - (spanDays - 1) * DAY_MS);
   return {
     from: previousStart.toISOString().slice(0, 10),
     to: previousEnd.toISOString().slice(0, 10),
@@ -99,11 +89,6 @@ function numberValue(value: DashboardRow[string] | undefined): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function percentageChange(current: number, previous: number): number | null {
-  if (previous === 0) return current === 0 ? 0 : null;
-  return ((current - previous) / Math.abs(previous)) * 100;
-}
-
 function welcomeCopy(locale: 'id' | 'en', name: string, hour: number) {
   if (locale === 'id') {
     const greeting =
@@ -122,8 +107,7 @@ function welcomeCopy(locale: 'id' | 'en', name: string, hour: number) {
     };
   }
 
-  const greeting =
-    hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
   return {
     greeting: `${greeting}, ${name}!`,
     title: "Here's your business overview",
@@ -143,7 +127,6 @@ export function DashboardPage() {
     isDenied: locationDenied,
   } = useBusinessLocation();
   const [activityPeriod, setActivityPeriod] = useState<ActivityPeriod>('month');
-
   const api = useMemo(
     () => new DashboardApi(createApiClient(runtime.apiBaseUrl)),
     [createApiClient, runtime.apiBaseUrl],
@@ -151,51 +134,42 @@ export function DashboardPage() {
 
   // Core dashboard availability is independent from report hide preferences.
   const canReadSales = isReportAvailable(session, 'business-performance');
+  const canReadExpenses = isReportAvailable(session, 'expenses');
   const canReadCatalog = isReportAvailable(session, 'catalog-performance');
   const canReadEmployees = isReportAvailable(session, 'employee-performance');
 
   const showTopItems = canShowDashboardWidget(session, 'TOP_ITEMS');
   const showPaymentMix = canShowDashboardWidget(session, 'PAYMENT_MIX');
-  const showRecentTransactions = canShowDashboardWidget(
-    session,
-    'RECENT_TRANSACTIONS',
-  );
+  const showRecentTransactions = canShowDashboardWidget(session, 'RECENT_TRANSACTIONS');
   const showTopEmployees = canShowDashboardWidget(session, 'TOP_EMPLOYEES');
   const showBusinessInsight = canShowDashboardWidget(session, 'BUSINESS_INSIGHT');
 
-  const today = periodRange('today');
-  const yesterday = previousRange(today.from, today.to);
-  const month = periodRange('month');
-  const previousMonth = previousRange(month.from, month.to);
   const activity = periodRange(activityPeriod);
   const previousActivity = previousRange(activity.from, activity.to);
+  const month = periodRange('month');
+  const previousMonth = previousRange(month.from, month.to);
   const recent = recentRange(30);
 
-  const todayFilters: DashboardFilterState = { ...today, locationId };
-  const yesterdayFilters: DashboardFilterState = { ...yesterday, locationId };
+  const activityFilters: DashboardFilterState = { ...activity, locationId };
+  const previousActivityFilters: DashboardFilterState = { ...previousActivity, locationId };
+  const expenseActivityFilters: DashboardFilterState = { ...activityFilters, status: 'APPROVED' };
+  const todayExpenseFilters: DashboardFilterState = {
+    ...periodRange('today'),
+    locationId,
+    status: 'APPROVED',
+  };
+  const previousExpenseActivityFilters: DashboardFilterState = {
+    ...previousActivityFilters,
+    status: 'APPROVED',
+  };
   const monthFilters: DashboardFilterState = { ...month, locationId };
   const previousMonthFilters: DashboardFilterState = { ...previousMonth, locationId };
-  const activityFilters: DashboardFilterState = { ...activity, locationId };
-  const previousActivityFilters: DashboardFilterState = {
-    ...previousActivity,
-    locationId,
-  };
   const recentFilters: DashboardFilterState = { ...recent, locationId };
   const reportEnabled = Boolean(session && canReadSales && locationReady);
 
-  const todayPerformance = useQuery({
-    queryKey: ['dashboard', 'business-performance', todayFilters],
-    queryFn: () => api.report('business-performance', todayFilters),
-    enabled: reportEnabled,
-  });
-  const yesterdayPerformance = useQuery({
-    queryKey: ['dashboard', 'business-performance', yesterdayFilters],
-    queryFn: () => api.report('business-performance', yesterdayFilters),
-    enabled: reportEnabled,
-  });
-  const todayTransactions = useQuery({
-    queryKey: ['dashboard', 'today-transaction-summary', todayFilters],
-    queryFn: () => api.report('transactions', todayFilters, 1),
+  const dailySummary = useQuery({
+    queryKey: ['dashboard', 'daily-summary', locationId],
+    queryFn: () => api.dailySummary(locationId),
     enabled: reportEnabled,
   });
   const activityPerformance = useQuery({
@@ -204,14 +178,24 @@ export function DashboardPage() {
     enabled: reportEnabled,
   });
   const previousActivityPerformance = useQuery({
-    queryKey: [
-      'dashboard',
-      'business-performance',
-      'previous-activity',
-      previousActivityFilters,
-    ],
+    queryKey: ['dashboard', 'business-performance', 'previous-activity', previousActivityFilters],
     queryFn: () => api.report('business-performance', previousActivityFilters),
     enabled: reportEnabled,
+  });
+  const todayExpenses = useQuery({
+    queryKey: ['dashboard', 'expenses', 'today', todayExpenseFilters],
+    queryFn: () => api.report('expenses', todayExpenseFilters),
+    enabled: Boolean(session && canReadExpenses && !canReadSales && locationReady),
+  });
+  const activityExpenses = useQuery({
+    queryKey: ['dashboard', 'expenses', expenseActivityFilters],
+    queryFn: () => api.report('expenses', expenseActivityFilters),
+    enabled: Boolean(session && canReadExpenses && locationReady),
+  });
+  const previousActivityExpenses = useQuery({
+    queryKey: ['dashboard', 'expenses', 'previous-activity', previousExpenseActivityFilters],
+    queryFn: () => api.report('expenses', previousExpenseActivityFilters),
+    enabled: Boolean(session && canReadExpenses && locationReady),
   });
   const lastTransactions = useQuery({
     queryKey: ['dashboard', 'last-transactions', recentFilters],
@@ -224,12 +208,7 @@ export function DashboardPage() {
     enabled: Boolean(reportEnabled && (showPaymentMix || showBusinessInsight)),
   });
   const previousMonthPerformance = useQuery({
-    queryKey: [
-      'dashboard',
-      'business-performance',
-      'previous-month',
-      previousMonthFilters,
-    ],
+    queryKey: ['dashboard', 'business-performance', 'previous-month', previousMonthFilters],
     queryFn: () => api.report('business-performance', previousMonthFilters),
     enabled: Boolean(reportEnabled && showBusinessInsight),
   });
@@ -241,9 +220,7 @@ export function DashboardPage() {
   const employeePerformance = useQuery({
     queryKey: ['dashboard', 'employee-performance', monthFilters],
     queryFn: () => api.report('employee-performance', monthFilters, 5),
-    enabled: Boolean(
-      session && canReadEmployees && locationReady && showTopEmployees,
-    ),
+    enabled: Boolean(session && canReadEmployees && locationReady && showTopEmployees),
   });
 
   if (!session) return null;
@@ -262,60 +239,53 @@ export function DashboardPage() {
   };
   const money = (value: DashboardRow[string] | undefined) =>
     formatMoney(String(value ?? 0), runtime.currency);
-  const moneyNumber = (value: number) =>
-    formatMoney(String(value), runtime.currency);
+  const moneyNumber = (value: number) => formatMoney(String(value), runtime.currency);
+  const dailyMoney = (value: string | undefined) =>
+    formatMoney(String(value ?? '0'), summary?.currency ?? runtime.currency);
 
-  const todayData = todayPerformance.data;
-  const yesterdayData = yesterdayPerformance.data;
-  const todayTransactionData = todayTransactions.data;
+  const summary = dailySummary.data;
   const activityData = activityPerformance.data;
   const previousActivityData = previousActivityPerformance.data;
+  const activityExpenseData = activityExpenses.data;
+  const previousActivityExpenseData = previousActivityExpenses.data;
+  const activityRevenue = numberValue(activityData?.summary.finalRevenue);
+  const previousActivityRevenue = numberValue(previousActivityData?.summary.finalRevenue);
+  const activityNetRevenueValue = activityData?.summary.netRevenue;
+  const activityNetRevenue =
+    activityNetRevenueValue === undefined || activityNetRevenueValue === null
+      ? undefined
+      : numberValue(activityNetRevenueValue);
+  const previousActivityNetRevenueValue = previousActivityData?.summary.netRevenue;
+  const previousActivityNetRevenue =
+    previousActivityNetRevenueValue === undefined || previousActivityNetRevenueValue === null
+      ? undefined
+      : numberValue(previousActivityNetRevenueValue);
+  const activityTransactions = numberValue(activityData?.summary.transactionCount);
+  const previousActivityTransactions = numberValue(previousActivityData?.summary.transactionCount);
+  const approvedExpenses = numberValue(activityExpenseData?.summary.approvedExpenseTotal);
+  const approvedTodayExpenses = numberValue(todayExpenses.data?.summary.approvedExpenseTotal);
+  const previousApprovedExpenses = numberValue(
+    previousActivityExpenseData?.summary.approvedExpenseTotal,
+  );
   const monthData = monthPerformance.data;
   const previousMonthData = previousMonthPerformance.data;
 
-  const revenueToday = numberValue(todayData?.summary.finalRevenue);
-  const revenueYesterday = numberValue(yesterdayData?.summary.finalRevenue);
-  const transactionsToday = numberValue(todayData?.summary.transactionCount);
-  const transactionsYesterday = numberValue(yesterdayData?.summary.transactionCount);
-  const averageToday = numberValue(todayData?.summary.averageTransactionValue);
-  const averageYesterday = numberValue(yesterdayData?.summary.averageTransactionValue);
-  const quantityToday = numberValue(todayData?.summary.quantitySold);
-  const quantityYesterday = numberValue(yesterdayData?.summary.quantitySold);
-  const activityRevenue = numberValue(activityData?.summary.finalRevenue);
-  const previousActivityRevenue = numberValue(
-    previousActivityData?.summary.finalRevenue,
-  );
-  const activityTransactions = numberValue(activityData?.summary.transactionCount);
-  const previousActivityTransactions = numberValue(
-    previousActivityData?.summary.transactionCount,
-  );
-  const transactionTotalToday = numberValue(
-    todayTransactionData?.summary.transactionCount,
-  );
-  const finalizedToday = numberValue(todayTransactionData?.summary.finalizedCount);
-  const voidedToday = numberValue(todayTransactionData?.summary.voidedCount);
-
   const paymentMix =
-    monthData?.analytics.breakdowns?.paymentMethod ??
-    monthData?.analytics.breakdown ??
-    [];
+    monthData?.analytics.breakdowns?.paymentMethod ?? monthData?.analytics.breakdown ?? [];
   const recentTransactions = lastTransactions.data?.items ?? [];
   const topItems = (catalogPerformance.data?.items ?? []).slice(0, 5).map((row) => ({
     label: String(row.itemName ?? '—'),
     secondary: `${formatInteger(numberValue(row.quantitySold))} ${text('sold')} · ${formatInteger(numberValue(row.transactionCount))} ${text('txShort')}`,
     value: money(row.finalRevenue),
   }));
-  const topEmployees = (employeePerformance.data?.items ?? [])
-    .slice(0, 5)
-    .map((row) => ({
-      label: String(row.employeeName ?? '—'),
-      secondary: `${formatInteger(numberValue(row.contributedTransactions))} ${text('txShort')} · ${String(row.topCatalogItem ?? '—')}`,
-      value: money(row.contributionRevenue),
-    }));
+  const topEmployees = (employeePerformance.data?.items ?? []).slice(0, 5).map((row) => ({
+    label: String(row.employeeName ?? '—'),
+    secondary: `${formatInteger(numberValue(row.contributedTransactions))} ${text('txShort')} · ${String(row.topCatalogItem ?? '—')}`,
+    value: money(row.contributionRevenue),
+  }));
 
   const firstName =
-    session.identity.displayName.trim().split(/\s+/)[0] ||
-    (locale === 'id' ? 'Pengguna' : 'there');
+    session.identity.displayName.trim().split(/\s+/)[0] || (locale === 'id' ? 'Pengguna' : 'there');
   const welcome = welcomeCopy(locale, firstName, new Date().getHours());
 
   const transactionReportHref = canAccessReport(session, 'transactions')
@@ -337,9 +307,7 @@ export function DashboardPage() {
   return (
     <BackofficePage>
       <section className="pt-2">
-        <p className="text-sm font-medium text-[var(--color-text-muted)]">
-          {welcome.greeting}
-        </p>
+        <p className="text-sm font-medium text-[var(--color-text-muted)]">{welcome.greeting}</p>
         <h1 className="mt-1 text-[clamp(1.65rem,2vw,2.15rem)] font-semibold tracking-[-0.035em] text-[var(--color-text)]">
           {welcome.title}
         </h1>
@@ -348,7 +316,7 @@ export function DashboardPage() {
         </p>
       </section>
 
-      {!canReadSales ? (
+      {!canReadSales && !canReadExpenses ? (
         <DCard
           variant="elevated"
           className="mt-5 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5"
@@ -360,7 +328,7 @@ export function DashboardPage() {
         </DCard>
       ) : null}
 
-      {canReadSales && !locationReady ? (
+      {(canReadSales || canReadExpenses) && !locationReady ? (
         <DCard
           variant="elevated"
           className="mt-5 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5"
@@ -374,54 +342,77 @@ export function DashboardPage() {
         </DCard>
       ) : null}
 
+      {canReadExpenses && !canReadSales && locationReady ? (
+        <section className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <DashboardKpiCard
+            label={text('expensesToday')}
+            value={moneyNumber(approvedTodayExpenses)}
+            context={text('today')}
+            tone="warm"
+            icon={<WalletCards aria-hidden="true" className="size-4" />}
+          />
+        </section>
+      ) : null}
+
       {canReadSales && locationReady ? (
         <>
-          <section className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <DashboardKpiCard
-              label={text('revenueToday')}
-              value={money(todayData?.summary.finalRevenue)}
-              context={text('vsYesterday')}
-              delta={percentageChange(revenueToday, revenueYesterday)}
-              trendStart={revenueYesterday}
-              trendEnd={revenueToday}
-              tone="sky"
-              icon={<CircleDollarSign aria-hidden="true" className="size-4" />}
-            />
-            <DashboardKpiCard
-              label={text('transactionsToday')}
-              value={formatInteger(transactionsToday)}
-              context={text('vsYesterday')}
-              delta={percentageChange(transactionsToday, transactionsYesterday)}
-              trendStart={transactionsYesterday}
-              trendEnd={transactionsToday}
-              tone="mint"
-              icon={<ReceiptText aria-hidden="true" className="size-4" />}
-            />
-            <DashboardKpiCard
-              label={text('averageTransactionToday')}
-              value={money(todayData?.summary.averageTransactionValue)}
-              context={text('vsYesterday')}
-              delta={percentageChange(averageToday, averageYesterday)}
-              trendStart={averageYesterday}
-              trendEnd={averageToday}
-              tone="violet"
-              icon={<Hash aria-hidden="true" className="size-4" />}
-            />
-            <DashboardKpiCard
-              label={text('quantitySoldToday')}
-              value={formatInteger(quantityToday)}
-              context={text('vsYesterday')}
-              delta={percentageChange(quantityToday, quantityYesterday)}
-              trendStart={quantityYesterday}
-              trendEnd={quantityToday}
-              tone="warm"
-              icon={<PackageCheck aria-hidden="true" className="size-4" />}
-            />
-          </section>
+          {dailySummary.isPending ? (
+            <DCard
+              variant="elevated"
+              className="mt-5 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5"
+            >
+              <p className="text-sm text-[var(--color-text-muted)]">{text('summaryLoading')}</p>
+            </DCard>
+          ) : dailySummary.isError || !summary ? (
+            <DCard
+              variant="elevated"
+              className="mt-5 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5"
+            >
+              <p className="text-sm font-semibold">{text('summaryError')}</p>
+            </DCard>
+          ) : (
+            <section className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <DashboardKpiCard
+                label={text('incomeToday')}
+                value={dailyMoney(summary.income)}
+                context={text('today')}
+                tone="sky"
+                icon={<CircleDollarSign aria-hidden="true" className="size-4" />}
+              />
+              {canReadExpenses &&
+              summary.financeAvailable &&
+              summary.expenses !== undefined &&
+              summary.netRevenue !== undefined ? (
+                <>
+                  <DashboardKpiCard
+                    label={text('expensesToday')}
+                    value={dailyMoney(summary.expenses)}
+                    context={text('today')}
+                    tone="warm"
+                    icon={<WalletCards aria-hidden="true" className="size-4" />}
+                  />
+                  <DashboardKpiCard
+                    label={text('netRevenueToday')}
+                    value={dailyMoney(summary.netRevenue)}
+                    context={text('today')}
+                    tone="violet"
+                    icon={<TrendingUp aria-hidden="true" className="size-4" />}
+                  />
+                </>
+              ) : null}
+              <DashboardKpiCard
+                label={text('transactionsToday')}
+                value={formatInteger(summary.totalTransactions)}
+                context={text('today')}
+                tone="mint"
+                icon={<ReceiptText aria-hidden="true" className="size-4" />}
+              />
+            </section>
+          )}
 
           <section className="mt-4 grid items-start gap-4 xl:grid-cols-[minmax(0,1.9fr)_minmax(280px,0.72fr)]">
             <BusinessPerformanceCard
-              title={text('transactionActivity')}
+              title={text('activity')}
               period={activityPeriod}
               periodOptions={[
                 { value: 'today', label: text('today') },
@@ -429,21 +420,29 @@ export function DashboardPage() {
                 { value: 'month', label: text('thisMonth') },
                 { value: 'year', label: text('thisYear') },
               ]}
-              onPeriodChange={(value) =>
-                setActivityPeriod(value as ActivityPeriod)
-              }
+              onPeriodChange={(value) => setActivityPeriod(value as ActivityPeriod)}
               revenue={activityRevenue}
               transactions={activityTransactions}
               previousRevenue={previousActivityRevenue}
+              {...(activityNetRevenue === undefined ? {} : { netRevenue: activityNetRevenue })}
+              {...(previousActivityNetRevenue === undefined
+                ? {}
+                : { previousNetRevenue: previousActivityNetRevenue })}
               previousTransactions={previousActivityTransactions}
               trend={activityData?.analytics.trend ?? []}
+              expenses={approvedExpenses}
+              previousExpenses={previousApprovedExpenses}
+              expenseTrend={activityExpenseData?.analytics.trend ?? []}
+              showExpenses={canReadExpenses}
               formatMoney={moneyNumber}
             />
-            <TransactionCompletionCard
-              finalized={finalizedToday}
-              total={transactionTotalToday}
-              voided={voidedToday}
-            />
+            {summary ? (
+              <TransactionCompletionCard
+                finalized={summary.transactionCompletion.finalized}
+                total={summary.transactionCompletion.total}
+                voided={summary.transactionCompletion.voided}
+              />
+            ) : null}
           </section>
 
           {showTopItems || showPaymentMix || showRecentTransactions ? (

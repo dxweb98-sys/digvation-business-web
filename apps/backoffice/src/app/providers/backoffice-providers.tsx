@@ -1,18 +1,30 @@
 import {
-  applyEffectiveBusinessConfiguration,
-  RuntimeProvider,
-  useRuntime,
-  type RuntimeConfig,
+  AuthenticatedRuntimeProjectionProvider,
+  ConnectivityProvider,
+  DeploymentBootstrapProvider,
+  useConnectivity,
+  type DeploymentBootstrapConfig,
 } from '@digvation/business-runtime';
+import { ConnectionStateBoundary } from '@digvation/business-system-states';
+import type { AuthPort } from '@digvation/business-auth';
 import { DLocalizationProvider, DToastProvider } from '@digvation/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 import type { RouterProviderProps } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 
 import { BackofficeAuthProvider, useBackofficeAuth } from '../../auth/backoffice-auth-context';
-import type { HttpAuthAdapter } from '../../auth/http-auth-adapter';
-import { BackofficeLocalizationProvider, useBackofficeLocalization } from '../localization/backoffice-localization';
+import {
+  AccountActivationProvider,
+  type AccountActivationPort,
+} from '../../auth/account-activation';
+import { PasswordRecoveryProvider, type PasswordRecoveryPort } from '../../auth/password-recovery';
+import { useBackofficeStartupReady } from '../bootstrap/backoffice-startup';
+import { resolveBackofficeLocale } from '../localization/backoffice-locale';
+import {
+  BackofficeLocalizationProvider,
+  useBackofficeLocalization,
+} from '../localization/backoffice-localization-base';
 import { BusinessLocationProvider } from './business-location-context';
 
 const queryClient = new QueryClient({
@@ -23,22 +35,39 @@ const queryClient = new QueryClient({
 });
 
 interface BackofficeProvidersProps {
-  runtime: RuntimeConfig;
-  auth: HttpAuthAdapter;
+  bootstrap: DeploymentBootstrapConfig;
+  auth: AuthPort;
+  passwordRecovery: PasswordRecoveryPort;
+  accountActivation: AccountActivationPort;
   router: RouterProviderProps['router'];
 }
 
-export function BackofficeProviders({ runtime, auth, router }: BackofficeProvidersProps) {
+export function BackofficeProviders({
+  bootstrap,
+  auth,
+  passwordRecovery,
+  accountActivation,
+  router,
+}: BackofficeProvidersProps) {
   return (
-    <RuntimeProvider config={runtime}>
-      <BackofficeLocalizationProvider>
-        <BackofficeDesignSystemProviders auth={auth} router={router} />
-      </BackofficeLocalizationProvider>
-    </RuntimeProvider>
+    <DeploymentBootstrapProvider config={bootstrap}>
+      <ConnectivityProvider>
+        <BackofficeLocalizationProvider>
+          <PasswordRecoveryProvider port={passwordRecovery}>
+            <AccountActivationProvider port={accountActivation}>
+              <BackofficeDesignSystemProviders auth={auth} router={router} />
+            </AccountActivationProvider>
+          </PasswordRecoveryProvider>
+        </BackofficeLocalizationProvider>
+      </ConnectivityProvider>
+    </DeploymentBootstrapProvider>
   );
 }
 
-function BackofficeDesignSystemProviders({ auth, router }: Omit<BackofficeProvidersProps, 'runtime'>) {
+function BackofficeDesignSystemProviders({
+  auth,
+  router,
+}: Pick<BackofficeProvidersProps, 'auth' | 'router'>) {
   const { locale } = useBackofficeLocalization();
 
   return (
@@ -52,33 +81,45 @@ function BackofficeDesignSystemProviders({ auth, router }: Omit<BackofficeProvid
   );
 }
 
-function AuthenticatedBackofficeProviders({
-  router,
-}: Pick<BackofficeProvidersProps, 'router'>) {
-  const bootstrapRuntime = useRuntime();
-  const { session } = useBackofficeAuth();
+function AuthenticatedBackofficeProviders({ router }: Pick<BackofficeProvidersProps, 'router'>) {
+  const { session, status } = useBackofficeAuth();
   const { setLocale } = useBackofficeLocalization();
-  const runtime = useMemo(
-    () =>
-      applyEffectiveBusinessConfiguration(
-        bootstrapRuntime,
-        session?.businessConfiguration,
-      ),
-    [bootstrapRuntime, session?.businessConfiguration],
-  );
-  const configuredLocale = session?.businessConfiguration?.preferences.defaultLocale;
+  const markStartupReady = useBackofficeStartupReady();
 
   useEffect(() => {
-    if (configuredLocale) setLocale(configuredLocale === 'en-US' ? 'en' : 'id');
-  }, [configuredLocale, setLocale]);
+    if (!session) return;
+    setLocale(resolveBackofficeLocale(session.preferences.locale));
+  }, [session, setLocale]);
+
+  useEffect(() => {
+    if (status !== 'hydrating') markStartupReady();
+  }, [markStartupReady, status]);
+
+  // The startup splash overlay stays visible until session restore settles.
+  if (status === 'hydrating') return null;
+
+  const content = (
+    <QueryClientProvider client={queryClient}>
+      <BusinessLocationProvider>
+        <ConnectedBackofficeRouter router={router} />
+      </BusinessLocationProvider>
+    </QueryClientProvider>
+  );
+
+  if (!session) return content;
 
   return (
-    <RuntimeProvider config={runtime}>
-      <QueryClientProvider client={queryClient}>
-        <BusinessLocationProvider>
-          <RouterProvider router={router} />
-        </BusinessLocationProvider>
-      </QueryClientProvider>
-    </RuntimeProvider>
+    <AuthenticatedRuntimeProjectionProvider projection={session}>
+      {content}
+    </AuthenticatedRuntimeProjectionProvider>
+  );
+}
+
+function ConnectedBackofficeRouter({ router }: Pick<BackofficeProvidersProps, 'router'>) {
+  const { isOnline } = useConnectivity();
+  return (
+    <ConnectionStateBoundary isOnline={isOnline}>
+      <RouterProvider router={router} />
+    </ConnectionStateBoundary>
   );
 }

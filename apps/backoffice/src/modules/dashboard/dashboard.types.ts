@@ -2,7 +2,8 @@ export type DashboardReportType =
   | 'business-performance'
   | 'transactions'
   | 'catalog-performance'
-  | 'employee-performance';
+  | 'employee-performance'
+  | 'expenses';
 
 export type DashboardRow = Record<string, string | number | null>;
 
@@ -43,4 +44,20 @@ export interface DashboardFilterState {
   from: string;
   to: string;
   locationId: string;
+  status?: 'APPROVED';
+}
+
+export interface DashboardDailySummary {
+  date: string;
+  currency: string;
+  income: string;
+  expenses?: string;
+  netRevenue?: string;
+  totalTransactions: number;
+  financeAvailable: boolean;
+  transactionCompletion: {
+    total: number;
+    finalized: number;
+    voided: number;
+  };
 }

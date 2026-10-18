@@ -1,0 +1,28 @@
+{
+  "apiBaseUrl": "http://127.0.0.1:4003",
+  "deploymentProfile": "DEDICATED",
+  "workspaceResolution": {
+    "mode": "FIXED",
+    "workspace": "dgv-salon"
+  },
+  "applications": {
+    "operational": true,
+    "backoffice": true
+  },
+  "branding": {
+    "mode": "DIGVATION_DEFAULT",
+    "productName": "Digvation",
+    "companyName": "Digvation Indonesia"
+  },
+  "theme": {
+    "preset": "CUSTOM",
+    "radius": "SOFT",
+    "colors": {
+      "brand": "#a5584d"
+    }
+  },
+  "defaults": {
+    "locale": "id-ID",
+    "country": "ID"
+  }
+}

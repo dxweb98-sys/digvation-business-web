@@ -1,200 +1,71 @@
 import {
   AuthProvider,
-  useAuth,
   type AuthPort,
   type AuthSession,
   type SessionEndReason,
 } from '@digvation/business-auth';
 import {
-  applyEffectiveBusinessConfiguration,
+  AuthenticatedRuntimeProjectionProvider,
   ConnectivityProvider,
-  loadAuthenticatedRuntimeAvailability,
-  RuntimeProvider,
-  useRuntime,
-  type RuntimeAvailabilityConfig,
-  type RuntimeConfig,
+  DeploymentBootstrapProvider,
+  useConnectivity,
+  type DeploymentBootstrapConfig,
 } from '@digvation/business-runtime';
-import {
-  DLocalizationProvider,
-  DToastProvider as ToastProvider,
-  useToast,
-} from '@digvation/ui';
+import { ConnectionStateBoundary } from '@digvation/business-system-states';
+import { DLocalizationProvider, DToastProvider as ToastProvider, useToast } from '@digvation/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { RouterProviderProps } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-  type TransitionEvent,
-} from 'react';
+import { useCallback, useEffect, useRef, useState, type TransitionEvent } from 'react';
 
-import { OperationalLoginPage } from '../../modules/operational/operational-login-page';
-import { OperationalSessionProvider } from '../../modules/operational/operational-session-provider';
-import { PosOperationalSessionProvider } from '../../modules/pos/pos-operational-session-provider';
-import { OperationalAvailabilityProvider } from './operational-availability-context';
+import { operationalQueryClientDefaults } from '../data/operational-cache-policy';
+import { operationalCopy, type OperationalLocale } from '../localization/operational-localization';
+import { OperationalLoginPage } from '../auth/operational-login-page';
+import { resolveOperationalSurfaceAccess } from '../../shared/operational-access/operational-surface-access';
+import { OperationalAccessDenied } from '../auth/operational-access-denied';
+import { OperationalSessionProvider } from '../../shared/operational-access/operational-session-provider';
+import { PosOperationalSessionProvider } from '../../features/sell/session/pos-operational-session-provider';
 
-const SESSION_END_TRANSITION_MS = 5_000;
-const IDLE_SESSION_ENDED_MESSAGE =
-  'Sesi Anda telah berakhir karena tidak ada aktivitas. Silakan masuk kembali.';
-const INVALID_SESSION_ENDED_MESSAGE = 'Sesi Anda telah berakhir. Silakan masuk kembali.';
-
-function hasImplementedOperationalSurface(availability: RuntimeAvailabilityConfig): boolean {
-  const permissions = availability.effectivePermissions;
-  const hasPos =
-    availability.effectiveEntitlements.products.includes('POS') &&
-    permissions.some((permission) => permission.startsWith('sales:'));
-  const hasExpenses =
-    availability.effectiveEntitlements.capabilities.includes('FINANCE_OPERATIONS') &&
-    permissions.some((permission) => permission.startsWith('expenses:'));
-  return hasPos || hasExpenses;
-}
-
-function AuthenticatedOperationalRuntime({ children }: { children: ReactNode }) {
-  const { session, authPort } = useAuth();
-  const bootstrapRuntime = useRuntime();
-  const [state, setState] = useState<'loading' | 'allowed' | 'denied' | 'unavailable'>('loading');
-  const [effectiveRuntime, setEffectiveRuntime] = useState<RuntimeConfig | null>(null);
-  const [availability, setAvailability] = useState<RuntimeAvailabilityConfig | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    setState('loading');
-    setEffectiveRuntime(null);
-    setAvailability(null);
-    void (async () => {
-      const token = await authPort.getAccessToken?.();
-      if (!token) {
-        if (active) setState('denied');
-        return;
-      }
-      try {
-        const nextAvailability = await loadAuthenticatedRuntimeAvailability(
-          bootstrapRuntime.apiBaseUrl,
-          token,
-        );
-        if (!active) return;
-        if (
-          !nextAvailability.effectiveFoundations.includes('OPERATIONAL_ACCESS') ||
-          !hasImplementedOperationalSurface(nextAvailability)
-        ) {
-          setState('denied');
-          return;
-        }
-        setAvailability(nextAvailability);
-        setEffectiveRuntime(
-          applyEffectiveBusinessConfiguration(
-            bootstrapRuntime,
-            nextAvailability.businessConfiguration,
-          ),
-        );
-        setState('allowed');
-      } catch {
-        if (active) setState('unavailable');
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, [authPort, bootstrapRuntime, session.identity.userId]);
-
-  if (state === 'allowed' && effectiveRuntime && availability)
-    return (
-      <RuntimeProvider config={effectiveRuntime}>
-        <OperationalAvailabilityProvider availability={availability}>
-          <DLocalizationProvider
-            locale={effectiveRuntime.locale === 'en-US' ? 'en-US' : 'id-ID'}
-          >
-            {children}
-          </DLocalizationProvider>
-        </OperationalAvailabilityProvider>
-      </RuntimeProvider>
-    );
-
-  return (
-    <main className="grid min-h-screen place-items-center bg-[var(--color-background)] p-6 text-center">
-      <section className="max-w-md rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
-        <h1 className="text-lg font-semibold">
-          {state === 'loading'
-            ? 'Memverifikasi akses operasional'
-            : state === 'denied'
-              ? 'Akses operasional tidak tersedia'
-              : 'Konteks operasional belum tersedia'}
-        </h1>
-        <p className="mt-2 text-sm text-[var(--color-text-muted)]">
-          {state === 'loading'
-            ? 'Mohon tunggu.'
-            : 'Hubungi administrator jika akses ini seharusnya tersedia.'}
-        </p>
-      </section>
-    </main>
-  );
+function runtimeLocale(locale: string): OperationalLocale {
+  return locale === 'en-US' ? 'en-US' : 'id-ID';
 }
 
 const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      refetchOnWindowFocus: true,
-    },
-    mutations: {
-      retry: false,
-      networkMode: 'always',
-    },
-  },
+  defaultOptions: operationalQueryClientDefaults,
 });
 
 interface OperationalProvidersProps {
-  runtime: RuntimeConfig;
+  bootstrap: DeploymentBootstrapConfig;
   session: AuthSession | null;
   authPort: AuthPort;
   router: RouterProviderProps['router'];
 }
 
-type OperationalAuthBoundaryProps = OperationalProvidersProps;
+type OperationalAuthBoundaryProps = Omit<OperationalProvidersProps, 'bootstrap'>;
 
-function OperationalAuthBoundary({
-  runtime,
-  session,
-  authPort,
-  router,
-}: OperationalAuthBoundaryProps) {
+function OperationalAuthBoundary({ session, authPort, router }: OperationalAuthBoundaryProps) {
   const [authenticatedSession, setAuthenticatedSession] = useState(session);
   const [isLoggingOut, setLoggingOut] = useState(false);
-  const [sessionEndReason, setSessionEndReason] = useState<SessionEndReason | null>(null);
   const sessionEnded = useRef(false);
-  const sessionEndTimer = useRef<number | null>(null);
   const { showToast } = useToast();
 
-  const clearSessionEndTimer = useCallback(() => {
-    if (sessionEndTimer.current === null) return;
-    window.clearTimeout(sessionEndTimer.current);
-    sessionEndTimer.current = null;
-  }, []);
+  const locale = runtimeLocale(authenticatedSession?.preferences.locale ?? 'id-ID');
+  const copy = (value: string) => operationalCopy(value, locale);
 
   const handleSessionEnded = useCallback(
-    (reason: SessionEndReason) => {
+    (_reason: SessionEndReason) => {
       if (sessionEnded.current) return;
       sessionEnded.current = true;
-      clearSessionEndTimer();
       setLoggingOut(false);
       setAuthenticatedSession(null);
-      setSessionEndReason(reason);
       showToast({
         variant: 'warning',
-        title:
-          reason === 'idle' ? IDLE_SESSION_ENDED_MESSAGE : INVALID_SESSION_ENDED_MESSAGE,
+        title: copy('Your session has ended. Sign in again.'),
       });
       void authPort.logout();
-      sessionEndTimer.current = window.setTimeout(() => {
-        sessionEndTimer.current = null;
-        setSessionEndReason(null);
-      }, SESSION_END_TRANSITION_MS);
     },
-    [authPort, clearSessionEndTimer, showToast],
+    [authPort, copy, showToast],
   );
 
   useEffect(() => {
@@ -202,17 +73,20 @@ function OperationalAuthBoundary({
     return authPort.subscribeSessionEnded(handleSessionEnded);
   }, [authPort, handleSessionEnded]);
 
-  useEffect(() => () => clearSessionEndTimer(), [clearSessionEndTimer]);
+  const handleAuthenticated = useCallback((nextSession: AuthSession) => {
+    sessionEnded.current = false;
+    setAuthenticatedSession(nextSession);
+  }, []);
 
-  const handleAuthenticated = useCallback(
-    (nextSession: AuthSession) => {
-      clearSessionEndTimer();
-      sessionEnded.current = false;
-      setSessionEndReason(null);
-      setAuthenticatedSession(nextSession);
-    },
-    [clearSessionEndTimer],
-  );
+  useEffect(() => {
+    if (!isLoggingOut) return undefined;
+    // Return to sign-in even when the exit transition end is not delivered.
+    const timer = window.setTimeout(() => {
+      setAuthenticatedSession(null);
+      setLoggingOut(false);
+    }, 260);
+    return () => window.clearTimeout(timer);
+  }, [isLoggingOut]);
 
   const completeLogoutTransition = (event: TransitionEvent<HTMLDivElement>) => {
     if (event.target !== event.currentTarget || event.propertyName !== 'opacity') return;
@@ -221,69 +95,93 @@ function OperationalAuthBoundary({
     setLoggingOut(false);
   };
 
-  if (sessionEndReason) {
-    return (
-      <main className="grid min-h-screen place-items-center bg-[var(--color-background)] p-6 text-center">
-        <section className="max-w-md rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
-          <h1 className="text-lg font-semibold">Mengakhiri sesi</h1>
-          <p className="mt-2 text-sm text-[var(--color-text-muted)]">
-            Mengalihkan ke halaman masuk...
-          </p>
-        </section>
-      </main>
-    );
-  }
-
   if (!authenticatedSession) {
     return <OperationalLoginPage authPort={authPort} onAuthenticated={handleAuthenticated} />;
   }
 
+  const surface = resolveOperationalSurfaceAccess(authenticatedSession.access);
+  const operationalEnabled = authenticatedSession.access.foundations.includes('OPERATIONAL_ACCESS');
+  const denial = !operationalEnabled ? 'MODULE_NOT_ENABLED' : surface.denial;
+
+  if (denial || !surface.home) {
+    return (
+      <OperationalAccessDenied
+        reason={denial ?? 'NO_PERMITTED_MODULE'}
+        copy={copy}
+        onChangeAccount={() => {
+          sessionEnded.current = true;
+          void authPort.logout().finally(() => setAuthenticatedSession(null));
+        }}
+        onCheckAgain={async () => {
+          const refreshed = await authPort.refreshSessionContext();
+          if (!refreshed) {
+            setAuthenticatedSession(null);
+            return true;
+          }
+          const next = resolveOperationalSurfaceAccess(refreshed.access);
+          const enabled = refreshed.access.foundations.includes('OPERATIONAL_ACCESS');
+          if (enabled && next.home) {
+            setAuthenticatedSession(refreshed);
+            return true;
+          }
+          return false;
+        }}
+      />
+    );
+  }
+
   return (
-    <AuthProvider
-      session={authenticatedSession}
-      authPort={authPort}
-      onLogout={() => setLoggingOut(true)}
-    >
-      <AuthenticatedOperationalRuntime>
-        <OperationalSessionProvider>
-          <PosOperationalSessionProvider>
-            <div
-              className={`min-h-screen transition-[opacity,transform] duration-150 ease-out ${
-                isLoggingOut
-                  ? 'pointer-events-none -translate-y-1 opacity-0'
-                  : 'opacity-100'
-              }`}
-              onTransitionEnd={completeLogoutTransition}
-            >
-              <RouterProvider router={router} />
-            </div>
-          </PosOperationalSessionProvider>
-        </OperationalSessionProvider>
-      </AuthenticatedOperationalRuntime>
-    </AuthProvider>
+    <AuthenticatedRuntimeProjectionProvider projection={authenticatedSession}>
+      <AuthProvider
+        session={authenticatedSession}
+        authPort={authPort}
+        onLogout={() => setLoggingOut(true)}
+      >
+        <DLocalizationProvider locale={runtimeLocale(authenticatedSession.preferences.locale)}>
+          <OperationalSessionProvider>
+            <PosOperationalSessionProvider>
+              <div
+                className={`operational-view-enter min-h-screen transition-[opacity,transform] duration-150 ease-out ${
+                  isLoggingOut ? 'pointer-events-none -translate-y-1 opacity-0' : 'opacity-100'
+                }`}
+                onTransitionEnd={completeLogoutTransition}
+              >
+                <ConnectedOperationalRouter router={router} />
+              </div>
+            </PosOperationalSessionProvider>
+          </OperationalSessionProvider>
+        </DLocalizationProvider>
+      </AuthProvider>
+    </AuthenticatedRuntimeProjectionProvider>
   );
 }
 
 export function OperationalProviders({
-  runtime,
+  bootstrap,
   session,
   authPort,
   router,
 }: OperationalProvidersProps) {
   return (
-    <RuntimeProvider config={runtime}>
+    <DeploymentBootstrapProvider config={bootstrap}>
       <ConnectivityProvider>
         <QueryClientProvider client={queryClient}>
-          <ToastProvider>
-            <OperationalAuthBoundary
-              runtime={runtime}
-              session={session}
-              authPort={authPort}
-              router={router}
-            />
-          </ToastProvider>
+          <DLocalizationProvider locale={runtimeLocale(bootstrap.defaults.locale)}>
+            <ToastProvider>
+              <OperationalAuthBoundary session={session} authPort={authPort} router={router} />
+            </ToastProvider>
+          </DLocalizationProvider>
         </QueryClientProvider>
       </ConnectivityProvider>
-    </RuntimeProvider>
+    </DeploymentBootstrapProvider>
+  );
+}
+
+function ConnectedOperationalRouter({ router }: Pick<OperationalProvidersProps, 'router'>) {
+  const { isOnline } = useConnectivity();
+  return (
+    <ConnectionStateBoundary isOnline={isOnline}>
+      <RouterProvider router={router} />
+    </ConnectionStateBoundary>
   );
 }

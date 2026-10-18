@@ -1,8 +1,8 @@
 import { useParams } from 'react-router';
 
-import { ReplatformedPosWorkspace } from '../../features/sell/components/replatformed-pos-workspace';
-import { VariantPicker } from '../../features/sell/components/variant-picker';
-import { useCashierTransactionWorkspace } from '../../features/sell/use-cashier-transaction-workspace';
+import { ReplatformedPosWorkspace } from '../../features/sell/workspace/ui/replatformed-pos-workspace';
+import { ItemConfigurator } from '../../features/sell/cart/item-configurator';
+import { useCashierTransactionWorkspace } from '../../features/sell/workspace/model/use-cashier-transaction-workspace';
 
 export function SellPage() {
   const { saleId } = useParams<{ saleId: string }>();
@@ -11,11 +11,12 @@ export function SellPage() {
   return (
     <section className="h-full min-h-0 overflow-hidden">
       <ReplatformedPosWorkspace workspace={workspace} />
-      {workspace.variantPicker?.context !== 'TRANSACTION_ADJUSTMENT' && workspace.variantPicker ? (
-        <VariantPicker
-          {...workspace.variantPicker}
-          onSelect={workspace.selectVariant}
-          onClose={workspace.closeVariantPicker}
+      {workspace.itemConfigurator ? (
+        <ItemConfigurator
+          {...workspace.itemConfigurator}
+          loadCandidates={workspace.loadComponentCandidates}
+          onConfirm={workspace.confirmItemConfiguration}
+          onClose={workspace.closeItemConfigurator}
         />
       ) : null}
     </section>
