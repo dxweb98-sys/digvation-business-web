@@ -168,10 +168,20 @@ export function NotificationBell() {
                 <span
                   className={[
                     'mt-1 flex size-5 shrink-0 items-center justify-center rounded-full border',
-                    notification.readAt ? 'border-transparent bg-[var(--color-surface-muted)]/60' : 'border-[var(--color-brand)]/20 bg-[var(--color-brand)]/10',
+                    notification.readAt
+                      ? 'border-transparent bg-[var(--color-surface-muted)]/60'
+                      : 'border-[var(--color-brand)]/20 bg-[var(--color-brand)]/10',
                   ].join(' ')}
                   aria-hidden="true"
-                ><span className={notification.readAt ? 'size-1 rounded-full bg-[var(--color-text-muted)]/50' : 'size-1.5 rounded-full bg-[var(--color-brand)]'} /></span>
+                >
+                  <span
+                    className={
+                      notification.readAt
+                        ? 'size-1 rounded-full bg-[var(--color-text-muted)]/50'
+                        : 'size-1.5 rounded-full bg-[var(--color-brand)]'
+                    }
+                  />
+                </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold text-[var(--color-text)]">
                     {notificationTitle(locale, notification)}

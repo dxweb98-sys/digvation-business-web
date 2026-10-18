@@ -184,7 +184,9 @@ export function InvitationDialog({
               autoCapitalize="none"
               autoComplete="off"
               placeholder={copy('For example, siti@business.com')}
-              hint={copy('The activation link is sent here and the address is verified on activation.')}
+              hint={copy(
+                'The activation link is sent here and the address is verified on activation.',
+              )}
               error={emailError}
               disabled={saving}
             />

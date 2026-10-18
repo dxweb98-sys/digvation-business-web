@@ -131,7 +131,11 @@ describe('ProfileDialog (Owner)', () => {
 
   it('saves a changed email as unverified account data', async () => {
     client.get.mockResolvedValue(self(systemKey));
-    client.patch.mockResolvedValue({ ...self(systemKey), email: 'baru@example.com', emailVerifiedAt: null });
+    client.patch.mockResolvedValue({
+      ...self(systemKey),
+      email: 'baru@example.com',
+      emailVerifiedAt: null,
+    });
     renderDialog();
     await openEditor();
     await waitFor(() => expect(field(/Email/).value).toBe('siti@example.com'));
@@ -164,8 +168,16 @@ describe('ProfileDialog (Manager/Cashier)', () => {
     renderDialog();
 
     await waitFor(() => expect(document.body.textContent).toContain('siti@example.com'));
-    expect([...document.body.querySelectorAll('button')].some((node) => /Ubah profil/.test(node.textContent ?? ''))).toBe(false);
+    expect(
+      [...document.body.querySelectorAll('button')].some((node) =>
+        /Ubah profil/.test(node.textContent ?? ''),
+      ),
+    ).toBe(false);
     expect(field(/Nama tampilan/)).toBeNull();
-    expect([...document.body.querySelectorAll('button')].some((node) => /Kirim tautan verifikasi/.test(node.textContent ?? ''))).toBe(true);
+    expect(
+      [...document.body.querySelectorAll('button')].some((node) =>
+        /Kirim tautan verifikasi/.test(node.textContent ?? ''),
+      ),
+    ).toBe(true);
   });
 });

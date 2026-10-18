@@ -138,7 +138,12 @@ export function BackofficePasswordResetPage() {
           </span>
           <h1 className={titleClassName}>{t('resetDoneTitle')}</h1>
           <p className={descriptionClassName}>{t('resetDoneDescription')}</p>
-          <DButton size="lg" fullWidth className="mt-7" onClick={() => navigateAfterReset(destination, navigate)}>
+          <DButton
+            size="lg"
+            fullWidth
+            className="mt-7"
+            onClick={() => navigateAfterReset(destination, navigate)}
+          >
             {t('activationGoToSignIn')}
           </DButton>
         </div>
@@ -237,13 +242,17 @@ export function BackofficePasswordResetPage() {
   );
 }
 
-function navigateAfterReset(destination: PasswordResetDestination, navigate: ReturnType<typeof useNavigate>) {
+function navigateAfterReset(
+  destination: PasswordResetDestination,
+  navigate: ReturnType<typeof useNavigate>,
+) {
   if (destination !== 'OPERATIONAL') {
     navigate('/login');
     return;
   }
   const configuredOrigin = import.meta.env.VITE_OPERATIONAL_APP_ORIGIN;
-  const localOrigin = window.location.hostname === 'localhost' ? 'http://localhost:5173' : undefined;
+  const localOrigin =
+    window.location.hostname === 'localhost' ? 'http://localhost:5173' : undefined;
   const origin = configuredOrigin || localOrigin;
   if (!origin) return;
   try {

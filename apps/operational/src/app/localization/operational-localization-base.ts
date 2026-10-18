@@ -56,7 +56,10 @@ const copy: Record<string, LocalizedLabel> = {
   'Edit profile': { 'id-ID': 'Ubah profil', 'en-US': 'Edit profile' },
   'Account details': { 'id-ID': 'Detail akun', 'en-US': 'Account details' },
   'Sign-in username': { 'id-ID': 'Username masuk', 'en-US': 'Sign-in username' },
-  'Verified phone number': { 'id-ID': 'Nomor telepon terverifikasi', 'en-US': 'Verified phone number' },
+  'Verified phone number': {
+    'id-ID': 'Nomor telepon terverifikasi',
+    'en-US': 'Verified phone number',
+  },
   'Email not set': { 'id-ID': 'Email belum diisi', 'en-US': 'Email not set' },
   'Ask an administrator to add or update your email.': {
     'id-ID': 'Minta administrator untuk menambahkan atau memperbarui email Anda.',
@@ -79,7 +82,10 @@ const copy: Record<string, LocalizedLabel> = {
     'id-ID': 'Tambahkan email melalui Ubah profil untuk menerima tautan kata sandi.',
     'en-US': 'Add an email in Edit profile to receive password links.',
   },
-  'Send verification link': { 'id-ID': 'Kirim tautan verifikasi', 'en-US': 'Send verification link' },
+  'Send verification link': {
+    'id-ID': 'Kirim tautan verifikasi',
+    'en-US': 'Send verification link',
+  },
   Name: { 'id-ID': 'Nama', 'en-US': 'Name' },
   Business: { 'id-ID': 'Bisnis', 'en-US': 'Business' },
   Version: { 'id-ID': 'Versi', 'en-US': 'Version' },

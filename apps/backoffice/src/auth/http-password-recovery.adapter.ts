@@ -42,7 +42,9 @@ export class HttpPasswordRecoveryAdapter implements PasswordRecoveryPort {
     if (!response.ok) throw new Error('PASSWORD_RECOVERY_REQUEST_FAILED');
   }
 
-  public async confirm(input: PasswordResetReference & { newPassword: string }): Promise<{ destination: PasswordResetDestination }> {
+  public async confirm(
+    input: PasswordResetReference & { newPassword: string },
+  ): Promise<{ destination: PasswordResetDestination }> {
     const response = await this.post('password-reset/link/confirm', {
       workspace: input.workspace,
       challengeId: input.challengeId,
@@ -98,14 +100,4 @@ async function rejection(response: Response): Promise<void> {
     REJECTION_BY_CODE[payload.error?.code ?? ''] ??
       (response.status >= 500 ? 'network' : 'invalid'),
   );
-}
-
-/**
- * A typed phone number (08…, 62…, +62…) is sent as canonical E.164 so it matches the stored
- * number; anything else is a username and is sent as typed.
- */
-function normalizeRecoveryIdentifier(identifier: string): string {
-  const trimmed = identifier.trim();
-  if (!/^[+\d][\d\s().+-]*$/.test(trimmed)) return trimmed;
-  return trimmed;
 }

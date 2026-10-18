@@ -27,9 +27,9 @@ const notification = {
 describe('Operational notification formatting', () => {
   it('renders localized title, contextual IDR amount, and severity instead of notification enums', () => {
     expect(notificationTitle('id-ID', notification)).toBe('Pengeluaran disetujui');
-    expect(notificationContext('id-ID', notification, (amount, currency) => `${currency} ${amount}`)).toBe(
-      'IDR 125000.00 di Kemang telah disetujui.',
-    );
+    expect(
+      notificationContext('id-ID', notification, (amount, currency) => `${currency} ${amount}`),
+    ).toBe('IDR 125000.00 di Kemang telah disetujui.');
     expect(notificationSeverityLabel('id-ID', notification.severity)).toBe('Perlu perhatian');
   });
 });

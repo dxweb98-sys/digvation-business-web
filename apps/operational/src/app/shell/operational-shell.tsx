@@ -1,7 +1,16 @@
 import { hasSessionFeature, useAuth } from '@digvation/business-auth';
 import { useConnectivity, useDeploymentBootstrap } from '@digvation/business-runtime';
 import { DAvatar, DButton, DDialog, DDropdown, useToast } from '@digvation/ui';
-import { Building2, ChevronDown, Check, LogOut, MapPin, Menu, UserCircle, UserRound } from 'lucide-react';
+import {
+  Building2,
+  ChevronDown,
+  Check,
+  LogOut,
+  MapPin,
+  Menu,
+  UserCircle,
+  UserRound,
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 

@@ -1620,10 +1620,11 @@ export const backofficeCopy: Record<string, { id: string; en: string }> = {
     id: 'Tautan sekali pakai dikirim ke email pengguna ini. Hanya pemilik email yang dapat memverifikasinya.',
     en: 'A one-time link is sent to this user email. Only the email owner can verify it.',
   },
-  'A one-time link is sent to the verified email of this user. It replaces any link that is still pending.': {
-    id: 'Tautan sekali pakai dikirim ke email terverifikasi pengguna ini. Tautan ini menggantikan tautan yang masih menunggu.',
-    en: 'A one-time link is sent to the verified email of this user. It replaces any link that is still pending.',
-  },
+  'A one-time link is sent to the verified email of this user. It replaces any link that is still pending.':
+    {
+      id: 'Tautan sekali pakai dikirim ke email terverifikasi pengguna ini. Tautan ini menggantikan tautan yang masih menunggu.',
+      en: 'A one-time link is sent to the verified email of this user. It replaces any link that is still pending.',
+    },
   'Until an email is verified, password links are sent via WhatsApp.': {
     id: 'Selama email belum diverifikasi, tautan kata sandi dikirim lewat WhatsApp.',
     en: 'Until an email is verified, password links are sent via WhatsApp.',

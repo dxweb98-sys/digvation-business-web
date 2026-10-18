@@ -172,7 +172,9 @@ export function OperationalNotificationsPage() {
             {locale === 'id-ID' ? 'Notifikasi' : 'Notifications'}
           </h1>
           <p className="mt-1 text-sm text-(--color-text-muted)">
-            {locale === 'id-ID' ? 'Riwayat notifikasi akun Anda.' : 'Your account notification history.'}
+            {locale === 'id-ID'
+              ? 'Riwayat notifikasi akun Anda.'
+              : 'Your account notification history.'}
           </p>
         </div>
         {(unread.data?.count ?? 0) > 0 ? (
@@ -184,8 +186,16 @@ export function OperationalNotificationsPage() {
       <section className="mt-6">
         {list.isError ? (
           <DConnectionError
-            title={locale === 'id-ID' ? 'Notifikasi tidak dapat dimuat.' : 'Could not load notifications.'}
-            message={locale === 'id-ID' ? 'Coba muat ulang notifikasi.' : 'Try loading notifications again.'}
+            title={
+              locale === 'id-ID'
+                ? 'Notifikasi tidak dapat dimuat.'
+                : 'Could not load notifications.'
+            }
+            message={
+              locale === 'id-ID'
+                ? 'Coba muat ulang notifikasi.'
+                : 'Try loading notifications again.'
+            }
             onRetry={() => void list.refetch()}
             isRetrying={list.isFetching}
           />
@@ -200,7 +210,8 @@ export function OperationalNotificationsPage() {
                 label: locale === 'id-ID' ? 'Buka' : 'Open',
                 icon: <Eye aria-hidden="true" className="size-4" />,
                 onClick: (notification) => void openNotification(notification),
-                show: (notification) => Boolean(safeOperationalNotificationPath(notification.actionPath)),
+                show: (notification) =>
+                  Boolean(safeOperationalNotificationPath(notification.actionPath)),
               },
               {
                 label: locale === 'id-ID' ? 'Tandai dibaca' : 'Mark read',

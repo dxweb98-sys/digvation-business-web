@@ -71,9 +71,7 @@ describe('invitation form model', () => {
   it('requires a valid email and sends only Runtime CreateInvitationDto fields', () => {
     expect(validateInvitationForm({ ...valid, email: '' }).issues.email).toBe('EMAIL_REQUIRED');
     expect(validateInvitationForm({ ...valid, email: 'bad' }).issues.email).toBe('EMAIL_INVALID');
-    expect(
-      toCreateInvitationInput({ ...valid, email: ' siti@usaha.com ' }),
-    ).toEqual({
+    expect(toCreateInvitationInput({ ...valid, email: ' siti@usaha.com ' })).toEqual({
       phoneE164: '+6281234567890',
       displayName: 'Siti Rahma',
       roleIds: valid.roleIds,

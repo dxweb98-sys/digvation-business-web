@@ -24,7 +24,15 @@ import {
 import { useIdentityConflictCopy } from './identity-conflict-copy';
 
 /** The overview is display-only; the existing self-service endpoint owns every edit. */
-export function ProfileDialog({ open, onClose, onRequestPasswordLink = () => undefined }: { open: boolean; onClose: () => void; onRequestPasswordLink?: () => void }) {
+export function ProfileDialog({
+  open,
+  onClose,
+  onRequestPasswordLink = () => undefined,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onRequestPasswordLink?: () => void;
+}) {
   const bootstrap = useDeploymentBootstrap();
   const { createApiClient, refreshSessionContext } = useBackofficeAuth();
   const api = useMemo(
@@ -112,7 +120,14 @@ function ProfileContent({
 
   const save = async () => {
     setAttempted(true);
-    if (!profile || nameMissing || usernameInvalid || emailInvalid || !(dirty || emailChanged) || saving)
+    if (
+      !profile ||
+      nameMissing ||
+      usernameInvalid ||
+      emailInvalid ||
+      !(dirty || emailChanged) ||
+      saving
+    )
       return;
     setSaving(true);
     try {
@@ -250,7 +265,12 @@ function ProfileOverview({
             </div>
           </div>
           {canEdit ? (
-            <DButton size="sm" variant="secondary" leftIcon={<Pencil className="size-3.5" />} onClick={onEdit}>
+            <DButton
+              size="sm"
+              variant="secondary"
+              leftIcon={<Pencil className="size-3.5" />}
+              onClick={onEdit}
+            >
               {copy('Edit profile')}
             </DButton>
           ) : null}
@@ -260,9 +280,21 @@ function ProfileOverview({
       <section>
         <RecordSectionLabel>{copy('Account details')}</RecordSectionLabel>
         <dl className="mt-3 divide-y divide-[var(--color-border)] rounded-[var(--radius-control)] border border-[var(--color-border)]">
-          <ProfileDetail label={copy('Display name')} value={profile.displayName} icon={<UserRound className="size-3.5" aria-hidden="true" />} />
-          <ProfileDetail label={copy('Sign-in username')} value={profile.username ? `@${profile.username}` : copy('Not set')} icon={<AtSign className="size-3.5" aria-hidden="true" />} />
-          <ProfileDetail label={copy('Phone number')} value={formatPhoneNumber(profile.phoneE164)} icon={<Phone className="size-3.5" aria-hidden="true" />} />
+          <ProfileDetail
+            label={copy('Display name')}
+            value={profile.displayName}
+            icon={<UserRound className="size-3.5" aria-hidden="true" />}
+          />
+          <ProfileDetail
+            label={copy('Sign-in username')}
+            value={profile.username ? `@${profile.username}` : copy('Not set')}
+            icon={<AtSign className="size-3.5" aria-hidden="true" />}
+          />
+          <ProfileDetail
+            label={copy('Phone number')}
+            value={formatPhoneNumber(profile.phoneE164)}
+            icon={<Phone className="size-3.5" aria-hidden="true" />}
+          />
         </dl>
       </section>
 
@@ -284,33 +316,41 @@ function ProfileOverview({
           </DBadge>
         </div>
         <div className="mt-3">
-              <p className="text-xs leading-5 text-[var(--color-text-muted)]">
-                {profile.email
-                  ? emailVerified
-                    ? copy('This email is verified.')
-                    : copy('Verify this email before it can receive account-security links.')
-                  : copy('Ask an administrator to add or update your email.')}
-              </p>
-              {profile.email && !emailVerified ? (
-                <DButton
-                  className="mt-3"
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  loading={sendingVerification}
-                  onClick={onRequestVerification}
-                >
-                  {copy('Send verification link')}
-                </DButton>
-              ) : null}
+          <p className="text-xs leading-5 text-[var(--color-text-muted)]">
+            {profile.email
+              ? emailVerified
+                ? copy('This email is verified.')
+                : copy('Verify this email before it can receive account-security links.')
+              : copy('Ask an administrator to add or update your email.')}
+          </p>
+          {profile.email && !emailVerified ? (
+            <DButton
+              className="mt-3"
+              type="button"
+              size="sm"
+              variant="secondary"
+              loading={sendingVerification}
+              onClick={onRequestVerification}
+            >
+              {copy('Send verification link')}
+            </DButton>
+          ) : null}
         </div>
       </section>
       <section className="border-t border-[var(--color-border)] pt-5">
         <RecordSectionLabel>{copy('Account security')}</RecordSectionLabel>
         <p className="mt-2 text-xs leading-5 text-[var(--color-text-muted)]">
-          {emailVerified ? copy('A password-change link will be sent to your verified email.') : copy('Verify your email before requesting a password-change link.')}
+          {emailVerified
+            ? copy('A password-change link will be sent to your verified email.')
+            : copy('Verify your email before requesting a password-change link.')}
         </p>
-        <DButton className="mt-3" size="sm" variant="secondary" disabled={!emailVerified} onClick={onRequestPasswordLink}>
+        <DButton
+          className="mt-3"
+          size="sm"
+          variant="secondary"
+          disabled={!emailVerified}
+          onClick={onRequestPasswordLink}
+        >
           {copy('Send password change link')}
         </DButton>
       </section>
@@ -323,22 +363,16 @@ function formatPhoneNumber(phoneE164: string | null): string {
   return phoneE164.startsWith('+62') ? `0${phoneE164.slice(3)}` : phoneE164;
 }
 
-function ProfileDetail({
-  label,
-  value,
-  icon,
-}: {
-  label: string;
-  value: string;
-  icon: ReactNode;
-}) {
+function ProfileDetail({ label, value, icon }: { label: string; value: string; icon: ReactNode }) {
   return (
     <div className="flex min-w-0 items-center justify-between gap-4 px-3 py-3">
       <dt className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
         <span className="text-[var(--color-brand)]">{icon}</span>
         {label}
       </dt>
-      <dd className="break-words text-right text-sm font-semibold text-[var(--color-text)]">{value}</dd>
+      <dd className="break-words text-right text-sm font-semibold text-[var(--color-text)]">
+        {value}
+      </dd>
     </div>
   );
 }
@@ -379,7 +413,8 @@ function ProfileEditor({
   onRequestVerification: () => void;
 }) {
   const { copy } = useBackofficeLocalization();
-  const canVerifyEmail = Boolean(profile.email) && !profile.emailVerifiedAt && email === profile.email;
+  const canVerifyEmail =
+    Boolean(profile.email) && !profile.emailVerifiedAt && email === profile.email;
 
   return (
     <div className="space-y-4">
@@ -429,7 +464,9 @@ function ProfileEditor({
             onChange={onUsernameChange}
             autoCapitalize="none"
             autoComplete="off"
-            hint={copy('Not case-sensitive. You stay signed in and use the new name the next time you sign in.')}
+            hint={copy(
+              'Not case-sensitive. You stay signed in and use the new name the next time you sign in.',
+            )}
             error={
               attempted && usernameInvalid
                 ? copy('Use 3 to 64 letters, numbers, dot, underscore, or hyphen.')
