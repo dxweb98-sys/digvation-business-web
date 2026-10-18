@@ -279,7 +279,7 @@ for (const width of [390, 430, 1280]) {
       ).toBeVisible();
       await shot(page, info, 'member-detail-without-loyalty');
       if (surface === 'operational') {
-        await page.getByRole('button', { name: 'Ubah data', exact: true }).click();
+        await page.getByRole('button', { name: 'Ubah profil', exact: true }).click();
         const memberPhone = page.getByRole('dialog').getByRole('textbox').nth(1);
         await expect(memberPhone).toHaveValue(/^08\d+$/);
         await expect(memberPhone).not.toHaveValue(/\s|\+/);
