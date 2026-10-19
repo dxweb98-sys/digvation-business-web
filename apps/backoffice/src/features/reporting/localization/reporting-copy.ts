@@ -84,7 +84,11 @@ export const reportingCopy: Copy = {
 
   // KPIs
   Revenue: { id: 'Pendapatan', en: 'Revenue' },
+  'Effective revenue': { id: 'Pendapatan efektif', en: 'Effective revenue' },
+  'Original transaction value': { id: 'Nilai transaksi asli', en: 'Original transaction value' },
   Transactions: { id: 'Transaksi', en: 'Transactions' },
+  'Recorded transactions': { id: 'Transaksi tercatat', en: 'Recorded transactions' },
+  'Completed transactions': { id: 'Transaksi selesai', en: 'Completed transactions' },
   'Average transaction': { id: 'Rata-rata transaksi', en: 'Average transaction' },
   'Items sold': { id: 'Item terjual', en: 'Items sold' },
   'Approved expenses': { id: 'Pengeluaran disetujui', en: 'Approved expenses' },
@@ -123,6 +127,10 @@ export const reportingCopy: Copy = {
   'Revenue by transaction status': {
     id: 'Pendapatan per status transaksi',
     en: 'Revenue by transaction status',
+  },
+  'Transaction composition by status': {
+    id: 'Komposisi transaksi berdasarkan status',
+    en: 'Transaction composition by status',
   },
   'Top items by revenue': { id: 'Item teratas per pendapatan', en: 'Top items by revenue' },
   'Usage activity': { id: 'Aktivitas pemakaian', en: 'Usage activity' },
