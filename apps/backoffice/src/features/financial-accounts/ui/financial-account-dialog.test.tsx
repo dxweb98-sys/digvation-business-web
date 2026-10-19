@@ -158,7 +158,12 @@ describe('FinancialAccountDetailDialog', () => {
   function renderDetail(account: FinancialAccount, canUpdate = true) {
     const handlers = { onClose: vi.fn(), onEdit: vi.fn() };
     renderWithProviders(
-      <FinancialAccountDetailDialog account={account} canUpdate={canUpdate} {...handlers} />,
+      <FinancialAccountDetailDialog
+        account={account}
+        api={fakeFinancialAccountsApi()}
+        canUpdate={canUpdate}
+        {...handlers}
+      />,
     );
     return { ...handlers, dialog: within(screen.getByRole('dialog')) };
   }

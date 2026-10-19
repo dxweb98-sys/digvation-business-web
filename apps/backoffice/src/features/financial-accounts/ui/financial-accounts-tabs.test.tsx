@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { FinancialAccountsApi } from '../api/financial-accounts-api';
 import { FinancialAccountsTab } from './financial-accounts-tab';
+import { FinancialAccountDetailDialog } from './financial-account-detail-dialog';
 import { PaymentRouteDialog } from './payment-route-dialog';
 import { PaymentRoutingTab } from './payment-routing-tab';
 import {
@@ -89,6 +90,50 @@ describe('FinancialAccountsTab', () => {
     renderTab();
     fireEvent.click(await screen.findByRole('button', { name: 'Tambah akun' }));
     expect(within(screen.getByRole('dialog')).getByText('Identitas akun')).toBeTruthy();
+  });
+});
+
+describe('FinancialAccountDetailDialog', () => {
+  it('shows an honest recorded-movement summary and its movement rows', async () => {
+    const api = fakeFinancialAccountsApi({ accounts: [testAccount('CASH')] });
+    api.getStatement.mockResolvedValue({
+      account: testAccount('CASH'),
+      openingBalanceAvailable: false,
+      openingRecordedNetMovement: '0.0000',
+      totalIncoming: '205350.0000',
+      totalOutgoing: '25000.0000',
+      closingRecordedNetMovement: '180350.0000',
+      total: 1,
+      limit: 25,
+      offset: 0,
+      items: [
+        {
+          id: 'payment-1',
+          source: 'PAYMENT',
+          direction: 'IN',
+          amount: '205350.0000',
+          currency: 'IDR',
+          occurredAt: '2026-10-01T00:00:00.000Z',
+          nature: 'FUNDS_MOVEMENT',
+          sourceId: 'payment-1',
+          accountId: 'cash-account',
+          sellingLocationId: 'location-1',
+        },
+      ],
+    });
+    renderWithProviders(
+      <FinancialAccountDetailDialog
+        account={testAccount('CASH')}
+        api={api as unknown as FinancialAccountsApi}
+        canUpdate={false}
+        onClose={vi.fn()}
+        onEdit={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByText('Mutasi')).toBeTruthy();
+    expect(await screen.findByText('Pergerakan bersih tercatat')).toBeTruthy();
+    expect(screen.getByText('Pembayaran diterima')).toBeTruthy();
   });
 });
 
