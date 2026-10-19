@@ -144,17 +144,26 @@ export const financialAccountsCopy: Record<string, { id: string; en: string }> =
   // Account detail
   'Financial account details': { id: 'Detail akun keuangan', en: 'Financial account details' },
   'Account information': { id: 'Informasi akun', en: 'Account information' },
+
+  // Account movements
   Mutasi: { id: 'Mutasi', en: 'Movements' },
-  'Loading movements...': { id: 'Memuat mutasi...', en: 'Loading movements...' },
+  'Account movements': { id: 'Mutasi akun', en: 'Account movements' },
+  'Movement history': { id: 'Riwayat mutasi', en: 'Movement history' },
   'Could not load account movements.': {
     id: 'Mutasi akun tidak dapat dimuat.',
     en: 'Could not load account movements.',
   },
-  'Recorded net movement is shown because no opening balance has been recorded.': {
-    id: 'Pergerakan bersih tercatat ditampilkan karena saldo awal belum dicatat.',
-    en: 'Recorded net movement is shown because no opening balance has been recorded.',
+  'Try loading the account movements again.': {
+    id: 'Coba muat ulang mutasi akun.',
+    en: 'Try loading the account movements again.',
   },
-  'Recorded net movement': { id: 'Pergerakan bersih tercatat', en: 'Recorded net movement' },
+  Summary: { id: 'Ringkasan', en: 'Summary' },
+  'Loading summary...': { id: 'Memuat ringkasan...', en: 'Loading summary...' },
+  'Movement difference': { id: 'Selisih mutasi', en: 'Movement difference' },
+  'Money in minus money out recorded in the system. This is not the current account balance.': {
+    id: 'Dana masuk dikurangi dana keluar yang tercatat di sistem. Ini bukan saldo rekening saat ini.',
+    en: 'Money in minus money out recorded in the system. This is not the current account balance.',
+  },
   'Money in': { id: 'Dana masuk', en: 'Money in' },
   'Money out': { id: 'Dana keluar', en: 'Money out' },
   'Date & time': { id: 'Tanggal & waktu', en: 'Date & time' },
@@ -164,14 +173,22 @@ export const financialAccountsCopy: Record<string, { id: string; en: string }> =
     id: 'Belum ada mutasi tercatat untuk akun ini.',
     en: 'No recorded movements for this account.',
   },
+  'No movements match these filters.': {
+    id: 'Tidak ada mutasi yang sesuai dengan filter.',
+    en: 'No movements match these filters.',
+  },
+  Period: { id: 'Periode', en: 'Period' },
+  Direction: { id: 'Arah', en: 'Direction' },
+  'Reset filters': { id: 'Atur ulang filter', en: 'Reset filters' },
   'Payment received': { id: 'Pembayaran diterima', en: 'Payment received' },
   Refund: { id: 'Pengembalian dana', en: 'Refund' },
   Expense: { id: 'Pengeluaran', en: 'Expense' },
   'Cash movement': { id: 'Pergerakan kas', en: 'Cash movement' },
   'Payment correction': { id: 'Koreksi pembayaran', en: 'Payment correction' },
-  Reattribution: { id: 'Atribusi ulang', en: 'Reattribution' },
-  Previous: { id: 'Sebelumnya', en: 'Previous' },
-  Next: { id: 'Berikutnya', en: 'Next' },
+  'Adjusts which account an earlier payment was recorded to.': {
+    id: 'Penyesuaian pencatatan akun pembayaran sebelumnya.',
+    en: 'Adjusts which account an earlier payment was recorded to.',
+  },
 
   // Payment routing
   Route: { id: 'Rute', en: 'Route' },

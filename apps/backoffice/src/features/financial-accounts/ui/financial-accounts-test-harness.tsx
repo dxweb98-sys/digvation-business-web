@@ -4,7 +4,7 @@ import {
 } from '@digvation/business-runtime';
 import { DToastProvider } from '@digvation/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { vi } from 'vitest';
 
@@ -15,6 +15,7 @@ import type {
   FinancialAccountType,
   PaymentRoute,
   FinancialAccountStatement,
+  FinancialAccountStatementMovement,
   SellingLocation,
 } from '../api/financial-accounts-api';
 
@@ -80,6 +81,33 @@ export function testRoute(change: Partial<PaymentRoute> = {}): PaymentRoute {
     updatedAt: '2026-10-01T00:00:00.000Z',
     ...change,
   };
+}
+
+export function testMovement(
+  change: Partial<FinancialAccountStatementMovement> = {},
+): FinancialAccountStatementMovement {
+  return {
+    id: 'movement-1',
+    source: 'PAYMENT',
+    direction: 'IN',
+    amount: '205350.0000',
+    currency: 'IDR',
+    occurredAt: '2026-10-01T00:00:00.000Z',
+    nature: 'FUNDS_MOVEMENT',
+    sourceId: 'payment-1',
+    accountId: 'cash-account',
+    sellingLocationId: 'location-1',
+    ...change,
+  };
+}
+
+/** Opens the action menu of the table row showing `text` and picks `action`. */
+export async function clickRowAction(text: string, action: string) {
+  const row = (await screen.findAllByText(text))
+    .map((node) => node.closest('tr'))
+    .find((node): node is HTMLTableRowElement => Boolean(node));
+  fireEvent.click(row!.querySelector('[data-ds-component="dropdown-trigger"] > *')!);
+  fireEvent.click((await screen.findAllByText(action)).at(-1)!);
 }
 
 const page = <T,>(items: T[]) => ({ items, limit: 20, offset: 0, total: items.length });
