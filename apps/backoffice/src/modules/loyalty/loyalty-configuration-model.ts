@@ -38,6 +38,23 @@ export function trimDecimal(value: string | null | undefined): string {
   return value.includes('.') ? value.replace(/\.?0+$/, '') : value;
 }
 
+/**
+ * A stored amount as readable currency: "1000.0000" IDR → "Rp1.000". Only trailing zeros are
+ * dropped, so a meaningful fraction such as "0.5000" stays visible ("Rp0,5").
+ */
+export function formatLoyaltyMoney(amount: string, currency: string): string {
+  const exact = trimDecimal(amount);
+  const fractionDigits = exact.split('.')[1]?.length ?? 0;
+  return new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  })
+    .format(Number(exact))
+    .replace(/[\u00a0\u202f]/g, '');
+}
+
 export function draftFromConfiguration(
   configuration: LoyaltyConfiguration,
 ): LoyaltyConfigurationDraft {

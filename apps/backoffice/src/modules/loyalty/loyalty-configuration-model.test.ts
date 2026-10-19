@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { LoyaltyConfiguration } from './loyalty-api';
 import {
   draftFromConfiguration,
+  formatLoyaltyMoney,
   isDraftValid,
   transactionEarningExample,
   updateInputFromDraft,
@@ -232,5 +233,18 @@ describe('transactionEarningExample', () => {
     expect(
       transactionEarningExample({ amountPerStep: '200000', pointsPerStep: '1.5', currency: 'IDR' }),
     ).toBeNull();
+  });
+});
+
+describe('formatLoyaltyMoney', () => {
+  it('drops only trailing zeros of a stored whole-number amount', () => {
+    expect(formatLoyaltyMoney('1000.0000', 'IDR')).toBe('Rp1.000');
+    expect(formatLoyaltyMoney('200000', 'IDR')).toBe('Rp200.000');
+  });
+
+  it('keeps every meaningful fraction digit exactly as stored', () => {
+    expect(formatLoyaltyMoney('0.5000', 'IDR')).toBe('Rp0,5');
+    expect(formatLoyaltyMoney('1250.7500', 'IDR')).toBe('Rp1.250,75');
+    expect(formatLoyaltyMoney('0.0001', 'IDR')).toBe('Rp0,0001');
   });
 });

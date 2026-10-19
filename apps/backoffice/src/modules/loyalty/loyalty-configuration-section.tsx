@@ -10,13 +10,21 @@ import {
   useToast,
 } from '@digvation/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState, type ReactNode } from 'react';
+import { Coins, Gift, Pencil, Repeat, Sparkles } from 'lucide-react';
+import { useState } from 'react';
 
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
 import { isSessionExpiredError } from '../../auth/backoffice-auth-context';
+import {
+  RecordInfoTile,
+  RecordPanel,
+  RecordPanelBody,
+  RecordPanelHeader,
+} from '../../shared/ui/record-dialog';
 import type { LoyaltyApi, LoyaltyEarningMode } from './loyalty-api';
 import {
   draftFromConfiguration,
+  formatLoyaltyMoney,
   transactionEarningExample,
   updateInputFromDraft,
   validateDraft,
@@ -24,14 +32,6 @@ import {
 } from './loyalty-configuration-model';
 
 const key = ['loyalty', 'configuration'] as const;
-
-function Card({ children }: { children: ReactNode }) {
-  return (
-    <section className="rounded-(--radius-card) border border-(--color-border) bg-(--color-surface) p-5 sm:p-6">
-      {children}
-    </section>
-  );
-}
 
 function pointsLabel(points: number) {
   return `${points} poin / unit`;
@@ -47,12 +47,6 @@ const modeCopy: Record<LoyaltyEarningMode, { label: string; description: string 
     description: 'Poin dihitung dari total transaksi, per kelipatan nominal tertentu.',
   },
 };
-
-function formatStep(amount: string, currency: string): string {
-  return new Intl.NumberFormat('id-ID', { style: 'currency', currency, maximumFractionDigits: 0 })
-    .format(Number(amount))
-    .replace(/[\u00a0\u202f]/g, '');
-}
 
 export function LoyaltyConfigurationSection({
   api,
@@ -122,53 +116,84 @@ export function LoyaltyConfigurationSection({
 
   const data = configuration.data;
   return (
-    <Card>
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h2 className="font-semibold">Pengaturan poin</h2>
-          <p className="mt-1 text-sm text-(--color-text-muted)">
-            Nilai penukaran poin dan cara pelanggan mendapatkan poin.
-          </p>
-        </div>
-        {canConfigure && data ? (
-          <DButton variant="secondary" size="sm" onClick={edit}>
-            Ubah pengaturan
-          </DButton>
+    <RecordPanel padded={false} ariaLabel="Pengaturan poin">
+      <RecordPanelHeader
+        title="Pengaturan poin"
+        trailing={
+          canConfigure && data ? (
+            <DButton
+              variant="secondary"
+              size="sm"
+              leftIcon={<Pencil className="size-4" />}
+              onClick={edit}
+            >
+              Ubah pengaturan
+            </DButton>
+          ) : null
+        }
+      />
+      <RecordPanelBody>
+        <p className="text-sm text-(--color-text-muted)">
+          Nilai penukaran poin dan cara pelanggan mendapatkan poin.
+        </p>
+        {configuration.isLoading ? (
+          <div className="mt-4 grid gap-3 sm:grid-cols-2" role="status" aria-busy="true">
+            {[0, 1, 2, 3].map((tile) => (
+              <DSkeleton key={tile} height={68} rounded="lg" />
+            ))}
+          </div>
+        ) : data ? (
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <RecordInfoTile
+              label="Nilai penukaran poin"
+              icon={<Coins className="size-3.5" aria-hidden="true" />}
+              value={
+                data.pointValue
+                  ? `1 poin = ${formatLoyaltyMoney(data.pointValue, data.currency)}`
+                  : null
+              }
+            />
+            <RecordInfoTile
+              label="Cara mendapatkan poin"
+              icon={<Sparkles className="size-3.5" aria-hidden="true" />}
+              value={
+                <>
+                  {modeCopy[data.earningMode].label}
+                  <span className="mt-0.5 block text-xs font-normal text-(--color-text-muted)">
+                    {modeCopy[data.earningMode].description}
+                  </span>
+                </>
+              }
+            />
+            <RecordInfoTile
+              label={
+                data.earningMode === 'TRANSACTION_TOTAL'
+                  ? 'Perolehan poin per transaksi'
+                  : 'Perolehan poin default'
+              }
+              icon={<Gift className="size-3.5" aria-hidden="true" />}
+              value={
+                data.earningMode === 'TRANSACTION_TOTAL'
+                  ? data.transactionAmountPerStep && data.transactionPointsPerStep
+                    ? `Setiap ${formatLoyaltyMoney(data.transactionAmountPerStep, data.currency)} → ${data.transactionPointsPerStep} poin`
+                    : null
+                  : data.defaultEarningBehavior === 'FIXED'
+                    ? pointsLabel(data.defaultFixedPointsPerUnit)
+                    : 'Tidak dapat poin kecuali ada aturan khusus per item'
+              }
+            />
+            <RecordInfoTile
+              label="Saat transaksi menggunakan poin"
+              icon={<Repeat className="size-3.5" aria-hidden="true" />}
+              value={
+                data.earnWhileRedeemingPolicy === 'EARN_WHEN_REDEEMING'
+                  ? 'Tetap dapat poin'
+                  : 'Tidak dapat poin baru'
+              }
+            />
+          </div>
         ) : null}
-      </div>
-      {configuration.isLoading ? (
-        <DSkeleton className="mt-5 h-24" />
-      ) : data ? (
-        <div className="mt-5 grid gap-5 text-sm sm:grid-cols-3">
-          <div>
-            <p className="text-(--color-text-muted)">Nilai poin saat ditukarkan</p>
-            <p className="mt-1 text-lg font-semibold">
-              1 poin = {data.pointValue ?? 'Belum diatur'} {data.currency}
-            </p>
-          </div>
-          <div>
-            <p className="text-(--color-text-muted)">Cara mendapatkan poin</p>
-            <p className="mt-1 font-semibold">{modeCopy[data.earningMode].label}</p>
-            <p className="mt-1 text-(--color-text-muted)">
-              {data.earningMode === 'TRANSACTION_TOTAL'
-                ? data.transactionAmountPerStep && data.transactionPointsPerStep
-                  ? `Setiap ${formatStep(data.transactionAmountPerStep, data.currency)} → ${data.transactionPointsPerStep} poin`
-                  : 'Belum diatur'
-                : data.defaultEarningBehavior === 'FIXED'
-                  ? `Default: ${pointsLabel(data.defaultFixedPointsPerUnit)}`
-                  : 'Default: tidak dapat poin kecuali ada aturan khusus per item.'}
-            </p>
-          </div>
-          <div>
-            <p className="text-(--color-text-muted)">Saat transaksi menggunakan poin</p>
-            <p className="mt-1 font-semibold">
-              {data.earnWhileRedeemingPolicy === 'EARN_WHEN_REDEEMING'
-                ? 'Tetap dapat poin'
-                : 'Tidak dapat poin baru'}
-            </p>
-          </div>
-        </div>
-      ) : null}
+      </RecordPanelBody>
       <DDialog
         open={open}
         onClose={() => !saving && setOpen(false)}
@@ -319,6 +344,6 @@ export function LoyaltyConfigurationSection({
           </div>
         ) : null}
       </DDialog>
-    </Card>
+    </RecordPanel>
   );
 }

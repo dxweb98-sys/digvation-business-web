@@ -8,11 +8,12 @@ import {
   type TableColumn,
 } from '@digvation/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { CircleOff, Package, Pencil, Plus } from 'lucide-react';
 import { useState } from 'react';
 
 import { normalizeBackofficeApiError } from '../../app/api/backoffice-api-error';
 import { isSessionExpiredError } from '../../auth/backoffice-auth-context';
+import { RecordDialogTitle, RecordPanel } from '../../shared/ui/record-dialog';
 import type { ProductCommissionApi, ProductCommissionRule } from './product-commission-api';
 import {
   commissionPerItemLabel,
@@ -73,11 +74,11 @@ export function ProductCommissionSection({
   };
 
   const remove = async () => {
-    if (!removeTarget) return;
+    if (!removeTarget || removing) return;
     setRemoving(true);
     try {
       await api.removeRule(removeTarget);
-      showToast({ variant: 'success', title: 'Komisi produk dihapus.' });
+      showToast({ variant: 'success', title: 'Komisi produk dihentikan.' });
       setRemoveTarget(null);
       if ((rules.data?.items.length ?? 0) === 1 && offset > 0) setOffset(offset - pageSize);
       refresh();
@@ -93,29 +94,35 @@ export function ProductCommissionSection({
       key: 'itemName',
       label: 'Produk',
       render: (rule) => (
-        <span>
-          <span className="block font-medium">{rule.itemName}</span>
-          <span className="block text-xs text-(--color-text-muted)">{rule.itemCode}</span>
-        </span>
+        <div className="min-w-0">
+          <p className="font-medium text-(--color-text)">{rule.itemName}</p>
+          <p className="mt-0.5 font-mono text-xs text-(--color-text-muted)">{rule.itemCode}</p>
+        </div>
       ),
     },
     {
       key: 'commissionPerUnit',
-      label: 'Komisi',
-      render: (rule) => commissionPerItemLabel(rule.commissionPerUnit, rule.currency),
+      label: 'Komisi per item',
+      align: 'right',
+      render: (rule) => (
+        <span className="whitespace-nowrap tabular-nums">
+          {commissionPerItemLabel(rule.commissionPerUnit, rule.currency)}
+        </span>
+      ),
     },
   ];
 
   return (
-    <section className="rounded-(--radius-card) border border-(--color-border) bg-(--color-surface) p-5 sm:p-6">
-      <h2 className="text-base font-semibold text-(--color-text)">Komisi Produk</h2>
-      <p className="mt-1 max-w-3xl text-sm text-(--color-text-muted)">
-        Produk yang terdaftar di sini memberi komisi tetap per item kepada karyawan penjualnya saat
-        transaksi selesai. Menghapus produk hanya menghentikan komisi transaksi berikutnya; komisi
-        yang sudah tercatat tidak berubah.
-      </p>
+    <section aria-label="Komisi produk" className="space-y-3">
+      <header>
+        <h2 className="text-sm font-semibold tracking-tight text-(--color-text)">Komisi produk</h2>
+        <p className="mt-1 max-w-3xl text-sm text-(--color-text-muted)">
+          Produk di daftar ini memberi komisi tetap per item kepada karyawan penjualnya saat
+          transaksi selesai. Komisi yang sudah tercatat tidak berubah.
+        </p>
+      </header>
 
-      <div className="mt-4">
+      <div>
         <DDataTable
           columns={columns}
           data={rules.data?.items ?? []}
@@ -128,7 +135,7 @@ export function ProductCommissionSection({
                 leftIcon={<Plus className="size-4" />}
                 onClick={() => setEditor({ rule: null })}
               >
-                Tambah Produk
+                Tambah produk
               </DButton>
             ) : null
           }
@@ -146,8 +153,8 @@ export function ProductCommissionSection({
               show: () => canConfigure,
             },
             {
-              label: 'Hapus komisi',
-              icon: <Trash2 className="size-4" />,
+              label: 'Hentikan komisi',
+              icon: <CircleOff className="size-4" />,
               variant: 'danger',
               onClick: (rule) => setRemoveTarget(rule),
               show: () => canConfigure,
@@ -174,24 +181,47 @@ export function ProductCommissionSection({
 
       <DDialog
         open={removeTarget !== null}
-        onClose={() => setRemoveTarget(null)}
-        title="Hapus komisi produk?"
+        onClose={() => {
+          if (!removing) setRemoveTarget(null);
+        }}
+        title={<RecordDialogTitle title="Hentikan komisi?" />}
         footer={
           <div className="flex justify-end gap-2">
-            <DButton variant="secondary" onClick={() => setRemoveTarget(null)}>
+            <DButton variant="secondary" onClick={() => setRemoveTarget(null)} disabled={removing}>
               Batal
             </DButton>
             <DButton variant="danger" loading={removing} onClick={() => void remove()}>
-              Hapus
+              Hentikan komisi
             </DButton>
           </div>
         }
       >
-        <p className="text-sm text-(--color-text-muted)">
-          {removeTarget
-            ? `${removeTarget.itemName} tidak lagi memberi komisi pada transaksi berikutnya. Komisi yang sudah tercatat tidak berubah.`
-            : ''}
-        </p>
+        {removeTarget ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-4 rounded-lg bg-(--color-surface-muted) px-3 py-2.5">
+              <div className="flex min-w-0 items-center gap-3">
+                <Package className="size-4 shrink-0 text-(--color-brand)" aria-hidden="true" />
+                <ProductIdentity rule={removeTarget} />
+              </div>
+              <span className="shrink-0 whitespace-nowrap text-sm font-semibold tabular-nums text-(--color-text)">
+                {commissionPerItemLabel(removeTarget.commissionPerUnit, removeTarget.currency)}
+              </span>
+            </div>
+            <p
+              role="note"
+              className="flex gap-2 rounded-xl border border-[color-mix(in_srgb,var(--color-warning)_35%,var(--color-border))] bg-[color-mix(in_srgb,var(--color-warning)_10%,var(--color-surface))] px-4 py-3 text-sm text-(--color-text)"
+            >
+              <CircleOff
+                className="mt-0.5 size-4 shrink-0 text-(--color-warning)"
+                aria-hidden="true"
+              />
+              <span>
+                Komisi untuk produk ini tidak akan diberikan pada transaksi berikutnya. Komisi dari
+                transaksi sebelumnya tetap tersimpan.
+              </span>
+            </p>
+          </div>
+        ) : null}
       </DDialog>
     </section>
   );
@@ -235,7 +265,7 @@ function CommissionEditor({
 
   const save = async () => {
     setTouched(true);
-    if (!productId || error) return;
+    if (!productId || error || saving) return;
     setSaving(true);
     try {
       await api.setRule(productId, {
@@ -251,14 +281,18 @@ function CommissionEditor({
     }
   };
 
+  const close = () => {
+    if (!saving) onClose();
+  };
+
   return (
     <DDialog
       open
-      onClose={onClose}
-      title={rule ? `Ubah komisi ${rule.itemName}` : 'Tambah produk komisi'}
+      onClose={close}
+      title={<RecordDialogTitle title={rule ? 'Ubah komisi produk' : 'Tambah produk komisi'} />}
       footer={
         <div className="flex justify-end gap-2">
-          <DButton variant="secondary" onClick={onClose}>
+          <DButton variant="secondary" onClick={close} disabled={saving}>
             Batal
           </DButton>
           <DButton loading={saving} disabled={!productId} onClick={() => void save()}>
@@ -267,28 +301,62 @@ function CommissionEditor({
         </div>
       }
     >
-      <div className="space-y-4">
-        {rule ? null : (
-          <DCombobox
-            label="Produk"
-            ariaLabel="Produk komisi"
-            placeholder="Cari produk"
-            options={options}
-            value={productId}
-            loading={products.isFetching}
-            onSearchChange={setSearch}
-            onChange={(value) => setProductId(value === null ? null : String(value))}
+      <RecordPanel>
+        {/* Product above amount: one column at every width. */}
+        <div className="space-y-4">
+          {rule ? (
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-(--color-text)">Produk</p>
+              <div
+                className="mt-1.5 flex h-10 min-w-0 items-center gap-2 rounded-lg border border-(--color-border) bg-(--color-surface-muted) px-3"
+                title={`${rule.itemName} (${rule.itemCode})`}
+              >
+                <Package className="size-4 shrink-0 text-(--color-brand)" aria-hidden="true" />
+                <span className="min-w-0 truncate text-sm font-medium text-(--color-text)">
+                  {rule.itemName}
+                </span>
+                <span className="shrink-0 font-mono text-xs text-(--color-text-muted)">
+                  {rule.itemCode}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <DCombobox
+              label="Produk"
+              ariaLabel="Produk komisi"
+              placeholder="Cari produk"
+              options={options}
+              value={productId}
+              loading={products.isFetching}
+              disabled={saving}
+              onSearchChange={setSearch}
+              onChange={(value) => setProductId(value === null ? null : String(value))}
+            />
+          )}
+          <DCurrencyInput
+            label={`Komisi per item (${currency})`}
+            value={amount}
+            onValueChange={setAmount}
+            placeholder="5000"
+            disabled={saving}
+            error={touched ? (error ?? undefined) : undefined}
+            hint="Nominal tetap per item terjual, dikalikan jumlah pada transaksi."
           />
-        )}
-        <DCurrencyInput
-          label={`Komisi per item (${currency})`}
-          value={amount}
-          onValueChange={setAmount}
-          placeholder="5000"
-          error={touched ? (error ?? undefined) : undefined}
-          hint="Nominal tetap per item terjual, dikalikan jumlah pada transaksi."
-        />
-      </div>
+        </div>
+      </RecordPanel>
     </DDialog>
+  );
+}
+
+function ProductIdentity({ rule }: { rule: ProductCommissionRule }) {
+  return (
+    <span className="block min-w-0">
+      <span className="block break-words text-sm font-semibold text-(--color-text)">
+        {rule.itemName}
+      </span>
+      <span className="mt-0.5 block font-mono text-xs font-normal text-(--color-text-muted)">
+        {rule.itemCode}
+      </span>
+    </span>
   );
 }
