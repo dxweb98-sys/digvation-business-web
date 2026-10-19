@@ -88,13 +88,13 @@ describe('Product commission configuration', () => {
   it('hides configuration actions without commission:configure', async () => {
     renderSection({ canConfigure: false });
     await screen.findAllByText('Shampoo Premium');
-    expect(screen.queryByRole('button', { name: /Tambah Produk/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Tambah produk/ })).toBeNull();
   });
 
   it('adds a Product with a valid amount and offers no Service or duplicate', async () => {
     const { api } = renderSection();
     await screen.findAllByText('Shampoo Premium');
-    fireEvent.click(screen.getAllByRole('button', { name: /Tambah Produk/ })[0]!);
+    fireEvent.click(screen.getAllByRole('button', { name: /Tambah produk/ })[0]!);
     const dialog = within(await screen.findByRole('dialog'));
 
     openProducts(dialog);
@@ -118,7 +118,7 @@ describe('Product commission configuration', () => {
     async (value) => {
       const { api } = renderSection();
       await screen.findAllByText('Shampoo Premium');
-      fireEvent.click(screen.getAllByRole('button', { name: /Tambah Produk/ })[0]!);
+      fireEvent.click(screen.getAllByRole('button', { name: /Tambah produk/ })[0]!);
       const dialog = within(await screen.findByRole('dialog'));
       openProducts(dialog);
       fireEvent.click(await screen.findByRole('option', { name: /Hair Serum/ }));
@@ -127,4 +127,49 @@ describe('Product commission configuration', () => {
       expect(api.setRule).not.toHaveBeenCalled();
     },
   );
+
+  it('stops a commission for future sales only, using the existing remove operation', async () => {
+    const { api } = renderSection();
+    const row = (await screen.findAllByText('Shampoo Premium'))
+      .map((node) => node.closest('tr'))
+      .find((node): node is HTMLTableRowElement => Boolean(node))!;
+    fireEvent.click(row.querySelector('[data-ds-component="dropdown-trigger"] > *')!);
+    fireEvent.click((await screen.findAllByText('Hentikan komisi')).at(-1)!);
+
+    const dialog = within(await screen.findByRole('dialog'));
+    expect(dialog.getByText('Hentikan komisi?')).toBeTruthy();
+    expect(dialog.getByText('SHAMPOO')).toBeTruthy();
+    expect(
+      dialog.getByText(
+        'Komisi untuk produk ini tidak akan diberikan pada transaksi berikutnya. Komisi dari transaksi sebelumnya tetap tersimpan.',
+      ),
+    ).toBeTruthy();
+    expect(dialog.queryByText(/Hapus|dihapus/)).toBeNull();
+
+    fireEvent.click(dialog.getByRole('button', { name: 'Hentikan komisi' }));
+    await waitFor(() => expect(api.removeRule).toHaveBeenCalledWith(rule()));
+    expect(api.setRule).not.toHaveBeenCalled();
+  });
+
+  it('edits an existing amount with the product shown as read-only identity', async () => {
+    const { api } = renderSection();
+    const row = (await screen.findAllByText('Shampoo Premium'))
+      .map((node) => node.closest('tr'))
+      .find((node): node is HTMLTableRowElement => Boolean(node))!;
+    fireEvent.click(row.querySelector('[data-ds-component="dropdown-trigger"] > *')!);
+    fireEvent.click((await screen.findAllByText('Ubah nominal')).at(-1)!);
+
+    const dialog = within(await screen.findByRole('dialog'));
+    expect(dialog.getByText('Ubah komisi produk')).toBeTruthy();
+    expect(dialog.getByText('Shampoo Premium')).toBeTruthy();
+    expect(dialog.queryByRole('combobox')).toBeNull();
+    fireEvent.change(dialog.getByLabelText(/Komisi per item/), { target: { value: '6000' } });
+    fireEvent.click(dialog.getByRole('button', { name: 'Simpan' }));
+    await waitFor(() =>
+      expect(api.setRule).toHaveBeenCalledWith('shampoo', {
+        expectedVersion: 1,
+        commissionPerUnit: '6000',
+      }),
+    );
+  });
 });
