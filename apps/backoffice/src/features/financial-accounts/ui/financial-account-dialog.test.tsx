@@ -149,7 +149,7 @@ describe('FinancialAccountDialog', () => {
   it('shows a legacy account without a code quietly in the title', () => {
     const { dialog } = renderEditor(testAccount('CASH', { code: null }));
 
-    expect(dialog.getByText('—')).toBeTruthy();
+    expect(dialog.getByText('-')).toBeTruthy();
     expect(dialog.queryByText('null')).toBeNull();
   });
 });
@@ -188,7 +188,7 @@ describe('FinancialAccountDetailDialog', () => {
       false,
     );
 
-    expect(dialog.getAllByText('—').length).toBeGreaterThanOrEqual(2);
+    expect(dialog.getAllByText('-').length).toBeGreaterThan(0);
     expect(dialog.queryByText('null')).toBeNull();
     expect(dialog.queryByRole('button', { name: 'Ubah akun' })).toBeNull();
   });

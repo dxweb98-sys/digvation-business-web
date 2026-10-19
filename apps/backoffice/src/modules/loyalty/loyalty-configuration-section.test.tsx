@@ -55,9 +55,26 @@ describe('Loyalty configuration: summary', () => {
     renderSection();
 
     expect(await screen.findByText('Per Item')).toBeTruthy();
-    expect(screen.getByText('Default: 2 poin / unit')).toBeTruthy();
+    expect(screen.getByText('Perolehan poin default')).toBeTruthy();
+    expect(screen.getByText('2 poin / unit')).toBeTruthy();
+    expect(screen.getByText('Saat transaksi menggunakan poin')).toBeTruthy();
     expect(screen.getByText('Tidak dapat poin baru')).toBeTruthy();
-    expect(screen.getByText(/1 poin = 1000\.0000 IDR/)).toBeTruthy();
+    expect(screen.getByText('Nilai penukaran poin')).toBeTruthy();
+    expect(screen.getByText('1 poin = Rp1.000')).toBeTruthy();
+    expect(screen.queryByText(/\.0000|IDR/)).toBeNull();
+  });
+
+  it('keeps a meaningful fraction of the point value instead of rounding it away', async () => {
+    renderSection({ ...perItem, pointValue: '0.5000' });
+
+    expect(await screen.findByText('1 poin = Rp0,5')).toBeTruthy();
+  });
+
+  it('marks an unset point value quietly instead of showing a fake amount', async () => {
+    renderSection({ ...perItem, pointValue: null });
+
+    expect(await screen.findByText('Nilai penukaran poin')).toBeTruthy();
+    expect(screen.queryByText(/1 poin =/)).toBeNull();
   });
 
   it('shows the transaction step and the earn-while-redeeming policy', async () => {

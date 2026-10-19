@@ -119,7 +119,7 @@ export function accountDestinationSummary(
 }
 
 /** Quiet placeholder for absent identifiers, e.g. legacy accounts created without a code. */
-export const EMPTY_VALUE = '—';
+export const EMPTY_VALUE = '-';
 
 export function displayCode(code: string | null | undefined) {
   return code?.trim() || EMPTY_VALUE;

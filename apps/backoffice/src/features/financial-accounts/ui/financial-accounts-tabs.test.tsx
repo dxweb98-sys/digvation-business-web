@@ -6,6 +6,7 @@ import { FinancialAccountsTab } from './financial-accounts-tab';
 import { PaymentRouteDialog } from './payment-route-dialog';
 import { PaymentRoutingTab } from './payment-routing-tab';
 import {
+  clickRowAction,
   fakeFinancialAccountsApi,
   renderWithProviders,
   testAccount,
@@ -51,7 +52,8 @@ describe('FinancialAccountsTab', () => {
     expect(screen.getAllByText('Akun QRIS').length).toBeGreaterThan(0);
     expect(screen.getAllByText('BCA · ID1023456789').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Kas Lama').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('—').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('-').length).toBeGreaterThan(0);
+    expect(screen.queryByText('—')).toBeNull();
     expect(screen.getAllByText('Kas di lokasi').length).toBeGreaterThan(0);
     expect(screen.queryByText('null')).toBeNull();
   });
@@ -89,6 +91,57 @@ describe('FinancialAccountsTab', () => {
     renderTab();
     fireEvent.click(await screen.findByRole('button', { name: 'Tambah akun' }));
     expect(within(screen.getByRole('dialog')).getByText('Identitas akun')).toBeTruthy();
+  });
+
+  it('opens account details without requesting account movements', async () => {
+    const api = renderTab(fakeFinancialAccountsApi({ accounts: [testAccount('BANK')] }));
+    await clickRowAction('Akun BANK', 'Lihat detail');
+
+    const dialog = within(await screen.findByRole('dialog'));
+    expect(dialog.getByText('Detail akun keuangan')).toBeTruthy();
+    expect(dialog.getByText('Informasi akun')).toBeTruthy();
+    expect(dialog.queryByText('Riwayat mutasi')).toBeNull();
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    expect(api.getStatement).not.toHaveBeenCalled();
+  });
+
+  it('opens Mutasi for read-only users and requests movements only when it opens', async () => {
+    const api = renderTab(fakeFinancialAccountsApi({ accounts: [testAccount('BANK')] }), {
+      canCreate: false,
+      canUpdate: false,
+    });
+    await screen.findAllByText('Akun BANK');
+    expect(api.getStatement).not.toHaveBeenCalled();
+
+    await clickRowAction('Akun BANK', 'Mutasi');
+
+    const dialog = within(await screen.findByRole('dialog'));
+    expect(dialog.getByText('Mutasi akun')).toBeTruthy();
+    expect(dialog.getByRole('heading', { name: 'Akun BANK' })).toBeTruthy();
+    expect(dialog.queryByText('Informasi akun')).toBeNull();
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    await waitFor(() =>
+      expect(api.getStatement).toHaveBeenCalledWith('bank-account', { limit: 25, offset: 0 }),
+    );
+  });
+
+  it('opens Mutasi for the selected account without reusing another account statement', async () => {
+    const api = renderTab(
+      fakeFinancialAccountsApi({ accounts: [testAccount('BANK'), testAccount('QRIS')] }),
+    );
+    await clickRowAction('Akun BANK', 'Mutasi');
+    await waitFor(() => expect(api.getStatement).toHaveBeenCalledTimes(1));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Tutup' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+
+    await clickRowAction('Akun QRIS', 'Mutasi');
+
+    const dialog = within(await screen.findByRole('dialog'));
+    expect(dialog.getByRole('heading', { name: 'Akun QRIS' })).toBeTruthy();
+    expect(dialog.queryByText('Akun BANK')).toBeNull();
+    await waitFor(() =>
+      expect(api.getStatement).toHaveBeenLastCalledWith('qris-account', { limit: 25, offset: 0 }),
+    );
   });
 });
 

@@ -81,7 +81,7 @@ describe('payment route compatibility', () => {
       route({ financialAccountCode: null, financialAccountName: 'Legacy bank' }),
     );
     expect(options).toEqual([
-      { value: 'bank-account', label: 'Legacy bank · — · IDR', disabled: false },
+      { value: 'bank-account', label: 'Legacy bank · - · IDR', disabled: false },
     ]);
   });
 });

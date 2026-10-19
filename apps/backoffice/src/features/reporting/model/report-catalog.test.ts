@@ -54,6 +54,19 @@ describe('Report catalog', () => {
       expect(report.columns?.length).toBeGreaterThan(0);
   });
 
+  it('labels transaction revenue as effective while keeping status analytics a count composition', () => {
+    const transactions = reportDefinition('transactions');
+    expect(transactions?.kpis.map((kpi) => kpi.key)).toEqual(
+      expect.arrayContaining(['transactionCount', 'effectiveTransactionCount', 'finalRevenue']),
+    );
+    expect(transactions?.analytics.breakdowns).toContainEqual(
+      expect.objectContaining({ key: 'saleStatus', measure: 'count' }),
+    );
+    expect(transactions?.columns?.map((column) => column.key)).toEqual(
+      expect.arrayContaining(['total', 'refundAmount', 'effectiveRevenue']),
+    );
+  });
+
   it('never shows technical identifiers as table columns', () => {
     for (const report of REPORT_CATALOG)
       for (const column of report.columns ?? [])
