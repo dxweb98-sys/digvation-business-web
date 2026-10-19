@@ -53,17 +53,20 @@ export function RecordPanel({
   className = '',
   ariaLabel,
   padded = true,
+  flat = false,
 }: {
   children: ReactNode;
   className?: string;
   ariaLabel?: string;
   /** `false` lets a `RecordPanelHeader` + `RecordPanelBody` span the card edge to edge. */
   padded?: boolean;
+  /** Bordered without elevation, for panels that sit beside other flat cards. */
+  flat?: boolean;
 }) {
   return (
     <section
       aria-label={ariaLabel}
-      className={`overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm ${padded ? 'p-5' : ''} ${className}`}
+      className={`overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] ${flat ? '' : 'shadow-sm'} ${padded ? 'p-5' : ''} ${className}`}
     >
       {children}
     </section>

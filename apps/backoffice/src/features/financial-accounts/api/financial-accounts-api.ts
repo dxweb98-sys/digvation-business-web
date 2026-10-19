@@ -67,6 +67,17 @@ export interface FinancialAccountQuery {
 export type FinancialAccountMovementSource =
   'PAYMENT' | 'REFUND' | 'EXPENSE' | 'CASH_MOVEMENT' | 'PAYMENT_CORRECTION';
 
+/** Runtime statement filters; `from`/`to` are inclusive ISO date-times on `occurredAt`. */
+export interface FinancialAccountStatementQuery {
+  from?: string;
+  to?: string;
+  source?: FinancialAccountMovementSource;
+  direction?: 'IN' | 'OUT';
+  sellingLocationId?: string;
+  limit: number;
+  offset: number;
+}
+
 export interface FinancialAccountStatementMovement {
   id: string;
   source: FinancialAccountMovementSource;
@@ -151,7 +162,7 @@ export class FinancialAccountsApi {
       ...input,
     });
   }
-  getStatement(accountId: string, query: { limit: number; offset: number }) {
+  getStatement(accountId: string, query: FinancialAccountStatementQuery) {
     return this.client.get<FinancialAccountStatement>(
       `/api/v1/financial-accounts/${accountId}/statement?${buildQueryString(query)}`,
     );
