@@ -64,6 +64,50 @@ export interface FinancialAccountQuery {
   offset: number;
 }
 
+export type FinancialAccountMovementSource =
+  'PAYMENT' | 'REFUND' | 'EXPENSE' | 'CASH_MOVEMENT' | 'PAYMENT_CORRECTION';
+
+/** Runtime statement filters; `from`/`to` are inclusive ISO date-times on `occurredAt`. */
+export interface FinancialAccountStatementQuery {
+  from?: string;
+  to?: string;
+  source?: FinancialAccountMovementSource;
+  direction?: 'IN' | 'OUT';
+  sellingLocationId?: string;
+  limit: number;
+  offset: number;
+}
+
+export interface FinancialAccountStatementMovement {
+  id: string;
+  source: FinancialAccountMovementSource;
+  direction: 'IN' | 'OUT';
+  amount: string;
+  currency: string;
+  occurredAt: string;
+  nature: 'FUNDS_MOVEMENT' | 'REATTRIBUTION';
+  sourceId: string;
+  accountId: string;
+  saleId?: string;
+  sellingLocationId: string;
+  actorId?: string | null;
+  actorKind?: string | null;
+  note?: string | null;
+}
+
+export interface FinancialAccountStatement {
+  account: FinancialAccount;
+  openingBalanceAvailable: false;
+  openingRecordedNetMovement: string;
+  totalIncoming: string;
+  totalOutgoing: string;
+  closingRecordedNetMovement: string;
+  items: FinancialAccountStatementMovement[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 export interface PaymentRouteQuery {
   sellingLocationId?: string;
   paymentMethod?: PaymentMethod;
@@ -117,6 +161,11 @@ export class FinancialAccountsApi {
       expectedVersion: account.version,
       ...input,
     });
+  }
+  getStatement(accountId: string, query: FinancialAccountStatementQuery) {
+    return this.client.get<FinancialAccountStatement>(
+      `/api/v1/financial-accounts/${accountId}/statement?${buildQueryString(query)}`,
+    );
   }
 
   listRoutes(query: PaymentRouteQuery) {

@@ -6,7 +6,7 @@ import {
   useToast,
   type TableColumn,
 } from '@digvation/ui';
-import { CircleCheck, CircleOff, Eye, Pencil, Plus } from 'lucide-react';
+import { ArrowLeftRight, CircleCheck, CircleOff, Eye, Pencil, Plus } from 'lucide-react';
 import { useState } from 'react';
 
 import { useFormState } from '../../../shared/forms/use-form-state';
@@ -27,6 +27,7 @@ import {
 } from '../model/financial-account-model';
 import { FinancialAccountDetailDialog } from './financial-account-detail-dialog';
 import { FinancialAccountDialog } from './financial-account-dialog';
+import { FinancialAccountStatementDialog } from './financial-account-statement-dialog';
 import { RecordIdentity, RecordStatusBadge, useApiErrorToast } from './financial-accounts-shared';
 
 type AccountFilterState = { q: string; type: '' | FinancialAccountType; status: '' | RecordStatus };
@@ -52,6 +53,7 @@ export function FinancialAccountsTab({
   const pagination = usePaginationState({ initialPageSize: 20 });
   const [editor, setEditor] = useState<FinancialAccount | null | undefined>();
   const [detail, setDetail] = useState<FinancialAccount | null>(null);
+  const [statement, setStatement] = useState<FinancialAccount | null>(null);
   const accounts = useListQuery({
     queryKey: [...financialAccountKeys.list, query],
     pagination: { page: pagination.page, pageSize: pagination.pageSize },
@@ -177,6 +179,11 @@ export function FinancialAccountsTab({
             onClick: setDetail,
           },
           {
+            label: copy('Mutasi'),
+            icon: <ArrowLeftRight className="size-4" />,
+            onClick: setStatement,
+          },
+          {
             label: copy('Edit account'),
             icon: <Pencil className="size-4" />,
             onClick: setEditor,
@@ -213,6 +220,12 @@ export function FinancialAccountsTab({
           setDetail(null);
           setEditor(account);
         }}
+      />
+      <FinancialAccountStatementDialog
+        key={`statement-${statement?.id ?? 'closed'}`}
+        account={statement}
+        api={api}
+        onClose={() => setStatement(null)}
       />
     </>
   );

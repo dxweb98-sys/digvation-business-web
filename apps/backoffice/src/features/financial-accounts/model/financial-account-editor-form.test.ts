@@ -150,7 +150,7 @@ describe('financial account editor form', () => {
   });
 
   it('renders a missing legacy code and destination quietly', () => {
-    expect(displayCode(null)).toBe('—');
+    expect(displayCode(null)).toBe('-');
     expect(displayCode('ACC-000001')).toBe('ACC-000001');
     expect(accountDestinationSummary(account)).toBe('BCA · ID1023456789');
     expect(
