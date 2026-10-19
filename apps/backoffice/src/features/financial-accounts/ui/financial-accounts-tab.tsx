@@ -207,6 +207,7 @@ export function FinancialAccountsTab({
       <FinancialAccountDetailDialog
         key={`detail-${detail?.id ?? 'closed'}`}
         account={detail}
+        api={api}
         canUpdate={canUpdate}
         onClose={() => setDetail(null)}
         onEdit={(account) => {

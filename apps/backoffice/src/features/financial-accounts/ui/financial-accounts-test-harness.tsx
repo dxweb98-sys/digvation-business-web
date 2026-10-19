@@ -14,6 +14,7 @@ import type {
   FinancialAccountsApi,
   FinancialAccountType,
   PaymentRoute,
+  FinancialAccountStatement,
   SellingLocation,
 } from '../api/financial-accounts-api';
 
@@ -101,6 +102,21 @@ export function fakeFinancialAccountsApi({
       ...input,
       version: account.version + 1,
     })),
+    getStatement: vi.fn<FinancialAccountsApi['getStatement']>(
+      async (accountId) =>
+        ({
+          account: accounts.find((account) => account.id === accountId) ?? testAccount('CASH'),
+          openingBalanceAvailable: false,
+          openingRecordedNetMovement: '0.0000',
+          totalIncoming: '0.0000',
+          totalOutgoing: '0.0000',
+          closingRecordedNetMovement: '0.0000',
+          items: [],
+          total: 0,
+          limit: 25,
+          offset: 0,
+        }) satisfies FinancialAccountStatement,
+    ),
     listRoutes: vi.fn<FinancialAccountsApi['listRoutes']>(async () => page(routes)),
     createRoute: vi.fn(async () => testRoute()),
     updateRoute: vi.fn(async () => testRoute()),
