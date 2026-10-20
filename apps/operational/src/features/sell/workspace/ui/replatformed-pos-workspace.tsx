@@ -10,7 +10,14 @@ import {
   useToast,
 } from '@digvation-labs/ui';
 import { useQuery } from '@tanstack/react-query';
-import { AlertCircle, CheckCircle2, RotateCcw, ShoppingBag, Sparkles } from 'lucide-react';
+import {
+  AlertCircle,
+  CheckCircle2,
+  RefreshCw,
+  RotateCcw,
+  ShoppingBag,
+  Sparkles,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import {
@@ -771,6 +778,16 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
             {workspace.canRetryLastCommand ? (
               <Button size="sm" variant="outline" onClick={workspace.retryLastCommand}>
                 <RotateCcw className="mr-1.5 size-3.5" /> {copy('Try same action')}
+              </Button>
+            ) : null}
+            {workspace.settlementRecovery?.refusal === 'PROMOTION_REPRICE' ? (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={workspace.isCoreMutating}
+                onClick={() => void workspace.updateRepricedTotal()}
+              >
+                <RefreshCw className="mr-1.5 size-3.5" /> {copy('Update total')}
               </Button>
             ) : null}
             {workspace.viewModel.primaryMode === 'CONFLICT_REVIEW' ? (

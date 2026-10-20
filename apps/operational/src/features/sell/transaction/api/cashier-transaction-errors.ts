@@ -47,6 +47,12 @@ export function cashierTransactionErrorMessage(error: unknown, locale?: string):
   if (isApiErrorCode(error, 'SALE_PAYMENT_OVERAPPLIED')) {
     return copyForLocale('Refund required', locale);
   }
+  if (isApiErrorCode(error, 'SALE_LINE_DISCOUNT_EXCEEDS_BASE_ITEM')) {
+    return copyForLocale(
+      'The fixed discount exceeds the base item price. Additional items do not count toward the discount limit. Change or remove the discount before continuing.',
+      locale,
+    );
+  }
   if (isApiErrorCode(error, 'SALE_NOT_SETTLED')) {
     return copyForLocale(
       'Complete the remaining payment before finishing this transaction.',

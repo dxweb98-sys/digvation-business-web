@@ -29,7 +29,10 @@ import {
   createCashierTransactionAdapter,
   isLocalCashierDemoEnabled,
 } from '../../transaction/api/cashier-transaction-adapter-factory';
-import { cashierTransactionErrorMessage } from '../../transaction/api/cashier-transaction-errors';
+import {
+  cashierTransactionErrorMessage,
+  isApiErrorCode,
+} from '../../transaction/api/cashier-transaction-errors';
 import { cashierTransactionKeys } from '../../transaction/api/cashier-transaction-keys';
 import type {
   CatalogItem,
@@ -97,7 +100,12 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
   // while the tab is in the background. A second timer here would refetch the
   // same list twice as often, including while nobody is looking at it.
 
-  const command = useSaleCommandCoordinator({ client: transactionAdapter, rememberSale });
+  const command = useSaleCommandCoordinator({
+    client: transactionAdapter,
+    rememberSale,
+    permissions: session?.access.permissions,
+    capabilities: session?.access.capabilities,
+  });
 
   const catalog = useSellingCatalog({
     query: transactionAdapter,
@@ -201,6 +209,23 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     } catch (error) {
       command.reportError(error);
       throw error;
+    }
+  };
+
+  /**
+   * The explicit "Update total" recovery for a transaction stored at a total priced by the previous
+   * item Promotion rule: the existing Promotion refresh, sent only when the cashier asks for it.
+   * A failure is reported by the refresh itself.
+   */
+  const updateRepricedTotal = async () => {
+    const recovery = command.settlementRecovery;
+    if (recovery?.refusal !== 'PROMOTION_REPRICE') return;
+    const latest = await command.refetchSale(recovery.saleId);
+    if (!latest || latest.status !== 'OPEN') return;
+    try {
+      await refreshPromotionEligibility(latest);
+    } catch {
+      // Already shown through the notice.
     }
   };
 
@@ -943,7 +968,8 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
       command.commitSale(updated);
       return updated;
     } catch (error) {
-      command.reportError(error);
+      if (isApiErrorCode(error, 'SALE_NOT_SETTLED')) await command.recoverFailure(error, sale.id);
+      else command.reportError(error);
       throw error;
     }
   };
@@ -989,7 +1015,8 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
       if (queueContextSale?.id === updated.id) setQueueContextSale(updated);
       return updated;
     } catch (error) {
-      command.reportError(error);
+      if (isApiErrorCode(error, 'SALE_NOT_SETTLED')) await command.recoverFailure(error, sale.id);
+      else command.reportError(error);
       throw error;
     }
   };
@@ -1096,6 +1123,8 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     ),
     refreshPaymentRoutes,
     refreshPromotionEligibility,
+    settlementRecovery: command.settlementRecovery,
+    updateRepricedTotal,
     selectedLocationId: selectedLocationId ?? '',
     search: catalog.search,
     itemType: catalog.itemType,
