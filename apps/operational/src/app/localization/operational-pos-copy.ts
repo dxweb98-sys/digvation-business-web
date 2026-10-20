@@ -1284,6 +1284,27 @@ const posCopy: Record<string, LocalizedCopy> = {
     'id-ID': 'Komponen khusus varian',
     'en-US': 'Variant-specific components',
   },
+  'The fixed discount exceeds the base item price. Additional items do not count toward the discount limit. Change or remove the discount before continuing.':
+    {
+      'id-ID':
+        'Nominal diskon melebihi harga dasar item. Item tambahan tidak termasuk dalam batas diskon. Ubah atau hapus diskon sebelum melanjutkan.',
+      'en-US':
+        'The fixed discount exceeds the base item price. Additional items do not count toward the discount limit. Change or remove the discount before continuing.',
+    },
+  'The transaction total needs updating because the item discount rule changed. Open the item discount, remove it, then apply the correct discount again. Check the new total before completing the payment.':
+    {
+      'id-ID':
+        'Total transaksi perlu diperbarui karena aturan diskon item berubah. Buka diskon item, hapus lalu terapkan kembali diskon yang sesuai. Periksa total terbaru sebelum menyelesaikan pembayaran.',
+      'en-US':
+        'The transaction total needs updating because the item discount rule changed. Open the item discount, remove it, then apply the correct discount again. Check the new total before completing the payment.',
+    },
+  'The transaction total needs updating because the item discount rule changed. Ask a Manager or Owner to remove the item discount and apply it again, then check the new total before completing the payment.':
+    {
+      'id-ID':
+        'Total transaksi perlu diperbarui karena aturan diskon item berubah. Minta Manajer atau Pemilik menghapus lalu menerapkan kembali diskon item, kemudian periksa total terbaru sebelum menyelesaikan pembayaran.',
+      'en-US':
+        'The transaction total needs updating because the item discount rule changed. Ask a Manager or Owner to remove the item discount and apply it again, then check the new total before completing the payment.',
+    },
 };
 
 export function operationalPosCopy(value: string, locale: OperationalLocale): string | undefined {

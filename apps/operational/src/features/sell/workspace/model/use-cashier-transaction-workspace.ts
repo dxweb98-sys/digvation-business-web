@@ -29,7 +29,10 @@ import {
   createCashierTransactionAdapter,
   isLocalCashierDemoEnabled,
 } from '../../transaction/api/cashier-transaction-adapter-factory';
-import { cashierTransactionErrorMessage } from '../../transaction/api/cashier-transaction-errors';
+import {
+  cashierTransactionErrorMessage,
+  isApiErrorCode,
+} from '../../transaction/api/cashier-transaction-errors';
 import { cashierTransactionKeys } from '../../transaction/api/cashier-transaction-keys';
 import type {
   CatalogItem,
@@ -97,7 +100,11 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
   // while the tab is in the background. A second timer here would refetch the
   // same list twice as often, including while nobody is looking at it.
 
-  const command = useSaleCommandCoordinator({ client: transactionAdapter, rememberSale });
+  const command = useSaleCommandCoordinator({
+    client: transactionAdapter,
+    rememberSale,
+    permissions: session?.access.permissions,
+  });
 
   const catalog = useSellingCatalog({
     query: transactionAdapter,
@@ -943,7 +950,8 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
       command.commitSale(updated);
       return updated;
     } catch (error) {
-      command.reportError(error);
+      if (isApiErrorCode(error, 'SALE_NOT_SETTLED')) await command.recoverFailure(error, sale.id);
+      else command.reportError(error);
       throw error;
     }
   };
@@ -989,7 +997,8 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
       if (queueContextSale?.id === updated.id) setQueueContextSale(updated);
       return updated;
     } catch (error) {
-      command.reportError(error);
+      if (isApiErrorCode(error, 'SALE_NOT_SETTLED')) await command.recoverFailure(error, sale.id);
+      else command.reportError(error);
       throw error;
     }
   };
