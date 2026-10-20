@@ -6,6 +6,7 @@ import { transactionNumber } from '../transaction/model/sale-display';
 import type { Dispatch, SetStateAction } from 'react';
 import type { useToast } from '@digvation-labs/ui';
 import type { QueueStatus } from './queue-status';
+import { isApiErrorCode } from '../transaction/api/cashier-transaction-errors';
 
 /**
  * Completing queued work: confirmation, finalize, and the immediate receipt rule (detail when the
@@ -64,7 +65,14 @@ export function useQueuedSaleCompletion({
         description: `${transactionNumber(finalized, workspace.locale)} ${copy('has been completed.')}`,
         variant: 'success',
       });
-    } catch {
+    } catch (error) {
+      // An unsettled refusal is already explained by the workspace notice with its next step (pay
+      // the rest, or update the total); close the confirmation so that notice is in view instead of
+      // adding a second, generic instruction.
+      if (isApiErrorCode(error, 'SALE_NOT_SETTLED')) {
+        setCompletionConfirmationTarget(null);
+        return;
+      }
       showToast({
         title: copy('Could not complete transaction'),
         description: copy('Check the transaction status and try again.'),

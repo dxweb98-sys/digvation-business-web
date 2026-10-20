@@ -8,6 +8,7 @@ const addition = (componentSource: 'FIXED_BOM' | 'SALE_SELECTED') =>
   ({ componentSource }) as NonNullable<Line['compositionComponents']>[number];
 
 const line = (overrides: Partial<Line> = {}): Line => ({
+  id: 'line-1',
   removedAt: null,
   discountType: 'PERCENTAGE',
   compositionComponents: [addition('SALE_SELECTED')],
@@ -82,5 +83,68 @@ describe('settlement refusal guidance', () => {
         DISCOUNT,
       ),
     ).toBe('UNSETTLED');
+  });
+});
+
+describe('item promotion recovery', () => {
+  const promoted = (
+    lines: Line[],
+    saleLineId: string | null = 'line-1',
+    payments = paidInFull,
+  ) => ({
+    ...sale(lines, payments),
+    adjustments: [{ source: 'PROMOTION' as const, saleLineId }],
+  });
+  const UPDATE = ['sales:read', 'sales:update'];
+  const PROMOTIONS = ['PROMOTIONS'];
+
+  it('offers the Promotion refresh to an account that may update the transaction', () => {
+    expect(settlementRefusal(promoted([line({ discountType: null })]), UPDATE, PROMOTIONS)).toBe(
+      'PROMOTION_REPRICE',
+    );
+    // One refresh re-prices an item discount on the same line too.
+    expect(settlementRefusal(promoted([line()]), [...UPDATE, 'sales:discount'], PROMOTIONS)).toBe(
+      'PROMOTION_REPRICE',
+    );
+  });
+
+  it('sends an account without the update permission to a Manager or Owner', () => {
+    expect(settlementRefusal(promoted([line({ discountType: null })]), CASHIER, PROMOTIONS)).toBe(
+      'PROMOTION_REPRICE_NEEDS_AUTHORIZATION',
+    );
+  });
+
+  it('offers no Promotion guidance where Promotions are disabled', () => {
+    // Runtime refuses the refresh for every account, so nobody is pointed at it.
+    expect(settlementRefusal(promoted([line({ discountType: null })]), UPDATE, [])).toBe(
+      'UNSETTLED',
+    );
+    // A manual item discount on the same line keeps its own guidance.
+    expect(settlementRefusal(promoted([line()]), DISCOUNT, [])).toBe('ITEM_DISCOUNT_REPRICE');
+  });
+
+  it('gives no Promotion guidance where the rule did not change anything', () => {
+    // A transaction Promotion is not tied to a line.
+    expect(
+      settlementRefusal(promoted([line({ discountType: null })], null), UPDATE, PROMOTIONS),
+    ).toBe('UNSETTLED');
+    // A line Promotion on an item without sale-selected additions.
+    expect(
+      settlementRefusal(
+        promoted([line({ discountType: null, compositionComponents: [addition('FIXED_BOM')] })]),
+        UPDATE,
+        PROMOTIONS,
+      ),
+    ).toBe('UNSETTLED');
+    // An amount is still open: ordinary payment guidance.
+    expect(
+      settlementRefusal(
+        promoted([line({ discountType: null })], 'line-1', [
+          { status: 'SUCCEEDED', appliedAmount: '100000.0000' },
+        ]),
+        UPDATE,
+        PROMOTIONS,
+      ),
+    ).toBe('REMAINING_PAYMENT');
   });
 });

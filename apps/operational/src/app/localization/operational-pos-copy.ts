@@ -1305,6 +1305,28 @@ const posCopy: Record<string, LocalizedCopy> = {
       'en-US':
         'The transaction total needs updating because the item discount rule changed. Ask a Manager or Owner to remove the item discount and apply it again, then check the new total before completing the payment.',
     },
+  'The transaction total needs updating because the item promotion rule changed. Select Update total, then check the new total before completing the payment.':
+    {
+      'id-ID':
+        'Total transaksi perlu diperbarui karena aturan promo item berubah. Pilih Perbarui total, lalu periksa total terbaru sebelum menyelesaikan pembayaran.',
+      'en-US':
+        'The transaction total needs updating because the item promotion rule changed. Select Update total, then check the new total before completing the payment.',
+    },
+  'The transaction total needs updating because the item promotion rule changed. Ask a Manager or Owner to update the total, then check the new total before completing the payment.':
+    {
+      'id-ID':
+        'Total transaksi perlu diperbarui karena aturan promo item berubah. Minta Manajer atau Pemilik memperbarui total, lalu periksa total terbaru sebelum menyelesaikan pembayaran.',
+      'en-US':
+        'The transaction total needs updating because the item promotion rule changed. Ask a Manager or Owner to update the total, then check the new total before completing the payment.',
+    },
+  'Complete the remaining payment before finishing this transaction.': {
+    'id-ID': 'Selesaikan sisa pembayaran sebelum menyelesaikan transaksi ini.',
+    'en-US': 'Complete the remaining payment before finishing this transaction.',
+  },
+  'Update total': {
+    'id-ID': 'Perbarui total',
+    'en-US': 'Update total',
+  },
 };
 
 export function operationalPosCopy(value: string, locale: OperationalLocale): string | undefined {
