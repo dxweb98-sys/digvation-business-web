@@ -19,16 +19,25 @@ import {
   queueEntryFor,
   useCanReadCompletedSaleDetails,
 } from '../../transaction/model/completed-sale-visibility';
+import {
+  SETTLEMENT_REFUSAL_COPY,
+  settlementRefusal,
+} from '../../transaction/model/settlement-recovery';
 import type { SynchronizationState } from './sale-workspace-view-model';
 
 interface UseSaleCommandCoordinatorOptions {
   client: SaleTransactionClient;
   rememberSale: (saleId: string) => void;
+  /** The signed-in account's permissions; they choose which recovery guidance is offered. */
+  permissions?: readonly string[];
 }
+
+const NO_PERMISSIONS: readonly string[] = [];
 
 export function useSaleCommandCoordinator({
   client,
   rememberSale,
+  permissions = NO_PERMISSIONS,
 }: UseSaleCommandCoordinatorOptions) {
   const runtime = useRuntime();
   const locale = runtime.locale;
@@ -116,6 +125,20 @@ export function useSaleCommandCoordinator({
         return;
       }
 
+      // Runtime refused to finish an unsettled transaction. The refusal is kept as is; the latest
+      // transaction is read again so the cashier sees its real remaining amount and the matching
+      // next step.
+      if (isApiErrorCode(error, 'SALE_NOT_SETTLED') && saleId) {
+        const latest = await refetchSale(saleId);
+        setSynchronization('CLEAN');
+        setNotice(
+          copy(
+            SETTLEMENT_REFUSAL_COPY[latest ? settlementRefusal(latest, permissions) : 'UNSETTLED'],
+          ),
+        );
+        return;
+      }
+
       if (!isKnownApiFailure(error)) {
         if (saleId) await refetchSale(saleId);
         setSynchronization('UNCERTAIN_COMMAND');
@@ -132,7 +155,7 @@ export function useSaleCommandCoordinator({
       setSynchronization('CLEAN');
       setNotice(cashierTransactionErrorMessage(error, locale));
     },
-    [copy, locale, refetchSale],
+    [copy, locale, permissions, refetchSale],
   );
 
   const runMutation = useCallback(async <T>(operation: () => Promise<T>): Promise<T> => {
