@@ -21,6 +21,7 @@ import {
 } from '../../transaction/model/completed-sale-visibility';
 import {
   SETTLEMENT_REFUSAL_COPY,
+  type SettlementRefusal,
   settlementRefusal,
 } from '../../transaction/model/settlement-recovery';
 import type { SynchronizationState } from './sale-workspace-view-model';
@@ -30,19 +31,30 @@ interface UseSaleCommandCoordinatorOptions {
   rememberSale: (saleId: string) => void;
   /** The signed-in account's permissions; they choose which recovery guidance is offered. */
   permissions?: readonly string[];
+  /** The business's effective capabilities; Promotion recovery needs Promotions. */
+  capabilities?: readonly string[];
 }
 
-const NO_PERMISSIONS: readonly string[] = [];
+/** The recovery the current notice explains, for the transaction it was read from. */
+export interface SettlementRecovery {
+  saleId: string;
+  refusal: SettlementRefusal;
+  notice: string;
+}
+
+const NO_ENTRIES: readonly string[] = [];
 
 export function useSaleCommandCoordinator({
   client,
   rememberSale,
-  permissions = NO_PERMISSIONS,
+  permissions = NO_ENTRIES,
+  capabilities = NO_ENTRIES,
 }: UseSaleCommandCoordinatorOptions) {
   const runtime = useRuntime();
   const locale = runtime.locale;
   const queryClient = useQueryClient();
   const [notice, setNotice] = useState<string | null>(null);
+  const [recovery, setRecovery] = useState<SettlementRecovery | null>(null);
   const [synchronization, setSynchronization] = useState<SynchronizationState>('CLEAN');
   const [activeMutationCount, setActiveMutationCount] = useState(0);
   const copy = useCallback(
@@ -130,12 +142,11 @@ export function useSaleCommandCoordinator({
       // next step.
       if (isApiErrorCode(error, 'SALE_NOT_SETTLED') && saleId) {
         const latest = await refetchSale(saleId);
+        const refusal = latest ? settlementRefusal(latest, permissions, capabilities) : 'UNSETTLED';
+        const message = copy(SETTLEMENT_REFUSAL_COPY[refusal]);
         setSynchronization('CLEAN');
-        setNotice(
-          copy(
-            SETTLEMENT_REFUSAL_COPY[latest ? settlementRefusal(latest, permissions) : 'UNSETTLED'],
-          ),
-        );
+        setRecovery({ saleId, refusal, notice: message });
+        setNotice(message);
         return;
       }
 
@@ -155,7 +166,7 @@ export function useSaleCommandCoordinator({
       setSynchronization('CLEAN');
       setNotice(cashierTransactionErrorMessage(error, locale));
     },
-    [copy, locale, permissions, refetchSale],
+    [capabilities, copy, locale, permissions, refetchSale],
   );
 
   const runMutation = useCallback(async <T>(operation: () => Promise<T>): Promise<T> => {
@@ -174,6 +185,8 @@ export function useSaleCommandCoordinator({
 
   return {
     notice,
+    /** Only while the notice on screen is still the one that explained this recovery. */
+    settlementRecovery: recovery && recovery.notice === notice ? recovery : null,
     synchronization,
     effectiveSynchronization,
     isMutating: activeMutationCount > 0,

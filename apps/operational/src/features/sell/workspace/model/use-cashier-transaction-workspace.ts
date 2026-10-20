@@ -104,6 +104,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     client: transactionAdapter,
     rememberSale,
     permissions: session?.access.permissions,
+    capabilities: session?.access.capabilities,
   });
 
   const catalog = useSellingCatalog({
@@ -208,6 +209,23 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     } catch (error) {
       command.reportError(error);
       throw error;
+    }
+  };
+
+  /**
+   * The explicit "Update total" recovery for a transaction stored at a total priced by the previous
+   * item Promotion rule: the existing Promotion refresh, sent only when the cashier asks for it.
+   * A failure is reported by the refresh itself.
+   */
+  const updateRepricedTotal = async () => {
+    const recovery = command.settlementRecovery;
+    if (recovery?.refusal !== 'PROMOTION_REPRICE') return;
+    const latest = await command.refetchSale(recovery.saleId);
+    if (!latest || latest.status !== 'OPEN') return;
+    try {
+      await refreshPromotionEligibility(latest);
+    } catch {
+      // Already shown through the notice.
     }
   };
 
@@ -1105,6 +1123,8 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     ),
     refreshPaymentRoutes,
     refreshPromotionEligibility,
+    settlementRecovery: command.settlementRecovery,
+    updateRepricedTotal,
     selectedLocationId: selectedLocationId ?? '',
     search: catalog.search,
     itemType: catalog.itemType,

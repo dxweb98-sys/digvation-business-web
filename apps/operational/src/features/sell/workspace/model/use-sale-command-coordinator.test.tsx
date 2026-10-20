@@ -30,7 +30,7 @@ const legacySale = (overrides: Partial<Sale> = {}) =>
     ...overrides,
   }) as unknown as Sale;
 
-function coordinator(latest: Sale, permissions: string[]) {
+function coordinator(latest: Sale, permissions: string[], capabilities: string[] = []) {
   const getSale = vi.fn().mockResolvedValue(latest);
   const client = { getSale } as unknown as SaleTransactionClient;
   const queryClient = new QueryClient();
@@ -38,7 +38,13 @@ function coordinator(latest: Sale, permissions: string[]) {
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
   const hook = renderHook(
-    () => useSaleCommandCoordinator({ client, rememberSale: () => undefined, permissions }),
+    () =>
+      useSaleCommandCoordinator({
+        client,
+        rememberSale: () => undefined,
+        permissions,
+        capabilities,
+      }),
     { wrapper },
   );
   return { hook, getSale };
@@ -82,5 +88,50 @@ describe('unsettled finalization recovery', () => {
     );
     await act(() => hook.result.current.recoverFailure(unsettled, 'sale-1'));
     expect(hook.result.current.notice).not.toMatch(/diskon item/);
+  });
+
+  it('exposes the Promotion refresh recovery only while its notice is shown', async () => {
+    const promoted = legacySale({
+      lines: [
+        {
+          id: 'line-1',
+          removedAt: null,
+          discountType: null,
+          compositionComponents: [{ componentSource: 'SALE_SELECTED' }],
+        },
+      ],
+      adjustments: [{ source: 'PROMOTION', saleLineId: 'line-1' }],
+    } as unknown as Partial<Sale>);
+    const { hook } = coordinator(promoted, ['sales:update'], ['PROMOTIONS']);
+    await act(() => hook.result.current.recoverFailure(unsettled, 'sale-1'));
+    expect(hook.result.current.notice).toBe(
+      'Total transaksi perlu diperbarui karena aturan promo item berubah. Pilih Perbarui total, lalu periksa total terbaru sebelum menyelesaikan pembayaran.',
+    );
+    expect(hook.result.current.settlementRecovery).toMatchObject({
+      saleId: 'sale-1',
+      refusal: 'PROMOTION_REPRICE',
+    });
+    act(() => hook.result.current.clearNotice());
+    expect(hook.result.current.settlementRecovery).toBeNull();
+  });
+
+  it('never exposes the Promotion refresh where Promotions are disabled', async () => {
+    const promoted = legacySale({
+      lines: [
+        {
+          id: 'line-1',
+          removedAt: null,
+          discountType: null,
+          compositionComponents: [{ componentSource: 'SALE_SELECTED' }],
+        },
+      ],
+      adjustments: [{ source: 'PROMOTION', saleLineId: 'line-1' }],
+    } as unknown as Partial<Sale>);
+    const { hook } = coordinator(promoted, ['sales:update', 'sales:discount'], []);
+    await act(() => hook.result.current.recoverFailure(unsettled, 'sale-1'));
+    expect(hook.result.current.settlementRecovery?.refusal).toBe('UNSETTLED');
+    expect(hook.result.current.notice).toBe(
+      'Selesaikan sisa pembayaran sebelum menyelesaikan transaksi ini.',
+    );
   });
 });
