@@ -4,7 +4,8 @@ import { useOperationalLocalization } from '../../../../app/localization/operati
 import { additionPerformedBy, saleLineAdditions, saleLineBase } from '../model/sale-line-additions';
 import { saleLineWorkStatus } from '../../queue/queued-sale-work';
 import { correctionSourceOf } from '../../adjustment/sale-adjustment-access';
-import { lineDiscountRows } from '../model/sale-presentation';
+import { additionDiscountNote, lineDiscountRows } from '../model/sale-presentation';
+import { AdditionDiscountNote } from './addition-discount-note';
 import type { Employee, Sale, SaleLine } from '../model/cashier-transaction.types';
 import {
   SaleDetailSection,
@@ -118,21 +119,25 @@ function ReferenceTransactionOrderLine({
       }))}
       usage={
         additions.length ? (
-          <SaleLineAdditions
-            heading={copy('Additional items')}
-            baseLabel={copy('Item price')}
-            base={{
-              pricing: `${quantity(line.quantity)} × ${format(lineBase.unitPrice)}`,
-              amount: format(lineBase.amount),
-            }}
-            rows={additions.map((addition) => ({
-              id: addition.id,
-              name: addition.name,
-              pricing: `${quantity(addition.quantity)} × ${format(addition.unitPrice)}`,
-              amount: format(addition.amount),
-              performedBy: additionPerformedBy(addition, employees, copy),
-            }))}
-          />
+          <>
+            <SaleLineAdditions
+              heading={copy('Additional items')}
+              baseLabel={copy('Item price')}
+              base={{
+                pricing: `${quantity(line.quantity)} × ${format(lineBase.unitPrice)}`,
+                amount: format(lineBase.amount),
+              }}
+              rows={additions.map((addition) => ({
+                id: addition.id,
+                name: addition.name,
+                pricing: `${quantity(addition.quantity)} × ${format(addition.unitPrice)}`,
+                amount: format(addition.amount),
+                performedBy: additionPerformedBy(addition, employees, copy),
+                soldBy: addition.soldByName ? `${copy('Sold by')} ${addition.soldByName}` : null,
+              }))}
+            />
+            <AdditionDiscountNote kind={additionDiscountNote(sale, line)} className="mt-1.5" />
+          </>
         ) : null
       }
       earning={

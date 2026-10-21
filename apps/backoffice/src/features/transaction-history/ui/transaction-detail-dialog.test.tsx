@@ -336,7 +336,12 @@ describe('Transaction detail actions', () => {
     expect(dialog.getAllByText('Dikembalikan oleh:')).toHaveLength(2);
     expect(dialog.getAllByText('Dewi Pemilik').length).toBeGreaterThanOrEqual(2);
     expect(dialog.getByText('Transaksi salah input')).toBeTruthy();
-    expect(dialog.getByText('Direversal oleh')).toBeTruthy();
+    expect(dialog.getByText('Pembatalan transaksi')).toBeTruthy();
+    expect(dialog.getByText('Dibatalkan oleh')).toBeTruthy();
+    // Cancellation and returned money are separate facts: the panel states the refund outcome.
+    expect(dialog.getByText('Dana ke pelanggan')).toBeTruthy();
+    expect(dialog.getAllByText('Dana dikembalikan penuh').length).toBeGreaterThan(0);
+    expect(dialog.queryByText(/direversal/i)).toBeNull();
   });
 
   it('sends the canonical refund amount, never the displayed grouping', async () => {

@@ -817,6 +817,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           active={queueTab}
           onChangeTab={setQueueTab}
           groups={groups}
+          employees={workspace.employees}
           issues={queueIssues}
           locale={workspace.locale}
           onStartWork={(transaction) => void startQueuedWork(transaction)}

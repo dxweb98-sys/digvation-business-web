@@ -8,6 +8,7 @@ import {
   operationalLabel,
   resolveOperationalLocale,
 } from '../../../app/localization/operational-localization';
+import { PosCurrencyInput } from '../lib/pos-controls';
 import type { DiscountInput } from '../transaction/api/cashier-transaction.adapter';
 import type {
   ContributionPreview,
@@ -459,13 +460,23 @@ export function SaleLineTaskDialog({
                 <option value="PERCENTAGE">{copy('Percentage')}</option>
                 <option value="FIXED_AMOUNT">{copy('Fixed amount')}</option>
               </DSelect>
-              <DDecimalInput
-                aria-label={copy('Item discount')}
-                value={discountValue}
-                disabled={monetaryDisabled}
-                onValueChange={setDiscountValue}
-                placeholder={discountType === 'PERCENTAGE' ? '10 (%)' : '50000'}
-              />
+              {discountType === 'FIXED_AMOUNT' ? (
+                // Same rupiah field as the transaction discount; the plain decimal reaches Runtime.
+                <PosCurrencyInput
+                  aria-label={copy('Item discount')}
+                  value={discountValue}
+                  disabled={monetaryDisabled}
+                  onChange={setDiscountValue}
+                />
+              ) : (
+                <DDecimalInput
+                  aria-label={copy('Item discount')}
+                  value={discountValue}
+                  disabled={monetaryDisabled}
+                  onValueChange={setDiscountValue}
+                  placeholder="10 (%)"
+                />
+              )}
             </div>
             <DInput
               aria-label={copy('Discount reason')}

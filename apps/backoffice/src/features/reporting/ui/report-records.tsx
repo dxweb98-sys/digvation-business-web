@@ -1,5 +1,5 @@
 import type { AuthSession } from '@digvation/business-auth';
-import { DBadge, DDataTable, type TableColumn } from '@digvation/ui';
+import { DBadge, DDataTable, DInfoNote, type TableColumn } from '@digvation/ui';
 import { Eye } from 'lucide-react';
 import { useState } from 'react';
 
@@ -68,9 +68,21 @@ export function ReportRecords({
           {copy('Records for the selected report, period, and filters.')}
         </p>
       </header>
+      {/* One consistent place for the explanation of figures that are easy to misread. */}
+      {definition.note ? (
+        <DInfoNote variant="info" className="max-w-[80ch]">
+          {copy(definition.note)}
+        </DInfoNote>
+      ) : null}
       <DDataTable
         rowKey={(row, index) =>
-          String(row.id ?? row.saleId ?? row.employeeId ?? `${row.saleNumber ?? ''}-${index}`)
+          String(
+            row.id ??
+              row.saleId ??
+              row.employeeId ??
+              (row.catalogItemId ? `${row.catalogItemId}:${row.catalogVariantId ?? ''}` : null) ??
+              `${row.saleNumber ?? ''}-${index}`,
+          )
         }
         loading={loading}
         data={rows}

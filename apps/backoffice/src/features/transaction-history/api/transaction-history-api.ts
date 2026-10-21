@@ -175,6 +175,8 @@ export interface SaleLineCompositionComponent {
   extendedContribution: string;
   performers: { employeeId: string; shareRate: string }[];
   contributions: EmployeeContribution[];
+  /** SALE_SELECTED only: its own Product salesperson snapshot, independent of performers. */
+  soldByEmployeeNameSnapshot?: string | null;
 }
 
 /** A captured Promotion or manual discount outcome; `actualAmount` is what it took off. */

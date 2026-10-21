@@ -847,13 +847,62 @@ describe('ItemConfigurator — who performs a Service addition ("Dikerjakan oleh
     await click(await screen.findByRole('option', { name }));
   }
 
-  it('shows "Dikerjakan oleh" on a chosen addition, never "Dijual oleh" for the Service', async () => {
+  const sellers = () => screen.queryAllByLabelText('Dijual oleh', { selector: 'button' });
+  async function chooseSeller(index: number, name: string) {
+    await click(sellers()[index]!);
+    await click(await screen.findByRole('option', { name }));
+  }
+
+  it('shows "Dikerjakan oleh" and a separate "Dijual oleh" on a chosen addition, never on the Service itself', async () => {
     const { dialog } = hairColor();
     await click(dialog().getByText('Red'));
     expect(groups()).toHaveLength(0);
+    // The Service line has performers, never a salesperson of its own.
+    expect(sellers()).toHaveLength(0);
     await chooseAdditional(0, 'Serum');
     expect(groups()).toHaveLength(1);
-    expect(screen.queryByLabelText('Dijual oleh', { selector: 'button' })).toBeNull();
+    expect(sellers()).toHaveLength(1);
+  });
+
+  it('keeps the addition salesperson and its performers independent, even for the same employee', async () => {
+    const { onConfirm, dialog } = hairColor();
+    await click(dialog().getByText('Red'));
+    await chooseAdditional(0, 'Serum');
+    await addPerformer(0, 'Pak Heru');
+    await chooseSeller(0, 'Rindu');
+    // Adding another performer never changes who sold it.
+    await addPerformer(0, 'Andini');
+    await click(addButton());
+    const [serum] = onConfirm.mock.calls[0]![0].additionalComponents;
+    expect(serum.soldBy).toEqual({ employeeId: 'emp-rindu', name: 'Rindu' });
+    expect(serum.performers).toEqual([
+      { employeeId: 'emp-heru', name: 'Pak Heru' },
+      { employeeId: 'emp-andini', name: 'Andini' },
+    ]);
+    // The Service line itself still has no salesperson.
+    expect(onConfirm.mock.calls[0]![0].soldBy).toBeUndefined();
+  });
+
+  it('allows the same employee to perform and to sell the addition, as two attributions', async () => {
+    const { onConfirm, dialog } = hairColor();
+    await click(dialog().getByText('Red'));
+    await chooseAdditional(0, 'Serum');
+    await addPerformer(0, 'Pak Heru');
+    await chooseSeller(0, 'Pak Heru');
+    await click(addButton());
+    const [serum] = onConfirm.mock.calls[0]![0].additionalComponents;
+    expect(serum.performers).toEqual([{ employeeId: 'emp-heru', name: 'Pak Heru' }]);
+    expect(serum.soldBy).toEqual({ employeeId: 'emp-heru', name: 'Pak Heru' });
+  });
+
+  it('never infers a salesperson from a performer', async () => {
+    const { onConfirm, dialog } = hairColor();
+    await click(dialog().getByText('Red'));
+    await chooseAdditional(0, 'Serum');
+    await addPerformer(0, 'Pak Heru');
+    await click(addButton());
+    const [serum] = onConfirm.mock.calls[0]![0].additionalComponents;
+    expect(serum.soldBy).toBeUndefined();
   });
 
   it('sends one or several performers with the addition, as Service work', async () => {

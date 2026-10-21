@@ -22,6 +22,13 @@ export type ValueKind =
 /** Copy keys for Runtime enum values; the codes themselves are never shown. */
 export const ENUM_LABELS = {
   saleStatus: { OPEN: 'Open', FINALIZED: 'Completed', VOIDED: 'Cancelled' },
+  /** Presentation only: a completed Sale cancelled afterwards is its own state, never a filter. */
+  transactionState: {
+    OPEN: 'Open',
+    FINALIZED: 'Completed',
+    VOIDED: 'Cancelled',
+    REVERSED: 'Cancelled after completion',
+  },
   paymentStatus: {
     PENDING: 'Pending',
     SUCCEEDED: 'Succeeded',
@@ -60,6 +67,7 @@ export const ENUM_LABELS = {
   },
   commissionEntry: { EARN: 'Commission earned', REVERSAL: 'Commission reversal' },
   commissionType: { FIXED_PER_UNIT: 'Fixed per unit' },
+  commissionSoldAs: { PRODUCT_LINE: 'Product', ADDITIONAL_ITEM: 'Service additional item' },
   taxTreatment: { INCLUDED: 'Included in price', EXCLUDED: 'Added to price' },
   yesNo: { YES: 'Yes', NO: 'No' },
 } as const satisfies Record<string, Record<string, string>>;
@@ -124,7 +132,13 @@ export type ReportFilter =
   | { key: string; label: string; reference: ReferenceSource };
 
 export type ReportDetail =
-  'transaction' | 'component-usage' | 'product-commission' | 'payment' | 'tax' | 'employee';
+  | 'transaction'
+  | 'component-usage'
+  | 'product-commission'
+  | 'payment'
+  | 'tax'
+  | 'employee'
+  | 'catalog-item';
 
 export interface ReportDefinition {
   type: ReportType;
@@ -139,6 +153,8 @@ export interface ReportDefinition {
   /** `null` for aggregate reports without a detailed record table. */
   columns: ReportColumn[] | null;
   detail: ReportDetail | null;
+  /** One short explanation shown with the records, for figures that are easy to misread. */
+  note?: string;
 }
 
 const money = (key: string, label: string): ReportColumn => ({
@@ -208,7 +224,7 @@ export const REPORT_CATALOG: readonly ReportDefinition[] = [
           key: 'saleStatus',
           title: 'Transaction composition by status',
           measure: 'count',
-          enum: 'saleStatus',
+          enum: 'transactionState',
         },
       ],
     },
@@ -226,7 +242,7 @@ export const REPORT_CATALOG: readonly ReportDefinition[] = [
       { key: 'saleStatus', label: 'Status', kind: 'badge' },
       { key: 'createdBy', label: 'Created by', kind: 'actor' },
       money('total', 'Original transaction value'),
-      money('refundAmount', 'Refunded'),
+      money('refundAmount', 'Money refunded'),
       money('effectiveRevenue', 'Effective revenue'),
     ],
     detail: 'transaction',
@@ -240,6 +256,11 @@ export const REPORT_CATALOG: readonly ReportDefinition[] = [
       { key: 'quantitySold', label: 'Items sold', kind: 'quantity' },
       { key: 'itemCount', label: 'Items with sales', kind: 'count' },
       { key: 'transactionCount', label: 'Transactions', kind: 'count' },
+      {
+        key: 'saleLevelRefundAmount',
+        label: 'Money refunded on these transactions',
+        kind: 'money',
+      },
     ],
     analytics: { ranking: { title: 'Top items by revenue', kind: 'money' } },
     filters: [
@@ -252,13 +273,14 @@ export const REPORT_CATALOG: readonly ReportDefinition[] = [
       count('rank', '#'),
       { key: 'itemName', label: 'Item', kind: 'text', secondaryKey: 'itemCode' },
       count('transactionCount', 'Transactions'),
-      quantity('quantitySold', 'Quantity'),
+      quantity('quantitySold', 'Units sold'),
       money('finalRevenue', 'Revenue'),
       money('discountAmount', 'Discount'),
       money('taxAmount', 'Tax'),
       money('averageSellingValue', 'Average value'),
     ],
-    detail: null,
+    detail: 'catalog-item',
+    note: 'catalogPerformanceNote',
   },
   {
     type: 'component-usage',
@@ -323,11 +345,19 @@ export const REPORT_CATALOG: readonly ReportDefinition[] = [
       { key: 'saleNumber', label: 'Transaction', kind: 'text', secondaryKey: 'sellingLocation' },
       { key: 'employeeName', label: 'Employee', kind: 'text', secondaryKey: 'employeeCode' },
       { key: 'productName', label: 'Product', kind: 'text', secondaryKey: 'variantName' },
+      {
+        key: 'soldAs',
+        label: 'Sold as',
+        kind: 'enum',
+        enum: 'commissionSoldAs',
+        secondaryKey: 'parentItemName',
+      },
       { key: 'entryType', label: 'Entry', kind: 'badge', enum: 'commissionEntry' },
       quantity('quantity', 'Quantity'),
       { key: 'commissionAmount', label: 'Commission', kind: 'signedMoney', align: 'right' },
     ],
     detail: 'product-commission',
+    note: 'productCommissionNote',
   },
   {
     type: 'employee-performance',
@@ -354,6 +384,7 @@ export const REPORT_CATALOG: readonly ReportDefinition[] = [
       { key: 'topCatalogItem', label: 'Top item', kind: 'text' },
     ],
     detail: 'employee',
+    note: 'employeePerformanceNote',
   },
   {
     type: 'attendance',
@@ -406,7 +437,7 @@ export const REPORT_CATALOG: readonly ReportDefinition[] = [
     kpis: [
       { key: 'successfulAmount', label: 'Net received', kind: 'signedMoney' },
       { key: 'successfulPayments', label: 'Successful payments', kind: 'count' },
-      { key: 'refundedAmount', label: 'Refunded', kind: 'money' },
+      { key: 'refundedAmount', label: 'Money refunded', kind: 'money' },
       { key: 'failedPayments', label: 'Failed attempts', kind: 'count' },
     ],
     analytics: {

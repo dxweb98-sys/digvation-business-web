@@ -32,6 +32,8 @@ export interface AdditionalRow {
   quantity: string;
   /** Service only: who performs this addition. */
   performers: CartDraftSalesperson[];
+  /** Optional Product salesperson of this addition; independent of its performers. */
+  soldBy: CartDraftSalesperson | null;
 }
 
 export function newAdditionalRow(): AdditionalRow {
@@ -41,6 +43,7 @@ export function newAdditionalRow(): AdditionalRow {
     variantId: null,
     quantity: '1',
     performers: [],
+    soldBy: null,
   };
 }
 
@@ -166,6 +169,7 @@ export function additionalItemsOf(
         label: variant ? `${candidate.name} / ${variant.name}` : candidate.name,
         unitPrice,
         ...(row.performers.length ? { performers: row.performers } : {}),
+        ...(row.soldBy ? { soldBy: row.soldBy } : {}),
       },
     ];
   });
@@ -210,6 +214,7 @@ export function rowsFromAdditions(additions: readonly CartDraftAdditionalItem[])
     variantId: entry.componentVariantId ?? null,
     quantity: entry.quantity.includes('.') ? entry.quantity.replace(/\.?0+$/, '') : entry.quantity,
     performers: entry.performers ?? [],
+    soldBy: entry.soldBy ?? null,
   }));
 }
 

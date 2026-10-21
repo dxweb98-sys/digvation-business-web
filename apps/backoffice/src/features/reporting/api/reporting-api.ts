@@ -115,6 +115,46 @@ export interface EmployeeContributionDetail {
   };
 }
 
+/** The Sales behind one Catalog Performance item/variant row, for the same period and location. */
+export interface CatalogItemTransactionsDetail {
+  item: {
+    catalogItemId: string;
+    catalogVariantId: string | null;
+    itemName: string | null;
+    variantName: string | null;
+  };
+  period: { dateFrom: string; dateTo: string; sellingLocationId: string | null };
+  /** Identical to the Catalog Performance row; computed over every record, not the page. */
+  summary: {
+    transactionCount: number;
+    quantitySold: string;
+    grossRevenue: string;
+    discountAmount: string;
+    taxAmount: string;
+    finalRevenue: string;
+  };
+  records: {
+    items: {
+      saleId: string;
+      saleNumber: string;
+      invoiceNumber: string | null;
+      occurredAt: string;
+      sellingLocation: string | null;
+      quantity: string;
+      grossAmount: string;
+      discountAmount: string;
+      taxAmount: string;
+      lineAmount: string;
+      /** Money returned on the whole Sale; never attributed to this item. */
+      saleRefundAmount: string;
+      refundState: 'NONE' | 'PARTIAL' | 'FULL';
+    }[];
+    total: number;
+    page: number;
+    pageSize: number;
+  };
+}
+
 export class ReportingApi {
   constructor(
     private readonly client: ApiClient,
@@ -135,6 +175,22 @@ export class ReportingApi {
   ) {
     return this.client.get<EmployeeContributionDetail>(
       `/api/v1/reports/employee-performance/employees/${encodeURIComponent(employeeId)}?${buildQueryString({ ...query, ...page })}`,
+    );
+  }
+
+  catalogItemTransactions(
+    item: { catalogItemId: string; catalogVariantId: string | null },
+    query: Pick<ReportQuery, 'dateFrom' | 'dateTo' | 'sellingLocationId'>,
+    page: { page: number; pageSize: number },
+  ) {
+    return this.client.get<CatalogItemTransactionsDetail>(
+      `/api/v1/reports/catalog-performance/items/${encodeURIComponent(item.catalogItemId)}/transactions?${buildQueryString(
+        {
+          ...query,
+          ...(item.catalogVariantId ? { catalogVariantId: item.catalogVariantId } : {}),
+          ...page,
+        },
+      )}`,
     );
   }
 

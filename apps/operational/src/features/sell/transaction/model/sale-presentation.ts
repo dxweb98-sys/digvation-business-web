@@ -615,3 +615,41 @@ export function formatServiceDuration(
     ? `${hours} ${labels.hour}`
     : `${hours} ${labels.hour} ${rest} ${labels.minute}`;
 }
+
+/**
+ * Which explanation a line with sale-selected additions needs about its discounts, mirroring the
+ * Runtime pricing policy: an item-scoped discount (manual item discount, or an ITEM/CATEGORY
+ * Promotion) reduces only the main item, while a transaction discount is shared by the whole line,
+ * additions included. An overridden line price has no separate main item, so nothing is claimed.
+ *
+ * - `ITEM_ONLY`: an item-scoped discount applies and the additions carry no discount at all.
+ * - `ITEM_AND_TRANSACTION`: the additions are outside the item discount but share a transaction one.
+ * - `null`: no additions, no item-scoped discount, or an overridden price.
+ */
+export type AdditionDiscountNote = 'ITEM_ONLY' | 'ITEM_AND_TRANSACTION' | null;
+
+export function additionDiscountNote(
+  sale: { adjustments?: readonly SaleAdjustment[] | null },
+  line: Pick<
+    SaleLine,
+    | 'id'
+    | 'compositionComponents'
+    | 'discountType'
+    | 'lineDiscountAmount'
+    | 'orderDiscountAllocationAmount'
+    | 'overrideAmount'
+  >,
+): AdditionDiscountNote {
+  const hasAddition = (line.compositionComponents ?? []).some(
+    (component) => component.componentSource === 'SALE_SELECTED',
+  );
+  if (!hasAddition || line.overrideAmount !== null) return null;
+  const lineAdjustments = (sale.adjustments ?? []).filter(
+    (adjustment) => adjustment.saleLineId === line.id && positive(adjustment.actualAmount),
+  );
+  const itemScoped =
+    (line.discountType !== null && positive(line.lineDiscountAmount)) ||
+    lineAdjustments.some((adjustment) => adjustment.scope !== 'TRANSACTION');
+  if (!itemScoped) return null;
+  return positive(line.orderDiscountAllocationAmount) ? 'ITEM_AND_TRANSACTION' : 'ITEM_ONLY';
+}

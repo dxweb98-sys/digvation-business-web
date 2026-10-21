@@ -202,6 +202,8 @@ export interface SaleLineAdditionRow {
   amount: string;
   /** Service work on this addition, e.g. "Dikerjakan oleh Heru, Rindu"; never a salesperson. */
   performedBy?: string | null;
+  /** Product sale of this addition, e.g. "Dijual oleh Budi"; never a performer. */
+  soldBy?: string | null;
 }
 
 /**
@@ -242,6 +244,11 @@ export function SaleLineAdditions({
               {row.performedBy ? (
                 <span className="block break-words text-[var(--color-text-muted)]">
                   {row.performedBy}
+                </span>
+              ) : null}
+              {row.soldBy ? (
+                <span className="block break-words text-[var(--color-text-muted)]">
+                  {row.soldBy}
                 </span>
               ) : null}
             </span>
