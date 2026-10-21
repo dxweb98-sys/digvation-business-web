@@ -178,12 +178,18 @@ function AdditionalItemRow({
   onChange,
   onRemove,
   performerOptions,
+  salespersonOptions,
   copy,
   money,
 }: {
   baseItemId: string;
   /** Service only: who may perform the addition; absent hides "Performed by". */
   performerOptions?: readonly SalespersonOption[] | undefined;
+  /**
+   * Runtime-approved Product salespeople: who may be credited with selling this additional
+   * Product. A separate choice from its performers; absent hides "Sold by".
+   */
+  salespersonOptions?: readonly SalespersonOption[] | undefined;
   row: AdditionalRow;
   rows: readonly AdditionalRow[];
   fixed: ReturnType<typeof fixedComponentsFor>;
@@ -233,8 +239,9 @@ function AdditionalItemRow({
               onChange({
                 candidateId: typeof value === 'string' ? value : null,
                 variantId: null,
-                // A different item is different work: nobody is assigned to it yet.
-                ...(value !== row.candidateId ? { performers: [] } : {}),
+                // A different item is different work and a different sale: nobody is assigned
+                // to perform or credited with selling it yet.
+                ...(value !== row.candidateId ? { performers: [], soldBy: null } : {}),
               })
             }
           />
@@ -300,7 +307,57 @@ function AdditionalItemRow({
           copy={copy}
         />
       ) : null}
+
+      {selected && salespersonOptions ? (
+        <AdditionSalesperson
+          soldBy={row.soldBy}
+          options={salespersonOptions}
+          onChange={(soldBy) => onChange({ soldBy })}
+          copy={copy}
+        />
+      ) : null}
     </li>
+  );
+}
+
+/**
+ * Who sold one additional Product ("Dijual oleh"): optional, chosen explicitly, and independent of
+ * who performs it. Product commission follows only this choice, never a performer.
+ */
+function AdditionSalesperson({
+  soldBy,
+  options,
+  onChange,
+  copy,
+}: {
+  soldBy: CartDraftSalesperson | null;
+  options: readonly SalespersonOption[];
+  onChange: (soldBy: CartDraftSalesperson | null) => void;
+  copy: (value: string) => string;
+}) {
+  const choices = useMemo(() => {
+    const list = options.map((option) => ({ value: option.id, label: option.name }));
+    // A salesperson chosen earlier stays readable even when no longer offered.
+    return soldBy && !list.some((option) => option.value === soldBy.employeeId)
+      ? [{ value: soldBy.employeeId, label: soldBy.name }, ...list]
+      : list;
+  }, [options, soldBy]);
+  return (
+    <Select
+      label={copy('Sold by')}
+      value={soldBy?.employeeId ?? null}
+      placeholder={copy('No salesperson')}
+      clearable
+      searchable
+      options={choices}
+      onChange={(value) => {
+        const chosen = choices.find((option) => option.value === value);
+        onChange(
+          typeof value === 'string' && chosen ? { employeeId: value, name: chosen.label } : null,
+        );
+      }}
+      className="w-full"
+    />
   );
 }
 
@@ -850,6 +907,7 @@ export function ItemConfigurator({
                     loadCandidates={loadCandidates}
                     onDiscover={discover}
                     performerOptions={item.type === 'SERVICE' ? componentPerformers : undefined}
+                    salespersonOptions={salespeople}
                     onChange={(change) => updateRow(row.key, change)}
                     onRemove={() =>
                       setRows((existing) =>

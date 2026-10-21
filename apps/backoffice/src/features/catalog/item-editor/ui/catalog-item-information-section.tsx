@@ -18,7 +18,7 @@ export function CatalogItemInformationSection({
   canManageImage: boolean;
   existingImage: CatalogItemImage | null | undefined;
 }) {
-  const { code, name, lifecycle } = editor.form;
+  const { code, name, lifecycle, type } = editor.form;
   const { file, removeRequested } = editor.image;
   const { saving } = editor.ui;
   const { setFormField, selectImage, requestImageRemoval } = editor.actions;
@@ -67,7 +67,8 @@ export function CatalogItemInformationSection({
               onChange={(value) => setFormField('lifecycle', value as Item['lifecycle'])}
               options={[
                 { label: 'Draft', value: 'DRAFT' },
-                { label: 'Aktif Dijual', value: 'ACTIVE' },
+                // A Service is performed, not stocked for sale: plain "Aktif" for it. Same lifecycle value.
+                { label: type === 'SERVICE' ? 'Aktif' : 'Aktif Dijual', value: 'ACTIVE' },
                 { label: 'Nonaktif', value: 'INACTIVE' },
               ]}
             />

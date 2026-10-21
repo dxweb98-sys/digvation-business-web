@@ -364,6 +364,10 @@ export interface SaleLineCompositionComponent {
   extendedContribution: string;
   /** SALE_SELECTED of a Service only: who performs it ("Dikerjakan oleh"). */
   performers?: Array<{ employeeId: string; shareRate: string }>;
+  /** SALE_SELECTED only: its own Product salesperson ("Dijual oleh"), independent of performers. */
+  soldByEmployeeId?: string | null;
+  soldByEmployeeCodeSnapshot?: string | null;
+  soldByEmployeeNameSnapshot?: string | null;
   /** Immutable finalized work facts for this component, with their snapshots. */
   contributions?: Array<{
     employeeId: string;

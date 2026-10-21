@@ -26,7 +26,7 @@ const TRANSACTION_STATUS: Record<TransactionStatusKind, Omit<TransactionSummary<
   OPEN: { label: 'Open', variant: 'info' },
   COMPLETED: { label: 'Completed', variant: 'success' },
   CANCELLED: { label: 'Cancelled', variant: 'secondary' },
-  REVERSED: { label: 'Reversed', variant: 'danger' },
+  REVERSED: { label: 'Cancelled after completion', variant: 'danger' },
 };
 
 export const SALE_STATUS_LABELS: Record<SaleStatus, string> = {
@@ -116,7 +116,7 @@ export type WorkSummaryKind =
 
 const WORK_SUMMARY: Record<WorkSummaryKind, Omit<TransactionSummary<never>, 'kind'>> = {
   NONE: { label: 'No tracked work', variant: 'outline' },
-  DRAFT: { label: 'Not submitted', variant: 'outline' },
+  DRAFT: { label: 'Not queued yet', variant: 'outline' },
   WAITING: { label: 'Waiting', variant: 'warning' },
   IN_PROGRESS: { label: 'In progress', variant: 'info' },
   COMPLETED: { label: 'Completed', variant: 'success' },

@@ -108,7 +108,58 @@ export const reportingCopy: Copy = {
   Records: { id: 'Data', en: 'Records' },
   'Net received': { id: 'Diterima bersih', en: 'Net received' },
   'Successful payments': { id: 'Pembayaran berhasil', en: 'Successful payments' },
-  Refunded: { id: 'Dikembalikan', en: 'Refunded' },
+  'Money refunded': { id: 'Dana dikembalikan', en: 'Money refunded' },
+  'Money refunded on these transactions': {
+    id: 'Dana dikembalikan pada transaksi ini',
+    en: 'Money refunded on these transactions',
+  },
+  'Sold as': { id: 'Dijual sebagai', en: 'Sold as' },
+  'Service additional item': { id: 'Item tambahan layanan', en: 'Service additional item' },
+  catalogPerformanceNote: {
+    id: 'Transaksi adalah jumlah transaksi berbeda yang menjual item ini; unit terjual adalah total jumlahnya di semua transaksi itu. Contoh: 4 transaksi dapat menjual 6 unit. Hanya transaksi selesai yang tidak dibatalkan yang dihitung. Pengembalian dana dicatat per transaksi dan tidak dibagi ke item, sehingga ditampilkan terpisah.',
+    en: 'Transactions is the number of different transactions that sold the item; units sold is the total quantity across them. For example, 4 transactions can sell 6 units. Only completed transactions that were not cancelled count. Refunds are recorded per transaction and not split by item, so they are shown separately.',
+  },
+  employeePerformanceNote: {
+    id: 'Kontribusi hanya dihitung dari transaksi selesai yang tidak dibatalkan setelah selesai. Pengembalian dana dicatat per transaksi dan tidak dibagi ke karyawan. Komisi penjualan produk ada di laporan Komisi Produk.',
+    en: 'Contribution counts only completed transactions that were not cancelled after completion. Refunds are recorded per transaction and are not split by employee. Product sales commission is in the Product Commission report.',
+  },
+  productCommissionNote: {
+    id: 'Komisi produk hanya untuk karyawan yang dipilih sebagai penjual produk, termasuk penjual item tambahan layanan. Karyawan yang mengerjakan layanan dicatat terpisah di Kinerja Karyawan.',
+    en: 'Product commission goes only to the employee chosen as the product’s seller, including the seller of a service’s additional item. Employees who perform a service are recorded separately in Employee Performance.',
+  },
+  // Catalog Performance detail
+  'Catalog performance detail': { id: 'Detail kinerja katalog', en: 'Catalog performance detail' },
+  'Could not load the transactions for this item.': {
+    id: 'Transaksi untuk item ini tidak dapat dimuat.',
+    en: 'Could not load the transactions for this item.',
+  },
+  'Loading transactions…': { id: 'Memuat transaksi…', en: 'Loading transactions…' },
+  'transactions sold': { id: 'transaksi menjual total', en: 'transactions sold' },
+  units: { id: 'unit', en: 'units' },
+  'of this item in this period.': {
+    id: 'item ini pada periode ini.',
+    en: 'of this item in this period.',
+  },
+  'Original amount': { id: 'Nilai awal', en: 'Original amount' },
+  'Item amount': { id: 'Nilai item', en: 'Item amount' },
+  'Transactions behind this item': {
+    id: 'Transaksi untuk item ini',
+    en: 'Transactions behind this item',
+  },
+  'No transactions sold this item in this period.': {
+    id: 'Tidak ada transaksi yang menjual item ini pada periode ini.',
+    en: 'No transactions sold this item in this period.',
+  },
+  'Money returned': { id: 'Dana dikembalikan', en: 'Money returned' },
+  'No refund': { id: 'Tidak ada', en: 'No refund' },
+  'Partly refunded': { id: 'Sebagian', en: 'Partly refunded' },
+  'Fully refunded': { id: 'Penuh', en: 'Fully refunded' },
+  'Some of these transactions later returned money to the customer. A refund belongs to the whole transaction, so the item amount here is not reduced by it.':
+    {
+      id: 'Sebagian transaksi ini kemudian mengembalikan dana ke pelanggan. Pengembalian dana berlaku untuk seluruh transaksi, jadi nilai item di sini tidak dikurangi.',
+      en: 'Some of these transactions later returned money to the customer. A refund belongs to the whole transaction, so the item amount here is not reduced by it.',
+    },
+  'View transaction': { id: 'Lihat transaksi', en: 'View transaction' },
   'Failed attempts': { id: 'Percobaan gagal', en: 'Failed attempts' },
   Expenses: { id: 'Pengeluaran', en: 'Expenses' },
   'Net movement': { id: 'Pergerakan bersih', en: 'Net movement' },
@@ -216,7 +267,10 @@ export const reportingCopy: Copy = {
   Open: { id: 'Berjalan', en: 'Open' },
   Completed: { id: 'Selesai', en: 'Completed' },
   Cancelled: { id: 'Dibatalkan', en: 'Cancelled' },
-  Reversed: { id: 'Direversal', en: 'Reversed' },
+  'Cancelled after completion': {
+    id: 'Dibatalkan setelah selesai',
+    en: 'Cancelled after completion',
+  },
   Pending: { id: 'Menunggu', en: 'Pending' },
   Succeeded: { id: 'Berhasil', en: 'Succeeded' },
   Failed: { id: 'Gagal', en: 'Failed' },

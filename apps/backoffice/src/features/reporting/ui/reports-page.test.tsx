@@ -307,7 +307,7 @@ describe('Transaction report detail', () => {
     );
     await screen.findAllByText('TRX-20261001-000001', undefined, LOADED);
     const row = tableRow('TRX-20261001-000001');
-    expect(within(row).getByText('Direversal')).toBeTruthy();
+    expect(within(row).getByText('Dibatalkan setelah selesai')).toBeTruthy();
     expect(row.textContent).not.toContain('CASH:SUCCEEDED');
     fireEvent.click(row.querySelector('[data-ds-component="dropdown-trigger"] > *')!);
     fireEvent.click((await screen.findAllByText('Lihat detail')).at(-1)!);
@@ -325,14 +325,13 @@ describe('Transaction report detail', () => {
       tableRow('TRX-20261001-000001').querySelector('[data-ds-component="dropdown-trigger"]'),
     ).toBeNull();
     cleanup();
-    open('/?type=catalog-performance', ['catalog:read'], {
-      'catalog-performance': dataset('catalog-performance', {
+    open('/?type=locations', ['locations:read'], {
+      locations: dataset('locations', {
         summary: { finalRevenue: '1.0000' },
         items: [
           {
-            rank: 1,
-            itemCode: 'HC',
-            itemName: 'Hair Color',
+            locationCode: 'HC',
+            locationName: 'Hair Color',
             transactionCount: 1,
             quantitySold: '1.5000',
             finalRevenue: '1.0000',

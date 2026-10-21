@@ -10,6 +10,10 @@ import {
   saleLineAdditions,
   saleLineBase,
 } from '../transaction/model/sale-line-additions';
+import {
+  additionDiscountNote,
+  type AdditionDiscountNote,
+} from '../transaction/model/sale-presentation';
 import type {
   CatalogItem,
   CatalogVariant,
@@ -37,6 +41,11 @@ export interface CartDraftAdditionalItem {
    * work, never a Product salesperson; absent or empty means nobody is assigned to it.
    */
   performers?: CartDraftSalesperson[];
+  /**
+   * Optional Product salesperson of this additional Product ("Dijual oleh"). Chosen on its own;
+   * never taken from a performer, and changing one never changes the other.
+   */
+  soldBy?: CartDraftSalesperson | null;
 }
 
 /** Order-independent identity of who performs an addition. */
@@ -48,14 +57,14 @@ function performerSignature(performers: readonly CartDraftSalesperson[] | undefi
 }
 
 /**
- * Stable identity of one unit's additions: same Products, Variants, quantities and performers
- * means the same configuration and price. Order does not matter.
+ * Stable identity of one unit's additions: same Products, Variants, quantities, performers and
+ * salesperson means the same configuration and price. Order does not matter.
  */
 export function additionSignature(additions: readonly CartDraftAdditionalItem[]): string {
   return additions
     .map(
       (entry) =>
-        `${entry.componentItemId}:${entry.componentVariantId ?? ''}:${createDecimal(entry.quantity).toFixed(4)}:${performerSignature(entry.performers)}`,
+        `${entry.componentItemId}:${entry.componentVariantId ?? ''}:${createDecimal(entry.quantity).toFixed(4)}:${performerSignature(entry.performers)}:${entry.soldBy?.employeeId ?? ''}`,
     )
     .sort()
     .join('|');
@@ -179,6 +188,8 @@ export interface CartDisplayLine {
   lineDiscountAmount: string;
   discountType: DiscountType | null;
   discountValue: string | null;
+  /** Persisted lines only: why the additions are outside an item-scoped discount (Runtime facts). */
+  additionDiscountNote?: AdditionDiscountNote;
   promotion?: {
     name: string;
     effectiveFrom: string | null;
@@ -534,6 +545,7 @@ export function saleDisplayLines(
       effectiveUnitPrice: line.effectiveUnitPrice,
       totalAmount: line.grossAmount,
       lineDiscountAmount: line.lineDiscountAmount,
+      additionDiscountNote: additionDiscountNote({ adjustments }, line),
       discountType: hasSeveralLineAdjustments
         ? null
         : (singleLineAdjustment?.type ?? line.discountType),
@@ -644,5 +656,6 @@ export function startAddition(entry: CartDraftAdditionalItem) {
     ...(entry.performers?.length
       ? { performers: entry.performers.map((performer) => ({ employeeId: performer.employeeId })) }
       : {}),
+    ...(entry.soldBy ? { soldByEmployeeId: entry.soldBy.employeeId } : {}),
   };
 }

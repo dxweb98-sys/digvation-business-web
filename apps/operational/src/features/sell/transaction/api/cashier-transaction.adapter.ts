@@ -42,6 +42,11 @@ export interface SaleSelectedComponentInput {
   quantity: string;
   /** Service only: who performs it; shares are equal unless Runtime is told otherwise. */
   performers?: Array<{ employeeId: string; shareRate?: string }>;
+  /**
+   * Optional Product salesperson of this additional Product ("Dijual oleh"); chosen explicitly and
+   * never derived from a performer. Runtime validates eligibility.
+   */
+  soldByEmployeeId?: string;
 }
 
 export interface StartSaleInput extends CreateSaleInput {

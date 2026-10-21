@@ -369,22 +369,20 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
       (price) => price.amount,
       () => null,
     );
-    // Only a Product can have a salesperson. Runtime decides who is eligible; Web never filters.
-    const salespeople =
-      item.type === 'PRODUCT'
-        ? await queryClient
-            .fetchQuery({
-              queryKey: cashierTransactionKeys.productSalespeople(),
-              queryFn: ({ signal }) => transactionAdapter.listProductSalespeople(signal),
-              ...referenceQueryPolicy,
-            })
-            .then(
-              (page) =>
-                page.items.map((employee) => ({ id: employee.id, name: employee.displayName })),
-              () => [],
-            )
-        : undefined;
-    // A Service's additional items are performed by Service performers, never sold by anyone.
+    // A Product line, and any selected additional Product, may name a salesperson. Runtime decides
+    // who is eligible; Web never filters.
+    const salespeople = await queryClient
+      .fetchQuery({
+        queryKey: cashierTransactionKeys.productSalespeople(),
+        queryFn: ({ signal }) => transactionAdapter.listProductSalespeople(signal),
+        ...referenceQueryPolicy,
+      })
+      .then(
+        (page) => page.items.map((employee) => ({ id: employee.id, name: employee.displayName })),
+        () => [],
+      );
+    // A Service's additional items are performed by Service performers; who sold them is chosen
+    // separately above.
     const componentPerformers =
       item.type === 'SERVICE'
         ? await queryClient
@@ -402,7 +400,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     return {
       item,
       variants,
-      ...(salespeople ? { salespeople } : {}),
+      salespeople,
       ...(componentPerformers ? { componentPerformers } : {}),
       itemOption:
         variants.length > 0 && item.variantSelectionMode === 'OPTIONAL'

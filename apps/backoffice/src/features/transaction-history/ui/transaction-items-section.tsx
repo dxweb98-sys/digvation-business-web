@@ -136,6 +136,9 @@ function ServicePriceBreakdownPanel({
             <Attribution label={copy('Worked by')}>
               <EmployeeNames names={addition.performers} />
             </Attribution>
+            {addition.soldBy ? (
+              <Attribution label={copy('Sold by')}>{addition.soldBy}</Attribution>
+            ) : null}
           </li>
         ))}
         <li className="flex items-start justify-between gap-3 border-t border-[var(--color-border)] pt-2 font-semibold text-[var(--color-text)]">

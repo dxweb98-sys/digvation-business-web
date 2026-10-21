@@ -496,6 +496,21 @@ const copy: Record<string, LocalizedLabel> = {
   'Item discount': { 'id-ID': 'Diskon item', 'en-US': 'Item discount' },
   Discount: { 'id-ID': 'Diskon', 'en-US': 'Discount' },
   'Discount information': { 'id-ID': 'Informasi diskon', 'en-US': 'Discount information' },
+  'The item discount applies only to the main item price. Additional items are not discounted.': {
+    'id-ID':
+      'Diskon item hanya berlaku untuk harga item utama. Item tambahan tidak termasuk diskon.',
+    'en-US':
+      'The item discount applies only to the main item price. Additional items are not discounted.',
+  },
+  'The item discount applies only to the main item price. Additional items share only the transaction discount.':
+    {
+      'id-ID':
+        'Diskon item hanya berlaku untuk harga item utama. Item tambahan hanya ikut diskon transaksi.',
+      'en-US':
+        'The item discount applies only to the main item price. Additional items share only the transaction discount.',
+    },
+  'More items': { 'id-ID': 'item lainnya', 'en-US': 'more items' },
+  'Not assigned yet': { 'id-ID': 'Belum ada pelaksana', 'en-US': 'Not assigned yet' },
   Start: { 'id-ID': 'Mulai', 'en-US': 'Start' },
   End: { 'id-ID': 'Berakhir', 'en-US': 'End' },
   Percentage: { 'id-ID': 'Persentase', 'en-US': 'Percentage' },

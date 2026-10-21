@@ -98,6 +98,24 @@ describe('transactionItems', () => {
     ]);
   });
 
+  it('keeps an addition salesperson separate from its performer, even when it is the same person', () => {
+    const sale = testSale({
+      lines: [
+        testLine({
+          compositionComponents: [testComponent({ soldByEmployeeNameSnapshot: 'Citra Ayu' })],
+        }),
+      ],
+    });
+    const [addition] = transactionItems(sale)[0]!.additionalComponents;
+    expect(addition).toEqual(
+      expect.objectContaining({ performers: ['Citra Ayu'], soldBy: 'Citra Ayu' }),
+    );
+    const [unsold] = transactionItems(
+      testSale({ lines: [testLine({ compositionComponents: [testComponent()] })] }),
+    )[0]!.additionalComponents;
+    expect(unsold!.soldBy).toBeNull();
+  });
+
   it('prefers finalized component contribution snapshots', () => {
     const sale = testSale({
       lines: [

@@ -13,6 +13,8 @@ export interface SaleLineAddition {
   amount: string;
   /** Who performs it ("Dikerjakan oleh"); empty when nobody is assigned. */
   performerIds: string[];
+  /** Its own Product salesperson ("Dijual oleh"), a snapshot; null when none was chosen. */
+  soldByName: string | null;
 }
 
 /**
@@ -32,6 +34,9 @@ export function saleLineAdditions(
       // Contributions are stored per line unit; the line quantity is applied exactly once.
       amount: createDecimal(component.extendedContribution).times(line.quantity).toFixed(4),
       performerIds: (component.performers ?? []).map((performer) => performer.employeeId),
+      soldByName: component.soldByEmployeeId
+        ? component.soldByEmployeeNameSnapshot?.trim() || null
+        : null,
     }));
 }
 
@@ -81,6 +86,15 @@ export function saleLineConfiguration(
                 employeeId: performer.employeeId,
                 name: performerName(performer.employeeId),
               })),
+            }
+          : {}),
+        // Re-sent explicitly on edit, so a replacement never drops or reassigns the salesperson.
+        ...(component.soldByEmployeeId
+          ? {
+              soldBy: {
+                employeeId: component.soldByEmployeeId,
+                name: component.soldByEmployeeNameSnapshot ?? '',
+              },
             }
           : {}),
       })),
