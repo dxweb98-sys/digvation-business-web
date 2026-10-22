@@ -114,7 +114,7 @@ function initialAllocations(sale: Sale): Record<string, PerformerAllocation> {
   );
 }
 
-const issueCopy: Record<Exclude<AllocationIssue, null>, string> = {
+export const issueCopy: Record<Exclude<AllocationIssue, null>, string> = {
   EMPTY: 'Select at least one employee.',
   OVER: 'Percentages exceed 100%. Lower one of them.',
   UNDER: 'Percentages must total 100%.',
@@ -170,11 +170,11 @@ function ShareInput({
  * Who performs ONE unit, and how they share it, as a single control. Ticking an
  * employee selects them; once two or more are ticked each ticked row gains its
  * own percentage, so selection and contribution are read and edited on the same
- * row rather than in two stacked blocks. A one-line total with "Split evenly"
- * closes the list, and only when the work is actually shared. Shares attribute
- * one unit's work only and never change amounts.
+ * row rather than in two stacked blocks. The total and "Split evenly" live in
+ * the dialog footer (WorkSplit). Shares attribute one unit's work only and never
+ * change amounts.
  */
-function EmployeeChoices({
+export function EmployeeChoices({
   allocation,
   employees,
   nameOf,
@@ -187,9 +187,8 @@ function EmployeeChoices({
   disabled: boolean;
   onChange: (next: PerformerAllocation) => void;
 }) {
-  const { copy, locale } = useOperationalLocalization();
+  const { copy } = useOperationalLocalization();
   const [query, setQuery] = useState('');
-  const searchable = employees.length > 8;
   const visible = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase();
     return needle
@@ -198,31 +197,39 @@ function EmployeeChoices({
         )
       : employees;
   }, [employees, query]);
-  const { shares, total, issue } = resolveAllocation(allocation);
+  const { shares } = resolveAllocation(allocation);
   const shareOf = new Map(shares.map((share) => [share.employeeId, share]));
   const sharing = shares.length >= 2;
-  const typed = shares.some((share) => share.manual);
   const selected = allocation.employeeIds;
 
   return (
     <div className="min-w-0">
       <fieldset className="min-w-0">
         <legend className="sr-only">{copy('Employees for this service')}</legend>
-        {searchable ? (
-          <div className="relative mb-2">
-            <Search
-              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--color-text-muted)]"
-              aria-hidden="true"
-            />
-            <DInput
-              aria-label={copy('Search employee')}
-              value={query}
-              onChange={setQuery}
-              placeholder={copy('Search employee')}
-              className="pl-9"
-            />
-          </div>
-        ) : null}
+        <DInput
+          aria-label={copy('Search employee')}
+          value={query}
+          onChange={setQuery}
+          placeholder={copy('Search name or code')}
+          leftIcon={<Search className="size-4" aria-hidden="true" />}
+        />
+        {/* How many are listed and chosen, announced as one sentence when the search changes it. */}
+        <p
+          role="status"
+          aria-atomic="true"
+          className="mb-1.5 mt-2 flex items-center justify-between gap-3 text-xs text-[var(--color-text-muted)]"
+        >
+          <span>
+            {query.trim()
+              ? `${visible.length} ${copy('of')} ${employees.length} ${copy('employees')}`
+              : `${employees.length} ${copy('employees')}`}
+          </span>
+          {selected.length ? (
+            <span className="font-semibold text-[var(--color-brand)]">
+              {selected.length} {copy('chosen')}
+            </span>
+          ) : null}
+        </p>
         {/* The list scrolls; its own padding lets row highlights reach past the text edge. */}
         <ul className="-mx-2 my-0 max-h-[min(15rem,34dvh)] list-none space-y-0.5 overflow-y-auto px-2 py-0">
           {visible.map((employee) => {
@@ -230,7 +237,13 @@ function EmployeeChoices({
             const share = shareOf.get(employee.id);
             return (
               <li key={employee.id} className="flex min-h-11 items-center gap-1 sm:min-h-10">
-                <label className="-ml-2 flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-[var(--radius-control)] px-2 text-sm transition-colors hover:bg-[var(--color-surface-muted)] sm:min-h-10">
+                <label
+                  className={`-ml-2 flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-[var(--radius-control)] px-2 text-sm transition-colors sm:min-h-10 ${
+                    checked
+                      ? 'bg-[var(--color-brand)]/[.07]'
+                      : 'hover:bg-[var(--color-surface-muted)]'
+                  }`}
+                >
                   <DCheckbox
                     checked={checked}
                     disabled={disabled}
@@ -279,46 +292,74 @@ function EmployeeChoices({
             );
           })}
           {visible.length === 0 ? (
-            <li className="py-3 text-sm text-[var(--color-text-muted)]">
-              {copy('No employee matches this search.')}
+            <li className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm text-[var(--color-text-muted)]">
+              <span>{copy('No employee matches this name or code.')}</span>
+              <DButton
+                size="sm"
+                variant="ghost"
+                className="h-8 px-2.5 text-xs"
+                onClick={() => setQuery('')}
+              >
+                {copy('Clear search')}
+              </DButton>
             </li>
           ) : null}
         </ul>
       </fieldset>
-      {sharing ? (
-        <section
-          aria-label={copy('Work split')}
-          className="flex min-h-9 items-center justify-between gap-3 pt-1 text-xs"
-        >
-          <span
-            className={`flex min-w-0 items-center gap-1.5 font-medium ${
-              issue ? 'text-[var(--color-danger)]' : 'text-[var(--color-text-muted)]'
-            }`}
-          >
-            {issue ? (
-              <AlertTriangle className="size-3.5 shrink-0" aria-hidden="true" />
-            ) : (
-              <CheckCircle2
-                className="size-3.5 shrink-0 text-[var(--color-success)]"
-                aria-hidden="true"
-              />
-            )}
-            {issue && issue !== 'EMPTY'
-              ? copy(issueCopy[issue])
-              : `${copy('Total')} ${formatPercent(total, locale)}%`}
-          </span>
-          <DButton
-            size="sm"
-            variant={typed ? 'soft' : 'ghost'}
-            disabled={disabled || !typed}
-            onClick={() => onChange(evenAllocation(allocation))}
-            className="h-8 shrink-0 px-2.5 text-xs"
-          >
-            {copy('Split evenly')}
-          </DButton>
-        </section>
-      ) : null}
     </div>
+  );
+}
+
+/**
+ * The total and "Split evenly" of the unit being edited, shown in the dialog footer
+ * beside Cancel/Save and only while the work is actually shared.
+ */
+export function WorkSplit({
+  allocation,
+  disabled,
+  onChange,
+}: {
+  allocation: PerformerAllocation;
+  disabled: boolean;
+  onChange: (next: PerformerAllocation) => void;
+}) {
+  const { copy, locale } = useOperationalLocalization();
+  const { shares, total, issue } = resolveAllocation(allocation);
+  const typed = shares.some((share) => share.manual);
+  return (
+    <section
+      aria-label={copy('Work split')}
+      className="flex w-full min-w-0 items-center justify-between gap-3 text-xs max-sm:border-b max-sm:border-[var(--color-border)] max-sm:pb-2 sm:w-auto sm:justify-start"
+    >
+      <span
+        role="status"
+        aria-atomic="true"
+        className={`flex min-w-0 items-center gap-1.5 font-medium ${
+          issue ? 'text-[var(--color-danger)]' : 'text-[var(--color-text-muted)]'
+        }`}
+      >
+        {issue ? (
+          <AlertTriangle className="size-3.5 shrink-0" aria-hidden="true" />
+        ) : (
+          <CheckCircle2
+            className="size-3.5 shrink-0 text-[var(--color-success)]"
+            aria-hidden="true"
+          />
+        )}
+        {issue && issue !== 'EMPTY'
+          ? copy(issueCopy[issue])
+          : `${copy('Total')} ${formatPercent(total, locale)}%`}
+      </span>
+      <DButton
+        size="sm"
+        variant={typed ? 'soft' : 'ghost'}
+        disabled={disabled || !typed}
+        onClick={() => onChange(evenAllocation(allocation))}
+        className="h-8 shrink-0 px-2.5 text-xs"
+      >
+        {copy('Split evenly')}
+      </DButton>
+    </section>
   );
 }
 
@@ -515,6 +556,14 @@ export function ServicePerformersDialog({
     ]);
   };
 
+  // The footer split belongs to the unit being edited: the only one, or the open one.
+  const splitKey =
+    employees.length && targets.length
+      ? targets.length === 1
+        ? targets[0]!.key
+        : targets.find((target) => target.key === openUnit)?.key
+      : undefined;
+
   const unitProblem = (key: string) =>
     issueOf(key) === 'EMPTY' ? copy('No employee yet') : copy('Check the percentages');
 
@@ -542,17 +591,27 @@ export function ServicePerformersDialog({
       size="md"
       className="pos-reference-dialog w-full overflow-hidden"
       footer={
-        <div className="flex items-center justify-end gap-2">
-          <DButton variant="ghost" disabled={isSaving} onClick={close}>
-            {copy('Cancel')}
-          </DButton>
-          <DButton
-            loading={isSaving}
-            disabled={isSaving || !employees.length || !targets.length}
-            onClick={save}
-          >
-            {copy('Save')}
-          </DButton>
+        // Allocation on the left, confirmation on the right; on a phone they stack as two rows.
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          {splitKey && resolveAllocation(allocations[splitKey]!).shares.length >= 2 ? (
+            <WorkSplit
+              allocation={allocations[splitKey]!}
+              disabled={isSaving}
+              onChange={(next) => setUnit(splitKey, next)}
+            />
+          ) : null}
+          <div className="ml-auto flex items-center gap-2">
+            <DButton variant="ghost" disabled={isSaving} onClick={close}>
+              {copy('Cancel')}
+            </DButton>
+            <DButton
+              loading={isSaving}
+              disabled={isSaving || !employees.length || !targets.length}
+              onClick={save}
+            >
+              {copy('Save')}
+            </DButton>
+          </div>
         </div>
       }
     >

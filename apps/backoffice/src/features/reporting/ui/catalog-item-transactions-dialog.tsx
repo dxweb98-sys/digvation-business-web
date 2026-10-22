@@ -15,7 +15,6 @@ import { useMemo, useState } from 'react';
 import { normalizeBackofficeApiError } from '../../../app/api/backoffice-api-error';
 import { useBackofficeAuth } from '../../../auth/backoffice-auth-context';
 import {
-  RecordInfoTile,
   RecordPanel,
   RecordPanelBody,
   RecordPanelHeader,
@@ -116,7 +115,7 @@ export function CatalogItemTransactionsDialog({
     },
     {
       key: 'quantity',
-      label: copy('Units sold'),
+      label: copy('Quantity sold'),
       align: 'right',
       render: (record) => <span className="tabular-nums">{quantity(record.quantity)}</span>,
     },
@@ -193,48 +192,62 @@ export function CatalogItemTransactionsDialog({
         ) : (
           <>
             <RecordPanel>
-              <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
+                {/* What was sold, and where and when the figures come from. */}
                 <div className="min-w-0 flex-1">
-                  <h2 className="break-words text-lg font-semibold tracking-tight text-[var(--color-text)]">
+                  <h2 className="break-words text-xl font-semibold tracking-tight text-[var(--color-text)]">
                     {data.item.itemName ?? String(row.itemName ?? '—')}
-                    {data.item.variantName ? (
-                      <span className="text-[var(--color-text-muted)]">
-                        {' '}
-                        · {data.item.variantName}
-                      </span>
-                    ) : null}
                   </h2>
-                  {/* Transactions and units are different counts; say both in one plain sentence. */}
-                  <p className="mt-1 break-words text-sm text-[var(--color-text-muted)]">
-                    {count(data.summary.transactionCount)} {copy('transactions sold')}{' '}
-                    {quantity(data.summary.quantitySold)} {copy('units')}{' '}
-                    {copy('of this item in this period.')}
-                  </p>
-                  <p className="mt-2 break-words text-xs text-[var(--color-text-muted)]">
+                  {data.item.itemType || data.item.variantName ? (
+                    <p className="mt-1 break-words text-sm text-[var(--color-text-muted)]">
+                      {[
+                        data.item.itemType
+                          ? copy(data.item.itemType === 'SERVICE' ? 'Service' : 'Product')
+                          : null,
+                        data.item.variantName,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </p>
+                  ) : null}
+                  <p className="mt-3 break-words text-xs text-[var(--color-text-muted)]">
                     {period} · {scope.locationName ?? copy('All locations')}
                   </p>
                 </div>
-                <div className="text-left sm:text-right">
+                {/* The one strong number, with the counts that explain it right under it. */}
+                <div className="min-w-0 basis-full sm:basis-auto sm:text-right">
                   <RecordSectionLabel>{copy('Revenue')}</RecordSectionLabel>
-                  <p className="mt-0.5 text-2xl font-semibold tracking-tight tabular-nums text-[var(--color-text)]">
+                  <p className="mt-0.5 text-3xl font-semibold tracking-tight tabular-nums text-[var(--color-text)]">
                     {money(data.summary.finalRevenue)}
+                  </p>
+                  <p className="mt-1 text-sm tabular-nums text-[var(--color-text-muted)]">
+                    {count(data.summary.transactionCount)} {copy('transactions')} ·{' '}
+                    {quantity(data.summary.quantitySold)}{' '}
+                    {copy(
+                      data.item.itemType === 'SERVICE'
+                        ? 'services'
+                        : data.item.itemType === 'PRODUCT'
+                          ? 'products'
+                          : 'sold',
+                    )}
                   </p>
                 </div>
               </div>
+              <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-[var(--color-border)] pt-3 text-sm">
+                <div className="min-w-0">
+                  <dt className="text-xs text-[var(--color-text-muted)]">{copy('Discount')}</dt>
+                  <dd className="mt-0.5 font-medium tabular-nums text-[var(--color-text)]">
+                    {money(data.summary.discountAmount)}
+                  </dd>
+                </div>
+                <div className="min-w-0">
+                  <dt className="text-xs text-[var(--color-text-muted)]">{copy('Tax')}</dt>
+                  <dd className="mt-0.5 font-medium tabular-nums text-[var(--color-text)]">
+                    {money(data.summary.taxAmount)}
+                  </dd>
+                </div>
+              </dl>
             </RecordPanel>
-
-            <section aria-label={copy('Summary')} className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              <RecordInfoTile
-                label={copy('Transactions')}
-                value={count(data.summary.transactionCount)}
-              />
-              <RecordInfoTile
-                label={copy('Units sold')}
-                value={quantity(data.summary.quantitySold)}
-              />
-              <RecordInfoTile label={copy('Discount')} value={money(data.summary.discountAmount)} />
-              <RecordInfoTile label={copy('Tax')} value={money(data.summary.taxAmount)} />
-            </section>
 
             {data.records.items.some((record) => record.refundState !== 'NONE') ? (
               <DInfoNote variant="info">

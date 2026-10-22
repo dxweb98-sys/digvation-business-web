@@ -43,6 +43,8 @@ import { currencyInputFromAmount, normalizeCurrencyPaymentInput } from '../../li
 import { SaleAdjustmentControls } from '../../adjustment/sale-adjustment-controls';
 import { SaleLineTaskDialog } from '../../queue/sale-line-task-dialog';
 import { ServicePerformersDialog } from '../../performer/service-performers-dialog';
+import { AdditionPerformersDialog } from '../../performer/addition-performers-dialog';
+import { additionWork, saleLineAdditions } from '../../transaction/model/sale-line-additions';
 import {
   presentableTransaction,
   useCanReadCompletedSaleDetails,
@@ -143,8 +145,20 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   const [cartOpen, setCartOpen] = useState(false);
   const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
 
-  const { performerTarget, setPerformerTarget, isSavingPerformers, savePerformers } =
-    useServicePerformerAssignment({ workspace, setQueueDetail, showToast, copy });
+  const {
+    performerTarget,
+    setPerformerTarget,
+    isSavingPerformers,
+    savePerformers,
+    additionTarget,
+    setAdditionTarget,
+    saveAdditionPerformers,
+  } = useServicePerformerAssignment({ workspace, setQueueDetail, showToast, copy });
+  const editedAddition = additionTarget
+    ? saleLineAdditions(additionTarget.line).find(
+        (addition) => addition.id === additionTarget.additionId,
+      )
+    : undefined;
 
   const [receiptSaleId, setReceiptSaleId] = useState<string | null>(null);
   const {
@@ -817,7 +831,6 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           active={queueTab}
           onChangeTab={setQueueTab}
           groups={groups}
-          employees={workspace.employees}
           issues={queueIssues}
           locale={workspace.locale}
           onStartWork={(transaction) => void startQueuedWork(transaction)}
@@ -1148,6 +1161,11 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           workspace.requestEmployeeOptions();
           setPerformerTarget({ sale: displayedQueueDetail, line });
         }}
+        onAssignAddition={(line, additionId) => {
+          if (!displayedQueueDetail) return;
+          workspace.requestEmployeeOptions();
+          setAdditionTarget({ sale: displayedQueueDetail, line, additionId });
+        }}
         onStartLineWork={(line) => {
           if (!displayedQueueDetail) return;
           void startWaitingServiceLine(displayedQueueDetail, line);
@@ -1314,6 +1332,27 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           isSaving={isSavingPerformers}
           onClose={() => setPerformerTarget(null)}
           onSave={(plans) => void savePerformers(performerTarget, plans)}
+        />
+      ) : null}
+
+      {additionTarget && editedAddition ? (
+        <AdditionPerformersDialog
+          key={`${additionTarget.sale.id}:${additionTarget.additionId}`}
+          additionName={`${editedAddition.name} · ${additionTarget.line.itemNameSnapshot}`}
+          assignment={editedAddition.performerAssignment}
+          performers={editedAddition.performerRates}
+          serviceNames={
+            additionWork(
+              { ...editedAddition, performerIds: [], performerAssignment: 'SERVICE' },
+              additionTarget.line,
+              workspace.employees,
+              copy('Employee unavailable'),
+            )?.names ?? []
+          }
+          employees={workspace.employees}
+          isSaving={isSavingPerformers}
+          onClose={() => setAdditionTarget(null)}
+          onSave={(input) => void saveAdditionPerformers(additionTarget, input)}
         />
       ) : null}
 

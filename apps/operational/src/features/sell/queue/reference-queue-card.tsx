@@ -15,12 +15,9 @@ import { useOperationalLocalization } from '../../../app/localization/operationa
 import { hasStartableQueuedWork } from './queued-sale-work';
 import type {
   CompletedSaleSummary,
-  Employee,
   QueueSale,
   Sale,
 } from '../transaction/model/cashier-transaction.types';
-import { additionDiscountNote, employeeDisplayName } from '../transaction/model/sale-presentation';
-import { AdditionDiscountNote } from '../transaction/ui/addition-discount-note';
 import { ReceiptDeliveryIndicatorLine } from '../receipt/receipt-delivery-dialog';
 import type { ReceiptDeliveryIndicator } from '../transaction/api/operational-projection-client';
 import { type QueueStatus, statusMeta } from './queue-status';
@@ -31,10 +28,6 @@ import {
 } from '../payment/sale-payment-status';
 import { money, transactionNumber, isPositiveDecimal } from '../transaction/model/sale-display';
 import { customerDisplayName } from '../customer/model/sale-customer-display';
-
-/** Neutral surface for every queue card; status is carried by its chip, not the background. */
-const QUEUE_CARD_SURFACE =
-  'w-[min(360px,calc(100vw-3rem))] shrink-0 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 transition-shadow hover:shadow-sm';
 
 /**
  * A completed transaction for an operator without `sales:read-completed`: it
@@ -56,7 +49,9 @@ export function RestrictedCompletedQueueCard({
   const meta = statusMeta.COMPLETED;
   const number = transactionNumber(summary, locale);
   return (
-    <article className={QUEUE_CARD_SURFACE}>
+    <article
+      className={`w-[min(360px,calc(100vw-3rem))] shrink-0 rounded-2xl border border-[var(--color-border)] p-4 transition-shadow hover:shadow-sm ${meta.soft}`}
+    >
       <div className="mb-2 flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="font-mono text-[11px] text-[var(--color-text-muted)]">{number}</p>
@@ -113,7 +108,6 @@ export function ReferenceQueueCard({
   onSendReceipt,
   onEditCustomer,
   receiptDelivery = null,
-  employees = [],
 }: {
   sale: Sale;
   status: QueueStatus;
@@ -132,8 +126,6 @@ export function ReferenceQueueCard({
   onEditCustomer?: (sale: Sale) => void;
   /** Latest receipt delivery; shown only on a completed transaction with a customer. */
   receiptDelivery?: ReceiptDeliveryIndicator | null;
-  /** For performer names not yet captured as snapshots. */
-  employees?: readonly Pick<Employee, 'id' | 'displayName'>[];
 }) {
   const { copy, label } = useOperationalLocalization();
   const meta = statusMeta[status];
@@ -252,64 +244,50 @@ export function ReferenceQueueCard({
       : []),
   ];
 
-  const time = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(
-    new Date(sale.createdAt),
-  );
-  const paymentLabel = copy(paid ? 'Paid' : hasPayment ? 'Partially paid' : 'Unpaid');
-
   return (
     <article
-      aria-label={`${transactionNumber(sale, locale)} · ${customerDisplayName(customer, locale)}`}
-      className={`${QUEUE_CARD_SURFACE} flex flex-col`}
+      className={`w-[min(360px,calc(100vw-3rem))] shrink-0 rounded-2xl border border-[var(--color-border)] p-4 transition-shadow hover:shadow-sm ${meta.soft}`}
     >
-      {/* Who and which transaction: the customer leads, the number and time support it. */}
-      <header className="flex items-start justify-between gap-3">
+      <div className="mb-2 flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <h3 className="line-clamp-2 break-words text-[15px] font-semibold leading-snug text-[var(--color-text)]">
+          <p className="font-mono text-[11px] text-[var(--color-text-muted)]">
+            {transactionNumber(sale, locale)}
+          </p>
+          <p className="mt-0.5 truncate text-sm font-bold">
             {customerDisplayName(customer, locale)}
-          </h3>
-          <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
-            <span className="font-mono">{transactionNumber(sale, locale)}</span>
-            <span aria-hidden="true"> · </span>
-            <time dateTime={sale.createdAt}>{time}</time>
           </p>
         </div>
-        <span
-          className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold ${meta.tone}`}
-        >
-          {meta.icon}
-          {label(meta.value)}
-        </span>
-      </header>
-
-      {/* What is being done, and by whom. */}
-      <QueueCardLines sale={sale} employees={employees} />
-
-      {issues.length ? (
-        <div className="mt-3 rounded-xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 px-3 py-2 text-xs">
-          <p className="font-semibold text-[var(--color-warning)]">
-            {copy('Complete before starting')}
-          </p>
-          <p className="mt-0.5 text-[var(--color-text-muted)]">{issues[0]}</p>
-        </div>
-      ) : null}
-
-      {/* Money and next step. */}
-      <footer className="mt-auto flex items-end justify-between gap-3 border-t border-[var(--color-border)] pt-3">
-        <div className="min-w-0">
+        <div className="flex shrink-0 items-center gap-1">
           <span
-            className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${paid ? 'bg-[var(--color-success)]/10 text-[var(--color-success)]' : 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]'}`}
+            className={`inline-flex items-center rounded-full px-2 py-1 text-[10px] font-bold ${paid ? 'bg-[var(--color-success)]/10 text-[var(--color-success)]' : 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]'}`}
           >
-            {paymentLabel}
+            {copy(paid ? 'Paid' : hasPayment ? 'Partially paid' : 'Unpaid')}
           </span>
-          <p className="mt-1 text-base font-bold tabular-nums text-[var(--color-text)]">
+          <span
+            className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold ${meta.tone}`}
+          >
+            {meta.icon}
+            {label(meta.value)}
+          </span>
+        </div>
+      </div>
+      <QueueCardMainItem sale={sale} />
+      <div className="mb-3 flex items-end justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-xs text-[var(--color-text-muted)]">
+            {sale.lines.filter((line) => !line.removedAt).length} {copy('items')},{' '}
+            {new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(
+              new Date(sale.createdAt),
+            )}
+          </p>
+          <p className="mt-1 text-sm font-bold text-[var(--color-brand)]">
             {money(sale.totalAmount, locale)}
           </p>
           {status === 'COMPLETED' && sale.customer ? (
             <ReceiptDeliveryIndicatorLine indicator={receiptDelivery} />
           ) : null}
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex items-center gap-2">
           {canStartWork ? (
             <DButton
               size="sm"
@@ -350,101 +328,44 @@ export function ReferenceQueueCard({
             ))}
           </Dropdown>
         </div>
-      </footer>
+      </div>
+      {issues.length ? (
+        <div className="mt-3 rounded-xl border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 px-3 py-2 text-xs">
+          <p className="font-semibold text-[var(--color-warning)]">
+            {copy('Complete before starting')}
+          </p>
+          <p className="mt-0.5 text-[var(--color-text-muted)]">{issues[0]}</p>
+        </div>
+      ) : null}
     </article>
   );
 }
 
-/** At most this many items are described on a card; the rest are counted. */
-const VISIBLE_LINES = 2;
+const selectedAdditions = (line: Sale['lines'][number]) =>
+  (line.compositionComponents ?? []).filter(
+    (component) => component.componentSource === 'SALE_SELECTED',
+  ).length;
 
 /**
- * The transaction's items in reading order: the main item and quantity, its selected additions,
- * who performs it, and why its additions are outside an item discount. Plain grouped text, never a
- * card per field.
+ * The main item and, compactly, how many additions it carries: enough to recognize the order. A
+ * line with additions leads (it is what the order is about); otherwise the first active line.
+ * Performers, addition names and discount notes belong to the transaction detail.
  */
-function QueueCardLines({
-  sale,
-  employees,
-}: {
-  sale: Sale;
-  employees: readonly Pick<Employee, 'id' | 'displayName'>[];
-}) {
+function QueueCardMainItem({ sale }: { sale: Sale }) {
   const { copy } = useOperationalLocalization();
-  const lines = sale.lines.filter((line) => !line.removedAt);
-  if (!lines.length) return null;
-  const hidden = lines.length - VISIBLE_LINES;
+  const active = sale.lines.filter((line) => !line.removedAt);
+  const main = active.find((line) => selectedAdditions(line) > 0) ?? active[0];
+  if (!main) return null;
+  const additions = selectedAdditions(main);
   return (
-    <ul className="mt-3 space-y-2.5 border-t border-[var(--color-border)] pt-3">
-      {lines.slice(0, VISIBLE_LINES).map((line) => {
-        const additions = (line.compositionComponents ?? []).filter(
-          (component) => component.componentSource === 'SALE_SELECTED',
-        );
-        const performerIds = [
-          ...new Set([
-            ...(line.participations ?? []).filter((p) => p.assigned).map((p) => p.employeeId),
-            ...(line.workUnits ?? []).flatMap((unit) => unit.employeeIds),
-          ]),
-        ];
-        const tracked = line.fulfillmentBehaviorSnapshot === 'TRACKED';
-        return (
-          <li key={line.id} className="min-w-0">
-            <p className="flex items-baseline justify-between gap-2 text-[13px] font-medium text-[var(--color-text)]">
-              <span className="min-w-0 break-words">
-                {line.itemNameSnapshot}
-                {line.variantNameSnapshot ? (
-                  <span className="font-normal text-[var(--color-text-muted)]">
-                    {' '}
-                    · {line.variantNameSnapshot}
-                  </span>
-                ) : null}
-              </span>
-              <span className="shrink-0 text-xs tabular-nums text-[var(--color-text-muted)]">
-                ×{formatQuantity(line.quantity)}
-              </span>
-            </p>
-            {additions.length ? (
-              <p className="mt-0.5 break-words text-xs text-[var(--color-text-muted)]">
-                +{' '}
-                {additions
-                  .map((addition) =>
-                    [addition.itemNameSnapshot, addition.variantNameSnapshot]
-                      .filter(Boolean)
-                      .join(' · '),
-                  )
-                  .join(', ')}
-              </p>
-            ) : null}
-            {tracked ? (
-              <p
-                className={`mt-0.5 flex items-start gap-1 text-xs ${performerIds.length ? 'text-[var(--color-text-muted)]' : 'text-[var(--color-warning)]'}`}
-              >
-                <User aria-hidden="true" className="mt-px size-3 shrink-0" />
-                <span className="min-w-0 break-words">
-                  {performerIds.length
-                    ? performerIds
-                        .map((id) =>
-                          employeeDisplayName(line, id, employees, copy('Employee unavailable')),
-                        )
-                        .join(', ')
-                    : copy('Not assigned yet')}
-                </span>
-              </p>
-            ) : null}
-            <AdditionDiscountNote kind={additionDiscountNote(sale, line)} className="mt-1" />
-          </li>
-        );
-      })}
-      {hidden > 0 ? (
-        <li className="text-xs text-[var(--color-text-muted)]">
-          +{hidden} {copy('More items')}
-        </li>
+    <p className="mb-0.5 flex min-w-0 items-baseline gap-1 text-[13px] font-medium text-[var(--color-text)]">
+      <span className="truncate">{main.itemNameSnapshot}</span>
+      {/* The count stays readable when a long item name is cut. */}
+      {additions ? (
+        <span className="shrink-0 font-normal text-[var(--color-text-muted)]">
+          + {additions} {copy('add-ons')}
+        </span>
       ) : null}
-    </ul>
+    </p>
   );
-}
-
-/** A trailing-zero-free quantity: "2", "1.5". */
-function formatQuantity(quantity: string) {
-  return quantity.replace(/(\.\d*?[1-9])0+$|\.0+$/, '$1');
 }

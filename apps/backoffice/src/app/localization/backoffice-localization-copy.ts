@@ -933,7 +933,7 @@ export const backofficeCopy: Record<string, { id: string; en: string }> = {
   },
   Quantity: { id: 'Kuantitas', en: 'Quantity' },
   OPEN: { id: 'Terbuka', en: 'Open' },
-  FINALIZED: { id: 'Difinalisasi', en: 'Finalized' },
+  FINALIZED: { id: 'Selesai', en: 'Completed' },
   VOIDED: { id: 'Dibatalkan', en: 'Voided' },
   SUCCEEDED: { id: 'Berhasil', en: 'Succeeded' },
   FAILED: { id: 'Gagal', en: 'Failed' },

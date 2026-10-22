@@ -122,6 +122,8 @@ export interface CatalogItemTransactionsDetail {
     catalogVariantId: string | null;
     itemName: string | null;
     variantName: string | null;
+    /** PRODUCT or SERVICE; null when it cannot be read. */
+    itemType: 'PRODUCT' | 'SERVICE' | null;
   };
   period: { dateFrom: string; dateTo: string; sellingLocationId: string | null };
   /** Identical to the Catalog Performance row; computed over every record, not the page. */

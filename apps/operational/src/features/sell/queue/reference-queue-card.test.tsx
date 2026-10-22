@@ -90,10 +90,6 @@ function renderCard(value: Sale) {
         onView={noop}
         onViewReceipt={noop}
         onSendReceipt={noop}
-        employees={[
-          { id: 'emp-andi', displayName: 'Andi' },
-          { id: 'emp-citra', displayName: 'Citra' },
-        ]}
       />
     </DeploymentBootstrapProvider>,
   );
@@ -104,38 +100,17 @@ const NOTE = /Diskon item hanya berlaku untuk harga item utama/;
 
 afterEach(cleanup);
 
-describe('queue card hierarchy', () => {
-  it('leads with the customer and shows the work: main item, additions, and who performs it', () => {
+describe('compact queue card', () => {
+  it('identifies the order: customer, number, main item and how many additions it carries', () => {
     const card = renderCard(sale([line()]));
-    expect(card.getByRole('heading', { name: longCustomer })).toBeTruthy();
+    expect(card.getByText(longCustomer)).toBeTruthy();
     expect(card.getByText('TRX-20261021-000007')).toBeTruthy();
-    expect(card.getByText(/Potong Rambut/)).toBeTruthy();
-    expect(card.getByText(/Hair Spray, Pomade/)).toBeTruthy();
-    expect(card.getByText('Andi, Citra')).toBeTruthy();
-    expect(card.queryByText(NOTE)).toBeNull();
+    expect(card.getByText('Potong Rambut')).toBeTruthy();
+    expect(card.getByText(/\+ 2 tambahan/)).toBeTruthy();
   });
 
-  it('flags tracked work without a performer and counts items beyond the first two', () => {
+  it('leaves performers, addition names and discount notes to the transaction detail', () => {
     const card = renderCard(
-      sale([
-        line({ participations: [] }),
-        line({ id: 'line-2', compositionComponents: [] }),
-        line({ id: 'line-3', compositionComponents: [] }),
-      ]),
-    );
-    expect(card.getByText('Belum ada pelaksana')).toBeTruthy();
-    expect(card.getByText(/\+1 item lainnya/)).toBeTruthy();
-  });
-
-  it('explains an item discount only when it really leaves the additions out', () => {
-    const item = renderCard(
-      sale([line({ discountType: 'PERCENTAGE', lineDiscountAmount: '20000.0000' })]),
-    );
-    expect(item.getByText(NOTE)).toBeTruthy();
-    expect(item.getByText(/Item tambahan tidak termasuk diskon/)).toBeTruthy();
-    cleanup();
-
-    const both = renderCard(
       sale([
         line({
           discountType: 'PERCENTAGE',
@@ -144,12 +119,32 @@ describe('queue card hierarchy', () => {
         }),
       ]),
     );
-    expect(both.getByText(/Item tambahan hanya ikut diskon transaksi/)).toBeTruthy();
-    cleanup();
+    expect(card.queryByText(/Hair Spray/)).toBeNull();
+    expect(card.queryByText(/emp-andi|Andi/)).toBeNull();
+    expect(card.queryByText(NOTE)).toBeNull();
+  });
 
-    const transactionOnly = renderCard(
-      sale([line({ orderDiscountAllocationAmount: '5000.0000' })]),
+  it('leads with the item that carries additions, whatever order the lines arrive in', () => {
+    const card = renderCard(
+      sale([
+        line({
+          id: 'line-product',
+          itemNameSnapshot: 'Pomade',
+          variantNameSnapshot: null,
+          fulfillmentBehaviorSnapshot: 'INSTANT',
+          compositionComponents: [],
+        }),
+        line(),
+      ]),
     );
-    expect(transactionOnly.queryByText(NOTE)).toBeNull();
+    expect(card.getByText('Potong Rambut')).toBeTruthy();
+    expect(card.getByText(/\+ 2 tambahan/)).toBeTruthy();
+    expect(card.queryByText('Pomade')).toBeNull();
+  });
+
+  it('shows no addition count for an item without additions', () => {
+    const card = renderCard(sale([line({ compositionComponents: [] })]));
+    expect(card.getByText('Potong Rambut')).toBeTruthy();
+    expect(card.queryByText(/tambahan/)).toBeNull();
   });
 });

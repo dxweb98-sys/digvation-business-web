@@ -253,14 +253,10 @@ export const REPORT_CATALOG: readonly ReportDefinition[] = [
     locationScoped: true,
     kpis: [
       { key: 'finalRevenue', label: 'Revenue', kind: 'money' },
-      { key: 'quantitySold', label: 'Items sold', kind: 'quantity' },
-      { key: 'itemCount', label: 'Items with sales', kind: 'count' },
+      // Products and Services together: a quantity, never "units" of a Service.
+      { key: 'quantitySold', label: 'Quantity sold', kind: 'quantity' },
       { key: 'transactionCount', label: 'Transactions', kind: 'count' },
-      {
-        key: 'saleLevelRefundAmount',
-        label: 'Money refunded on these transactions',
-        kind: 'money',
-      },
+      { key: 'saleLevelRefundAmount', label: 'Money returned', kind: 'money' },
     ],
     analytics: { ranking: { title: 'Top items by revenue', kind: 'money' } },
     filters: [
@@ -273,7 +269,7 @@ export const REPORT_CATALOG: readonly ReportDefinition[] = [
       count('rank', '#'),
       { key: 'itemName', label: 'Item', kind: 'text', secondaryKey: 'itemCode' },
       count('transactionCount', 'Transactions'),
-      quantity('quantitySold', 'Units sold'),
+      quantity('quantitySold', 'Quantity sold'),
       money('finalRevenue', 'Revenue'),
       money('discountAmount', 'Discount'),
       money('taxAmount', 'Tax'),

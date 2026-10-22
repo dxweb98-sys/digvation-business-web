@@ -1,7 +1,7 @@
 import { DTabs, DTabsContent, DTabsList, DTabsTrigger } from '@digvation/ui';
 import { ChevronDown, Clock } from 'lucide-react';
 import { useOperationalLocalization } from '../../../app/localization/operational-localization';
-import type { Employee, QueueSale, Sale } from '../transaction/model/cashier-transaction.types';
+import type { QueueSale, Sale } from '../transaction/model/cashier-transaction.types';
 import {
   isCompletedSaleSummary,
   restrictedQueueSummary,
@@ -29,7 +29,6 @@ export function ReferenceQueueBoard({
   onSendReceipt,
   receiptDeliveries,
   onEditCustomer,
-  employees = [],
 }: {
   open: boolean;
   onOpenChange: (value: boolean) => void;
@@ -49,8 +48,6 @@ export function ReferenceQueueBoard({
   onSendReceipt: (sale: QueueSale) => void;
   /** Latest receipt delivery per completed transaction, kept beside the queue items. */
   receiptDeliveries: Readonly<Record<string, ReceiptDeliveryIndicator>>;
-  /** For performer names on the cards. */
-  employees?: readonly Pick<Employee, 'id' | 'displayName'>[];
   /** Corrects a walk-in customer before the transaction is completed. */
   onEditCustomer: (sale: Sale) => void;
 }) {
@@ -117,7 +114,7 @@ export function ReferenceQueueBoard({
             >
               <DTabsList className="max-w-full overflow-x-auto">
                 {statuses.map((status) => (
-                  <DTabsTrigger key={status} value={status}>
+                  <DTabsTrigger key={status} value={status} className="shrink-0 whitespace-nowrap">
                     {statusLabel(status)} ({groups[status].length})
                   </DTabsTrigger>
                 ))}
@@ -166,7 +163,6 @@ export function ReferenceQueueBoard({
                                   onSendReceipt={onSendReceipt}
                                   onEditCustomer={onEditCustomer}
                                   receiptDelivery={receiptDeliveries[sale.id] ?? null}
-                                  employees={employees}
                                 />
                               );
                             })}

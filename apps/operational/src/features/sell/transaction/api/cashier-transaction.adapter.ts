@@ -16,6 +16,7 @@ import type {
   ResolvedPrice,
   QueueSale,
   Sale,
+  SaleComponentPerformerAssignment,
   SaleCustomerSelection,
   SellingLocation,
 } from '../model/cashier-transaction.types';
@@ -42,11 +43,8 @@ export interface SaleSelectedComponentInput {
   quantity: string;
   /** Service only: who performs it; shares are equal unless Runtime is told otherwise. */
   performers?: Array<{ employeeId: string; shareRate?: string }>;
-  /**
-   * Optional Product salesperson of this additional Product ("Dijual oleh"); chosen explicitly and
-   * never derived from a performer. Runtime validates eligibility.
-   */
-  soldByEmployeeId?: string;
+  /** Service only: re-sends a decision already made when the line is reconfigured. */
+  performerAssignment?: SaleComponentPerformerAssignment;
 }
 
 export interface StartSaleInput extends CreateSaleInput {
@@ -315,6 +313,15 @@ export interface ServicePerformersInput {
   performers: Array<{ employeeId: string; shareRate?: string }>;
 }
 
+/** Who performs one selected addition of a Service: the main Service performers, or its own. */
+export type AdditionPerformersDecision =
+  | { assignment: 'SERVICE' }
+  | { assignment: 'OWN'; performers: Array<{ employeeId: string; shareRate: string }> };
+
+export type SaleLineComponentPerformersInput = AdditionPerformersDecision & {
+  expectedVersion: number;
+};
+
 export interface ServiceWorkUnitsInput {
   expectedVersion: number;
   /** One entry per unit of quantity, in unit order; shares are fractions summing to 1. */
@@ -463,6 +470,12 @@ export interface SaleTransactionClient {
     saleId: string,
     saleLineId: string,
     input: ServiceWorkUnitsInput,
+  ): Promise<Sale>;
+  setSaleLineComponentPerformers?(
+    saleId: string,
+    saleLineId: string,
+    componentId: string,
+    input: SaleLineComponentPerformersInput,
   ): Promise<Sale>;
   setSaleLineAssignments(saleId: string, saleLineId: string, input: AssignmentInput): Promise<Sale>;
   setSaleLineContributions(

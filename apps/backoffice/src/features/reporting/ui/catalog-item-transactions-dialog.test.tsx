@@ -56,6 +56,7 @@ const detail = (page = 1): CatalogItemTransactionsDetail => ({
     catalogVariantId: VARIANT_ID,
     itemName: 'Pomade',
     variantName: 'Standar',
+    itemType: 'PRODUCT',
   },
   period: { dateFrom: '2026-10-20', dateTo: '2026-10-20', sellingLocationId: null },
   summary: {
@@ -108,7 +109,10 @@ vi.mock('../../../auth/backoffice-auth-context', () => ({
 
 afterEach(cleanup);
 
-async function openDetail(permissions = ['catalog:read']) {
+async function openDetail(
+  permissions = ['catalog:read'],
+  itemType: CatalogItemTransactionsDetail['item']['itemType'] = 'PRODUCT',
+) {
   api.permissions = permissions;
   const requests: string[] = [];
   const fake = fakeGet({ 'catalog-performance': ranking });
@@ -117,7 +121,10 @@ async function openDetail(permissions = ['catalog:read']) {
       requests.push(url);
       const path = url.split('?')[0]!;
       if (path === `/api/v1/reports/catalog-performance/items/${ITEM_ID}/transactions`)
-        return detail(Number(new URLSearchParams(url.split('?')[1]).get('page') ?? 1));
+        return withType(
+          detail(Number(new URLSearchParams(url.split('?')[1]).get('page') ?? 1)),
+          itemType,
+        );
       return fake.get(url);
     },
   };
@@ -134,14 +141,33 @@ async function openDetail(permissions = ['catalog:read']) {
   return { dialog: within(dialog), element: dialog, requests };
 }
 
+const withType = (
+  value: CatalogItemTransactionsDetail,
+  itemType: CatalogItemTransactionsDetail['item']['itemType'],
+): CatalogItemTransactionsDetail => ({ ...value, item: { ...value.item, itemType } });
+
 describe('Catalog performance detail', () => {
-  it('explains transactions versus units on the report itself', async () => {
+  it('reads a Service quantity as services, never as product units', async () => {
+    const { dialog } = await openDetail(['catalog:read'], 'SERVICE');
+    expect(dialog.getByText('Layanan · Standar')).toBeTruthy();
+    expect(dialog.getByText('4 transaksi · 6 layanan')).toBeTruthy();
+  });
+
+  it('keeps a neutral wording when the item type is unknown', async () => {
+    const { dialog } = await openDetail(['catalog:read'], null);
+    expect(dialog.getByText('4 transaksi · 6 terjual')).toBeTruthy();
+  });
+
+  it('explains transactions versus quantity on the report itself, for products and services', async () => {
     api.permissions = ['catalog:read'];
     api.client = fakeGet({ 'catalog-performance': ranking });
     renderReports('/?type=catalog-performance&dateFrom=2026-10-20&dateTo=2026-10-20');
     await screen.findAllByText('Pomade — Standar', undefined, LOADED);
-    expect(screen.getByText(/4 transaksi dapat menjual 6 unit/)).toBeTruthy();
-    expect(screen.getAllByText('Unit terjual').length).toBeGreaterThan(0);
+    expect(screen.getByText(/4 transaksi dapat menjual 6 layanan/)).toBeTruthy();
+    expect(screen.getAllByText('Kuantitas terjual').length).toBeGreaterThan(0);
+    // The redundant "items with sales" count is no longer a headline figure.
+    expect(screen.queryByText('Item terjual (jenis)')).toBeNull();
+    expect(screen.queryByText('Unit terjual')).toBeNull();
   });
 
   it('requests exactly the row, its variant and the report scope, and reconciles with the row', async () => {
@@ -151,12 +177,10 @@ describe('Catalog performance detail', () => {
         `catalogVariantId=${VARIANT_ID}.*page=1&pageSize=10|dateFrom=2026-10-20&dateTo=2026-10-20.*catalogVariantId=${VARIANT_ID}`,
       ),
     );
-    expect(
-      dialog.getByText(/4 transaksi menjual total 6 unit item ini pada periode ini\./),
-    ).toBeTruthy();
-    const summary = within(dialog.getByRole('region', { name: 'Ringkasan' }));
-    expect(summary.getByText('4')).toBeTruthy();
-    expect(summary.getByText('6')).toBeTruthy();
+    // Identity first, then the revenue with the counts that explain it, in the item's own words.
+    expect(dialog.getByRole('heading', { name: 'Pomade' })).toBeTruthy();
+    expect(dialog.getByText('Produk · Standar')).toBeTruthy();
+    expect(dialog.getByText('4 transaksi · 6 produk')).toBeTruthy();
     expect(dialog.getAllByText(/Rp\s?266\.400/).length).toBeGreaterThan(0);
   });
 

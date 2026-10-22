@@ -285,12 +285,12 @@ describe('ServicePerformersDialog: edit is scoped to the clicked service line', 
     tick(/Andini/);
     // One employee: no percentage field and no total.
     expect(screen.queryByRole('region', { name: 'Pembagian pengerjaan' })).toBeNull();
-    expect(screen.queryAllByRole('textbox')).toHaveLength(0);
+    expect(screen.queryAllByRole('textbox', { name: /^Porsi \(%\)/ })).toHaveLength(0);
     tick(/Rindu/);
     // Two employees on ONE unit: each ticked row gains its own share, with a total.
     const split = screen.getByRole('region', { name: 'Pembagian pengerjaan' });
     expect(split.textContent).toContain('Total 100%');
-    expect(screen.getAllByRole('textbox')).toHaveLength(2);
+    expect(screen.getAllByRole('textbox', { name: /^Porsi \(%\)/ })).toHaveLength(2);
     cleanup();
 
     // Quantity 2 with one employee per unit never shows a split.
@@ -310,5 +310,110 @@ describe('ServicePerformersDialog: edit is scoped to the clicked service line', 
     save();
     expect(onSave).not.toHaveBeenCalled();
     expect(screen.getByRole('alert').textContent).toMatch(/Hair Color · Pengerjaan 2/);
+  });
+});
+
+describe('ServicePerformersDialog: finding an employee', () => {
+  afterEach(cleanup);
+  const search = () => screen.getByRole('textbox', { name: 'Cari karyawan' });
+  const status = () => screen.getByRole('status');
+
+  it('always offers search, and says how many employees are listed and chosen', () => {
+    renderDialog(saleOf(line('l-color', 'Hair Color')), 'l-color');
+    expect(status().textContent).toBe('3 karyawan');
+    tick(/Andini/);
+    expect(status().textContent).toContain('1 dipilih');
+  });
+
+  it('finds an employee by name or by code and counts what matches', () => {
+    renderDialog(saleOf(line('l-color', 'Hair Color')), 'l-color');
+    fireEvent.change(search(), { target: { value: 'rin' } });
+    expect(screen.getAllByRole('checkbox').map((box) => box.closest('label')!.textContent)).toEqual(
+      [expect.stringContaining('Rindu')],
+    );
+    expect(status().textContent).toBe('1 dari 3 karyawan');
+    fireEvent.change(search(), { target: { value: 'SAR' } });
+    expect(screen.getByRole('checkbox', { name: /Sari/ })).toBeTruthy();
+  });
+
+  it('keeps a choice made before searching, and clears a search that matches nobody', () => {
+    const { onSave } = renderDialog(saleOf(line('l-color', 'Hair Color')), 'l-color');
+    tick(/Andini/);
+    fireEvent.change(search(), { target: { value: 'zzz' } });
+    expect(screen.getByText('Tidak ada karyawan dengan nama atau kode itu.')).toBeTruthy();
+    expect(status().textContent).toContain('1 dipilih');
+    fireEvent.click(screen.getByRole('button', { name: 'Hapus pencarian' }));
+    expect((screen.getByRole('checkbox', { name: /Andini/ }) as HTMLInputElement).checked).toBe(
+      true,
+    );
+    save();
+    expect(onSave).toHaveBeenCalled();
+  });
+});
+
+describe('ServicePerformersDialog: the work split sits in the footer', () => {
+  afterEach(cleanup);
+  const split = () => screen.queryByRole('region', { name: 'Pembagian pengerjaan' });
+  const share = (name: string) =>
+    screen.getByRole('textbox', { name: `Porsi (%) ${name}` }) as HTMLInputElement;
+  const type = (name: string, value: string) =>
+    fireEvent.change(share(name), { target: { value } });
+  const evenly = () => fireEvent.click(screen.getByRole('button', { name: 'Bagi rata' }));
+
+  it('keeps one performer free of allocation controls', () => {
+    renderDialog(saleOf(line('l-color', 'Hair Color')), 'l-color');
+    tick(/Andini/);
+    expect(split()).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Bagi rata' })).toBeNull();
+  });
+
+  it('groups the total and "Bagi rata" with Batal/Simpan, once', () => {
+    const { onSave } = renderDialog(saleOf(line('l-color', 'Hair Color')), 'l-color');
+    tick(/Andini/);
+    tick(/Rindu/);
+    const footerRow = split()!.parentElement!;
+    expect(footerRow.contains(screen.getByRole('button', { name: /^Simpan$/ }))).toBe(true);
+    expect(footerRow.contains(screen.getByRole('button', { name: 'Batal' }))).toBe(true);
+    expect(screen.getAllByText(/^Total /)).toHaveLength(1);
+    expect(split()!.textContent).toContain('Total 100%');
+    save();
+    const rates = payload(onSave)[0]!.units[0]!.map((performer) => Number(performer.shareRate));
+    expect(rates).toEqual([0.5, 0.5]);
+  });
+
+  it('blocks an invalid total and restores an even split of three with "Bagi rata"', () => {
+    const { onSave } = renderDialog(saleOf(line('l-color', 'Hair Color')), 'l-color');
+    tick(/Andini/);
+    tick(/Rindu/);
+    tick(/Sari/);
+    expect(screen.getByRole('button', { name: 'Bagi rata' }).hasAttribute('disabled')).toBe(true);
+    type('Andini', '90');
+    type('Rindu', '30');
+    expect(split()!.textContent).toContain('persentase melebihi 100%');
+    save();
+    expect(onSave).not.toHaveBeenCalled();
+    evenly();
+    expect(split()!.textContent).toContain('Total 100%');
+    save();
+    const units = payload(onSave)[0]!.units[0]!;
+    expect(units).toHaveLength(3);
+    expect(units.reduce((sum, performer) => sum + Number(performer.shareRate), 0)).toBeCloseTo(
+      1,
+      12,
+    );
+  });
+
+  it('never changes a typed share when someone else is added or removed', () => {
+    renderDialog(saleOf(line('l-color', 'Hair Color')), 'l-color');
+    tick(/Andini/);
+    tick(/Rindu/);
+    type('Andini', '70');
+    fireEvent.blur(share('Andini'));
+    expect(share('Rindu').value).toBe('30');
+    tick(/Sari/);
+    expect(share('Andini').value).toBe('70');
+    tick(/Sari/);
+    expect(share('Andini').value).toBe('70');
+    expect(share('Rindu').value).toBe('30');
   });
 });

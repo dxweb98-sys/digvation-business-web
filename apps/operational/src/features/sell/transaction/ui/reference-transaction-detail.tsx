@@ -79,6 +79,7 @@ export function ReferenceTransactionDetail({
   onSendReceipt,
   deliveryStatus,
   onAssign,
+  onAssignAddition,
   onStartLineWork,
   onComplete,
   isMutating,
@@ -103,6 +104,8 @@ export function ReferenceTransactionDetail({
     delivery: { status: ReceiptDeliveryState } | null;
   };
   onAssign: (line: SaleLine) => void;
+  /** Opens who performs one selected addition of a Service line. */
+  onAssignAddition?: (line: SaleLine, additionId: string) => void;
   onStartLineWork: (line: SaleLine) => void;
   onComplete: () => void;
   isMutating: boolean;
@@ -229,6 +232,7 @@ export function ReferenceTransactionDetail({
                   locale={locale}
                   isMutating={isMutating}
                   onAssign={onAssign}
+                  onAssignAddition={onAssignAddition}
                   onStartLineWork={onStartLineWork}
                 />
               </div>
