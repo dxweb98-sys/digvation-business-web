@@ -229,7 +229,7 @@ for (const [name, viewport] of [
         moneyReturned: true,
       },
     });
-    await expect(page.getByText('Transaksi berhasil direversal.')).toBeVisible();
+    await expect(page.getByText('Transaksi berhasil dibatalkan.')).toBeVisible();
   });
 }
 
@@ -266,6 +266,6 @@ test('a Runtime refusal is shown in the dialog and nothing is reported as done',
     dialog.getByText('Transaksi ini telah berubah. Muat ulang lalu coba lagi.'),
   ).toBeVisible();
   await expect(dialog).toBeVisible();
-  await expect(page.getByText('Transaksi berhasil direversal.')).toHaveCount(0);
+  await expect(page.getByText('Transaksi berhasil dibatalkan.')).toHaveCount(0);
   expect(writes).toHaveLength(1);
 });
