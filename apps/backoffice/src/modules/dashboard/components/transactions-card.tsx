@@ -1,10 +1,23 @@
-import { DCard } from '@digvation/ui';
+import { DBadge, DCard, type BadgeVariant } from '@digvation/ui';
 import { ReceiptText } from 'lucide-react';
 
 import { useBackofficeLocalization } from '../../../app/localization/backoffice-localization';
 import { useDashboardI18n } from '../dashboard-i18n';
 import type { DashboardRow } from '../dashboard.types';
 import { DashboardCardHeader } from './dashboard-card-header';
+
+/**
+ * The dashboard names a Sale's lifecycle in one plain word: open, completed or cancelled. A
+ * Sale reversed after completion reads as cancelled here; Transaction History keeps the detail.
+ * Cancelled says nothing about a refund.
+ */
+function saleStatusBadge(row: DashboardRow): { key: string; variant: BadgeVariant } | null {
+  if (row.saleStatus === 'VOIDED' || (row.saleStatus === 'FINALIZED' && row.reversed === 'YES'))
+    return { key: 'VOIDED', variant: 'danger' };
+  if (row.saleStatus === 'FINALIZED') return { key: 'FINALIZED', variant: 'success' };
+  if (row.saleStatus === 'OPEN') return { key: 'OPEN', variant: 'info' };
+  return null;
+}
 
 export function TransactionsCard({
   title,
@@ -49,6 +62,7 @@ export function TransactionsCard({
               transaction.saleNumber ?? transaction.invoiceNumber ?? '—',
             );
             const occurredAt = formatDateTime(transaction.occurredAt);
+            const status = saleStatusBadge(transaction);
             return (
               <div
                 key={String(transaction.saleNumber ?? transaction.invoiceNumber ?? index)}
@@ -65,9 +79,11 @@ export function TransactionsCard({
                     >
                       {transactionNumber}
                     </p>
-                    <span className="shrink-0 rounded-full bg-(--color-surface-muted) px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-(--color-text-muted)">
-                      {copy(String(transaction.saleStatus ?? '—'))}
-                    </span>
+                    {status ? (
+                      <DBadge variant={status.variant} className="shrink-0">
+                        {copy(status.key)}
+                      </DBadge>
+                    ) : null}
                   </div>
                   <p className="mt-0.5 text-[10px] text-(--color-text-muted)" title={occurredAt}>
                     {occurredAt}

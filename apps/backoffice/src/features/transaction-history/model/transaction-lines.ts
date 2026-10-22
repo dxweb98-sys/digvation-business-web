@@ -25,6 +25,8 @@ export interface AdditionalComponentPresentation {
   /** Billed contribution; `null` when the component is included in the Service price. */
   chargedAmount: string | null;
   performers: EmployeeName[];
+  /** Who sold this additional Product; a separate attribution from who performed it. */
+  soldBy: string | null;
 }
 
 export interface ServicePriceAdditionPresentation extends AdditionalComponentPresentation {
@@ -126,6 +128,7 @@ function additionalComponents(line: SaleLine, nameOf: (id: string) => EmployeeNa
           ? null
           : component.extendedContribution,
       performers: componentPerformers(component, nameOf),
+      soldBy: component.soldByEmployeeNameSnapshot?.trim() || null,
     }));
 }
 

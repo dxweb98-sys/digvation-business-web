@@ -114,7 +114,7 @@ export function ReferenceQueueBoard({
             >
               <DTabsList className="max-w-full overflow-x-auto">
                 {statuses.map((status) => (
-                  <DTabsTrigger key={status} value={status}>
+                  <DTabsTrigger key={status} value={status} className="shrink-0 whitespace-nowrap">
                     {statusLabel(status)} ({groups[status].length})
                   </DTabsTrigger>
                 ))}

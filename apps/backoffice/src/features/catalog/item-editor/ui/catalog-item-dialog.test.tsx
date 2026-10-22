@@ -571,3 +571,18 @@ describe('CatalogItemDialog variant pricing', () => {
     });
   });
 });
+
+describe('CatalogItemDialog status wording', () => {
+  it('calls an active Service simply active, while a Product keeps its sale wording', async () => {
+    renderDialog(fakeApi(), { ...existingItem, type: 'SERVICE', lifecycle: 'ACTIVE' });
+    const service = within(screen.getByRole('dialog'));
+    expect(await service.findAllByText('Aktif')).not.toHaveLength(0);
+    expect(service.queryByText('Aktif Dijual')).toBeNull();
+    cleanup();
+
+    renderDialog(fakeApi(), { ...existingItem, type: 'PRODUCT', lifecycle: 'ACTIVE' });
+    expect(await within(screen.getByRole('dialog')).findAllByText('Aktif Dijual')).not.toHaveLength(
+      0,
+    );
+  });
+});

@@ -32,7 +32,7 @@ import { FinancialAccountsPage } from '../../features/financial-accounts';
 import { ExpensesPage } from '../../features/expenses';
 import { TransactionHistoryPage } from '../../features/transaction-history';
 import { ReportsPage } from '../../features/reporting';
-import { ActivityPage } from '../../modules/activity';
+import { ActivityPage } from '../../features/activity';
 import { NotificationsPage } from '../../modules/notifications';
 
 function BackofficeNotFoundRoute() {

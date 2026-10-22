@@ -823,12 +823,7 @@ describe('ItemConfigurator — Product salesperson', () => {
   });
 });
 
-describe('ItemConfigurator — who performs a Service addition ("Dikerjakan oleh")', () => {
-  const performers = [
-    { id: 'emp-andini', name: 'Andini' },
-    { id: 'emp-heru', name: 'Pak Heru' },
-    { id: 'emp-rindu', name: 'Rindu' },
-  ];
+describe('ItemConfigurator — additions of a Service ask nothing about who performs them', () => {
   const variants = [variant('red', 'Red', [fixedCap])];
   const hairColor = (state: Partial<ItemConfiguratorState> = {}) =>
     renderConfigurator({
@@ -836,82 +831,29 @@ describe('ItemConfigurator — who performs a Service addition ("Dikerjakan oleh
       variants,
       itemPrice: null,
       pricesByVariantId: { red: '200000.0000' },
-      componentPerformers: performers,
-      salespeople: performers,
       ...state,
     });
-  const groups = () => screen.queryAllByRole('group', { name: 'Dikerjakan oleh' });
-  async function addPerformer(groupIndex: number, name: string) {
-    const group = within(groups()[groupIndex]!);
-    await click(group.getByRole('button', { name: /Tambah yang mengerjakan/ }));
-    await click(await screen.findByRole('option', { name }));
-  }
+  const performerControls = () => [
+    ...screen.queryAllByRole('group', { name: 'Dikerjakan oleh' }),
+    ...screen.queryAllByRole('radio', { name: /Sama dengan layanan utama|Pilih karyawan lain/ }),
+  ];
 
-  it('shows "Dikerjakan oleh" on a chosen addition, never "Dijual oleh" for the Service', async () => {
-    const { dialog } = hairColor();
-    await click(dialog().getByText('Red'));
-    expect(groups()).toHaveLength(0);
-    await chooseAdditional(0, 'Serum');
-    expect(groups()).toHaveLength(1);
-    expect(screen.queryByLabelText('Dijual oleh', { selector: 'button' })).toBeNull();
-  });
-
-  it('sends one or several performers with the addition, as Service work', async () => {
+  it('adds a Service with an addition without deciding who performs it', async () => {
     const { onConfirm, dialog } = hairColor();
     await click(dialog().getByText('Red'));
     await chooseAdditional(0, 'Serum');
-    await addPerformer(0, 'Pak Heru');
-    await addPerformer(0, 'Rindu');
+    expect(performerControls()).toHaveLength(0);
+    // An additional item is Service composition: it never earns Product sales commission.
+    expect(screen.queryAllByLabelText('Dijual oleh', { selector: 'button' })).toHaveLength(0);
+    expect(addButton()).toHaveProperty('disabled', false);
     await click(addButton());
-    expect(onConfirm.mock.calls[0]![0].additionalComponents).toEqual([
-      expect.objectContaining({
-        componentItemId: 'serum',
-        performers: [
-          { employeeId: 'emp-heru', name: 'Pak Heru' },
-          { employeeId: 'emp-rindu', name: 'Rindu' },
-        ],
-      }),
-    ]);
-    expect(onConfirm.mock.calls[0]![0].soldBy).toBeUndefined();
+    const [serum] = onConfirm.mock.calls[0]![0].additionalComponents;
+    expect(serum.performers).toBeUndefined();
+    expect(serum.performerAssignment).toBeUndefined();
+    expect(serum).not.toHaveProperty('soldBy');
   });
 
-  it('keeps each addition independent: different employees, or the same one when chosen', async () => {
-    const { onConfirm, dialog } = hairColor();
-    await click(dialog().getByText('Red'));
-    await chooseAdditional(0, 'Serum');
-    await click(dialog().getByRole('button', { name: 'Tambah item lain' }));
-    await chooseAdditional(1, 'Satin Ribbon');
-    await addPerformer(0, 'Pak Heru');
-    await addPerformer(1, 'Rindu');
-    // Andini (who may also perform the base Service) can be chosen explicitly too.
-    await addPerformer(1, 'Andini');
-    await click(addButton());
-    const [serum, ribbon] = onConfirm.mock.calls[0]![0].additionalComponents;
-    expect(serum.performers).toEqual([{ employeeId: 'emp-heru', name: 'Pak Heru' }]);
-    expect(ribbon.performers).toEqual([
-      { employeeId: 'emp-rindu', name: 'Rindu' },
-      { employeeId: 'emp-andini', name: 'Andini' },
-    ]);
-  });
-
-  it('removes a performer, and an employee is never listed twice for one addition', async () => {
-    const { onConfirm, dialog } = hairColor();
-    await click(dialog().getByText('Red'));
-    await chooseAdditional(0, 'Serum');
-    await addPerformer(0, 'Pak Heru');
-    await click(within(groups()[0]!).getByRole('button', { name: /Tambah yang mengerjakan/ }));
-    expect(offered('Pak Heru')).toBe(false);
-    await click(screen.getByRole('option', { name: 'Rindu' }));
-    await click(
-      within(groups()[0]!).getByRole('button', { name: 'Hapus yang mengerjakan Pak Heru' }),
-    );
-    await click(addButton());
-    expect(onConfirm.mock.calls[0]![0].additionalComponents[0].performers).toEqual([
-      { employeeId: 'emp-rindu', name: 'Rindu' },
-    ]);
-  });
-
-  it('reopens a line with its additions’ performers, resolving names from the eligible list', async () => {
+  it('reconfiguring a line keeps the decision each addition already has', async () => {
     const { onConfirm } = hairColor({
       initial: {
         catalogVariantId: 'red',
@@ -922,33 +864,52 @@ describe('ItemConfigurator — who performs a Service addition ("Dikerjakan oleh
             quantity: '1.0000',
             label: 'Serum',
             unitPrice: '5000.0000',
-            performers: [{ employeeId: 'emp-heru', name: '' }],
+            performers: [{ employeeId: 'emp-heru', name: '', shareRate: '1' }],
+            performerAssignment: 'OWN',
+          },
+          {
+            componentItemId: 'ribbon',
+            quantity: '1.0000',
+            label: 'Satin Ribbon',
+            unitPrice: '3000.0000',
+            performerAssignment: 'SERVICE',
           },
         ],
       },
       confirmLabel: 'Simpan perubahan',
     } as never);
-    expect(within(groups()[0]!).getByText('Pak Heru')).toBeTruthy();
+    expect(performerControls()).toHaveLength(0);
     await click(screen.getByRole('button', { name: /^Simpan perubahan/ }));
-    expect(onConfirm.mock.calls[0]![0].additionalComponents[0].performers).toEqual([
-      { employeeId: 'emp-heru', name: '' },
-    ]);
+    const [serum, ribbon] = onConfirm.mock.calls[0]![0].additionalComponents;
+    expect(serum).toMatchObject({
+      performerAssignment: 'OWN',
+      performers: [{ employeeId: 'emp-heru', shareRate: '1' }],
+    });
+    expect(ribbon).toMatchObject({ performerAssignment: 'SERVICE' });
+    expect(ribbon.performers).toBeUndefined();
   });
 
-  it('clears the performers when a different Product is chosen for the addition', async () => {
-    const { onConfirm, dialog } = hairColor();
-    await click(dialog().getByText('Red'));
-    await chooseAdditional(0, 'Serum');
-    await addPerformer(0, 'Pak Heru');
+  it('forgets the decision when a different Product is chosen for the addition', async () => {
+    const { onConfirm } = hairColor({
+      initial: {
+        catalogVariantId: 'red',
+        quantity: '1',
+        additionalComponents: [
+          {
+            componentItemId: 'serum',
+            quantity: '1.0000',
+            label: 'Serum',
+            unitPrice: '5000.0000',
+            performerAssignment: 'SERVICE',
+          },
+        ],
+      },
+      confirmLabel: 'Simpan perubahan',
+    } as never);
     await chooseAdditional(0, 'Hair Dye');
-    await click(addButton());
+    await click(screen.getByRole('button', { name: /^Simpan perubahan/ }));
     const [addition] = onConfirm.mock.calls[0]![0].additionalComponents;
     expect(addition.componentItemId).toBe('dye');
-    expect(addition.performers).toBeUndefined();
-  });
-
-  it('offers no performer picker for a Product item', async () => {
-    renderConfigurator({ item: shampoo, componentPerformers: performers });
-    expect(groups()).toHaveLength(0);
+    expect(addition.performerAssignment).toBeUndefined();
   });
 });

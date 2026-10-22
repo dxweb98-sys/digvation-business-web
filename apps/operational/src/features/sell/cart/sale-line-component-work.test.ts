@@ -60,15 +60,15 @@ describe('Service additional item work in Web', () => {
     );
   });
 
-  it('reopens a line with its addition performers, and never a salesperson for them', () => {
+  it('reopens a line with its addition performers and their shares, and never a salesperson for them', () => {
     const configuration = saleLineConfiguration(line, employees);
     expect(configuration.soldBy).toBeNull();
     expect(configuration.additionalComponents).toEqual([
       expect.objectContaining({
         componentItemId: 'red-coloring',
         performers: [
-          { employeeId: 'emp-heru', name: 'Pak Heru' },
-          { employeeId: 'emp-rindu', name: 'Rindu' },
+          { employeeId: 'emp-heru', name: 'Pak Heru', shareRate: '0.5' },
+          { employeeId: 'emp-rindu', name: 'Rindu', shareRate: '0.5' },
         ],
       }),
     ]);
