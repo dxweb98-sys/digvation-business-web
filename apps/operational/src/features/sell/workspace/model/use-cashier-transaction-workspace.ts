@@ -50,6 +50,7 @@ import type {
   PaymentCorrectionInput,
   RefundDisbursementInput,
   OrderAdjustmentInput,
+  AdditionPerformersDecision,
 } from '../../transaction/api/cashier-transaction.adapter';
 import { saleLineConfiguration } from '../../transaction/model/sale-line-additions';
 import { fetchResolvedPrice, fetchResolvedVariantPrices } from '../../catalog/resolved-price-query';
@@ -384,26 +385,10 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
               () => [],
             )
         : undefined;
-    // A Service's additional items are performed by Service performers, never sold by anyone.
-    const componentPerformers =
-      item.type === 'SERVICE'
-        ? await queryClient
-            .fetchQuery({
-              queryKey: cashierTransactionKeys.servicePerformers(),
-              queryFn: ({ signal }) => transactionAdapter.listServicePerformers(signal),
-              ...referenceQueryPolicy,
-            })
-            .then(
-              (page) =>
-                page.items.map((employee) => ({ id: employee.id, name: employee.displayName })),
-              () => [],
-            )
-        : undefined;
     return {
       item,
       variants,
       ...(salespeople ? { salespeople } : {}),
-      ...(componentPerformers ? { componentPerformers } : {}),
       itemOption:
         variants.length > 0 && item.variantSelectionMode === 'OPTIONAL'
           ? { price: ownPrice }
@@ -947,6 +932,33 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     }
   };
 
+  /** Decides who performs one selected addition of a queued Service line, on the latest Sale. */
+  const setQueuedAdditionPerformers = async (
+    sale: Sale,
+    lineId: string,
+    componentId: string,
+    input: AdditionPerformersDecision,
+  ) => {
+    command.clearNotice();
+    try {
+      if (!transactionAdapter.setSaleLineComponentPerformers)
+        throw new Error(copy('Performers are not available for this transaction.'));
+      const base = await transactionAdapter.getSale(sale.id);
+      const current = await command.runMutation(() =>
+        transactionAdapter.setSaleLineComponentPerformers!(base.id, lineId, componentId, {
+          ...input,
+          expectedVersion: base.version,
+        }),
+      );
+      command.commitSale(current);
+      if (queueContextSale?.id === current.id) setQueueContextSale(current);
+      return current;
+    } catch (error) {
+      command.reportError(error);
+      throw error;
+    }
+  };
+
   /**
    * Completes an exactly settled all-INSTANT Sale straight from checkout: the same authoritative
    * finalize command, with no queue, no work state and no fake fulfillment. Sales with tracked
@@ -1200,6 +1212,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     startSaleWork,
     transitionQueuedFulfillment,
     setQueuedWorkUnits,
+    setQueuedAdditionPerformers,
     finalizeQueuedSale,
     createQueuedPayment,
     transitionQueuedPayment,

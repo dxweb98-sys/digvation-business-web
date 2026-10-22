@@ -200,55 +200,108 @@ export interface SaleLineAdditionRow {
   /** Quantity x selling unit price, already formatted. */
   pricing: string;
   amount: string;
-  /** Service work on this addition, e.g. "Dikerjakan oleh Heru, Rindu"; never a salesperson. */
-  performedBy?: string | null;
+  /** Service work on this addition; never a salesperson. Absent for a Product line. */
+  work?: {
+    label: string;
+    /** Effective performers, or a prompt when the main Service has nobody assigned yet. */
+    value: string;
+    missing: boolean;
+    /** Set when the addition follows the main Service's performers, e.g. "Sama dengan layanan utama". */
+    inheritedLabel: string | null;
+    /** Edit control for who performs it, while the work can still change. */
+    action?: ReactNode;
+  } | null;
+  /** Historical only: a Product salesperson recorded before additions stopped earning commission. */
+  soldBy?: { label: string; value: string } | null;
 }
 
 /**
- * Price breakdown of a line sold with transaction-selected additions, so "base + additions = line
- * total" can be read at a glance. The line total stays on the line itself: this block only explains
- * it, and never adds to it. Fixed BOM components are internal and are never listed here.
+ * The additions of one Sale line, grouped under it: the main item's own price first, then one small
+ * card per addition with its price and who does its work. The line total stays on the line itself:
+ * this block only explains it, and never adds to it. Fixed BOM components are never listed here.
  */
 export function SaleLineAdditions({
   heading,
   baseLabel,
   base,
   rows,
+  footer,
 }: {
   heading: string;
   baseLabel: string;
   base: { pricing: string; amount: string };
   rows: readonly SaleLineAdditionRow[];
+  /** Explanation that applies to this line only, such as its item-discount note. */
+  footer?: ReactNode;
 }) {
   if (!rows.length) return null;
   return (
-    <div className="pos-line-additions mt-2 rounded-lg bg-[var(--color-surface-muted)]/60 px-3 py-2">
-      <p className="text-[11px] font-semibold text-[var(--color-text-muted)]">{heading}</p>
-      <ul aria-label={heading} className="mt-1 space-y-1.5 text-xs">
-        <li className="flex items-start justify-between gap-3 text-[var(--color-text-muted)]">
-          <span className="min-w-0">
-            <span className="break-words">{baseLabel}</span>
-            <span className="block tabular-nums">{base.pricing}</span>
-          </span>
-          <span className="shrink-0 tabular-nums">{base.amount}</span>
-        </li>
+    <div className="pos-line-additions mt-2 border-l-2 border-[var(--color-border)] pl-3">
+      <div className="flex items-start justify-between gap-3 text-xs text-[var(--color-text-muted)]">
+        <span className="min-w-0">
+          <span className="break-words">{baseLabel}</span>
+          <span className="block tabular-nums">{base.pricing}</span>
+        </span>
+        <span className="shrink-0 tabular-nums">{base.amount}</span>
+      </div>
+      <p className="mt-2.5 text-[11px] font-semibold text-[var(--color-text-muted)]">{heading}</p>
+      <ul aria-label={heading} className="mt-1 space-y-1.5">
         {rows.map((row) => (
-          <li key={row.id} className="flex items-start justify-between gap-3">
-            <span className="min-w-0">
-              <span className="break-words text-[var(--color-text)]">+ {row.name}</span>
-              <span className="block tabular-nums text-[var(--color-text-muted)]">
-                {row.pricing}
-              </span>
-              {row.performedBy ? (
-                <span className="block break-words text-[var(--color-text-muted)]">
-                  {row.performedBy}
+          <li
+            key={row.id}
+            className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-xs"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <span className="min-w-0">
+                <span className="block break-words text-[13px] font-medium text-[var(--color-text)]">
+                  {row.name}
                 </span>
-              ) : null}
-            </span>
-            <span className="shrink-0 tabular-nums text-[var(--color-text)]">{row.amount}</span>
+                <span className="block tabular-nums text-[var(--color-text-muted)]">
+                  {row.pricing}
+                </span>
+              </span>
+              <span className="shrink-0 font-medium tabular-nums text-[var(--color-text)]">
+                {row.amount}
+              </span>
+            </div>
+            {row.work || row.soldBy ? (
+              <dl className="mt-1.5 space-y-1 border-t border-[var(--color-border)]/70 pt-1.5">
+                {row.work ? (
+                  <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                    <dt className="text-[var(--color-text-muted)]">{row.work.label}</dt>
+                    <dd
+                      className={`min-w-0 break-words font-medium ${
+                        row.work.missing
+                          ? 'text-[var(--color-warning)]'
+                          : 'text-[var(--color-text)]'
+                      }`}
+                    >
+                      {row.work.value}
+                    </dd>
+                    {row.work.inheritedLabel ? (
+                      <dd className="rounded-full bg-[var(--color-surface-muted)] px-2 py-0.5 text-[11px] text-[var(--color-text-muted)]">
+                        {row.work.inheritedLabel}
+                      </dd>
+                    ) : null}
+                    {row.work.action ? (
+                      <dd className="m-0 ml-auto shrink-0">{row.work.action}</dd>
+                    ) : null}
+                  </div>
+                ) : null}
+                {row.soldBy ? (
+                  <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+                    <dt className="text-[var(--color-text-muted)]">{row.soldBy.label}</dt>
+                    <dd className="min-w-0 break-words text-[var(--color-text)]">
+                      {row.soldBy.value}
+                    </dd>
+                  </div>
+                ) : null}
+              </dl>
+            ) : null}
           </li>
         ))}
       </ul>
+      {footer}
     </div>
   );
 }

@@ -22,7 +22,7 @@ import {
 } from '../model/transaction-actions';
 import { discountBreakdown } from '../model/transaction-adjustments';
 import { membershipPresentation } from '../model/transaction-loyalty';
-import { transactionStatusSummary } from '../model/transaction-summary';
+import { paymentSummary, transactionStatusSummary } from '../model/transaction-summary';
 import { TransactionDiscountBreakdown } from './transaction-discount-breakdown';
 import { TransactionFinancialSummary } from './transaction-financial-summary';
 import { TransactionItemsSection } from './transaction-items-section';
@@ -340,18 +340,33 @@ function TransactionDetailBody({
       ) : null}
 
       {sale.reversal ? (
-        <RecordPanel ariaLabel={copy('Reversal')} padded={false}>
-          <RecordPanelHeader title={copy('Reversal')} />
+        <RecordPanel ariaLabel={copy('Transaction cancellation')} padded={false}>
+          <RecordPanelHeader title={copy('Transaction cancellation')} />
           <RecordPanelBody className="grid gap-3 sm:grid-cols-2">
             <RecordInfoTile label={copy('Reason')} value={sale.reversal.reason} />
             <RecordInfoTile
-              label={copy('Reversed on')}
+              label={copy('Cancelled on')}
               value={dateTime(sale.reversal.reversedAt)}
             />
-            <RecordInfoTile label={copy('Reversed by')} value={sale.reversal.reversedBy ?? '—'} />
+            <RecordInfoTile label={copy('Cancelled by')} value={sale.reversal.reversedBy ?? '—'} />
+            {/* Cancelling the Sale and returning money are separate facts; show what really happened. */}
+            <RecordInfoTile
+              label={copy('Money returned to the customer')}
+              value={copy(reversalRefundOutcome(sale))}
+            />
           </RecordPanelBody>
         </RecordPanel>
       ) : null}
     </div>
   );
+}
+
+/** The refund outcome of a cancelled-after-completion Sale, from the recorded payment facts only. */
+function reversalRefundOutcome(sale: Sale): string {
+  const { kind } = paymentSummary(sale);
+  return kind === 'REFUNDED'
+    ? 'Fully refunded'
+    : kind === 'PARTIALLY_REFUNDED'
+      ? 'Partly refunded'
+      : 'No refund recorded';
 }

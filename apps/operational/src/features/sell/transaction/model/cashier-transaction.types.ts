@@ -338,6 +338,8 @@ export interface ContributionPreview {
   facts: EmployeeContribution[];
 }
 
+export type SaleComponentPerformerAssignment = 'SERVICE' | 'OWN';
+
 /**
  * Immutable Sale-time evidence of a Service's resolved composition. It is line detail, never a
  * separate customer-facing or priced Sale line.
@@ -364,6 +366,15 @@ export interface SaleLineCompositionComponent {
   extendedContribution: string;
   /** SALE_SELECTED of a Service only: who performs it ("Dikerjakan oleh"). */
   performers?: Array<{ employeeId: string; shareRate: string }>;
+  /**
+   * SALE_SELECTED of a Service only: who performs it, as the operator decided. null until decided;
+   * SERVICE follows the main Service performers; OWN uses `performers`.
+   */
+  performerAssignment?: SaleComponentPerformerAssignment | null;
+  /** SALE_SELECTED only: its own Product salesperson ("Dijual oleh"), independent of performers. */
+  soldByEmployeeId?: string | null;
+  soldByEmployeeCodeSnapshot?: string | null;
+  soldByEmployeeNameSnapshot?: string | null;
   /** Immutable finalized work facts for this component, with their snapshots. */
   contributions?: Array<{
     employeeId: string;

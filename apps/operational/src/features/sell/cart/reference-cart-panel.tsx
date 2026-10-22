@@ -14,6 +14,7 @@ import {
 import { useOperationalLocalization } from '../../../app/localization/operational-localization';
 import type { CartDisplayLine } from './cart-draft';
 import { lineDiscountPercentage } from '../transaction/model/sale-presentation';
+import { AdditionDiscountNote } from '../transaction/ui/addition-discount-note';
 import type { SaleCustomer } from '../transaction/model/cashier-transaction.types';
 import { CartLineBreakdown } from './cart-line-breakdown';
 import { money, quantity, isPositiveDecimal } from '../transaction/model/sale-display';
@@ -257,6 +258,10 @@ export function ReferenceCartPanel({
                       </span>
                     </div>
                   ) : null}
+                  <AdditionDiscountNote
+                    kind={line.additionDiscountNote ?? null}
+                    className="mt-1.5"
+                  />
                 </div>
               );
             })}

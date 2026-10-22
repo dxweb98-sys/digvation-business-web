@@ -1,8 +1,6 @@
-import { useRuntime } from '@digvation/business-runtime';
 import { DBadge, DInfoNote } from '@digvation/ui';
-import { useMemo, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 
-import { useBackofficeAuth } from '../../../auth/backoffice-auth-context';
 import {
   RecordInfoTile,
   RecordPanel,
@@ -10,7 +8,6 @@ import {
   RecordPanelHeader,
   RecordSectionLabel,
 } from '../../../shared/ui/record-dialog';
-import { TransactionDetailDialog, TransactionHistoryApi } from '../../transaction-history';
 import type { ReportRow } from '../api/reporting-api';
 import { useReportingLocalization } from '../localization/use-reporting-localization';
 import {
@@ -20,8 +17,10 @@ import {
   type EnumName,
 } from '../model/report-catalog';
 import { enumLabel, formatActor, formatReportValue } from '../model/report-format';
+import { CatalogItemTransactionsDialog } from './catalog-item-transactions-dialog';
 import { EmployeePerformanceDialog, type EmployeeDetailScope } from './employee-performance-dialog';
-import { DetailShell, UnavailableDetail } from './report-detail-shell';
+import { DetailShell } from './report-detail-shell';
+import { ReportTransactionDetail } from './report-transaction-detail';
 
 /** Reporting is read-only: details open without any domain action. */
 export function ReportDetail({
@@ -51,6 +50,17 @@ export function ReportDetail({
     );
   if (kind === 'transaction')
     return <ReportTransactionDetail row={row} open={open} onClose={onClose} />;
+  if (kind === 'catalog-item')
+    return (
+      // One dialog instance per item row: paging and cached figures never carry over.
+      <CatalogItemTransactionsDialog
+        key={`${String(row.catalogItemId ?? '')}:${String(row.catalogVariantId ?? '')}`}
+        row={row}
+        scope={scope}
+        open={open}
+        onClose={onClose}
+      />
+    );
   const Body = {
     'component-usage': ComponentUsageBody,
     'product-commission': CommissionBody,
@@ -58,36 +68,6 @@ export function ReportDetail({
     tax: TaxBody,
   }[kind];
   return <Body row={row} open={open} onClose={onClose} />;
-}
-
-function ReportTransactionDetail({
-  row,
-  open,
-  onClose,
-}: {
-  row: ReportRow;
-  open: boolean;
-  onClose: () => void;
-}) {
-  const { createApiClient } = useBackofficeAuth();
-  const { apiBaseUrl } = useRuntime();
-  const { copy } = useReportingLocalization();
-  const api = useMemo(
-    () => new TransactionHistoryApi(createApiClient(apiBaseUrl)),
-    [apiBaseUrl, createApiClient],
-  );
-  if (!row.saleId)
-    return <UnavailableDetail open={open} onClose={onClose} title={copy('Transaction detail')} />;
-  return (
-    <TransactionDetailDialog
-      open={open}
-      saleId={row.saleId ? String(row.saleId) : null}
-      api={api}
-      permissions={{ refund: false, reverse: false }}
-      onClose={onClose}
-      onChanged={() => undefined}
-    />
-  );
 }
 
 function useFacts(row: ReportRow) {

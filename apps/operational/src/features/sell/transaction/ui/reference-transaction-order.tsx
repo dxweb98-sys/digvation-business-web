@@ -1,10 +1,11 @@
 import { DButton } from '@digvation-labs/ui';
-import { PlayCircle, ShoppingBag } from 'lucide-react';
+import { Pencil, PlayCircle, ShoppingBag, UserPlus } from 'lucide-react';
 import { useOperationalLocalization } from '../../../../app/localization/operational-localization';
-import { additionPerformedBy, saleLineAdditions, saleLineBase } from '../model/sale-line-additions';
+import { additionWork, saleLineAdditions, saleLineBase } from '../model/sale-line-additions';
 import { saleLineWorkStatus } from '../../queue/queued-sale-work';
 import { correctionSourceOf } from '../../adjustment/sale-adjustment-access';
-import { lineDiscountRows } from '../model/sale-presentation';
+import { additionDiscountNote, lineDiscountRows } from '../model/sale-presentation';
+import { AdditionDiscountNote } from './addition-discount-note';
 import type { Employee, Sale, SaleLine } from '../model/cashier-transaction.types';
 import {
   SaleDetailSection,
@@ -21,6 +22,8 @@ import { money, formatDurationMinutes, quantity } from '../model/sale-display';
 import { pointQuantity } from '../model/sale-points';
 import { DiscountDetailsContent, DiscountInfoTooltip } from './discount-details';
 import { ServicePerformers } from '../../performer/service-performer-credits';
+import { formatPercent } from '../../performer/service-performer-allocation';
+import { createDecimal } from '@digvation/pos-money';
 
 /** The line status a transaction state already implies, so it is not repeated per item. */
 const impliedLineWorkStatus: Partial<Record<QueueStatus, string>> = {
@@ -44,6 +47,8 @@ type OrderLineProps = {
   locale: string;
   isMutating: boolean;
   onAssign: (line: SaleLine) => void;
+  /** Opens who performs one selected addition of a Service line; omitted where it cannot change. */
+  onAssignAddition?: ((line: SaleLine, additionId: string) => void) | undefined;
   onStartLineWork: (line: SaleLine) => void;
 };
 
@@ -54,6 +59,7 @@ function ReferenceTransactionOrderLine({
   locale,
   isMutating,
   onAssign,
+  onAssignAddition,
   onStartLineWork,
 }: OrderLineProps) {
   const { copy, label } = useOperationalLocalization();
@@ -74,6 +80,11 @@ function ReferenceTransactionOrderLine({
   const durationLabel = formatDurationMinutes(line.defaultDurationMinutesSnapshot, locale);
   const workSummary = attributed ? servicePerformerSummary(line, employees, locale) : null;
   const editable = attributed && status === 'PROGRESS';
+  // Who performs an addition can change while its Service's own work can.
+  const additionsEditable =
+    editable &&
+    onAssignAddition !== undefined &&
+    (line.fulfillment?.status === 'WAITING' || line.fulfillment?.status === 'IN_PROGRESS');
   // The transaction's own state already says "in progress"; a line only
   // repeats it when it differs (waiting, completed, canceled).
   const showWorkStatus =
@@ -125,13 +136,82 @@ function ReferenceTransactionOrderLine({
               pricing: `${quantity(line.quantity)} × ${format(lineBase.unitPrice)}`,
               amount: format(lineBase.amount),
             }}
-            rows={additions.map((addition) => ({
-              id: addition.id,
-              name: addition.name,
-              pricing: `${quantity(addition.quantity)} × ${format(addition.unitPrice)}`,
-              amount: format(addition.amount),
-              performedBy: additionPerformedBy(addition, employees, copy),
-            }))}
+            rows={additions.map((addition) => {
+              const work = additionWork(addition, line, employees, copy('Employee unavailable'));
+              return {
+                id: addition.id,
+                name: addition.name,
+                pricing: `${quantity(addition.quantity)} × ${format(addition.unitPrice)}`,
+                amount: format(addition.amount),
+                work: work
+                  ? {
+                      label: copy('Performed by'),
+                      value:
+                        work.state === 'UNDECIDED'
+                          ? copy('Not decided yet')
+                          : work.match === 'SAME_EMPLOYEES'
+                            ? // Same people, split differently: the shares say how.
+                              work.shares
+                                .map(
+                                  (share) =>
+                                    `${share.name} ${formatPercent(
+                                      createDecimal(share.shareRate)
+                                        .times(10000)
+                                        .round()
+                                        .toNumber(),
+                                      locale,
+                                    )}%`,
+                                )
+                                .join(' · ')
+                            : work.names.length
+                              ? work.names.join(', ')
+                              : copy('Main service performer not chosen yet'),
+                      missing: work.names.length === 0,
+                      inheritedLabel:
+                        work.state === 'SERVICE'
+                          ? copy('Follows main service')
+                          : work.match === 'SAME'
+                            ? copy('Same as main service')
+                            : work.match === 'SAME_EMPLOYEES'
+                              ? copy('Same employees, different shares')
+                              : null,
+                      action: additionsEditable ? (
+                        work.state === 'UNDECIDED' ? (
+                          <DButton
+                            size="sm"
+                            variant="soft"
+                            disabled={isMutating}
+                            leftIcon={<UserPlus className="size-3.5" aria-hidden="true" />}
+                            aria-label={`${copy('Choose employee')}: ${addition.name}`}
+                            className="h-7 px-2"
+                            onClick={() => onAssignAddition!(line, addition.id)}
+                          >
+                            {copy('Choose employee')}
+                          </DButton>
+                        ) : (
+                          <DButton
+                            size="icon"
+                            variant="ghost"
+                            disabled={isMutating}
+                            title={copy('Change employee')}
+                            aria-label={`${copy('Change employee')}: ${addition.name}`}
+                            className="-my-1 -mr-1.5 size-8 text-[var(--color-text-muted)]"
+                            onClick={() => onAssignAddition!(line, addition.id)}
+                          >
+                            <Pencil className="size-3.5" aria-hidden="true" />
+                          </DButton>
+                        )
+                      ) : null,
+                    }
+                  : null,
+                soldBy: addition.soldByName
+                  ? { label: copy('Sold by'), value: addition.soldByName }
+                  : null,
+              };
+            })}
+            footer={
+              <AdditionDiscountNote kind={additionDiscountNote(sale, line)} className="mt-2" />
+            }
           />
         ) : null
       }
@@ -200,6 +280,7 @@ export function ReferenceTransactionOrder({
   locale,
   isMutating,
   onAssign,
+  onAssignAddition,
   onStartLineWork,
 }: Omit<OrderLineProps, 'line'> & { activeLines: readonly SaleLine[] }) {
   const { copy } = useOperationalLocalization();
@@ -219,6 +300,7 @@ export function ReferenceTransactionOrder({
             locale={locale}
             isMutating={isMutating}
             onAssign={onAssign}
+            onAssignAddition={onAssignAddition}
             onStartLineWork={onStartLineWork}
           />
         ))}

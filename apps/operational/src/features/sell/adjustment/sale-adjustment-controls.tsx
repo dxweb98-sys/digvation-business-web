@@ -7,6 +7,7 @@ import { BadgePercent, CheckCircle2, Plus, Tag, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { useOperationalLocalization } from '../../../app/localization/operational-localization';
+import { PosCurrencyInput } from '../lib/pos-controls';
 import { createCashierTransactionAdapter } from '../transaction/api/cashier-transaction-adapter-factory';
 import { cashierTransactionErrorMessage } from '../transaction/api/cashier-transaction-errors';
 import { cashierTransactionKeys } from '../transaction/api/cashier-transaction-keys';
@@ -520,15 +521,29 @@ export function SaleAdjustmentControls({
                     { value: 'PERCENTAGE', label: text('Percentage') },
                     { value: 'FIXED_AMOUNT', label: text('Fixed amount') },
                   ]}
-                  onValueChange={(value) => setDiscountType(value as DiscountType)}
+                  onValueChange={(value) => {
+                    // A percentage and an amount are different units: never carry one into the other.
+                    if (value !== discountType) setDiscountValue('');
+                    setDiscountType(value as DiscountType);
+                  }}
                 />
-                <DInput
-                  label={text(discountType === 'PERCENTAGE' ? 'Discount (%)' : 'Discount amount')}
-                  value={discountValue}
-                  inputMode="decimal"
-                  disabled={!monetaryAvailable || workspace.isCoreMutating}
-                  onChange={setDiscountValue}
-                />
+                {discountType === 'FIXED_AMOUNT' ? (
+                  // Whole rupiah with grouping; the plain decimal value is what reaches Runtime.
+                  <PosCurrencyInput
+                    label={text('Discount amount')}
+                    value={discountValue}
+                    disabled={!monetaryAvailable || workspace.isCoreMutating}
+                    onChange={setDiscountValue}
+                  />
+                ) : (
+                  <DInput
+                    label={text('Discount (%)')}
+                    value={discountValue}
+                    inputMode="decimal"
+                    disabled={!monetaryAvailable || workspace.isCoreMutating}
+                    onChange={setDiscountValue}
+                  />
+                )}
                 <div className="sm:col-span-2">
                   <DInput
                     label={text('Reason')}

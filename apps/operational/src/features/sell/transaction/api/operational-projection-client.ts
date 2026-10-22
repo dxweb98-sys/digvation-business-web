@@ -361,6 +361,12 @@ export function attachOperationalProjection(
       input,
     );
 
+  operational.setSaleLineComponentPerformers = (saleId, saleLineId, componentId, input) =>
+    client.post<Sale>(
+      `${OPERATIONAL_PREFIX}/transactions/${saleId}/lines/${saleLineId}/components/${componentId}/performers`,
+      input,
+    );
+
   operational.setSaleLineAssignments = (saleId, saleLineId, input) =>
     client.post<Sale>(
       `${OPERATIONAL_PREFIX}/transactions/${saleId}/lines/${saleLineId}/assignments`,

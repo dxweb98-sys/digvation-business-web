@@ -10,12 +10,17 @@ import {
   saleLineAdditions,
   saleLineBase,
 } from '../transaction/model/sale-line-additions';
+import {
+  additionDiscountNote,
+  type AdditionDiscountNote,
+} from '../transaction/model/sale-presentation';
 import type {
   CatalogItem,
   CatalogVariant,
   DiscountType,
   ResolvedPrice,
   SaleAdjustment,
+  SaleComponentPerformerAssignment,
   SaleCustomer,
   SaleCustomerSelection,
   SaleLine,
@@ -33,10 +38,17 @@ export interface CartDraftAdditionalItem {
   /** Display only: the Product/Variant price Runtime offered when it was chosen. */
   unitPrice: string;
   /**
-   * Service only: who performs this additional item ("Dikerjakan oleh"). Part of the Service's
-   * work, never a Product salesperson; absent or empty means nobody is assigned to it.
+   * Service only: who performs this additional item ("Dikerjakan oleh"), as decided in the
+   * transaction detail. Part of the Service's work, never a Product salesperson.
    */
-  performers?: CartDraftSalesperson[];
+  performers?: CartDraftAdditionalPerformer[];
+  /** Service only: the decision itself; absent while it is not decided yet. */
+  performerAssignment?: SaleComponentPerformerAssignment;
+}
+
+/** An addition's performer and, once decided, their share of its work. */
+export interface CartDraftAdditionalPerformer extends CartDraftSalesperson {
+  shareRate?: string;
 }
 
 /** Order-independent identity of who performs an addition. */
@@ -55,7 +67,7 @@ export function additionSignature(additions: readonly CartDraftAdditionalItem[])
   return additions
     .map(
       (entry) =>
-        `${entry.componentItemId}:${entry.componentVariantId ?? ''}:${createDecimal(entry.quantity).toFixed(4)}:${performerSignature(entry.performers)}`,
+        `${entry.componentItemId}:${entry.componentVariantId ?? ''}:${createDecimal(entry.quantity).toFixed(4)}:${entry.performerAssignment ?? ''}:${performerSignature(entry.performers)}`,
     )
     .sort()
     .join('|');
@@ -179,6 +191,8 @@ export interface CartDisplayLine {
   lineDiscountAmount: string;
   discountType: DiscountType | null;
   discountValue: string | null;
+  /** Persisted lines only: why the additions are outside an item-scoped discount (Runtime facts). */
+  additionDiscountNote?: AdditionDiscountNote;
   promotion?: {
     name: string;
     effectiveFrom: string | null;
@@ -534,6 +548,7 @@ export function saleDisplayLines(
       effectiveUnitPrice: line.effectiveUnitPrice,
       totalAmount: line.grossAmount,
       lineDiscountAmount: line.lineDiscountAmount,
+      additionDiscountNote: additionDiscountNote({ adjustments }, line),
       discountType: hasSeveralLineAdjustments
         ? null
         : (singleLineAdjustment?.type ?? line.discountType),
@@ -635,14 +650,21 @@ export function cartDraftPricingInput(draft: CartDraft | null): SalePricingPrevi
   };
 }
 
-/** The Runtime input for one addition, with its performers when anyone performs it. */
+/** The Runtime input for one addition, with who performs it once that has been decided. */
 export function startAddition(entry: CartDraftAdditionalItem) {
   return {
     componentItemId: entry.componentItemId,
     ...(entry.componentVariantId ? { componentVariantId: entry.componentVariantId } : {}),
     quantity: entry.quantity,
     ...(entry.performers?.length
-      ? { performers: entry.performers.map((performer) => ({ employeeId: performer.employeeId })) }
-      : {}),
+      ? {
+          performers: entry.performers.map((performer) => ({
+            employeeId: performer.employeeId,
+            ...(performer.shareRate ? { shareRate: performer.shareRate } : {}),
+          })),
+        }
+      : entry.performerAssignment === 'SERVICE'
+        ? { performerAssignment: 'SERVICE' as const }
+        : {}),
   };
 }

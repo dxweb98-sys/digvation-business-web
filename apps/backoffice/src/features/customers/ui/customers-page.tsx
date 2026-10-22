@@ -2,6 +2,7 @@ import { useRuntime } from '@digvation/business-runtime';
 import {
   DBadge,
   DButton,
+  DConnectionError,
   DDataTable,
   DDialog,
   DInput,
@@ -100,78 +101,78 @@ export function CustomersPage() {
   return (
     <BackofficePage>
       <BackofficePageHeader title={text('Customers')} description={text('description')} />
-      {customers.isError ? (
-        <div
-          role="alert"
-          className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--color-border)] p-4"
-        >
-          <p>{text('LoadError')}</p>
-          <DButton variant="secondary" onClick={() => void customers.refetch()}>
-            {text('Retry')}
-          </DButton>
-        </div>
-      ) : null}
-      <DDataTable
-        columns={columns}
-        data={customers.data?.items ?? []}
-        loading={customers.isLoading}
-        rowKey="id"
-        searchable
-        searchPlaceholder={text('search')}
-        searchValue={filters.values.q}
-        onSearchChange={(q) => {
-          filters.setField('q', q);
-          pagination.resetPage();
-        }}
-        filters={
-          <DSelectFilter
-            label={text('Status')}
-            value={filters.values.status || null}
-            clearable
-            onChange={(value) => {
-              filters.setField('status', (value ?? '') as '' | Customer['status']);
+      {/* Same rhythm as the other directory pages: header, then the list section. */}
+      <section className="mt-6">
+        {customers.isError ? (
+          <DConnectionError
+            title={text('LoadError')}
+            onRetry={() => void customers.refetch()}
+            isRetrying={customers.isFetching}
+          />
+        ) : (
+          <DDataTable
+            columns={columns}
+            data={customers.data?.items ?? []}
+            loading={customers.isLoading}
+            rowKey="id"
+            searchable
+            searchPlaceholder={text('search')}
+            searchValue={filters.values.q}
+            onSearchChange={(q) => {
+              filters.setField('q', q);
               pagination.resetPage();
             }}
-            options={[
-              { value: 'ACTIVE', label: text('Active') },
-              { value: 'INACTIVE', label: text('Inactive') },
-            ]}
-          />
-        }
-        emptyMessage={
-          filters.values.q || filters.values.status ? text('NoResults') : text('NoCustomers')
-        }
-        pagination={{
-          page: pagination.page,
-          pageSize: pagination.pageSize,
-          total: customers.data?.total ?? 0,
-        }}
-        onPageChange={pagination.setPage}
-        onRowClick={(customer) => {
-          setSelectionScope(scopeIdentity);
-          setSelected(customer);
-        }}
-        onPageSizeChange={pagination.setPageSize}
-        actions={[
-          {
-            label: text('Detail'),
-            icon: <Eye className="size-4" />,
-            onClick: (customer) => {
+            filters={
+              <DSelectFilter
+                label={text('Status')}
+                value={filters.values.status || null}
+                clearable
+                onChange={(value) => {
+                  filters.setField('status', (value ?? '') as '' | Customer['status']);
+                  pagination.resetPage();
+                }}
+                options={[
+                  { value: 'ACTIVE', label: text('Active') },
+                  { value: 'INACTIVE', label: text('Inactive') },
+                ]}
+              />
+            }
+            emptyMessage={
+              filters.values.q || filters.values.status ? text('NoResults') : text('NoCustomers')
+            }
+            pagination={{
+              page: pagination.page,
+              pageSize: pagination.pageSize,
+              total: customers.data?.total ?? 0,
+            }}
+            onPageChange={pagination.setPage}
+            onRowClick={(customer) => {
               setSelectionScope(scopeIdentity);
               setSelected(customer);
-            },
-          },
-          {
-            label: text('Edit'),
-            icon: <Pencil className="size-4" />,
-            onClick: (customer) => {
-              setSelectionScope(scopeIdentity);
-              setEditing(customer);
-            },
-            show: () => canEdit,
-          },
-        ]}
-      />
+            }}
+            onPageSizeChange={pagination.setPageSize}
+            actions={[
+              {
+                label: text('Detail'),
+                icon: <Eye className="size-4" />,
+                onClick: (customer) => {
+                  setSelectionScope(scopeIdentity);
+                  setSelected(customer);
+                },
+              },
+              {
+                label: text('Edit'),
+                icon: <Pencil className="size-4" />,
+                onClick: (customer) => {
+                  setSelectionScope(scopeIdentity);
+                  setEditing(customer);
+                },
+                show: () => canEdit,
+              },
+            ]}
+          />
+        )}
+      </section>
       {selected && selectionScope === scopeIdentity ? (
         <CustomerDetailDialog
           customer={selected}

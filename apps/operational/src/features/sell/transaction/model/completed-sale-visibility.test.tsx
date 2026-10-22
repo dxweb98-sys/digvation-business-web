@@ -50,7 +50,17 @@ function completedSale(): Sale {
     createdAt: '2026-09-19T01:00:00.000Z',
     updatedAt: '2026-09-19T03:00:00.000Z',
     lines: [
-      { id: 'line-1', removedAt: null },
+      {
+        id: 'line-1',
+        removedAt: null,
+        itemNameSnapshot: 'Potong Rambut',
+        variantNameSnapshot: null,
+        quantity: '1.0000',
+        fulfillmentBehaviorSnapshot: 'TRACKED',
+        participations: [],
+        compositionComponents: [],
+        contributions: [],
+      },
       { id: 'line-2', removedAt: '2026-09-19T02:00:00.000Z' },
     ],
     payments: [{ id: 'payment-1', status: 'SUCCEEDED', appliedAmount: '350000.0000' }],

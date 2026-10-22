@@ -35,7 +35,7 @@ describe('Report catalog', () => {
     ).toEqual({
       'business-performance': null,
       transactions: 'transaction',
-      'catalog-performance': null,
+      'catalog-performance': 'catalog-item',
       'component-usage': 'component-usage',
       'product-commission': 'product-commission',
       'employee-performance': 'employee',

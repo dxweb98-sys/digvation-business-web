@@ -807,13 +807,18 @@ describe('ReferenceTransactionDetail selected additions', () => {
     renderRuntimeDetail(withUsage([developer, redBrand]));
 
     const rows = within(additionsList()).getAllByRole('listitem');
-    expect(rows).toHaveLength(2);
-    // Base first, then the addition attached to its parent line.
-    expect(within(rows[0]!).getByText('Harga item')).toBeTruthy();
-    expect(rows[0]!.textContent).toContain('200.000');
-    expect(rows[1]!.textContent).toContain('+ Red Coloring Brand / Intense');
-    expect(rows[1]!.textContent).toContain('1 × Rp 10.000');
-    expect(rows[1]!.textContent).toContain('10.000');
+    expect(rows).toHaveLength(1);
+    // The main item's own price leads the group, then one card per addition under its line.
+    const group = additionsList().parentElement!;
+    expect(within(group).getByText('Harga item')).toBeTruthy();
+    expect(group.firstElementChild!.textContent).toContain('200.000');
+    expect(rows[0]!.textContent).toContain('Red Coloring Brand / Intense');
+    expect(rows[0]!.textContent).toContain('1 × Rp 10.000');
+    expect(rows[0]!.textContent).toContain('10.000');
+    // Nobody has decided who performs it yet: said plainly, never assumed, never a seller.
+    expect(rows[0]!.textContent).toContain('Belum ditentukan');
+    expect(rows[0]!.textContent).not.toContain('Sama dengan layanan utama');
+    expect(rows[0]!.textContent).not.toContain('Dijual oleh');
     expect(additionsList().closest('li.pos-line-item')?.textContent).toContain('Hair Color');
     // The line total stays the line amount (200.000 + 10.000).
     expect(additionsList().closest('li.pos-line-item')?.textContent).toContain('210.000');
@@ -845,11 +850,188 @@ describe('ReferenceTransactionDetail selected additions', () => {
     expect(lists).toHaveLength(1);
     const rows = within(lists[0]!).getAllByRole('listitem');
     // 2 x 200.000 = 400.000 base, 2 x 10.000 = 20.000 addition, 420.000 line.
-    expect(rows[0]!.textContent).toContain('400.000');
-    expect(rows[1]!.textContent).toContain('2 × ');
-    expect(rows[1]!.textContent).toContain('20.000');
+    expect(lists[0]!.parentElement!.firstElementChild!.textContent).toContain('400.000');
+    expect(rows[0]!.textContent).toContain('2 × ');
+    expect(rows[0]!.textContent).toContain('20.000');
     expect(lists[0]!.closest('li.pos-line-item')?.textContent).toContain('420.000');
     expect(lists[0]!.closest('li.pos-line-item')?.textContent).not.toContain('Highlight');
+  });
+
+  it('shows who does each addition: its own performers, or the main Service performers it follows', () => {
+    const sale = withUsage([
+      redBrand,
+      {
+        ...redBrand,
+        id: 'u-serum',
+        itemNameSnapshot: 'Serum',
+        variantNameSnapshot: null,
+        performers: [{ employeeId: 'emp-rindu', shareRate: '1' }],
+        contributions: [
+          {
+            employeeId: 'emp-rindu',
+            employeeCodeSnapshot: 'RP',
+            employeeDisplayNameSnapshot: 'Rindu Putri',
+            shareRate: '1',
+            contributionBaseAmount: '10000.0000',
+            contributionAmount: '10000.0000',
+          },
+        ],
+      },
+    ]);
+    const line = sale.lines[0]!;
+    line.contributions = [
+      {
+        ...(line.contributions[0] ?? {}),
+        employeeId: 'emp-andini',
+        employeeDisplayNameSnapshot: 'Andini',
+      } as SaleLine['contributions'][number],
+    ];
+    renderRuntimeDetail(sale);
+    const [inherited, own] = within(additionsList()).getAllByRole('listitem');
+    expect(inherited!.textContent).toContain('Dikerjakan oleh');
+    expect(inherited!.textContent).toContain('Andini');
+    expect(inherited!.textContent).toContain('Mengikuti layanan utama');
+    expect(own!.textContent).toContain('Rindu Putri');
+    expect(own!.textContent).not.toContain('Sama dengan layanan utama');
+    expect(own!.textContent).not.toContain('Andini');
+  });
+
+  it('recognises own employees that are exactly the main Service, and says when only the people match', () => {
+    const sale = withUsage([
+      {
+        ...redBrand,
+        performerAssignment: 'OWN',
+        performers: [
+          { employeeId: 'emp-rindu', shareRate: '0.7' },
+          { employeeId: 'emp-andini', shareRate: '0.3' },
+        ],
+      },
+      {
+        ...redBrand,
+        id: 'u-serum',
+        itemNameSnapshot: 'Serum',
+        variantNameSnapshot: null,
+        performerAssignment: 'OWN',
+        performers: [
+          { employeeId: 'emp-rindu', shareRate: '0.5' },
+          { employeeId: 'emp-andini', shareRate: '0.5' },
+        ],
+      },
+    ]);
+    sale.lines[0]!.participations = [
+      { employeeId: 'emp-andini', assigned: true, shareRate: '0.500000000000000000' },
+      { employeeId: 'emp-rindu', assigned: true, shareRate: '0.500000000000000000' },
+    ] as unknown as SaleLine['participations'];
+    renderRuntimeDetail(sale);
+    const [differentShares, same] = within(additionsList()).getAllByRole('listitem');
+    expect(differentShares!.textContent).toContain('Karyawan sama, porsi berbeda');
+    expect(differentShares!.textContent).toMatch(/70%.*30%/);
+    expect(differentShares!.textContent).not.toContain('Sama dengan layanan utama');
+    expect(same!.textContent).toContain('Sama dengan layanan utama');
+    expect(same!.textContent).not.toContain('Mengikuti layanan utama');
+  });
+
+  it('says the main Service performer is not chosen yet instead of naming nobody', () => {
+    renderRuntimeDetail(withUsage([{ ...redBrand, performerAssignment: 'SERVICE' }]));
+    const [row] = within(additionsList()).getAllByRole('listitem');
+    expect(row!.textContent).toContain('Pelaksana layanan utama belum dipilih');
+    expect(row!.textContent).toContain('Mengikuti layanan utama');
+  });
+
+  describe('deciding who performs an addition', () => {
+    const inProgress = (components: Usage[]) => {
+      const sale = withUsage(components);
+      sale.operationalState = 'IN_PROGRESS';
+      sale.lines[0]!.fulfillment!.status = 'IN_PROGRESS';
+      return sale;
+    };
+    const renderEditable = (sale: Sale, onAssignAddition = vi.fn()) => {
+      render(
+        <DeploymentBootstrapProvider config={bootstrap}>
+          <ReferenceTransactionDetail
+            sale={sale}
+            locale="id-ID"
+            employees={[]}
+            businessName="Digvation"
+            branchName="Main branch"
+            cashierName="Kasir"
+            showPaymentReceipt={false}
+            onClose={vi.fn()}
+            onNewSale={vi.fn()}
+            onViewReceipt={vi.fn()}
+            onAssign={vi.fn()}
+            onAssignAddition={onAssignAddition}
+            onStartLineWork={vi.fn()}
+            onComplete={vi.fn()}
+            isMutating={false}
+          />
+        </DeploymentBootstrapProvider>,
+      );
+      return onAssignAddition;
+    };
+    const name = 'Red Coloring Brand / Intense';
+
+    it('offers each addition its own action, opening exactly that addition', () => {
+      const onAssignAddition = renderEditable(
+        inProgress([
+          redBrand,
+          {
+            ...redBrand,
+            id: 'u-serum',
+            itemNameSnapshot: 'Serum',
+            variantNameSnapshot: null,
+            performerAssignment: 'SERVICE',
+          },
+        ]),
+      );
+      // Undecided: the same "choose" affordance as the Service itself.
+      fireEvent.click(screen.getByRole('button', { name: `Pilih karyawan: ${name}` }));
+      expect(onAssignAddition).toHaveBeenLastCalledWith(
+        expect.objectContaining({ id: 'line-1' }),
+        'u-red',
+      );
+      // Decided: a plain change action.
+      fireEvent.click(screen.getByRole('button', { name: 'Ubah karyawan: Serum' }));
+      expect(onAssignAddition).toHaveBeenLastCalledWith(
+        expect.objectContaining({ id: 'line-1' }),
+        'u-serum',
+      );
+    });
+
+    it('blocks completing the work while an addition is undecided, and names it', () => {
+      renderEditable(inProgress([redBrand]));
+      expect(document.body.textContent).toContain(
+        `${name}: Tentukan siapa yang mengerjakan item tambahan ini sebelum melanjutkan.`,
+      );
+    });
+
+    it('offers no action once the Sale is completed', () => {
+      const sale = inProgress([redBrand]);
+      sale.status = 'FINALIZED';
+      sale.finalizedAt = '2026-09-24T02:15:00.000Z';
+      sale.lines[0]!.fulfillment!.status = 'COMPLETED';
+      renderEditable(sale);
+      expect(screen.queryByRole('button', { name: new RegExp(`karyawan: ${name}`) })).toBeNull();
+    });
+  });
+
+  it('keeps a seller recorded before additions stopped earning commission, apart from its performer', () => {
+    renderRuntimeDetail(
+      withUsage([
+        {
+          ...redBrand,
+          performers: [{ employeeId: 'emp-rindu', shareRate: '1' }],
+          soldByEmployeeId: 'emp-andini',
+          soldByEmployeeCodeSnapshot: 'AN',
+          soldByEmployeeNameSnapshot: 'Andini',
+        },
+      ]),
+    );
+    const [row] = within(additionsList()).getAllByRole('listitem');
+    const performed = within(row!).getByText('Dikerjakan oleh').parentElement!;
+    const sold = within(row!).getByText('Dijual oleh').parentElement!;
+    expect(performed.textContent).not.toContain('Andini');
+    expect(sold.textContent).toContain('Andini');
   });
 
   it('shows the selected additions on the customer receipt as a breakdown, never fixed BOM', () => {

@@ -33,10 +33,14 @@ export const transactionHistoryCopy: Record<string, { id: string; en: string }> 
   },
 
   // Transaction status
-  Open: { id: 'Berjalan', en: 'Open' },
+  Open: { id: 'Terbuka', en: 'Open' },
   Completed: { id: 'Selesai', en: 'Completed' },
   Cancelled: { id: 'Dibatalkan', en: 'Cancelled' },
-  Reversed: { id: 'Direversal', en: 'Reversed' },
+  // A completed Sale cancelled afterwards. Whether money went back is the separate refund state.
+  'Cancelled after completion': {
+    id: 'Dibatalkan setelah selesai',
+    en: 'Cancelled after completion',
+  },
 
   // Payment summary
   'Not paid': { id: 'Belum dibayar', en: 'Not paid' },
@@ -46,8 +50,8 @@ export const transactionHistoryCopy: Record<string, { id: string; en: string }> 
   'Partially paid': { id: 'Dibayar sebagian', en: 'Partially paid' },
   Paid: { id: 'Lunas', en: 'Paid' },
   'Paid (split)': { id: 'Lunas (pembayaran terpisah)', en: 'Paid (split)' },
-  'Partially refunded': { id: 'Dikembalikan sebagian', en: 'Partially refunded' },
-  Refunded: { id: 'Dikembalikan', en: 'Refunded' },
+  'Partially refunded': { id: 'Dana dikembalikan sebagian', en: 'Partly refunded' },
+  Refunded: { id: 'Dana dikembalikan penuh', en: 'Fully refunded' },
 
   // Payment attempts (raw statuses, used by the attempt filter and attempt history)
   Pending: { id: 'Menunggu', en: 'Pending' },
@@ -57,7 +61,8 @@ export const transactionHistoryCopy: Record<string, { id: string; en: string }> 
 
   // Work summary
   'No tracked work': { id: 'Tanpa pengerjaan', en: 'No tracked work' },
-  'Not submitted': { id: 'Belum dikirim', en: 'Not submitted' },
+  // Tracked Service work that has not been placed in the work queue yet.
+  'Not queued yet': { id: 'Belum masuk antrean', en: 'Not queued yet' },
   Waiting: { id: 'Menunggu', en: 'Waiting' },
   'In progress': { id: 'Dikerjakan', en: 'In progress' },
 
@@ -208,10 +213,17 @@ export const transactionHistoryCopy: Record<string, { id: string; en: string }> 
     id: 'Tidak dihitung dalam pembayaran transaksi.',
     en: 'Not counted toward the transaction payment.',
   },
-  Reversal: { id: 'Reversal', en: 'Reversal' },
+  'Transaction cancellation': { id: 'Pembatalan transaksi', en: 'Transaction cancellation' },
   Reason: { id: 'Alasan', en: 'Reason' },
-  'Reversed on': { id: 'Direversal pada', en: 'Reversed on' },
-  'Reversed by': { id: 'Direversal oleh', en: 'Reversed by' },
+  'Cancelled on': { id: 'Dibatalkan pada', en: 'Cancelled on' },
+  'Money returned to the customer': {
+    id: 'Dana ke pelanggan',
+    en: 'Money returned to the customer',
+  },
+  'Fully refunded': { id: 'Dana dikembalikan penuh', en: 'Fully refunded' },
+  'Partly refunded': { id: 'Dana dikembalikan sebagian', en: 'Partly refunded' },
+  'No refund recorded': { id: 'Tidak ada pengembalian dana', en: 'No refund recorded' },
+  'Cancelled by': { id: 'Dibatalkan oleh', en: 'Cancelled by' },
   'Refund reason': { id: 'Alasan pengembalian', en: 'Refund reason' },
   'Refunded by': { id: 'Dikembalikan oleh', en: 'Refunded by' },
   'Refunded on': { id: 'Dikembalikan pada', en: 'Refunded on' },
@@ -245,14 +257,14 @@ export const transactionHistoryCopy: Record<string, { id: string; en: string }> 
   },
 
   // Reverse
-  'Reverse transaction': { id: 'Batalkan transaksi', en: 'Reverse transaction' },
+  'Reverse transaction': { id: 'Batalkan transaksi', en: 'Cancel transaction' },
   'For example, Customer returned the item': {
     id: 'Contoh: Pelanggan mengembalikan barang',
     en: 'For example, Customer returned the item',
   },
   'All successful payments must be fully refunded before this transaction can be reversed.': {
-    id: 'Semua pembayaran yang berhasil harus dikembalikan penuh sebelum transaksi ini dapat direversal.',
-    en: 'All successful payments must be fully refunded before this transaction can be reversed.',
+    id: 'Semua pembayaran yang berhasil harus dikembalikan penuh sebelum transaksi ini dapat dibatalkan.',
+    en: 'All successful payments must be fully refunded before this transaction can be cancelled.',
   },
   'Received money to return': {
     id: 'Uang diterima yang dikembalikan',
@@ -260,7 +272,7 @@ export const transactionHistoryCopy: Record<string, { id: string; en: string }> 
   },
   'Return money and reverse': {
     id: 'Kembalikan dana & batalkan',
-    en: 'Return money and reverse',
+    en: 'Return money and cancel',
   },
   'The money was really returned to the customer.': {
     id: 'Uang sudah benar-benar dikembalikan ke pelanggan.',
@@ -270,10 +282,10 @@ export const transactionHistoryCopy: Record<string, { id: string; en: string }> 
     id: 'Konfirmasi bahwa uang sudah dikembalikan ke pelanggan.',
     en: 'Confirm that the money was returned to the customer.',
   },
-  'Transaction reversed.': { id: 'Transaksi berhasil direversal.', en: 'Transaction reversed.' },
+  'Transaction reversed.': { id: 'Transaksi berhasil dibatalkan.', en: 'Transaction cancelled.' },
   'Could not reverse this transaction.': {
-    id: 'Transaksi ini tidak dapat direversal.',
-    en: 'Could not reverse this transaction.',
+    id: 'Transaksi ini tidak dapat dibatalkan.',
+    en: 'Could not cancel this transaction.',
   },
 
   // Promotions and discounts
@@ -299,23 +311,23 @@ export const transactionHistoryCopy: Record<string, { id: string; en: string }> 
     en: 'Final points are recorded when the transaction is completed.',
   },
   'This transaction was reversed; the points it earned and used have been compensated.': {
-    id: 'Transaksi ini telah direversal; poin yang diperoleh dan digunakan sudah dikompensasi.',
-    en: 'This transaction was reversed; the points it earned and used have been compensated.',
+    id: 'Transaksi ini telah dibatalkan setelah selesai; poin yang diperoleh dan digunakan sudah dikompensasi.',
+    en: 'This transaction was cancelled after completion; the points it earned and used have been compensated.',
   },
 
   // Reverse eligibility and action errors
   'Refund all completed payments before reversing this transaction.': {
-    id: 'Kembalikan semua pembayaran yang berhasil sebelum mereversal transaksi ini.',
-    en: 'Refund all completed payments before reversing this transaction.',
+    id: 'Kembalikan semua pembayaran yang berhasil sebelum membatalkan transaksi ini.',
+    en: 'Refund all completed payments before cancelling this transaction.',
   },
   'Resolve the pending payment before reversing this transaction.': {
-    id: 'Selesaikan pembayaran yang masih menunggu sebelum mereversal transaksi ini.',
-    en: 'Resolve the pending payment before reversing this transaction.',
+    id: 'Selesaikan pembayaran yang masih menunggu sebelum membatalkan transaksi ini.',
+    en: 'Resolve the pending payment before cancelling this transaction.',
   },
   'Money that was really received must be refunded before this transaction can be reversed. A payment entered by mistake cannot be removed here yet.':
     {
       id: 'Uang yang benar-benar diterima harus dikembalikan sebelum transaksi ini dapat dibatalkan. Pembayaran yang salah input belum dapat dihapus di sini.',
-      en: 'Money that was really received must be refunded before this transaction can be reversed. A payment entered by mistake cannot be removed here yet.',
+      en: 'Money that was really received must be refunded before this transaction can be cancelled. A payment entered by mistake cannot be removed here yet.',
     },
   'Choose how the refund is returned.': {
     id: 'Pilih bagaimana dana dikembalikan.',
@@ -349,12 +361,12 @@ export const transactionHistoryCopy: Record<string, { id: string; en: string }> 
     en: 'The original payment keeps its own account.',
   },
   'Only a completed transaction can be reversed.': {
-    id: 'Hanya transaksi yang sudah selesai yang dapat direversal.',
-    en: 'Only a completed transaction can be reversed.',
+    id: 'Hanya transaksi yang sudah selesai yang dapat dibatalkan di sini.',
+    en: 'Only a completed transaction can be cancelled here.',
   },
   'This transaction has already been reversed.': {
-    id: 'Transaksi ini sudah direversal.',
-    en: 'This transaction has already been reversed.',
+    id: 'Transaksi ini sudah dibatalkan.',
+    en: 'This transaction has already been cancelled.',
   },
   'This transaction changed in the meantime. Reload it and try again.': {
     id: 'Transaksi ini telah berubah. Muat ulang lalu coba lagi.',

@@ -50,7 +50,7 @@ export function RestrictedCompletedQueueCard({
   const number = transactionNumber(summary, locale);
   return (
     <article
-      className={`w-[360px] shrink-0 rounded-2xl border border-[var(--color-border)] p-4 transition-shadow hover:shadow-sm ${meta.soft}`}
+      className={`w-[min(360px,calc(100vw-3rem))] shrink-0 rounded-2xl border border-[var(--color-border)] p-4 transition-shadow hover:shadow-sm ${meta.soft}`}
     >
       <div className="mb-2 flex items-start justify-between gap-2">
         <div className="min-w-0">
@@ -246,7 +246,7 @@ export function ReferenceQueueCard({
 
   return (
     <article
-      className={`w-[360px] shrink-0 rounded-2xl border border-[var(--color-border)] p-4 transition-shadow hover:shadow-sm ${meta.soft}`}
+      className={`w-[min(360px,calc(100vw-3rem))] shrink-0 rounded-2xl border border-[var(--color-border)] p-4 transition-shadow hover:shadow-sm ${meta.soft}`}
     >
       <div className="mb-2 flex items-start justify-between gap-2">
         <div className="min-w-0">
@@ -271,8 +271,9 @@ export function ReferenceQueueCard({
           </span>
         </div>
       </div>
+      <QueueCardMainItem sale={sale} />
       <div className="mb-3 flex items-end justify-between gap-2">
-        <div>
+        <div className="min-w-0">
           <p className="text-xs text-[var(--color-text-muted)]">
             {sale.lines.filter((line) => !line.removedAt).length} {copy('items')},{' '}
             {new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(
@@ -337,5 +338,34 @@ export function ReferenceQueueCard({
         </div>
       ) : null}
     </article>
+  );
+}
+
+const selectedAdditions = (line: Sale['lines'][number]) =>
+  (line.compositionComponents ?? []).filter(
+    (component) => component.componentSource === 'SALE_SELECTED',
+  ).length;
+
+/**
+ * The main item and, compactly, how many additions it carries: enough to recognize the order. A
+ * line with additions leads (it is what the order is about); otherwise the first active line.
+ * Performers, addition names and discount notes belong to the transaction detail.
+ */
+function QueueCardMainItem({ sale }: { sale: Sale }) {
+  const { copy } = useOperationalLocalization();
+  const active = sale.lines.filter((line) => !line.removedAt);
+  const main = active.find((line) => selectedAdditions(line) > 0) ?? active[0];
+  if (!main) return null;
+  const additions = selectedAdditions(main);
+  return (
+    <p className="mb-0.5 flex min-w-0 items-baseline gap-1 text-[13px] font-medium text-[var(--color-text)]">
+      <span className="truncate">{main.itemNameSnapshot}</span>
+      {/* The count stays readable when a long item name is cut. */}
+      {additions ? (
+        <span className="shrink-0 font-normal text-[var(--color-text-muted)]">
+          + {additions} {copy('add-ons')}
+        </span>
+      ) : null}
+    </p>
   );
 }
