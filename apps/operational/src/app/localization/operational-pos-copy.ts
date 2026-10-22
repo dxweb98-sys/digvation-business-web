@@ -901,10 +901,13 @@ const posCopy: Record<string, LocalizedCopy> = {
   Employees: { 'id-ID': 'Karyawan', 'en-US': 'Employees' },
   'employees selected': { 'id-ID': 'dipilih', 'en-US': 'employees selected' },
   'Search employee': { 'id-ID': 'Cari karyawan', 'en-US': 'Search employee' },
-  'No employee matches this search.': {
-    'id-ID': 'Tidak ada karyawan yang cocok.',
-    'en-US': 'No employee matches this search.',
+  'No employee matches this name or code.': {
+    'id-ID': 'Tidak ada karyawan dengan nama atau kode itu.',
+    'en-US': 'No employee matches this name or code.',
   },
+  'Search name or code': { 'id-ID': 'Cari nama atau kode', 'en-US': 'Search name or code' },
+  chosen: { 'id-ID': 'dipilih', 'en-US': 'chosen' },
+  'Clear search': { 'id-ID': 'Hapus pencarian', 'en-US': 'Clear search' },
   'Discard employee changes?': {
     'id-ID': 'Buang perubahan karyawan?',
     'en-US': 'Discard employee changes?',
@@ -1109,11 +1112,42 @@ const posCopy: Record<string, LocalizedCopy> = {
   'Item quantity': { 'id-ID': 'Jumlah', 'en-US': 'Quantity' },
   'Sold by': { 'id-ID': 'Dijual oleh', 'en-US': 'Sold by' },
   'No salesperson': { 'id-ID': 'Tanpa penjual', 'en-US': 'No salesperson' },
-  'Add performer': { 'id-ID': 'Tambah yang mengerjakan', 'en-US': 'Add performer' },
-  'Remove performer': { 'id-ID': 'Hapus yang mengerjakan', 'en-US': 'Remove performer' },
-  'Optional. Part of the service work, not a product sale.': {
-    'id-ID': 'Opsional. Bagian dari pekerjaan layanan, bukan penjualan produk.',
-    'en-US': 'Optional. Part of the service work, not a product sale.',
+  'Same as main service': { 'id-ID': 'Sama dengan layanan utama', 'en-US': 'Same as main service' },
+  'Main service performer not chosen yet': {
+    'id-ID': 'Pelaksana layanan utama belum dipilih',
+    'en-US': 'Main service performer not chosen yet',
+  },
+  'Choose other employees': { 'id-ID': 'Pilih karyawan lain', 'en-US': 'Choose other employees' },
+  'Done by whoever performs the main service.': {
+    'id-ID': 'Dikerjakan oleh pelaksana layanan utama.',
+    'en-US': 'Done by whoever performs the main service.',
+  },
+  'Choose at least one employee, or use the main service performers.': {
+    'id-ID': 'Pilih minimal satu karyawan, atau gunakan pelaksana layanan utama.',
+    'en-US': 'Choose at least one employee, or use the main service performers.',
+  },
+  'Not decided yet': { 'id-ID': 'Belum ditentukan', 'en-US': 'Not decided yet' },
+  'Follows main service': { 'id-ID': 'Mengikuti layanan utama', 'en-US': 'Follows main service' },
+  'Same employees, different shares': {
+    'id-ID': 'Karyawan sama, porsi berbeda',
+    'en-US': 'Same employees, different shares',
+  },
+  Currently: { 'id-ID': 'Saat ini', 'en-US': 'Currently' },
+  'Performers are not available for this transaction.': {
+    'id-ID': 'Pelaksana tidak dapat diubah untuk transaksi ini.',
+    'en-US': 'Performers are not available for this transaction.',
+  },
+  'Who performs this additional item?': {
+    'id-ID': 'Siapa yang mengerjakan item tambahan ini?',
+    'en-US': 'Who performs this additional item?',
+  },
+  'Choose who performs it.': {
+    'id-ID': 'Pilih siapa yang mengerjakannya.',
+    'en-US': 'Choose who performs it.',
+  },
+  'Decide who performs this additional item before continuing.': {
+    'id-ID': 'Tentukan siapa yang mengerjakan item tambahan ini sebelum melanjutkan.',
+    'en-US': 'Decide who performs this additional item before continuing.',
   },
   'Optional. The salesperson earns commission when the sale is completed.': {
     'id-ID': 'Opsional. Penjual memperoleh komisi saat transaksi selesai.',
@@ -1275,6 +1309,7 @@ const posCopy: Record<string, LocalizedCopy> = {
     'en-US': 'The item could not be changed. Reload the transaction and try again.',
   },
   'Additional items': { 'id-ID': 'Item tambahan', 'en-US': 'Additional items' },
+  'add-ons': { 'id-ID': 'tambahan', 'en-US': 'add-ons' },
   'Additional items subtotal': { 'id-ID': 'Item tambahan', 'en-US': 'Additional items' },
   'Complete or remove the unfinished additional item.': {
     'id-ID': 'Lengkapi atau hapus item tambahan yang belum selesai.',

@@ -33,7 +33,7 @@ export const transactionHistoryCopy: Record<string, { id: string; en: string }> 
   },
 
   // Transaction status
-  Open: { id: 'Berjalan', en: 'Open' },
+  Open: { id: 'Terbuka', en: 'Open' },
   Completed: { id: 'Selesai', en: 'Completed' },
   Cancelled: { id: 'Dibatalkan', en: 'Cancelled' },
   // A completed Sale cancelled afterwards. Whether money went back is the separate refund state.

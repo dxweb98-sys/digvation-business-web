@@ -65,6 +65,9 @@ export function cashierTransactionErrorMessage(error: unknown, locale?: string):
       locale,
     );
   }
+  if (isApiErrorCode(error, 'SALE_COMPONENT_PERFORMER_REQUIRED')) {
+    return copyForLocale('Decide who performs this additional item before continuing.', locale);
+  }
   const promotionCopy = error instanceof ApiError ? PROMOTION_ERROR_COPY[error.code] : undefined;
   if (promotionCopy) return copyForLocale(promotionCopy, locale);
   const refundCopy = error instanceof ApiError ? REFUND_ERROR_COPY[error.code] : undefined;

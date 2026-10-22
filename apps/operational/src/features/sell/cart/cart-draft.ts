@@ -20,6 +20,7 @@ import type {
   DiscountType,
   ResolvedPrice,
   SaleAdjustment,
+  SaleComponentPerformerAssignment,
   SaleCustomer,
   SaleCustomerSelection,
   SaleLine,
@@ -37,15 +38,17 @@ export interface CartDraftAdditionalItem {
   /** Display only: the Product/Variant price Runtime offered when it was chosen. */
   unitPrice: string;
   /**
-   * Service only: who performs this additional item ("Dikerjakan oleh"). Part of the Service's
-   * work, never a Product salesperson; absent or empty means nobody is assigned to it.
+   * Service only: who performs this additional item ("Dikerjakan oleh"), as decided in the
+   * transaction detail. Part of the Service's work, never a Product salesperson.
    */
-  performers?: CartDraftSalesperson[];
-  /**
-   * Optional Product salesperson of this additional Product ("Dijual oleh"). Chosen on its own;
-   * never taken from a performer, and changing one never changes the other.
-   */
-  soldBy?: CartDraftSalesperson | null;
+  performers?: CartDraftAdditionalPerformer[];
+  /** Service only: the decision itself; absent while it is not decided yet. */
+  performerAssignment?: SaleComponentPerformerAssignment;
+}
+
+/** An addition's performer and, once decided, their share of its work. */
+export interface CartDraftAdditionalPerformer extends CartDraftSalesperson {
+  shareRate?: string;
 }
 
 /** Order-independent identity of who performs an addition. */
@@ -57,14 +60,14 @@ function performerSignature(performers: readonly CartDraftSalesperson[] | undefi
 }
 
 /**
- * Stable identity of one unit's additions: same Products, Variants, quantities, performers and
- * salesperson means the same configuration and price. Order does not matter.
+ * Stable identity of one unit's additions: same Products, Variants, quantities and performers
+ * means the same configuration and price. Order does not matter.
  */
 export function additionSignature(additions: readonly CartDraftAdditionalItem[]): string {
   return additions
     .map(
       (entry) =>
-        `${entry.componentItemId}:${entry.componentVariantId ?? ''}:${createDecimal(entry.quantity).toFixed(4)}:${performerSignature(entry.performers)}:${entry.soldBy?.employeeId ?? ''}`,
+        `${entry.componentItemId}:${entry.componentVariantId ?? ''}:${createDecimal(entry.quantity).toFixed(4)}:${entry.performerAssignment ?? ''}:${performerSignature(entry.performers)}`,
     )
     .sort()
     .join('|');
@@ -647,15 +650,21 @@ export function cartDraftPricingInput(draft: CartDraft | null): SalePricingPrevi
   };
 }
 
-/** The Runtime input for one addition, with its performers when anyone performs it. */
+/** The Runtime input for one addition, with who performs it once that has been decided. */
 export function startAddition(entry: CartDraftAdditionalItem) {
   return {
     componentItemId: entry.componentItemId,
     ...(entry.componentVariantId ? { componentVariantId: entry.componentVariantId } : {}),
     quantity: entry.quantity,
     ...(entry.performers?.length
-      ? { performers: entry.performers.map((performer) => ({ employeeId: performer.employeeId })) }
-      : {}),
-    ...(entry.soldBy ? { soldByEmployeeId: entry.soldBy.employeeId } : {}),
+      ? {
+          performers: entry.performers.map((performer) => ({
+            employeeId: performer.employeeId,
+            ...(performer.shareRate ? { shareRate: performer.shareRate } : {}),
+          })),
+        }
+      : entry.performerAssignment === 'SERVICE'
+        ? { performerAssignment: 'SERVICE' as const }
+        : {}),
   };
 }

@@ -1691,13 +1691,12 @@ describe('ReferenceOrderAdjustmentDialog — Service additional item work', () =
     expect(screen.queryByText(/Dijual oleh/)).toBeNull();
   });
 
-  it('prefills the correction with the addition and its performers, and proposes them', async () => {
+  it('prefills the correction with the addition and keeps who performs it, with their shares', async () => {
     const view = renderDialog({ sale: performedLine(), employees, candidates: [serum] });
     fireEvent.click(screen.getByRole('button', { name: 'Koreksi item Coloring Service' }));
-    // The source's performers come back as chips, named from the performer list.
-    const work = await screen.findByRole('group', { name: 'Dikerjakan oleh' });
-    expect(within(work).getByText('Pak Heru')).toBeTruthy();
-    expect(within(work).getByText('Rindu')).toBeTruthy();
+    // Who performs it is decided in the transaction detail, never asked again here.
+    await screen.findByLabelText('Alasan koreksi');
+    expect(screen.queryByRole('group', { name: 'Dikerjakan oleh' })).toBeNull();
     fireEvent.change(screen.getByLabelText('Alasan koreksi'), { target: { value: 'Ganti warna' } });
     await waitFor(() =>
       expect(
@@ -1714,7 +1713,10 @@ describe('ReferenceOrderAdjustmentDialog — Service additional item work', () =
           {
             componentItemId: 'serum',
             quantity: '1.0000',
-            performers: [{ employeeId: 'emp-heru' }, { employeeId: 'emp-rindu' }],
+            performers: [
+              { employeeId: 'emp-heru', shareRate: '0.5' },
+              { employeeId: 'emp-rindu', shareRate: '0.5' },
+            ],
           },
         ],
       },

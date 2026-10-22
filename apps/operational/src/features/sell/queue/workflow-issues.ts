@@ -3,6 +3,7 @@ import type { CartDisplayLine } from '../cart/cart-draft';
 import type { Sale, SaleLine } from '../transaction/model/cashier-transaction.types';
 import { serviceWorkUnitCount } from '../performer/service-performers-dialog';
 import { copyFor, isPositiveDecimal } from '../transaction/model/sale-display';
+import { saleLineAdditions } from '../transaction/model/sale-line-additions';
 
 export function employeeAssignmentIssues(
   line: SaleLine,
@@ -73,6 +74,12 @@ export function workflowIssues(sale: Sale, locale: string) {
     }
 
     issues.push(...employeeAssignmentIssues(line, locale, workLine));
+    // Runtime refuses to complete work while anyone performing it is still unknown.
+    for (const addition of saleLineAdditions(line))
+      if (!addition.performerAssignment && !addition.performerIds.length)
+        issues.push(
+          `${line.itemNameSnapshot}: ${addition.name}: ${copyFor('Decide who performs this additional item before continuing.', locale)}`,
+        );
   }
   return issues;
 }

@@ -66,11 +66,6 @@ export interface ItemConfiguratorState {
    * absent for a Service, which has performers instead of a salesperson.
    */
   salespeople?: readonly SalespersonOption[];
-  /**
-   * Runtime-filtered Service performers who may perform a Service's additional items. Only
-   * meaningful for a Service; an additional item is part of its work, never a Product sale.
-   */
-  componentPerformers?: readonly SalespersonOption[];
   /** Active variants; empty when the item is sold directly. */
   variants: readonly CatalogVariant[];
   /** Present only when the item itself is also sold without a variant. */
@@ -177,19 +172,10 @@ function AdditionalItemRow({
   onDiscover,
   onChange,
   onRemove,
-  performerOptions,
-  salespersonOptions,
   copy,
   money,
 }: {
   baseItemId: string;
-  /** Service only: who may perform the addition; absent hides "Performed by". */
-  performerOptions?: readonly SalespersonOption[] | undefined;
-  /**
-   * Runtime-approved Product salespeople: who may be credited with selling this additional
-   * Product. A separate choice from its performers; absent hides "Sold by".
-   */
-  salespersonOptions?: readonly SalespersonOption[] | undefined;
   row: AdditionalRow;
   rows: readonly AdditionalRow[];
   fixed: ReturnType<typeof fixedComponentsFor>;
@@ -239,9 +225,8 @@ function AdditionalItemRow({
               onChange({
                 candidateId: typeof value === 'string' ? value : null,
                 variantId: null,
-                // A different item is different work and a different sale: nobody is assigned
-                // to perform or credited with selling it yet.
-                ...(value !== row.candidateId ? { performers: [], soldBy: null } : {}),
+                // A different item is different work: who performs it is decided again later.
+                ...(value !== row.candidateId ? { decided: undefined } : {}),
               })
             }
           />
@@ -298,135 +283,7 @@ function AdditionalItemRow({
           </p>
         </div>
       ) : null}
-
-      {selected && performerOptions ? (
-        <AdditionPerformers
-          performers={row.performers}
-          options={performerOptions}
-          onChange={(performers) => onChange({ performers })}
-          copy={copy}
-        />
-      ) : null}
-
-      {selected && salespersonOptions ? (
-        <AdditionSalesperson
-          soldBy={row.soldBy}
-          options={salespersonOptions}
-          onChange={(soldBy) => onChange({ soldBy })}
-          copy={copy}
-        />
-      ) : null}
     </li>
-  );
-}
-
-/**
- * Who sold one additional Product ("Dijual oleh"): optional, chosen explicitly, and independent of
- * who performs it. Product commission follows only this choice, never a performer.
- */
-function AdditionSalesperson({
-  soldBy,
-  options,
-  onChange,
-  copy,
-}: {
-  soldBy: CartDraftSalesperson | null;
-  options: readonly SalespersonOption[];
-  onChange: (soldBy: CartDraftSalesperson | null) => void;
-  copy: (value: string) => string;
-}) {
-  const choices = useMemo(() => {
-    const list = options.map((option) => ({ value: option.id, label: option.name }));
-    // A salesperson chosen earlier stays readable even when no longer offered.
-    return soldBy && !list.some((option) => option.value === soldBy.employeeId)
-      ? [{ value: soldBy.employeeId, label: soldBy.name }, ...list]
-      : list;
-  }, [options, soldBy]);
-  return (
-    <Select
-      label={copy('Sold by')}
-      value={soldBy?.employeeId ?? null}
-      placeholder={copy('No salesperson')}
-      clearable
-      searchable
-      options={choices}
-      onChange={(value) => {
-        const chosen = choices.find((option) => option.value === value);
-        onChange(
-          typeof value === 'string' && chosen ? { employeeId: value, name: chosen.label } : null,
-        );
-      }}
-      className="w-full"
-    />
-  );
-}
-
-/**
- * Who performs one additional item of a Service ("Dikerjakan oleh"): zero, one or several
- * employees, sharing its work equally. Never a salesperson, and never a commission.
- */
-function AdditionPerformers({
-  performers,
-  options,
-  onChange,
-  copy,
-}: {
-  performers: readonly CartDraftSalesperson[];
-  options: readonly SalespersonOption[];
-  onChange: (performers: CartDraftSalesperson[]) => void;
-  copy: (value: string) => string;
-}) {
-  // Runtime returns only ids for a reopened line; the eligible list supplies the names.
-  const nameOf = (performer: CartDraftSalesperson) =>
-    performer.name ||
-    options.find((option) => option.id === performer.employeeId)?.name ||
-    performer.employeeId;
-  const available = options
-    .filter((option) => !performers.some((performer) => performer.employeeId === option.id))
-    .map((option) => ({ value: option.id, label: option.name }));
-  return (
-    <div role="group" aria-label={copy('Performed by')} className="space-y-2">
-      <p className="text-xs font-semibold text-[var(--color-text-muted)]">{copy('Performed by')}</p>
-      {performers.length ? (
-        <ul className="flex flex-wrap gap-2">
-          {performers.map((performer) => (
-            <li
-              key={performer.employeeId}
-              className="inline-flex items-center gap-1 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-muted)] py-1 pl-3 pr-1 text-xs font-semibold"
-            >
-              {nameOf(performer)}
-              <button
-                type="button"
-                className="grid size-6 place-items-center rounded-full hover:bg-[var(--color-surface)]"
-                aria-label={`${copy('Remove performer')} ${nameOf(performer)}`}
-                onClick={() =>
-                  onChange(performers.filter((entry) => entry.employeeId !== performer.employeeId))
-                }
-              >
-                <X className="size-3" aria-hidden="true" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      {available.length ? (
-        <Select
-          // Each pick adds one performer, then the picker is ready for the next one.
-          key={performers.map((performer) => performer.employeeId).join(',')}
-          value={null}
-          placeholder={copy('Add performer')}
-          searchable
-          options={available}
-          onChange={(value) => {
-            const chosen = available.find((option) => option.value === value);
-            if (typeof value === 'string' && chosen)
-              onChange([...performers, { employeeId: value, name: chosen.label }]);
-          }}
-          hint={copy('Optional. Part of the service work, not a product sale.')}
-          className="w-full"
-        />
-      ) : null}
-    </div>
   );
 }
 
@@ -438,7 +295,6 @@ export function ItemConfigurator({
   pricesByVariantId = {},
   unavailableVariantIds = [],
   salespeople,
-  componentPerformers,
   locale = 'id-ID',
   currency = 'IDR',
   initial,
@@ -906,8 +762,6 @@ export function ItemConfigurator({
                     known={known}
                     loadCandidates={loadCandidates}
                     onDiscover={discover}
-                    performerOptions={item.type === 'SERVICE' ? componentPerformers : undefined}
-                    salespersonOptions={salespeople}
                     onChange={(change) => updateRow(row.key, change)}
                     onRemove={() =>
                       setRows((existing) =>
