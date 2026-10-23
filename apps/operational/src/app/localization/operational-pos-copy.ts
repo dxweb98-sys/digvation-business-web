@@ -434,6 +434,8 @@ const posCopy: Record<string, LocalizedCopy> = {
   'Net total': { 'id-ID': 'Total Bersih', 'en-US': 'Net total' },
   'Ready to pay': { 'id-ID': 'Siap bayar', 'en-US': 'Ready to pay' },
   'Payment total': { 'id-ID': 'Total pembayaran', 'en-US': 'Payment total' },
+  'Show details': { 'id-ID': 'Lihat rincian', 'en-US': 'Show details' },
+  'Hide details': { 'id-ID': 'Sembunyikan rincian', 'en-US': 'Hide details' },
   'Transaction discount': { 'id-ID': 'Diskon transaksi', 'en-US': 'Transaction discount' },
   'Promotions and discounts': { 'id-ID': 'Promo dan diskon', 'en-US': 'Promotions and discounts' },
   Promotion: { 'id-ID': 'Promo', 'en-US': 'Promotion' },
@@ -543,9 +545,40 @@ const posCopy: Record<string, LocalizedCopy> = {
     'id-ID': 'Ubah jumlah atau hapus item yang belum dimulai, lalu simpan penyesuaian.',
     'en-US': 'Change quantity or remove items that have not started, then confirm.',
   },
-  'Finish the payment of this transaction before starting a new one.': {
-    'id-ID': 'Selesaikan pembayaran transaksi ini sebelum memulai transaksi baru.',
-    'en-US': 'Finish the payment of this transaction before starting a new one.',
+  'Start a new transaction? This transaction stays in the queue as awaiting settlement.': {
+    'id-ID': 'Mulai transaksi baru? Transaksi ini tetap ada di Antrian sebagai Menunggu pelunasan.',
+    'en-US': 'Start a new transaction? This transaction stays in the queue as awaiting settlement.',
+  },
+  'Continue that payment? The current transaction will remain open.': {
+    'id-ID': 'Lanjutkan pembayaran tersebut? Transaksi saat ini tetap terbuka.',
+    'en-US': 'Continue that payment? The current transaction will remain open.',
+  },
+  'Continue that payment? The items in the current cart are removed.': {
+    'id-ID': 'Lanjutkan pembayaran tersebut? Item di keranjang saat ini akan dihapus.',
+    'en-US': 'Continue that payment? The items in the current cart are removed.',
+  },
+  'Continue later': { 'id-ID': 'Lanjutkan nanti', 'en-US': 'Continue later' },
+  'Continue later keeps this transaction in the queue as awaiting settlement. Recorded payments stay on the transaction, and you can serve another customer.':
+    {
+      'id-ID':
+        'Lanjutkan nanti menyimpan transaksi ini di Antrian sebagai Menunggu pelunasan. Pembayaran yang sudah tercatat tetap tersimpan, dan Anda bisa melayani pelanggan lain.',
+      'en-US':
+        'Continue later keeps this transaction in the queue as awaiting settlement. Recorded payments stay on the transaction, and you can serve another customer.',
+    },
+  'A payment waiting for confirmation stays on the transaction. Confirm it when you continue the payment.':
+    {
+      'id-ID':
+        'Pembayaran yang menunggu konfirmasi tetap tersimpan di transaksi. Konfirmasi saat Anda melanjutkan pembayaran.',
+      'en-US':
+        'A payment waiting for confirmation stays on the transaction. Confirm it when you continue the payment.',
+    },
+  'Payment continues later': {
+    'id-ID': 'Pembayaran dilanjutkan nanti',
+    'en-US': 'Payment continues later',
+  },
+  'is in the queue as awaiting settlement.': {
+    'id-ID': 'ada di Antrian sebagai Menunggu pelunasan.',
+    'en-US': 'is in the queue as awaiting settlement.',
   },
   'This transaction has work to complete before it can be finished.': {
     'id-ID': 'Transaksi ini memiliki pengerjaan yang harus diselesaikan terlebih dahulu.',
@@ -1038,6 +1071,29 @@ const posCopy: Record<string, LocalizedCopy> = {
     },
   'Confirm payment': { 'id-ID': 'Konfirmasi pembayaran', 'en-US': 'Confirm payment' },
   'Continue payment': { 'id-ID': 'Lanjutkan pembayaran', 'en-US': 'Continue payment' },
+  'Awaiting settlement': { 'id-ID': 'Menunggu pelunasan', 'en-US': 'Awaiting settlement' },
+  'Refund and cancel': { 'id-ID': 'Kembalikan dana & batalkan', 'en-US': 'Refund and cancel' },
+  'Already received': { 'id-ID': 'Sudah diterima', 'en-US': 'Already received' },
+  'To be refunded': { 'id-ID': 'Akan dikembalikan', 'en-US': 'To be refunded' },
+  'I have returned': { 'id-ID': 'Saya sudah mengembalikan', 'en-US': 'I have returned' },
+  'to the customer.': {
+    'id-ID': 'kepada pelanggan secara langsung.',
+    'en-US': 'to the customer.',
+  },
+  'Load more awaiting settlement': {
+    'id-ID': 'Muat transaksi menunggu pelunasan lainnya',
+    'en-US': 'Load more awaiting settlement',
+  },
+  remaining: { 'id-ID': 'tersisa', 'en-US': 'remaining' },
+  Refunded: { 'id-ID': 'Dikembalikan', 'en-US': 'Refunded' },
+  'Partially refunded': { 'id-ID': 'Dikembalikan sebagian', 'en-US': 'Partially refunded' },
+  'Total returned': { 'id-ID': 'Total dikembalikan', 'en-US': 'Total returned' },
+  'Net received': { 'id-ID': 'Bersih diterima', 'en-US': 'Net received' },
+  'Completed before cancellation': {
+    'id-ID': 'Selesai sebelum pembatalan',
+    'en-US': 'Completed before cancellation',
+  },
+  'Cancelled on': { 'id-ID': 'Dibatalkan pada', 'en-US': 'Cancelled on' },
   'Back to edit': { 'id-ID': 'Kembali ubah', 'en-US': 'Back to edit' },
   'Confirm and complete': { 'id-ID': 'Konfirmasi dan selesaikan', 'en-US': 'Confirm and complete' },
   'Add to queue, collect later': {

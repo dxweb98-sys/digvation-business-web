@@ -9,8 +9,8 @@ import type { Employee, Sale, SaleLine } from '../model/cashier-transaction.type
 import { receiptDeliveryPreviewLabel } from '../../receipt/receipt-delivery-dialog';
 import { receiptDeliveryPhase } from '../../receipt/receipt-delivery';
 import type { ReceiptDeliveryState } from '../api/operational-projection-client';
-import { queueStatus } from '../../queue/queue-status';
-import { workflowIssues, groupWorkflowIssues } from '../../queue/workflow-issues';
+import { queueStatus } from '../../queue/model/queue-status';
+import { workflowIssues, groupWorkflowIssues } from '../../queue/model/workflow-issues';
 import { transactionNumber } from '../model/sale-display';
 import { ReceiptContent } from '../../receipt/receipt-content';
 import { ReferenceTransactionOrder } from './reference-transaction-order';
@@ -84,6 +84,7 @@ export function ReferenceTransactionDetail({
   onComplete,
   isMutating,
   onCorrectPayment,
+  onAdjustOrder,
 }: {
   sale: Sale | null;
   locale: string;
@@ -111,6 +112,8 @@ export function ReferenceTransactionDetail({
   isMutating: boolean;
   /** Opens the payment correction for this Sale; omitted when the session may not correct. */
   onCorrectPayment?: (sale: Sale) => void;
+  /** Opens the shared Adjust Order editor; omitted when the Sale may not be adjusted. */
+  onAdjustOrder?: (sale: Sale) => void;
 }) {
   const { copy, locale: copyLocale } = useOperationalLocalization();
   const [receiptPaper, setReceiptPaper] = useState<'58' | '80'>('80');
@@ -234,6 +237,7 @@ export function ReferenceTransactionDetail({
                   onAssign={onAssign}
                   onAssignAddition={onAssignAddition}
                   onStartLineWork={onStartLineWork}
+                  {...(onAdjustOrder ? { onAdjustOrder: () => onAdjustOrder(sale) } : {})}
                 />
               </div>
               <div
