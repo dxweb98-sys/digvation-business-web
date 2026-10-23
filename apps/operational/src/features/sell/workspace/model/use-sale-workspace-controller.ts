@@ -32,7 +32,7 @@ import {
   type CartDraftAdditionalItem,
   type CartDraftSalesperson,
   cartDraftPricingInput,
-} from '../../cart/cart-draft';
+} from '../../cart/model/cart-draft';
 import { isKnownApiFailure } from '../../transaction/api/cashier-transaction-errors';
 import { cashierTransactionKeys } from '../../transaction/api/cashier-transaction-keys';
 import type {

@@ -191,6 +191,71 @@ describe('sale presentation', () => {
   });
 });
 
+describe('saleSettlement after cancellation', () => {
+  const paid = { status: 'SUCCEEDED' as const, method: 'CASH' as const, tenderedAmount: null };
+  const refund = { ...paid, kind: 'REFUND' as const, changeAmount: null };
+
+  it('owes nothing once a completed Sale was reversed and its money returned', () => {
+    const settlement = saleSettlement({
+      totalAmount: '301600.0000',
+      status: 'FINALIZED',
+      reversal: { reason: 'Komplain', reversedAt: '2026-10-21T05:00:00.000Z' },
+      payments: [
+        { ...paid, appliedAmount: '201600.0000', changeAmount: null },
+        { ...paid, method: 'QRIS', appliedAmount: '100000.0000', changeAmount: null },
+        { ...refund, appliedAmount: '-301600.0000' },
+      ],
+    });
+    expect(settlement).toMatchObject({
+      closed: true,
+      paymentState: 'REFUNDED',
+      receivedAmount: '301600.0000',
+      refundedAmount: '301600.0000',
+      totalPaid: '0.0000',
+      balanceDue: '0.0000',
+    });
+  });
+
+  it('never presents a recorded refund as change given back', () => {
+    const settlement = saleSettlement({
+      totalAmount: '111000.0000',
+      status: 'FINALIZED',
+      reversal: { reason: 'Komplain', reversedAt: '2026-10-21T05:00:00.000Z' },
+      payments: [
+        {
+          ...paid,
+          appliedAmount: '111000.0000',
+          tenderedAmount: '111000.0000',
+          changeAmount: '0.0000',
+        },
+        {
+          ...refund,
+          appliedAmount: '-111000.0000',
+          refund: { id: 'refund-1' } as never,
+        },
+      ],
+    });
+    expect(settlement.cashChange).toBeNull();
+    expect(settlement.refundedAmount).toBe('111000.0000');
+  });
+
+  it('keeps an open partly paid Sale awaiting settlement with its real balance', () => {
+    expect(
+      saleSettlement({
+        totalAmount: '120000.0000',
+        status: 'OPEN',
+        payments: [{ ...paid, appliedAmount: '50000.0000', changeAmount: null }],
+      }),
+    ).toMatchObject({ closed: false, paymentState: 'PARTIALLY_PAID', balanceDue: '70000.0000' });
+  });
+
+  it('owes nothing on a voided Sale, refunded or never paid', () => {
+    expect(
+      saleSettlement({ totalAmount: '120000.0000', status: 'VOIDED', payments: [] }),
+    ).toMatchObject({ closed: true, paymentState: 'UNPAID', balanceDue: '0.0000' });
+  });
+});
+
 describe('saleSettlement', () => {
   const payment = (
     status: 'SUCCEEDED' | 'PENDING' | 'FAILED',
@@ -208,6 +273,9 @@ describe('saleSettlement', () => {
       cashTendered: null,
       cashChange: null,
       paymentState: 'UNPAID',
+      closed: false,
+      receivedAmount: '0.0000',
+      refundedAmount: '0.0000',
     });
   });
 
@@ -227,6 +295,9 @@ describe('saleSettlement', () => {
       cashTendered: '200000.0000',
       cashChange: '50000.0000',
       paymentState: 'PAID',
+      closed: false,
+      receivedAmount: '150000.0000',
+      refundedAmount: '0.0000',
     });
   });
 
@@ -246,6 +317,9 @@ describe('saleSettlement', () => {
       cashTendered: '222000.0000',
       cashChange: '16650.0000',
       paymentState: 'PAID',
+      closed: false,
+      receivedAmount: '222000.0000',
+      refundedAmount: '16650.0000',
     });
   });
 
@@ -265,6 +339,9 @@ describe('saleSettlement', () => {
       cashTendered: '250000.0000',
       cashChange: '50000.0000',
       paymentState: 'PAID',
+      closed: false,
+      receivedAmount: '500000.0000',
+      refundedAmount: '0.0000',
     });
   });
 

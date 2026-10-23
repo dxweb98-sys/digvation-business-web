@@ -399,7 +399,16 @@ export interface SaleSettlement {
   cashApplied: string;
   cashTendered: string | null;
   cashChange: string | null;
-  paymentState: 'PAID' | 'PARTIALLY_PAID' | 'UNPAID';
+  paymentState: 'PAID' | 'PARTIALLY_PAID' | 'UNPAID' | 'REFUNDED' | 'PARTIALLY_REFUNDED';
+  /**
+   * A VOIDED or reversed Sale: nothing is due any more, whatever its historical total. Its
+   * amounts are reconciliation history, never an active receivable.
+   */
+  closed: boolean;
+  /** Succeeded money received before any refund. */
+  receivedAmount: string;
+  /** Succeeded money returned through refund facts, as a positive amount. */
+  refundedAmount: string;
 }
 
 /**
@@ -409,6 +418,8 @@ export interface SaleSettlement {
 export function saleSettlement(sale: {
   totalAmount: string;
   payments: readonly SettlementPayment[];
+  status?: string;
+  reversal?: unknown;
 }): SaleSettlement {
   const succeeded = sale.payments.filter((payment) => payment.status === 'SUCCEEDED');
   const totalPaid = succeeded.reduce(
@@ -421,14 +432,17 @@ export function saleSettlement(sale: {
     (payment) => payment.method === 'CASH' && !isCorrectionLeg(payment),
   );
   const cashTendered = cash
-    .filter((payment) => payment.tenderedAmount !== null)
+    .filter((payment) => payment.tenderedAmount != null)
     .reduce(
       (sum, payment) => sum.plus(createDecimal(String(payment.tenderedAmount))),
       createDecimal('0'),
     );
   // Cash returned through an immutable compensation fact is change given back to the customer.
+  // A recorded refund is money returned, listed as a refund, never as change.
   const cashReturned = cash
-    .filter((payment) => createDecimal(String(payment.appliedAmount)).lessThan(0))
+    .filter(
+      (payment) => createDecimal(String(payment.appliedAmount)).lessThan(0) && !payment.refund,
+    )
     .reduce(
       (sum, payment) => sum.minus(createDecimal(String(payment.appliedAmount))),
       createDecimal('0'),
@@ -447,16 +461,33 @@ export function saleSettlement(sale: {
     .plus(cashReturned);
   const hasPending = sale.payments.some((payment) => payment.status === 'PENDING');
   const settled = !hasPending && totalPaid.equals(createDecimal(String(sale.totalAmount)));
+  const closed = sale.status === 'VOIDED' || (sale.status === 'FINALIZED' && sale.reversal != null);
+  const refunded = succeeded
+    .filter(isSucceededRefund)
+    .reduce((sum, payment) => sum.plus(refundedAmount(payment)), createDecimal('0'));
+  const paymentState: SaleSettlement['paymentState'] =
+    closed && refunded.greaterThan(0)
+      ? totalPaid.greaterThan(0)
+        ? 'PARTIALLY_REFUNDED'
+        : 'REFUNDED'
+      : settled
+        ? 'PAID'
+        : totalPaid.greaterThan(0)
+          ? 'PARTIALLY_PAID'
+          : 'UNPAID';
 
   return {
     totalPaid: totalPaid.toFixed(4),
-    balanceDue: balance.greaterThan(0) ? balance.toFixed(4) : '0.0000',
+    balanceDue: !closed && balance.greaterThan(0) ? balance.toFixed(4) : '0.0000',
     cashApplied: cashApplied.toFixed(4),
-    cashTendered: cash.some((payment) => payment.tenderedAmount !== null)
+    cashTendered: cash.some((payment) => payment.tenderedAmount != null)
       ? cashTendered.toFixed(4)
       : null,
     cashChange: cashChange.greaterThan(0) ? cashChange.toFixed(4) : null,
-    paymentState: settled ? 'PAID' : totalPaid.greaterThan(0) ? 'PARTIALLY_PAID' : 'UNPAID',
+    paymentState,
+    closed,
+    receivedAmount: totalPaid.plus(refunded).toFixed(4),
+    refundedAmount: refunded.toFixed(4),
   };
 }
 

@@ -26,7 +26,8 @@ const TRANSACTION_STATUS: Record<TransactionStatusKind, Omit<TransactionSummary<
   OPEN: { label: 'Open', variant: 'info' },
   COMPLETED: { label: 'Completed', variant: 'success' },
   CANCELLED: { label: 'Cancelled', variant: 'secondary' },
-  REVERSED: { label: 'Cancelled after completion', variant: 'danger' },
+  // A completed Sale reversed afterwards is cancelled; the reversal record keeps its history.
+  REVERSED: { label: 'Cancelled', variant: 'danger' },
 };
 
 export const SALE_STATUS_LABELS: Record<SaleStatus, string> = {
@@ -123,6 +124,9 @@ const WORK_SUMMARY: Record<WorkSummaryKind, Omit<TransactionSummary<never>, 'kin
   CANCELLED: { label: 'Cancelled', variant: 'secondary' },
 };
 
+/** Completed work of a Sale reversed afterwards: still completed, read in its context. */
+const COMPLETED_BEFORE_CANCELLATION = 'Completed before cancellation';
+
 export const FULFILLMENT_STATUS_LABELS: Record<FulfillmentStatus, string> = {
   WAITING: WORK_SUMMARY.WAITING.label,
   IN_PROGRESS: WORK_SUMMARY.IN_PROGRESS.label,
@@ -148,7 +152,7 @@ export function activeSaleLines<L extends Pick<SaleLine, 'removedAt'>>(lines: re
  * lines' fulfillment facts. Completed work stays completed after a later refund or reversal.
  */
 export function workSummary(
-  sale: Pick<Sale, 'status' | 'operationalState' | 'lines'>,
+  sale: Pick<Sale, 'status' | 'operationalState' | 'lines'> & Partial<Pick<Sale, 'reversal'>>,
 ): TransactionSummary<WorkSummaryKind> {
   const tracked = activeSaleLines(sale.lines).filter(
     (line) => line.fulfillmentBehaviorSnapshot === 'TRACKED',
@@ -173,6 +177,8 @@ export function workSummary(
               : sale.operationalState === 'UNSUBMITTED' || statuses.every((status) => !status)
                 ? 'DRAFT'
                 : 'WAITING';
+  if (kind === 'COMPLETED' && sale.status === 'FINALIZED' && sale.reversal)
+    return { kind, ...WORK_SUMMARY.COMPLETED, label: COMPLETED_BEFORE_CANCELLATION };
   return { kind, ...WORK_SUMMARY[kind] };
 }
 

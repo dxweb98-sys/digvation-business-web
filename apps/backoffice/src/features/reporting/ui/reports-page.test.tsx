@@ -307,7 +307,7 @@ describe('Transaction report detail', () => {
     );
     await screen.findAllByText('TRX-20261001-000001', undefined, LOADED);
     const row = tableRow('TRX-20261001-000001');
-    expect(within(row).getByText('Dibatalkan setelah selesai')).toBeTruthy();
+    expect(within(row).getByText('Dibatalkan')).toBeTruthy();
     expect(row.textContent).not.toContain('CASH:SUCCEEDED');
     fireEvent.click(row.querySelector('[data-ds-component="dropdown-trigger"] > *')!);
     fireEvent.click((await screen.findAllByText('Lihat detail')).at(-1)!);

@@ -16,6 +16,14 @@ describe('transactionStatusSummary', () => {
     expect(transactionStatusSummary(testSale({ status: 'VOIDED' })).kind).toBe('CANCELLED');
     expect(transactionStatusSummary(SCENARIOS.reversed).kind).toBe('REVERSED');
   });
+
+  it('reads a reversed completed Sale as cancelled first, in a destructive tone', () => {
+    expect(transactionStatusSummary(SCENARIOS.reversed)).toMatchObject({
+      label: 'Cancelled',
+      variant: 'danger',
+    });
+    expect(transactionStatusSummary(SCENARIOS.paid).label).toBe('Completed');
+  });
 });
 
 describe('paymentSummary', () => {
@@ -123,6 +131,8 @@ describe('workSummary', () => {
 
   it('keeps completed work completed after the money is refunded and the sale reversed', () => {
     expect(workSummary(SCENARIOS.reversed).kind).toBe('COMPLETED');
+    expect(workSummary(SCENARIOS.reversed).label).toBe('Completed before cancellation');
+    expect(workSummary(SCENARIOS.split).label).toBe('Completed');
   });
 
   it('ignores retired lines', () => {

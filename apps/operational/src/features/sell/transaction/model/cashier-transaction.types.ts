@@ -582,6 +582,8 @@ export interface CompletedSaleSummary {
   operationalState: SaleOperationalState;
   customer: Pick<SaleCustomer, 'type' | 'name'> | null;
   itemCount: number;
+  /** True once Runtime appended a reversal to this FINALIZED Sale; carries no amount. */
+  reversed: boolean;
   finalizedAt: string | null;
   createdAt: string;
   updatedAt: string;
