@@ -13,8 +13,8 @@ import {
   saleTaxLabel,
 } from '../transaction/model/sale-presentation';
 import type { Sale, SaleCustomer, SaleLine } from '../transaction/model/cashier-transaction.types';
-import { paymentAccountLabel } from '../payment/sale-payment-status';
-import { paymentCompositionOf } from '../payment/payment-correction-draft';
+import { paymentAccountLabel } from '../payment/model/sale-payment-status';
+import { paymentCompositionOf } from '../payment/model/payment-correction-draft';
 import {
   money,
   quantity,

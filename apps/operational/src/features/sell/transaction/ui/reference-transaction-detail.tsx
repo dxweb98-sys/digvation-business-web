@@ -9,8 +9,8 @@ import type { Employee, Sale, SaleLine } from '../model/cashier-transaction.type
 import { receiptDeliveryPreviewLabel } from '../../receipt/receipt-delivery-dialog';
 import { receiptDeliveryPhase } from '../../receipt/receipt-delivery';
 import type { ReceiptDeliveryState } from '../api/operational-projection-client';
-import { queueStatus } from '../../queue/queue-status';
-import { workflowIssues, groupWorkflowIssues } from '../../queue/workflow-issues';
+import { queueStatus } from '../../queue/model/queue-status';
+import { workflowIssues, groupWorkflowIssues } from '../../queue/model/workflow-issues';
 import { transactionNumber } from '../model/sale-display';
 import { ReceiptContent } from '../../receipt/receipt-content';
 import { ReferenceTransactionOrder } from './reference-transaction-order';

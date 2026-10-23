@@ -40,10 +40,10 @@ import type { Payment, Sale } from '../../transaction/model/cashier-transaction.
 import type { useCashierTransactionWorkspace } from '../model/use-cashier-transaction-workspace';
 
 import { currencyInputFromAmount, normalizeCurrencyPaymentInput } from '../../lib/pos-controls';
-import { SaleAdjustmentControls } from '../../adjustment/sale-adjustment-controls';
-import { SaleLineTaskDialog } from '../../queue/sale-line-task-dialog';
-import { ServicePerformersDialog } from '../../performer/service-performers-dialog';
-import { AdditionPerformersDialog } from '../../performer/addition-performers-dialog';
+import { SaleAdjustmentControls } from '../../adjustment/ui/sale-adjustment-controls';
+import { SaleLineTaskDialog } from '../../queue/ui/sale-line-task-dialog';
+import { ServicePerformersDialog } from '../../performer/ui/service-performers-dialog';
+import { AdditionPerformersDialog } from '../../performer/ui/addition-performers-dialog';
 import { additionWork, saleLineAdditions } from '../../transaction/model/sale-line-additions';
 import {
   presentableTransaction,
@@ -52,48 +52,51 @@ import {
 import { CustomerMemberDialog } from '../../customer/ui/customer-member-dialog';
 import { WalkInCustomerEditDialog } from '../../customer/ui/walk-in-customer-edit-dialog';
 import { ReceiptDeliveryDialog } from '../../receipt/receipt-delivery-dialog';
-import { canAdjustOrder, offersOrderAdjustment } from '../../adjustment/sale-adjustment-access';
-import { ReferencePaymentCorrectionDialog } from '../../payment/reference-payment-correction-dialog';
-import { canCorrectPayments } from '../../payment/payment-correction-draft';
+import {
+  canAdjustOrder,
+  offersOrderAdjustment,
+} from '../../adjustment/model/sale-adjustment-access';
+import { ReferencePaymentCorrectionDialog } from '../../payment/ui/reference-payment-correction-dialog';
+import { canCorrectPayments } from '../../payment/model/payment-correction-draft';
 import { completeSettledCheckout, hasTrackedWork } from '../../transaction/model/sale-lifecycle';
-import { type QueueStatus } from '../../queue/queue-status';
+import { type QueueStatus } from '../../queue/model/queue-status';
 import {
   type QueuedSaleEntry,
   readQueuedSaleEntries,
   writeQueuedSaleEntries,
-} from '../../queue/queued-sale-storage';
+} from '../../queue/model/queued-sale-storage';
 import {
   hasSuccessfulCheckout,
   financialSummary,
   type TerminalPaymentStatus,
   hasSuccessfulPayment,
-} from '../../payment/sale-payment-status';
-import { processIssues } from '../../queue/workflow-issues';
+} from '../../payment/model/sale-payment-status';
+import { processIssues } from '../../queue/model/workflow-issues';
 import { money, transactionNumber, isPositiveDecimal } from '../../transaction/model/sale-display';
-import { ReferenceQueueBoard } from '../../queue/reference-queue-board';
-import { ReferenceTypeButton } from '../../catalog/reference-type-button';
-import { ReferenceCatalogCard } from '../../catalog/reference-catalog-card';
-import { ReferenceFloatingCart } from '../../cart/reference-floating-cart';
-import { ReferencePaymentDialog } from '../../payment/reference-payment-dialog';
+import { ReferenceQueueBoard } from '../../queue/ui/reference-queue-board';
+import { ReferenceTypeButton } from '../../catalog/ui/reference-type-button';
+import { ReferenceCatalogCard } from '../../catalog/ui/reference-catalog-card';
+import { ReferenceFloatingCart } from '../../cart/ui/reference-floating-cart';
+import { ReferencePaymentDialog } from '../../payment/ui/reference-payment-dialog';
 import { ReferenceTransactionDetail } from '../../transaction/ui/reference-transaction-detail';
-import { ReferenceOrderAdjustmentDialog } from '../../adjustment/reference-order-adjustment-dialog';
-import { ReferenceBalancePaymentDialog } from '../../payment/reference-balance-payment-dialog';
-import { useOutstandingBalanceReset } from '../../payment/payment-dialog-state';
+import { ReferenceOrderAdjustmentDialog } from '../../adjustment/ui/reference-order-adjustment-dialog';
+import { ReferenceBalancePaymentDialog } from '../../payment/ui/reference-balance-payment-dialog';
+import { useOutstandingBalanceReset } from '../../payment/model/payment-dialog-state';
 import { ReferenceCancelDialog } from '../../transaction/ui/reference-cancel-dialog';
 import { useSaleCustomerContext } from '../../customer/model/use-sale-customer-context';
-import { useSellingCatalogFilter } from '../../catalog/use-selling-catalog-filter';
-import { useDraftTaxPreview } from '../../cart/use-draft-tax-preview';
-import { useCartPricingPreview } from '../../cart/use-cart-pricing-preview';
-import { useQueueGroups } from '../../queue/use-queue-groups';
-import { useAwaitingSettlementPages } from '../../queue/use-awaiting-settlement-pages';
-import { useCheckoutPaymentForm } from '../../payment/use-checkout-payment-form';
+import { useSellingCatalogFilter } from '../../catalog/model/use-selling-catalog-filter';
+import { useDraftTaxPreview } from '../../cart/model/use-draft-tax-preview';
+import { useCartPricingPreview } from '../../cart/model/use-cart-pricing-preview';
+import { useQueueGroups } from '../../queue/model/use-queue-groups';
+import { useAwaitingSettlementPages } from '../../queue/model/use-awaiting-settlement-pages';
+import { useCheckoutPaymentForm } from '../../payment/model/use-checkout-payment-form';
 import { useReceiptDeliveryPreview } from '../../receipt/use-receipt-delivery-preview';
-import { useServicePerformerAssignment } from '../../performer/use-service-performer-assignment';
-import { useQueuedWorkActions } from '../../queue/use-queued-work-actions';
-import { useOrderAdjustment } from '../../adjustment/use-order-adjustment';
-import { useQueuedSaleCancellation } from '../../queue/use-queued-sale-cancellation';
-import { useQueuedSaleCustomerEdit } from '../../queue/use-queued-sale-customer-edit';
-import { useQueuedSaleCompletion } from '../../queue/use-queued-sale-completion';
+import { useServicePerformerAssignment } from '../../performer/model/use-service-performer-assignment';
+import { useQueuedWorkActions } from '../../queue/model/use-queued-work-actions';
+import { useOrderAdjustment } from '../../adjustment/model/use-order-adjustment';
+import { useQueuedSaleCancellation } from '../../queue/model/use-queued-sale-cancellation';
+import { useQueuedSaleCustomerEdit } from '../../queue/model/use-queued-sale-customer-edit';
+import { useQueuedSaleCompletion } from '../../queue/model/use-queued-sale-completion';
 import './replatformed-pos-workspace.css';
 
 type Workspace = ReturnType<typeof useCashierTransactionWorkspace>;

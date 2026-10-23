@@ -2,11 +2,9 @@ import { DButton as Button, DCheckbox, DDialog as Dialog } from '@digvation-labs
 import { DTextarea } from '@digvation/ui';
 import { useOperationalLocalization } from '../../../../app/localization/operational-localization';
 import type { PaymentRoute, Sale } from '../model/cashier-transaction.types';
-import {
-  RefundDisbursementPicker,
-  type RefundDisbursementDraft,
-} from '../../adjustment/refund-disbursement-picker';
-import { financialSummary } from '../../payment/sale-payment-status';
+import type { RefundDisbursementDraft } from '../../adjustment/model/refund-disbursement-draft';
+import { RefundDisbursementPicker } from '../../adjustment/ui/refund-disbursement-picker';
+import { financialSummary } from '../../payment/model/sale-payment-status';
 import { money, transactionNumber, isPositiveDecimal } from '../model/sale-display';
 import { awaitsSettlement } from '../model/sale-lifecycle';
 

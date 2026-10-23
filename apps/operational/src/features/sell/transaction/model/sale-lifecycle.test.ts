@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { Sale } from './cashier-transaction.types';
-import { hasStartableQueuedWork } from '../../queue/queued-sale-work';
+import { hasStartableQueuedWork } from '../../queue/model/queued-sale-work';
 import {
   awaitsSettlement,
   checkoutCompletionOf,

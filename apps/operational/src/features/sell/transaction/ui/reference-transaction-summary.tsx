@@ -21,11 +21,16 @@ import {
   SaleRefundList,
   StatusPill,
 } from './sale-detail-presentation';
-import { isReversedSale, statusMeta, queueStatus, queueStatusTone } from '../../queue/queue-status';
-import { paymentAccountLabel } from '../../payment/sale-payment-status';
-import type { groupWorkflowIssues } from '../../queue/workflow-issues';
+import {
+  isReversedSale,
+  statusMeta,
+  queueStatus,
+  queueStatusTone,
+} from '../../queue/model/queue-status';
+import { paymentAccountLabel } from '../../payment/model/sale-payment-status';
+import type { groupWorkflowIssues } from '../../queue/model/workflow-issues';
 import { money } from '../model/sale-display';
-import { paymentCompositionOf } from '../../payment/payment-correction-draft';
+import { paymentCompositionOf } from '../../payment/model/payment-correction-draft';
 import {
   customerDisplayName,
   customerDisplayDetail,

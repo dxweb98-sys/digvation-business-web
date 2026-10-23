@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   defaultRefundDisbursement,
   type RefundDisbursementDraft,
-} from '../../adjustment/refund-disbursement-picker';
+} from '../../adjustment/model/refund-disbursement-draft';
 import type { PaymentRoute, Sale } from '../model/cashier-transaction.types';
 import { ReferenceCancelDialog } from './reference-cancel-dialog';
 

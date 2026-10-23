@@ -20,10 +20,13 @@ import {
   startAddition,
   type CartDraftAdditionalItem,
   type CartDraftSalesperson,
-} from '../../cart/cart-draft';
-import { MAX_CONFIGURATION_UNITS, opensItemConfigurator } from '../../cart/item-configurator-model';
+} from '../../cart/model/cart-draft';
+import {
+  MAX_CONFIGURATION_UNITS,
+  opensItemConfigurator,
+} from '../../cart/model/item-configurator-model';
 import { awaitsSettlement, hasTrackedWork } from '../../transaction/model/sale-lifecycle';
-import type { ItemConfiguration, ItemConfiguratorState } from '../../cart/item-configurator';
+import type { ItemConfiguration, ItemConfiguratorState } from '../../cart/ui/item-configurator';
 import type { VariantPickerContext, VariantPickerState } from './variant-selection';
 import {
   createCashierTransactionAdapter,
@@ -53,14 +56,17 @@ import type {
   AdditionPerformersDecision,
 } from '../../transaction/api/cashier-transaction.adapter';
 import { saleLineConfiguration } from '../../transaction/model/sale-line-additions';
-import { fetchResolvedPrice, fetchResolvedVariantPrices } from '../../catalog/resolved-price-query';
-import type { ServiceLineWorkPlan } from '../../performer/service-performer-allocation';
+import {
+  fetchResolvedPrice,
+  fetchResolvedVariantPrices,
+} from '../../catalog/model/resolved-price-query';
+import type { ServiceLineWorkPlan } from '../../performer/model/service-performer-allocation';
 import { createSaleWorkspaceViewModel } from './sale-workspace-view-model';
-import { useEmployeeOptions } from '../../performer/use-employee-options';
+import { useEmployeeOptions } from '../../performer/model/use-employee-options';
 import { useSaleCommandCoordinator } from './use-sale-command-coordinator';
 import { useSaleCoreController } from './use-sale-core-controller';
 import { useSaleWorkspaceController } from './use-sale-workspace-controller';
-import { useSellingCatalog } from '../../catalog/use-selling-catalog';
+import { useSellingCatalog } from '../../catalog/model/use-selling-catalog';
 
 export function useCashierTransactionWorkspace(routeSaleId?: string) {
   const runtime = useRuntime();

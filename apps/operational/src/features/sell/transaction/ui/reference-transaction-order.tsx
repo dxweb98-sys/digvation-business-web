@@ -2,8 +2,8 @@ import { DButton } from '@digvation-labs/ui';
 import { Pencil, PlayCircle, ShoppingBag, UserPlus } from 'lucide-react';
 import { useOperationalLocalization } from '../../../../app/localization/operational-localization';
 import { additionWork, saleLineAdditions, saleLineBase } from '../model/sale-line-additions';
-import { saleLineWorkStatus } from '../../queue/queued-sale-work';
-import { correctionSourceOf } from '../../adjustment/sale-adjustment-access';
+import { saleLineWorkStatus } from '../../queue/model/queued-sale-work';
+import { correctionSourceOf } from '../../adjustment/model/sale-adjustment-access';
 import { additionDiscountNote, lineDiscountRows } from '../model/sale-presentation';
 import { AdditionDiscountNote } from './addition-discount-note';
 import type { Employee, Sale, SaleLine } from '../model/cashier-transaction.types';
@@ -14,15 +14,15 @@ import {
   SaleLineItemList,
   StatusPill,
 } from './sale-detail-presentation';
-import { serviceWorkUnitCount } from '../../performer/service-performers-dialog';
-import { servicePerformerSummary } from '../../performer/service-performer-summary';
-import { type QueueStatus, queueStatus } from '../../queue/queue-status';
-import { employeeAssignmentIssues } from '../../queue/workflow-issues';
+import { serviceWorkUnitCount } from '../../performer/model/service-work-units';
+import { servicePerformerSummary } from '../../performer/model/service-performer-summary';
+import { type QueueStatus, queueStatus } from '../../queue/model/queue-status';
+import { employeeAssignmentIssues } from '../../queue/model/workflow-issues';
 import { money, formatDurationMinutes, quantity } from '../model/sale-display';
 import { pointQuantity } from '../model/sale-points';
 import { DiscountDetailsContent, DiscountInfoTooltip } from './discount-details';
-import { ServicePerformers } from '../../performer/service-performer-credits';
-import { formatPercent } from '../../performer/service-performer-allocation';
+import { ServicePerformers } from '../../performer/ui/service-performer-credits';
+import { formatPercent } from '../../performer/model/service-performer-allocation';
 import { createDecimal } from '@digvation/pos-money';
 
 /** The line status a transaction state already implies, so it is not repeated per item. */

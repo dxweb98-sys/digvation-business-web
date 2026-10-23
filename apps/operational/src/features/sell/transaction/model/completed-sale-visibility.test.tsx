@@ -13,7 +13,10 @@ import {
   queueEntryFor,
   restrictedQueueSummary,
 } from './completed-sale-visibility';
-import { ReferenceQueueCard, RestrictedCompletedQueueCard } from '../../queue/reference-queue-card';
+import {
+  ReferenceQueueCard,
+  RestrictedCompletedQueueCard,
+} from '../../queue/ui/reference-queue-card';
 
 const bootstrap = {
   apiBaseUrl: '',
