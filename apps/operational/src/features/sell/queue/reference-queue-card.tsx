@@ -8,11 +8,13 @@ import {
   Send,
   ShoppingBag,
   User,
+  Wallet,
   XCircle,
 } from 'lucide-react';
 import { type ReactNode } from 'react';
 import { useOperationalLocalization } from '../../../app/localization/operational-localization';
 import { hasStartableQueuedWork } from './queued-sale-work';
+import { awaitsSettlement } from '../transaction/model/sale-lifecycle';
 import type {
   CompletedSaleSummary,
   QueueSale,
@@ -20,13 +22,14 @@ import type {
 } from '../transaction/model/cashier-transaction.types';
 import { ReceiptDeliveryIndicatorLine } from '../receipt/receipt-delivery-dialog';
 import type { ReceiptDeliveryIndicator } from '../transaction/api/operational-projection-client';
-import { type QueueStatus, statusMeta } from './queue-status';
+import { type QueueStatus, queueStatus, statusMeta } from './queue-status';
 import {
   hasSuccessfulCheckout,
   financialSummary,
   hasSuccessfulPayment,
 } from '../payment/sale-payment-status';
 import { money, transactionNumber, isPositiveDecimal } from '../transaction/model/sale-display';
+import { saleSettlement } from '../transaction/model/sale-presentation';
 import { customerDisplayName } from '../customer/model/sale-customer-display';
 
 /**
@@ -46,7 +49,8 @@ export function RestrictedCompletedQueueCard({
   onSendReceipt: (sale: QueueSale) => void;
 }) {
   const { copy, label } = useOperationalLocalization();
-  const meta = statusMeta.COMPLETED;
+  // A completed Sale reversed afterwards reads as cancelled; the summary still carries no amount.
+  const meta = statusMeta[queueStatus(summary) ?? 'COMPLETED'];
   const number = transactionNumber(summary, locale);
   return (
     <article
@@ -107,6 +111,8 @@ export function ReferenceQueueCard({
   onViewReceipt,
   onSendReceipt,
   onEditCustomer,
+  onResume,
+  canRefundCancel = false,
   receiptDelivery = null,
 }: {
   sale: Sale;
@@ -124,6 +130,10 @@ export function ReferenceQueueCard({
   onSendReceipt: (sale: Sale) => void;
   /** Offered for an unfinished walk-in transaction only. */
   onEditCustomer?: (sale: Sale) => void;
+  /** Reopens a Sale awaiting settlement at its checkout to collect the rest of its balance. */
+  onResume?: (sale: Sale) => void;
+  /** May cancel a Sale awaiting settlement by returning its money (sales:void and payments:refund). */
+  canRefundCancel?: boolean;
   /** Latest receipt delivery; shown only on a completed transaction with a customer. */
   receiptDelivery?: ReceiptDeliveryIndicator | null;
 }) {
@@ -132,8 +142,23 @@ export function ReferenceQueueCard({
   const { balanceDue } = financialSummary(sale);
   const hasPayment = hasSuccessfulPayment(sale);
   const paid = hasSuccessfulCheckout(sale);
+  // A cancelled or reversed Sale owes nothing: money it gave back reads as refunded, not unpaid.
+  const settlement = saleSettlement(sale);
+  const refunded = settlement.closed && settlement.refundedAmount !== '0.0000';
+  const paymentBadge = refunded
+    ? settlement.paymentState === 'PARTIALLY_REFUNDED'
+      ? 'Partially refunded'
+      : 'Refunded'
+    : paid
+      ? 'Paid'
+      : hasPayment
+        ? 'Partially paid'
+        : 'Unpaid';
   const customer = sale.customer ?? null;
   const canStartWork = hasStartableQueuedWork(sale);
+  // Not work: an unsubmitted Sale that already received money. It is resumed at checkout, or
+  // cancelled only by returning that money, for an operator allowed to refund.
+  const awaiting = awaitsSettlement(sale);
   const editCustomerItem =
     onEditCustomer &&
     sale.status === 'OPEN' &&
@@ -177,7 +202,26 @@ export function ReferenceQueueCard({
           },
         ]
       : []),
-    ...(status === 'QUEUED'
+    ...(awaiting && onResume
+      ? [
+          {
+            label: copy('Continue payment'),
+            icon: <CreditCard className="size-3.5" />,
+            onSelect: () => onResume(sale),
+          },
+        ]
+      : []),
+    ...(awaiting && canRefundCancel
+      ? [
+          {
+            label: copy('Refund and cancel'),
+            icon: <XCircle className="size-3.5" />,
+            destructive: true,
+            onSelect: () => onCancel(sale),
+          },
+        ]
+      : []),
+    ...(status === 'QUEUED' && !awaiting
       ? [
           ...(canStartWork
             ? [
@@ -259,16 +303,23 @@ export function ReferenceQueueCard({
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <span
-            className={`inline-flex items-center rounded-full px-2 py-1 text-[10px] font-bold ${paid ? 'bg-[var(--color-success)]/10 text-[var(--color-success)]' : 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]'}`}
+            className={`inline-flex items-center rounded-full px-2 py-1 text-[10px] font-bold ${refunded ? 'bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]' : paid ? 'bg-[var(--color-success)]/10 text-[var(--color-success)]' : 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]'}`}
           >
-            {copy(paid ? 'Paid' : hasPayment ? 'Partially paid' : 'Unpaid')}
+            {copy(paymentBadge)}
           </span>
-          <span
-            className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold ${meta.tone}`}
-          >
-            {meta.icon}
-            {label(meta.value)}
-          </span>
+          {awaiting ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-warning)]/10 px-2 py-1 text-[10px] font-bold text-[var(--color-warning)]">
+              <Wallet className="size-3.75" aria-hidden="true" />
+              {copy('Awaiting settlement')}
+            </span>
+          ) : (
+            <span
+              className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold ${meta.tone}`}
+            >
+              {meta.icon}
+              {label(meta.value)}
+            </span>
+          )}
         </div>
       </div>
       <QueueCardMainItem sale={sale} />
@@ -283,11 +334,26 @@ export function ReferenceQueueCard({
           <p className="mt-1 text-sm font-bold text-[var(--color-brand)]">
             {money(sale.totalAmount, locale)}
           </p>
+          {awaiting ? (
+            <p className="mt-0.5 text-xs font-semibold text-[var(--color-warning)]">
+              {copy('Remaining')}: {money(balanceDue, locale)}
+            </p>
+          ) : null}
           {status === 'COMPLETED' && sale.customer ? (
             <ReceiptDeliveryIndicatorLine indicator={receiptDelivery} />
           ) : null}
         </div>
         <div className="flex items-center gap-2">
+          {awaiting && onResume ? (
+            <DButton
+              size="sm"
+              className="h-8 px-3 text-[11px]"
+              leftIcon={<CreditCard className="size-3.5" />}
+              onClick={() => onResume(sale)}
+            >
+              {copy('Continue payment')}
+            </DButton>
+          ) : null}
           {canStartWork ? (
             <DButton
               size="sm"

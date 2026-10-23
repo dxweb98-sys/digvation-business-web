@@ -7,6 +7,7 @@ import { money, isPositiveDecimal } from '../transaction/model/sale-display';
 import type { Dispatch, SetStateAction } from 'react';
 import type { useToast } from '@digvation-labs/ui';
 import type { QueueStatus } from './queue-status';
+import { awaitsSettlement } from '../transaction/model/sale-lifecycle';
 import type { RefundDisbursementInput } from '../transaction/api/cashier-transaction.adapter';
 import type { PaymentRoute } from '../transaction/model/cashier-transaction.types';
 import {
@@ -30,6 +31,7 @@ export function useQueuedSaleCancellation({
     voidQueuedSale: (
       targetSale: Sale,
       refundDisbursement?: RefundDisbursementInput,
+      moneyReturned?: boolean,
     ) => Promise<Sale>;
     closeQueueContext: () => void;
     paymentRoutes: readonly PaymentRoute[];
@@ -46,6 +48,8 @@ export function useQueuedSaleCancellation({
   // How a paid Sale's money is returned; until changed, the first available account.
   const [disbursementChoice, setDisbursement] = useState<RefundDisbursementDraft | null>(null);
   const disbursement = disbursementChoice ?? defaultRefundDisbursement(workspace.paymentRoutes);
+  // A Sale awaiting settlement is only cancelled once the operator confirms the money is back.
+  const [moneyReturned, setMoneyReturned] = useState(false);
   const [cancellationReasons, setCancellationReasons] = useState<Record<string, string>>(() =>
     isLocalDemo ? readCancellationReasons() : {},
   );
@@ -53,16 +57,20 @@ export function useQueuedSaleCancellation({
     setCancelTarget(transaction);
     setCancelReason('');
     setDisbursement(null);
+    setMoneyReturned(false);
   };
   const confirmCancel = async () => {
     if (!cancelTarget || !cancelReason.trim()) return;
     const refundAmount = financialSummary(cancelTarget).totalPaid;
     const refunds = isPositiveDecimal(refundAmount);
     if (refunds && !disbursement) return;
+    const confirmsReturn = refunds && awaitsSettlement(cancelTarget);
+    if (confirmsReturn && !moneyReturned) return;
     try {
       const canceledSale = await workspace.voidQueuedSale(
         cancelTarget,
         refunds && disbursement ? refundDisbursementInput(disbursement) : undefined,
+        confirmsReturn ? true : undefined,
       );
       if (isLocalDemo) {
         writeCancellationReason(canceledSale.id, cancelReason.trim());
@@ -99,6 +107,8 @@ export function useQueuedSaleCancellation({
     setCancelReason,
     disbursement,
     setDisbursement,
+    moneyReturned,
+    setMoneyReturned,
     cancellationReasons,
     requestCancel,
     confirmCancel,

@@ -282,13 +282,31 @@ export function ReferenceTransactionOrder({
   onAssign,
   onAssignAddition,
   onStartLineWork,
-}: Omit<OrderLineProps, 'line'> & { activeLines: readonly SaleLine[] }) {
+  onAdjustOrder,
+}: Omit<OrderLineProps, 'line'> & {
+  activeLines: readonly SaleLine[];
+  /** Opens the shared Adjust Order editor; omitted when the Sale may not be adjusted. */
+  onAdjustOrder?: () => void;
+}) {
   const { copy } = useOperationalLocalization();
   return (
     <SaleDetailSection
       title={copy('Order')}
       icon={<ShoppingBag className="size-4" />}
       aside={`${activeLines.length} ${copy('items')}`}
+      action={
+        onAdjustOrder ? (
+          <button
+            type="button"
+            onClick={onAdjustOrder}
+            disabled={isMutating}
+            className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-[var(--color-border)] px-2 py-1 text-xs font-semibold text-[var(--color-brand)] transition-colors hover:bg-[var(--color-brand)]/8 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand)]/30 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Pencil className="size-3" aria-hidden="true" />
+            {copy('Adjust order')}
+          </button>
+        ) : null
+      }
     >
       <SaleLineItemList>
         {activeLines.map((line) => (

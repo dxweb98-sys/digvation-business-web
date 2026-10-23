@@ -22,7 +22,7 @@ import {
   type CartDraftSalesperson,
 } from '../../cart/cart-draft';
 import { MAX_CONFIGURATION_UNITS, opensItemConfigurator } from '../../cart/item-configurator-model';
-import { blocksNewTransaction, hasTrackedWork } from '../../transaction/model/sale-lifecycle';
+import { awaitsSettlement, hasTrackedWork } from '../../transaction/model/sale-lifecycle';
 import type { ItemConfiguration, ItemConfiguratorState } from '../../cart/item-configurator';
 import type { VariantPickerContext, VariantPickerState } from './variant-selection';
 import {
@@ -612,25 +612,46 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     }
   };
 
-  /** A partly paid all-INSTANT Sale has no queue to live in: it must not be abandoned. */
-  const isNewSaleBlocked = blocksNewTransaction(saleWorkspace.sale);
+  /**
+   * A Sale that already received money but is not settled stays in the queue as awaiting
+   * settlement, so leaving it is safe: its payments stay on it and it is resumed from the queue.
+   */
+  const isAwaitingSettlement = awaitsSettlement(saleWorkspace.sale);
 
-  const newSale = () => {
-    if (isNewSaleBlocked) {
-      command.reportError(
-        new Error(copy('Finish the payment of this transaction before starting a new one.')),
-      );
-      return false;
-    }
-    if (saleWorkspace.sale?.status === 'OPEN') {
+  /** `deferred`: the cashier already chose to continue this payment later, so no confirmation. */
+  const newSale = ({ deferred = false }: { deferred?: boolean } = {}) => {
+    if (saleWorkspace.sale?.status === 'OPEN' && !deferred) {
       const confirmed = window.confirm(
-        copy('Start a new transaction? The current transaction will remain open.'),
+        copy(
+          isAwaitingSettlement
+            ? 'Start a new transaction? This transaction stays in the queue as awaiting settlement.'
+            : 'Start a new transaction? The current transaction will remain open.',
+        ),
       );
       if (!confirmed) return false;
     }
     navigate('/sell');
     closeQueueContext();
     saleWorkspace.clearDraft();
+    return true;
+  };
+
+  /** Makes a Sale awaiting settlement the active transaction again, exactly as it was left. */
+  const resumeSale = (saleId: string) => {
+    if (saleWorkspace.sale?.id === saleId) return true;
+    // An unsaved cart would be lost; an OPEN Sale would stay open but leave the screen.
+    if (saleWorkspace.cart.isLocalDraft) {
+      if (
+        !window.confirm(copy('Continue that payment? The items in the current cart are removed.'))
+      )
+        return false;
+    } else if (saleWorkspace.sale?.status === 'OPEN' && !isAwaitingSettlement) {
+      if (!window.confirm(copy('Continue that payment? The current transaction will remain open.')))
+        return false;
+    }
+    closeQueueContext();
+    saleWorkspace.clearDraft();
+    navigate(`/sell/${saleId}`);
     return true;
   };
 
@@ -1103,7 +1124,11 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     paymentRouteId?: string,
   ) => core.createPayment(method, appliedAmount, tenderedAmount, providerReference, paymentRouteId);
 
-  const voidQueuedSale = async (targetSale: Sale, refundDisbursement?: RefundDisbursementInput) => {
+  const voidQueuedSale = async (
+    targetSale: Sale,
+    refundDisbursement?: RefundDisbursementInput,
+    moneyReturned?: boolean,
+  ) => {
     command.clearNotice();
     try {
       const authoritative = await transactionAdapter.getSale(targetSale.id);
@@ -1113,6 +1138,7 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
           authoritative.version,
           `cashier-void-${crypto.randomUUID()}`,
           refundDisbursement,
+          moneyReturned,
         ),
       );
       cacheQueueContext(updated);
@@ -1226,7 +1252,8 @@ export function useCashierTransactionWorkspace(routeSaleId?: string) {
     voidSale: core.voidSale,
     voidQueuedSale,
     newSale,
-    isNewSaleBlocked,
+    resumeSale,
+    isAwaitingSettlement,
     finalizeInstantSale,
     clearProcessedDraft,
     openQueueContext,

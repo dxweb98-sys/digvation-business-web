@@ -18,7 +18,7 @@ import {
   ShoppingBag,
   Sparkles,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   QUEUE_REFRESH_INTERVAL_MS,
@@ -52,7 +52,7 @@ import {
 import { CustomerMemberDialog } from '../../customer/ui/customer-member-dialog';
 import { WalkInCustomerEditDialog } from '../../customer/ui/walk-in-customer-edit-dialog';
 import { ReceiptDeliveryDialog } from '../../receipt/receipt-delivery-dialog';
-import { canAdjustOrder } from '../../adjustment/sale-adjustment-access';
+import { canAdjustOrder, offersOrderAdjustment } from '../../adjustment/sale-adjustment-access';
 import { ReferencePaymentCorrectionDialog } from '../../payment/reference-payment-correction-dialog';
 import { canCorrectPayments } from '../../payment/payment-correction-draft';
 import { completeSettledCheckout, hasTrackedWork } from '../../transaction/model/sale-lifecycle';
@@ -85,6 +85,7 @@ import { useSellingCatalogFilter } from '../../catalog/use-selling-catalog-filte
 import { useDraftTaxPreview } from '../../cart/use-draft-tax-preview';
 import { useCartPricingPreview } from '../../cart/use-cart-pricing-preview';
 import { useQueueGroups } from '../../queue/use-queue-groups';
+import { useAwaitingSettlementPages } from '../../queue/use-awaiting-settlement-pages';
 import { useCheckoutPaymentForm } from '../../payment/use-checkout-payment-form';
 import { useReceiptDeliveryPreview } from '../../receipt/use-receipt-delivery-preview';
 import { useServicePerformerAssignment } from '../../performer/use-service-performer-assignment';
@@ -168,6 +169,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     setCancelReason,
     disbursement: cancelDisbursement,
     setDisbursement: setCancelDisbursement,
+    moneyReturned: cancelMoneyReturned,
+    setMoneyReturned: setCancelMoneyReturned,
     cancellationReasons,
     requestCancel,
     confirmCancel,
@@ -184,6 +187,10 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   // Effective permission, never a role name: without it completed transactions
   // show no amount, detail or receipt, and can only be sent to the customer.
   const canReadCompleted = useCanReadCompletedSaleDetails();
+  // Cancelling a Sale awaiting settlement returns its money: both authorities are required.
+  const canRefundCancel = ['sales:void', 'payments:refund'].every((permission) =>
+    session.access.permissions.includes(permission),
+  );
   const {
     completionConfirmationTarget,
     setCompletionConfirmationTarget,
@@ -293,20 +300,28 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       setTender(amount);
     },
   );
-  const { setAdjustmentTarget, displayedAdjustmentTarget, openAdjustment } = useOrderAdjustment({
-    workspace,
-    session,
-    sale: queueContextSale,
-    setQueueDetail,
-    showToast,
-    copy,
-  });
+  const { setAdjustmentTarget, displayedAdjustmentTarget, openAdjustment, adjustmentCommitted } =
+    useOrderAdjustment({
+      workspace,
+      session,
+      sale: queueContextSale,
+      setQueueDetail,
+      showToast,
+      copy,
+    });
 
+  const awaitingSettlement = useAwaitingSettlementPages({
+    adapter,
+    queue: transactionsQuery.data,
+    locationId: workspace.selectedLocationId,
+  });
+  const loadMoreAwaitingSettlement = awaitingSettlement.loadMore;
   const { groups } = useQueueGroups({
     transactionsQuery,
     isLocalDemo,
     queuedSaleEntries,
     workspace,
+    awaitingSettlementPages: awaitingSettlement.items,
   });
 
   const [checkoutPreparing, setCheckoutPreparing] = useState(false);
@@ -406,6 +421,41 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   };
 
   const refreshQueue = () => void transactionsQuery.refetch();
+
+  /** A Sale resumed from the queue opens at its checkout once it is the active transaction. */
+  const resumeCheckoutSaleId = useRef<string | null>(null);
+  const resumeSale = (transaction: Sale) => {
+    if (!workspace.resumeSale(transaction.id)) return;
+    setQueueDetail(null);
+    setReceiptSaleId(null);
+    setCartOpen(false);
+    startNewCustomerTransaction();
+    resumeCheckoutSaleId.current = transaction.id;
+  };
+  useEffect(() => {
+    if (!resumeCheckoutSaleId.current || sale?.id !== resumeCheckoutSaleId.current) return;
+    resumeCheckoutSaleId.current = null;
+    void openCheckout();
+    // openCheckout reads the current render; it runs once per resumed Sale.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sale?.id]);
+
+  /** "Continue later": the Sale keeps its payments and waits in the queue; serve the next customer. */
+  const deferCheckoutPayment = () => {
+    const deferred = sale;
+    setCheckoutOpen(false);
+    setCartOpen(false);
+    if (!workspace.newSale({ deferred: true })) return;
+    startNewCustomerTransaction();
+    setQueueTab('QUEUED');
+    refreshQueue();
+    if (deferred)
+      showToast({
+        title: copy('Payment continues later'),
+        description: `${transactionNumber(deferred, workspace.locale)} ${copy('is in the queue as awaiting settlement.')} ${copy('Remaining')}: ${money(paymentProgress(deferred).remainingAmount, workspace.locale)}`,
+        variant: 'success',
+      });
+  };
   const { customerEditTarget, setCustomerEditTarget, openCustomerEdit, saveCustomerEdit } =
     useQueuedSaleCustomerEdit({
       adapter,
@@ -839,6 +889,24 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           onPay={(transaction) => void openQueuePayment(transaction)}
           onCancel={requestCancel}
           onEditCustomer={openCustomerEdit}
+          onResume={resumeSale}
+          canRefundCancel={canRefundCancel}
+          awaitingSettlementMore={
+            loadMoreAwaitingSettlement && awaitingSettlement.remaining > 0
+              ? {
+                  remaining: awaitingSettlement.remaining,
+                  isLoading: awaitingSettlement.isLoading,
+                  onLoadMore: () =>
+                    void loadMoreAwaitingSettlement().catch((error: unknown) =>
+                      showToast({
+                        title: copy('Could not load transaction'),
+                        description: cashierTransactionErrorMessage(error),
+                        variant: 'danger',
+                      }),
+                    ),
+                }
+              : null
+          }
           onView={(transaction) => {
             // A queue card is a polling projection. Show it immediately, then
             // replace it with the authoritative transaction response so detail
@@ -1095,6 +1163,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         onConfirmPayment={recordCheckoutPayment}
         onQueue={() => void queueCheckout('QUEUE')}
         onQueueWithBalance={() => void queueCheckout('QUEUE')}
+        onDeferPayment={deferCheckoutPayment}
         loyaltyRedemption={sale?.loyaltyRedemption ?? null}
         loyaltyPointBalance={
           activeSelectedMember ? (memberBalanceQuery.data?.pointsBalance ?? null) : null
@@ -1132,17 +1201,6 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           setReceiptSaleId(null);
         }}
         onNewSale={() => {
-          // A partly paid all-INSTANT Sale has no queue: keep it as the active transaction.
-          if (workspace.isNewSaleBlocked) {
-            showToast({
-              title: copy('Transaction not finished'),
-              description: copy(
-                'Finish the payment of this transaction before starting a new one.',
-              ),
-              variant: 'warning',
-            });
-            return;
-          }
           setQueueDetail(null);
           setReceiptSaleId(null);
           setCartOpen(false);
@@ -1177,6 +1235,13 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         {...(displayedQueueDetail &&
         canCorrectPayments(displayedQueueDetail, session.access.permissions)
           ? { onCorrectPayment: setPaymentCorrectionTarget }
+          : {})}
+        {...(displayedQueueDetail &&
+        offersOrderAdjustment(displayedQueueDetail, session.access.permissions)
+          ? {
+              onAdjustOrder: (transaction: Sale) =>
+                void openAdjustment(transaction, { keepDetail: true }),
+            }
           : {})}
       />
 
@@ -1215,9 +1280,9 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         // The draft is only previewed; the queue takes Runtime's Sale once the whole draft is saved.
         onPreview={workspace.previewOrderAdjustment}
         onCommit={workspace.commitOrderAdjustment}
-        onCommitted={() => {
+        onCommitted={(result) => {
           workspace.closeVariantPicker();
-          setAdjustmentTarget(null);
+          adjustmentCommitted(result.sale);
           workspace.closeQueueContext();
         }}
         onReload={async (saleId) => {
@@ -1321,6 +1386,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         paymentRoutes={workspace.paymentRoutes}
         disbursement={cancelDisbursement}
         onDisbursementChange={setCancelDisbursement}
+        moneyReturned={cancelMoneyReturned}
+        onMoneyReturnedChange={setCancelMoneyReturned}
       />
 
       {performerTarget ? (

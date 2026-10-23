@@ -45,6 +45,16 @@ export interface OperationalProjectionQuery {
     input: SellingCatalogDisplayInput,
     signal?: AbortSignal,
   ): Promise<OperationalCatalogProjection>;
+  /** A further page of a location's Sales awaiting settlement, newest first (bounded by Runtime). */
+  listAwaitingSettlement?(
+    input: { sellingLocationId: string; offset: number; limit: number },
+    signal?: AbortSignal,
+  ): Promise<AwaitingSettlementPage>;
+}
+
+export interface AwaitingSettlementPage extends ApiPage<Sale> {
+  /** All Sales awaiting settlement at the location. */
+  readonly total: number;
 }
 
 export interface OperationalPromotionCommands {
@@ -125,6 +135,11 @@ export interface ReceiptDeliveryIndicator {
 
 export interface OperationalQueuePage extends ApiPage<QueueSale> {
   readonly receiptDeliveries?: Readonly<Record<string, ReceiptDeliveryIndicator>>;
+  /**
+   * Sales awaiting settlement per location, whatever their date. `items` holds the newest of them;
+   * the rest is paged through `listAwaitingSettlement`.
+   */
+  readonly awaitingSettlementTotals?: Readonly<Record<string, number>>;
 }
 
 export type OperationalAwareTransactionPort = SaleTransactionPort &
@@ -183,6 +198,18 @@ export function attachOperationalProjection(
     if (sellingLocationId) query.set('sellingLocationId', sellingLocationId);
     const suffix = query.size ? `?${query.toString()}` : '';
     return client.get<OperationalQueuePage>(`${OPERATIONAL_PREFIX}/queue${suffix}`, { signal });
+  };
+
+  operational.listAwaitingSettlement = (input, signal) => {
+    const query = new URLSearchParams({
+      sellingLocationId: input.sellingLocationId,
+      offset: String(input.offset),
+      limit: String(input.limit),
+    });
+    return client.get<AwaitingSettlementPage>(
+      `${OPERATIONAL_PREFIX}/queue/awaiting-settlement?${query.toString()}`,
+      { signal },
+    );
   };
 
   operational.createSale = (input: CreateSaleInput, idempotencyKey: string) =>
@@ -427,10 +454,20 @@ export function attachOperationalProjection(
       { headers: { 'Idempotency-Key': idempotencyKey } },
     );
 
-  operational.voidSale = (saleId, expectedVersion, idempotencyKey, refundDisbursement) =>
+  operational.voidSale = (
+    saleId,
+    expectedVersion,
+    idempotencyKey,
+    refundDisbursement,
+    moneyReturned,
+  ) =>
     client.post<Sale>(
       `${OPERATIONAL_PREFIX}/transactions/${saleId}/void`,
-      { expectedVersion, ...(refundDisbursement ? { refundDisbursement } : {}) },
+      {
+        expectedVersion,
+        ...(refundDisbursement ? { refundDisbursement } : {}),
+        ...(moneyReturned ? { moneyReturned: true } : {}),
+      },
       { headers: { 'Idempotency-Key': idempotencyKey } },
     );
 

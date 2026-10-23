@@ -35,6 +35,7 @@ export function completedSaleSummary(sale: Sale): CompletedSaleSummary {
     operationalState: sale.operationalState,
     customer: sale.customer ? { type: sale.customer.type, name: sale.customer.name } : null,
     itemCount: sale.lines.filter((line) => line.removedAt === null).length,
+    reversed: sale.reversal != null,
     finalizedAt: sale.finalizedAt,
     createdAt: sale.createdAt,
     updatedAt: sale.updatedAt,

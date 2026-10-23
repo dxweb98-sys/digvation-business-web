@@ -1,5 +1,7 @@
 import { createDecimal } from '@digvation/pos-money';
 import { DBadge as Badge } from '@digvation-labs/ui';
+import { ChevronDown } from 'lucide-react';
+import { useId, useState } from 'react';
 
 import { useOperationalLocalization } from '../../../app/localization/operational-localization';
 import {
@@ -56,7 +58,11 @@ export function PaymentCustomerSummary({
   );
 }
 
-/** The amount to pay, how it is composed, and how much of it is already paid. */
+/**
+ * The amount to pay, how it is composed, and how much of it is already paid. The total stays
+ * visible; the composition can be collapsed so the payment method stays within reach. Toggling
+ * only changes what is shown: every amount comes from the caller as it is.
+ */
 export function PaymentTotalSummary({
   total,
   saleTotal,
@@ -92,57 +98,86 @@ export function PaymentTotalSummary({
   const { copy } = useOperationalLocalization();
   const hasDiscount = !createDecimal(discountAmount).equals(createDecimal('0'));
   const hasTax = !createDecimal(taxAmount).equals(createDecimal('0'));
+  const [expanded, setExpanded] = useState(true);
+  const detailsId = useId();
   return (
-    <div className="pos-pay-section p-4 shadow-sm">
-      <p className="pos-pay-eyebrow">{copy('Payment total')}</p>
-      <h3 className="mt-0.5 text-3xl font-bold leading-tight tabular-nums text-[var(--color-brand)]">
-        {format(total)}
-      </h3>
-      <div className="mt-3 space-y-1.5 border-t border-[var(--color-border)] pt-3 text-[13px]">
-        <div className="flex justify-between gap-3">
-          <span className="text-[var(--color-text-muted)]">{copy('Subtotal')}</span>
-          <span className="font-semibold tabular-nums">{format(gross)}</span>
-        </div>
-        {hasDiscount ? (
-          <div className="flex justify-between gap-3">
-            <span className="text-[var(--color-text-muted)]">{discountLabel}</span>
-            <span className="font-semibold text-[var(--color-danger)]">
-              −{format(discountAmount)}
-            </span>
+    <div className="pos-pay-section shadow-sm">
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-controls={detailsId}
+        onClick={() => setExpanded((current) => !current)}
+        className="flex w-full items-center justify-between gap-3 rounded-[inherit] p-4 text-left transition-colors hover:bg-[var(--color-surface-muted)]/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-brand)]/30"
+      >
+        <span className="min-w-0">
+          <span className="pos-pay-eyebrow block">{copy('Payment total')}</span>
+          <span className="mt-0.5 block text-3xl font-bold leading-tight tabular-nums text-[var(--color-brand)]">
+            {format(total)}
+          </span>
+        </span>
+        <span className="flex shrink-0 items-center gap-1.5 text-[11px] font-semibold text-[var(--color-text-muted)]">
+          <span className="max-sm:sr-only">{copy(expanded ? 'Hide details' : 'Show details')}</span>
+          <ChevronDown
+            aria-hidden="true"
+            className={`size-[18px] transition-transform motion-reduce:transition-none ${expanded ? 'rotate-180' : ''}`}
+          />
+        </span>
+      </button>
+      <div
+        id={detailsId}
+        inert={!expanded}
+        className={`pos-collapsible grid ${expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
+      >
+        <div className="min-h-0 overflow-hidden px-4">
+          <div className="pb-4">
+            <div className="space-y-1.5 border-t border-[var(--color-border)] pt-3 text-[13px]">
+              <div className="flex justify-between gap-3">
+                <span className="text-[var(--color-text-muted)]">{copy('Subtotal')}</span>
+                <span className="font-semibold tabular-nums">{format(gross)}</span>
+              </div>
+              {hasDiscount ? (
+                <div className="flex justify-between gap-3">
+                  <span className="text-[var(--color-text-muted)]">{discountLabel}</span>
+                  <span className="font-semibold text-[var(--color-danger)]">
+                    −{format(discountAmount)}
+                  </span>
+                </div>
+              ) : null}
+              {hasLoyaltyRedemption ? (
+                <div className="flex justify-between gap-3">
+                  <span className="flex items-center gap-2 text-[var(--color-text-muted)]">
+                    <span className="size-2 rounded-full bg-[var(--color-warning)]" />
+                    {copy('Loyalty redemption')}
+                  </span>
+                  <span className="font-semibold text-[var(--color-danger)]">
+                    −{format(redeemedAmount!)}
+                  </span>
+                </div>
+              ) : null}
+              {hasTax ? (
+                <div className="flex justify-between gap-3">
+                  <span className="text-[var(--color-text-muted)]">{taxLabel}</span>
+                  <span className="font-semibold">{format(taxAmount)}</span>
+                </div>
+              ) : null}
+              <div className="flex justify-between border-t border-[var(--color-border)] pt-2.5 text-sm font-bold">
+                <span className="font-bold">{copy('Net total')}</span>
+                <span className="font-bold">{format(total)}</span>
+              </div>
+            </div>
+            {hasPaymentActivity ? (
+              <div className="mt-3">
+                <PaymentProgressSummary total={saleTotal} progress={progress} format={format} />
+                {hasRecordedMoney && !fullyPaid ? (
+                  <p className="mt-2 text-[11px] font-medium text-[var(--color-text-muted)]">
+                    {copy('The transaction is not complete until the remaining amount is paid.')}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
           </div>
-        ) : null}
-        {hasLoyaltyRedemption ? (
-          <div className="flex justify-between gap-3">
-            <span className="flex items-center gap-2 text-[var(--color-text-muted)]">
-              <span className="size-2 rounded-full bg-[var(--color-warning)]" />
-              {copy('Loyalty redemption')}
-            </span>
-            <span className="font-semibold text-[var(--color-danger)]">
-              −{format(redeemedAmount!)}
-            </span>
-          </div>
-        ) : null}
-        {hasTax ? (
-          <div className="flex justify-between gap-3">
-            <span className="text-[var(--color-text-muted)]">{taxLabel}</span>
-            <span className="font-semibold">{format(taxAmount)}</span>
-          </div>
-        ) : null}
-        <div className="flex justify-between border-t border-[var(--color-border)] pt-2.5 text-sm font-bold">
-          <span className="font-bold">{copy('Net total')}</span>
-          <span className="font-bold">{format(total)}</span>
         </div>
       </div>
-      {hasPaymentActivity ? (
-        <div className="mt-3">
-          <PaymentProgressSummary total={saleTotal} progress={progress} format={format} />
-          {hasRecordedMoney && !fullyPaid ? (
-            <p className="mt-2 text-[11px] font-medium text-[var(--color-text-muted)]">
-              {copy('The transaction is not complete until the remaining amount is paid.')}
-            </p>
-          ) : null}
-        </div>
-      ) : null}
     </div>
   );
 }

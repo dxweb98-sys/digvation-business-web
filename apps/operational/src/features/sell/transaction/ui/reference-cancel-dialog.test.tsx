@@ -67,6 +67,7 @@ function renderCancel(target: Sale, routes: PaymentRoute[]) {
   function Harness() {
     const [reason, setReason] = useState('');
     const [choice, setChoice] = useState<RefundDisbursementDraft | null>(null);
+    const [moneyReturned, setMoneyReturned] = useState(false);
     return (
       <ReferenceCancelDialog
         sale={target}
@@ -78,6 +79,8 @@ function renderCancel(target: Sale, routes: PaymentRoute[]) {
         paymentRoutes={routes}
         disbursement={choice ?? defaultRefundDisbursement(routes)}
         onDisbursementChange={setChoice}
+        moneyReturned={moneyReturned}
+        onMoneyReturnedChange={setMoneyReturned}
       />
     );
   }
@@ -119,6 +122,46 @@ describe('ReferenceCancelDialog', () => {
       target: { value: 'Permintaan pelanggan' },
     });
     expect(confirmButton().disabled).toBe(true);
+  });
+
+  it('cancels a partly paid Product-only Sale only after confirming the money was returned', () => {
+    const awaiting = {
+      ...sale(null),
+      operationalState: 'UNSUBMITTED',
+      totalAmount: '127650.0000',
+      lines: [{ id: 'line-1', removedAt: null, fulfillmentBehaviorSnapshot: 'INSTANT' }],
+      payments: [
+        { id: 'p-cash', status: 'SUCCEEDED', method: 'CASH', appliedAmount: '30000.0000' },
+        { id: 'p-bank', status: 'SUCCEEDED', method: 'BANK_TRANSFER', appliedAmount: '20000.0000' },
+        { id: 'p-wait', status: 'FAILED', method: 'BANK_TRANSFER', appliedAmount: '9000.0000' },
+      ],
+    } as unknown as Sale;
+    const { onConfirm } = renderCancel(awaiting, [route('route-cash', 'CASH', 'Kas Laci')]);
+    const terms = (label: string) =>
+      screen.getByText(label).closest('div')?.querySelector('dd')?.textContent ?? '';
+    expect(terms('Total transaksi')).toMatch(/127\.650/);
+    expect(terms('Sudah diterima')).toMatch(/50\.000/);
+    expect(terms('Akan dikembalikan')).toMatch(/50\.000/);
+    expect(screen.getByRole('region', { name: 'Pengembalian dana' }).textContent).toContain(
+      'Kas Laci',
+    );
+    const refundAndCancel = () =>
+      screen.getByRole('button', { name: 'Kembalikan dana & batalkan' }) as HTMLButtonElement;
+    fireEvent.change(screen.getByRole('textbox', { name: /Alasan pembatalan/ }), {
+      target: { value: 'Pelanggan batal' },
+    });
+    // The reason and the account are not enough: the money must really be back.
+    expect(refundAndCancel().disabled).toBe(true);
+    fireEvent.click(screen.getByRole('checkbox'));
+    expect(refundAndCancel().disabled).toBe(false);
+    fireEvent.click(refundAndCancel());
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the queued cancellation without the extra confirmation', () => {
+    renderCancel(sale('218670.0000'), [route('route-cash', 'CASH', 'Kas Laci')]);
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(screen.queryByText('Akan dikembalikan')).toBeNull();
   });
 
   it('cancels an unpaid Sale without any refund choice', () => {

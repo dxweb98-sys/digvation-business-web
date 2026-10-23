@@ -500,12 +500,36 @@ export function PaymentLeaveNotice({
   progress,
   format,
   hasPending,
+  instantOnly = false,
 }: {
   progress: PaymentProgress;
   format: Format;
   hasPending: boolean;
+  /** An all-INSTANT Sale continues later from the queue rather than being queued as work. */
+  instantOnly?: boolean;
 }) {
   const { copy } = useOperationalLocalization();
+  if (instantOnly)
+    return (
+      <div className="space-y-3">
+        <DAlert variant="warning">
+          {format(progress.paidAmount)} {copy('is already recorded for this transaction.')}{' '}
+          {format(progress.remainingAmount)} {copy('is still unpaid.')}
+        </DAlert>
+        <p className="text-sm text-[var(--color-text-muted)]">
+          {copy(
+            'Continue later keeps this transaction in the queue as awaiting settlement. Recorded payments stay on the transaction, and you can serve another customer.',
+          )}
+        </p>
+        {hasPending ? (
+          <p className="text-sm text-[var(--color-text-muted)]">
+            {copy(
+              'A payment waiting for confirmation stays on the transaction. Confirm it when you continue the payment.',
+            )}
+          </p>
+        ) : null}
+      </div>
+    );
   return (
     <div className="space-y-3">
       <DAlert variant="warning">

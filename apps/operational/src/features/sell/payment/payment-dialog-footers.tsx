@@ -31,7 +31,12 @@ export function PaymentEditFooter({
   const { copy } = useOperationalLocalization();
   return (
     <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2">
-      <DButton variant="ghost" className="h-12 px-3 text-sm" onClick={onCancel}>
+      {/* On a phone the longer leave label wraps so the amount to pay is never cut off. */}
+      <DButton
+        variant="ghost"
+        className="h-12 px-3 text-sm max-sm:max-w-28 max-sm:whitespace-normal max-sm:leading-tight"
+        onClick={onCancel}
+      >
         {copy(leavesPayment ? 'Leave payment' : 'Cancel')}
       </DButton>
       {collectsPayment ? (
@@ -93,23 +98,34 @@ export function PaymentLeaveFooter({
   isSubmitting,
   onQueueWithBalance,
   onContinue,
+  instantOnly,
+  onDeferPayment,
 }: {
   hasPending: boolean;
   isSubmitting: boolean;
   onQueueWithBalance: () => void;
   onContinue: () => void;
+  /** An all-INSTANT Sale has no work to queue: it continues later from the queue instead. */
+  instantOnly: boolean;
+  onDeferPayment: () => void;
 }) {
   const { copy } = useOperationalLocalization();
   return (
     <div className="flex flex-col-reverse justify-end gap-2 sm:flex-row">
-      <DButton
-        variant="outline"
-        disabled={hasPending || isSubmitting}
-        loading={isSubmitting}
-        onClick={onQueueWithBalance}
-      >
-        {copy('Add to queue, collect later')}
-      </DButton>
+      {instantOnly ? (
+        <DButton variant="outline" disabled={isSubmitting} onClick={onDeferPayment}>
+          {copy('Continue later')}
+        </DButton>
+      ) : (
+        <DButton
+          variant="outline"
+          disabled={hasPending || isSubmitting}
+          loading={isSubmitting}
+          onClick={onQueueWithBalance}
+        >
+          {copy('Add to queue, collect later')}
+        </DButton>
+      )}
       <DButton onClick={onContinue}>{copy('Continue payment')}</DButton>
     </div>
   );

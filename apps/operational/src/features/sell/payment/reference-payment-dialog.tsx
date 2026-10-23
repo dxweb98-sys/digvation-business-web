@@ -77,6 +77,7 @@ export function ReferencePaymentDialog({
   onConfirmPayment,
   onQueue,
   onQueueWithBalance,
+  onDeferPayment,
   loyaltyRedemption,
   loyaltyPointBalance,
   isLoyaltyBalanceLoading,
@@ -129,6 +130,8 @@ export function ReferencePaymentDialog({
   onQueue: () => void;
   /** Queues a partly paid transaction so the rest is collected from the queue. */
   onQueueWithBalance: () => void;
+  /** Leaves a partly paid all-INSTANT Sale awaiting settlement, to be resumed from the queue. */
+  onDeferPayment: () => void;
   loyaltyRedemption: Sale['loyaltyRedemption'];
   loyaltyPointBalance: string | null;
   isLoyaltyBalanceLoading: boolean;
@@ -233,8 +236,9 @@ export function ReferencePaymentDialog({
       setStep('edit');
       return;
     }
-    // Leaving a partly paid all-INSTANT Sale keeps it open; there is no queue to collect from later.
-    if (hasRecordedMoney && !fullyPaid && !instantOnly) {
+    // Leaving a Sale that already received money never discards it: tracked work can be queued
+    // with its balance, and an all-INSTANT Sale stays awaiting settlement in the queue.
+    if (hasRecordedMoney && !fullyPaid) {
       setStep('leave');
       return;
     }
@@ -297,6 +301,8 @@ export function ReferencePaymentDialog({
         hasPending={hasPending}
         isSubmitting={isSubmitting}
         onQueueWithBalance={onQueueWithBalance}
+        instantOnly={instantOnly}
+        onDeferPayment={onDeferPayment}
         onContinue={() => setStep('edit')}
       />
     ) : undefined;
@@ -323,7 +329,12 @@ export function ReferencePaymentDialog({
       {step === 'review' ? (
         <PaymentReview {...shownReview} />
       ) : step === 'leave' ? (
-        <PaymentLeaveNotice progress={progress} format={format} hasPending={hasPending} />
+        <PaymentLeaveNotice
+          progress={progress}
+          format={format}
+          hasPending={hasPending}
+          instantOnly={instantOnly}
+        />
       ) : (
         <div className="grid min-h-0 gap-0 lg:h-[min(720px,calc(85dvh-5.5rem))] lg:grid-cols-[minmax(0,1fr)_440px] lg:overflow-hidden">
           <div className="min-h-0 space-y-3 overscroll-contain bg-[var(--color-surface)] p-4 lg:overflow-y-auto lg:border-r lg:border-[var(--color-border)] lg:pr-3">
@@ -381,7 +392,9 @@ export function ReferencePaymentDialog({
           </div>
 
           <div className="max-lg:contents lg:sticky lg:top-0 lg:flex lg:h-full lg:min-h-0 lg:w-[440px] lg:min-w-[440px] lg:flex-col lg:self-stretch lg:overflow-hidden lg:bg-[var(--color-surface-muted)]/60">
-            <div className="shrink-0 space-y-3 bg-[var(--color-surface-muted)]/60 p-4 pb-3 lg:overflow-y-hidden lg:[scrollbar-gutter:stable]">
+            {/* One scroll region holds the summary, recorded payments and payment method, so an
+                expanded summary never squeezes the method out of reach; only the actions stay fixed. */}
+            <div className="min-h-0 flex-1 space-y-3 overscroll-contain bg-[var(--color-surface-muted)]/60 p-4 lg:overflow-y-auto lg:[scrollbar-gutter:stable]">
               {customer ? (
                 <PaymentCustomerSummary
                   customer={customer}
@@ -407,9 +420,7 @@ export function ReferencePaymentDialog({
                 fullyPaid={fullyPaid}
                 format={format}
               />
-            </div>
 
-            <div className="min-h-0 flex-1 space-y-3 overscroll-contain bg-[var(--color-surface-muted)]/60 px-4 pb-4 lg:overflow-y-auto lg:[scrollbar-gutter:stable]">
               {hasPaymentActivity && sale ? (
                 <RecordedPaymentList
                   payments={payments}

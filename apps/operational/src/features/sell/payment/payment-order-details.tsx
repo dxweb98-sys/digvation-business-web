@@ -29,7 +29,7 @@ export function PaymentOrderDetails({
   const { copy } = useOperationalLocalization();
   return (
     <section className="pos-pay-section">
-      <div className="pos-pay-section__head border-b border-[var(--color-border)]">
+      <div className="pos-pay-section__head border-b border-[var(--color-border)] max-sm:flex-wrap">
         <div className="pos-pay-section__title">
           <ShoppingBag
             className="size-4 shrink-0 text-[var(--color-text-muted)]"

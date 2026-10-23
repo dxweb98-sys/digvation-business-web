@@ -1,4 +1,5 @@
 import { DTabs, DTabsContent, DTabsList, DTabsTrigger } from '@digvation/ui';
+import { DButton } from '@digvation-labs/ui';
 import { ChevronDown, Clock } from 'lucide-react';
 import { useOperationalLocalization } from '../../../app/localization/operational-localization';
 import type { QueueSale, Sale } from '../transaction/model/cashier-transaction.types';
@@ -29,6 +30,9 @@ export function ReferenceQueueBoard({
   onSendReceipt,
   receiptDeliveries,
   onEditCustomer,
+  onResume,
+  canRefundCancel,
+  awaitingSettlementMore = null,
 }: {
   open: boolean;
   onOpenChange: (value: boolean) => void;
@@ -50,6 +54,16 @@ export function ReferenceQueueBoard({
   receiptDeliveries: Readonly<Record<string, ReceiptDeliveryIndicator>>;
   /** Corrects a walk-in customer before the transaction is completed. */
   onEditCustomer: (sale: Sale) => void;
+  /** Reopens a Sale awaiting settlement at its checkout. */
+  onResume: (sale: Sale) => void;
+  /** The session may cancel a Sale awaiting settlement by refunding it (sales:void, payments:refund). */
+  canRefundCancel: boolean;
+  /** Further Sales awaiting settlement at this location, loaded a bounded page at a time. */
+  awaitingSettlementMore?: {
+    remaining: number;
+    isLoading: boolean;
+    onLoadMore: () => void;
+  } | null;
 }) {
   const { copy, label } = useOperationalLocalization();
   const statuses = Object.keys(statusMeta) as QueueStatus[];
@@ -162,6 +176,8 @@ export function ReferenceQueueBoard({
                                   onViewReceipt={onViewReceipt}
                                   onSendReceipt={onSendReceipt}
                                   onEditCustomer={onEditCustomer}
+                                  onResume={onResume}
+                                  canRefundCancel={canRefundCancel}
                                   receiptDelivery={receiptDeliveries[sale.id] ?? null}
                                 />
                               );
@@ -178,6 +194,19 @@ export function ReferenceQueueBoard({
                           </p>
                         </div>
                       )}
+                      {status === 'QUEUED' && awaitingSettlementMore ? (
+                        <DButton
+                          size="sm"
+                          variant="outline"
+                          className="w-full sm:w-auto"
+                          loading={awaitingSettlementMore.isLoading}
+                          disabled={awaitingSettlementMore.isLoading}
+                          onClick={awaitingSettlementMore.onLoadMore}
+                        >
+                          {copy('Load more awaiting settlement')} (
+                          {awaitingSettlementMore.remaining} {copy('remaining')})
+                        </DButton>
+                      ) : null}
                     </div>
                   </DTabsContent>
                 );

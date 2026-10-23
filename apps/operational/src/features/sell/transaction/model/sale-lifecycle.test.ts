@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Sale } from './cashier-transaction.types';
 import { hasStartableQueuedWork } from '../../queue/queued-sale-work';
 import {
-  blocksNewTransaction,
+  awaitsSettlement,
   checkoutCompletionOf,
   completeSettledCheckout,
   hasTrackedWork,
@@ -173,32 +173,40 @@ describe('pending provider payment', () => {
   });
 });
 
-describe('a partly paid Product Sale cannot be silently abandoned', () => {
-  it('blocks a new transaction after a successful partial payment', () => {
-    expect(blocksNewTransaction(saleWith(['PRODUCT'], [paid('100000.0000')]))).toBe(true);
+describe('a partly paid unsubmitted Sale awaits settlement in the queue', () => {
+  it('awaits settlement after a successful partial payment', () => {
+    expect(awaitsSettlement(saleWith(['PRODUCT'], [paid('100000.0000')]))).toBe(true);
   });
 
-  it('also blocks while a provider payment is pending', () => {
-    expect(blocksNewTransaction(saleWith(['PRODUCT'], [pending('200000.0000')]))).toBe(true);
+  it('also awaits settlement while a payment is pending', () => {
+    expect(awaitsSettlement(saleWith(['PRODUCT'], [pending('200000.0000')]))).toBe(true);
   });
 
-  it('keeps the existing reset behavior for a Sale with no payment', () => {
-    expect(blocksNewTransaction(saleWith(['PRODUCT'], []))).toBe(false);
-    expect(blocksNewTransaction(null)).toBe(false);
-    expect(blocksNewTransaction(undefined)).toBe(false);
+  it('is not an unpaid draft or a failed payment', () => {
+    expect(awaitsSettlement(saleWith(['PRODUCT'], []))).toBe(false);
+    expect(
+      awaitsSettlement(saleWith(['PRODUCT'], [{ status: 'FAILED', applied: '100000.0000' }])),
+    ).toBe(false);
+    expect(awaitsSettlement(null)).toBe(false);
+    expect(awaitsSettlement(undefined)).toBe(false);
   });
 
-  it('permits a fresh transaction once the Sale is finalized', () => {
+  it('ends once the Sale is finalized', () => {
     const finalized = saleWith(['PRODUCT'], [paid('200000.0000')], '200000.0000', {
       status: 'FINALIZED',
     });
-    expect(blocksNewTransaction(finalized)).toBe(false);
+    expect(awaitsSettlement(finalized)).toBe(false);
   });
 
-  it('does not apply to a queue-tracked Sale, which lives in the queue', () => {
-    expect(blocksNewTransaction(saleWith(['PRODUCT', 'SERVICE'], [paid('100000.0000')]))).toBe(
-      false,
-    );
+  it('covers an unsubmitted partly paid Sale with tracked work, but not one already queued', () => {
+    expect(awaitsSettlement(saleWith(['PRODUCT', 'SERVICE'], [paid('100000.0000')]))).toBe(true);
+    expect(
+      awaitsSettlement(
+        saleWith(['PRODUCT', 'SERVICE'], [paid('100000.0000')], '200000.0000', {
+          operationalState: 'QUEUED',
+        }),
+      ),
+    ).toBe(false);
   });
 });
 

@@ -34,9 +34,24 @@ export const statusMeta: Record<
   },
 };
 
+/**
+ * True once Runtime has appended a reversal to this FINALIZED Sale, from the full Sale or from the
+ * restricted completed-sale summary alike. The Sale itself stays FINALIZED and immutable.
+ */
+export function isReversedSale(
+  sale: Pick<QueueSale, 'status'> & { reversal?: unknown; reversed?: boolean },
+): boolean {
+  return sale.status === 'FINALIZED' && (sale.reversed === true || sale.reversal != null);
+}
+
+/** User-facing status: an authoritative reversal takes precedence over FINALIZED. */
 export function queueStatus(
-  sale: Pick<QueueSale, 'status' | 'operationalState'>,
+  sale: Pick<QueueSale, 'status' | 'operationalState'> & {
+    reversal?: unknown;
+    reversed?: boolean;
+  },
 ): QueueStatus | null {
+  if (isReversedSale(sale)) return 'CANCELED';
   if (sale.status === 'FINALIZED') return 'COMPLETED';
   if (sale.status === 'VOIDED') return 'CANCELED';
   if (sale.operationalState === 'IN_PROGRESS') return 'PROGRESS';

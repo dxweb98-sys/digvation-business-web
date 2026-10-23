@@ -113,6 +113,7 @@ export function SaleDetailSection({
   title,
   icon,
   aside,
+  action,
   /** `panel` for scannable lists, `muted` for the money summary, `plain` for bare content. */
   surface = 'panel',
   children,
@@ -120,6 +121,8 @@ export function SaleDetailSection({
   title: string;
   icon?: ReactNode;
   aside?: ReactNode;
+  /** A secondary command about the whole section, at the right of a panel's header. */
+  action?: ReactNode;
   surface?: 'plain' | 'panel' | 'muted';
   children: ReactNode;
 }) {
@@ -152,6 +155,7 @@ export function SaleDetailSection({
             {aside}
           </span>
         ) : null}
+        {action ? <div className="ml-auto shrink-0">{action}</div> : null}
       </DCardHeader>
       <DCardContent className="px-4 py-0">{children}</DCardContent>
     </DCard>
@@ -457,6 +461,14 @@ export function SaleFinancialSummary({
     totalPaid?: string;
     balance: string;
     settled: string;
+    /** A VOIDED or reversed Sale's history: what came in, what went back, and what is left. */
+    closed?: {
+      refunded: string;
+      partiallyRefunded: string;
+      received: string;
+      returned: string;
+      net: string;
+    };
     cashReceived: string;
     change: string;
     /** Title word of a manual discount, for example "Diskon". */
@@ -483,6 +495,11 @@ export function SaleFinancialSummary({
   paymentActions?: ReactNode;
 }) {
   const hasBalance = settlement.balanceDue !== '0.0000';
+  // A closed Sale owes nothing; when money went back, its history replaces the settlement rows.
+  const closedHistory =
+    settlement.closed && labels.closed && settlement.refundedAmount !== '0.0000'
+      ? labels.closed
+      : null;
   // A settled sale whose payments equal its total says so once, as a badge. The
   // paid and balance rows only appear when they add information.
   const settledExactly = !hasBalance && settlement.totalPaid === total;
@@ -554,13 +571,34 @@ export function SaleFinancialSummary({
               ) : null}
               {payment?.aside ? <div className="mt-1">{payment.aside}</div> : null}
             </div>
-            {!hasBalance ? (
+            {closedHistory ? (
+              <DBadge variant="secondary" dot className="shrink-0 font-semibold">
+                {settlement.paymentState === 'PARTIALLY_REFUNDED'
+                  ? closedHistory.partiallyRefunded
+                  : closedHistory.refunded}
+              </DBadge>
+            ) : !hasBalance && !settlement.closed ? (
               <DBadge variant="success" dot className="shrink-0 font-semibold">
                 {labels.settled}
               </DBadge>
             ) : null}
           </div>
-          {settlementRows ? (
+          {closedHistory ? (
+            <dl className="mt-2 space-y-1.5 text-[13px]" data-testid="closed-sale-payment-history">
+              <div className="flex justify-between gap-4">
+                <dt className="text-[var(--color-text-muted)]">{closedHistory.received}</dt>
+                <dd className="font-semibold tabular-nums">{format(settlement.receivedAmount)}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-[var(--color-text-muted)]">{closedHistory.returned}</dt>
+                <dd className="font-semibold tabular-nums">−{format(settlement.refundedAmount)}</dd>
+              </div>
+              <div className="flex justify-between gap-4 font-semibold">
+                <dt>{closedHistory.net}</dt>
+                <dd className="tabular-nums">{format(settlement.totalPaid)}</dd>
+              </div>
+            </dl>
+          ) : settlementRows ? (
             <dl className="mt-2 space-y-1.5 text-[13px]">
               <div className="flex justify-between gap-4">
                 <dt className="text-[var(--color-text-muted)]">{labels.paid}</dt>
@@ -577,7 +615,7 @@ export function SaleFinancialSummary({
             </dl>
           ) : null}
           {payment ? <div className="mt-1">{payment.content}</div> : null}
-          {payment && !settlementRows && labels.totalPaid ? (
+          {payment && !settlementRows && !closedHistory && labels.totalPaid ? (
             <p className="flex justify-between gap-4 border-t border-[var(--color-border)] pt-2.5 text-sm font-bold">
               <span>{labels.totalPaid}</span>
               <span className="tabular-nums">{format(settlement.totalPaid)}</span>

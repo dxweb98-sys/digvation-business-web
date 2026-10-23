@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   canAdjustOrder,
   correctionSourceOf,
+  offersOrderAdjustment,
   PROGRESSED_ADJUSTMENT_PERMISSION,
   saleLineAdjustmentMode,
 } from './sale-adjustment-access';
@@ -67,5 +68,21 @@ describe('correctionSourceOf', () => {
     expect(correctionSourceOf(sale, { correctedFromLineId: 'elsewhere' })).toBeNull();
     expect(correctionSourceOf(sale, { correctedFromLineId: null })).toBeNull();
     expect(correctionSourceOf(sale, {})).toBeNull();
+  });
+});
+
+describe('offersOrderAdjustment', () => {
+  const at = (status: string, operationalState: string) => ({ status, operationalState }) as never;
+
+  it('offers queued and in-progress OPEN Sales, as the queue card does', () => {
+    expect(offersOrderAdjustment(at('OPEN', 'QUEUED'), UPDATE)).toBe(true);
+    expect(offersOrderAdjustment(at('OPEN', 'IN_PROGRESS'), BOTH)).toBe(true);
+    expect(offersOrderAdjustment(at('OPEN', 'IN_PROGRESS'), UPDATE)).toBe(false);
+  });
+
+  it('keeps completed, cancelled and unsubmitted Sales out', () => {
+    expect(offersOrderAdjustment(at('FINALIZED', 'QUEUED'), BOTH)).toBe(false);
+    expect(offersOrderAdjustment(at('VOIDED', 'QUEUED'), BOTH)).toBe(false);
+    expect(offersOrderAdjustment(at('OPEN', 'UNSUBMITTED'), BOTH)).toBe(false);
   });
 });

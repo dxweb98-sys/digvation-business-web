@@ -23,6 +23,22 @@ export function canAdjustOrder(
 }
 
 /**
+ * Whether Adjust Order is offered for a Sale at all: an OPEN Sale submitted as queued or in-progress
+ * work (as on the queue card), with the session's adjustment permissions. Completed and cancelled
+ * Sales stay immutable, and an unsubmitted Sale is changed at its checkout instead.
+ */
+export function offersOrderAdjustment(
+  sale: Pick<Sale, 'status' | 'operationalState'>,
+  permissions: readonly string[],
+): boolean {
+  return (
+    sale.status === 'OPEN' &&
+    (sale.operationalState === 'QUEUED' || sale.operationalState === 'IN_PROGRESS') &&
+    canAdjustOrder(sale, permissions)
+  );
+}
+
+/**
  * How a persisted line of an OPEN Sale may be changed in Adjust Order:
  * - `EDIT`: nothing has started on it, so it is edited ordinarily (quantity, configuration, removal).
  *   This includes an item added during the current adjustment of an in-progress Sale: a mistaken

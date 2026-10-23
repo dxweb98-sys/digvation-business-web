@@ -219,6 +219,55 @@ describe('ReferenceTransactionDetail Runtime detail shapes', () => {
     expect(screen.getAllByText(/197[.,]580/).length).toBeGreaterThan(0);
   });
 
+  it('shows a completed Service Sale reversed afterwards as cancelled, refunded and owing nothing', () => {
+    const base = runtimeQueueDetail({
+      status: 'FINALIZED',
+      operationalState: 'IN_PROGRESS',
+      finalizedAt: '2026-09-24T02:15:00.000Z',
+      loyaltyRedemption: null,
+      reversal: { reason: 'Komplain pelanggan', reversedAt: '2026-09-25T03:00:00.000Z' },
+    });
+    const reversed: Sale = {
+      ...base,
+      lines: base.lines.map((line) => ({
+        ...line,
+        fulfillment: {
+          ...line.fulfillment!,
+          status: 'COMPLETED',
+          completedAt: '2026-09-24T02:10:00.000Z',
+        },
+      })),
+      payments: [
+        ...base.payments,
+        {
+          ...base.payments[0]!,
+          id: 'refund-1',
+          kind: 'REFUND',
+          appliedAmount: '-197580.0000',
+          tenderedAmount: null,
+          changeAmount: null,
+        },
+      ],
+    };
+    renderRuntimeDetail(reversed);
+
+    expect(screen.getByText('Dibatalkan')).toBeTruthy();
+    expect(screen.getByText('Selesai sebelum pembatalan')).toBeTruthy();
+    expect(screen.getByText('Komplain pelanggan')).toBeTruthy();
+    // Historical items and work stay as they were.
+    expect(screen.getAllByText('Hair Color').length).toBeGreaterThan(0);
+    const history = screen.getByTestId('closed-sale-payment-history');
+    expect(history.textContent).toMatch(/Total dikembalikan−Rp\s?197\.580/);
+    expect(history.textContent).toMatch(/Bersih diterimaRp\s?0/);
+    expect(screen.getByText('Dikembalikan')).toBeTruthy();
+    // The method it was paid with and the one it went back through.
+    expect(screen.getAllByText('Kas Utama')).toHaveLength(2);
+    expect(screen.queryByText('Sisa tagihan')).toBeNull();
+    expect(screen.queryByText('Bayar sebagian')).toBeNull();
+    expect(screen.queryByText('Lunas')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Selesaikan|Bayar|Sesuaikan pesanan/ })).toBeNull();
+  });
+
   it('renders Runtime preview points for Open work without treating them as earned history', () => {
     const open = runtimeQueueDetail({ loyaltyRedemption: null });
     setLineLoyaltyEarning(open, {
@@ -2080,5 +2129,49 @@ describe('ReferenceTransactionDetail payment correction', () => {
     expect(text).toMatch(/Tunai.*10[.,]000/);
     expect(text).not.toMatch(/105[.,]000/);
     expect(text).not.toContain('Koreksi');
+  });
+});
+
+describe('ReferenceTransactionDetail Adjust Order entry', () => {
+  afterEach(cleanup);
+
+  const renderAdjustable = (sale: Sale, onAdjustOrder?: (sale: Sale) => void) =>
+    render(
+      <DeploymentBootstrapProvider config={bootstrap}>
+        <ReferenceTransactionDetail
+          sale={sale}
+          locale="id-ID"
+          employees={[]}
+          businessName="Digvation"
+          branchName="Main branch"
+          cashierName="Kasir"
+          showPaymentReceipt={false}
+          onClose={vi.fn()}
+          onNewSale={vi.fn()}
+          onViewReceipt={vi.fn()}
+          onAssign={vi.fn()}
+          onStartLineWork={vi.fn()}
+          onComplete={vi.fn()}
+          isMutating={false}
+          {...(onAdjustOrder ? { onAdjustOrder } : {})}
+        />
+      </DeploymentBootstrapProvider>,
+    );
+  const orderHeader = () =>
+    screen.getByRole('heading', { name: 'Pesanan' }).parentElement as HTMLElement;
+
+  it('sits in the Pesanan header, beside its item count, and opens the shared editor for this Sale', () => {
+    const onAdjustOrder = vi.fn();
+    renderAdjustable(runtimeQueueDetail(), onAdjustOrder);
+    const header = orderHeader();
+    expect(header.textContent).toMatch(/\d+ item/);
+    fireEvent.click(within(header).getByRole('button', { name: 'Sesuaikan pesanan' }));
+    expect(onAdjustOrder).toHaveBeenCalledOnce();
+    expect(onAdjustOrder.mock.calls[0]![0].id).toBe('sale-runtime-1');
+  });
+
+  it('is absent when the Sale may not be adjusted', () => {
+    renderAdjustable(runtimeQueueDetail());
+    expect(screen.queryByRole('button', { name: 'Sesuaikan pesanan' })).toBeNull();
   });
 });

@@ -85,6 +85,7 @@ describe('completed sale visibility', () => {
       operationalState: 'IN_PROGRESS',
       customer: { type: 'NON_MEMBER', name: 'Rina' },
       itemCount: 1,
+      reversed: false,
       finalizedAt: '2026-09-19T03:00:00.000Z',
       createdAt: '2026-09-19T01:00:00.000Z',
       updatedAt: '2026-09-19T03:00:00.000Z',

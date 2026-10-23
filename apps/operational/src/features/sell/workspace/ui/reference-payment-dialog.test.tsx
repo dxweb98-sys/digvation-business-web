@@ -96,6 +96,7 @@ function PaymentHarness({
   payments = [],
   onQueue = vi.fn(),
   onClose = vi.fn(),
+  onDeferPayment = vi.fn(),
   open = true,
   isSubmitting = false,
 }: {
@@ -107,6 +108,7 @@ function PaymentHarness({
   payments?: PaymentFixture[];
   onQueue?: () => void;
   onClose?: () => void;
+  onDeferPayment?: () => void;
   open?: boolean;
   isSubmitting?: boolean;
 }) {
@@ -153,6 +155,7 @@ function PaymentHarness({
           onConfirmPayment={onConfirm}
           onQueue={onQueue}
           onQueueWithBalance={vi.fn()}
+          onDeferPayment={onDeferPayment}
           loyaltyRedemption={null}
           loyaltyPointBalance={null}
           isLoyaltyBalanceLoading={false}
@@ -449,8 +452,9 @@ describe('ReferencePaymentDialog for an all-INSTANT (Product-only) Sale', () => 
     expect(screen.queryByText(/antrian/i)).toBeNull();
   });
 
-  it('closing a partly paid Product Sale keeps it open, with no queue-and-collect-later step', () => {
+  it('leaving a partly paid Product Sale offers to continue later, never to queue it as work', () => {
     const onClose = vi.fn();
+    const onDeferPayment = vi.fn();
     render(
       <PaymentHarness
         onConfirm={vi.fn(async () => undefined)}
@@ -458,11 +462,37 @@ describe('ReferencePaymentDialog for an all-INSTANT (Product-only) Sale', () => 
         amount="200000.0000"
         payments={[{ status: 'SUCCEEDED', appliedAmount: '100000.0000' }]}
         onClose={onClose}
+        onDeferPayment={onDeferPayment}
       />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Tinggalkan pembayaran' }));
-    expect(onClose).toHaveBeenCalledTimes(1);
+    // The recorded payment is never discarded by leaving: the dialog explains where it waits.
+    expect(onClose).not.toHaveBeenCalled();
+    expect(document.body.textContent).toMatch(/Menunggu pelunasan/);
     expect(screen.queryByText(/kumpulkan nanti|collect later/i)).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Lanjutkan pembayaran' }));
+    expect(screen.getByRole('button', { name: /^Bayar/ })).toBeTruthy();
+    expect(onDeferPayment).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tinggalkan pembayaran' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Lanjutkan nanti' }));
+    expect(onDeferPayment).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('closes an unpaid Product Sale without a leave step', () => {
+    const onClose = vi.fn();
+    render(
+      <PaymentHarness
+        onConfirm={vi.fn(async () => undefined)}
+        kind="instant"
+        amount="200000.0000"
+        onClose={onClose}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Batal' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('a settled Product Sale offers to complete the transaction, never to add it to a queue', () => {
@@ -481,5 +511,46 @@ describe('ReferencePaymentDialog for an all-INSTANT (Product-only) Sale', () => 
     ).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Selesaikan transaksi' }));
     expect(onQueue).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('ReferencePaymentDialog payment total summary', () => {
+  const summaryToggle = () => screen.getByRole('button', { name: /Total pembayaran/ });
+
+  it('starts expanded and collapses to the total alone without touching the payment form', () => {
+    const onConfirm = vi.fn(async () => undefined);
+    render(
+      <PaymentHarness
+        onConfirm={onConfirm}
+        kind="instant"
+        amount="200000.0000"
+        payments={[{ status: 'SUCCEEDED', appliedAmount: '50000.0000' }]}
+      />,
+    );
+    const toggle = summaryToggle();
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    const details = document.getElementById(toggle.getAttribute('aria-controls')!)!;
+    expect(details.hasAttribute('inert')).toBe(false);
+    expect(details.textContent).toMatch(/Subtotal/);
+
+    const amount = screen.getAllByRole('textbox')[0] as HTMLInputElement;
+    fireEvent.change(amount, { target: { value: '30000' } });
+    const before = amount.value;
+    const payLabel = screen.getByRole('button', { name: /^Bayar/ }).textContent;
+
+    toggle.focus();
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(details.hasAttribute('inert')).toBe(true);
+    // The total stays visible in the header; nothing is recalculated or lost.
+    expect(toggle.textContent).toMatch(/200[.,]000/);
+    expect(document.activeElement).toBe(toggle);
+    expect((screen.getAllByRole('textbox')[0] as HTMLInputElement).value).toBe(before);
+    expect(screen.getByRole('button', { name: /^Bayar/ }).textContent).toBe(payLabel);
+
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(details.hasAttribute('inert')).toBe(false);
+    expect(screen.getByRole('button', { name: /^Bayar/ }).textContent).toBe(payLabel);
   });
 });
