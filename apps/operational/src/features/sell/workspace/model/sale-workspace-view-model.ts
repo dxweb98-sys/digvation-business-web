@@ -6,7 +6,7 @@ import {
   resolveOperationalLocale,
 } from '../../../../app/localization/operational-localization';
 import type { Sale, SaleLine } from '../../transaction/model/cashier-transaction.types';
-import { saleLineWorkStatus } from '../../queue/queued-sale-work';
+import { saleLineWorkStatus } from '../../queue/model/queued-sale-work';
 
 export type SaleWorkspacePrimaryMode =
   | 'EMPTY'

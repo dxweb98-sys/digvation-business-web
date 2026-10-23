@@ -18,7 +18,7 @@ import {
   ShoppingBag,
   Sparkles,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   QUEUE_REFRESH_INTERVAL_MS,
@@ -40,10 +40,10 @@ import type { Payment, Sale } from '../../transaction/model/cashier-transaction.
 import type { useCashierTransactionWorkspace } from '../model/use-cashier-transaction-workspace';
 
 import { currencyInputFromAmount, normalizeCurrencyPaymentInput } from '../../lib/pos-controls';
-import { SaleAdjustmentControls } from '../../adjustment/sale-adjustment-controls';
-import { SaleLineTaskDialog } from '../../queue/sale-line-task-dialog';
-import { ServicePerformersDialog } from '../../performer/service-performers-dialog';
-import { AdditionPerformersDialog } from '../../performer/addition-performers-dialog';
+import { SaleAdjustmentControls } from '../../adjustment/ui/sale-adjustment-controls';
+import { SaleLineTaskDialog } from '../../queue/ui/sale-line-task-dialog';
+import { ServicePerformersDialog } from '../../performer/ui/service-performers-dialog';
+import { AdditionPerformersDialog } from '../../performer/ui/addition-performers-dialog';
 import { additionWork, saleLineAdditions } from '../../transaction/model/sale-line-additions';
 import {
   presentableTransaction,
@@ -52,47 +52,51 @@ import {
 import { CustomerMemberDialog } from '../../customer/ui/customer-member-dialog';
 import { WalkInCustomerEditDialog } from '../../customer/ui/walk-in-customer-edit-dialog';
 import { ReceiptDeliveryDialog } from '../../receipt/receipt-delivery-dialog';
-import { canAdjustOrder } from '../../adjustment/sale-adjustment-access';
-import { ReferencePaymentCorrectionDialog } from '../../payment/reference-payment-correction-dialog';
-import { canCorrectPayments } from '../../payment/payment-correction-draft';
+import {
+  canAdjustOrder,
+  offersOrderAdjustment,
+} from '../../adjustment/model/sale-adjustment-access';
+import { ReferencePaymentCorrectionDialog } from '../../payment/ui/reference-payment-correction-dialog';
+import { canCorrectPayments } from '../../payment/model/payment-correction-draft';
 import { completeSettledCheckout, hasTrackedWork } from '../../transaction/model/sale-lifecycle';
-import { type QueueStatus } from '../../queue/queue-status';
+import { type QueueStatus } from '../../queue/model/queue-status';
 import {
   type QueuedSaleEntry,
   readQueuedSaleEntries,
   writeQueuedSaleEntries,
-} from '../../queue/queued-sale-storage';
+} from '../../queue/model/queued-sale-storage';
 import {
   hasSuccessfulCheckout,
   financialSummary,
   type TerminalPaymentStatus,
   hasSuccessfulPayment,
-} from '../../payment/sale-payment-status';
-import { processIssues } from '../../queue/workflow-issues';
+} from '../../payment/model/sale-payment-status';
+import { processIssues } from '../../queue/model/workflow-issues';
 import { money, transactionNumber, isPositiveDecimal } from '../../transaction/model/sale-display';
-import { ReferenceQueueBoard } from '../../queue/reference-queue-board';
-import { ReferenceTypeButton } from '../../catalog/reference-type-button';
-import { ReferenceCatalogCard } from '../../catalog/reference-catalog-card';
-import { ReferenceFloatingCart } from '../../cart/reference-floating-cart';
-import { ReferencePaymentDialog } from '../../payment/reference-payment-dialog';
+import { ReferenceQueueBoard } from '../../queue/ui/reference-queue-board';
+import { ReferenceTypeButton } from '../../catalog/ui/reference-type-button';
+import { ReferenceCatalogCard } from '../../catalog/ui/reference-catalog-card';
+import { ReferenceFloatingCart } from '../../cart/ui/reference-floating-cart';
+import { ReferencePaymentDialog } from '../../payment/ui/reference-payment-dialog';
 import { ReferenceTransactionDetail } from '../../transaction/ui/reference-transaction-detail';
-import { ReferenceOrderAdjustmentDialog } from '../../adjustment/reference-order-adjustment-dialog';
-import { ReferenceBalancePaymentDialog } from '../../payment/reference-balance-payment-dialog';
-import { useOutstandingBalanceReset } from '../../payment/payment-dialog-state';
+import { ReferenceOrderAdjustmentDialog } from '../../adjustment/ui/reference-order-adjustment-dialog';
+import { ReferenceBalancePaymentDialog } from '../../payment/ui/reference-balance-payment-dialog';
+import { useOutstandingBalanceReset } from '../../payment/model/payment-dialog-state';
 import { ReferenceCancelDialog } from '../../transaction/ui/reference-cancel-dialog';
 import { useSaleCustomerContext } from '../../customer/model/use-sale-customer-context';
-import { useSellingCatalogFilter } from '../../catalog/use-selling-catalog-filter';
-import { useDraftTaxPreview } from '../../cart/use-draft-tax-preview';
-import { useCartPricingPreview } from '../../cart/use-cart-pricing-preview';
-import { useQueueGroups } from '../../queue/use-queue-groups';
-import { useCheckoutPaymentForm } from '../../payment/use-checkout-payment-form';
+import { useSellingCatalogFilter } from '../../catalog/model/use-selling-catalog-filter';
+import { useDraftTaxPreview } from '../../cart/model/use-draft-tax-preview';
+import { useCartPricingPreview } from '../../cart/model/use-cart-pricing-preview';
+import { useQueueGroups } from '../../queue/model/use-queue-groups';
+import { useAwaitingSettlementPages } from '../../queue/model/use-awaiting-settlement-pages';
+import { useCheckoutPaymentForm } from '../../payment/model/use-checkout-payment-form';
 import { useReceiptDeliveryPreview } from '../../receipt/use-receipt-delivery-preview';
-import { useServicePerformerAssignment } from '../../performer/use-service-performer-assignment';
-import { useQueuedWorkActions } from '../../queue/use-queued-work-actions';
-import { useOrderAdjustment } from '../../adjustment/use-order-adjustment';
-import { useQueuedSaleCancellation } from '../../queue/use-queued-sale-cancellation';
-import { useQueuedSaleCustomerEdit } from '../../queue/use-queued-sale-customer-edit';
-import { useQueuedSaleCompletion } from '../../queue/use-queued-sale-completion';
+import { useServicePerformerAssignment } from '../../performer/model/use-service-performer-assignment';
+import { useQueuedWorkActions } from '../../queue/model/use-queued-work-actions';
+import { useOrderAdjustment } from '../../adjustment/model/use-order-adjustment';
+import { useQueuedSaleCancellation } from '../../queue/model/use-queued-sale-cancellation';
+import { useQueuedSaleCustomerEdit } from '../../queue/model/use-queued-sale-customer-edit';
+import { useQueuedSaleCompletion } from '../../queue/model/use-queued-sale-completion';
 import './replatformed-pos-workspace.css';
 
 type Workspace = ReturnType<typeof useCashierTransactionWorkspace>;
@@ -168,6 +172,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
     setCancelReason,
     disbursement: cancelDisbursement,
     setDisbursement: setCancelDisbursement,
+    moneyReturned: cancelMoneyReturned,
+    setMoneyReturned: setCancelMoneyReturned,
     cancellationReasons,
     requestCancel,
     confirmCancel,
@@ -184,6 +190,10 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   // Effective permission, never a role name: without it completed transactions
   // show no amount, detail or receipt, and can only be sent to the customer.
   const canReadCompleted = useCanReadCompletedSaleDetails();
+  // Cancelling a Sale awaiting settlement returns its money: both authorities are required.
+  const canRefundCancel = ['sales:void', 'payments:refund'].every((permission) =>
+    session.access.permissions.includes(permission),
+  );
   const {
     completionConfirmationTarget,
     setCompletionConfirmationTarget,
@@ -293,20 +303,28 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
       setTender(amount);
     },
   );
-  const { setAdjustmentTarget, displayedAdjustmentTarget, openAdjustment } = useOrderAdjustment({
-    workspace,
-    session,
-    sale: queueContextSale,
-    setQueueDetail,
-    showToast,
-    copy,
-  });
+  const { setAdjustmentTarget, displayedAdjustmentTarget, openAdjustment, adjustmentCommitted } =
+    useOrderAdjustment({
+      workspace,
+      session,
+      sale: queueContextSale,
+      setQueueDetail,
+      showToast,
+      copy,
+    });
 
+  const awaitingSettlement = useAwaitingSettlementPages({
+    adapter,
+    queue: transactionsQuery.data,
+    locationId: workspace.selectedLocationId,
+  });
+  const loadMoreAwaitingSettlement = awaitingSettlement.loadMore;
   const { groups } = useQueueGroups({
     transactionsQuery,
     isLocalDemo,
     queuedSaleEntries,
     workspace,
+    awaitingSettlementPages: awaitingSettlement.items,
   });
 
   const [checkoutPreparing, setCheckoutPreparing] = useState(false);
@@ -406,6 +424,41 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
   };
 
   const refreshQueue = () => void transactionsQuery.refetch();
+
+  /** A Sale resumed from the queue opens at its checkout once it is the active transaction. */
+  const resumeCheckoutSaleId = useRef<string | null>(null);
+  const resumeSale = (transaction: Sale) => {
+    if (!workspace.resumeSale(transaction.id)) return;
+    setQueueDetail(null);
+    setReceiptSaleId(null);
+    setCartOpen(false);
+    startNewCustomerTransaction();
+    resumeCheckoutSaleId.current = transaction.id;
+  };
+  useEffect(() => {
+    if (!resumeCheckoutSaleId.current || sale?.id !== resumeCheckoutSaleId.current) return;
+    resumeCheckoutSaleId.current = null;
+    void openCheckout();
+    // openCheckout reads the current render; it runs once per resumed Sale.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sale?.id]);
+
+  /** "Continue later": the Sale keeps its payments and waits in the queue; serve the next customer. */
+  const deferCheckoutPayment = () => {
+    const deferred = sale;
+    setCheckoutOpen(false);
+    setCartOpen(false);
+    if (!workspace.newSale({ deferred: true })) return;
+    startNewCustomerTransaction();
+    setQueueTab('QUEUED');
+    refreshQueue();
+    if (deferred)
+      showToast({
+        title: copy('Payment continues later'),
+        description: `${transactionNumber(deferred, workspace.locale)} ${copy('is in the queue as awaiting settlement.')} ${copy('Remaining')}: ${money(paymentProgress(deferred).remainingAmount, workspace.locale)}`,
+        variant: 'success',
+      });
+  };
   const { customerEditTarget, setCustomerEditTarget, openCustomerEdit, saveCustomerEdit } =
     useQueuedSaleCustomerEdit({
       adapter,
@@ -839,6 +892,24 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           onPay={(transaction) => void openQueuePayment(transaction)}
           onCancel={requestCancel}
           onEditCustomer={openCustomerEdit}
+          onResume={resumeSale}
+          canRefundCancel={canRefundCancel}
+          awaitingSettlementMore={
+            loadMoreAwaitingSettlement && awaitingSettlement.remaining > 0
+              ? {
+                  remaining: awaitingSettlement.remaining,
+                  isLoading: awaitingSettlement.isLoading,
+                  onLoadMore: () =>
+                    void loadMoreAwaitingSettlement().catch((error: unknown) =>
+                      showToast({
+                        title: copy('Could not load transaction'),
+                        description: cashierTransactionErrorMessage(error),
+                        variant: 'danger',
+                      }),
+                    ),
+                }
+              : null
+          }
           onView={(transaction) => {
             // A queue card is a polling projection. Show it immediately, then
             // replace it with the authoritative transaction response so detail
@@ -1095,6 +1166,7 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         onConfirmPayment={recordCheckoutPayment}
         onQueue={() => void queueCheckout('QUEUE')}
         onQueueWithBalance={() => void queueCheckout('QUEUE')}
+        onDeferPayment={deferCheckoutPayment}
         loyaltyRedemption={sale?.loyaltyRedemption ?? null}
         loyaltyPointBalance={
           activeSelectedMember ? (memberBalanceQuery.data?.pointsBalance ?? null) : null
@@ -1132,17 +1204,6 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
           setReceiptSaleId(null);
         }}
         onNewSale={() => {
-          // A partly paid all-INSTANT Sale has no queue: keep it as the active transaction.
-          if (workspace.isNewSaleBlocked) {
-            showToast({
-              title: copy('Transaction not finished'),
-              description: copy(
-                'Finish the payment of this transaction before starting a new one.',
-              ),
-              variant: 'warning',
-            });
-            return;
-          }
           setQueueDetail(null);
           setReceiptSaleId(null);
           setCartOpen(false);
@@ -1177,6 +1238,13 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         {...(displayedQueueDetail &&
         canCorrectPayments(displayedQueueDetail, session.access.permissions)
           ? { onCorrectPayment: setPaymentCorrectionTarget }
+          : {})}
+        {...(displayedQueueDetail &&
+        offersOrderAdjustment(displayedQueueDetail, session.access.permissions)
+          ? {
+              onAdjustOrder: (transaction: Sale) =>
+                void openAdjustment(transaction, { keepDetail: true }),
+            }
           : {})}
       />
 
@@ -1215,9 +1283,9 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         // The draft is only previewed; the queue takes Runtime's Sale once the whole draft is saved.
         onPreview={workspace.previewOrderAdjustment}
         onCommit={workspace.commitOrderAdjustment}
-        onCommitted={() => {
+        onCommitted={(result) => {
           workspace.closeVariantPicker();
-          setAdjustmentTarget(null);
+          adjustmentCommitted(result.sale);
           workspace.closeQueueContext();
         }}
         onReload={async (saleId) => {
@@ -1321,6 +1389,8 @@ export function ReplatformedPosWorkspace({ workspace }: { workspace: Workspace }
         paymentRoutes={workspace.paymentRoutes}
         disbursement={cancelDisbursement}
         onDisbursementChange={setCancelDisbursement}
+        moneyReturned={cancelMoneyReturned}
+        onMoneyReturnedChange={setCancelMoneyReturned}
       />
 
       {performerTarget ? (

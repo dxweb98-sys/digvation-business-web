@@ -39,6 +39,9 @@ describe('SaleFinancialSummary', () => {
         settlement={{
           cashApplied: '0.0000',
           paymentState: 'PAID',
+          closed: false,
+          receivedAmount: '0.0000',
+          refundedAmount: '0.0000',
           totalPaid: '180000.0000',
           balanceDue: '0.0000',
           cashTendered: null,
@@ -95,6 +98,9 @@ describe('SaleFinancialSummary settlement', () => {
       summary({
         cashApplied: '100000.0000',
         paymentState: 'PAID',
+        closed: false,
+        receivedAmount: '0.0000',
+        refundedAmount: '0.0000',
         totalPaid: '100000.0000',
         balanceDue: '0.0000',
         cashTendered: '100000.0000',
@@ -113,6 +119,9 @@ describe('SaleFinancialSummary settlement', () => {
       summary({
         cashApplied: '0.0000',
         paymentState: 'PARTIALLY_PAID',
+        closed: false,
+        receivedAmount: '0.0000',
+        refundedAmount: '0.0000',
         totalPaid: '40000.0000',
         balanceDue: '60000.0000',
         cashTendered: null,
@@ -130,6 +139,9 @@ describe('SaleFinancialSummary settlement', () => {
       summary({
         cashApplied: '100000.0000',
         paymentState: 'PAID',
+        closed: false,
+        receivedAmount: '0.0000',
+        refundedAmount: '0.0000',
         totalPaid: '100000.0000',
         balanceDue: '0.0000',
         cashTendered: '150000.0000',
@@ -138,6 +150,49 @@ describe('SaleFinancialSummary settlement', () => {
     );
     expect(screen.getByText('Cash received')).toBeTruthy();
     expect(screen.getByText('Change')).toBeTruthy();
+  });
+
+  it('shows a fully refunded cancelled Sale as refunded history, never as an amount due', () => {
+    render(
+      <SaleFinancialSummary
+        labels={{
+          ...labels,
+          closed: {
+            refunded: 'Refunded',
+            partiallyRefunded: 'Partially refunded',
+            received: 'Received',
+            returned: 'Total returned',
+            net: 'Net received',
+          },
+        }}
+        gross="301600.0000"
+        discounts={[]}
+        tax={null}
+        total="301600.0000"
+        settlement={{
+          cashApplied: '301600.0000',
+          paymentState: 'REFUNDED',
+          closed: true,
+          receivedAmount: '301600.0000',
+          refundedAmount: '301600.0000',
+          totalPaid: '0.0000',
+          balanceDue: '0.0000',
+          cashTendered: null,
+          cashChange: null,
+        }}
+        format={(amount) => `Rp ${amount}`}
+        payment={{ title: 'Payment', content: <p>Cash</p> }}
+      />,
+    );
+    const history = screen.getByTestId('closed-sale-payment-history');
+    expect(history.textContent).toContain('ReceivedRp 301600.0000');
+    expect(history.textContent).toContain('Total returned−Rp 301600.0000');
+    expect(history.textContent).toContain('Net receivedRp 0.0000');
+    expect(screen.getByText('Refunded')).toBeTruthy();
+    expect(screen.queryByText('Settled')).toBeNull();
+    expect(screen.queryByText('Remaining')).toBeNull();
+    // Historical payment methods stay visible.
+    expect(screen.getByText('Cash')).toBeTruthy();
   });
 });
 

@@ -1,6 +1,6 @@
 import { createDecimal } from '@digvation/pos-money';
 
-import type { Sale } from './cashier-transaction.types';
+import type { QueueSale, Sale } from './cashier-transaction.types';
 
 /**
  * The single Sale-level lifecycle classification for Operational checkout.
@@ -50,16 +50,14 @@ export function checkoutCompletionOf(
 }
 
 /**
- * A partly paid (or payment-pending) all-INSTANT Sale has no queue to live in, so the active
- * transaction must not be silently abandoned by starting a new one.
+ * An OPEN Sale never submitted as work that already holds a successful or pending payment: its
+ * balance is still due. Runtime lists it in the Operational queue (as Runtime decides, never by
+ * changing the Sale), so the cashier can leave it, serve someone else and resume the same Sale.
  */
-export function blocksNewTransaction(
-  sale: Pick<Sale, 'status' | 'lines' | 'payments'> | null | undefined,
-): boolean {
-  if (!sale || sale.status !== 'OPEN' || !isInstantOnly(sale)) return false;
-  return (
-    sumPayments(sale, 'SUCCEEDED').greaterThan(0) ||
-    sale.payments.some((payment) => payment.status === 'PENDING')
+export function awaitsSettlement(sale: QueueSale | null | undefined): sale is Sale {
+  if (!sale || sale.status !== 'OPEN' || sale.operationalState !== 'UNSUBMITTED') return false;
+  return sale.payments.some(
+    (payment) => payment.status === 'SUCCEEDED' || payment.status === 'PENDING',
   );
 }
 

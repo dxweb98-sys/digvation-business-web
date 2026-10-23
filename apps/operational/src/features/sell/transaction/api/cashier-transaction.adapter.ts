@@ -512,6 +512,8 @@ export interface SaleTransactionClient {
     expectedVersion: number,
     idempotencyKey: string,
     refundDisbursement?: RefundDisbursementInput,
+    /** The operator confirmed the refunded money was really returned to the customer. */
+    moneyReturned?: boolean,
   ): Promise<Sale>;
 }
 
@@ -943,10 +945,15 @@ export class HttpCashierTransactionAdapter
     expectedVersion: number,
     idempotencyKey: string,
     refundDisbursement?: RefundDisbursementInput,
+    moneyReturned?: boolean,
   ): Promise<Sale> {
     return this.client.post<Sale>(
       `${API_PREFIX}/sales/${saleId}/void`,
-      { expectedVersion, ...(refundDisbursement ? { refundDisbursement } : {}) },
+      {
+        expectedVersion,
+        ...(refundDisbursement ? { refundDisbursement } : {}),
+        ...(moneyReturned ? { moneyReturned: true } : {}),
+      },
       { headers: { 'Idempotency-Key': idempotencyKey } },
     );
   }

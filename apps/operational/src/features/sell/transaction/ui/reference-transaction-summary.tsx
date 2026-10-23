@@ -21,11 +21,16 @@ import {
   SaleRefundList,
   StatusPill,
 } from './sale-detail-presentation';
-import { statusMeta, queueStatus, queueStatusTone } from '../../queue/queue-status';
-import { paymentAccountLabel } from '../../payment/sale-payment-status';
-import type { groupWorkflowIssues } from '../../queue/workflow-issues';
+import {
+  isReversedSale,
+  statusMeta,
+  queueStatus,
+  queueStatusTone,
+} from '../../queue/model/queue-status';
+import { paymentAccountLabel } from '../../payment/model/sale-payment-status';
+import type { groupWorkflowIssues } from '../../queue/model/workflow-issues';
 import { money } from '../model/sale-display';
-import { paymentCompositionOf } from '../../payment/payment-correction-draft';
+import { paymentCompositionOf } from '../../payment/model/payment-correction-draft';
 import {
   customerDisplayName,
   customerDisplayDetail,
@@ -48,6 +53,7 @@ function ReferenceTransactionSummaryContext({
 }) {
   const { copy, label } = useOperationalLocalization();
   const status = queueStatus(sale);
+  const reversal = isReversedSale(sale) ? (sale.reversal ?? null) : null;
   const customer = sale.customer ?? null;
   const earnedPoints = saleEarnedPoints(sale);
   return (
@@ -91,6 +97,12 @@ function ReferenceTransactionSummaryContext({
         >
           {status ? label(statusMeta[status].value) : label('OPEN')}
         </StatusPill>
+        {reversal ? (
+          // The Sale was completed, then reversed: its work history stays completed.
+          <span className="text-xs font-medium text-[var(--color-text-muted)]">
+            {copy('Completed before cancellation')}
+          </span>
+        ) : null}
       </div>
       {earnedPoints ? (
         <div
@@ -101,6 +113,18 @@ function ReferenceTransactionSummaryContext({
           <span className="font-bold text-[var(--color-success)]">
             +{pointQuantity(earnedPoints, locale)}
           </span>
+        </div>
+      ) : null}
+      {reversal ? (
+        <div className="mt-2 border-l-2 border-[var(--color-danger)] pl-2.5 text-xs">
+          <p className="font-semibold text-[var(--color-danger)]">{copy('Cancellation reason')}</p>
+          <p className="mt-0.5 text-[var(--color-text-muted)]">{reversal.reason}</p>
+          <p className="mt-0.5 text-[var(--color-text-muted)]">
+            {copy('Cancelled on')}{' '}
+            {new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(
+              new Date(reversal.reversedAt),
+            )}
+          </p>
         </div>
       ) : null}
       {sale.status === 'VOIDED' && cancellationReason ? (
@@ -211,6 +235,13 @@ export function ReferenceTransactionSummary({
         totalPaid: copy('Total paid'),
         balance: copy('Balance due'),
         settled: copy('Paid'),
+        closed: {
+          refunded: copy('Refunded'),
+          partiallyRefunded: copy('Partially refunded'),
+          received: copy('Received'),
+          returned: copy('Total returned'),
+          net: copy('Net received'),
+        },
         cashReceived: copy('Cash received'),
         change: copy('Change'),
         discount: copy('Discount'),

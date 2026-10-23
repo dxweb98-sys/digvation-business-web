@@ -41,6 +41,10 @@ export const transactionHistoryCopy: Record<string, { id: string; en: string }> 
     id: 'Dibatalkan setelah selesai',
     en: 'Cancelled after completion',
   },
+  'Completed before cancellation': {
+    id: 'Selesai sebelum pembatalan',
+    en: 'Completed before cancellation',
+  },
 
   // Payment summary
   'Not paid': { id: 'Belum dibayar', en: 'Not paid' },

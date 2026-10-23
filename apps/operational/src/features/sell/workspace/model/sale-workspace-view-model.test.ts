@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Payment, Sale, SaleLine } from '../../transaction/model/cashier-transaction.types';
-import { hasStartableQueuedWork, saleLineWorkStatus } from '../../queue/queued-sale-work';
+import { hasStartableQueuedWork, saleLineWorkStatus } from '../../queue/model/queued-sale-work';
 import { createSaleWorkspaceViewModel } from './sale-workspace-view-model';
 
 const SALE_ID = '33333333-3333-4333-8333-333333333333';
