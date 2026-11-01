@@ -27,6 +27,7 @@ export const runtimeConfigSchema = z.object({
     operational: z.boolean(),
     backoffice: z.boolean(),
   }),
+  operationalApplication: z.enum(['POS_SALON_APP']).optional(),
   branding: z.object({
     mode: z.enum(['DIGVATION_DEFAULT', 'WHITE_LABEL']),
     productName: z.string().min(1),

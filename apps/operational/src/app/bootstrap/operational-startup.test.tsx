@@ -1,4 +1,5 @@
-import { act, render, within } from '@testing-library/react';
+import type { DeploymentBootstrapConfig } from '@digvation/business-runtime';
+import { act, cleanup, render, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -7,6 +8,18 @@ import {
   remainingSplashTime,
   SPLASH_MINIMUM_VISIBLE_MS,
 } from './operational-startup';
+
+afterEach(cleanup);
+
+const splashBootstrap: DeploymentBootstrapConfig = {
+  apiBaseUrl: '',
+  deploymentProfile: 'DEDICATED',
+  workspaceResolution: { mode: 'FIXED', workspace: 'digvation-demo' },
+  applications: { operational: true, backoffice: true },
+  branding: { mode: 'DIGVATION_DEFAULT', productName: 'Digvation Business' },
+  theme: { preset: 'DIGVATION_LIGHT', radius: 'SOFT' },
+  defaults: { locale: 'id-ID', country: 'ID' },
+};
 
 describe('remainingSplashTime', () => {
   it('waits only for the unused part of the minimum visible duration', () => {
@@ -21,6 +34,23 @@ describe('OperationalStartupSplash', () => {
 
     expect(within(container).queryByText('Menyiapkan Operational')).not.toBeNull();
     expect(within(container).getByRole('heading', { level: 1 }).textContent).toBe(' ');
+  });
+
+  it('names the declared POS Salon application while preparing', () => {
+    const { container } = render(
+      <OperationalStartupSplash
+        bootstrap={{ ...splashBootstrap, operationalApplication: 'POS_SALON_APP' }}
+      />,
+    );
+
+    expect(within(container).queryByText('Menyiapkan POS Salon')).not.toBeNull();
+    expect(within(container).queryByText('Menyiapkan Operational')).toBeNull();
+  });
+
+  it('keeps the legacy Operational name when no application identity is declared', () => {
+    const { container } = render(<OperationalStartupSplash bootstrap={splashBootstrap} />);
+
+    expect(within(container).queryByText('Menyiapkan Operational')).not.toBeNull();
   });
 });
 

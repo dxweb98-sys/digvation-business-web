@@ -3,6 +3,12 @@ export type BrandingMode = 'DIGVATION_DEFAULT' | 'WHITE_LABEL';
 export type ThemePreset = 'DIGVATION_LIGHT' | 'CUSTOM';
 export type ThemeRadius = 'COMPACT' | 'SOFT' | 'ROUNDED';
 export type ApplicationId = 'operational' | 'backoffice';
+/**
+ * Operational application identity declared by the deployment. Absent means the
+ * grandfathered legacy Operational application. Presentation only, never an
+ * entitlement or application-access authority.
+ */
+export type OperationalApplicationIdentity = 'POS_SALON_APP';
 export type BusinessProduct = 'POS';
 export type BusinessCapability =
   | 'FINANCE_OPERATIONS'
@@ -82,6 +88,7 @@ export interface DeploymentBootstrapConfig {
   deploymentProfile: DeploymentProfile;
   workspaceResolution: WorkspaceResolutionConfig;
   applications: ApplicationAvailabilityConfig;
+  operationalApplication?: OperationalApplicationIdentity | undefined;
   branding: BrandingConfig;
   theme: ThemeConfig;
   defaults: DeploymentBootstrapDefaults;

@@ -9,6 +9,7 @@ import {
   ConnectivityProvider,
   DeploymentBootstrapProvider,
   useConnectivity,
+  useDeploymentBootstrap,
   type DeploymentBootstrapConfig,
 } from '@digvation/business-runtime';
 import { ConnectionStateBoundary } from '@digvation/business-system-states';
@@ -24,6 +25,7 @@ import { operationalCopy, type OperationalLocale } from '../localization/operati
 import { OperationalLoginPage } from '../auth/operational-login-page';
 import { resolveOperationalSurfaceAccess } from '../../shared/operational-access/operational-surface-access';
 import { OperationalAccessDenied } from '../auth/operational-access-denied';
+import { operationalApplicationCopy } from '../localization/operational-application-identity';
 import { OperationalSessionProvider } from '../../shared/operational-access/operational-session-provider';
 import { PosOperationalSessionProvider } from '../../features/sell/session/pos-operational-session-provider';
 
@@ -49,6 +51,7 @@ function OperationalAuthBoundary({ session, authPort, router }: OperationalAuthB
   const [isLoggingOut, setLoggingOut] = useState(false);
   const sessionEnded = useRef(false);
   const { showToast } = useToast();
+  const application = operationalApplicationCopy(useDeploymentBootstrap());
 
   const locale = runtimeLocale(authenticatedSession?.preferences.locale ?? 'id-ID');
   const copy = (value: string) => operationalCopy(value, locale);
@@ -108,6 +111,7 @@ function OperationalAuthBoundary({ session, authPort, router }: OperationalAuthB
       <OperationalAccessDenied
         reason={denial ?? 'NO_PERMITTED_MODULE'}
         copy={copy}
+        application={application}
         onChangeAccount={() => {
           sessionEnded.current = true;
           void authPort.logout().finally(() => setAuthenticatedSession(null));

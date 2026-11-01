@@ -7,6 +7,10 @@ const posCopy: Record<string, LocalizedCopy> = {
     'id-ID': 'Operasional belum diaktifkan untuk bisnis ini',
     'en-US': 'Operational is not enabled for this business',
   },
+  'POS Salon is not enabled for this business': {
+    'id-ID': 'POS Salon belum diaktifkan untuk bisnis ini',
+    'en-US': 'POS Salon is not enabled for this business',
+  },
   'No Operational module is available for your account': {
     'id-ID': 'Belum ada modul Operasional untuk akun Anda',
     'en-US': 'No Operational module is available for your account',
@@ -17,6 +21,13 @@ const posCopy: Record<string, LocalizedCopy> = {
         'Modul yang dipakai di Operasional belum diaktifkan untuk bisnis ini. Hubungi administrator bisnis Anda.',
       'en-US':
         'The modules used in Operational have not been enabled for this business. Contact your business administrator.',
+    },
+  'The modules used in POS Salon have not been enabled for this business. Contact your business administrator.':
+    {
+      'id-ID':
+        'Modul yang dipakai di POS Salon belum diaktifkan untuk bisnis ini. Hubungi administrator bisnis Anda.',
+      'en-US':
+        'The modules used in POS Salon have not been enabled for this business. Contact your business administrator.',
     },
   'Your role does not include Sell, Customers or Expenses. Ask your business administrator to update your role in Backoffice, then check again.':
     {
@@ -224,6 +235,7 @@ const posCopy: Record<string, LocalizedCopy> = {
   'Manual discount': { 'id-ID': 'Diskon manual', 'en-US': 'Manual discount' },
   'Opening Operational…': { 'id-ID': 'Membuka Operational…', 'en-US': 'Opening Operational…' },
   'Preparing Operational': { 'id-ID': 'Menyiapkan Operational', 'en-US': 'Preparing Operational' },
+  'Preparing POS Salon': { 'id-ID': 'Menyiapkan POS Salon', 'en-US': 'Preparing POS Salon' },
   Transaction: { 'id-ID': 'Transaksi', 'en-US': 'Transaction' },
   Add: { 'id-ID': 'Tambah', 'en-US': 'Add' },
   From: { 'id-ID': 'Mulai', 'en-US': 'From' },

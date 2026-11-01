@@ -37,6 +37,7 @@ export type {
   EffectiveBusinessPreferences,
   EffectiveBusinessProfileConfiguration,
   EffectiveEntitlementConfig,
+  OperationalApplicationIdentity,
   ThemeColorConfig,
   ThemeConfig,
   ThemePreset,

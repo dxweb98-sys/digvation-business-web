@@ -14,6 +14,7 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 
+import { operationalApplicationCopy } from '../localization/operational-application-identity';
 import { useOperationalLocalization } from '../localization/operational-localization';
 import { OperationalNotificationBell } from '../../features/notifications/operational-notification-bell';
 import { useOperationalAccessContext } from '../../shared/operational-access/operational-access-api';
@@ -76,7 +77,9 @@ export function OperationalShell({ navigationSections }: OperationalShellProps) 
   }, [canSwitchBranches, operationalAccessQuery.data]);
   const selectedLocation = locations.find((location) => location.id === selectedLocationId) ?? null;
   const brandSubtitle =
-    session.business.name || bootstrap.branding.companyName || copy('Operational');
+    session.business.name ||
+    bootstrap.branding.companyName ||
+    copy(operationalApplicationCopy(bootstrap).name);
   const userInitials = identityInitials(session.identity.displayName);
   const primaryRole = session.identity.roles[0] ?? null;
   const roleContext = primaryRole?.name ?? copy('Account');
