@@ -2,6 +2,7 @@ import { ApplicationSplash, type DeploymentBootstrapConfig } from '@digvation/bu
 import { Building2 } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode, type TransitionEvent } from 'react';
 
+import { operationalApplicationCopy } from '../localization/operational-application-identity';
 import {
   operationalCopy,
   resolveOperationalLocale,
@@ -37,7 +38,7 @@ export function OperationalStartupSplash({
       // Reserve the product line until runtime branding resolves so the composition never shifts.
       productName={branding?.productName ?? ' '}
       message={operationalCopy(
-        'Preparing Operational',
+        operationalApplicationCopy(bootstrap).preparing,
         resolveOperationalLocale(bootstrap?.defaults.locale),
       )}
       mark={

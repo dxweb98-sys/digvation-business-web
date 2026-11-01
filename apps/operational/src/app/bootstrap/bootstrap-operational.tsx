@@ -7,6 +7,7 @@ import {
 } from '@digvation/business-runtime';
 import type { ReactNode } from 'react';
 
+import { operationalDocumentTitle } from '../localization/operational-application-identity';
 import { OperationalProviders } from '../providers/operational-providers';
 import { operationalRouter } from '../router/operational-router';
 
@@ -21,7 +22,7 @@ export function bootstrapOperational(): OperationalStartup {
   const bootstrap = new HttpDeploymentBootstrapAdapter().load();
 
   const application = bootstrap.then(async (config) => {
-    document.title = `${config.branding.productName} - Operational`;
+    document.title = operationalDocumentTitle(config);
     const authPort = new HttpAuthAdapter(
       config.apiBaseUrl,
       resolveBootstrapWorkspace(config),

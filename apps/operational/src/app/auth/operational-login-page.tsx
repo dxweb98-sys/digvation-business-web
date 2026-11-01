@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type FormEvent, type TransitionEvent } fro
 
 import type { AuthPort, AuthSession } from '@digvation/business-auth';
 import { useDeploymentBootstrap } from '@digvation/business-runtime';
+import { operationalApplicationCopy } from '../localization/operational-application-identity';
 import { useOperationalLocalization } from '../localization/operational-localization';
 import './operational-login-page.css';
 
@@ -84,7 +85,9 @@ type FieldErrors = { identifier?: string; password?: string };
  * from live selling: counter, queue and receipt.
  */
 export function OperationalLoginPage({ authPort, onAuthenticated }: OperationalLoginPageProps) {
-  const { branding } = useDeploymentBootstrap();
+  const bootstrap = useDeploymentBootstrap();
+  const { branding } = bootstrap;
+  const application = operationalApplicationCopy(bootstrap);
   const { copy } = useOperationalLocalization();
   const { showToast } = useToast();
   const [identifier, setIdentifier] = useState('');
@@ -181,10 +184,12 @@ export function OperationalLoginPage({ authPort, onAuthenticated }: OperationalL
                   {branding.productName}
                 </p>
                 <p className="truncate text-xs leading-4 text-[var(--color-text-muted)]">
-                  {branding.companyName ?? copy('Operational')}
+                  {branding.companyName ?? copy(application.name)}
                 </p>
               </div>
-              <span className="operational-login__app-label shrink-0">{copy('Operational')}</span>
+              <span className="operational-login__app-label shrink-0">
+                {copy(application.name)}
+              </span>
             </div>
 
             <div className="operational-login__brand items-center gap-3">
@@ -198,7 +203,7 @@ export function OperationalLoginPage({ authPort, onAuthenticated }: OperationalL
 
             <div className="operational-login__caption relative">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--color-brand)]">
-                {copy('Operational')}
+                {copy(application.name)}
               </p>
               <p className="mt-2 text-[1.375rem] font-semibold leading-7 tracking-[-0.02em] text-[var(--color-text)]">
                 {copy('Run the business today.')}
@@ -212,7 +217,7 @@ export function OperationalLoginPage({ authPort, onAuthenticated }: OperationalL
           <section className="operational-login__form">
             <div className="operational-login__form-content mx-auto w-full max-w-[380px]">
               <h1 className="text-2xl font-bold leading-8 tracking-[-0.02em] text-[var(--color-text)]">
-                {copy('Sign in to Operational')}
+                {copy(application.signIn)}
               </h1>
               <p className="mt-1.5 text-sm leading-6 text-[var(--color-text-muted)]">
                 {copy('Use your account to start working.')}

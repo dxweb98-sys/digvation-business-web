@@ -1,6 +1,8 @@
 import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { operationalApplicationCopy } from '../localization/operational-application-identity';
+import { operationalCopy } from '../localization/operational-localization';
 import { OperationalAccessDenied } from './operational-access-denied';
 
 afterEach(cleanup);
@@ -16,6 +18,7 @@ describe('OperationalAccessDenied', () => {
       <OperationalAccessDenied
         reason="NO_PERMITTED_MODULE"
         copy={copy}
+        application={operationalApplicationCopy(null)}
         onCheckAgain={() => Promise.resolve(false)}
         onChangeAccount={vi.fn()}
       />,
@@ -30,11 +33,41 @@ describe('OperationalAccessDenied', () => {
       <OperationalAccessDenied
         reason="MODULE_NOT_ENABLED"
         copy={copy}
+        application={operationalApplicationCopy(null)}
         onCheckAgain={() => Promise.resolve(false)}
         onChangeAccount={vi.fn()}
       />,
     );
     expect(text()).toContain('Operational is not enabled for this business');
+    expect(text()).toContain('The modules used in Operational have not been enabled');
+  });
+
+  it('names the declared POS Salon application when it is not enabled for the business', () => {
+    render(
+      <OperationalAccessDenied
+        reason="MODULE_NOT_ENABLED"
+        copy={(value) => operationalCopy(value, 'id-ID')}
+        application={operationalApplicationCopy({ operationalApplication: 'POS_SALON_APP' })}
+        onCheckAgain={() => Promise.resolve(false)}
+        onChangeAccount={vi.fn()}
+      />,
+    );
+    expect(text()).toContain('POS Salon belum diaktifkan untuk bisnis ini');
+    expect(text()).toContain('Modul yang dipakai di POS Salon belum diaktifkan untuk bisnis ini.');
+    expect(text()).not.toMatch(/Operational|Operasional/);
+  });
+
+  it('keeps the generic module wording when POS Salon has no permitted module', () => {
+    render(
+      <OperationalAccessDenied
+        reason="NO_PERMITTED_MODULE"
+        copy={(value) => operationalCopy(value, 'id-ID')}
+        application={operationalApplicationCopy({ operationalApplication: 'POS_SALON_APP' })}
+        onCheckAgain={() => Promise.resolve(false)}
+        onChangeAccount={vi.fn()}
+      />,
+    );
+    expect(text()).toContain('Belum ada modul Operasional untuk akun Anda');
   });
 
   it('checks again and says so when access did not change', async () => {
@@ -43,6 +76,7 @@ describe('OperationalAccessDenied', () => {
       <OperationalAccessDenied
         reason="NO_PERMITTED_MODULE"
         copy={copy}
+        application={operationalApplicationCopy(null)}
         onCheckAgain={check}
         onChangeAccount={vi.fn()}
       />,
@@ -60,6 +94,7 @@ describe('OperationalAccessDenied', () => {
       <OperationalAccessDenied
         reason="NO_PERMITTED_MODULE"
         copy={copy}
+        application={operationalApplicationCopy(null)}
         onCheckAgain={() => Promise.reject(new Error('offline'))}
         onChangeAccount={change}
       />,

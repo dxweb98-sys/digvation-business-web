@@ -11,6 +11,7 @@ const copy: Record<string, LocalizedLabel> = {
   Sell: { 'id-ID': 'Jual', 'en-US': 'Sell' },
   Operations: { 'id-ID': 'Operasional', 'en-US': 'Operations' },
   Operational: { 'id-ID': 'Operational', 'en-US': 'Operational' },
+  'POS Salon': { 'id-ID': 'POS Salon', 'en-US': 'POS Salon' },
   Expenses: { 'id-ID': 'Pengeluaran', 'en-US': 'Expenses' },
   'Transaction history': { 'id-ID': 'Riwayat transaksi', 'en-US': 'Transaction history' },
   Date: { 'id-ID': 'Tanggal', 'en-US': 'Date' },
@@ -144,6 +145,7 @@ const copy: Record<string, LocalizedLabel> = {
   'Request password change': { 'id-ID': 'Ubah kata sandi', 'en-US': 'Change password' },
   Branch: { 'id-ID': 'Cabang', 'en-US': 'Branch' },
   'Sign in to Operational': { 'id-ID': 'Masuk ke Operational', 'en-US': 'Sign in to Operational' },
+  'Sign in to POS Salon': { 'id-ID': 'Masuk ke POS Salon', 'en-US': 'Sign in to POS Salon' },
   'Use your account to start working.': {
     'id-ID': 'Gunakan akun Anda untuk mulai bekerja.',
     'en-US': 'Use your account to start working.',

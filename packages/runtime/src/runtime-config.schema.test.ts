@@ -55,4 +55,22 @@ describe('deployment bootstrap schema', () => {
       defaultWorkspace: 'shared-demo',
     });
   });
+
+  it('accepts the POS Salon operational application identity', () => {
+    const parsed = runtimeConfigSchema.parse(
+      bootstrap({ operationalApplication: 'POS_SALON_APP' }),
+    );
+    expect(parsed.operationalApplication).toBe('POS_SALON_APP');
+  });
+
+  it('keeps the legacy Operational application when no identity is declared', () => {
+    const parsed = runtimeConfigSchema.parse(bootstrap());
+    expect(parsed).not.toHaveProperty('operationalApplication');
+  });
+
+  it('rejects an unknown operational application identity', () => {
+    expect(() =>
+      runtimeConfigSchema.parse(bootstrap({ operationalApplication: 'POS_LAUNDRY_APP' })),
+    ).toThrow();
+  });
 });

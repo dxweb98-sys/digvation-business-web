@@ -3,6 +3,7 @@ import { LockKeyhole } from 'lucide-react';
 import { useState } from 'react';
 
 import type { OperationalDenial } from '../../shared/operational-access/operational-surface-access';
+import type { OperationalApplicationCopy } from '../localization/operational-application-identity';
 
 /**
  * Signed in, but no Operational module can be opened. It explains what is missing in everyday
@@ -14,8 +15,11 @@ export function OperationalAccessDenied({
   onCheckAgain,
   onChangeAccount,
   copy,
+  application,
 }: {
   copy: (value: string) => string;
+  /** Application named by the deployment; generic module wording stays unchanged. */
+  application: OperationalApplicationCopy;
   reason: OperationalDenial;
   /** Resolves true when the access changed and the session was replaced. */
   onCheckAgain: () => Promise<boolean>;
@@ -54,14 +58,14 @@ export function OperationalAccessDenied({
         <h1 id="operational-denied-title" className="mt-4 text-lg font-semibold">
           {copy(
             notEnabled
-              ? 'Operational is not enabled for this business'
+              ? application.notEnabled
               : 'No Operational module is available for your account',
           )}
         </h1>
         <p className="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">
           {copy(
             notEnabled
-              ? 'The modules used in Operational have not been enabled for this business. Contact your business administrator.'
+              ? application.notEnabledDetail
               : 'Your role does not include Sell, Customers or Expenses. Ask your business administrator to update your role in Backoffice, then check again.',
           )}
         </p>

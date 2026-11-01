@@ -9,6 +9,7 @@
     "operational": true,
     "backoffice": true
   },
+  "operationalApplication": "POS_SALON_APP",
   "branding": {
     "mode": "DIGVATION_DEFAULT",
     "productName": "Digvation",
